@@ -127,3 +127,73 @@ public enum OnboardingBrief {
 
     private static func org(_ o: String?) -> String { o.map { " (\($0))" } ?? "" }
 }
+
+// MARK: - "Install engine" bootstrap (user 2026-09-03)
+
+/// What the Install engine button has to run. `uv tool install
+/// claude-swap` needs `uv`, and a Mac that has never installed it dead
+/// -ended on "uv not found — get it first: brew install uv" — a button
+/// that asks you to open a terminal is the terminal, one click later.
+/// So a missing `uv` is a first STEP, not a failure: Homebrew when it is
+/// there, else Astral's standalone installer, which needs no Homebrew
+/// and no sudo (it lands in `~/.local/bin`, already a locator candidate).
+public enum EngineInstall {
+    public enum Bootstrap: Equatable, Sendable {
+        /// `brew install uv`, with the brew binary that was found.
+        case brew(String)
+        /// `curl -LsSf https://astral.sh/uv/install.sh | sh`
+        case standalone
+    }
+
+    public enum Step: Equatable, Sendable {
+        case installUV(Bootstrap)
+        /// `uv tool install claude-swap`, run with whatever `uv` the
+        /// re-locate finds — the path is not known before the bootstrap.
+        case installEngine
+    }
+
+    public static func uvCandidates(home: String = NSHomeDirectory()) -> [String] {
+        [
+            "\(home)/.local/bin/uv",
+            "/opt/homebrew/bin/uv",
+            "/usr/local/bin/uv",
+            "\(home)/.cargo/bin/uv",
+        ]
+    }
+
+    public static func brewCandidates() -> [String] {
+        ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+    }
+
+    /// The steps to run, in order, given what is already on disk.
+    public static func plan(uv: String?, brew: String?) -> [Step] {
+        guard uv == nil else { return [.installEngine] }
+        return [.installUV(brew.map(Bootstrap.brew) ?? .standalone), .installEngine]
+    }
+
+    /// The shell one-liner for `.standalone`. `set -o pipefail` so a
+    /// failed download can't be piped into a successful `sh`.
+    public static let standaloneScript =
+        "set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh"
+
+    /// What the user is told while a step runs.
+    public static func progressMessage(_ step: Step) -> String {
+        switch step {
+        case .installUV(.brew): return "Installing uv with Homebrew…"
+        case .installUV(.standalone): return "Installing uv…"
+        case .installEngine: return "Installing claude-swap…"
+        }
+    }
+
+    /// What the user is told when a step fails. `output` is the tail of
+    /// the child's combined stdout+stderr.
+    public static func failureMessage(_ step: Step, output: String) -> String {
+        let tail = output.trimmingCharacters(in: .whitespacesAndNewlines).suffix(200)
+        switch step {
+        case .installUV:
+            return "Couldn't install uv: \(tail)"
+        case .installEngine:
+            return "Install failed: \(tail)"
+        }
+    }
+}

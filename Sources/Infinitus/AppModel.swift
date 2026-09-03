@@ -1128,55 +1128,88 @@ final class AppModel: ObservableObject {
     @Published var installingEngine = false
     @Published var installMessage: String?
 
-    /// Button-triggered only — never auto-installs. Runs
-    /// `uv tool install claude-swap`, then relaunches so init re-runs
-    /// the locator (cswap stays a let; the restart IS the re-detect).
+    /// Button-triggered only — never auto-installs. Bootstraps `uv`
+    /// first when the Mac has none (Homebrew if it is there, else
+    /// Astral's standalone installer), then runs
+    /// `uv tool install claude-swap` and relaunches so init re-runs the
+    /// locator (cswap stays a let; the restart IS the re-detect).
     func installEngine() {
         guard !installingEngine else { return }
-        let uv = CswapLocator.locate(candidates: [
-            "\(NSHomeDirectory())/.local/bin/uv",
-            "/opt/homebrew/bin/uv",
-            "/usr/local/bin/uv",
-        ])
-        guard let uv else {
-            installMessage = "uv not found — get it first: brew install uv"
-            return
-        }
+        let steps = EngineInstall.plan(
+            uv: CswapLocator.locate(candidates: EngineInstall.uvCandidates()),
+            brew: CswapLocator.locate(candidates: EngineInstall.brewCandidates()))
         installingEngine = true
-        installMessage = "Installing claude-swap…"
+        installMessage = steps.first.map(EngineInstall.progressMessage)
         Task.detached {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: uv)
-            p.arguments = ["tool", "install", "claude-swap"]
-            let pipe = Pipe()
-            p.standardOutput = pipe
-            p.standardError = pipe
-            do {
-                try p.run()
-                p.waitUntilExit()
-                let out = String(decoding:
-                    pipe.fileHandleForReading.readDataToEndOfFile(),
-                    as: UTF8.self)
-                let ok = p.terminationStatus == 0
+            for step in steps {
                 await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.installingEngine = false
-                    if ok {
-                        self.installMessage = "Installed — restarting…"
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            self.relaunchApp()
-                        }
-                    } else {
-                        self.installMessage = "Install failed: "
-                            + out.suffix(200)
-                    }
+                    self?.installMessage = EngineInstall.progressMessage(step)
                 }
-            } catch {
-                await MainActor.run { [weak self] in
-                    self?.installingEngine = false
-                    self?.installMessage = "Couldn't run uv: \(error.localizedDescription)"
+                let result: (ok: Bool, output: String)
+                switch step {
+                case .installUV(.brew(let brew)):
+                    result = AppModel.runInstallStep(brew, ["install", "uv"])
+                case .installUV(.standalone):
+                    result = AppModel.runInstallStep(
+                        "/bin/sh", ["-c", EngineInstall.standaloneScript])
+                case .installEngine:
+                    guard let uv = CswapLocator.locate(
+                        candidates: EngineInstall.uvCandidates()) else {
+                        await MainActor.run { [weak self] in
+                            self?.installingEngine = false
+                            self?.installMessage = "uv installed but not on this Mac's "
+                                + "usual paths — run: uv tool install claude-swap"
+                        }
+                        return
+                    }
+                    result = AppModel.runInstallStep(uv, ["tool", "install", "claude-swap"])
+                }
+                guard result.ok else {
+                    await MainActor.run { [weak self] in
+                        self?.installingEngine = false
+                        self?.installMessage = EngineInstall.failureMessage(
+                            step, output: result.output)
+                    }
+                    return
                 }
             }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.installingEngine = false
+                self.installMessage = "Installed — restarting…"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    self.relaunchApp()
+                }
+            }
+        }
+    }
+
+    /// One blocking install child, combined stdout+stderr. Called only
+    /// off the main actor (Task.detached).
+    private nonisolated static func runInstallStep(_ path: String, _ arguments: [String])
+        -> (ok: Bool, output: String) {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = arguments
+        // A GUI app's inherited PATH reaches neither Homebrew nor
+        // ~/.local/bin, and both installers shell out to their own tools.
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = "\(NSHomeDirectory())/.local/bin:/opt/homebrew/bin:/usr/local/bin:"
+            + (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
+        p.environment = env
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe
+        do {
+            try p.run()
+            // Drain before waiting: a filled pipe buffer would wedge the
+            // child forever (the uv installer is chatty).
+            let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(),
+                             as: UTF8.self)
+            p.waitUntilExit()
+            return (p.terminationStatus == 0, out)
+        } catch {
+            return (false, error.localizedDescription)
         }
     }
 

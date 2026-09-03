@@ -19,3 +19,34 @@ final class OnboardingBriefTests: XCTestCase {
         XCTAssertTrue(text.contains("NOT installed"))
     }
 }
+
+final class EngineInstallPlanTests: XCTestCase {
+    func testUVPresentInstallsTheEngineDirectly() {
+        XCTAssertEqual(EngineInstall.plan(uv: "/opt/homebrew/bin/uv", brew: "/opt/homebrew/bin/brew"),
+                       [.installEngine])
+    }
+
+    func testMissingUVIsBootstrappedWithHomebrewFirst() {
+        XCTAssertEqual(EngineInstall.plan(uv: nil, brew: "/opt/homebrew/bin/brew"),
+                       [.installUV(.brew("/opt/homebrew/bin/brew")), .installEngine])
+    }
+
+    func testNoHomebrewFallsBackToTheStandaloneInstaller() {
+        XCTAssertEqual(EngineInstall.plan(uv: nil, brew: nil),
+                       [.installUV(.standalone), .installEngine])
+        // Whatever it lands is picked up by the locator's own candidates.
+        XCTAssertTrue(EngineInstall.standaloneScript.contains("astral.sh/uv/install.sh"))
+        XCTAssertTrue(EngineInstall.standaloneScript.contains("pipefail"))
+        XCTAssertTrue(EngineInstall.uvCandidates(home: "/Users/x").contains("/Users/x/.local/bin/uv"))
+    }
+
+    func testMessagesNameTheStepThatIsRunning() {
+        XCTAssertEqual(EngineInstall.progressMessage(.installUV(.brew("/opt/homebrew/bin/brew"))),
+                       "Installing uv with Homebrew…")
+        XCTAssertEqual(EngineInstall.progressMessage(.installEngine), "Installing claude-swap…")
+        XCTAssertEqual(EngineInstall.failureMessage(.installUV(.standalone), output: "  boom\n"),
+                       "Couldn't install uv: boom")
+        XCTAssertEqual(EngineInstall.failureMessage(.installEngine, output: "nope"),
+                       "Install failed: nope")
+    }
+}
