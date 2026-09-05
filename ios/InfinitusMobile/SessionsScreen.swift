@@ -184,11 +184,17 @@ struct SessionsScreen: View {
                         Image(systemName: "key.fill").foregroundStyle(.orange)
                             .accessibilityLabel("needs AWS login")
                     }
+                    // The row wears the theme like the chat header does
+                    // (user 2026-09-05: "sessions list to honor colors
+                    // too"): the name in the theme's accent, the state
+                    // word in its state color. Off keeps the stock list.
                     Text(title(session))
                         .font(.headline).lineLimit(1)
+                        .foregroundStyle(model.rowTheme.plain ? Color.primary : ThemeColor.flash(model.rowTheme))
                     Spacer(minLength: 8)
                     Text(SessionWords.status(session.status, theme: model.rowTheme))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(model.rowTheme.plain ? Color.secondary : color(for: session.status))
                     Text(SessionWords.age(since: session.startedAt))
                         .font(.caption).monospacedDigit()
                         .foregroundStyle(.tertiary)
