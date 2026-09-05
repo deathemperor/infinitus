@@ -510,6 +510,17 @@ struct SessionFeedScreen: View {
 
     // MARK: - Layer 2: sending in
 
+    /// "Reply…" / "Listening…" in the theme's words (#124): a theme that
+
+    /// renames every tab and state should not leave the composer plain.
+
+    private var composerPlaceholder: String {
+
+        model.rowTheme.loadingWord(dictation.listening ? "composerListening" : "composerReply")
+
+    }
+
+
     private var composer: some View {
         VStack(spacing: 4) {
             if let messageResult {
@@ -600,7 +611,7 @@ struct SessionFeedScreen: View {
                 .disabled(sendingMessage || attachments.count >= SessionInput.maxAttachments)
                 ZStack(alignment: .topLeading) {
                     if draft.isEmpty {
-                        Text(dictation.listening ? "Listening…" : "Reply…")
+                        Text(composerPlaceholder)
                             .font(.body)
                             .foregroundStyle(.secondary)
                             .padding(.leading, 5)
@@ -608,7 +619,7 @@ struct SessionFeedScreen: View {
                             .allowsHitTesting(false)
                     }
                     PasteableTextView(text: $draft, isFocused: $composerFocused,
-                                      placeholder: dictation.listening ? "Listening…" : "Reply…") { image in
+                                      placeholder: composerPlaceholder) { image in
                         addImage(image, prefix: "pasted")
                     }
                 }
