@@ -245,25 +245,32 @@ else
 fi
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
-stage "Mac — local proof: build → notarize → staple → Gatekeeper"
-say "Same steps release.yml runs; a few minutes, mostly Apple's queue."
-if confirm "Run ./make-app.sh + notarytool now?"; then
-  ./make-app.sh
-  codesign -dvv Infinitus.app 2>&1 | grep -E "^Authority=Developer ID" \
-    || warn "the bundle is not Developer ID signed — did stage 1 land?"
-  rm -f notarize.zip
-  ditto -c -k --keepParent Infinitus.app notarize.zip
-  if xcrun notarytool submit notarize.zip --wait --keychain-profile "$NOTARY_PROFILE"; then
-    xcrun stapler staple Infinitus.app
-    spctl --assess --type execute -vv Infinitus.app \
-      && printf '  %s✓ Gatekeeper accepts%s Infinitus.app\n' "$GREEN" "$RESET"
-    note "The bundle on disk changed under the running app: quit Infinitus and"
-    note "\`open Infinitus.app\` once to exercise the hardened-runtime build."
+stage "Mac — local proof: re-sign a copy → notarize → staple → Gatekeeper"
+say "Same steps release.yml runs, on a COPY of the built Infinitus.app: the"
+say "bundle in the repo and the running app are left alone (another session"
+say "owns rebuilds), and nothing here needs a rebuild."
+if [[ ! -d Infinitus.app ]]; then
+  warn "no Infinitus.app in the repo — have it built first (./make-app.sh)"
+  SKIPPED+=("local notarization proof (needs a built Infinitus.app)")
+elif confirm "Notarize a copy of Infinitus.app now?"; then
+  DEVID=$(security find-identity -v -p codesigning 2>/dev/null \
+    | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+  PROOF=$(mktemp -d)
+  cp -R Infinitus.app "$PROOF/Infinitus.app"
+  # Inside-out, as make-app.sh does: the helper, then the bundle.
+  codesign --force --options runtime --timestamp --sign "$DEVID" \
+    "$PROOF/Infinitus.app/Contents/MacOS/infinitusctl"
+  codesign --force --options runtime --timestamp --sign "$DEVID" "$PROOF/Infinitus.app"
+  ditto -c -k --keepParent "$PROOF/Infinitus.app" "$PROOF/notarize.zip"
+  if xcrun notarytool submit "$PROOF/notarize.zip" --wait --keychain-profile "$NOTARY_PROFILE"; then
+    xcrun stapler staple "$PROOF/Infinitus.app"
+    spctl --assess --type execute -vv "$PROOF/Infinitus.app" \
+      && printf '  %s✓ Gatekeeper accepts%s the notarized copy (%s)\n' "$GREEN" "$RESET" "$PROOF/Infinitus.app"
+    note "The proof copy stays in $PROOF; the next release build gets the same treatment in CI."
   else
     warn "notarization did not pass — run: xcrun notarytool log <submission id> --keychain-profile $NOTARY_PROFILE"
     SKIPPED+=("notarization proof (see notarytool log)")
   fi
-  rm -f notarize.zip
 else
   SKIPPED+=("local notarization proof (RELEASING.md 'Local check')")
 fi

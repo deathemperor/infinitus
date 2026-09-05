@@ -51,9 +51,9 @@ signs with `--options runtime --timestamp` → `notarytool submit --wait` →
 released zip is built after it. Once a notarized release exists, drop the
 `--no-quarantine` wording from the README and the cask.
 
-Local check of a Developer ID build: `SIGN_IDENTITY="Developer ID
-Application: …" ./make-app.sh && spctl --assess --type execute -vv
-Infinitus.app`.
+Local check of a Developer ID build: the wizard's stage 3 re-signs a
+copy of `Infinitus.app` in a temp dir, notarizes, staples and runs
+`spctl --assess` on it — no rebuild, the repo bundle untouched.
 
 ## Phone
 
