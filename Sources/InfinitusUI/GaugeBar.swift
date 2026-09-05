@@ -56,6 +56,11 @@ public struct GaugeBar: View {
     /// The HP-drop zoom: 5× on a 56pt capsule is the drama; a bar that
     /// already spans its panel grows 1.5× so it stays on screen.
     private var dropScale: Double { hud == nil ? 5 : 1.5 }
+    /// The halos were drawn for the 6pt capsule — a 1pt ring and a few
+    /// points of shadow. On the 14pt HUD bar that read as a tinted rim,
+    /// not a glow (user 2026-09-05, phone: "death2nd is supposed to have
+    /// glow effect on 7d and fable"); ring and shadow scale with height.
+    private var haloScale: Double { max(1, barHeight / 6) }
     @State private var shown: Double = 0
     // HP-drop drama (user 2026-08-31): a big one-refresh plunge zooms
     // the bar 5×, flashes the doomed chunk, then drains it. dropSeq
@@ -239,9 +244,9 @@ public struct GaugeBar: View {
                                      blue: 0.10 + 0.75 * burnHeat)
                     shape
                         .strokeBorder(tint.opacity(0.4 + 0.5 * burnHeat),
-                                      lineWidth: 1)
+                                      lineWidth: haloScale)
                         .shadow(color: tint.opacity(0.5 + 0.5 * burnHeat),
-                                radius: 2 + 5 * burnHeat)
+                                radius: (2 + 5 * burnHeat) * haloScale)
                         .allowsHitTesting(false)
                 }
             }
@@ -251,7 +256,7 @@ public struct GaugeBar: View {
             // calmer than the burn: reserve is good news, not drama.
             .overlay {
                 if animated, burnArmed, chill > 0, burnStyle != "off" {
-                    ChillHalo(chill: chill, cornerRadius: radius)
+                    ChillHalo(chill: chill, cornerRadius: radius, scale: haloScale)
                 }
             }
             // The HUD bar carries its glyph and value inside, on the
@@ -468,26 +473,40 @@ extension EnvironmentValues {
 private struct ChillHalo: View {
     let chill: Double
     let cornerRadius: Double
+    /// 1 on the capsule; the HUD bar's height over the capsule's.
+    let scale: Double
 
     var body: some View {
         let peak = 0.35 + 0.65 * chill
+        let radius = (2 + 5 * peak * 0.6) * scale
+        // The host is grown by the shadow's spill and the ring drawn inset
+        // by the same amount: iOS clips a representable to its frame, so a
+        // host the size of the bar showed the ring and not the glow around
+        // it (2026-09-06, the phone HUD's "glow" was a tinted rim).
+        let outset = radius * 2
         LayerEffect { host, bounds in
-            let ring = CAShapeLayer()
-            ring.frame = bounds
-            ring.path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                               cornerWidth: cornerRadius, cornerHeight: cornerRadius,
-                               transform: nil)
-            ring.fillColor = nil
-            ring.strokeColor = rgb(0.35, 0.95, 0.75, 0.85 * peak)
-            ring.lineWidth = 1
-            ring.shadowColor = rgb(0.35, 0.95, 0.75)
-            ring.shadowOpacity = Float(peak)
-            ring.shadowRadius = 2 + 5 * peak * 0.6
-            ring.shadowOffset = .zero
-            ring.add(CABasicAnimation.loop("opacity", from: 1, to: 0.15, duration: 1.2,
+            let rect = bounds.insetBy(dx: outset + 0.5, dy: outset + 0.5)
+            let corner = min(cornerRadius, rect.height / 2)
+            let path = CGPath(roundedRect: rect, cornerWidth: corner, cornerHeight: corner,
+                              transform: nil)
+            // The glow is three concentric strokes, wide and faint to
+            // narrow and bright — iOS renders no shadow for a stroke-only
+            // shape layer inside a representable (the ring showed, the
+            // spill never did), and a stroke stack reads the same on both
+            // platforms. All breathe together on the host's opacity.
+            for (width, alpha) in [(radius * 2, 0.10), (radius, 0.22), (scale, 0.85)] {
+                let ring = CAShapeLayer()
+                ring.frame = bounds
+                ring.path = path
+                ring.fillColor = nil
+                ring.strokeColor = rgb(0.35, 0.95, 0.75, alpha * peak)
+                ring.lineWidth = width
+                host.addSublayer(ring)
+            }
+            host.add(CABasicAnimation.loop("opacity", from: 1, to: 0.15, duration: 1.2,
                                            autoreverses: true, easeInOut: true), forKey: "breath")
-            host.addSublayer(ring)
         }
+        .padding(-outset)
         .allowsHitTesting(false)
     }
 }
