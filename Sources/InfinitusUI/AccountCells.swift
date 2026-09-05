@@ -383,19 +383,14 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         model.rowTheme.id == "rpg" && account.allLucky7s
     }
 
-    /// Limit break is an RPG-exclusive (user 2026-08-31: "only and
-    /// always apply for RPG and apply on Fable"): other themes
-    /// downgrade a selected limit style to ember...
+    /// The 7d bar's pace fire and the Fable bar's (BurnRules: limit
+    /// break is RPG-only, and RPG's Fable always burns limit-style).
     var effectiveBurnStyle: String {
-        model.burnStyle == "limit" && model.rowTheme.id != "rpg"
-            ? "ember" : model.burnStyle
+        BurnRules.weekly(pref: model.burnStyle, theme: model.rowTheme)
     }
 
-    /// ...and under RPG the Fable bar ALWAYS burns limit-style — the
-    /// rainbow marquee is its signature ("off" still masters it off).
     var fableBurnStyle: String {
-        guard model.burnStyle != "off" else { return "off" }
-        return model.rowTheme.id == "rpg" ? "limit" : effectiveBurnStyle
+        BurnRules.scoped(pref: model.burnStyle, theme: model.rowTheme)
     }
 
     /// The paired trigger alone — the 5h/7d labels flash only when

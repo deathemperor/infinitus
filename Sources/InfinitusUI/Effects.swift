@@ -338,6 +338,7 @@ public struct LuckyRowBackground: View {
 /// like the 7777 damage pops, with a rainbow run.
 struct LuckySevens: View {
     let text: String
+    var font: Font = PopupFont.caption
 
     private static let steps: [CGColor] = [
         rgb(1.00, 0.85, 0.20), rgb(1, 1, 1),
@@ -350,7 +351,7 @@ struct LuckySevens: View {
         // The PSX palette flip as a discrete CA colour keyframe under a
         // text mask: hard 0.14s steps, nothing per frame in-process.
         Text(text)
-            .font(PopupFont.caption).bold().monospacedDigit()
+            .font(font).bold().monospacedDigit()
             .foregroundStyle(.clear)
             .overlay {
                 LayerEffect { host, bounds in
@@ -362,7 +363,7 @@ struct LuckySevens: View {
                         duration: 0.14 * Double(Self.steps.count), discrete: true), forKey: "flash")
                     host.addSublayer(g)
                 }
-                .mask(Text(text).font(PopupFont.caption).bold().monospacedDigit())
+                .mask(Text(text).font(font).bold().monospacedDigit())
             }
         .help("All Lucky 7s!")
     }
@@ -439,7 +440,11 @@ extension View {
 /// death band (one-shot) and the chill halo (mint, per-gauge): this is
 /// an ambient alarm, urgent but not seizure bait.
 public struct CriticalPulse: View {
-    public init() {}
+    var cornerRadius: Double = 4
+
+    public init(cornerRadius: Double = 4) {
+        self.cornerRadius = cornerRadius
+    }
 
     public var body: some View {
         // 1.6s breath: the peak look (fill 0.18, rim 0.50) fading to
@@ -448,7 +453,7 @@ public struct CriticalPulse: View {
         LayerEffect { host, bounds in
             let band = CALayer()
             band.frame = bounds
-            band.cornerRadius = 4
+            band.cornerRadius = cornerRadius
             band.backgroundColor = CGColor(red: 1, green: 0, blue: 0, alpha: 0.18)
             band.borderWidth = 1
             band.borderColor = CGColor(red: 1, green: 0, blue: 0, alpha: 0.50)

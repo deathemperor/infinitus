@@ -362,11 +362,23 @@ struct SessionFeedScreen: View {
     /// account behind it and every window on it.
     private var headerData: ChatHeaderData {
         let pair = headerAccount
-        return ChatHeaderData(name: feed?.name ?? repoName(session.cwd),
-                              status: feed?.status ?? session.status,
-                              accountName: pair.map { ChatHeaderData.accountName($0.account) },
-                              plan: pair?.account.plan,
-                              chips: pair.map { ChatHeaderData.chips($0.account, theme: model.rowTheme) } ?? [])
+        var data = ChatHeaderData(name: feed?.name ?? repoName(session.cwd),
+                                  status: feed?.status ?? session.status,
+                                  accountName: pair.map { ChatHeaderData.accountName($0.account) },
+                                  plan: pair?.account.plan,
+                                  chips: pair.map { ChatHeaderData.chips($0.account, theme: model.rowTheme,
+                                                                         burnStyle: $0.fleet.burnStyle) } ?? [])
+        // The Fleet card's beats for this account (the fleet's ticks
+        // reach here through MirrorModel's objectWillChange relay); the
+        // switch celebration only when this account is the one switched to.
+        if let (account, fleet) = pair {
+            data.switchTick = account.active ? fleet.switchFlashTick : 0
+            data.deathTick = fleet.deathTicks[account.number] ?? 0
+            data.reviveTick = fleet.reviveTicks[account.number] ?? 0
+            data.critical = AccountRowVitals.isCritical(account)
+            data.lucky = AccountRowVitals.isLucky(account, theme: fleet.rowTheme)
+        }
+        return data
     }
 
     /// Reachability, where it's seen: a banner up top, not a caption at

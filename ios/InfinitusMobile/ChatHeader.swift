@@ -13,6 +13,14 @@ struct ChatHeaderData {
     var accountName: String?
     var plan: String?
     var chips: [WindowChip]
+    /// The fleet's one-shot beats for this account (0 = never armed):
+    /// the switch celebration, the death hit, the revival fanfare.
+    var switchTick = 0
+    var deathTick = 0
+    var reviveTick = 0
+    /// Dying (binding window in the 90s) and All Lucky 7s (RPG).
+    var critical = false
+    var lucky = false
 
     /// One window per row of the Fleet card, ready for a line: the
     /// session and weekly windows first, then the per-model ones.
@@ -25,27 +33,40 @@ struct ChatHeaderData {
         let color: Color
         let window: UsageWindow
         let session: Bool
+        /// The bar's pace fire, the Fleet card's rules: 5h calm, 7d the
+        /// pref (limit break RPG-only), Fable always limit under RPG.
+        let burnStyle: String
+        /// The fever digits: the 5h/7d pair only when BOTH sit at 77,
+        /// a model bar when it does itself (RPG only).
+        let lucky: Bool
         var isModel: Bool { id.hasPrefix("m:") }
     }
 
-    static func chips(_ account: Account, theme: RowTheme) -> [WindowChip] {
+    static func chips(_ account: Account, theme: RowTheme, burnStyle: String = "off") -> [WindowChip] {
         var out: [WindowChip] = []
+        let pref = theme.plain ? "off" : burnStyle
+        let rpg = theme.id == "rpg"
+        let at77 = { (w: UsageWindow?) in w.map { Int(GaugeMath.remaining(usedPct: $0.pct)) == 77 } ?? false }
+        let pair = rpg && at77(account.usage?.fiveHour) && at77(account.usage?.sevenDay)
         if let w = account.usage?.fiveHour {
             let glyph = theme.plain ? theme.sessionLabel : PopupGlyph.text(theme.sessionLabel)
             out.append(.init(id: "5h", glyph: glyph, name: glyph,
-                             color: ThemeColor.resolve(theme.sessionColor), window: w, session: true))
+                             color: ThemeColor.resolve(theme.sessionColor), window: w, session: true,
+                             burnStyle: "off", lucky: pair))
         }
         if let w = account.usage?.sevenDay {
             let glyph = theme.plain ? theme.weeklyLabel : PopupGlyph.text(theme.weeklyLabel)
             out.append(.init(id: "7d", glyph: glyph, name: glyph,
-                             color: ThemeColor.resolve(theme.weeklyColor), window: w, session: false))
+                             color: ThemeColor.resolve(theme.weeklyColor), window: w, session: false,
+                             burnStyle: BurnRules.weekly(pref: pref, theme: theme), lucky: pair))
         }
         for w in account.usage?.scoped ?? [] {
             let name = theme.plain ? (w.name ?? "?") : theme.modelName(w.name)
             out.append(.init(id: "m:" + (w.name ?? "?"),
                              glyph: theme.plain ? name : PopupGlyph.text(theme.scopedPrefix) + name,
                              name: name,
-                             color: ThemeColor.resolve(theme.scopedColor), window: w, session: false))
+                             color: ThemeColor.resolve(theme.scopedColor), window: w, session: false,
+                             burnStyle: BurnRules.scoped(pref: pref, theme: theme), lucky: rpg && at77(w)))
         }
         return out
     }
@@ -55,16 +76,18 @@ struct ChatHeaderData {
     }
 
     /// The Settings preview: a busy session on a Max account, part-way
-    /// through its windows, under the first name in the theme's pool.
+    /// through its windows, under the first name in the theme's pool;
+    /// the model window runs ahead of pace so the preview shows the burn.
     static func sample(theme: RowTheme) -> ChatHeaderData {
         let alias = theme.accountNames.first ?? "player1"
         let account = Account(number: 1, email: "\(alias.lowercased())@example.com", active: true,
                               usage: Usage(fiveHour: UsageWindow(pct: 71, expectedPct: 58),
-                                           sevenDay: UsageWindow(pct: 34, expectedPct: 41),
-                                           scoped: [UsageWindow(pct: 53, name: "Fable")]),
+                                           sevenDay: UsageWindow(pct: 34, expectedPct: 41, aheadOfPace: false),
+                                           scoped: [UsageWindow(pct: 53, name: "Fable",
+                                                                expectedPct: 35, aheadOfPace: true)]),
                               alias: alias, plan: "Max 20x")
         return ChatHeaderData(name: "limitless", status: "busy", accountName: alias, plan: "Max 20x",
-                              chips: chips(account, theme: theme))
+                              chips: chips(account, theme: theme, burnStyle: "flame"))
     }
 }
 
@@ -78,6 +101,8 @@ struct ChatHeaderView: View {
     let data: ChatHeaderData
     var route: SessionDetailRoute? = nil
     var onBack: (() -> Void)? = nil
+    /// The Fleet card's gate: no flashes, pulses or fire under Reduce Motion.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch style {
@@ -250,8 +275,12 @@ struct ChatHeaderView: View {
                                 GaugeBar(remaining: GaugeMath.remaining(usedPct: chip.window.pct),
                                          color: chip.color,
                                          paceRemaining: chip.window.expectedPct.map { 100 - $0 },
-                                         dividers: chip.session ? (1..<5).map { Double($0) * 20 }
-                                                                : (1..<7).map { Double($0) * 100 / 7 })
+                                         dividers: dividers(chip),
+                                         animated: !reduceMotion,
+                                         burnStyle: chip.burnStyle,
+                                         burnHeat: heat(chip), chill: chill(chip),
+                                         lucky: chip.lucky)
+                                    .glowOnChange(of: chip.window.pct, color: ThemeColor.flash(theme))
                             }
                         }
                         .fixedSize()
@@ -277,6 +306,19 @@ struct ChatHeaderView: View {
     private var ink: Color { theme.plain ? Color.primary : Color.white }
     private var hudCorner: CGFloat { 8 }
     private var portraitSize: CGFloat { 58 }
+    private var nameFont: Font { .system(size: 14, weight: .heavy, design: .rounded) }
+
+    private func dividers(_ chip: ChatHeaderData.WindowChip) -> [Double] {
+        chip.session ? (1..<5).map { Double($0) * 20 } : (1..<7).map { Double($0) * 100 / 7 }
+    }
+    private func heat(_ chip: ChatHeaderData.WindowChip) -> Double {
+        GaugeMath.burnHeat(usedPct: chip.window.pct, expectedPct: chip.window.expectedPct,
+                           ahead: chip.window.aheadOfPace)
+    }
+    private func chill(_ chip: ChatHeaderData.WindowChip) -> Double {
+        GaugeMath.chillDepth(usedPct: chip.window.pct, expectedPct: chip.window.expectedPct,
+                             ahead: chip.window.aheadOfPace)
+    }
 
     private var hud: some View {
         HStack(spacing: 2) {
@@ -285,10 +327,14 @@ struct ChatHeaderView: View {
                 ZStack(alignment: .leading) {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(data.name)
-                                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                                .foregroundStyle(theme.plain ? Color.primary : ring)
-                                .lineLimit(1)
+                            if data.lucky, !reduceMotion {
+                                LuckyName(text: data.name, font: nameFont)
+                            } else {
+                                Text(data.name)
+                                    .font(nameFont)
+                                    .foregroundStyle(theme.plain ? Color.primary : ring)
+                                    .lineLimit(1)
+                            }
                             Spacer(minLength: 4)
                             Text(statusWord)
                                 .font(.system(size: 10, weight: .bold))
@@ -308,13 +354,25 @@ struct ChatHeaderView: View {
                     }
                     .padding(.leading, portraitSize / 2 + 8)
                     .padding(.trailing, 8).padding(.vertical, 6)
-                    .background(
-                        LinearGradient(colors: [plate, plate.opacity(theme.plain ? 0.6 : 0.85)],
-                                       startPoint: .top, endPoint: .bottom),
-                        in: RoundedRectangle(cornerRadius: hudCorner))
+                    .background {
+                        ZStack {
+                            LinearGradient(colors: [plate, plate.opacity(theme.plain ? 0.6 : 0.85)],
+                                           startPoint: .top, endPoint: .bottom)
+                            // The fever's rainbow wash and orbiting comet,
+                            // over the plate and under the content.
+                            if data.lucky, !reduceMotion { LuckyRowBackground(cornerRadius: hudCorner) }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: hudCorner))
+                    }
                     .overlay(RoundedRectangle(cornerRadius: hudCorner).stroke(ring.opacity(0.75), lineWidth: 1.2))
                     .overlay(RoundedRectangle(cornerRadius: hudCorner - 2).inset(by: 2)
                         .stroke(Color.black.opacity(theme.plain ? 0 : 0.4), lineWidth: 1))
+                    // The Fleet card's row effects, on the plate: the dying
+                    // alarm, then the same one-shot chain in the same order.
+                    .overlay { if data.critical, !reduceMotion { CriticalPulse(cornerRadius: hudCorner) } }
+                    .switchFlash(reduceMotion ? 0 : data.switchTick, color: ThemeColor.flash(theme))
+                    .deathFlash(reduceMotion ? 0 : data.deathTick)
+                    .reviveFlash(reduceMotion ? 0 : data.reviveTick)
                     .padding(.leading, portraitSize / 2)
                     portrait
                 }
@@ -366,45 +424,26 @@ struct ChatHeaderView: View {
         }
     }
 
-    /// A unit-frame bar: the window's glyph at the left, what's left at
-    /// the right, a glossy fill in the window's color.
+    /// A unit-frame bar: the shared gauge in its HUD skin — the window's
+    /// glyph at the left, what's left at the right, a glossy fill in the
+    /// window's color — so every effect the Fleet card's bars play plays
+    /// here too (#72: "keep bar effects and animation").
     private func hudBar(_ chip: ChatHeaderData.WindowChip) -> some View {
-        let remaining = GaugeMath.remaining(usedPct: chip.window.pct)
-        return GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3).fill(theme.plain ? Color.primary.opacity(0.1) : Color.black.opacity(0.7))
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(LinearGradient(colors: [chip.color.opacity(1), chip.color.opacity(0.55)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .overlay(alignment: .top) {
-                        // Gloss: the top half catches the light.
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white.opacity(0.22))
-                            .frame(height: geo.size.height * 0.45)
-                    }
-                    .frame(width: max(0, geo.size.width * remaining / 100))
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                // The pace tick the gauges carry: where the bar would be
-                // if usage tracked the clock.
-                if let expected = chip.window.expectedPct {
-                    Rectangle().fill(ink.opacity(0.85))
-                        .frame(width: 1.5)
-                        .offset(x: geo.size.width * max(0, min(100, 100 - expected)) / 100)
-                }
-                HStack {
-                    Text(chip.glyph)
-                    Spacer(minLength: 0)
-                    Text("\(Int(remaining))%")
-                }
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).monospacedDigit().lineLimit(1)
-                .foregroundStyle(ink)
-                .shadow(color: .black.opacity(theme.plain ? 0 : 0.9), radius: 1)
-                .padding(.horizontal, 5)
-            }
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(ring.opacity(0.55), lineWidth: 1))
+        GeometryReader { geo in
+            GaugeBar(remaining: GaugeMath.remaining(usedPct: chip.window.pct),
+                     color: chip.color,
+                     paceRemaining: chip.window.expectedPct.map { 100 - $0 },
+                     dividers: dividers(chip),
+                     animated: !reduceMotion,
+                     burnStyle: chip.burnStyle,
+                     burnHeat: heat(chip), chill: chill(chip),
+                     dropAnchor: .center,
+                     lucky: chip.lucky,
+                     hud: GaugeHUD(glyph: chip.glyph, ink: ink, ring: ring,
+                                   plain: theme.plain, width: geo.size.width))
         }
         .frame(height: 14)
-        .animation(.easeOut(duration: 0.5), value: remaining)
+        .glowOnChange(of: chip.window.pct, color: ThemeColor.flash(theme))
     }
 }
 

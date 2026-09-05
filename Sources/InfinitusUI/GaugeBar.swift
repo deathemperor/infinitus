@@ -1,4 +1,5 @@
 import SwiftUI
+import InfinitusCore
 
 /// CodexBar-faithful usage bar (steipete/CodexBar UsageProgressBar.swift,
 /// studied 2026-08-30 at user request), themed:
@@ -38,13 +39,23 @@ public struct GaugeBar: View {
     /// All Lucky 7s: the call site decides the trigger; the label
     /// flashes the fever digits instead of the plain percent.
     var lucky: Bool = false
+    /// The unit-frame skin (the phone's Game HUD header): same effects
+    /// engine, drawn as a full-width glossy bar with the glyph and the
+    /// value INSIDE. Nil = the capsule with the percent beside it.
+    var hud: GaugeHUD? = nil
     @ScaledMetric(relativeTo: .caption) private var baseBarWidth = 56.0
     @ScaledMetric(relativeTo: .caption) private var baseBarHeight = 6.0
     /// The solo card (one account, nothing to compare against) grows
     /// its gauges through this; rows in a grid keep 1.
     @Environment(\.gaugeScale) private var gaugeScale
-    private var barWidth: Double { baseBarWidth * gaugeScale }
-    private var barHeight: Double { baseBarHeight * min(gaugeScale, 1.5) }
+    private var barWidth: Double { hud?.width ?? baseBarWidth * gaugeScale }
+    private var barHeight: Double { hud?.height ?? baseBarHeight * min(gaugeScale, 1.5) }
+    /// The capsule is a rounded rect at half height; the HUD bar squarer.
+    private var radius: Double { hud?.cornerRadius ?? barHeight / 2 }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: radius) }
+    /// The HP-drop zoom: 5× on a 56pt capsule is the drama; a bar that
+    /// already spans its panel grows 1.5× so it stays on screen.
+    private var dropScale: Double { hud == nil ? 5 : 1.5 }
     @State private var shown: Double = 0
     // HP-drop drama (user 2026-08-31): a big one-refresh plunge zooms
     // the bar 5×, flashes the doomed chunk, then drains it. dropSeq
@@ -79,7 +90,7 @@ public struct GaugeBar: View {
                 dividers: [Double] = [], animated: Bool = true,
                 burnStyle: String = "off", burnHeat: Double = 0,
                 chill: Double = 0, dropAnchor: UnitPoint = .leading,
-                lucky: Bool = false) {
+                lucky: Bool = false, hud: GaugeHUD? = nil) {
         self.remaining = remaining
         self.color = color
         self.paceRemaining = paceRemaining
@@ -90,102 +101,13 @@ public struct GaugeBar: View {
         self.chill = chill
         self.dropAnchor = dropAnchor
         self.lucky = lucky
+        self.hud = hud
     }
 
     public var body: some View {
         HStack(spacing: 3) {
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.secondary.opacity(0.22))
-                // Fill animates via frame width (Canvas can't animate).
-                Capsule().fill(color)
-                    .frame(width: max(0, barWidth * min(100, max(0, shown)) / 100))
-                // The doomed chunk: from the drop floor to the live fill
-                // edge — derived from `shown`, so the filldown eats it in
-                // perfect sync with the fill (no separate choreography).
-                if let to = dropTo {
-                    let x0 = barWidth * min(100, max(0, to)) / 100
-                    let x1 = barWidth * min(100, max(0, shown)) / 100
-                    Rectangle().fill(.white)
-                        .frame(width: max(0, x1 - x0))
-                        .offset(x: x0)
-                        .opacity(cutFlash ? 0.95 : 0.35)
-                }
-                overlayMarks
-            }
-            .frame(width: barWidth, height: barHeight)
-            .clipShape(Capsule())
-            // Unclipped overlay so flames lick a few points above the
-            // capsule; BurnOverlay caps its own rise (grid rows sit
-            // close above). Gated here so the TimelineView inside
-            // doesn't exist — and costs nothing — on calm bars.
-            .overlay(alignment: .bottom) {
-                if animated, burnArmed, burnHeat > 0, burnStyle != "off" {
-                    BurnOverlay(style: burnStyle, heat: burnHeat,
-                                fillFraction: min(100, max(0, shown)) / 100,
-                                barWidth: barWidth, barHeight: barHeight)
-                }
-            }
-            // Heat halo (user 2026-08-31: "bar with few left the
-            // effects on remaining is too subtle"): the burn rides the
-            // FILL, which nearly vanishes near empty — a heat-tinted
-            // glowing border on the whole capsule keeps ahead-of-pace
-            // readable at any fill. Ember orange -> core white as heat
-            // climbs (BurnOverlay's palette).
-            .overlay {
-                if animated, burnArmed, burnHeat > 0, burnStyle != "off" {
-                    let tint = Color(red: 1,
-                                     green: 0.45 + 0.51 * burnHeat,
-                                     blue: 0.10 + 0.75 * burnHeat)
-                    Capsule()
-                        .strokeBorder(tint.opacity(0.4 + 0.5 * burnHeat),
-                                      lineWidth: 1)
-                        .shadow(color: tint.opacity(0.5 + 0.5 * burnHeat),
-                                radius: 2 + 5 * burnHeat)
-                        .allowsHitTesting(false)
-                }
-            }
-            // Cool halo (todo 2026-09-01: "effects to accounts that are
-            // behind in usage"): the heat halo's inverse — usage running
-            // behind the clock breathes a slow mint glow. Deliberately
-            // calmer than the burn: reserve is good news, not drama.
-            .overlay {
-                if animated, burnArmed, chill > 0, burnStyle != "off" {
-                    ChillHalo(chill: chill)
-                }
-            }
-            // Shard burst on a killing blow — above the bar, zooming
-            // with it.
-            .overlay {
-                KillBurst(tick: killTick)
-                    .frame(width: barWidth * 1.8, height: 44)
-            }
-            // The kill shake: hard jitter, zoomed.
-            .keyframeAnimator(initialValue: 0.0, trigger: killTick) { view, x in
-                view.offset(x: x)
-            } keyframes: { _ in
-                KeyframeTrack {
-                    CubicKeyframe(0.001, duration: 0.001)
-                    CubicKeyframe(-2.5, duration: 0.05)
-                    CubicKeyframe(2.5, duration: 0.05)
-                    CubicKeyframe(-2, duration: 0.05)
-                    CubicKeyframe(1.5, duration: 0.05)
-                    CubicKeyframe(0, duration: 0.08)
-                }
-            }
-            // The HP-drop zoom — after the burn overlay so flames zoom
-            // with the bar. Overlapping neighbor rows is the drama.
-            .scaleEffect(dropZoom ? 5 : 1, anchor: dropAnchor)
-            .zIndex(dropZoom ? 10 : 0)
-
-            if lucky, animated {
-                LuckySevens(text: "\(Int(remaining))%")
-            } else {
-                Text("\(Int(remaining))%")
-                    .font(PopupFont.caption).monospacedDigit()
-                    .contentTransition(animated ? .numericText(value: remaining)
-                                                : .identity)
-                    .foregroundStyle(remaining <= 0 ? Color.red : color.opacity(0.9))
-            }
+            bar
+            if hud == nil { percentLabel }
         }
         .onAppear {
             if animated, introOnAppear {
@@ -230,6 +152,142 @@ public struct GaugeBar: View {
                 withAnimation(.easeOut(duration: 0.5)) { shown = new }
             }
         }
+    }
+
+    /// The percent: the fever digits when the 7s align, else the plain
+    /// number rolling to its value. Beside the capsule; inside the HUD bar.
+    @ViewBuilder private var percentLabel: some View {
+        if lucky, animated {
+            LuckySevens(text: "\(Int(remaining))%", font: hud?.font ?? PopupFont.caption)
+        } else if let hud {
+            Text("\(Int(remaining))%")
+                .font(hud.font).monospacedDigit()
+                .contentTransition(animated ? .numericText(value: remaining) : .identity)
+        } else {
+            Text("\(Int(remaining))%")
+                .font(PopupFont.caption).monospacedDigit()
+                .contentTransition(animated ? .numericText(value: remaining)
+                                            : .identity)
+                .foregroundStyle(remaining <= 0 ? Color.red : color.opacity(0.9))
+        }
+    }
+
+    private var bar: some View {
+            ZStack(alignment: .leading) {
+                if let hud {
+                    shape.fill(hud.plain ? Color.primary.opacity(0.1) : Color.black.opacity(0.7))
+                } else {
+                    shape.fill(Color.secondary.opacity(0.22))
+                }
+                // Fill animates via frame width (Canvas can't animate).
+                if let hud {
+                    // Glossy: a top-to-bottom fade with the top half
+                    // catching the light (the WoW unit frame).
+                    shape.fill(LinearGradient(colors: [color.opacity(1), color.opacity(0.55)],
+                                              startPoint: .top, endPoint: .bottom))
+                        .overlay(alignment: .top) {
+                            shape.fill(Color.white.opacity(0.22))
+                                .frame(height: hud.height * 0.45)
+                        }
+                        .frame(width: max(0, barWidth * min(100, max(0, shown)) / 100))
+                        .clipShape(shape)
+                } else {
+                    shape.fill(color)
+                        .frame(width: max(0, barWidth * min(100, max(0, shown)) / 100))
+                }
+                // The doomed chunk: from the drop floor to the live fill
+                // edge — derived from `shown`, so the filldown eats it in
+                // perfect sync with the fill (no separate choreography).
+                if let to = dropTo {
+                    let x0 = barWidth * min(100, max(0, to)) / 100
+                    let x1 = barWidth * min(100, max(0, shown)) / 100
+                    Rectangle().fill(.white)
+                        .frame(width: max(0, x1 - x0))
+                        .offset(x: x0)
+                        .opacity(cutFlash ? 0.95 : 0.35)
+                }
+                overlayMarks
+            }
+            .frame(width: barWidth, height: barHeight)
+            .clipShape(shape)
+            // The HUD bar carries its glyph and value inside, on the
+            // theme's ink over a hard shadow, rimmed by the frame's ring.
+            .overlay {
+                if let hud {
+                    HStack {
+                        Text(hud.glyph).font(hud.font)
+                        Spacer(minLength: 0)
+                        percentLabel
+                    }
+                    .lineLimit(1)
+                    .foregroundStyle(hud.ink)
+                    .shadow(color: .black.opacity(hud.plain ? 0 : 0.9), radius: 1)
+                    .padding(.horizontal, 5)
+                    .overlay(shape.stroke(hud.ring.opacity(0.55), lineWidth: 1))
+                }
+            }
+            // Unclipped overlay so flames lick a few points above the
+            // capsule; BurnOverlay caps its own rise (grid rows sit
+            // close above). Gated here so the TimelineView inside
+            // doesn't exist — and costs nothing — on calm bars.
+            .overlay(alignment: .bottom) {
+                if animated, burnArmed, burnHeat > 0, burnStyle != "off" {
+                    BurnOverlay(style: burnStyle, heat: burnHeat,
+                                fillFraction: min(100, max(0, shown)) / 100,
+                                barWidth: barWidth, barHeight: barHeight)
+                }
+            }
+            // Heat halo (user 2026-08-31: "bar with few left the
+            // effects on remaining is too subtle"): the burn rides the
+            // FILL, which nearly vanishes near empty — a heat-tinted
+            // glowing border on the whole capsule keeps ahead-of-pace
+            // readable at any fill. Ember orange -> core white as heat
+            // climbs (BurnOverlay's palette).
+            .overlay {
+                if animated, burnArmed, burnHeat > 0, burnStyle != "off" {
+                    let tint = Color(red: 1,
+                                     green: 0.45 + 0.51 * burnHeat,
+                                     blue: 0.10 + 0.75 * burnHeat)
+                    shape
+                        .strokeBorder(tint.opacity(0.4 + 0.5 * burnHeat),
+                                      lineWidth: 1)
+                        .shadow(color: tint.opacity(0.5 + 0.5 * burnHeat),
+                                radius: 2 + 5 * burnHeat)
+                        .allowsHitTesting(false)
+                }
+            }
+            // Cool halo (todo 2026-09-01: "effects to accounts that are
+            // behind in usage"): the heat halo's inverse — usage running
+            // behind the clock breathes a slow mint glow. Deliberately
+            // calmer than the burn: reserve is good news, not drama.
+            .overlay {
+                if animated, burnArmed, chill > 0, burnStyle != "off" {
+                    ChillHalo(chill: chill, cornerRadius: radius)
+                }
+            }
+            // Shard burst on a killing blow — above the bar, zooming
+            // with it.
+            .overlay {
+                KillBurst(tick: killTick)
+                    .frame(width: barWidth * 1.8, height: 44)
+            }
+            // The kill shake: hard jitter, zoomed.
+            .keyframeAnimator(initialValue: 0.0, trigger: killTick) { view, x in
+                view.offset(x: x)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(0.001, duration: 0.001)
+                    CubicKeyframe(-2.5, duration: 0.05)
+                    CubicKeyframe(2.5, duration: 0.05)
+                    CubicKeyframe(-2, duration: 0.05)
+                    CubicKeyframe(1.5, duration: 0.05)
+                    CubicKeyframe(0, duration: 0.08)
+                }
+            }
+            // The HP-drop zoom — after the burn overlay so flames zoom
+            // with the bar. Overlapping neighbor rows is the drama.
+            .scaleEffect(dropZoom ? dropScale : 1, anchor: dropAnchor)
+            .zIndex(dropZoom ? 10 : 0)
     }
 
     /// The HP-drop sequence (user 2026-08-31): zoom the bar 5× in
@@ -325,6 +383,49 @@ public struct GaugeBar: View {
 }
 
 
+/// GaugeBar's unit-frame skin (the phone's Game HUD header, user
+/// 2026-09-05: "keep bar effects and animation"): a full-width glossy
+/// bar in the panel's ink and ring colors, the window's glyph at the
+/// left and the value at the right, inside. Every effect the capsule
+/// plays — burn, chill, HP drop, kill, fever digits, refill — plays here.
+public struct GaugeHUD {
+    public var glyph: String
+    public var ink: Color
+    public var ring: Color
+    /// The Off theme: a neutral track, no shadow under the text.
+    public var plain: Bool
+    public var width: Double
+    public var height: Double = 14
+    public var cornerRadius: Double = 3
+    public var font: Font = .system(size: 10, weight: .heavy, design: .rounded)
+
+    public init(glyph: String, ink: Color, ring: Color, plain: Bool, width: Double) {
+        self.glyph = glyph
+        self.ink = ink
+        self.ring = ring
+        self.plain = plain
+        self.width = width
+    }
+}
+
+/// Which pace-fire style a bar wears, from the burn-style pref and the
+/// theme (user 2026-08-31: "only and always apply for RPG and apply on
+/// Fable"). Shared by the Mac rows and the phone's chat header.
+public enum BurnRules {
+    /// Limit break is an RPG-exclusive: other themes downgrade a
+    /// selected limit style to ember.
+    public static func weekly(pref: String, theme: RowTheme) -> String {
+        pref == "limit" && theme.id != "rpg" ? "ember" : pref
+    }
+
+    /// Under RPG the Fable bar ALWAYS burns limit-style — the rainbow
+    /// marquee is its signature ("off" still masters it off).
+    public static func scoped(pref: String, theme: RowTheme) -> String {
+        guard pref != "off" else { return "off" }
+        return theme.id == "rpg" ? "limit" : weekly(pref: pref, theme: theme)
+    }
+}
+
 // MARK: Intro environment plumbing — set once on MenuContent, read by
 // every bar (GaugeBar takes no model).
 private struct IntroTickKey: EnvironmentKey {
@@ -361,6 +462,7 @@ extension EnvironmentValues {
 /// full pop-out layout per tick (#18). Radius sits at the mid-breath.
 private struct ChillHalo: View {
     let chill: Double
+    let cornerRadius: Double
 
     var body: some View {
         let peak = 0.35 + 0.65 * chill
@@ -368,7 +470,7 @@ private struct ChillHalo: View {
             let ring = CAShapeLayer()
             ring.frame = bounds
             ring.path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                               cornerWidth: bounds.height / 2, cornerHeight: bounds.height / 2,
+                               cornerWidth: cornerRadius, cornerHeight: cornerRadius,
                                transform: nil)
             ring.fillColor = nil
             ring.strokeColor = rgb(0.35, 0.95, 0.75, 0.85 * peak)
