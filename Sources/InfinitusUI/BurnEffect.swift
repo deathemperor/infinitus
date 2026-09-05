@@ -23,6 +23,8 @@ struct BurnOverlay: View {
     let fillFraction: Double   // 0…1, the animated fill tip
     let barWidth: Double
     let barHeight: Double
+    /// The bar's corner radius — the capsule's half height, the HUD's 3.
+    let cornerRadius: Double
 
     /// How far flames rise above the capsule. Tall on purpose — the
     /// first cut capped this at 6 and read as "not dramatic enough"
@@ -69,7 +71,7 @@ struct BurnOverlay: View {
     private func clip(_ bar: CGRect) -> CALayer {
         let c = CALayer()
         c.frame = bar
-        c.cornerRadius = bar.height / 2
+        c.cornerRadius = cornerRadius
         c.masksToBounds = true
         return c
     }

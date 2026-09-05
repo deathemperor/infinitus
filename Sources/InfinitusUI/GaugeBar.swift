@@ -210,21 +210,9 @@ public struct GaugeBar: View {
             }
             .frame(width: barWidth, height: barHeight)
             .clipShape(shape)
-            // The HUD bar carries its glyph and value inside, on the
-            // theme's ink over a hard shadow, rimmed by the frame's ring.
+            // The HUD bar is rimmed by the frame's ring.
             .overlay {
-                if let hud {
-                    HStack {
-                        Text(hud.glyph).font(hud.font)
-                        Spacer(minLength: 0)
-                        percentLabel
-                    }
-                    .lineLimit(1)
-                    .foregroundStyle(hud.ink)
-                    .shadow(color: .black.opacity(hud.plain ? 0 : 0.9), radius: 1)
-                    .padding(.horizontal, 5)
-                    .overlay(shape.stroke(hud.ring.opacity(0.55), lineWidth: 1))
-                }
+                if let hud { shape.stroke(hud.ring.opacity(0.55), lineWidth: 1) }
             }
             // Unclipped overlay so flames lick a few points above the
             // capsule; BurnOverlay caps its own rise (grid rows sit
@@ -234,7 +222,8 @@ public struct GaugeBar: View {
                 if animated, burnArmed, burnHeat > 0, burnStyle != "off" {
                     BurnOverlay(style: burnStyle, heat: burnHeat,
                                 fillFraction: min(100, max(0, shown)) / 100,
-                                barWidth: barWidth, barHeight: barHeight)
+                                barWidth: barWidth, barHeight: barHeight,
+                                cornerRadius: radius)
                 }
             }
             // Heat halo (user 2026-08-31: "bar with few left the
@@ -263,6 +252,22 @@ public struct GaugeBar: View {
             .overlay {
                 if animated, burnArmed, chill > 0, burnStyle != "off" {
                     ChillHalo(chill: chill, cornerRadius: radius)
+                }
+            }
+            // The HUD bar carries its glyph and value inside, on the
+            // theme's ink over a hard shadow — above the fire, so the
+            // words stay legible while the bar burns.
+            .overlay {
+                if let hud {
+                    HStack {
+                        Text(hud.glyph).font(hud.font)
+                        Spacer(minLength: 0)
+                        percentLabel
+                    }
+                    .lineLimit(1)
+                    .foregroundStyle(hud.ink)
+                    .shadow(color: .black.opacity(hud.plain ? 0 : 0.9), radius: 1)
+                    .padding(.horizontal, 5)
                 }
             }
             // Shard burst on a killing blow — above the bar, zooming
