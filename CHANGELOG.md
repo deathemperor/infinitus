@@ -5,7 +5,7 @@ links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
 publishes the matching section as the GitHub release body.
 
-## 0.4.3 (unreleased)
+## 0.4.3
 
 ### Stats
 - Stats reads Codex CLI transcripts too, with two more effort tables, per engine and per effort setting — one full rescan on first refresh.
@@ -32,6 +32,7 @@ publishes the matching section as the GitHub release body.
 - Randomize names: every account gets a fresh name from the current theme's pool (Settings › Accounts, or `infinitusctl randomize-names`).
 
 ### Mac
+- Releases are signed with a Developer ID and notarized: no more right-click → Open on first launch.
 - Bundle ids move to `run.infinitus` and `run.infinitus.mobile`: settings carry over; notifications, login item, proxy key and phone pairing are asked once more.
 - Capture Screen for a Session… in the menu-bar menu: pick a region or window, choose a session, add a note, and it lands in that session's chat like a phone message.
 

@@ -39,10 +39,9 @@ or flip the track in-app under About → Update channel):
 brew install --cask deathemperor/tap/infinitus@nightly
 ```
 
-Builds are ad-hoc signed, not notarized: if Gatekeeper balks, install
-with `--no-quarantine` (or right-click → Open once). The release
-pipeline is ready for Developer ID + notarization once a certificate
-exists — see [docs/RELEASING.md](docs/RELEASING.md).
+Releases are Developer ID signed and notarized since 0.4.3, so they
+open like any other app. Nightly builds are ad-hoc signed: install
+those with `--no-quarantine` (or right-click → Open once).
 
 ### GitHub releases
 
@@ -190,6 +189,25 @@ to drive the running app.
 - **All accounts limited, handled** — a floating countdown to the first
   account back, the sessions waiting to resume counted, and nothing
   shown while the account you're on is still fine.
+- **Share → Infinitus from any app** — images, files, a link or text go
+  into a session with a note, picked from the Mac's live list, without
+  opening the app; your sessions sit in the share sheet's suggestions
+  row. Your own turns render Markdown, and a message from another
+  session shows as "Message from @name".
+- **Chat headers in three styles** — compact, a stat strip with mini
+  gauges, or Game HUD: a ringed portrait with the level on its rim, a
+  name plate, HP/MP-style bars and a buff square per model, all in the
+  theme's colors (Settings › Appearance › Chat header previews each).
+- **Live Activities that keep moving** — with an APNs key on the Mac
+  (Settings › Devices) the lock-screen countdown and the working card
+  update with the phone app closed; the app icon follows the theme.
+- **Crash reports, on-device** — the phone app and the Mac app record
+  their own crashes into Settings; nothing leaves your machine, and any
+  report can go into a session's chat for triage.
+- **Randomize names** — every account gets a fresh name from the
+  theme's pool (Settings › Accounts, or `infinitusctl randomize-names`).
+- **Team (preview)** — `infinitusctl team` creates a team on any git
+  remote and exchanges end-to-end encrypted files between members.
 - **`infinitusctl`** — an agent-facing control CLI over a same-user
   socket: status, fleets, switch/rotate/hold/rename/prefer/reorder,
   proxy settings, AWS logins, stats, windows and perf probes; the same

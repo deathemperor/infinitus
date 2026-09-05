@@ -257,7 +257,7 @@
       "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, a full-screen fleet wall and 15 themes.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
-      "softwareVersion": "0.4.2",
+      "softwareVersion": "0.4.3",
       "license": "https://github.com/deathemperor/infinitus/blob/main/LICENSE",
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -305,7 +305,7 @@
         { "@type": "Question", "name": "Is Infinitus free?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
         { "@type": "Question", "name": "How do I install Infinitus?",
-          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask --no-quarantine deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The claude-swap CLI must be on your PATH." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The claude-swap CLI must be on your PATH." } },
         { "@type": "Question", "name": "Are the usage numbers Infinitus shows exact?",
           "acceptedAnswer": { "@type": "Answer", "text": "Usage percentages come from Anthropic's own limits reporting; usage-cost figures in the app are estimates, never billing truth." } }
       ]
@@ -345,22 +345,22 @@
     so an agent run survives the five-hour wall without you.
   </p>
   <div class="cta">
-    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.2/Infinitus-0.4.2.zip">Download for macOS</a>
+    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.3/Infinitus-0.4.3.zip">Download for macOS</a>
     <a class="btn" href="https://github.com/deathemperor/infinitus">Source on GitHub</a>
-    <span class="note">v0.4.2 · macOS menu bar + Linux panel · free &amp; open source</span>
+    <span class="note">v0.4.3 · macOS menu bar + Linux panel · free &amp; open source</span>
   </div>
-  <button class="brew" type="button" data-copy="brew install --cask --no-quarantine deathemperor/tap/infinitus"
+  <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
           title="Copy to clipboard" aria-label="Copy the Homebrew install command">
-    <span class="p">$</span> brew install --cask --no-quarantine deathemperor/tap/infinitus
+    <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
     <span class="k">copy</span>
   </button>
-  <p class="also">Unsigned build for now: first launch is right-click → Open.
+  <p class="also">Signed and notarized — it opens like any other app.
     Needs the <a href="https://github.com/deathemperor/claude-swap">claude-swap</a> CLI
     on your PATH — Infinitus walks you through the first account.</p>
   <p class="also">Also for
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.2/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.2/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.2/infinitus-omarchy.tar.gz">Omarchy</a>
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.3/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.3/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.3/infinitus-omarchy.tar.gz">Omarchy</a>
     — or <a href="#install">brew / AUR / source</a>.</p>
 </header>
 
@@ -449,7 +449,16 @@
         app's Share sheet straight into a session.</p></div>
       <div class="card"><h3><span class="dot">●</span>Live Activities</h3>
         <p>Working sessions in the Dynamic Island; when everything is
-        limited, a lock-screen revival countdown that ticks natively.</p></div>
+        limited, a lock-screen revival countdown that ticks natively. With
+        an APNs key on the Mac they keep moving with the app closed.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Game HUD chat header</h3>
+        <p>A ringed portrait with the level on its rim, a name plate,
+        HP/MP-style bars and a buff square per model — or a compact
+        header, or a stat strip. Every style previews live in your theme.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Crash reports, on-device</h3>
+        <p>The phone app and the Mac app record their own crashes into
+        Settings. Nothing leaves your machine; any report can go into a
+        session's chat for triage.</p></div>
       <div class="card"><h3><span class="dot">●</span>Widgets in your theme</h3>
         <p>Home-screen and lock-screen widgets draw the active account's
         windows as your theme names and colors them, what's waiting on
@@ -593,7 +602,7 @@
       <div>
         <h3>macOS</h3>
         <pre><span class="c"># Homebrew</span>
-<span class="g">brew</span> install --cask --no-quarantine deathemperor/tap/infinitus
+<span class="g">brew</span> install --cask deathemperor/tap/infinitus
 
 <span class="c"># or grab Infinitus.app from the latest release</span>
 <span class="g">open</span> https://github.com/deathemperor/infinitus/releases
@@ -601,8 +610,8 @@
 <span class="c"># or build it yourself</span>
 <span class="g">git</span> clone https://github.com/deathemperor/infinitus
 <span class="g">cd</span> infinitus &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
-        <p class="fineprint">Builds are currently unsigned — first launch is
-        right-click → Open. Requires the <a href="https://github.com/deathemperor/claude-swap">claude-swap</a> CLI on your PATH;
+        <p class="fineprint">Releases are Developer ID signed and notarized
+        (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/claude-swap">claude-swap</a> CLI on your PATH;
         Infinitus walks you through first-account setup.</p>
       </div>
       <div>
@@ -651,12 +660,12 @@
   <div class="wrap">
     <h2>Keep the agents running.</h2>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.2/Infinitus-0.4.2.zip">Download for macOS</a>
+      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.3/Infinitus-0.4.3.zip">Download for macOS</a>
       <a class="btn" href="#install">Linux &amp; source</a>
     </div>
-    <button class="brew" type="button" data-copy="brew install --cask --no-quarantine deathemperor/tap/infinitus"
+    <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
             title="Copy to clipboard" aria-label="Copy the Homebrew install command">
-      <span class="p">$</span> brew install --cask --no-quarantine deathemperor/tap/infinitus
+      <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
       <span class="k">copy</span>
     </button>
   </div>

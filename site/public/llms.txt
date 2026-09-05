@@ -22,9 +22,9 @@
 
 ## Platforms
 
-- macOS 14+ (Apple silicon): `brew install --cask --no-quarantine deathemperor/tap/infinitus`, or download `Infinitus.app` from the latest release. Builds are unsigned: first launch is right-click → Open.
+- macOS 14+ (Apple silicon): `brew install --cask deathemperor/tap/infinitus`, or download `Infinitus.app` from the latest release. Releases are Developer ID signed and notarized.
 - Linux: static `infinitus-tray` binaries for x86_64 and aarch64; Omarchy / Arch panel plugin for Quickshell (`packaging/omarchy/`), also on the AUR.
-- iOS companion app: in progress (mirror of the fleet state).
+- iOS companion app: fleet mirror, session chat, Live Activities, widgets and the share sheet; device builds from the repo, not on the App Store yet.
 
 ## Requirements
 
