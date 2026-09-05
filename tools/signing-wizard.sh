@@ -289,8 +289,18 @@ P12_PATH="${P12_PATH:-$HOME/Downloads/DeveloperID.p12}"
 P12_PATH="${P12_PATH/#\~/$HOME}"
 ask_secret P12_PASSWORD "The .p12 export password:"
 # A wrong password only surfaces in CI ("MAC verification failed during
-# PKCS12 import", release v0.4.3's first run) — check it here first.
-until [[ ! -f "$P12_PATH" ]] || openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:$P12_PASSWORD" 2>/dev/null; do
+# PKCS12 import", release v0.4.3's first run) — check it here first, with
+# the same `security import` the release job runs (openssl 3 rejects the
+# legacy ciphers Keychain Access exports with, even on the right password).
+p12_opens() {
+  local k; k="$(mktemp -d)/probe.keychain-db"
+  security create-keychain -p "" "$k" >/dev/null 2>&1 || return 1
+  security import "$1" -k "$k" -P "$2" -T /usr/bin/codesign >/dev/null 2>&1
+  local rc=$?
+  security delete-keychain "$k" >/dev/null 2>&1
+  return $rc
+}
+until [[ ! -f "$P12_PATH" ]] || p12_opens "$P12_PATH" "$P12_PASSWORD"; do
   warn "that password does not open $P12_PATH"
   ask_secret P12_PASSWORD "The .p12 export password (again):"
 done
