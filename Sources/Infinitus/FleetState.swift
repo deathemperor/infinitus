@@ -217,6 +217,39 @@ final class FleetState: ObservableObject, Identifiable {
         perform { try await engine.remove(fleet: provider, number: number) }
     }
 
+    /// Write every managed account to `path`. The file holds CREDENTIALS,
+    /// so the caller warns before offering it and this reports where it
+    /// landed rather than a bare success.
+    func exportAccounts(to path: URL, full: Bool, done: @escaping (String?) -> Void) {
+        let engine = engine
+        Task {
+            do {
+                try await engine.exportAccounts(to: path, account: nil, full: full)
+                done(nil)
+            } catch let error as CLIError {
+                // The engine's own words ("no accounts to export …"),
+                // which is what the user has to act on.
+                done(error.message)
+            } catch { done("\(error)") }
+        }
+    }
+
+    /// Read accounts back. `force` REPLACES existing slots — the caller
+    /// must have confirmed it. A successful import changes the fleet, so
+    /// the snapshot is refreshed before the completion runs.
+    func importAccounts(from path: URL, force: Bool, done: @escaping (String?) -> Void) {
+        let engine = engine
+        Task {
+            do {
+                try await engine.importAccounts(from: path, force: force)
+                await host.refreshSnapshot()
+                done(nil)
+            } catch let error as CLIError {
+                done(error.message)
+            } catch { done("\(error)") }
+        }
+    }
+
     /// Every account gets a fresh name from the theme's pool, in one
     /// pass (user 2026-09-04 "randomize account names").
     func randomizeNames() {

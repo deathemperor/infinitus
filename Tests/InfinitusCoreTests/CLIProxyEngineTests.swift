@@ -1,5 +1,11 @@
-#if !os(Linux)   // URLProtocol stubbing is unverified on corelibs-foundation
+// URLProtocol stubbing: Darwin, and swift-corelibs-foundation on Windows
+// (`protocolClasses` is honoured there — verified 2026-09-05). Linux is
+// still unverified, so it stays out.
+#if canImport(Darwin) || os(Windows)
 import XCTest
+#if canImport(FoundationNetworking)
+import FoundationNetworking   // URLProtocol/URLRequest live here off Darwin
+#endif
 @testable import InfinitusCore
 
 /// Records every request and answers by path — no proxy, no network.

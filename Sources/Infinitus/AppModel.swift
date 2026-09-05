@@ -315,6 +315,20 @@ final class AppModel: ObservableObject {
             relaunchApp()
         }
     }
+    /// Claude Code's settings.json points its API
+    /// (`env.ANTHROPIC_BASE_URL`) at the 9Router endpoint: the 9Router
+    /// fleet is what Claude Code actually hits, so it leads
+    /// (EngineRegistry.primary). Re-read only when the file changes —
+    /// refreshRouting.
+    @Published var routedVia9Router = false
+    /// Where the routed env points: the settings URL's origin
+    /// (scheme://host:port). The engine runs against THIS, not the
+    /// configured base URL — on this Mac the router lives on the LAN
+    /// (192.168.2.12:20128), so the loopback default would poll
+    /// nothing. Launch-time only; engines don't move once built.
+    private(set) var routingBaseURL: URL?
+    /// settings.json's stamp at the last routing read.
+    private var routingStamp: (mtime: Date, size: Int)?
     var nineRouterBaseURL: String {
         defaults.string(forKey: "9router_base_url") ?? NineRouterEngine.defaultBaseURL.absoluteString
     }
@@ -746,6 +760,25 @@ final class AppModel: ObservableObject {
         mockMode = mock
         cswapEnabled = defaults.object(forKey: "engine_cswap_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
+        // Claude Code → 9Router routing (user 2026-09-04): when the
+        // settings.json env names the 9Router base URL (or its
+        // well-known loopback port), Claude Code's requests ride
+        // 9Router and that engine leads. Riding the env is not a
+        // stored choice: the key is written only while absent, so an
+        // explicit off (false) wins, and an env removal drops the
+        // engine back off at the next launch. The write bypasses the
+        // @Published setter on purpose — its didSet relaunches. The
+        // router URL is read from defaults directly: computed
+        // properties are off-limits this early in init.
+        let routerURL = URL(string: defaults.string(forKey: "9router_base_url")
+            ?? NineRouterEngine.defaultBaseURL.absoluteString)
+        let routedSettings = playground ? nil : ClaudeCodeRouting.anthropicBaseURL()
+        let routed = ClaudeCodeRouting.isRouted(routedSettings, to: routerURL)
+        routingBaseURL = routed ? ClaudeCodeRouting.origin(of: routedSettings) ?? routerURL : nil
+        if routed, defaults.object(forKey: "engine_9router_enabled") == nil {
+            defaults.set(true, forKey: "engine_9router_enabled")
+        }
+        routedVia9Router = routed
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
         sortByHeadroom = defaults.object(forKey: "sort_headroom") as? Bool ?? true
@@ -806,11 +839,18 @@ final class AppModel: ObservableObject {
         if !playground, nineRouterEnabled, let url = URL(string: nineRouterBaseURL) {
             // A missing password still registers: 9Router with "require
             // login" off answers loopback anonymously; otherwise the first
-            // poll reports unauthorized and the pane says so.
+            // poll reports unauthorized and the pane says so. Routed?
+            // The engine runs where the env points (the origin), with
+            // the password looked up under that URL first — the
+            // dashboard password follows the router, not the config.
+            let base = routingBaseURL ?? url
             registry.register(NineRouterEngine(
-                baseURL: url,
-                password: Keychain.read(account: nineRouterBaseURL, service: Keychain.nineRouterService) ?? ""))
+                baseURL: base,
+                password: Keychain.read(account: base.absoluteString, service: Keychain.nineRouterService)
+                    ?? Keychain.read(account: nineRouterBaseURL, service: Keychain.nineRouterService)
+                    ?? ""))
         }
+        registry.routedEngineID = routedVia9Router ? NineRouterEngine.engineID : nil
         NSLog("Infinitus engines: %@", registry.engines.map(\.id).joined(separator: ", "))
         // Last run's snapshot renders NOW — the popup otherwise opened
         // as an empty sliver and expanded seconds later when the first
@@ -1106,9 +1146,17 @@ final class AppModel: ObservableObject {
             else { return nil }
             guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
             else { return nil }
+            // W9: the phone gates its composer on these. The Mac can always
+            // type into the session's terminal (PtyNudge), so `keys` is
+            // true; `canMessage` says whether the peer socket is listening.
+            let annotated = SessionFeed(
+                pid: feed.pid, sessionId: feed.sessionId, cwd: feed.cwd, status: feed.status,
+                waiting: feed.waiting, items: feed.items, name: feed.name, stamp: feed.stamp,
+                canMessage: !record.messagingSocketPath.isEmpty, keys: true,
+                permissionMode: feed.permissionMode)
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
-            return try? encoder.encode(feed)
+            return try? encoder.encode(annotated)
         }
         mirrorServer.awsLogin.set(
             start: { [weak self] request in
@@ -1747,7 +1795,38 @@ final class AppModel: ObservableObject {
     /// off the PRIMARY Claude fleet exactly as they did when cswap was
     /// the only engine. An engine that fails keeps its last good rows
     /// (the rumps menubar's _worker policy) and records its error.
+    /// Re-read Claude Code's settings.json for the routing env only
+    /// when the file changed (a stat per refresh, a parse on change).
+    /// Enablement and registration stay launch-time decisions — this
+    /// moves the primary fleet and the pane note only.
+    private func refreshRouting() {
+        guard !isPlayground else { return }
+        let url = ClaudeSessions.configHome().appendingPathComponent("settings.json")
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let mtime = attrs[.modificationDate] as? Date
+        else {
+            if routedVia9Router {
+                routedVia9Router = false
+                registry.routedEngineID = nil
+                NSLog("Infinitus routing: settings.json gone — Claude Code no longer routed via 9Router")
+            }
+            routingStamp = nil
+            return
+        }
+        let size = attrs[.size] as? Int ?? 0
+        if let stamp = routingStamp, stamp.mtime == mtime, stamp.size == size { return }
+        routingStamp = (mtime, size)
+        let routed = ClaudeCodeRouting.isRouted(
+            ClaudeCodeRouting.anthropicBaseURL(), to: URL(string: nineRouterBaseURL))
+        guard routed != routedVia9Router else { return }
+        routedVia9Router = routed
+        registry.routedEngineID = routed ? NineRouterEngine.engineID : nil
+        NSLog("Infinitus routing: Claude Code %@ 9Router (env.ANTHROPIC_BASE_URL)",
+              routed ? "routed via" : "no longer routed via")
+    }
+
     func refreshSnapshot() async {
+        refreshRouting()
         let engines = registry.engines
         guard !engines.isEmpty else { return }
         var results: [(id: String, fleets: [EngineFleet]?, error: Error?)] = []
@@ -1869,7 +1948,7 @@ final class AppModel: ObservableObject {
             updateBattlePlan(list)
             revivalPanel.sync(model: self)
         }
-        // The footer's ⚡ tokens/minute needs the transcripts read even
+    /// The footer's ⚡ tokens/minute needs the transcripts read even
         // with the sessions card closed (user 2026-09-03 "display
         // toks/m on bottom right status"). Every listed session, not
         // just the busy ones: a session that hit the expired AWS

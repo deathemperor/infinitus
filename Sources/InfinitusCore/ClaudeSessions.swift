@@ -1,4 +1,7 @@
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 
 /// A running Claude Code session, from `~/.claude/sessions/<pid>.json`.
 /// Claude Code's own bookkeeping (the same records `claude` reads to find
@@ -60,8 +63,19 @@ public enum ClaudeSessions {
 
     public static func isAlive(_ pid: Int32) -> Bool {
         guard pid > 1 else { return false }
+        #if os(Windows)
+        // No kill(2): a query-only handle is the whole check. STILL_ACTIVE on
+        // a reused pid is the ambiguity `WinProcess.isAlive(pid:procStart:)`
+        // settles with the FILETIME match.
+        guard let handle = OpenProcess(DWORD(PROCESS_QUERY_LIMITED_INFORMATION),
+                                       false, DWORD(UInt32(bitPattern: pid))) else { return false }
+        defer { CloseHandle(handle) }
+        var code: DWORD = 0
+        return GetExitCodeProcess(handle, &code) && code == STILL_ACTIVE
+        #else
         if kill(pid, 0) == 0 { return true }
         return errno == EPERM   // exists, just not ours
+        #endif
     }
 
     /// Live sessions. A record that cannot be read is skipped — one bad

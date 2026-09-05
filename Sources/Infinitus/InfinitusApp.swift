@@ -635,18 +635,42 @@ struct MenuContent: View {
         }
     }
 
-    /// Ten-plus accounts scroll instead of growing an off-screen popup.
+    private var totalAccounts: Int {
+        model.fleets.reduce(0, { $0 + $1.accounts.count })
+    }
+
+    /// Taller content scrolls to fit the screen without cutting off rows.
+    /// Stacked cards are 50-75pt each, so 4+ cards exceed standard heights.
+    /// Wide rows are ~28pt each, but multiple fleets add headers and spacing.
+    private var shouldScrollAccounts: Bool {
+        if model.popupLayout == "stacked" {
+            return totalAccounts > 3 || (totalAccounts > 2 && model.fleets.count > 1)
+        }
+        return totalAccounts > 4 || (totalAccounts > 3 && model.fleets.count > 1)
+    }
+
+    /// Dynamic height limit capped by available screen height so rows fit naturally.
+    private var accountScrollMaxHeight: CGFloat {
+        if let screen = NSScreen.main {
+            // Leave headroom for menu bar, header/footer chrome (~140pt), and screen margins
+            let available = screen.visibleFrame.height - 150
+            return max(480, min(720, available))
+        }
+        return 700
+    }
+
+    /// Fleets past the height threshold scroll instead of growing an off-screen popup.
     @ViewBuilder private var accountArea: some View {
         Group {
             if model.engineMissing {
                 OnboardingCard(model: model)
             } else if model.accounts.isEmpty && model.snapshotLoaded {
                 FirstAccountCard(model: model)
-            } else if model.fleets.reduce(0, { $0 + $1.accounts.count }) > 10 {
-                ScrollView(showsIndicators: false) {
+            } else if shouldScrollAccounts {
+                ScrollView(showsIndicators: true) {
                     FleetStack(fleets: model.fleets)
                 }
-                .frame(maxHeight: 560)
+                .frame(maxHeight: accountScrollMaxHeight)
             } else {
                 FleetStack(fleets: model.fleets)
             }

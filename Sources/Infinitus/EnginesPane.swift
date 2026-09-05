@@ -340,39 +340,11 @@ struct RoutingNotes: View {
     var affinity: Bool? = nil
 
     var body: some View {
-        Text(explainer).font(.caption).foregroundStyle(.secondary)
-        if strategy != nil, strategy != "fill-first" {
-            if affinity == nil {
-                Text("Turn on session-affinity in the proxy's config (this proxy has no "
-                     + "management route for it yet) so a conversation stays on one "
-                     + "credential: without it every request lands on a different account "
-                     + "and the prompt cache misses. Under affinity, Switch only steers "
-                     + "new sessions.")
-                    .font(.caption).foregroundStyle(.orange)
-            } else if affinity == false {
-                Text("Turn on session affinity so a conversation stays on one credential: "
-                     + "without it every request lands on a different account and the "
-                     + "prompt cache misses.")
-                    .font(.caption).foregroundStyle(.orange)
-            } else {
-                Text("Under affinity, Switch only steers new sessions; bound ones keep "
-                     + "their credential until the TTL lapses.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var explainer: String {
-        switch strategy {
-        case "round-robin":
-            return "Each request goes to the next credential in turn."
-        case "weighted-round-robin":
-            return "Requests rotate in proportion to each credential's priority."
-        case nil:
-            return "Read from the proxy on the next refresh."
-        default:
-            return "Highest priority wins until it is rate-limited \u{2014} cswap's "
-                + "consume-first. Switch in the Accounts tab raises a credential to the top."
+        Text(ProxyRoutingNotes.explainer(strategy: strategy)).font(.caption).foregroundStyle(.secondary)
+        if let warning = ProxyRoutingNotes.affinityWarning(strategy: strategy, affinity: affinity) {
+            Text(warning)
+                .font(.caption)
+                .foregroundStyle(affinity == true ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
         }
     }
 }
@@ -388,6 +360,17 @@ struct EngineToggleNotes: View {
                  + "Claude Code; the proxy rotates behind its own endpoint \u{2014} "
                  + "for the same accounts they fight. Run one per account set.")
                 .font(.caption).foregroundStyle(.orange)
+        }
+        if model.routedVia9Router {
+            Text(model.nineRouterEnabled
+                 ? "Claude Code is routed via 9Router \u{2014} env.ANTHROPIC_BASE_URL "
+                   + "in ~/.claude/settings.json points at it, and the 9Router fleet "
+                   + "is the one the title, resume nudge and pushes follow."
+                 : "Claude Code's env.ANTHROPIC_BASE_URL (~/.claude/settings.json) "
+                   + "points at 9Router, but the 9Router engine is off \u{2014} Claude "
+                   + "Code hits it unmanaged.")
+                .font(.caption)
+                .foregroundStyle(model.nineRouterEnabled ? Color.secondary : Color.orange)
         }
         Text("Flipping an engine restarts the app.")
             .font(.caption).foregroundStyle(.secondary)

@@ -24,11 +24,10 @@ public enum ThemeColor {
         case "brown": return .brown
         case "gray", "secondary": return .secondary
         default:
-            guard name.hasPrefix("#"), name.count == 7,
-                  let v = UInt32(name.dropFirst(), radix: 16) else { return .primary }
-            return Color(red: Double((v >> 16) & 0xff) / 255,
-                         green: Double((v >> 8) & 0xff) / 255,
-                         blue: Double(v & 0xff) / 255)
+            guard let c = ThemePalette.hex(name) else { return .primary }
+            return Color(red: Double(c.r) / 255,
+                         green: Double(c.g) / 255,
+                         blue: Double(c.b) / 255)
         }
     }
 }

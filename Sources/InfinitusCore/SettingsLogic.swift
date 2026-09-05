@@ -69,11 +69,20 @@ public struct ClaudeCodeConfig: Sendable {
     }
 
     public static func standard(home: String = NSHomeDirectory()) -> ClaudeCodeConfig {
-        ClaudeCodeConfig(
+        #if os(Windows)
+        return ClaudeCodeConfig(
+            userSettingsURL: ClaudeSessions.configHome(home: home).appendingPathComponent("settings.json"),
+            // No managed-settings equivalent on Windows; point at a path
+            // that never exists so `effectiveValue` falls through to user.
+            managedSettingsURL: URL(fileURLWithPath: "\(home)\\.infinitus-no-managed-settings")
+        )
+        #else
+        return ClaudeCodeConfig(
             userSettingsURL: URL(fileURLWithPath: "\(home)/.claude/settings.json"),
             managedSettingsURL: URL(
                 fileURLWithPath: "/Library/Application Support/ClaudeCode/managed-settings.json")
         )
+        #endif
     }
 
     public func effectiveValue(_ key: String) throws -> Effective? {

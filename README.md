@@ -74,6 +74,18 @@ Arch users can build from [`packaging/aur/PKGBUILD`](packaging/aur/) —
 > desktop session were involved. Reports from actual Linux desktops
 > welcome.
 
+### Windows — phone remote daemon (`infinitus-win`)
+
+Windows runs Claude Code natively (Windows Terminal + `claude.exe`), but
+Claude Code's built-in `--remote-control` is disabled under custom
+`ANTHROPIC_BASE_URL` configs. `infinitus-win` provides a native Windows daemon
+and CLI that bridges local Claude Code sessions, transcripts, and named pipes to
+the [Infinitus mobile companion](ios/InfinitusMobile).
+
+See [`windows/README.md`](windows/README.md) for toolchain setup (`winget install --id Swift.Toolchain -e`),
+build instructions, firewall configuration, and CLI commands (`serve`, `sessions`,
+`pair`, `snapshot`, `message`, `resume`).
+
 ### Requirements
 
 - macOS 14+ (best on macOS 26 — the glass chrome uses it)

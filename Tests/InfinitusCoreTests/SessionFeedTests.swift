@@ -234,6 +234,45 @@ final class SessionFeedTests: XCTestCase {
         XCTAssertNil(SessionFeedReader.parse(lines: [#"{"type":"user","uuid":"u-3","message":{"role":"user","content":"plain"}}"#], limit: 1).first?.images)
     }
 
+    /// W9: the newest `permission-mode` entry wins — the phone words a
+    /// held-for-approval delivery on it. The real entry shape (verified
+    /// against a live transcript, 2026-09-04) is a top-level
+    /// `{"type":"permission-mode","permissionMode":"…"}`.
+    func testPermissionModeTakesTheNewestEntry() throws {
+        let lines = [
+            #"{"type":"permission-mode","permissionMode":"default","sessionId":"s"}"#,
+            #"{"type":"user","uuid":"u-1","message":{"role":"user","content":"hi"}}"#,
+            #"{"type":"permission-mode","permissionMode":"bypassPermissions","sessionId":"s"}"#,
+        ]
+        XCTAssertEqual(SessionFeedReader.permissionMode(lines: lines), "bypassPermissions")
+        XCTAssertEqual(SessionFeedReader.permissionMode(lines: Array(lines.prefix(2))), "default")
+        XCTAssertNil(SessionFeedReader.permissionMode(lines: [lines[1]]),
+                     "a tail with no mode entry says nothing")
+    }
+
+    /// W9: the three new fields are optional, so a payload written before
+    /// they existed still decodes on the phone.
+    func testFeedDecodesWithoutTheAdditiveFields() throws {
+        let legacy = #"{"pid":1,"sessionId":"s","cwd":"/tmp","waiting":false,"items":[]}"#
+        let feed = try JSONDecoder().decode(SessionFeed.self, from: XCTUnwrap(legacy.data(using: .utf8)))
+        XCTAssertNil(feed.canMessage)
+        XCTAssertNil(feed.keys)
+        XCTAssertNil(feed.permissionMode)
+    }
+
+    /// W8: a Windows attachments path is backslash-separated, so the id
+    /// takes the last component either way (behaviour unchanged on Mac —
+    /// the case above still passes).
+    func testAttachedImageIdsTakeTheLastComponentOfAWindowsPath() throws {
+        let windows: [String: Any] = [
+            "type": "user", "uuid": "w-1", "timestamp": "2026-09-04T03:00:02.000Z",
+            "message": ["role": "user", "content":
+                #"look\#n\#n[attached: C:\Users\BM\AppData\Local\Infinitus\attachments\UUID-shot.png, C:\Users\BM\notes.txt]"#]]
+        let line = String(decoding: try JSONSerialization.data(withJSONObject: windows), as: UTF8.self)
+        XCTAssertEqual(SessionFeedReader.parse(lines: [line], limit: 1).first?.images,
+                       ["a:UUID-shot.png"])
+    }
+
     /// One pasted screenshot is a 400-600 KB transcript line (the base64
     /// tool result), wider than the whole 256 KiB tail: the phone then saw
     /// only what came after the last image (user 2026-09-04 "session msgs
@@ -272,7 +311,10 @@ final class SessionFeedTests: XCTestCase {
                                                    attachmentsDir: attachments)?.data, Data([1, 2, 3]))
         XCTAssertEqual(SessionFeedReader.imageData(record: record, id: "a:shot.png", claudeDir: claudeDir,
                                                    attachmentsDir: attachments)?.mime, "image/png")
-        for bad in ["a:../secret.png", "a:/etc/passwd", "a:shot.txt", "a:", "x:shot.png"] {
+        // Windows ids join the refusal list (W8): a backslash or a drive
+        // letter must never resolve outside the attachments folder.
+        for bad in ["a:../secret.png", "a:/etc/passwd", "a:shot.txt", "a:", "x:shot.png",
+                    "a:..\\secret.png", "a:C:\\Windows\\win.ini", "a:sub\\shot.png"] {
             XCTAssertNil(SessionFeedReader.imageData(record: record, id: bad, claudeDir: claudeDir,
                                                      attachmentsDir: attachments), bad)
         }

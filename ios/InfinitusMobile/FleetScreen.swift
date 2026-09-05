@@ -101,12 +101,17 @@ struct FleetScreen: View {
     /// cards in portrait, the wide grid in landscape
     /// (MirrorModel.popupLayout). Both render at their natural width now;
     /// PopupFit scales the whole popup to the screen.
+    /// Fleets with prefix "claude-code-" that have no accounts (like Windows)
+    /// are hidden from the Fleet tab (04-phone.md).
     @ViewBuilder private var accountArea: some View {
         Group {
-            if model.fleets.allSatisfy({ $0.accounts.isEmpty }) {
+            let visibleFleets = model.fleets.filter { fleet in
+                !(fleet.engineID.hasPrefix("claude-code-") && fleet.accounts.isEmpty)
+            }
+            if visibleFleets.allSatisfy({ $0.accounts.isEmpty }) {
                 EmptyView()
             } else {
-                FleetStack(fleets: model.fleets)
+                FleetStack(fleets: visibleFleets)
             }
         }
         .introContent(model)

@@ -14,6 +14,14 @@ final class TeamGitTests: XCTestCase {
         try? FileManager.default.removeItem(at: scratch)
     }
 
+    /// TeamGit shells out through `/usr/bin/env git` — macOS/Linux only
+    /// until Windows grows a PATH-resolved git shim (upstream, Team).
+    func skipOffPOSIX() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts are POSIX-only; not ported to Windows yet")
+        #endif
+    }
+
     /// A bare repo standing in for the team's remote.
     func makeRemote() throws -> String {
         let bare = scratch.appendingPathComponent("remote.git")
@@ -37,6 +45,7 @@ final class TeamGitTests: XCTestCase {
     }
 
     func testTwoClonesExchangeFilesThroughTheRemote() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
         let b = TeamGit(dir: scratch.appendingPathComponent("b"), remote: remote, token: nil, author: "kid-b")
@@ -83,6 +92,7 @@ final class TeamGitTests: XCTestCase {
     }
 
     func testBadPathsAreRefused() throws {
+        try skipOffPOSIX()
         let g = TeamGit(dir: scratch.appendingPathComponent("g"), remote: try makeRemote(), token: nil, author: "k")
         try g.open()
         XCTAssertThrowsError(try g.put("nope/x", Data()))
@@ -93,6 +103,7 @@ final class TeamGitTests: XCTestCase {
     /// I1: rebuilding the same bytes on the winner's tip is a blind
     /// overwrite for read-modify-write objects like the roster.
     func testALostRaceIsReportedWhenRetryIsOff() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let a = TeamGit(dir: scratch.appendingPathComponent("r-a"), remote: remote, token: nil, author: "kid-a")
         let b = TeamGit(dir: scratch.appendingPathComponent("r-b"), remote: remote, token: nil, author: "kid-b")

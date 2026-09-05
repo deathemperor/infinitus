@@ -25,9 +25,20 @@ final class EngineRegistry: ObservableObject {
         engines.first { $0.id == id }
     }
 
+    /// The engine whose endpoint Claude Code is actually pointed at —
+    /// set from `env.ANTHROPIC_BASE_URL` (AppModel). nil: nobody routed.
+    var routedEngineID: String?
+
     /// The Claude fleet the popup chrome, title, resume nudge and push
-    /// triggers reason about — cswap's when cswap is on.
-    var primary: FleetState? { fleets.first { $0.provider == .claude } }
+    /// triggers reason about — the routed engine's when Claude Code's
+    /// settings name it (2026-09-04), else cswap's when cswap is on.
+    var primary: FleetState? {
+        if let routed = routedEngineID,
+           let fleet = fleets.first(where: { $0.provider == .claude && $0.engineID == routed }) {
+            return fleet
+        }
+        return fleets.first { $0.provider == .claude }
+    }
 
     /// Find or create the state for a reported fleet.
     func state(for fleet: EngineFleet) -> FleetState {

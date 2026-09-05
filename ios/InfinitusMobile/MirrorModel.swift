@@ -7,8 +7,9 @@ import InfinitusUI
 /// Reads the fleet mirror a Mac already captured (#9 phase 1's
 /// `FleetMirror` seam) and republishes it as view-ready state.
 ///
-/// Coordinates one `MirrorFleetModel` per `EngineFleet` in the snapshot
-/// (#9 issue 9), stable instances keyed by engineID across refreshes —
+/// Coordinates one `MirrorFleetModel` per `EngineFleet` of every paired
+/// host (windows plan 04-phone), stable instances keyed by host + engine
+/// across refreshes —
 /// same split as the Mac's `EngineRegistry` / `FleetState`. Also
 /// conforms to `FleetModel` itself (#9 phase C2), as a FACADE over the
 /// primary (first Claude) fleet — same shape as the Mac's `AppModel` —
@@ -21,9 +22,19 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// side lands in the same fleets and Live Activities.
     static let shared = MirrorModel()
 
+    /// Every host's last snapshot, keyed by `MirrorHost.id` — the merged
+    /// sessions list reads the whole map; the facade reads the primary
+    /// host's, kept in `snapshot` for the pre-multi-host readers.
+    @Published private(set) var snapshots: [String: MirrorSnapshot] = [:]
+    /// The PRIMARY host's snapshot (the Mac): forecast, plan, footer
+    /// chips and Live Activities all read this one.
     @Published private(set) var snapshot: MirrorSnapshot?
-    /// Sessions the Mac says need an AWS sign-in (AwsLoginScreen).
-    var awsLogins: [AwsLogin.Item] { snapshot?.awsLogins ?? [] }
+    /// Sessions waiting for an AWS sign-in (AwsLoginScreen), every host
+    /// merged in stored order — a Windows daemon reports none, so this
+    /// is the Mac's today.
+    var awsLogins: [AwsLogin.Item] {
+        hosts.compactMap { snapshots[$0.id]?.awsLogins }.flatMap { $0 }
+    }
     func awsLogin(for pid: Int) -> AwsLogin.Item? {
         awsLogins.first { $0.pid == pid }
     }
@@ -50,8 +61,16 @@ final class MirrorModel: ObservableObject, FleetModel {
     private let mirror: FleetMirror
     private let defaults: UserDefaults
     /// Whether the LAN transport is in play (it isn't when the simulator
-    /// is pointed at a file with INFINITUS_MIRROR_PATH).
+    /// is pointed at a file with INFINITUS_MIRROR_PATH, or at a fixture
+    /// host list with INFINITUS_MIRROR_PATHS).
     private let usesLAN: Bool
+
+    /// A dev-seam override, with an empty value read as unset — a shell
+    /// exports a variable empty more often than it unsets it.
+    private static func envValue(_ key: String) -> String? {
+        let value = ProcessInfo.processInfo.environment[key]
+        return (value?.isEmpty == false) ? value : nil
+    }
 
     // MARK: display prefs — Follow Mac, or local overrides
 
@@ -77,42 +96,65 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// one toggle away — the native tab shell is the default.
     @Published var macPopupView: Bool { didSet { defaults.set(macPopupView, forKey: "mac_popup_view") } }
 
-    // MARK: LAN transport (#9)
+    // MARK: LAN transport (#9, one host per record since the windows plan)
 
-    /// Every `host:port` (or pairing-QR URL) the phone will try, in order
-    /// — empty means "use Bonjour only". The mirror reads the same list
-    /// straight from UserDefaults (#9 pair once, every route).
-    @Published var manualEndpoints: [String] {
-        didSet {
-            defaults.set(manualEndpoints, forKey: NetworkFleetMirror.manualKey)
-            ShareBridge.publish(defaults)
-        }
+    /// Every paired host, in stored order — the Mac first (host #0, the
+    /// migrated record). The transport reads the same store straight
+    /// from UserDefaults (#9 pair once, every route), so an edit takes
+    /// effect at once either way.
+    @Published private(set) var hosts: [MirrorHost] = []
+    /// What the Settings screen shows about each connection.
+    @Published private(set) var transportStatuses: [String: String] = [:]
+    /// Pre-multi-host readers (Settings' connection section, the session
+    /// detail's status line): the primary host's line, else the first
+    /// host that has one.
+    var transportStatus: String {
+        if let id = primaryHostID, let line = transportStatuses[id] { return line }
+        return hosts.compactMap { transportStatuses[$0.id] }.first ?? ""
     }
-    /// The Mac's pairing token (#9 remote access): without it every
-    /// request comes back 401, whether the Mac was found by Bonjour, by
-    /// address, or through a tunnel.
-    @Published var pairToken: String {
-        didSet {
+
+    /// Host #0's face, for the two fields Settings still binds (W14's
+    /// Hosts section replaces them): the Mac's route list and its token.
+    var manualEndpoints: [String] {
+        get { hosts.first?.endpoints ?? [] }
+        set { updateFirstHost { $0.endpoints = newValue } }
+    }
+    /// The Mac's pairing token: without it every request comes back 401,
+    /// however the host was found.
+    var pairToken: String {
+        get { hosts.first?.token ?? "" }
+        set {
             // What's stored is always the normalised token, so a token
-            // typed with lowercase or dashes still matches; assigning
-            // back to `pairToken` re-enters `didSet` (Swift does fire it
-            // for a nested assignment) and only tidies the field.
-            let normalized = MirrorPairing.normalize(pairToken)
-            defaults.set(normalized, forKey: NetworkFleetMirror.tokenKey)
-            if normalized != pairToken { pairToken = normalized }
-            ShareBridge.publish(defaults)
+            // typed with lowercase or dashes still matches.
+            updateFirstHost { $0.token = MirrorPairing.normalize(newValue) }
         }
     }
-    /// What the Settings screen shows about the connection.
-    @Published private(set) var transportStatus = ""
+
+    /// Writes host #0 through the store and reloads, so the transport
+    /// sees the change on its very next fetch. Fixture hosts aren't in
+    /// the store — nothing to update there.
+    private func updateFirstHost(_ change: (inout MirrorHost) -> Void) {
+        guard usesLAN, let first = hosts.first else { return }
+        MirrorHostStore.update(first.id, defaults, change)
+        hosts = MirrorHostStore.load(defaults)
+        // The share extension (#64) reads the pairing through the
+        // keychain — an edited route list or token must reach it.
+        ShareBridge.publish(host: hosts.first, defaults)
+    }
+
+    /// The host the facade reads — the one `primary` came from.
+    var primaryHostID: String? { primary?.hostID }
 
     init(mirror: FleetMirror? = nil, defaults: UserDefaults = .standard) {
         self.mirror = mirror ?? Self.makeMirror()
         self.defaults = defaults
-        usesLAN = mirror == nil && ProcessInfo.processInfo
-            .environment["INFINITUS_MIRROR_PATH"] == nil
-        manualEndpoints = NetworkFleetMirror.storedEndpoints(defaults)
-        pairToken = defaults.string(forKey: NetworkFleetMirror.tokenKey) ?? ""
+        usesLAN = mirror == nil && Self.envValue("INFINITUS_MIRROR_PATH") == nil
+            && Self.envValue("INFINITUS_MIRROR_PATHS") == nil
+        if usesLAN {
+            hosts = MirrorHostStore.load(defaults)   // runs the legacy migration
+        } else if let spec = Self.envValue("INFINITUS_MIRROR_PATHS") {
+            hosts = MirrorHostStore.fixtureHosts(spec).map { $0.host }
+        }
         followMac = defaults.object(forKey: "follow_mac") as? Bool ?? true
         localThemeID = defaults.string(forKey: "gamification_style") ?? "off"
         localCompactRows = defaults.object(forKey: "compact_rows") as? Bool ?? false
@@ -123,18 +165,24 @@ final class MirrorModel: ObservableObject, FleetModel {
         macPopupView = defaults.object(forKey: "mac_popup_view") as? Bool ?? false
     }
 
-    /// Pairs with a Mac from a scanned QR or an `infinitus://pair?…` deep
-    /// link: every route the QR carries replaces the stored list (#9 pair
-    /// once, every route) — a fresh scan is meant to reset, not append —
-    /// the token beside it. Returns false for anything that isn't one of
-    /// our pair URLs.
+    /// Pairs with a machine from a scanned QR or an `infinitus://pair?…`
+    /// deep link. Multi-host rule (windows plan README): the same token
+    /// is the same machine — every route the QR carries replaces that
+    /// host's list (#9 pair once, every route) — any other token is a
+    /// NEW host appended to the list, so a scan never unpairs the Mac.
+    /// Returns the paired host, or nil for anything that isn't one of our pair URLs.
     @discardableResult
-    func applyPairing(_ text: String) -> Bool {
-        guard let pairing = MirrorPairing.parsePairURL(text) else { return false }
-        manualEndpoints = pairing.endpoints
-        pairToken = pairing.token
+    func applyPairing(_ text: String) -> MirrorHost? {
+        guard let pairing = MirrorPairing.parsePairURL(text) else { return nil }
+        let paired = MirrorHostStore.upsert(endpoints: pairing.endpoints,
+                                            token: pairing.token, defaults)
+        if usesLAN {
+            hosts = MirrorHostStore.load(defaults)
+        } else if !hosts.contains(where: { $0.id == paired.id }) {
+            hosts.append(paired)   // fixture mode: a host the store doesn't hold
+        }
         Task { await refresh() }
-        return true
+        return paired
     }
 
     /// Adds an endpoint typed into Settings, de-duplicated — the field
@@ -150,14 +198,47 @@ final class MirrorModel: ObservableObject, FleetModel {
         manualEndpoints.remove(atOffsets: offsets)
     }
 
-    /// `INFINITUS_MIRROR_PATH` lets a simulator point at the Mac's live
-    /// export; otherwise the LAN transport (#9) fetches the snapshot from
-    /// whichever Mac advertises `_infinitus._tcp`, with the app's own
-    /// Documents copy as the offline fallback.
+    /// Swipe-to-delete in the Hosts section (W14's screen): dropping a
+    /// host's record drops its token with it — that IS the revoke.
+    func removeHost(at offsets: IndexSet) {
+        guard usesLAN else { return }
+        var stored = MirrorHostStore.load(defaults)
+        stored.remove(atOffsets: offsets)
+        MirrorHostStore.save(stored, defaults)
+        hosts = stored
+    }
+
+    /// Delete a single host by its id.
+    func removeHost(id: String) {
+        guard usesLAN else { return }
+        var stored = MirrorHostStore.load(defaults)
+        stored.removeAll { $0.id == id }
+        MirrorHostStore.save(stored, defaults)
+        hosts = stored
+    }
+
+    /// Update a host's properties in the store and reload.
+    func updateHost(_ id: String, _ change: (inout MirrorHost) -> Void) {
+        guard usesLAN else { return }
+        MirrorHostStore.update(id, defaults, change)
+        hosts = MirrorHostStore.load(defaults)
+    }
+
+    /// `INFINITUS_MIRROR_PATH` lets a simulator point at one machine's
+    /// live export, `INFINITUS_MIRROR_PATHS` at a colon-separated list
+    /// of fixture snapshots (one per host — see `MirrorHostStore`);
+    /// otherwise the LAN transport (#9) fetches from every paired host,
+    /// with the app's own Documents copy as the offline fallback.
     /// `fileprivate`, not `private`: `MobileUsage` below reuses it to read
     /// the same snapshot independently (#9 phase D1a).
     fileprivate static func makeMirror() -> FleetMirror {
-        if let path = ProcessInfo.processInfo.environment["INFINITUS_MIRROR_PATH"] {
+        if let paths = envValue("INFINITUS_MIRROR_PATHS") {
+            let files = MirrorHostStore.fixturePaths(paths).map {
+                FileFleetMirror(url: URL(fileURLWithPath: $0))
+            }
+            if !files.isEmpty { return ChainFleetMirror(mirrors: files) }
+        }
+        if let path = envValue("INFINITUS_MIRROR_PATH") {
             return FileFleetMirror(url: URL(fileURLWithPath: path))
         }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -176,100 +257,211 @@ final class MirrorModel: ObservableObject, FleetModel {
 
     func refresh() async {
         do {
-            guard let snapshot = try await mirror.latest() else {
-                self.snapshot = nil
-                prefs = nil
-                error = nil
-                fleets = []
-                fleetSinks = [:]
-                if usesLAN { transportStatus = await NetworkFleetMirror.shared.statusText }
-                return
-            }
-            let engineFleets: [EngineFleet]
-            if let snapshotFleets = snapshot.fleets {
-                // Newer Mac: one EngineFleet per engine, already in
-                // popup order — listJSON is cswap's `raw` bytes under
-                // this roof, so it's never re-decoded here.
-                engineFleets = snapshotFleets
+            if usesLAN {
+                await refreshHosts()
             } else {
-                // Older Mac: the only fleet is the legacy listJSON one,
-                // wrapped as an EngineFleet so `apply` stays one path.
-                guard let list = Self.decodeList(snapshot.listJSON) else {
-                    error = "couldn't read the mirrored fleet data"
-                    return
-                }
-                engineFleets = [EngineFleet(
-                    engineID: MirrorFleetModel.cswapEngineID, provider: .claude,
-                    accounts: list.accounts, activeNumber: list.activeAccountNumber,
-                    nextCandidate: list.nextCandidate, nextRecovery: list.nextRecovery,
-                    liveSessions: list.liveSessions, raw: snapshot.listJSON)]
-            }
-            self.snapshot = snapshot
-            prefs = snapshot.prefs
-            if usesLAN { transportStatus = await NetworkFleetMirror.shared.statusText }
-            // The route that just answered is now the last-good one; the
-            // share extension (#64) reads the pairing through the keychain.
-            ShareBridge.publish(defaults)
-            ShareSuggestions.sync(sessions: liveSessions?.sessions ?? [],
-                                  name: { sessionProgress.byPid[$0]?.name }, theme: rowTheme)
-            AppIcons.follow(themeID: rowTheme.id)
-            sessionProgress.apply(snapshot.progressByPid ?? [:], tokenRate: snapshot.tokenRate)
-            let firstLoad = reconcile(engineFleets)
-            error = nil
-            AwsLoginAlerts.shared.sync(snapshot.awsLogins ?? [])
-            if let fleet = fleets.first(where: { $0.provider == .claude }) ?? fleets.first {
-                FleetAlarmCenter.shared.sync(accounts: fleet.accounts, activeNumber: fleet.activeNumber,
-                                             macPushesAlerts: snapshot.pushesAlerts ?? false)
-            }
-            LiveActivities.shared.sync(
-                fleet: fleets.first { $0.provider == .claude } ?? fleets.first,
-                machine: snapshot.machineName, tokenRate: snapshot.tokenRate,
-                capturedAt: snapshot.capturedAt)
-            if firstLoad {
-                DispatchQueue.main.async { self.replayIntro() }
+                try await refreshFile()
             }
         } catch {
             self.error = error.localizedDescription
         }
     }
 
+    /// The multi-host fan-out (04-phone): every paired host is asked at
+    /// once, and each one's fleets join the merge in stored order — a
+    /// dead host costs its own 3 s and degrades only its own section.
+    private func refreshHosts() async {
+        let answered = await NetworkFleetMirror.shared.latestAll(hosts)
+        // The transport is the store's other writer (a swapped
+        // quick-tunnel URL, a new last-good endpoint) — re-read rather
+        // than second-guess it.
+        hosts = MirrorHostStore.load(defaults)
+        transportStatuses = await NetworkFleetMirror.shared.statuses
+        var perHost: [(hostID: String, fleets: [EngineFleet])] = []
+        var progress: [(hostID: String, byPid: [Int: SessionProgress])] = []
+        var rates: [String: TokenRate] = [:]
+        var decodeFailure: String?
+        var liveIDs: Set<String> = []
+        // A host that went away stops contributing its last snapshot at
+        // once; one that's merely unreachable keeps its previous one.
+        snapshots = snapshots.filter { id, _ in hosts.contains { $0.id == id } }
+        for (host, snapshot) in answered {
+            guard let snapshot else { continue }
+            guard let hostFleets = fleets(in: snapshot) else {
+                decodeFailure = "couldn't read the mirrored fleet data"
+                continue
+            }
+            liveIDs.insert(host.id)
+            snapshots[host.id] = snapshot
+            perHost.append((hostID: host.id, fleets: hostFleets))
+            progress.append((hostID: host.id, byPid: snapshot.progressByPid ?? [:]))
+            rates[host.id] = snapshot.tokenRate
+            // The QR carries neither label nor emoji — the first
+            // snapshot names and emoji's a freshly paired host.
+            if host.label.isEmpty || host.emoji.isEmpty {
+                MirrorHostStore.update(host.id, defaults) {
+                    if $0.label.isEmpty { $0.label = snapshot.machineName }
+                    if $0.emoji.isEmpty { $0.emoji = MirrorHost.defaultEmoji(for: snapshot) }
+                }
+            }
+        }
+        hosts = MirrorHostStore.load(defaults)   // the name fills above
+        // A host that just didn't answer keeps its last progress rows on
+        // screen — the same rule the cached snapshot follows. Live hosts
+        // come first, so a pid both report resolves to the live one.
+        for host in hosts where !liveIDs.contains(host.id) {
+            var rows: [Int: SessionProgress] = [:]
+            for (key, value) in sessionProgress.byKey where key.hostID == host.id {
+                rows[key.pid] = value
+            }
+            if !rows.isEmpty { progress.append((hostID: host.id, byPid: rows)) }
+        }
+        sessionProgress.apply(progress, rates: rates)
+        let firstLoad = reconcile(perHost)
+        sessionProgress.primaryHostID = primaryHostID
+        snapshot = primaryHostID.flatMap { snapshots[$0] }
+        prefs = snapshot?.prefs
+        error = decodeFailure
+        // The route that just answered is now the primary host's
+        // last-good one; the share extension (#64) reads the pairing
+        // through the keychain.
+        ShareBridge.publish(host: hosts.first { $0.id == primaryHostID } ?? hosts.first, defaults)
+        ShareSuggestions.sync(sessions: liveSessions?.sessions ?? [],
+                              name: { sessionProgress.byPid[$0]?.name }, theme: rowTheme)
+        AppIcons.follow(themeID: rowTheme.id)
+        AwsLoginAlerts.shared.sync(awsLogins)
+        if let fleet = primary {
+            FleetAlarmCenter.shared.sync(accounts: fleet.accounts, activeNumber: fleet.activeNumber,
+                                         macPushesAlerts: snapshot?.pushesAlerts ?? false)
+        }
+        LiveActivities.shared.sync(
+            fleet: primary, machine: snapshot?.machineName ?? "",
+            tokenRate: sessionProgress.tokenRate,
+            capturedAt: snapshot?.capturedAt ?? .distantPast)
+        if firstLoad {
+            DispatchQueue.main.async { self.replayIntro() }
+        }
+    }
+
+    /// The file path — one snapshot, one host. `INFINITUS_MIRROR_PATH(S)`
+    /// fixtures and the Documents offline copy both come through here,
+    /// so the pre-multi-host behaviour is exactly what it was.
+    private func refreshFile() async throws {
+        guard let snapshot = try await mirror.latest() else {
+            self.snapshot = nil
+            snapshots = [:]
+            prefs = nil
+            error = nil
+            fleets = []
+            fleetSinks = [:]
+            transportStatuses = [:]
+            return
+        }
+        guard let hostFleets = fleets(in: snapshot) else {
+            error = "couldn't read the mirrored fleet data"
+            return
+        }
+        // The fixture host this snapshot belongs to (labelled from its
+        // machineName), else a synthetic one for the Documents copy —
+        // either way the merge below stays one path.
+        let host = hosts.first { $0.label == snapshot.machineName } ?? hosts.first
+            ?? MirrorHost(id: "file", label: snapshot.machineName,
+                          emoji: MirrorHost.defaultEmoji(for: snapshot))
+        if hosts.isEmpty { hosts = [host] }
+        snapshots = [host.id: snapshot]
+        transportStatuses = [:]
+        sessionProgress.apply([(hostID: host.id, byPid: snapshot.progressByPid ?? [:])],
+                              rates: [host.id: snapshot.tokenRate])
+        let firstLoad = reconcile([(hostID: host.id, fleets: hostFleets)])
+        sessionProgress.primaryHostID = primaryHostID
+        self.snapshot = snapshot
+        prefs = snapshot.prefs
+        error = nil
+        ShareSuggestions.sync(sessions: liveSessions?.sessions ?? [],
+                              name: { sessionProgress.byPid[$0]?.name }, theme: rowTheme)
+        AppIcons.follow(themeID: rowTheme.id)
+        AwsLoginAlerts.shared.sync(awsLogins)
+        if let fleet = primary {
+            FleetAlarmCenter.shared.sync(accounts: fleet.accounts, activeNumber: fleet.activeNumber,
+                                         macPushesAlerts: snapshot.pushesAlerts ?? false)
+        }
+        LiveActivities.shared.sync(
+            fleet: primary, machine: snapshot.machineName, tokenRate: snapshot.tokenRate,
+            capturedAt: snapshot.capturedAt)
+        if firstLoad {
+            DispatchQueue.main.async { self.replayIntro() }
+        }
+    }
+
+    /// One host's snapshot → its fleets, in popup order (`nil` when an
+    /// older Mac's `listJSON` doesn't decode).
+    private func fleets(in snapshot: MirrorSnapshot) -> [EngineFleet]? {
+        if let snapshotFleets = snapshot.fleets {
+            // Newer Mac: one EngineFleet per engine, already in popup
+            // order — listJSON is cswap's `raw` bytes under this roof,
+            // so it's never re-decoded here.
+            return snapshotFleets
+        }
+        // Older Mac: the only fleet is the legacy listJSON one, wrapped
+        // as an EngineFleet so `apply` stays one path.
+        guard let list = Self.decodeList(snapshot.listJSON) else { return nil }
+        return [EngineFleet(engineID: MirrorFleetModel.cswapEngineID, provider: .claude,
+                            accounts: list.accounts, activeNumber: list.activeAccountNumber,
+                            nextCandidate: list.nextCandidate, nextRecovery: list.nextRecovery,
+                            liveSessions: list.liveSessions, raw: snapshot.listJSON)]
+    }
+
     /// Find-or-create one `MirrorFleetModel` per reported fleet — stable
-    /// instances keyed by engineID across refreshes, same as the Mac's
-    /// `EngineRegistry.state(for:)`, so each fleet's ticks/animations
-    /// survive the next snapshot. Returns whether the PRIMARY fleet
-    /// (first Claude fleet, else the first) just loaded its first
-    /// snapshot — `refresh` uses that to decide whether to replay the
-    /// intro, exactly as `AppModel.refreshSnapshot` does off `primary`.
-    private func reconcile(_ engineFleets: [EngineFleet]) -> Bool {
+    /// instances keyed by host + engine across refreshes, same as the
+    /// Mac's `EngineRegistry.state(for:)`, so each fleet's ticks and
+    /// animations survive the next snapshot AND two hosts' `cswap`
+    /// fleets never merge. Returns whether the PRIMARY fleet just loaded
+    /// its first snapshot — `refresh` uses that to decide whether to
+    /// replay the intro, exactly as `AppModel.refreshSnapshot` does off
+    /// `primary`.
+    private func reconcile(_ perHost: [(hostID: String, fleets: [EngineFleet])]) -> Bool {
         var existing = Dictionary(uniqueKeysWithValues: fleets.map { ($0.id, $0) })
         var changesByID: [String: MirrorFleetModel.Change] = [:]
         var newFleets: [MirrorFleetModel] = []
-        for ef in engineFleets {
-            let fleet: MirrorFleetModel
-            if let found = existing.removeValue(forKey: ef.key) {
-                fleet = found
-            } else {
-                fleet = MirrorFleetModel(engineID: ef.engineID, provider: ef.provider, host: self)
-                // Delayed mutations (death/revive ticks, the switch
-                // flash) land on the fleet with no coincident publish
-                // here — forward them so every observer of `self`
-                // (haptics, the facade) still sees them.
-                fleetSinks[ef.key] = fleet.objectWillChange
-                    .sink { [weak self] _ in self?.objectWillChange.send() }
+        for (hostID, hostFleets) in perHost {
+            for ef in hostFleets {
+                let key = "\(hostID)/\(ef.key)"
+                let fleet: MirrorFleetModel
+                if let found = existing.removeValue(forKey: key) {
+                    fleet = found
+                } else {
+                    fleet = MirrorFleetModel(hostID: hostID, engineID: ef.engineID,
+                                             provider: ef.provider, host: self)
+                    // Delayed mutations (death/revive ticks, the switch
+                    // flash) land on the fleet with no coincident publish
+                    // here — forward them so every observer of `self`
+                    // (haptics, the facade) still sees them.
+                    fleetSinks[key] = fleet.objectWillChange
+                        .sink { [weak self] _ in self?.objectWillChange.send() }
+                }
+                changesByID[key] = fleet.apply(ef)
+                newFleets.append(fleet)
             }
-            changesByID[ef.key] = fleet.apply(ef)
-            newFleets.append(fleet)
         }
         for goneID in existing.keys { fleetSinks.removeValue(forKey: goneID) }
         fleets = newFleets
-        let primaryID = (newFleets.first { $0.provider == .claude } ?? newFleets.first)?.id
+        let primaryID = pickPrimary(newFleets)?.id
         return primaryID.flatMap { changesByID[$0] }?.firstLoad ?? false
     }
 
     /// The primary Claude fleet — cswap's, on a cswap machine — the
     /// facade below reads (`AppModel`'s exact rule).
-    var primary: MirrorFleetModel? {
-        fleets.first { $0.provider == .claude } ?? fleets.first
+    var primary: MirrorFleetModel? { pickPrimary(fleets) }
+
+    /// Which fleet the facade reads once hosts merge (04-phone): the
+    /// first host that has a `.claude` fleet WITH accounts — the Mac,
+    /// whose cswap list is what the Fleet tab mirrors. A Windows host's
+    /// fleet carries `accounts: []` and never wins it; the older
+    /// first-Claude-fleet rule is the fallback.
+    private func pickPrimary(_ list: [MirrorFleetModel]) -> MirrorFleetModel? {
+        list.first { $0.provider == .claude && !$0.accounts.isEmpty }
+            ?? list.first { $0.provider == .claude }
+            ?? list.first
     }
 
     /// Intro phase timing, AppModel's formulas: bars (and the active-row
@@ -389,17 +581,51 @@ final class MirrorModel: ObservableObject, FleetModel {
 }
 
 /// The sessions card's progress feed on the phone (#9 phase D2): the
-/// per-pid `SessionProgress` the Mac already read from its transcripts
-/// and put in the snapshot. No transcripts to read here, so `refresh`
-/// keeps the protocol's no-op.
+/// per-pid `SessionProgress` each host read from its transcripts and put
+/// in its snapshot. No transcripts to read here, so `refresh` keeps the
+/// protocol's no-op.
 @MainActor
 final class MobileSessionProgress: ObservableObject, SessionProgressSource {
-    @Published private(set) var byPid: [Int: SessionProgress] = [:]
-    @Published private(set) var tokenRate: TokenRate?
+    /// A session's address once two hosts merge into one list — a pid
+    /// alone can't tell two machines' sessions apart.
+    struct SessionKey: Hashable {
+        let hostID: String
+        let pid: Int
+    }
 
-    func apply(_ byPid: [Int: SessionProgress], tokenRate: TokenRate?) {
-        if byPid != self.byPid { self.byPid = byPid }
-        if tokenRate != self.tokenRate { self.tokenRate = tokenRate }
+    /// Every host's rows, keyed (host, pid) — the merged sessions list
+    /// (W14) looks rows up by the same key it keys its rows with.
+    @Published private(set) var byKey: [SessionKey: SessionProgress] = [:]
+    /// The pre-multi-host shape `SessionProgressSource` still speaks.
+    /// When two hosts report the same pid, the earlier one in stored
+    /// order — the Mac — wins.
+    @Published private(set) var byPid: [Int: SessionProgress] = [:]
+    /// Each host's fleet-wide output tokens per minute.
+    private var rates: [String: TokenRate] = [:]
+    /// Which host's rate `tokenRate` reads — MirrorModel's primary (the
+    /// Mac), falling back to whichever host reported one.
+    var primaryHostID: String?
+
+    /// One apply per refresh, with every host's rows in stored order, so
+    /// both maps are rebuilt whole (a host that dropped off leaves
+    /// nothing stale behind).
+    func apply(_ perHost: [(hostID: String, byPid: [Int: SessionProgress])],
+               rates: [String: TokenRate]) {
+        var keyed: [SessionKey: SessionProgress] = [:]
+        var pids: [Int: SessionProgress] = [:]
+        for (hostID, rows) in perHost {
+            for (pid, progress) in rows {
+                keyed[SessionKey(hostID: hostID, pid: pid)] = progress
+                if pids[pid] == nil { pids[pid] = progress }
+            }
+        }
+        if keyed != byKey { byKey = keyed }
+        if pids != byPid { byPid = pids }
+        if rates != self.rates { self.rates = rates }
+    }
+
+    var tokenRate: TokenRate? {
+        rates[primaryHostID ?? ""] ?? rates.values.first
     }
 }
 

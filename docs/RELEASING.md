@@ -53,7 +53,15 @@ released zip is built after it. Once a notarized release exists, drop the
 
 Local check of a Developer ID build: the wizard's stage 3 re-signs a
 copy of `Infinitus.app` in a temp dir, notarizes, staples and runs
-`spctl --assess` on it — no rebuild, the repo bundle untouched.
+`spctl --assess` on it — no rebuild, the repo bundle untouched. Or via
+`SIGN_IDENTITY="Developer ID Application: …" ./make-app.sh && spctl --assess --type execute -vv Infinitus.app`.
+
+## Versioning & Bumping
+
+When bumping the release version:
+1. Update `VERSION` file at repo root.
+2. Update `InfinitusVersion.current` in `Sources/InfinitusCore/InfinitusVersion.swift` to match. Both Windows binaries (`infinitus-win` and `infinitus-tray-win`) read this constant.
+3. Verify agreement using `swift test --filter VersionTests`.
 
 ## Phone
 

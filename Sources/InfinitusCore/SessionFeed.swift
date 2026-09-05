@@ -103,10 +103,26 @@ public struct SessionFeed: Codable, Sendable {
     /// as `?since=` so the Mac can hold the reply until something changed
     /// (long-poll). New optional field.
     public let stamp: String?
+    /// Whether a message can be delivered to this session at all: a peer
+    /// channel is listening (Mac: the unix socket; Windows: the named
+    /// pipe). The phone gates its composer on it. Additive optional — an
+    /// older host omits it and the phone assumes yes, as it did before.
+    public let canMessage: Bool?
+    /// Whether the host can type into the session's terminal (the PTY
+    /// nudge path). True on the Mac, false on Windows: Windows Terminal
+    /// exposes no send-keys, so a session with no peer channel can't be
+    /// reached at all there.
+    public let keys: Bool?
+    /// The session's permission mode as its transcript last reported it
+    /// (`default`, `bypass`, …). A `default`-mode session HOLDS an
+    /// inbound peer message for its user's approval, so the phone says so
+    /// instead of implying the message was delivered.
+    public let permissionMode: String?
 
     public init(pid: Int32, sessionId: String, cwd: String, status: String?,
                 waiting: Bool, items: [SessionFeedItem], name: String? = nil,
-                stamp: String? = nil) {
+                stamp: String? = nil, canMessage: Bool? = nil, keys: Bool? = nil,
+                permissionMode: String? = nil) {
         self.pid = pid
         self.sessionId = sessionId
         self.cwd = cwd
@@ -115,6 +131,9 @@ public struct SessionFeed: Codable, Sendable {
         self.items = items
         self.name = name
         self.stamp = stamp
+        self.canMessage = canMessage
+        self.keys = keys
+        self.permissionMode = permissionMode
     }
 }
 
@@ -145,18 +164,35 @@ public enum SessionFeedReader {
         guard !record.sessionId.isEmpty else { return nil }
         let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
         var window = tailBytes
-        var parsed = parse(lines: tail(of: url, maxBytes: window), limit: limit)
+        var lines = tail(of: url, maxBytes: window)
+        var parsed = parse(lines: lines, limit: limit)
         let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
         while parsed.count < limit, window < size, window < tailBytesMax {
             window *= 4
-            parsed = parse(lines: tail(of: url, maxBytes: window), limit: limit)
+            lines = tail(of: url, maxBytes: window)
+            parsed = parse(lines: lines, limit: limit)
         }
         let raw = attachAgents(parsed, transcript: url)
         let (items, waiting) = finalize(items: raw, status: record.status,
                                         statusUpdatedAt: record.statusUpdatedAt)
         return SessionFeed(pid: record.pid, sessionId: record.sessionId, cwd: record.cwd,
                            status: record.status, waiting: waiting, items: items,
-                           name: record.name, stamp: stamp(record: record, claudeDir: claudeDir))
+                           name: record.name, stamp: stamp(record: record, claudeDir: claudeDir),
+                           permissionMode: permissionMode(lines: lines))
+    }
+
+    /// The newest `permission-mode` entry's mode in the transcript tail —
+    /// Claude Code writes one whenever the mode changes. Nil when the tail
+    /// holds none (the session never changed mode since it aged out).
+    public static func permissionMode(lines: [String]) -> String? {
+        for line in lines.reversed() where line.contains("\"permission-mode\"") {
+            guard let entry = decodeLine(line),
+                  (entry["subtype"] as? String) == "permission-mode" ||
+                  (entry["type"] as? String) == "permission-mode"
+            else { continue }
+            if let mode = entry["permissionMode"] as? String, !mode.isEmpty { return mode }
+        }
+        return nil
     }
 
     /// "size-mtime" of the transcript plus the record's status, so a
@@ -508,7 +544,10 @@ public enum SessionFeedReader {
         guard let range = text.range(of: "[attached: ", options: .backwards),
               let close = text[range.upperBound...].firstIndex(of: "]") else { return [] }
         return text[range.upperBound..<close].split(separator: ", ").compactMap { path in
-            let name = path.split(separator: "/").last.map(String.init) ?? String(path)
+            // Both separators: a Windows attachment path is
+            // `C:\Users\…\Infinitus\attachments\<uuid>-<name>.png`.
+            let name = path.split(whereSeparator: { $0 == "/" || $0 == "\\" })
+                .last.map(String.init) ?? String(path)
             return imageExtensions.contains(fileExtension(name)) ? "a:\(name)" : nil
         }
     }
@@ -536,7 +575,10 @@ public enum SessionFeedReader {
         if id.hasPrefix("a:") {
             let name = String(id.dropFirst(2))
             let ext = fileExtension(name)
-            guard !name.isEmpty, !name.contains("/"), !name.contains(".."), imageExtensions.contains(ext),
+            // `\` and `:` join the refusal list so a Windows id can never
+            // escape the attachments folder (`..\x`, `C:\…`).
+            guard !name.isEmpty, !name.contains("/"), !name.contains("\\"), !name.contains(":"),
+                  !name.contains(".."), imageExtensions.contains(ext),
                   let data = try? Data(contentsOf: attachmentsDir.appendingPathComponent(name)) else { return nil }
             return (data, mime(forExtension: ext))
         }

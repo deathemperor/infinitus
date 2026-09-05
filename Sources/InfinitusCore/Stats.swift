@@ -472,27 +472,33 @@ public enum Stats {
 
     // MARK: keys
 
-    nonisolated(unsafe) private static var keyFormatters: [TimeZone: DateFormatter] = [:]
-    private static let keyLock = NSLock()
-
-    private static func keyFormatter(_ calendar: Calendar) -> DateFormatter {
-        keyLock.lock(); defer { keyLock.unlock() }
-        if let f = keyFormatters[calendar.timeZone] { return f }
-        let f = DateFormatter()
-        f.calendar = calendar
-        f.timeZone = calendar.timeZone
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        keyFormatters[calendar.timeZone] = f
-        return f
-    }
-
+    /// "yyyy-MM-dd" in the calendar's own zone, via `Calendar` rather
+    /// than a `DateFormatter`.
+    ///
+    /// Why not a formatter: setting `DateFormatter.timeZone` to a named
+    /// IANA zone TRAPS on Windows (swift-corelibs-foundation, Swift
+    /// 6.3.3 — verified 2026-09-05: the setter succeeds and the next
+    /// `string(from:)` kills the process, which took the whole `swift
+    /// test` run down at `StatsTests`). `Calendar.dateComponents` on the
+    /// same zone works, and the key is a fixed-width ASCII date with no
+    /// locale in it, so nothing is lost by formatting it by hand.
     public static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
-        keyFormatter(calendar).string(from: date)
+        let p = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", p.year ?? 0, p.month ?? 0, p.day ?? 0)
     }
 
+    /// Midnight of a `dayKey`'s day in the calendar's zone — the inverse
+    /// of `dayKey`, same reason it avoids a formatter.
     public static func date(fromDayKey key: String, calendar: Calendar = .current) -> Date? {
-        keyFormatter(calendar).date(from: key)
+        let parts = key.split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2])
+        else { return nil }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return calendar.date(from: components)
     }
 
     /// Minute of the local day, 0…1439, for an epoch-seconds stamp.

@@ -108,12 +108,15 @@ struct NativeFleetScreen: View {
             }
             .sensoryFeedback(.success, trigger: pairedWith)
         } else {
+            let visibleFleets = model.fleets.filter { fleet in
+                !(fleet.engineID.hasPrefix("claude-code-") && fleet.accounts.isEmpty)
+            }
             List {
                 allDeadSection
                 heroSection
                 outlookSection
-                ForEach(model.fleets) { fleet in
-                    accountSection(fleet, isFirst: fleet.id == model.fleets.first?.id, wide: wide)
+                ForEach(visibleFleets) { fleet in
+                    accountSection(fleet, isFirst: fleet.id == visibleFleets.first?.id, wide: wide)
                 }
             }
             .listStyle(.insetGrouped)

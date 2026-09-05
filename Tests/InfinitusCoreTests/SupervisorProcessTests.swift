@@ -3,7 +3,9 @@ import XCTest
 
 /// CswapSupervisor against a scripted fake `cswap` — real process spawning,
 /// no real engine (running one here would fight the user's live menubar for
-/// the store mutex).
+/// the store mutex). The fake is a `#!/bin/sh` script: nothing to spawn on
+/// Windows.
+#if !os(Windows)
 final class SupervisorProcessTests: XCTestCase {
     private var scriptURL: URL!
 
@@ -79,3 +81,4 @@ final class SupervisorProcessTests: XCTestCase {
         wait(for: [stopped], timeout: 5)
     }
 }
+#endif

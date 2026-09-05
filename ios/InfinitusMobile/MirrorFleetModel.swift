@@ -12,6 +12,9 @@ import InfinitusUI
 @MainActor
 final class MirrorFleetModel: ObservableObject, Identifiable {
     let id: String
+    /// Which paired host this fleet came from — feeds, images, input and
+    /// the merged sessions list all route by it, never by pid alone.
+    let hostID: String
     let engineID: String
     let provider: Provider
     unowned let host: MirrorModel
@@ -30,13 +33,20 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
     @Published private(set) var report: UsageReport?
     private var usageCapturedAt: Date?
 
-    init(engineID: String, provider: Provider, host: MirrorModel) {
-        // EngineRegistry's key: an engine may yield one fleet per provider.
-        self.id = "\(engineID)/\(provider.rawValue)"
+    init(hostID: String, engineID: String, provider: Provider, host: MirrorModel) {
+        // EngineRegistry's key, prefixed with the host: an engine may
+        // yield one fleet per provider, and two machines both run cswap.
+        self.id = "\(hostID)/\(engineID)/\(provider.rawValue)"
+        self.hostID = hostID
         self.engineID = engineID
         self.provider = provider
         self.host = host
     }
+
+    /// The paired record this fleet belongs to — the merged sessions
+    /// list's emoji + label. `nil` only if the host was deleted while a
+    /// refresh was in flight.
+    var mirrorHost: MirrorHost? { host.hosts.first { $0.id == hostID } }
 
     /// The intro replay's celebration beat (MirrorModel.replayIntro) —
     /// kept a method, not a settable property, so nothing outside the
@@ -97,19 +107,16 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
 
     /// `CswapEngine.engineID` itself is `#if !os(iOS)` (the engine spawns
     /// a subprocess) — the phone only ever sees its id string, mirrored
-    /// verbatim from the Mac's `EngineFleet.engineID`.
-    static let cswapEngineID = "cswap"
+    /// verbatim from the Mac's `EngineFleet.engineID`. `nonisolated` so
+    /// non-main-actor code (MirrorHost's default emoji) can read it.
+    nonisolated static let cswapEngineID = "cswap"
 
     /// Same mapping the Mac's `FleetState.fleetLabel` reads off its
     /// `engine.displayName` — the phone has no `AccountEngine` instance
-    /// to ask, so it names the two engines it actually mirrors and
-    /// falls back to the raw id for anything else.
+    /// to ask, so it goes through Core's shared table (`EngineCatalog`),
+    /// which the Windows panel reads too.
     static func engineName(for engineID: String) -> String {
-        switch engineID {
-        case cswapEngineID: return "cswap"
-        case CLIProxyEngine.engineID: return "CLIProxyAPI"
-        default: return engineID
-        }
+        EngineCatalog.displayName(for: engineID)
     }
 }
 

@@ -18,10 +18,6 @@ struct SettingsForm: View {
     /// The QR scanner (#9 remote access) is a sheet, not a screen: it
     /// exists for the ten seconds it takes to pair.
     @State private var scanning = false
-    /// Staged text for the "add an address" field — submitting it grows
-    /// the endpoint list rather than replacing it (#9 pair once, every
-    /// route).
-    @State private var newEndpoint = ""
     @State private var paired = false
 
     var body: some View {
@@ -80,56 +76,9 @@ struct SettingsForm: View {
                     Button("Replay intro") { model.replayIntro() }
                 }
             }
-            // The transport (#9 remote access): which Mac is being
-            // mirrored, the token that lets us read it, and the ways in
-            // when Bonjour doesn't survive the network.
-            Section {
-                if PairScanner.isSupported {
-                    Button {
-                        scanning = true
-                    } label: {
-                        Label("Scan the Mac's QR code", systemImage: "qrcode.viewfinder")
-                            .font(.body.weight(.semibold))
-                    }
-                } else {
-                    Text("No camera here — type the address and token from the Mac's Settings → Devices below.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Text(model.transportStatus.isEmpty
-                     ? model.rowTheme.loadingWord("searching")
-                     : model.transportStatus)
-                    .font(.caption).foregroundStyle(.secondary)
-                ForEach(Array(model.manualEndpoints.enumerated()), id: \.element) { _, endpoint in
-                    Text(endpoint)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                }
-                .onDelete { model.removeManualEndpoint(at: $0) }
-                LabeledContent("Add address") {
-                    TextField("host:port, or a tunnel's https:// URL", text: $newEndpoint)
-                        .multilineTextAlignment(.trailing)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .onSubmit {
-                            model.addManualEndpoint(newEndpoint)
-                            newEndpoint = ""
-                        }
-                }
-                LabeledContent("Pairing token") {
-                    TextField("from the Mac's Devices settings",
-                              text: $model.pairToken)
-                        .multilineTextAlignment(.trailing)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .font(.system(.body, design: .monospaced))
-                }
-            } header: {
-                Text("Mac connection")
-            } footer: {
-                Text("Scanning the QR code sets everything up. On the same Wi-Fi the phone "
-                     + "finds the Mac by itself; add an address for anywhere else.")
-            }
+            // Multi-host pairing (04-phone, W14): each machine is its
+            // own record with label, emoji, endpoints and token.
+            hostsSection
             DictationSettings()
             ScreenshotSettings()
             // The 1:1 Mac rendering isn't lost, just off by default
@@ -157,15 +106,274 @@ struct SettingsForm: View {
         }
         .sheet(isPresented: $scanning) {
             PairScannerSheet { payload in
-                if model.applyPairing(payload) { paired = true }
+                if let host = model.applyPairing(payload) {
+                    pairedHostName = model.snapshots[host.id]?.machineName ?? (!host.label.isEmpty ? host.label : "the host")
+                    paired = true
+                }
             }
+        }
+        .sheet(isPresented: $addingManual) {
+            AddHostSheet(model: model)
         }
         .alert("Paired", isPresented: $paired) {
             Button("OK") { model.requestedTab = "fleet" }
         } message: {
-            Text("Paired with \(model.snapshot?.machineName ?? "the Mac"). Its accounts are on the Fleet tab.")
+            Text("Paired with \(pairedHostName). Its accounts and sessions show up as soon as it answers.")
         }
         .sensoryFeedback(.success, trigger: paired)
+    }
+
+    @State private var addingManual = false
+    @State private var pairedHostName = "the host"
+
+    private var hostsSection: some View {
+        Section {
+            if PairScanner.isSupported {
+                Button {
+                    scanning = true
+                } label: {
+                    Label("Scan a QR code", systemImage: "qrcode.viewfinder")
+                        .font(.body.weight(.semibold))
+                }
+            }
+            Button {
+                addingManual = true
+            } label: {
+                Label("Add by address + token", systemImage: "plus.circle")
+            }
+            if model.hosts.isEmpty {
+                Text("No hosts paired. Scan a QR code or add an address to start mirroring.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(model.hosts) { host in
+                    NavigationLink {
+                        HostDetailScreen(model: model, hostID: host.id)
+                    } label: {
+                        hostRow(host)
+                    }
+                }
+                .onDelete { model.removeHost(at: $0) }
+            }
+        } header: {
+            Text("Hosts")
+        } footer: {
+            Text("Infinitus can mirror multiple Macs and Windows boxes side by side. "
+                 + "Scanning a QR code sets up that machine; tap a host to edit its routes.")
+        }
+    }
+
+    private func hostRow(_ host: MirrorHost) -> some View {
+        let snapshot = model.snapshots[host.id]
+        let name = host.label.isEmpty ? (snapshot?.machineName ?? "Host") : host.label
+        let emoji = host.emoji.isEmpty ? MirrorHost.defaultEmoji(for: snapshot ?? MirrorSnapshot(capturedAt: Date(), machineName: name, listJSON: Data(), sessions: [])) : host.emoji
+        let status = model.transportStatuses[host.id]
+            ?? (model.hosts.count <= 1 ? model.transportStatus : nil)
+            ?? ""
+        return HStack(spacing: 10) {
+            Text(emoji).font(.title3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.body)
+                if !status.isEmpty {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+/// Host detail editor: label, emoji picker, endpoints list + add/remove, token.
+struct HostDetailScreen: View {
+    @ObservedObject var model: MirrorModel
+    let hostID: String
+
+    @State private var labelText = ""
+    @State private var selectedEmoji = ""
+    @State private var newEndpoint = ""
+    @State private var tokenText = ""
+    @State private var revealToken = false
+
+    private static let emojiPalette = ["🍎", "🪟", "🐧", "🖥️", "💻", "🏠", "🏢"]
+
+    private var host: MirrorHost? {
+        model.hosts.first(where: { $0.id == hostID })
+    }
+
+    var body: some View {
+        Form {
+            if let host {
+                Section("Host") {
+                    LabeledContent("Name") {
+                        TextField("Machine name", text: $labelText)
+                            .multilineTextAlignment(.trailing)
+                            .onSubmit { saveLabel() }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Icon").font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            ForEach(Self.emojiPalette, id: \.self) { emoji in
+                                Button {
+                                    selectedEmoji = emoji
+                                    model.updateHost(hostID) { $0.emoji = emoji }
+                                } label: {
+                                    Text(emoji)
+                                        .font(.title2)
+                                        .padding(6)
+                                        .background(selectedEmoji == emoji ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section {
+                    ForEach(Array(host.endpoints.enumerated()), id: \.element) { _, endpoint in
+                        Text(endpoint)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                    .onDelete { offsets in
+                        model.updateHost(hostID) { $0.endpoints.remove(atOffsets: offsets) }
+                    }
+                    LabeledContent("Add address") {
+                        TextField("host:port, or https://…", text: $newEndpoint)
+                            .multilineTextAlignment(.trailing)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            .onSubmit { addEndpoint() }
+                    }
+                } header: {
+                    Text("Routes")
+                } footer: {
+                    Text("Failover list for this host: local LAN, tailnet, tunnel.")
+                }
+
+                Section("Pairing Token") {
+                    if revealToken {
+                        TextField("Token", text: $tokenText)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .font(.system(.body, design: .monospaced))
+                            .onSubmit { saveToken() }
+                    } else {
+                        Text(MirrorPairing.mask(host.token.isEmpty ? tokenText : host.token))
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    Button(revealToken ? "Hide token" : "Reveal / Edit token") {
+                        if !revealToken { tokenText = host.token }
+                        else { saveToken() }
+                        revealToken.toggle()
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        model.removeHost(id: hostID)
+                    } label: {
+                        Label("Remove host", systemImage: "trash")
+                            .foregroundStyle(.red)
+                    }
+                }
+            } else {
+                ContentUnavailableView("Host removed", systemImage: "trash")
+            }
+        }
+        .navigationTitle(labelText.isEmpty ? (host?.label ?? "Host") : labelText)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if let host {
+                labelText = host.label
+                selectedEmoji = host.emoji
+                tokenText = host.token
+            }
+        }
+    }
+
+    private func saveLabel() {
+        let trimmed = labelText.trimmingCharacters(in: .whitespacesAndNewlines)
+        model.updateHost(hostID) { $0.label = trimmed }
+    }
+
+    private func saveToken() {
+        let normalized = MirrorPairing.normalize(tokenText)
+        model.updateHost(hostID) { $0.token = normalized }
+    }
+
+    private func addEndpoint() {
+        let endpoint = newEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !endpoint.isEmpty else { return }
+        model.updateHost(hostID) {
+            if !$0.endpoints.contains(endpoint) {
+                $0.endpoints.append(endpoint)
+            }
+        }
+        newEndpoint = ""
+    }
+}
+
+/// Sheet to add a host manually by entering endpoint + token.
+struct AddHostSheet: View {
+    @ObservedObject var model: MirrorModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var address = ""
+    @State private var token = ""
+    @State private var errorText: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("host:port or https://tunnel…", text: $address)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                } header: {
+                    Text("Host address")
+                }
+
+                Section {
+                    TextField("24-character token", text: $token)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .font(.system(.body, design: .monospaced))
+                } header: {
+                    Text("Pairing token")
+                } footer: {
+                    Text("Found in the host daemon's output or Infinitus Settings → Devices.")
+                }
+
+                if let errorText {
+                    Text(errorText).font(.caption).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Add host")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { submit() }
+                        .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                  || token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func submit() {
+        let addr = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tok = MirrorPairing.normalize(token)
+        guard !addr.isEmpty, !tok.isEmpty else { return }
+        let pairURL = MirrorPairing.pairURL(endpoint: addr, token: tok)
+        if model.applyPairing(pairURL) != nil {
+            dismiss()
+        } else {
+            errorText = "Invalid address or token format."
+        }
     }
 }
 

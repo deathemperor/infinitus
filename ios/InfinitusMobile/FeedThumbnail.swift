@@ -6,11 +6,18 @@ import InfinitusCore
 /// the mirror so the pairing token rides along (AsyncImage can't), kept
 /// per id so the feed's polls don't refetch it; tap for full size.
 struct FeedThumbnail: View {
+    let host: MirrorHost?
     let pid: Int32
     let id: String
     @State private var image: UIImage?
     @State private var failed = false
     @State private var showFull = false
+
+    init(host: MirrorHost? = nil, pid: Int32, id: String) {
+        self.host = host
+        self.pid = pid
+        self.id = id
+    }
 
     nonisolated(unsafe) private static let cache = NSCache<NSString, UIImage>()
     private static let side: CGFloat = 120
@@ -54,10 +61,11 @@ struct FeedThumbnail: View {
     }
 
     private func load() async {
-        let key = "\(pid)/\(id)" as NSString
+        let hostPrefix = host?.id ?? "default"
+        let key = "\(hostPrefix)/\(pid)/\(id)" as NSString
         if let hit = Self.cache.object(forKey: key) { image = hit; return }
         do {
-            let data = try await NetworkFleetMirror.shared.sessionImage(pid: pid, id: id)
+            let data = try await NetworkFleetMirror.shared.sessionImage(host: host, pid: pid, id: id)
             guard let decoded = UIImage(data: data) else { failed = true; return }
             Self.cache.setObject(decoded, forKey: key)
             image = decoded

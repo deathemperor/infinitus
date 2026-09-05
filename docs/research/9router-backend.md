@@ -44,3 +44,8 @@ unhold.
   user sets `ANTHROPIC_BASE_URL`; then cswap and 9Router fight (Engines
   pane note). Detecting that env and showing "routed via 9Router" is a
   possible follow-up.
+  → Done 2026-09-04 (`ClaudeCodeRouting`): when the settings.json env
+  names the 9Router base URL — exactly, or any http endpoint on port
+  20128 — the 9Router engine auto-enables (once; an explicit off wins)
+  and its Claude fleet leads `EngineRegistry.primary`; the re-read
+  happens only when settings.json changes.

@@ -112,24 +112,13 @@ struct SettingsFormBody: View {
     }
 
     static func sectionTitle(_ prefix: String) -> String {
-        switch prefix {
-        case "autoswitch": return "Auto-switch"
-        case "ui": return "Interface"
-        default: return prefix.prefix(1).uppercased() + prefix.dropFirst()
-        }
+        SettingsFormLabels.sectionTitle(prefix)
     }
 
     /// "limitScanIntervalSeconds" → "Limit scan interval seconds". The raw
     /// key stays reachable as the control's tooltip.
     static func humanLabel(_ key: String) -> String {
-        let tail = key.split(separator: ".").dropFirst().joined(separator: " ")
-        guard !tail.isEmpty else { return key }
-        var words = ""
-        for ch in tail {
-            if ch.isUppercase { words.append(" "); words.append(Character(ch.lowercased())) }
-            else { words.append(ch) }
-        }
-        return words.prefix(1).uppercased() + words.dropFirst()
+        SettingsFormLabels.humanLabel(key)
     }
 
     @ViewBuilder private func row(_ entry: SettingEntry) -> some View {

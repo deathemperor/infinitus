@@ -3,6 +3,9 @@ import XCTest
 
 final class TeamSecretsTests: XCTestCase {
     func testFileSecretsAreOwnerOnlyAndRoundTrip() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts / POSIX file modes are not ported to Windows yet")
+        #endif
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("secrets-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let s = FileSecrets(dir: dir)
@@ -53,6 +56,9 @@ final class TeamSecretsTests: XCTestCase {
     /// I6: the doc comment promised a temp file and a rename, but the
     /// target was deleted first — a reader in that window saw no secret.
     func testWriteReplacesAnExistingSecretAtomically() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts / POSIX file modes are not ported to Windows yet")
+        #endif
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("secrets-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let s = FileSecrets(dir: dir)

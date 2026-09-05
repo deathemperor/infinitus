@@ -4,8 +4,11 @@ import XCTest
 final class EventFeedTests: XCTestCase {
     func testDecodesTheCapturedStream() throws {
         let url = Bundle.module.url(forResource: "Fixtures/events.ndjson", withExtension: nil)!
+        // autocrlf checkouts hand the fixture over with CRLF endings — and a
+        // CRLF pair is ONE Character in Swift, so neither "\n" nor "\r" would
+        // match it. isNewline does, keeping the lines identical to an LF copy.
         let lines = String(decoding: try Data(contentsOf: url), as: UTF8.self)
-            .split(separator: "\n")
+            .split(whereSeparator: \.isNewline)
         let decoded = lines.map { EventFeed.decode(line: String($0)) }
         guard case .event(let poll) = decoded[0] else { return XCTFail("poll expected") }
         XCTAssertEqual(poll.kind, "poll")

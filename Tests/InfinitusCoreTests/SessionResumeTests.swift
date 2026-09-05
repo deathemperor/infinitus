@@ -3,7 +3,7 @@ import XCTest
 import Darwin
 private let sysBind = Darwin.bind
 private let sysSockStream = SOCK_STREAM
-#else
+#elseif canImport(Glibc)
 import Glibc
 private let sysBind = Glibc.bind
 private let sysSockStream = Int32(SOCK_STREAM.rawValue)   // Glibc enum
@@ -400,6 +400,9 @@ final class SessionResumeTests: XCTestCase {
 
 /// The Darwin socket path end to end against a scratch listener — the
 /// only channel for terminals without an injection API (Ghostty).
+/// AF_UNIX listener + client: Windows has neither here (the daemon writes
+/// PeerSocket.frames to a named pipe), so the whole suite stays Unix-only.
+#if !os(Windows)
 final class PeerSocketLoopbackTests: XCTestCase {
     func testSendDeliversAuthAndMessageFrames() throws {
         let dir = FileManager.default.temporaryDirectory
@@ -458,3 +461,4 @@ final class PeerSocketLoopbackTests: XCTestCase {
         XCTAssertFalse(PeerSocket.send(socketPath: "/tmp/inf-nope.sock", text: "x", pid: 77, claudeDir: dir, timeout: 1))
     }
 }
+#endif

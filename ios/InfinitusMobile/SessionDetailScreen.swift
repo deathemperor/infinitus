@@ -3,10 +3,13 @@ import InfinitusCore
 import InfinitusUI
 
 /// Value pushed by tapping a session's header (feed screen) — a distinct
-/// type from `SessionDetail` so the row tap (→ feed) and the header tap
+/// type from `HostSession` so the row tap (→ feed) and the header tap
 /// (→ detail, one level deeper) stack cleanly on the same `NavigationPath`.
 struct SessionDetailRoute: Hashable {
-    let session: SessionDetail
+    let hostSession: HostSession
+
+    var session: SessionDetail { hostSession.session }
+    var host: MirrorHost { hostSession.host }
 }
 
 /// The Mac's session vocabulary in the user's words — one word system
@@ -87,9 +90,27 @@ enum AccountSummaryFormat {
 struct SessionDetailScreen: View {
     @ObservedObject var model: MirrorModel
     @ObservedObject var progress: MobileSessionProgress
-    let session: SessionDetail
+    let hostSession: HostSession
 
-    private var p: SessionProgress? { progress.byPid[session.pid] }
+    init(model: MirrorModel, progress: MobileSessionProgress, hostSession: HostSession) {
+        self.model = model
+        self.progress = progress
+        self.hostSession = hostSession
+    }
+
+    init(model: MirrorModel, progress: MobileSessionProgress, session: SessionDetail) {
+        self.model = model
+        self.progress = progress
+        let host = model.hosts.first ?? MirrorHost(label: "Mac", emoji: "🍎")
+        self.hostSession = HostSession(host: host, session: session)
+    }
+
+    private var session: SessionDetail { hostSession.session }
+    private var host: MirrorHost { hostSession.host }
+
+    private var p: SessionProgress? {
+        progress.byKey[hostSession.id] ?? progress.byPid[session.pid]
+    }
     private var summary: SessionAccountSummary? { model.accountSummary(forSessionPid: session.pid) }
 
     var body: some View {
@@ -142,13 +163,19 @@ struct SessionDetailScreen: View {
             accountSection
 
             Section {
-                Text(model.transportStatus.isEmpty ? model.rowTheme.loadingWord("searching") : model.transportStatus)
+                // This host's own line (04-phone); the themed loading
+                // word speaks while nothing has answered yet.
+                let statusLine = model.transportStatuses[host.id]
+                    ?? (model.hosts.count <= 1 ? model.transportStatus : nil)
+                    ?? ""
+                Text(statusLine.isEmpty ? model.rowTheme.loadingWord("searching") : statusLine)
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
                 Text("Connection")
             } footer: {
                 // The process id is for the terminal, not the eye.
-                Text("Process \(session.pid) on the Mac.").monospacedDigit()
+                let machine = host.label.isEmpty ? "the Mac" : host.label
+                Text("Process \(session.pid) on \(machine).").monospacedDigit()
                     .contextMenu {
                         Button {
                             UIPasteboard.general.string = String(session.pid)

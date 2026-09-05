@@ -55,7 +55,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in popout_shown popover_pinned gamification_style burn_style mock_mode; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_9router_enabled; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }
@@ -77,6 +77,11 @@ defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
 defaults write "$DOMAIN" mock_mode -bool true
+# Explicitly off: the dev Mac's real ~/.claude/settings.json routes Claude Code
+# at the LAN 9Router, and any dev launch that sees it writes the key true for
+# good (AppModel only writes it while absent). The demo run shares this domain,
+# so it inherited the engine and polled the real router — 401s and a dead run.
+defaults write "$DOMAIN" engine_9router_enabled -bool false
 
 # --- AWS sign-in fixtures (must exist before launch: env is read at start) --
 # A stub `aws` in place of the real CLI: `login --remote --profile P`

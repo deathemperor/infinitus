@@ -139,6 +139,9 @@ targets:
     sources:
       - InfinitusMobileShare
       - InfinitusMobile/NetworkFleetMirror.swift
+      # The transport and the bridge both speak MirrorHost since the
+      # multi-host store (04-phone, W13) — one record per machine.
+      - InfinitusMobile/MirrorHost.swift
       - InfinitusMobile/ShareBridge.swift
       - InfinitusMobile/SharedKeychain.swift
       - InfinitusMobile/AttachmentImage.swift

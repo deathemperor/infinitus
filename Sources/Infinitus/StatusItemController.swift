@@ -252,12 +252,18 @@ final class StatusItemController {
         var x = rect.midX - size.width / 2
         x = min(x, screen.visibleFrame.maxX - size.width - 8)
         x = max(x, screen.visibleFrame.minX + 8)
-        var y = rect.minY - size.height - 6
+        var height = size.height
+        let maxHeight = min(screen.visibleFrame.height - 20,
+                            max(200, rect.minY - screen.visibleFrame.minY - 14))
+        if height > maxHeight {
+            height = maxHeight
+        }
+        var y = rect.minY - height - 6
         // A layout flip can also grow the panel past the bottom edge —
         // ride up rather than hang off the screen.
         y = max(y, screen.visibleFrame.minY + 8)
         return NSRect(x: x, y: y,
-                      width: size.width, height: size.height)
+                      width: size.width, height: height)
     }
 
     private func positionAnchored() {
@@ -517,6 +523,7 @@ final class StatusItemController {
         guard let screen = w.screen ?? NSScreen.main else { return }
         let v = screen.visibleFrame
         var f = w.frame
+        if f.height > v.height - 20 { f.size.height = v.height - 20 }
         if f.maxX > v.maxX { f.origin.x = v.maxX - f.width }
         if f.minX < v.minX { f.origin.x = v.minX }
         if f.maxY > v.maxY { f.origin.y = v.maxY - f.height }
@@ -553,6 +560,12 @@ final class StatusItemController {
         let now = Date()
         recentFits.removeAll { now.timeIntervalSince($0.at) > 1 }
         var target = want
+        if let screen = pinned.screen ?? NSScreen.main {
+            let maxH = screen.visibleFrame.height - 40
+            if target.height > maxH {
+                target.height = maxH
+            }
+        }
         if recentFits.contains(where: { $0.size == want }) {
             target = NSSize(width: max(want.width, current.width), height: max(want.height, current.height))
             if abs(target.width - current.width) < 0.5, abs(target.height - current.height) < 0.5 { return }
@@ -565,10 +578,10 @@ final class StatusItemController {
         pinned.setContentSize(target)
         clampOnScreen(pinned)
         let got = pinned.contentRect(forFrameRect: pinned.frame).size
-        if abs(got.width - target.width) > 0.5 || abs(got.height - target.height) > 0.5 {
-            refusedFit = target
+        if abs(got.width - want.width) > 0.5 || abs(got.height - want.height) > 0.5 {
+            refusedFit = want
             NSLog("Infinitus pop-out: asked for %.0f×%.0f, the window took %.0f×%.0f — not asking again",
-                  target.width, target.height, got.width, got.height)
+                  want.width, want.height, got.width, got.height)
         } else {
             refusedFit = nil
         }

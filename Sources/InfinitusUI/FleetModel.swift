@@ -95,18 +95,9 @@ public protocol FleetModel: ObservableObject {
     var canAddAccount: Bool { get }
 }
 
-/// One fleet's header line in a multi-fleet popup.
-public struct FleetLabel: Sendable, Equatable {
-    public let engineName: String
-    public let provider: Provider
-    /// Engine-side honesty note ("round-robin ignores priority tiers").
-    public let caveat: String?
-    public init(engineName: String, provider: Provider, caveat: String? = nil) {
-        self.engineName = engineName
-        self.provider = provider
-        self.caveat = caveat
-    }
-}
+// `FleetLabel` moved to InfinitusCore (FleetPanel.swift) so the Windows
+// panel, which cannot import a SwiftUI target, renders the same
+// "Claude · 9Router" header this popup does.
 
 public extension FleetModel {
     var capabilities: EngineCapabilities { .all }

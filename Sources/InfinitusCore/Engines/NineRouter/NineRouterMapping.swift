@@ -54,6 +54,36 @@ public struct NineRouterConnection: Decodable, Sendable {
         self.lastError = lastError
         self.updatedAt = updatedAt
     }
+
+    /// 9Router 0.6.x grew a plain-string shape for `lastError`
+    /// ("[403]: model requires a subscription" — the ollama/grok-cli
+    /// rows on the user's router, 2026-09-04) alongside the older
+    /// `{status, message}` object. Decode either; a string carries no
+    /// status, so `lastError.status` stays nil and the row just shows
+    /// as errored rather than relogin_required.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        provider = try c.decode(String.self, forKey: .provider)
+        authType = try c.decodeIfPresent(String.self, forKey: .authType)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        email = try c.decodeIfPresent(String.self, forKey: .email)
+        priority = try c.decodeIfPresent(Int.self, forKey: .priority)
+        isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive)
+        rateLimitedUntil = try c.decodeIfPresent(String.self, forKey: .rateLimitedUntil)
+        if let object = try? c.decodeIfPresent(LastError.self, forKey: .lastError) {
+            lastError = object
+        } else {
+            lastError = (try? c.decodeIfPresent(String.self, forKey: .lastError))
+                .flatMap { $0 }.map { LastError(status: nil, message: $0) }
+        }
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, provider, authType, name, email, priority, isActive
+        case rateLimitedUntil, lastError, updatedAt
+    }
 }
 
 public struct NineRouterConnectionList: Decodable, Sendable {
@@ -76,6 +106,7 @@ public enum NineRouterUsage {
         struct Quota: Decodable {
             let used: Double?
             let total: Double?
+            let remainingPercentage: Double?
             let resetAt: String?
             let unlimited: Bool?
         }
@@ -90,7 +121,7 @@ public enum NineRouterUsage {
 
     static let authExpiredMarkers = ["expired", "authentication", "unauthorized", "401", "re-authorize"]
 
-    public static func parse(_ data: Data, now: Date = Date()) -> Outcome {
+    public static func parse(_ data: Data, hidden: Set<String> = [], now: Date = Date()) -> Outcome {
         guard let wire = try? JSONDecoder().decode(Wire.self, from: data) else {
             return .unavailable("unreadable usage reply")
         }
@@ -102,18 +133,28 @@ public enum NineRouterUsage {
         guard let quotas = wire.quotas else { return .ok(nil, plan: wire.plan) }
 
         func window(_ q: Wire.Quota, name: String? = nil) -> UsageWindow? {
-            guard let used = q.used, q.unlimited != true else { return nil }
+            guard q.unlimited != true else { return nil }
+            let pct: Double
+            if let rp = q.remainingPercentage {
+                pct = max(0, min(100, 100.0 - rp))
+            } else if let used = q.used, let total = q.total, total > 0 {
+                pct = max(0, min(100, (used / total) * 100.0))
+            } else if let used = q.used {
+                pct = used
+            } else {
+                return nil
+            }
             var countdown: String?, clock: String?
             if let resetAt = q.resetAt, let date = WeeklyRoll.parse(resetAt) {
                 countdown = ResetFormat.countdown(until: date, now: now)
                 clock = ResetFormat.clock(date, now: now)
             }
-            return UsageWindow(pct: used, resetsAt: q.resetAt, countdown: countdown,
+            return UsageWindow(pct: pct, resetsAt: q.resetAt, countdown: countdown,
                                clock: clock, name: name)
         }
 
         var fiveHour: UsageWindow?, sevenDay: UsageWindow?
-        var scoped: [UsageWindow] = []
+        var modelQuotas: [(key: String, quota: Wire.Quota)] = []
         var spend: Spend?
         for (key, quota) in quotas.sorted(by: { $0.key < $1.key }) {
             let lower = key.lowercased()
@@ -139,9 +180,51 @@ public enum NineRouterUsage {
                 let model = key.dropFirst("weekly ".count)
                     .replacingOccurrences(of: "(7d)", with: "")
                     .trimmingCharacters(in: .whitespaces)
-                guard !model.isEmpty, let w = window(quota, name: model.capitalized) else { continue }
-                scoped.append(w)
+                guard !model.isEmpty else { continue }
+                modelQuotas.append((key: key, quota: quota))
+            } else {
+                // Per-model quota row (e.g. "gemini-3.8-flash-high").
+                // Honor 9Router's hide feature: hidden quotas are excluded.
+                guard !hidden.contains(key) else { continue }
+                modelQuotas.append((key: key, quota: quota))
             }
+        }
+
+        // When there is no explicit session (5h) window, promote the newest/biggest
+        // Gemini model to fiveHour so it displays in the first row.
+        if fiveHour == nil {
+            let geminiCandidates = modelQuotas.filter { $0.key.lowercased().contains("gemini") }
+            if let best = geminiCandidates.max(by: { isOlderGemini($0.key, than: $1.key) }) {
+                fiveHour = window(best.quota)
+                modelQuotas.removeAll { $0.key == best.key }
+            }
+        }
+
+        var scoped: [UsageWindow] = []
+        for item in modelQuotas {
+            let displayName: String
+            if item.key.lowercased().hasPrefix("weekly ") {
+                displayName = item.key.dropFirst("weekly ".count)
+                    .replacingOccurrences(of: "(7d)", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                    .capitalized
+            } else {
+                displayName = Self.modelName(item.key)
+            }
+            guard let w = window(item.quota, name: displayName) else { continue }
+            scoped.append(w)
+        }
+        // Most-burned first — the order the binding-window logic and
+        // the eye expect. Hidden rows were honored above; the cap is
+        // only the layout backstop for a connection with everything
+        // visible (the popup grid grows a row per scoped window). Ties
+        // stay alphabetical so the order is deterministic across polls
+        // (the grid re-renders on change).
+        if scoped.count > 1 {
+            scoped.sort { $0.pct != $1.pct ? $0.pct > $1.pct : ($0.name ?? "") < ($1.name ?? "") }
+        }
+        if scoped.count > Self.scopedCap {
+            scoped = Array(scoped.prefix(Self.scopedCap))
         }
         if let eu = wire.extraUsage, eu.isEnabled == true,
            let used = eu.usedCredits, let limit = eu.monthlyLimit, let pct = eu.utilization {
@@ -157,6 +240,84 @@ public enum NineRouterUsage {
         if fiveHour == nil, sevenDay == nil, scoped.isEmpty, spend == nil { return .ok(nil, plan: wire.plan) }
         return .ok(Usage(fiveHour: fiveHour, sevenDay: sevenDay,
                          scoped: scoped.isEmpty ? nil : scoped, spend: spend), plan: wire.plan)
+    }
+
+    /// The most-burned per-model rows a row shows — the grid grows a
+    /// scoped gauge per entry, so a nine-model Antigravity connection
+    /// can't have them all (the 9Router dashboard hides the rest
+    /// behind a "Hidden:" row; same idea).
+    static let scopedCap = 4
+
+    /// "gemini-3.8-flash-high" → "Gemini 3.8 Flash (High)" — the
+    /// dashboard's row label. Version and size tokens ("3.8", "120b")
+    /// ride along; known acronyms uppercase; an effort-level word
+    /// becomes the parenthetical the dashboard puts on the end.
+    static func modelName(_ slug: String) -> String {
+        let acronyms = ["gpt", "glm", "oss", "ai", "llm", "tts"]
+        let efforts = ["high", "medium", "low", "thinking", "max"]
+        var words: [String] = [], effort: String?
+        for token in slug.split(separator: "-") {
+            let t = token.lowercased()
+            if efforts.contains(t) { effort = t.capitalized; continue }
+            if t.first?.isNumber == true || acronyms.contains(t) { words.append(token.uppercased()) }
+            else { words.append(token.capitalized) }
+        }
+        if let effort { words.append("(\(effort))") }
+        return words.joined(separator: " ")
+    }
+
+    struct GeminiRank: Comparable {
+        let major: Int
+        let minor: Int
+        let tier: Int
+        let isPro: Bool
+
+        static func < (lhs: GeminiRank, rhs: GeminiRank) -> Bool {
+            if lhs.major != rhs.major { return lhs.major < rhs.major }
+            if lhs.minor != rhs.minor { return lhs.minor < rhs.minor }
+            if lhs.tier != rhs.tier { return lhs.tier < rhs.tier }
+            if lhs.isPro != rhs.isPro { return !lhs.isPro && rhs.isPro }
+            return false
+        }
+    }
+
+    static func geminiRank(_ slug: String) -> GeminiRank {
+        let lower = slug.lowercased()
+        var major = 0
+        var minor = 0
+        let pattern = #"(?:^|[-_/])v?(\d{1,2})(?:\.(\d+))?(?:[-_/]|$)"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let ns = lower as NSString
+            let matches = regex.matches(in: lower, range: NSRange(location: 0, length: ns.length))
+            for m in matches {
+                let matchedStr = ns.substring(with: m.range)
+                if matchedStr.contains("b") || matchedStr.contains("k") || matchedStr.contains("m") { continue }
+                let majStr = ns.substring(with: m.range(at: 1))
+                let minStr = m.range(at: 2).location != NSNotFound ? ns.substring(with: m.range(at: 2)) : "0"
+                if let maj = Int(majStr), let min = Int(minStr) {
+                    if maj < 50 {
+                        major = maj
+                        minor = min
+                        break
+                    }
+                }
+            }
+        }
+        let isPro = lower.contains("pro")
+        let tier: Int
+        if lower.contains("max") { tier = 5 }
+        else if lower.contains("high") { tier = 4 }
+        else if lower.contains("medium") { tier = 3 }
+        else if lower.contains("low") { tier = 2 }
+        else if lower.contains("image") { tier = 1 }
+        else { tier = 0 }
+        return GeminiRank(major: major, minor: minor, tier: tier, isPro: isPro)
+    }
+
+    static func isOlderGemini(_ a: String, than b: String) -> Bool {
+        let ra = geminiRank(a), rb = geminiRank(b)
+        if ra != rb { return ra < rb }
+        return a > b
     }
 }
 

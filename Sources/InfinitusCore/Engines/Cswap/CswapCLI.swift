@@ -4,11 +4,23 @@ import Foundation
 /// Where the `cswap` binary lives. Checked in order; first hit wins.
 public enum CswapLocator {
     public static func defaultCandidates(home: String = NSHomeDirectory()) -> [String] {
-        [
+        #if os(Windows)
+        // uv/pipx both land here; the .exe suffix is what
+        // isExecutableFile matches (verified on this box 2026-09-04).
+        let localAppData = ProcessInfo.processInfo.environment["LOCALAPPDATA"]
+            ?? "\(home)\\AppData\\Local"
+        return [
+            "\(home)\\.local\\bin\\cswap.exe",
+            "\(localAppData)\\Programs\\cswap\\cswap.exe",
+            "\(localAppData)\\pipx\\venvs\\claude-swap\\Scripts\\cswap.exe",
+        ]
+        #else
+        return [
             "\(home)/.local/bin/cswap",
             "/opt/homebrew/bin/cswap",
             "/usr/local/bin/cswap",
         ]
+        #endif
     }
 
     public static func locate(
@@ -164,6 +176,107 @@ public struct CswapCLI: Sendable {
         return trimmed.isEmpty
             ? try await run(["alias", String(number), "--unset"])
             : try await run(["alias", String(number), trimmed])
+    }
+
+    // MARK: - backup
+
+    /// `cswap export <path>` — write every managed account to one file.
+    ///
+    /// The result is a CREDENTIAL file: the default carries each account's
+    /// `oauthAccount`, and `full` includes the whole `~/.claude.json`.
+    /// Callers must treat the path like a private key and say so in the UI.
+    ///
+    /// The path is argv, which is fine — it is not the secret; the FILE is.
+    /// (CLAUDE.md's stdin rule is about tokens and webhook URLs, and holds
+    /// unchanged for `add-token` / `notify`.)
+    @discardableResult
+    public func exportAccounts(to path: URL, account: Int? = nil,
+                               full: Bool = false) async throws -> Data {
+        var arguments = ["export", path.path]
+        if let account { arguments += ["--account", String(account)] }
+        if full { arguments.append("--full") }
+        return try await runReportingErrors(arguments)
+    }
+
+    /// `cswap import <path>` — read accounts back.
+    ///
+    /// `force` overwrites accounts that already exist, so a caller must
+    /// confirm it first. WITHOUT it cswap still replaces slots whose
+    /// refresh token is dead: that is the documented repair path, not a
+    /// clobber, and it is why plain import is not itself destructive.
+    ///
+    /// No `--json` on either verb (the engine scopes that to
+    /// list/status/switch), so success is exit 0 and the failure reason
+    /// arrives as plain text on STDERR.
+    @discardableResult
+    public func importAccounts(from path: URL, force: Bool = false) async throws -> Data {
+        var arguments = ["import", path.path]
+        if force { arguments.append("--force") }
+        return try await runReportingErrors(arguments)
+    }
+
+    /// Whether an import failed ONLY because it would have to replace an
+    /// account that already exists — i.e. whether retrying with `--force`
+    /// is the thing the user is being asked to decide.
+    ///
+    /// Matched on the engine's own text, because there is nothing better:
+    /// cswap supports `--json` on list/status/switch only, so
+    /// export/import report failures as plain English on stderr. A MISS is
+    /// deliberately the safe direction — the caller then shows the
+    /// engine's message instead of offering to overwrite anything, so a
+    /// reworded error degrades to "here's what it said", never to an
+    /// unasked-for destructive retry.
+    public static func importNeedsForce(_ message: String) -> Bool {
+        let text = message.lowercased()
+        return text.contains("--force") || text.contains("already exists")
+    }
+
+    /// `run`, but a non-zero exit throws the engine's OWN message.
+    ///
+    /// `run` above drops stderr, which turns "no accounts to export — run
+    /// cswap --add-account first" into "cswap export … exited 1". Backup
+    /// failures are the ones a user has to act on (nothing to export, file
+    /// not found, not valid JSON, needs --force), so they surface verbatim.
+    /// Verified 2026-09-04: these verbs write plain text to stderr and
+    /// leave stdout empty — the opposite of `switch --json`, which reports
+    /// its errors as JSON on stdout.
+    private func runReportingErrors(_ arguments: [String]) async throws -> Data {
+        let binaryPath = self.binaryPath
+        return try await withCheckedThrowingContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: binaryPath)
+                process.arguments = arguments
+                let out = Pipe(), errors = Pipe()
+                process.standardOutput = out
+                process.standardError = errors
+                do {
+                    try process.run()
+                } catch {
+                    cont.resume(throwing: error)
+                    return
+                }
+                // Drain both BEFORE waiting: either pipe filling up would
+                // deadlock the child against an unread reader.
+                let data = out.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else {
+                    let text = String(decoding: errorData, as: UTF8.self)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    // cswap prefixes its own "Error: "; don't say it twice.
+                    let message = text.isEmpty
+                        ? "cswap \(arguments.joined(separator: " ")) exited \(process.terminationStatus)"
+                        : text.split(separator: "\n").last.map(String.init) ?? text
+                    cont.resume(throwing: CLIError(
+                        message: message.hasPrefix("Error: ")
+                            ? String(message.dropFirst("Error: ".count))
+                            : message))
+                    return
+                }
+                cont.resume(returning: data)
+            }
+        }
     }
 
     public func history(limit: Int = 10) async throws -> SwitchHistoryList {

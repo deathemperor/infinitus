@@ -14,7 +14,11 @@ import FoundationNetworking   // URLSession lives here on Linux
 /// honor by only logging in after a 401. Never reads `~/.9router`.
 public actor NineRouterEngine: AccountEngine {
     public static let engineID = "9router"
-    public static let defaultBaseURL = URL(string: "http://127.0.0.1:20128")!
+    /// 9Router's well-known dashboard/gateway port — what makes a
+    /// settings.json `ANTHROPIC_BASE_URL` recognizable as 9Router even
+    /// when the configured base URL moved.
+    public static let defaultPort = 20128
+    public static let defaultBaseURL = URL(string: "http://127.0.0.1:\(defaultPort)")!
 
     public nonisolated let id = NineRouterEngine.engineID
     public nonisolated var displayName: String { "9Router" }
@@ -34,6 +38,12 @@ public actor NineRouterEngine: AccountEngine {
     private var sharedUsage: [String: SharedUsage] = [:]
     private var expiredIDs: Set<String> = []
     private var loggedIn = false
+    /// Per-provider quota rows the user hid in 9Router's own dashboard
+    /// (`GET /api/settings` → `quotaVisibility.<provider>.hidden`,
+    /// raw model slugs). Refetched on the usage TTL — hiding a row
+    /// there hides it here (user 2026-09-04).
+    private var hiddenQuotas: [String: Set<String>] = [:]
+    private var hiddenFetchedAt: Date?
 
     public init(baseURL: URL = NineRouterEngine.defaultBaseURL, password: String,
                 session: URLSession? = nil, usageTTL: TimeInterval = 300) {
@@ -57,6 +67,9 @@ public actor NineRouterEngine: AccountEngine {
         var req = URLRequest(url: baseURL.appendingPathComponent("api/" + path))
         req.httpMethod = method
         req.timeoutInterval = 20   // usage relays an upstream round-trip
+        if let cliToken = NineRouterLocalAuth.cliToken() {
+            req.setValue(cliToken, forHTTPHeaderField: "x-9r-cli-token")
+        }
         if let json {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: json, options: [.withoutEscapingSlashes])
@@ -89,6 +102,28 @@ public actor NineRouterEngine: AccountEngine {
     /// Test hook: one dashboard GET, raw bytes.
     func rawGet(_ path: String) async throws -> (Int, Data) { try await request("GET", path) }
 
+    private func refreshHiddenQuotas(now: Date) async {
+        if let at = hiddenFetchedAt, now.timeIntervalSince(at) < usageTTL { return }
+        hiddenFetchedAt = now   // set either way: a failure retries next TTL, not next pass
+        guard let (_, data) = try? await request("GET", "settings"),
+              let wire = try? JSONDecoder().decode(HiddenWire.self, from: data)
+        else { return }
+        var byProvider: [String: Set<String>] = [:]
+        for (provider, visibility) in wire.quotaVisibility ?? [:] {
+            let hidden = visibility.hidden ?? []
+            guard !hidden.isEmpty else { continue }
+            byProvider[provider.lowercased()] = Set(hidden)
+        }
+        hiddenQuotas = byProvider
+    }
+
+    private struct HiddenWire: Decodable {
+        struct Visibility: Decodable {
+            let hidden: [String]?
+        }
+        let quotaVisibility: [String: Visibility]?
+    }
+
     // MARK: snapshot
 
     public struct Probe: Sendable, Equatable {
@@ -114,6 +149,8 @@ public actor NineRouterEngine: AccountEngine {
         // holding the same email — the Anthropic 429 budget is per
         // account (same rules as CLIProxyEngine).
         func fresh(_ at: Date) -> Bool { now.timeIntervalSince(at) < usageTTL }
+        await refreshHiddenQuotas(now: now)
+        let hidden = hiddenQuotas
         var usage: [String: Usage] = [:]
         var wanted: [NineRouterConnection] = []
         var leaderByEmail: [String: String] = [:]
@@ -148,7 +185,7 @@ public actor NineRouterEngine: AccountEngine {
                     guard let (_, body) = try? await self.request("GET", "usage/\(c.id)") else {
                         return (c.id, .unavailable("request failed"))
                     }
-                    return (c.id, NineRouterUsage.parse(body, now: now))
+                    return (c.id, NineRouterUsage.parse(body, hidden: hidden[c.provider.lowercased()] ?? [], now: now))
                 }
                 inFlight += 1
             }

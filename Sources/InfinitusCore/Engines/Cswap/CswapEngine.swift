@@ -103,5 +103,11 @@ public struct CswapEngine: AccountEngine {
     public func usageReport(days: Int) async throws -> UsageReport {
         try await cli.usageReport(days: days)
     }
+    public func exportAccounts(to path: URL, account: Int?, full: Bool) async throws {
+        try await cli.exportAccounts(to: path, account: account, full: full)
+    }
+    public func importAccounts(from path: URL, force: Bool) async throws {
+        try await cli.importAccounts(from: path, force: force)
+    }
 }
 #endif

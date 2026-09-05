@@ -49,11 +49,17 @@ public struct EngineCapabilities: OptionSet, Sendable, Codable, Hashable {
     /// has no "one request as credential X" verb yet — its cloaking
     /// lives in its executor, so nothing app-side can imitate it safely.
     public static let ignite      = EngineCapabilities(rawValue: 1 << 15)
+    /// Write every managed account to one file and read it back — cswap
+    /// `export` / `import`. Gated separately from `.remove` because an
+    /// export is a CREDENTIAL file and an import overwrites slots: an
+    /// engine may manage accounts without being able to hand them over
+    /// (the proxy holds keys it never reveals).
+    public static let backup      = EngineCapabilities(rawValue: 1 << 16)
 
     public static let all: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
         .addToken, .addOAuth, .autoSwitch, .costReport, .history,
-        .settings, .notify, .prefer, .ignite,
+        .settings, .notify, .prefer, .ignite, .backup,
     ]
 }
 
@@ -140,6 +146,15 @@ public protocol AccountEngine: Sendable {
     func beginOAuthAdd(fleet: Provider) async throws -> URL
     func awaitOAuthAdd() async throws
     func usageReport(days: Int) async throws -> UsageReport
+    /// Write every managed account to `path`. The result is a CREDENTIAL
+    /// file — treat it like a private key. `full` includes the whole
+    /// `~/.claude.json` rather than just the OAuth account.
+    func exportAccounts(to path: URL, account: Int?, full: Bool) async throws
+    /// Read accounts back from `path`. `force` overwrites accounts that
+    /// already exist — destructive, so a caller must confirm it. Without
+    /// it the engine may still replace slots whose token is dead (cswap
+    /// does), which is the repair case, not a clobber.
+    func importAccounts(from path: URL, force: Bool) async throws
 }
 
 /// Every action is opt-in: the defaults throw so a UI that ignored
@@ -172,4 +187,10 @@ public extension AccountEngine {
     func beginOAuthAdd(fleet: Provider) async throws -> URL { throw EngineError.unsupported("addOAuth") }
     func awaitOAuthAdd() async throws { throw EngineError.unsupported("addOAuth") }
     func usageReport(days: Int) async throws -> UsageReport { throw EngineError.unsupported("costReport") }
+    func exportAccounts(to path: URL, account: Int?, full: Bool) async throws {
+        throw EngineError.unsupported("backup")
+    }
+    func importAccounts(from path: URL, force: Bool) async throws {
+        throw EngineError.unsupported("backup")
+    }
 }

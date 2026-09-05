@@ -245,6 +245,28 @@ public struct SettingEntry: Decodable, Sendable {
     public let hi: Double?
     public let choices: [String]?
 
+    public init(
+        key: String,
+        value: JSONValue,
+        isSet: Bool = true,
+        kind: String = "string",
+        help: String = "",
+        defaultValue: JSONValue = .null,
+        lo: Double? = nil,
+        hi: Double? = nil,
+        choices: [String]? = nil
+    ) {
+        self.key = key
+        self.value = value
+        self.isSet = isSet
+        self.kind = kind
+        self.help = help
+        self.defaultValue = defaultValue
+        self.lo = lo
+        self.hi = hi
+        self.choices = choices
+    }
+
     enum CodingKeys: String, CodingKey {
         case key, value, isSet, kind, help, lo, hi, choices
         case defaultValue = "default"
@@ -280,6 +302,17 @@ public enum JSONValue: Codable, Equatable, Sendable {
         case .string(let s): try c.encode(s)
         case .array(let a): try c.encode(a)
         case .object(let o): try c.encode(o)
+        }
+    }
+
+    /// The text a user would type to reproduce this value.
+    public var editableText: String {
+        switch self {
+        case .null: return ""
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let n): return n == n.rounded() ? String(Int(n)) : String(n)
+        case .string(let s): return s
+        case .array, .object: return ""
         }
     }
 }

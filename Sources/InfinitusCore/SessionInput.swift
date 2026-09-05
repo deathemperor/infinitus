@@ -99,10 +99,15 @@ extension SessionInput {
     }
 
     /// `~/Library/Application Support/Infinitus/attachments` on macOS,
+    /// `%LOCALAPPDATA%\Infinitus\attachments` on Windows,
     /// `$XDG_STATE_HOME/infinitus/attachments` (Linux tray parity) —
     /// same base as `MirrorExporter.url` / `TrayMirror.stateDir`.
     public static var defaultAttachmentsDir: URL {
-        #if canImport(Glibc)
+        #if os(Windows)
+        let base = ProcessInfo.processInfo.environment["LOCALAPPDATA"]
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].path
+        return URL(fileURLWithPath: base).appendingPathComponent("Infinitus\\attachments")
+        #elseif canImport(Glibc)
         return MirrorWriter.linuxStateDir(env: ProcessInfo.processInfo.environment,
                                           home: NSHomeDirectory())
             .appendingPathComponent("attachments")

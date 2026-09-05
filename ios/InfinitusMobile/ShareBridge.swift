@@ -28,12 +28,19 @@ enum ShareBridge {
 
     /// The app's side: called after every refresh and pairing change,
     /// writes only when something changed.
+    ///
+    /// Multi-host (04-phone): the extension reaches ONE machine, so the
+    /// bridge carries the primary host's record. `host` is nil only
+    /// before the first pairing (or in fixture mode), and then there is
+    /// nothing worth bridging — the legacy single-host defaults keys
+    /// stopped being written when `mirror_hosts` took over.
     @MainActor
-    static func publish(_ defaults: UserDefaults = .standard) {
+    static func publish(host: MirrorHost?, _ defaults: UserDefaults = .standard) {
+        guard let host else { return }
         let pairing = Pairing(
-            endpoints: NetworkFleetMirror.storedEndpoints(defaults),
-            lastGood: defaults.string(forKey: NetworkFleetMirror.lastGoodKey),
-            token: MirrorPairing.normalize(defaults.string(forKey: NetworkFleetMirror.tokenKey) ?? ""),
+            endpoints: host.endpoints,
+            lastGood: host.lastGood,
+            token: host.normalizedToken,
             deviceId: NetworkFleetMirror.deviceId,
             deviceName: NetworkFleetMirror.deviceName)
         guard pairing != lastWritten, let data = try? JSONEncoder().encode(pairing) else { return }

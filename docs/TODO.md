@@ -107,6 +107,16 @@ Open work lives at github.com/deathemperor/infinitus/issues (user
 2026-09-01: "move todo items to use github issues tracking"); this
 file keeps the shipped log and the deferred-by-design notes.
 
+- ~~Windows daemon & remote control (`infinitus-win`)~~ → shipped
+  2026-09-04 (`windows/`): native Swift daemon target running alongside
+  Windows Terminal + `claude.exe`. Reuses `InfinitusCore` (`SessionFeed`,
+  `MirrorTransport`, `MirrorPairing`, `Snapshot`). Subcommands: `sessions`
+  (process liveness + FILETIME check against stale PID reuse, pipe check via
+  `WaitNamedPipeW`), `pair` (token stored in `%APPDATA%\Infinitus\pair-token`
+  with user-only DACL, `infinitus://pair` URL format with LAN/Tailnet addresses),
+  `snapshot` (synthetic fleet `claude-code-windows` with live progress per PID),
+  `message` (direct delivery over named pipes `\\.\pipe\LOCAL\cc-msg-*`).
+  Operator doc at `windows/README.md`.
 - ~~infinitusctl~~ → shipped 2026-09-03: agent-facing control CLI.
   `ControlProtocol` (InfinitusCore: request/reply, manifest table,
   socket path), `ControlServer` (app: same-user UNIX socket in App

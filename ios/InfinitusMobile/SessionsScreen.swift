@@ -19,11 +19,14 @@ struct SessionsScreen: View {
             content
                 .navigationTitle(model.rowTheme.tabLabel("sessions"))
                 .refreshable { await model.refresh() }
+                .navigationDestination(for: HostSession.self) { hostSession in
+                    SessionFeedScreen(model: model, hostSession: hostSession)
+                }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button { startSheet = true } label: { Image(systemName: "plus") }
                             .accessibilityLabel("Start a session")
-                            .disabled(model.snapshot == nil)
+                            .disabled(model.hosts.isEmpty)
                     }
                 }
                 .sheet(isPresented: $startSheet) { StartSessionSheet(model: model) }
@@ -39,53 +42,79 @@ struct SessionsScreen: View {
                 // title") — a distinct route so it stacks one level past
                 // the feed rather than replacing it.
                 .navigationDestination(for: SessionDetailRoute.self) { route in
-                    SessionDetailScreen(model: model, progress: progress, session: route.session)
+                    SessionDetailScreen(model: model, progress: progress, hostSession: route.hostSession)
                 }
         }
         // A shake staged a capture for a session: open its feed (which
         // takes the capture into its composer). A feed already open for
-        // that pid takes it itself — re-pushing a fresh SessionDetail
+        // that pid takes it itself — re-pushing a fresh HostSession
         // (its status may have moved) would rebuild the feed and lose
         // the capture the old one just took. Any other feed is replaced.
         .onChange(of: model.stagedCapture?.id) { _, _ in
             guard let staged = model.stagedCapture else { return }
             guard openPid != staged.pid else { return }
-            guard let session = fleetsWithSessions
-                      .flatMap({ $0.liveSessions?.sessions ?? [] })
-                      .first(where: { $0.pid == staged.pid })
+            guard let target = hostSession(pid: staged.pid)
             else { model.stagedCapture = nil; return }
             path = NavigationPath()
-            path.append(session)
+            path.append(target)
         }
         // Same dev seam as `INFINITUS_TAB` — a headless simulator capture
         // can't tap a row, so a pid named here pushes straight to its feed
         // (on appear too: a cached snapshot has the sessions before the
         // change fires).
-        .onChange(of: fleetsWithSessions.isEmpty) { _, _ in openSeamFeed() }
+        .onChange(of: hostSessionSections.isEmpty) { _, _ in openSeamFeed() }
         // A push during the stack's own appearance is dropped; a beat later lands.
         .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { openSeamFeed() } }
+    }
+
+    /// One live session by pid, across every paired host (04-phone) —
+    /// hosts are searched in stored order, so the Mac wins a pid two
+    /// machines happen to share.
+    private func hostSession(pid: Int) -> HostSession? {
+        hostSessionSections.flatMap { $0.sessions }.first { $0.pid == pid }
     }
 
     private func openSeamFeed() {
         guard path.isEmpty,
               let pidText = ProcessInfo.processInfo.environment["INFINITUS_FEED_PID"],
               let pid = Int(pidText),
-              let session = fleetsWithSessions
-                  .flatMap({ $0.liveSessions?.sessions ?? [] })
-                  .first(where: { $0.pid == pid })
+              let target = hostSession(pid: pid)
         else { return }
-        path.append(session)
+        path.append(target)
     }
 
-    /// One section per fleet that has sessions to show — in practice
-    /// only cswap's `liveSessions` is ever populated, but a fleet with
-    /// none simply contributes no section.
-    private var fleetsWithSessions: [MirrorFleetModel] {
-        model.fleets.filter { !($0.liveSessions?.sessions?.isEmpty ?? true) }
+    private struct HostSessionGroup: Identifiable {
+        let host: MirrorHost
+        let live: LiveSessions
+        let sessions: [HostSession]
+        var id: String { host.id }
+    }
+
+    private var hostSessionSections: [HostSessionGroup] {
+        var groups: [HostSessionGroup] = []
+        for host in model.hosts {
+            // Live sessions can come from the host snapshot or its fleet
+            let snapshot = model.snapshots[host.id]
+            let live: LiveSessions? = {
+                if let fleets = snapshot?.fleets,
+                   let f = fleets.first(where: { !($0.liveSessions?.sessions?.isEmpty ?? true) }) {
+                    return f.liveSessions
+                }
+                if let f = model.fleets.first(where: { $0.hostID == host.id && !($0.liveSessions?.sessions?.isEmpty ?? true) }) {
+                    return f.liveSessions
+                }
+                return snapshot?.fleets?.first?.liveSessions
+            }()
+            guard let live, let sessions = live.sessions, !sessions.isEmpty else { continue }
+            let sorted = sessions.sorted { ($0.status == "waiting" ? 0 : 1) < ($1.status == "waiting" ? 0 : 1) }
+            let hostSessions = sorted.map { HostSession(host: host, session: $0) }
+            groups.append(HostSessionGroup(host: host, live: live, sessions: hostSessions))
+        }
+        return groups
     }
 
     @ViewBuilder private var content: some View {
-        if !fleetsWithSessions.isEmpty {
+        if !hostSessionSections.isEmpty {
             List {
                 if !model.awsLogins.isEmpty {
                     // Up top, whatever the session's place in the list
@@ -110,17 +139,15 @@ struct SessionsScreen: View {
                         }
                     }
                 }
-                ForEach(fleetsWithSessions) { fleet in
-                    let live = fleet.liveSessions!
+                ForEach(hostSessionSections) { group in
                     Section {
                         // Sessions waiting on you first — they're what
                         // the phone is opened for.
-                        ForEach((live.sessions ?? []).sorted { ($0.status == "waiting" ? 0 : 1) < ($1.status == "waiting" ? 0 : 1) },
-                                id: \.pid) { session in
-                            NavigationLink(value: session) { row(session) }
+                        ForEach(group.sessions) { hs in
+                            NavigationLink(value: hs) { row(hs) }
                         }
                     } header: {
-                        sectionHeader(fleet: fleet, live: live)
+                        sectionHeader(group: group)
                     }
                 }
             }
@@ -130,12 +157,26 @@ struct SessionsScreen: View {
             // snapshot is in; the request waits for the login to appear.
             .onChange(of: model.requestedAwsLogin) { _, _ in openRequestedAwsLogin() }
             .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedAwsLogin() }
-        } else if !model.fleets.isEmpty {
+        } else if !model.hosts.isEmpty {
             ThemedPlaceholder(theme: model.rowTheme, key: "noSessions", plainSymbol: "brain",
-                              description: "Nothing is running on the Mac right now.")
+                              description: model.hosts.count > 1
+                                  ? "Nothing is running on your hosts right now."
+                                  : "Nothing is running on the \(model.hosts.first?.label.isEmpty == false ? model.hosts.first!.label : "Mac") right now.")
         } else {
-            ThemedPlaceholder(theme: model.rowTheme, key: "searching", plainSymbol: "antenna.radiowaves.left.and.right",
-                              description: "Pair with the Mac in Settings to see its sessions.")
+            ThemedPlaceholder(theme: model.rowTheme, key: "searching",
+                              plainSymbol: "antenna.radiowaves.left.and.right",
+                              description: "Pair with a host in Settings to see its sessions.")
+        }
+    }
+
+    private func headerTitle(_ group: HostSessionGroup) -> String {
+        let summary = SessionSummary.tooltip(group.live)
+        if model.hosts.count > 1 {
+            let label = group.host.label.isEmpty ? (group.host.emoji == "🪟" ? "Windows" : "Mac") : group.host.label
+            let emoji = group.host.emoji.isEmpty ? "🖥️" : group.host.emoji
+            return "\(emoji) \(label) — \(summary)"
+        } else {
+            return summary
         }
     }
 
@@ -145,11 +186,10 @@ struct SessionsScreen: View {
     /// snapshot lists the pid.
     private func openRequestedPid() {
         guard let pid = model.requestedPid,
-              let session = fleetsWithSessions.flatMap({ $0.liveSessions?.sessions ?? [] })
-                  .first(where: { $0.pid == pid }) else { return }
+              let target = hostSession(pid: pid) else { return }
         model.requestedPid = nil
         path = NavigationPath()
-        path.append(session)
+        path.append(target)
     }
 
     private func openRequestedAwsLogin() {
@@ -170,8 +210,9 @@ struct SessionsScreen: View {
         }
     }
 
-    private func row(_ session: SessionDetail) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+    private func row(_ hs: HostSession) -> some View {
+        let session = hs.session
+        return HStack(alignment: .top, spacing: 10) {
             Circle()
                 .fill(color(for: session.status))
                 .frame(width: 9, height: 9)
@@ -184,7 +225,7 @@ struct SessionsScreen: View {
                         Image(systemName: "key.fill").foregroundStyle(.orange)
                             .accessibilityLabel("needs AWS login")
                     }
-                    Text(title(session))
+                    Text(title(hs))
                         .font(.headline).lineLimit(1)
                     Spacer(minLength: 8)
                     Text(SessionWords.status(session.status, theme: model.rowTheme))
@@ -197,10 +238,10 @@ struct SessionsScreen: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.head)
                 // Metadata line: branch · model · kind · output tokens.
-                Text(metadata(session))
+                Text(metadata(hs))
                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                     .lineLimit(1).truncationMode(.middle)
-                if let p = progress.byPid[session.pid], p.hasProgressSignal {
+                if let p = progressForKey(hs), p.hasProgressSignal {
                     SessionProgressLine(progress: p)
                 }
             }
@@ -216,16 +257,18 @@ struct SessionsScreen: View {
         }
     }
 
+    private func progressForKey(_ hs: HostSession) -> SessionProgress? {
+        progress.byKey[hs.id] ?? progress.byPid[hs.session.pid]
+    }
+
     /// The summary line wears the theme (user 2026-09-04 "style the
     /// header info of sessions with theme"): the theme's session glyph in
     /// its gauge color on a wash of the theme's accent — the tint the
     /// Fleet screen's rows already wear. The Off theme keeps the stock
     /// list header.
-    private func sectionHeader(fleet: MirrorFleetModel, live: LiveSessions) -> some View {
-        let theme = fleet.rowTheme
-        let summary = model.fleets.count > 1
-            ? "\(fleet.fleetLabel?.engineName ?? fleet.engineID) — \(SessionSummary.tooltip(live))"
-            : SessionSummary.tooltip(live)
+    private func sectionHeader(group: HostSessionGroup) -> some View {
+        let theme = model.rowTheme
+        let summary = headerTitle(group)
         return Group {
             if theme.plain {
                 Text(summary)
@@ -256,9 +299,10 @@ struct SessionsScreen: View {
         }
     }
 
-    private func title(_ session: SessionDetail) -> String {
+    private func title(_ hs: HostSession) -> String {
+        let session = hs.session
         let repo = repoName(session.cwd)
-        let p = progress.byPid[session.pid]
+        let p = progressForKey(hs)
         let name = SessionNaming.displayName(name: p?.name, autoName: p?.autoName, cwd: session.cwd)
         guard name != repo else { return repo }
         return "\(name) · \(repo)"
@@ -272,8 +316,9 @@ struct SessionsScreen: View {
         (path as NSString).abbreviatingWithTildeInPath
     }
 
-    private func metadata(_ session: SessionDetail) -> String {
-        let p = progress.byPid[session.pid]
+    private func metadata(_ hs: HostSession) -> String {
+        let session = hs.session
+        let p = progressForKey(hs)
         var parts: [String] = []
         if let branch = p?.gitBranch { parts.append("⎇ \(branch)") }
         if let model = p?.model { parts.append(shortModel(model)) }
