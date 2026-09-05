@@ -189,7 +189,9 @@ cd "$(dirname "$0")/.."
 
 # Nothing here lands in the repo: ids and paths persist under ~/.config,
 # secrets go straight to the keychain / GitHub and are never written.
-ENV_FILE="${ENV_FILE:-$HOME/.config/infinitus/signing.env}"
+# The library defaults ENV_FILE to ./.env before this runs, so the
+# assignment is unconditional (INFINITUS_SIGNING_ENV overrides).
+ENV_FILE="${INFINITUS_SIGNING_ENV:-$HOME/.config/infinitus/signing.env}"
 mkdir -p "$(dirname "$ENV_FILE")"
 touch "$ENV_FILE" && chmod 600 "$ENV_FILE"
 
