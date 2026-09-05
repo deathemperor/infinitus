@@ -1,0 +1,6 @@
+interface:
+  display_name: "Infinitus"
+  short_description: "Repo-specific patterns and workflows for infinitus"
+  default_prompt: "Use the infinitus repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
