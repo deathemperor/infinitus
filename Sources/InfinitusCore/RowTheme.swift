@@ -221,21 +221,30 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
     }
 
     /// `count` distinct names for a fleet, from this theme's pool (every
-    /// built-in's when it has none). Past the pool, names repeat with a
-    /// numeric suffix. Deterministic under `generator` for tests.
-    public func randomAccountNames<G: RandomNumberGenerator>(count: Int, using generator: inout G) -> [String] {
+    /// built-in's when it has none), never one in `taken` — the names the
+    /// fleet already wears when a single account re-rolls (#145). Past
+    /// the pool, names repeat with a numeric suffix. Deterministic under
+    /// `generator` for tests.
+    public func randomAccountNames<G: RandomNumberGenerator>(count: Int, avoiding taken: Set<String> = [],
+                                                             using generator: inout G) -> [String] {
         var pool = accountNames.isEmpty ? Self.builtins.flatMap(\.accountNames) : accountNames
         pool = Array(Set(pool)).sorted().shuffled(using: &generator)
         guard !pool.isEmpty, count > 0 else { return [] }
-        return (0..<count).map { i in
-            let name = pool[i % pool.count]
-            return i < pool.count ? name : "\(name)-\(i / pool.count + 1)"
+        var picks: [String] = []
+        var level = 1
+        while picks.count < count {
+            for name in pool where picks.count < count {
+                let candidate = level == 1 ? name : "\(name)-\(level)"
+                if !taken.contains(candidate) { picks.append(candidate) }
+            }
+            level += 1
         }
+        return picks
     }
 
-    public func randomAccountNames(count: Int) -> [String] {
+    public func randomAccountNames(count: Int, avoiding taken: Set<String> = []) -> [String] {
         var g = SystemRandomNumberGenerator()
-        return randomAccountNames(count: count, using: &g)
+        return randomAccountNames(count: count, avoiding: taken, using: &g)
     }
 
     // MARK: built-ins

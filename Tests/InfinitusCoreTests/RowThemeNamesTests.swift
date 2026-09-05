@@ -36,6 +36,20 @@ final class RowThemeNamesTests: XCTestCase {
         XCTAssertTrue(many.suffix(2).allSatisfy { $0.hasSuffix("-2") })
     }
 
+    func testASingleRerollSkipsTheNamesTheFleetWears() {
+        let pool = RowTheme.rpg.accountNames
+        var g = Seeded(state: 5)
+        let free = pool.last!
+        XCTAssertEqual(RowTheme.rpg.randomAccountNames(count: 1, avoiding: Set(pool.dropLast()), using: &g), [free])
+        var g2 = Seeded(state: 5)
+        let exhausted = RowTheme.rpg.randomAccountNames(count: 2, avoiding: Set(pool), using: &g2)
+        XCTAssertEqual(exhausted.count, 2)
+        XCTAssertTrue(exhausted.allSatisfy { $0.hasSuffix("-2") }, "\(exhausted)")
+        XCTAssertTrue(Set(exhausted).isDisjoint(with: pool))
+        var g3 = Seeded(state: 5)
+        XCTAssertEqual(RowTheme.rpg.randomAccountNames(count: 2, avoiding: Set(pool), using: &g3), exhausted, "same seed, same picks")
+    }
+
     func testAPoollessThemeDrawsFromEveryBuiltin() {
         var g = Seeded(state: 3)
         let names = RowTheme.off.randomAccountNames(count: 4, using: &g)

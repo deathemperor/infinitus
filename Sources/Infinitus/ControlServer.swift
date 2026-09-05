@@ -281,11 +281,22 @@ final class ControlServer {
 
         case "randomize-names":
             guard let key = r.args.first, let fleet = model.fleets.first(where: { $0.id == key }) else {
-                throw Fail("usage: randomize-names <fleet>")
+                throw Fail("usage: randomize-names <fleet> [n]")
             }
             guard fleet.capabilities.contains(.rename) else { throw Fail("\(fleet.id) does not support rename") }
-            let names = model.rowTheme.randomAccountNames(count: fleet.accounts.count)
-            for (account, name) in zip(fleet.accounts, names) {
+            var targets = fleet.accounts
+            var taken = Set<String>()
+            if r.args.count > 1 {
+                // One account re-rolls alone (#145): it skips every name the
+                // fleet wears, its own included, so the roll visibly lands.
+                guard let n = Int(r.args[1]), let one = fleet.accounts.first(where: { $0.number == n }) else {
+                    throw Fail("no account #\(r.args[1]) in \(fleet.id)")
+                }
+                targets = [one]
+                taken = Set(fleet.accounts.compactMap(\.alias).filter { !$0.isEmpty })
+            }
+            let names = model.rowTheme.randomAccountNames(count: targets.count, avoiding: taken)
+            for (account, name) in zip(targets, names) {
                 try await fleet.engine.rename(fleet: fleet.provider, number: account.number, name)
             }
             await model.refreshSnapshot()

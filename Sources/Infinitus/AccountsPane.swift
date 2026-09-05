@@ -656,6 +656,11 @@ private struct FleetAccountsSection: View {
             List {
                 ForEach(fleet.accounts, id: \.number) { a in
                     row(a).moveDisabled(!caps.contains(.reorder))
+                        .contextMenu {
+                            if caps.contains(.rename) {
+                                Button("Re-roll name") { fleet.randomizeName(a.number) }
+                            }
+                        }
                 }
                 .onMove { from, to in
                     guard caps.contains(.reorder) else { return }

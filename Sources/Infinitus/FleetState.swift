@@ -234,6 +234,15 @@ final class FleetState: ObservableObject, Identifiable {
         }
     }
 
+    /// One account re-rolls its name from the theme's pool, skipping every
+    /// name the fleet already wears — its own included, so it visibly
+    /// changes (#145).
+    func randomizeName(_ number: Int) {
+        let taken = Set(accounts.compactMap(\.alias).filter { !$0.isEmpty })
+        guard let name = rowTheme.randomAccountNames(count: 1, avoiding: taken).first else { return }
+        rename(number, to: name)
+    }
+
     /// Rename = set/clear the account's alias, so every frontend
     /// (TUI, CLI, popup) shows the same name.
     func rename(_ number: Int, to name: String) {
