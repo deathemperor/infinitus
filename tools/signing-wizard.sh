@@ -288,6 +288,12 @@ ask P12_PATH "Path to the .p12 [~/Downloads/DeveloperID.p12]:"
 P12_PATH="${P12_PATH:-$HOME/Downloads/DeveloperID.p12}"
 P12_PATH="${P12_PATH/#\~/$HOME}"
 ask_secret P12_PASSWORD "The .p12 export password:"
+# A wrong password only surfaces in CI ("MAC verification failed during
+# PKCS12 import", release v0.4.3's first run) — check it here first.
+until [[ ! -f "$P12_PATH" ]] || openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:$P12_PASSWORD" 2>/dev/null; do
+  warn "that password does not open $P12_PATH"
+  ask_secret P12_PASSWORD "The .p12 export password (again):"
+done
 if [[ -f "$P12_PATH" && -f "${NOTARY_KEY_PATH:-/nonexistent}" ]]; then
   set_secret DEVELOPER_ID_P12_BASE64 "$(base64 -i "$P12_PATH")"
   set_secret DEVELOPER_ID_P12_PASSWORD "$P12_PASSWORD"
