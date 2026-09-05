@@ -92,19 +92,25 @@ final class ShareViewController: SLComposeServiceViewController {
         }
     }
 
-    /// Newest first, like the app's shake picker; a session's own name,
-    /// else its repo, then its status word.
+    /// Waiting sessions first (they are the ones a share most likely
+    /// answers), then newest first like the app's shake picker; labelled
+    /// by the session's own name and its repo (#123).
     static func sessions(in snapshot: MirrorSnapshot) -> [Session] {
         var live = snapshot.fleets?.flatMap { $0.liveSessions?.sessions ?? [] } ?? []
         if live.isEmpty, let list = try? JSONDecoder().decode(AccountList.self, from: snapshot.listJSON) {
             live = list.liveSessions?.sessions ?? []
         }
         var seen = Set<Int>()
-        return live.sorted { $0.startedAt > $1.startedAt }.compactMap { session in
+        return live.sorted {
+            let (a, b) = ($0.status == "waiting", $1.status == "waiting")
+            return a != b ? a : $0.startedAt > $1.startedAt
+        }.compactMap { session in
             guard seen.insert(session.pid).inserted else { return nil }
-            let name = snapshot.progressByPid?[session.pid]?.name
-                ?? URL(fileURLWithPath: session.cwd).lastPathComponent
-            return Session(pid: session.pid, cwd: session.cwd, label: "\(name) · \(session.status)")
+            let repo = URL(fileURLWithPath: session.cwd).lastPathComponent
+            let name = snapshot.progressByPid?[session.pid]?.name ?? repo
+            let label = name == repo ? repo : "\(name) · \(repo)"
+            return Session(pid: session.pid, cwd: session.cwd,
+                           label: session.status == "waiting" ? "\(label) · waiting" : label)
         }
     }
 
