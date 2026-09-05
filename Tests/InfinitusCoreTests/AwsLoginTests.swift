@@ -184,3 +184,59 @@ final class AwsLoginProgressTests: XCTestCase {
         XCTAssertEqual(SessionProgress.parse(lines: [failed] + padding).awsLoginProfile, "papaya-login")
     }
 }
+
+/// #149: the aws command that failed ran in a sub-agent, so the parent's
+/// own tail never carries the signature — the need is read off the
+/// sub-agent transcript and attributed to the parent.
+final class AwsLoginSubagentTests: XCTestCase {
+    var dir: URL!
+    let failed = #"{"type":"user","timestamp":"2026-09-03T08:00:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile papaya-login"}]}}"#
+    let failedLater = #"{"type":"user","timestamp":"2026-09-03T08:05:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile banyan"}]}}"#
+    let fine = #"{"type":"user","timestamp":"2026-09-03T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"ok"}]}]}}"#
+
+    override func setUpWithError() throws {
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("infinitus-aws-sub-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
+
+    private func write(_ lines: [String], agent: String? = nil, mtime: Date? = nil) throws {
+        let transcript = Transcript.path(cwd: "/p", sessionId: "s1", claudeDir: dir)
+        var url = transcript
+        if let agent {
+            let subagents = transcript.deletingPathExtension().appendingPathComponent("subagents")
+            try FileManager.default.createDirectory(at: subagents, withIntermediateDirectories: true)
+            url = subagents.appendingPathComponent("agent-\(agent).jsonl")
+        } else {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
+        try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        if let mtime { try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: url.path) }
+    }
+
+    func testASubagentsLapsedSignInIsAttributedToTheParent() throws {
+        try write([fine])
+        try write([failed], agent: "a")
+        let progress = SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir)
+        XCTAssertEqual(progress.awsLoginProfile, "papaya-login")
+        XCTAssertEqual(progress.awsLoginFailedAt, UsageHistory.parseISO("2026-09-03T08:00:00.000Z"))
+    }
+
+    func testTheNewestSubagentFailureWinsAndTheParentsOwnTailWinsOverAll() throws {
+        try write([fine])
+        try write([failed], agent: "a")
+        try write([failedLater], agent: "b")
+        XCTAssertEqual(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile, "banyan")
+        let ownFailure = #"{"type":"user","timestamp":"2026-09-03T08:09:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t9","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile parent-prof"}]}}"#
+        try write([ownFailure])
+        XCTAssertEqual(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile, "parent-prof")
+    }
+
+    func testAStaleAgentTranscriptAndAMovedOnAgentAreIgnored() throws {
+        try write([fine])
+        try write([failed], agent: "old", mtime: Date().addingTimeInterval(-2 * 60 * 60))
+        XCTAssertNil(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile)
+        try write([failed] + Array(repeating: fine, count: SessionProgress.awsLoginScanEntries * 2), agent: "busy")
+        XCTAssertNil(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile)
+    }
+}

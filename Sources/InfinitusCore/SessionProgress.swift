@@ -97,13 +97,7 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// as a JSON object are skipped, never an error, same convention as
     /// Transcript/UsageHistory.
     public static func parse(lines: [String], now: Date = Date()) -> SessionProgress {
-        let entries: [[String: Any]] = lines.compactMap { line in
-            guard line.first == "{",
-                  let data = line.data(using: .utf8),
-                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return nil }
-            return obj
-        }
+        let entries = jsonEntries(lines)
 
         var lastActivityAt: Date?
         for entry in entries.reversed() {
@@ -187,15 +181,26 @@ public struct SessionProgress: Sendable, Equatable, Codable {
             if gitBranch != nil, model != nil { break }
         }
 
-        // AWS sign-in lapsed? Only the newest tool results count: once the
-        // session moves on the signature scrolls out and the need clears.
-        // The session need not call `aws login` in any particular way: any
-        // aws command that fails with the CLI's expired-session error (or
-        // the cred broker's "Fix:" line) is the signal. When the error
-        // names no profile, the failed command's own --profile /
-        // AWS_PROFILE does (found by tool_use_id).
-        var awsLoginProfile: String?
-        var awsLoginFailedAt: Date?
+        let awsNeed = awsLoginNeed(entries: entries)
+
+        return SessionProgress(lastActivityAt: lastActivityAt, nowDoing: nowDoing, todos: todos,
+                                title: title, goal: goal(lines: lines), phase: phase(entries: entries),
+                                gitBranch: gitBranch, model: model,
+                                outputTokens: outputTokens, recentOutputTokens: recentOutputTokens,
+                                retrying: retrying, awsLoginProfile: awsNeed?.profile,
+                                awsLoginFailedAt: awsNeed?.failedAt)
+    }
+
+    /// The AWS profile whose sign-in lapsed, off the newest tool results
+    /// in `entries` — a session's own tail, or one sub-agent's (#149) —
+    /// and when the failing result was recorded. Only the newest tool
+    /// results count: once the transcript moves on the signature scrolls
+    /// out and the need clears. The session need not call `aws login` in
+    /// any particular way: any aws command that fails with the CLI's
+    /// expired-session error (or the cred broker's "Fix:" line) is the
+    /// signal. When the error names no profile, the failed command's own
+    /// --profile / AWS_PROFILE does (found by tool_use_id).
+    static func awsLoginNeed(entries: [[String: Any]]) -> (profile: String, failedAt: Date?)? {
         // Tool calls only: attachments, hook summaries, turn stats and
         // thinking/text turns pad a transcript by ~8 lines per call, so
         // a raw-line window lost the failed call as soon as the session
@@ -216,7 +221,7 @@ public struct SessionProgress: Sendable, Equatable, Codable {
             }
             return nil
         }
-        scan: for entry in recent.reversed() {
+        for entry in recent.reversed() {
             guard let message = entry["message"] as? [String: Any],
                   let content = message["content"] as? [[String: Any]] else { continue }
             for block in content where (block["type"] as? String) == "tool_result" {
@@ -227,23 +232,59 @@ public struct SessionProgress: Sendable, Equatable, Codable {
                     text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
                 } else { continue }
                 guard let profile = AwsLogin.profile(in: text) else { continue }
+                let failedAt = (entry["timestamp"] as? String).flatMap(UsageHistory.parseISO)
                 if profile == "default", let id = block["tool_use_id"] as? String,
                    let cmd = command(forToolUse: id), let named = AwsLogin.profile(inCommand: cmd) {
-                    awsLoginProfile = named
-                } else {
-                    awsLoginProfile = profile
+                    return (named, failedAt)
                 }
-                awsLoginFailedAt = (entry["timestamp"] as? String).flatMap(UsageHistory.parseISO)
-                break scan
+                return (profile, failedAt)
             }
         }
+        return nil
+    }
 
-        return SessionProgress(lastActivityAt: lastActivityAt, nowDoing: nowDoing, todos: todos,
-                                title: title, goal: goal(lines: lines), phase: phase(entries: entries),
-                                gitBranch: gitBranch, model: model,
-                                outputTokens: outputTokens, recentOutputTokens: recentOutputTokens,
-                                retrying: retrying, awsLoginProfile: awsLoginProfile,
-                                awsLoginFailedAt: awsLoginFailedAt)
+    /// A sub-agent's lapsed sign-in, attributed to the PARENT (#149): the
+    /// parent reads the error off the sub-agent's result and never runs
+    /// the aws command itself, so its own tail carries no signature.
+    /// Agent transcripts untouched for `window` are skipped without a
+    /// read (some sessions accumulate hundreds; see findSubagentLimits);
+    /// among the rest the newest failure wins.
+    static let subagentAwsLoginWindow: TimeInterval = 30 * 60
+    static func subagentAwsLoginNeed(transcript: URL, now: Date = Date(),
+                                     window: TimeInterval = subagentAwsLoginWindow) -> (profile: String, failedAt: Date?)? {
+        let subagentsDir = transcript.deletingPathExtension().appendingPathComponent("subagents")
+        var newest: (profile: String, failedAt: Date?)?
+        for file in Transcript.agentFiles(under: subagentsDir) {
+            guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
+                .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
+            guard let lines = tailLines(of: file, maxBytes: 128 * 1024),
+                  let need = awsLoginNeed(entries: jsonEntries(lines)) else { continue }
+            if newest == nil || (need.failedAt ?? .distantPast) > (newest?.failedAt ?? .distantPast) {
+                newest = need
+            }
+        }
+        return newest
+    }
+
+    static func jsonEntries(_ lines: [String]) -> [[String: Any]] {
+        lines.compactMap { line in
+            guard line.first == "{",
+                  let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return nil }
+            return obj
+        }
+    }
+
+    /// The last `maxBytes` of a transcript as lines; nil when unreadable.
+    static func tailLines(of url: URL, maxBytes: Int) -> [String]? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
+        guard (try? handle.seek(toOffset: start)) != nil,
+              let blob = try? handle.readToEnd() else { return nil }
+        return blob.split(separator: UInt8(ascii: "\n")).map { String(decoding: $0, as: UTF8.self) }
     }
 
     static let phaseWindow = 24
@@ -370,25 +411,18 @@ public struct SessionProgress: Sendable, Equatable, Codable {
                              name: String? = nil, maxBytes: Int = 512 * 1024) -> SessionProgress {
         let url = Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir)
         let headGoal = readGoal(sessionId: sessionId, cwd: cwd, claudeDir: claudeDir)
-        func withGoal(_ progress: SessionProgress) -> SessionProgress {
-            SessionProgress(lastActivityAt: progress.lastActivityAt, nowDoing: progress.nowDoing,
-                             todos: progress.todos, title: progress.title,
-                             goal: headGoal ?? progress.goal, phase: progress.phase, name: name,
-                             gitBranch: progress.gitBranch, model: progress.model,
-                             outputTokens: progress.outputTokens,
-                             recentOutputTokens: progress.recentOutputTokens, retrying: progress.retrying,
-                             awsLoginProfile: progress.awsLoginProfile,
-                             awsLoginFailedAt: progress.awsLoginFailedAt)
-        }
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return withGoal(parse(lines: [])) }
-        defer { try? handle.close() }
-        guard let size = try? handle.seekToEnd() else { return withGoal(parse(lines: [])) }
-        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
-        guard (try? handle.seek(toOffset: start)) != nil,
-              let blob = try? handle.readToEnd() else { return withGoal(parse(lines: [])) }
-        let lines = blob.split(separator: UInt8(ascii: "\n"))
-            .map { String(decoding: $0, as: UTF8.self) }
-        return withGoal(parse(lines: lines))
+        let progress = parse(lines: tailLines(of: url, maxBytes: maxBytes) ?? [])
+        // The session's own tail wins; a sub-agent's lapsed sign-in (#149)
+        // fills in only when the parent shows none.
+        let aws = progress.awsLoginProfile.map { ($0, progress.awsLoginFailedAt) }
+            ?? subagentAwsLoginNeed(transcript: url)
+        return SessionProgress(lastActivityAt: progress.lastActivityAt, nowDoing: progress.nowDoing,
+                               todos: progress.todos, title: progress.title,
+                               goal: headGoal ?? progress.goal, phase: progress.phase, name: name,
+                               gitBranch: progress.gitBranch, model: progress.model,
+                               outputTokens: progress.outputTokens,
+                               recentOutputTokens: progress.recentOutputTokens, retrying: progress.retrying,
+                               awsLoginProfile: aws?.0, awsLoginFailedAt: aws?.1)
     }
 
     /// Reads only the FIRST `maxBytes` of the transcript — the goal lives at

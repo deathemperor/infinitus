@@ -171,7 +171,7 @@ public enum Transcript {
     /// Every `agent-*.jsonl` under a session's `subagents/` dir, plus one
     /// level deeper for workflow runs (`subagents/workflows/<run>/`) —
     /// fixed depths, not a recursive walk (matches StatsScanner).
-    private static func agentFiles(under subagentsDir: URL) -> [URL] {
+    static func agentFiles(under subagentsDir: URL) -> [URL] {
         let fm = FileManager.default
         func agents(in dir: URL) -> [URL] {
             (try? fm.contentsOfDirectory(atPath: dir.path))?
