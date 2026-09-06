@@ -1,0 +1,69 @@
+import Foundation
+
+/// How a session was started by Infinitus (#163 / #165): the profile it
+/// was born from, the permission mode it runs in, the session it
+/// resumed. Claude Code's own session record carries none of this, so
+/// the Mac remembers it per pid from the moment a started session
+/// registers, and the snapshot carries it to the phone.
+public struct SessionBirth: Codable, Sendable, Equatable {
+    public let profile: String?
+    /// One of `SessionStart.permissionModes`; nil = supervised.
+    public let permissionMode: String?
+    /// The past session id this one resumed, when it did.
+    public let resumedFrom: String?
+
+    public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil) {
+        self.profile = profile
+        self.permissionMode = permissionMode
+        self.resumedFrom = resumedFrom
+    }
+
+    public init?(request: SessionStart.Request) {
+        let profile = request.profile?.trimmingCharacters(in: .whitespaces)
+        let mode = request.permissionMode.flatMap { m in SessionStart.permissionModes.contains { $0.mode == m } ? m : nil }
+        guard (profile?.isEmpty == false) || mode != nil || request.resume != nil else { return nil }
+        self.init(profile: profile?.isEmpty == false ? profile : nil, permissionMode: mode, resumedFrom: request.resume)
+    }
+
+    /// The mode as the pickers spell it ("Full access"), nil when supervised.
+    public var modeLabel: String? {
+        permissionMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
+    }
+
+    /// What the session row shows beside the name: "Review · Full access",
+    /// "resumed", or nil when there is nothing worth a chip.
+    public var chip: String? {
+        var parts: [String] = []
+        if let profile { parts.append(profile) }
+        if let modeLabel { parts.append(modeLabel) }
+        if parts.isEmpty, resumedFrom != nil { parts.append("resumed") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Full access is the one mode worth a warning color.
+    public var isUnrestricted: Bool { permissionMode == "bypassPermissions" }
+}
+
+public enum SessionBirths {
+    /// Missing or unreadable → empty (never an error).
+    public static func load(from url: URL) -> [Int: SessionBirth] {
+        guard let data = try? Data(contentsOf: url),
+              let raw = try? JSONDecoder().decode([String: SessionBirth].self, from: data) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: raw.compactMap { k, v in Int(k).map { ($0, v) } })
+    }
+
+    /// Keys are strings on disk (JSON objects), ints in memory.
+    public static func save(_ births: [Int: SessionBirth], to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let raw = Dictionary(uniqueKeysWithValues: births.map { (String($0.key), $0.value) })
+        try encoder.encode(raw).write(to: url, options: .atomic)
+    }
+
+    /// Only pids still in the roster keep a record — a pid is reused by
+    /// the OS eventually, and a dead session's chip must not outlive it.
+    public static func pruned(_ births: [Int: SessionBirth], alive: Set<Int>) -> [Int: SessionBirth] {
+        births.filter { alive.contains($0.key) }
+    }
+}

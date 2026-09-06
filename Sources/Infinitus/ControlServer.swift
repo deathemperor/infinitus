@@ -197,7 +197,9 @@ final class ControlServer {
             return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
                 .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
                          "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
-                         "kind": .string(row.kind)])
+                         "kind": .string(row.kind),
+                         "profile": model.sessionBirths[row.pid]?.profile.map { .string($0) } ?? .null,
+                         "permissionMode": model.sessionBirths[row.pid]?.permissionMode.map { .string($0) } ?? .null])
             }))
 
         case "profiles":
@@ -244,6 +246,9 @@ final class ControlServer {
             }
             let reply = SessionLauncher.start(SessionStart.Request(cwd: past.cwd, resume: past.sessionId),
                                               preferredHost: model.sessionHost)
+            if reply.outcome == "started", let pid = reply.pid {
+                model.recordBirth(pid: pid, SessionBirth(resumedFrom: past.sessionId))
+            }
             return ControlReply(ok: reply.outcome == "started", result: try .of(reply),
                                 error: reply.outcome == "started" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
 

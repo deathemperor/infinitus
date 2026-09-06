@@ -36,13 +36,14 @@ actor MirrorExporter {
                 plan: WindowPlanner.Plan? = nil, awsLogins: [AwsLogin.Item] = [],
                 progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
-                profiles: [SessionProfile] = []) {
+                profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:]) {
         guard Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
         // Same selection as InfinitusTray.swift's panel rows: busy/waiting
         // first, busy before waiting, capped at 6.
-        let sessionRecords = ClaudeSessions.list(claudeDir: claudeDir)
+        let allRecords = ClaudeSessions.list(claudeDir: claudeDir)
+        let sessionRecords = allRecords
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
         let now = Date()
@@ -93,7 +94,9 @@ actor MirrorExporter {
             awsLogins: awsLogins.isEmpty ? nil : awsLogins, stats: stats,
             recentCwds: recentCwds.isEmpty ? nil : recentCwds,
             pushesAlerts: pushesAlerts, app: app, team: team,
-            profiles: profiles.isEmpty ? nil : profiles)
+            profiles: profiles.isEmpty ? nil : profiles,
+            births: births.isEmpty ? nil
+                : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })))
         // Encoded once here rather than inside MirrorWriter so the LAN
         // server hands out the same bytes the file holds.
         let encoder = JSONEncoder()

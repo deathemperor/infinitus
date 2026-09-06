@@ -137,6 +137,17 @@ final class AppModel: ObservableObject {
     /// The machine-health guardian (#115): Settings › Machine's model.
     let machineModel = MachineModel()
     let sessionProfiles = SessionProfilesModel()
+    /// What Infinitus started each live session as (#163/#165), by pid;
+    /// kept across launches, pruned to the roster on every export.
+    @Published private(set) var sessionBirths: [Int: SessionBirth] = SessionBirths.load(from: AppModel.birthsURL)
+    static let birthsURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Infinitus/session-births.json")
+    func recordBirth(pid: Int, _ birth: SessionBirth) {
+        let alive = Set(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { Int($0.pid) })
+        sessionBirths = SessionBirths.pruned(sessionBirths, alive: alive.union([pid]))
+        sessionBirths[pid] = birth
+        try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
+    }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
     @Published var lastError: String?
@@ -1068,6 +1079,9 @@ final class AppModel: ObservableObject {
             let verb = request.resume == nil ? "started" : "resumed"
             let born = request.profile.map { " (profile \($0))" } ?? ""
             Task { @MainActor in
+                if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request) {
+                    self?.recordBirth(pid: pid, birth)
+                }
                 self?.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
                                      "phone \(verb) a session in \(label)\(born): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
             }
@@ -2035,7 +2049,8 @@ final class AppModel: ObservableObject {
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo, team: teamSnapshot,
-                                            profiles: self.sessionProfiles.profiles)
+                                            profiles: self.sessionProfiles.profiles,
+                                            births: self.sessionBirths)
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be

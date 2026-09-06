@@ -134,7 +134,7 @@ struct FleetScreen: View {
     /// whenever the Mac has sessions at all.
     @ViewBuilder private var sessionsCard: some View {
         if let live = model.liveSessions, live.total > 0 {
-            SessionListCard(live: live, progress: model.sessionProgress)
+            SessionListCard(live: live, progress: model.sessionProgress, births: model.snapshot?.births ?? [:])
         }
     }
 

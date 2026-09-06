@@ -24,10 +24,14 @@ public extension SessionProgressSource {
 public struct SessionListCard<P: SessionProgressSource>: View {
     let live: LiveSessions
     @ObservedObject var progress: P
+    /// How Infinitus started each session (#163/#165) — a chip beside the
+    /// name; empty on hosts that don't know.
+    let births: [Int: SessionBirth]
 
-    public init(live: LiveSessions, progress: P) {
+    public init(live: LiveSessions, progress: P, births: [Int: SessionBirth] = [:]) {
         self.live = live
         self.progress = progress
+        self.births = births
     }
 
     public var body: some View {
@@ -46,6 +50,12 @@ public struct SessionListCard<P: SessionProgressSource>: View {
                                 .font(PopupFont.caption)
                                 .lineLimit(1)
                                 .truncationMode(.head)
+                            if let birth = births[s.pid], let chip = birth.chip {
+                                Text(chip)
+                                    .font(PopupFont.caption2)
+                                    .foregroundStyle(birth.isUnrestricted ? Color.orange : Color.secondary)
+                                    .lineLimit(1)
+                            }
                             Spacer(minLength: 12)
                             Text(s.status)
                                 .font(PopupFont.caption).foregroundStyle(.secondary)

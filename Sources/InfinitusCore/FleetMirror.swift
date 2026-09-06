@@ -65,6 +65,9 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// The Mac's saved session profiles (#165) — the phone's Start a
     /// session chips. Additive optional.
     public let profiles: [SessionProfile]?
+    /// How Infinitus started each live session, by pid (#163/#165):
+    /// profile, permission mode, resumed-from. Additive optional.
+    public let births: [Int: SessionBirth]?
 
     public init(capturedAt: Date, machineName: String, listJSON: Data,
                 sessions: [SessionPanelRow], prefs: FleetPrefs? = nil,
@@ -79,7 +82,8 @@ public struct MirrorSnapshot: Codable, Sendable {
                 awsLogins: [AwsLogin.Item]? = nil,
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
-                app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil) {
+                app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil,
+                births: [Int: SessionBirth]? = nil) {
         self.capturedAt = capturedAt
         self.machineName = machineName
         self.listJSON = listJSON
@@ -100,6 +104,7 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.app = app
         self.team = team
         self.profiles = profiles
+        self.births = births
     }
 }
 

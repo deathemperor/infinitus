@@ -23,7 +23,7 @@ struct MacSessionsPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SessionListCard(live: live, progress: model.sessionProgress)
+            SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
             Divider()
             DisclosureGroup(isExpanded: $expanded) {
                 VStack(alignment: .leading, spacing: 4) {

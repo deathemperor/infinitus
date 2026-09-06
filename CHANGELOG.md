@@ -21,6 +21,7 @@ publishes the matching section as the GitHub release body.
 - The Sessions tab's clock button lists every session the Mac has ever run, newest first and searchable; swipe Resume reopens one in its folder and lands you in its chat.
 - Start a session picks its permissions: Supervised, Auto-accept edits, Auto or Full access, passed to Claude Code as its permission mode.
 - Start a session offers the Mac's saved profiles as chips; one tap fills folder, engine, permissions, model, system prompt and first prompt.
+- A session started from a profile or in a permission mode says so on its row ("Review · Full access"), on the phone and in the Mac popover.
 
 ### Mac
 - An AWS sign-in that lapses inside a sub-agent shows up on the parent session — key badge, Sign in row, push — and the continue nudge after signing in goes to the parent.
