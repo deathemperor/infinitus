@@ -8,40 +8,51 @@ import UIKit
 /// agents"): one INSendMessageIntent donation per live session, named
 /// after it, wearing the theme's glyph; the share extension declares
 /// the intent and preselects the session a tapped suggestion names.
-/// A session is identified by its working directory, which survives a
-/// restart where the pid does not.
+/// A session is identified by its Mac and working directory, which
+/// survive a restart where the pid does not (ShareBridge.conversation).
 @MainActor
 enum ShareSuggestions {
     static let maxDonations = 8
-    private static var donated: [String: String] = [:]   // cwd → name
+    private static var donated: [String: String] = [:]   // conversation → name
 
-    static func sync(sessions: [SessionDetail], name: (Int) -> String?, theme: RowTheme) {
+    /// One paired Mac's live sessions (#144); `mac` suffixes the names
+    /// once more than one Mac is paired.
+    struct Source {
+        let macId: String?
+        let mac: String?
+        let sessions: [SessionDetail]
+        let name: (Int) -> String?
+    }
+
+    static func sync(_ sources: [Source], theme: RowTheme) {
+        let all = sources.flatMap { source in source.sessions.map { (source, $0) } }
         var wanted: [String: String] = [:]
-        for session in sessions.sorted(by: { $0.startedAt > $1.startedAt }).prefix(maxDonations) {
-            wanted[session.cwd] = name(session.pid) ?? URL(fileURLWithPath: session.cwd).lastPathComponent
+        for (source, session) in all.sorted(by: { $0.1.startedAt > $1.1.startedAt }).prefix(maxDonations) {
+            let name = source.name(session.pid) ?? URL(fileURLWithPath: session.cwd).lastPathComponent
+            wanted[ShareBridge.conversation(macId: source.macId, cwd: session.cwd)] = source.mac.map { "\(name) · \($0)" } ?? name
         }
         guard wanted != donated else { return }
-        for cwd in donated.keys where wanted[cwd] == nil {
-            INInteraction.delete(with: Self.group(cwd))
+        for key in donated.keys where wanted[key] == nil {
+            INInteraction.delete(with: Self.group(key))
         }
         let image = glyphImage(theme)
-        for (cwd, name) in wanted where donated[cwd] != name {
-            let handle = INPersonHandle(value: cwd, type: .unknown)
+        for (key, name) in wanted where donated[key] != name {
+            let handle = INPersonHandle(value: key, type: .unknown)
             let person = INPerson(personHandle: handle, nameComponents: nil, displayName: name,
-                                  image: image, contactIdentifier: nil, customIdentifier: cwd)
+                                  image: image, contactIdentifier: nil, customIdentifier: key)
             let intent = INSendMessageIntent(recipients: [person], outgoingMessageType: .outgoingMessageText,
                                              content: nil, speakableGroupName: INSpeakableString(spokenPhrase: name),
-                                             conversationIdentifier: cwd, serviceName: "Infinitus", sender: nil,
+                                             conversationIdentifier: key, serviceName: "Infinitus", sender: nil,
                                              attachments: nil)
             if let image { intent.setImage(image, forParameterNamed: \.speakableGroupName) }
             let interaction = INInteraction(intent: intent, response: nil)
-            interaction.groupIdentifier = Self.group(cwd)
+            interaction.groupIdentifier = Self.group(key)
             interaction.donate()
         }
         donated = wanted
     }
 
-    private static func group(_ cwd: String) -> String { "session:" + cwd }
+    private static func group(_ key: String) -> String { "session:" + key }
 
     /// The theme's glyph on its tint, 180 px — what the row shows.
     private static func glyphImage(_ theme: RowTheme) -> INImage? {

@@ -106,18 +106,27 @@ final class ShareViewController: SLComposeServiceViewController {
     private func load(macId: String?, mac: String?, mirror: NetworkFleetMirror, several: Bool) async -> String? {
         do {
             guard let snapshot = try await mirror.latest() else { return "the Mac didn't answer" }
-            sessions += Self.sessions(in: snapshot, macId: macId, mac: several ? mac ?? snapshot.machineName : nil)
-            if selected == nil, !sessions.isEmpty {
+            let fresh = Self.sessions(in: snapshot, macId: macId, mac: several ? mac ?? snapshot.machineName : nil)
+            sessions += fresh
+            // The tapped suggestion wins whichever Mac answers with it;
+            // otherwise the first rows in pick the last-used session.
+            if let suggested, let hit = fresh.first(where: { $0.macId == suggested.macId && $0.cwd == suggested.cwd }) {
+                selected = hit
+            } else if selected == nil, !sessions.isEmpty {
                 let lastPid = UserDefaults.standard.integer(forKey: Self.lastPidKey)
                 let lastMac = UserDefaults.standard.string(forKey: Self.lastMacKey)
-                let suggested = (extensionContext?.intent as? INSendMessageIntent)?.conversationIdentifier
-                selected = sessions.first { $0.cwd == suggested }
-                    ?? sessions.first { $0.pid == lastPid && $0.macId == lastMac } ?? sessions[0]
+                selected = sessions.first { $0.pid == lastPid && $0.macId == lastMac } ?? sessions[0]
             }
             return nil
         } catch {
             return error.localizedDescription
         }
+    }
+
+    /// The session a tapped suggestions-row entry names (#82), on its Mac.
+    private var suggested: (macId: String?, cwd: String)? {
+        (extensionContext?.intent as? INSendMessageIntent)?.conversationIdentifier
+            .map(ShareBridge.session(conversation:))
     }
 
     private func mirror(for macId: String?) -> NetworkFleetMirror {

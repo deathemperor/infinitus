@@ -385,8 +385,7 @@ final class MirrorModel: ObservableObject, FleetModel {
             // The route that just answered is now the last-good one; the
             // share extension (#64) reads the pairing through the keychain.
             ShareBridge.publish(defaults)
-            ShareSuggestions.sync(sessions: liveSessions?.sessions ?? [],
-                                  name: { sessionProgress.byPid[$0]?.name }, theme: rowTheme)
+            syncShareSuggestions()
             AppIcons.follow(themeID: rowTheme.id)
             sessionProgress.apply(snapshot.progressByPid ?? [:], tokenRate: snapshot.tokenRate)
             let firstLoad = reconcile(engineFleets)
@@ -456,7 +455,7 @@ final class MirrorModel: ObservableObject, FleetModel {
         let pairings = MacPairing.load(defaults)
         let ids = Set(pairings.map(\.id))
         otherMirrors = otherMirrors.filter { ids.contains($0.key) }
-        guard !pairings.isEmpty else { others = []; refreshShortcutMacs(); return }
+        guard !pairings.isEmpty else { others = []; refreshShortcutMacs(); syncShareSuggestions(); return }
         let mirrors = pairings.map { ($0, otherMirror(for: $0)) }
         // `for await` yields in COMPLETION order, not the pairings' own
         // order — collecting by id and remapping keeps the Fleet/
@@ -499,6 +498,7 @@ final class MirrorModel: ObservableObject, FleetModel {
             return other
         }
         refreshShortcutMacs()
+        syncShareSuggestions()
         // Per-Mac reachable edge: newly answering ids fire once; a Mac
         // still down stays out of the set and fires nothing. Keyed on
         // `parked`, not snapshot presence: `latest()` hands back the
@@ -508,6 +508,22 @@ final class MirrorModel: ObservableObject, FleetModel {
         let newlyReachable = answered.subtracting(othersReachable)
         othersReachable = answered
         for id in newlyReachable { otherReachable?(id) }
+    }
+
+    /// The share sheet's suggestions row: every paired Mac's sessions
+    /// (#144), a Mac that's away left out since a share can't reach it.
+    private func syncShareSuggestions() {
+        let several = !others.isEmpty
+        var sources = [ShareSuggestions.Source(macId: nil, mac: several ? machineName(macId: nil) : nil,
+                                               sessions: liveSessions?.sessions ?? [],
+                                               name: { [sessionProgress] in sessionProgress.byPid[$0]?.name })]
+        for mac in others where !mac.parked {
+            let progress = mac.snapshot?.progressByPid ?? [:]
+            sources.append(.init(macId: mac.id, mac: mac.pairing.name,
+                                 sessions: mac.fleets.flatMap { $0.liveSessions?.sessions ?? [] },
+                                 name: { progress[$0]?.name }))
+        }
+        ShareSuggestions.sync(sources, theme: rowTheme)
     }
 
     /// Siri's "on <Mac>" phrases are precomputed from the entity query, so

@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Phone
+- The share sheet's suggestions row lists sessions from every paired Mac, each named with its Mac (#144).
 - Share → Infinitus lists the live sessions of every paired Mac, each row naming its Mac, and posts to that Mac (#144).
 - "Start a session on <Mac> in Infinitus" works from Siri and Shortcuts: the Mac is a picked parameter, and blank means the one the start sheet would pick (#144).
 - Team members say when they joined, on their row and in their detail (#219).
