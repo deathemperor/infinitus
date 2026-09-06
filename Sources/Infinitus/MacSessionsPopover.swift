@@ -25,6 +25,8 @@ struct MacSessionsPopover: View {
         VStack(alignment: .leading, spacing: 6) {
             SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
             Divider()
+            CheckpointsSection(model: model, live: live)
+            Divider()
             DisclosureGroup(isExpanded: $expanded) {
                 VStack(alignment: .leading, spacing: 4) {
                     if loading && past.isEmpty {

@@ -38,8 +38,7 @@ publishes the matching section as the GitHub release body.
 - The phone raises its own alarms, no push service needed: an exhausted account's limit lifting in 10 minutes, and the account the fleet just swapped to; off in Settings › Notifications.
 - Settings shows the Mac's and the phone's versions, can trigger the Mac's update, and says when a newer phone build is out.
 - Past sessions: the sessions popover lists the newest transcripts with a Resume button, and `infinitusctl past-sessions` / `resume-session <id>` (also MCP tools) do the same from a terminal or another session.
-- Settings › Profiles saves named ways to start a session (folder, engine, permissions, model, appended system prompt, first prompt); `infinitusctl profiles` / `profile-set` / `profile-remove` manage the same list.
-- Every prompt checkpoints the repository as a hidden git ref (with the plugin; Display › toggle): `infinitusctl checkpoints <session>` lists them, `checkpoint-diff` compares two or one against the working tree, `checkpoint-restore --yes` puts the files back and keeps a backup checkpoint.
+- Every prompt checkpoints the repository as a hidden git ref (with the plugin; Display › toggle): `infinitusctl checkpoints <session>` lists them, `checkpoint-diff` compares two or one against the working tree, `checkpoint-restore --yes` puts the files back and keeps a backup checkpoint; the sessions popover's Checkpoints section shows a session's timeline with Restore.
 
 ### Team (preview)
 - Reading the team store remembers each file's header, so a refresh pass reads only new files and the app's memory stays flat.
