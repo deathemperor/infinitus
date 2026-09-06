@@ -201,12 +201,10 @@ final class ControlServer {
             }))
 
         case "past-sessions":
-            let claudeDir = ClaudeSessions.configHome()
-            let live = Set(ClaudeSessions.list(claudeDir: claudeDir).map(\.sessionId))
-            let sessions = PastSessions.scan(claudeDir: claudeDir, liveIds: live,
+            let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                              limit: r.options["limit"].flatMap(Int.init) ?? 50,
                                              search: r.options["search"])
-            return ControlReply(ok: true, result: try .of(["sessions": sessions]))
+            return ControlReply(ok: true, result: try .of(PastSessions.Reply(sessions: sessions)))
 
         case "resume-session":
             guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: resume-session <sessionId>") }

@@ -20,6 +20,26 @@ public struct PastSession: Codable, Sendable, Equatable {
 }
 
 public enum PastSessions {
+    /// The mirror route (#164 phase 2): `GET /sessions/past?limit=&q=`
+    /// answers a `Reply`; the phone's Resume then posts `SessionStart`
+    /// with the session's cwd and `resume` id.
+    public static let path = "/sessions/past"
+    public static let limitQueryName = "limit"
+    public static let searchQueryName = "q"
+
+    public struct Reply: Codable, Sendable, Equatable {
+        public let sessions: [PastSession]
+        public init(sessions: [PastSession]) { self.sessions = sessions }
+    }
+
+    /// `scan` with the live set filled in from Claude Code's own session
+    /// records — what the control socket and the mirror both answer.
+    public static func list(claudeDir: URL, limit: Int = 50, search: String? = nil,
+                            alive: (Int32) -> Bool = ClaudeSessions.isAlive) -> [PastSession] {
+        let live = Set(ClaudeSessions.list(claudeDir: claudeDir, alive: alive).map(\.sessionId))
+        return scan(claudeDir: claudeDir, liveIds: live, limit: limit, search: search)
+    }
+
     /// Only the head of each transcript is read — the cwd and the opening
     /// prompt live there — and only for the `limit` newest files: a
     /// projects dir with thousands of transcripts over many gigabytes is
@@ -80,7 +100,10 @@ public enum PastSessions {
         let lines = head.split(separator: UInt8(ascii: "\n")).map { String(decoding: $0, as: UTF8.self) }
         let entries = SessionProgress.jsonEntries(lines)
         guard let cwd = entries.lazy.compactMap({ $0["cwd"] as? String }).first(where: { !$0.isEmpty }),
-              let first = SessionProgress.goal(lines: lines) else { return nil }
+              let first = SessionProgress.goal(lines: lines),
+              // Infinitus's own headless runs (the session namer's
+              // `claude -p`) open with its preface — not the user's work.
+              !first.hasPrefix("[Infinitus]") else { return nil }
         let id = file.url.deletingPathExtension().lastPathComponent
         return PastSession(sessionId: id, cwd: cwd, repo: (cwd as NSString).lastPathComponent,
                            firstMessage: first, lastActivityAt: file.mtime, bytes: file.bytes,

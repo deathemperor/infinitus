@@ -8,8 +8,9 @@ import InfinitusCore
 enum MCPCommand {
     static func run() -> Int32 {
         let path = ControlProtocol.socketURL().path
-        @Sendable func control(_ command: String, args: [String] = [], secret: String? = nil) -> Result<String, MCPServer.ToolError> {
-            let request = ControlRequest(command: command, args: args, options: [:], secret: secret)
+        @Sendable func control(_ command: String, args: [String] = [], options: [String: String] = [:],
+                               secret: String? = nil) -> Result<String, MCPServer.ToolError> {
+            let request = ControlRequest(command: command, args: args, options: options, secret: secret)
             guard let reply = roundTrip(request, path: path) else {
                 return .failure(.init("Infinitus is not running on this Mac (no control socket)"))
             }
@@ -38,6 +39,32 @@ enum MCPCommand {
                     description: "The live Claude Code sessions on this Mac: pid, name, folder, status (busy/idle/waiting/shell).",
                     inputSchema: .object(["type": .string("object"), "properties": .object([:])]),
                     call: { _ in control("sessions") }),
+            MCPTool(name: "past_sessions",
+                    description: "Every Claude Code session this Mac has run, newest first: session id, folder, opening prompt, last activity, whether it is live. Optional limit (default 50) and a search over repo, folder and prompt.",
+                    inputSchema: .object(["type": .string("object"),
+                                          "properties": .object([
+                                            "limit": .object(["type": .string("integer")]),
+                                            "search": .object(["type": .string("string")]),
+                                          ])]),
+                    call: { arguments in
+                        var options: [String: String] = [:]
+                        if let limit = string(arguments["limit"]) { options["limit"] = limit }
+                        if let search = string(arguments["search"]), !search.isEmpty { options["search"] = search }
+                        return control("past-sessions", options: options)
+                    }),
+            MCPTool(name: "resume_session",
+                    description: "Resume a past Claude Code session on this Mac: opens a new terminal in the folder it ran in with `claude --resume <id>`. Live sessions are refused — message them instead.",
+                    inputSchema: .object(["type": .string("object"),
+                                          "properties": .object([
+                                            "session_id": .object(["type": .string("string")]),
+                                          ]),
+                                          "required": .array([.string("session_id")])]),
+                    call: { arguments in
+                        guard let id = string(arguments["session_id"]), !id.isEmpty else {
+                            return .failure(.init("session_id is required"))
+                        }
+                        return control("resume-session", args: [id])
+                    }),
             MCPTool(name: "session_message",
                     description: "Send a message to another live session on this Mac, by pid or name, as if typed into its prompt.",
                     inputSchema: .object(["type": .string("object"),

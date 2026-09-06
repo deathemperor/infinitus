@@ -20,13 +20,19 @@ struct SessionsScreen: View {
                 .navigationTitle(model.rowTheme.tabLabel("sessions"))
                 .refreshable { await model.refresh() }
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button { path.append(PastSessionsRoute()) } label: { Image(systemName: "clock.arrow.circlepath") }
+                            .accessibilityLabel("Past sessions")
+                            .disabled(model.snapshot == nil)
                         Button { startSheet = true } label: { Image(systemName: "plus") }
                             .accessibilityLabel("Start a session")
                             .disabled(model.snapshot == nil)
                     }
                 }
                 .sheet(isPresented: $startSheet) { StartSessionSheet(model: model) }
+                .navigationDestination(for: PastSessionsRoute.self) { _ in
+                    PastSessionsScreen(model: model)
+                }
                 .onChange(of: model.requestedPid) { _, _ in openRequestedPid() }
                 .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedPid() }
                 .navigationDestination(for: SessionDetail.self) { session in

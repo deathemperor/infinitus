@@ -18,6 +18,7 @@ publishes the matching section as the GitHub release body.
 - The Game HUD bars' cool glow (usage behind pace) is a real glow now, scaled to the bar, instead of a tinted rim.
 - The chat composer's placeholder speaks the theme's language too ("Send word…" in the Wild West, "Codec open…" while dictating in Metal Gear).
 - Allow… on a permission card offers "Allow for this session": the Mac remembers the tool (Bash by command verb) and the plugin's PreToolUse hook skips that prompt for the rest of the session.
+- The Sessions tab's clock button lists every session the Mac has ever run, newest first and searchable; swipe Resume reopens one in its folder and lands you in its chat.
 
 ### Mac
 - An AWS sign-in that lapses inside a sub-agent shows up on the parent session — key badge, Sign in row, push — and the continue nudge after signing in goes to the parent.
@@ -33,7 +34,7 @@ publishes the matching section as the GitHub release body.
 - The Game HUD chat header's bars play the Fleet card's effects: pace fire, the cool halo, HP drops, Lucky 7s, the switch, death and revival flashes.
 - The phone raises its own alarms, no push service needed: an exhausted account's limit lifting in 10 minutes, and the account the fleet just swapped to; off in Settings › Notifications.
 - Settings shows the Mac's and the phone's versions, can trigger the Mac's update, and says when a newer phone build is out.
-- `infinitusctl past-sessions` lists every Claude Code session this Mac has run, newest first, and `resume-session <id>` reopens one in its folder.
+- Past sessions: the sessions popover lists the newest transcripts with a Resume button, and `infinitusctl past-sessions` / `resume-session <id>` (also MCP tools) do the same from a terminal or another session.
 
 ### Team (preview)
 - Reading the team store remembers each file's header, so a refresh pass reads only new files and the app's memory stays flat.

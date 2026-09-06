@@ -83,6 +83,24 @@ final class PastSessionsTests: XCTestCase {
         XCTAssertTrue(oldest?.live ?? false)
     }
 
+    func testListMarksLiveFromTheSessionRecords() throws {
+        try write(cwd: "/p", id: "a", lines: [user("Alpha", cwd: "/p/alpha")], age: 10)
+        try write(cwd: "/p", id: "b", lines: [user("Beta", cwd: "/p/beta")], age: 20)
+        let records = dir.appendingPathComponent("sessions")
+        try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
+        try #"{"pid":4242,"sessionId":"a","cwd":"/p/alpha","kind":"interactive"}"#
+            .write(to: records.appendingPathComponent("4242.json"), atomically: true, encoding: .utf8)
+        let sessions = PastSessions.list(claudeDir: dir, alive: { _ in true })
+        XCTAssertEqual(sessions.map { ($0.sessionId, $0.live) }.map { "\($0.0):\($0.1)" }, ["a:true", "b:false"])
+        XCTAssertEqual(PastSessions.list(claudeDir: dir, alive: { _ in false }).map(\.live), [false, false])
+    }
+
+    func testInfinitusOwnHeadlessRunsAreHidden() throws {
+        try write(cwd: "/p", id: "namer", lines: [user("[Infinitus] Title this coding session in 3 to 6 words", cwd: "/p/namer")], age: 1)
+        try write(cwd: "/p", id: "real", lines: [user("Fix the tests", cwd: "/p/real")], age: 2)
+        XCTAssertEqual(PastSessions.scan(claudeDir: dir).map(\.sessionId), ["real"])
+    }
+
     func testMissingProjectsDirIsEmpty() {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir.appendingPathComponent("none")), [])
     }

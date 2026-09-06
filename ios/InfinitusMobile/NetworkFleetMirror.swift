@@ -265,6 +265,30 @@ actor NetworkFleetMirror: FleetMirror {
         }
     }
 
+    /// The Mac's past sessions (#164): `GET /sessions/past?limit=&q=`,
+    /// same stored-endpoint → discovery path as the plain feed fetch.
+    func pastSessions(limit: Int = 50, search: String? = nil) async throws -> PastSessions.Reply {
+        let token = pairToken()
+        var path = PastSessions.path + "?\(PastSessions.limitQueryName)=\(limit)"
+        if let search, !search.isEmpty {
+            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+            path += "&\(PastSessions.searchQueryName)="
+                + (search.addingPercentEncoding(withAllowedCharacters: allowed) ?? search)
+        }
+        let data: Data
+        if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) {
+            data = stored
+        } else {
+            startBrowsing()
+            guard let discovered = await firstEndpoint() else { throw MirrorTransportError.timedOut }
+            (data, _) = try await fetch(discovered, path: path, hostHeader: "infinitus",
+                                        useTLS: false, token: token, timeout: Self.candidateTimeout)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(PastSessions.Reply.self, from: data)
+    }
+
     /// The session feed (#17 layer 1): same candidate/token/Host picking
     /// logic as `latest()`, factored into `fetchFromStored` so both share
     /// it — no snapshot-style caching here, a failed fetch just throws.

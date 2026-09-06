@@ -1064,11 +1064,16 @@ final class AppModel: ObservableObject {
         mirrorServer.sessionStart.set { [weak self] request in
             let reply = SessionLauncher.start(request, preferredHost: host)
             let label = (request.cwd as NSString).lastPathComponent
+            let verb = request.resume == nil ? "started" : "resumed"
             Task { @MainActor in
                 self?.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
-                                     "phone started a session in \(label): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
+                                     "phone \(verb) a session in \(label): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
             }
             return reply
+        }
+        mirrorServer.pastSessions.set { limit, search in
+            PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
+                                                           limit: limit, search: search))
         }
         team.gate = { [weak self] in TeamGate.check(lockEnabled: self?.lock.enabled) }
         team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
