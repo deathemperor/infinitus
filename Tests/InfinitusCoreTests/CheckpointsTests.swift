@@ -28,6 +28,14 @@ final class CheckpointsTests: XCTestCase {
         try text.write(to: repo.appendingPathComponent(path), atomically: true, encoding: .utf8)
     }
 
+    /// Symlinks resolved, no trailing slash — Linux's URL keeps one on
+    /// directories, macOS's does not.
+    private func realPath(_ path: String) -> String {
+        var p = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        while p.count > 1, p.hasSuffix("/") { p.removeLast() }
+        return p
+    }
+
     private func read(_ path: String) -> String? {
         try? String(contentsOf: repo.appendingPathComponent(path), encoding: .utf8)
     }
@@ -41,8 +49,7 @@ final class CheckpointsTests: XCTestCase {
                                                     subject: "Fix the crash\nmore detail"))
         XCTAssertEqual(c1.n, 1)
         XCTAssertEqual(c1.subject, "#1 Fix the crash")
-        XCTAssertEqual(URL(fileURLWithPath: c1.root).standardizedFileURL.resolvingSymlinksInPath(),
-                       repo.standardizedFileURL.resolvingSymlinksInPath())
+        XCTAssertEqual(realPath(c1.root), realPath(repo.path))
         XCTAssertEqual(try git.run(["status", "--short"], cwd: repo.path).split(separator: "\n").map(String.init).sorted(),
                        [" M src/a.txt", "?? src/new.txt"])   // index untouched, .log stayed ignored
         XCTAssertEqual(try git.run(["branch", "--list"], cwd: repo.path).contains("infinitus"), false)
@@ -97,7 +104,7 @@ final class CheckpointsTests: XCTestCase {
         try git.run(["worktree", "add", "-q", "--detach", wt.path], cwd: repo.path)
         try "wt\n".write(to: wt.appendingPathComponent("src/a.txt"), atomically: true, encoding: .utf8)
         let c1 = try XCTUnwrap(Checkpoints.snapshot(cwd: wt.path, sessionId: "s", subject: "in the worktree"))
-        XCTAssertEqual(URL(fileURLWithPath: c1.root).resolvingSymlinksInPath(), wt.resolvingSymlinksInPath())
+        XCTAssertEqual(realPath(c1.root), realPath(wt.path))
         // Looked up from the main checkout: found (shared refs), and the
         // live diff compares against the WORKTREE, which is unchanged.
         let listed = try Checkpoints.list(cwd: repo.path, sessionId: "s")
