@@ -10,7 +10,12 @@ import Foundation
 /// Episode rules:
 ///  - "sessions finished" needs TWO consecutive quiet ticks: busy drops to
 ///    0 between every turn, and a single-tick trigger would ping the phone
-///    on each turn gap.
+///    on each turn gap. It also needs `sessionsDoneMinBusy` of work first
+///    (#231): a one-command burst ending is not news either.
+///  - what would repeat after a relaunch is kept in `Memory` — the app
+///    persists it after each tick and hands it back through
+///    `init(memory:)`. The all-dead and waiting latches seed silently on
+///    the first look instead, which covers a relaunch without state.
 ///  - each condition fires once and re-arms only after it clears (the
 ///    last-alive warning re-arms below `rearmBelowPct`, hysteresis).
 ///  - flags are applied at emit time, but state advances regardless — so
@@ -23,8 +28,7 @@ import Foundation
 ///    app) and re-arms when it clears. Same launch seeding as waiting —
 ///    except that its announced keys survive a relaunch (#98: three
 ///    relaunches in a day re-pushed every fresh need three times): the
-///    app hands them back through `init(announcedAwsLogins:)` and reads
-///    `announcedAwsLoginKeys` after each tick to persist them.
+///    app hands them back in `Memory` and persists it after each tick.
 public struct PushTriggers: Sendable {
     public struct Account: Sendable {
         public let number: Int
@@ -59,15 +63,33 @@ public struct PushTriggers: Sendable {
 
     public static let warnPct = 90.0
     public static let rearmBelowPct = 85.0
+    /// Work shorter than this ending is not "all sessions finished".
+    public static let sessionsDoneMinBusy: TimeInterval = 10 * 60
 
-    private var sawBusy = false
+    /// The latches that would repeat after a relaunch unless remembered.
+    /// Only these three: all-dead and waiting seed silently instead.
+    public struct Memory: Codable, Equatable, Sendable {
+        /// AWS-login needs already pushed (session|profile|failedAt) (#98).
+        public var announcedAwsLogins: Set<String>
+        /// The account the last-alive warning went out for.
+        public var warnedLastAlive: Int?
+        /// When the current busy episode began: a relaunch mid-work keeps
+        /// the stretch, one right after the work finished still pushes.
+        public var busySince: Date?
+        public init(announcedAwsLogins: Set<String> = [], warnedLastAlive: Int? = nil, busySince: Date? = nil) {
+            self.announcedAwsLogins = announcedAwsLogins
+            self.warnedLastAlive = warnedLastAlive
+            self.busySince = busySince
+        }
+    }
+    public private(set) var memory: Memory
+
     private var quietTicks = 0
     private var allDeadAnnounced = false
     /// The first look with accounts seeds silently: a fleet already dead
     /// at launch is on screen (and the phone's countdown activity), and
     /// the app relaunches often enough that announcing it again is noise.
     private var seededAllDead = false
-    private var warnedLastAlive: Int?
     private var announcedWaiting: Set<Int> = []
     private var seededWaiting = false
     /// Sessions the plugin's hook already announced (#79): the hook pushes
@@ -76,20 +98,19 @@ public struct PushTriggers: Sendable {
     /// `waiting` must not pin its pid forever.
     private var hookAnnounced: [Int: Date] = [:]
     public static let hookGrace: TimeInterval = 5 * 60
-    private var announcedAwsLogins: Set<String> = []
     private var seededAwsLogins = false
     /// A need that failed this recently is pushed even on the seeding
     /// look: the relaunch (or the first scan) swallowed it, and the user
     /// has likely not seen it (#29). Older ones seed silently as before.
     public static let awsLoginFreshWindow: TimeInterval = 10 * 60
 
-    public init(announcedAwsLogins: Set<String> = []) {
-        self.announcedAwsLogins = announcedAwsLogins
+    public init(memory: Memory = Memory()) {
+        self.memory = memory
     }
 
     /// The needs already pushed (session|profile|failedAt), pruned to the
-    /// current roster on every scanned tick — persist these across launches.
-    public var announcedAwsLoginKeys: Set<String> { announcedAwsLogins }
+    /// current roster on every scanned tick.
+    public var announcedAwsLoginKeys: Set<String> { memory.announcedAwsLogins }
 
     public mutating func announceWaiting(pid: Int, now: Date = Date()) {
         hookAnnounced[pid] = now
@@ -128,15 +149,15 @@ public struct PushTriggers: Sendable {
             func key(_ item: AwsLogin.Item) -> String {
                 "\(item.id)|\(Int(item.failedAt?.timeIntervalSince1970 ?? 0))"
             }
-            for item in needs where !announcedAwsLogins.contains(key(item)) {
-                announcedAwsLogins.insert(key(item))
+            for item in needs where !memory.announcedAwsLogins.contains(key(item)) {
+                memory.announcedAwsLogins.insert(key(item))
                 let fresh = item.failedAt.map { now.timeIntervalSince($0) < Self.awsLoginFreshWindow } ?? false
                 if flags.awsLogin, seeded || fresh {
                     let who = item.sessionLabel ?? "session \(item.pid ?? 0)"
                     out.append("needs AWS login — \(who) (\(item.profile))")
                 }
             }
-            announcedAwsLogins = announcedAwsLogins.intersection(needs.map(key))
+            memory.announcedAwsLogins = memory.announcedAwsLogins.intersection(needs.map(key))
         }
 
         if let sessions {
@@ -159,14 +180,14 @@ public struct PushTriggers: Sendable {
 
         if let busy {
             if busy > 0 {
-                sawBusy = true
+                if memory.busySince == nil { memory.busySince = now }
                 quietTicks = 0
-            } else if sawBusy {
+            } else if let since = memory.busySince {
                 quietTicks += 1
                 if quietTicks >= 2 {
-                    sawBusy = false
+                    memory.busySince = nil
                     quietTicks = 0
-                    if flags.sessionsDone {
+                    if flags.sessionsDone, now.timeIntervalSince(since) >= Self.sessionsDoneMinBusy {
                         out.append("all sessions finished — 0 of \(total ?? 0) working")
                     }
                 }
@@ -191,15 +212,15 @@ public struct PushTriggers: Sendable {
         let alive = accounts.filter { !$0.dead }
         if alive.count == 1, let last = alive.first,
            let pct = last.worstPct, pct >= Self.warnPct {
-            if warnedLastAlive != last.number {
-                warnedLastAlive = last.number
+            if memory.warnedLastAlive != last.number {
+                memory.warnedLastAlive = last.number
                 if flags.lastAlive {
                     out.append("last account standing — \(last.name) at \(Int(pct.rounded()))%")
                 }
             }
         } else if alive.count != 1
             || (alive.first?.worstPct ?? 0) < Self.rearmBelowPct {
-            warnedLastAlive = nil
+            memory.warnedLastAlive = nil
         }
 
         return out

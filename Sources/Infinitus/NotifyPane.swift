@@ -109,7 +109,8 @@ struct NotifyPane: View {
                 Text("Push about sessions")
             } footer: {
                 Text("Finish: one push when every live session has been idle for two "
-                     + "refresh passes \u{2014} turn gaps don't count. Waits on you: one "
+                     + "refresh passes after at least \(Int(PushTriggers.sessionsDoneMinBusy / 60)) minutes "
+                     + "of work \u{2014} turn gaps and short bursts don't count. Waits on you: one "
                      + "push per session when it stops at a permission prompt or a "
                      + "question. AWS: one push per session and profile when a command "
                      + "fails on an expired sign-in \u{2014} sign in from the phone's "

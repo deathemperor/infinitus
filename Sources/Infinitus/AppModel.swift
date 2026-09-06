@@ -786,11 +786,18 @@ final class AppModel: ObservableObject {
         liveActivityPusher.pushAlert(title: "Infinitus", body: body, unlessRevival: phoneUnlessRevival)
     }
     private let awake = KeepAwake()
-    /// Seeded with the AWS-login needs already pushed before the last
-    /// relaunch (#98) — `failedAt` comes from the transcript line, so the
-    /// key is stable across launches.
-    private lazy var pushTriggers = PushTriggers(announcedAwsLogins: persistedAwsLoginKeys)
-    private lazy var persistedAwsLoginKeys = Set(defaults.stringArray(forKey: Self.announcedAwsLoginsKey) ?? [])
+    /// Seeded with what the triggers remembered before the last relaunch
+    /// (#98, #231): AWS-login needs already pushed (`failedAt` comes from
+    /// the transcript line, so the key is stable across launches), the
+    /// last-alive warning, the busy stretch.
+    private lazy var pushTriggers = PushTriggers(memory: persistedPushMemory)
+    private lazy var persistedPushMemory: PushTriggers.Memory = {
+        if let data = defaults.data(forKey: Self.pushMemoryKey),
+           let memory = try? JSONDecoder().decode(PushTriggers.Memory.self, from: data) { return memory }
+        // Before the blob only the AWS keys were kept.
+        return PushTriggers.Memory(announcedAwsLogins: Set(defaults.stringArray(forKey: Self.announcedAwsLoginsKey) ?? []))
+    }()
+    static let pushMemoryKey = "push_triggers_memory"
     static let announcedAwsLoginsKey = "push_announced_aws_logins"
     private let defaults: UserDefaults
     static let playgroundSuite = "run.infinitus.playground"
@@ -1832,14 +1839,13 @@ final class AppModel: ObservableObject {
             switch event.kind {
             case "switch":
                 Task { await refreshSnapshot() }  // the snapshot diff posts the notification
-            case "session-resumed":
-                notify(event.summary)
-            case "remote-control-rearmed":
-                notify(event.summary)
-            case "account-unquarantined":
-                notify("account back in rotation")
-            // "all-exhausted" arrives on every engine re-probe (~10 min while
-            // dead): the latched PushTriggers message owns that notification.
+            // Logged only (#231). "all-exhausted" arrives on every engine
+            // re-probe (~10 min while dead): the latched PushTriggers message
+            // owns that notification. session-resumed, remote-control-rearmed
+            // and account-unquarantined used to post banners with no latch
+            // and no Settings › Notify toggle; resumes are this app's own
+            // ResumeService now, the /rc re-arm is housekeeping, and the
+            // revival diff already carries the account-back news.
             default:
                 break
             }
@@ -2361,9 +2367,9 @@ final class AppModel: ObservableObject {
             sessions: list.liveSessions?.sessions,
             awsLogins: awsLoginsScanned ? awsLogins : nil,
             now: Date())
-        if pushTriggers.announcedAwsLoginKeys != persistedAwsLoginKeys {
-            persistedAwsLoginKeys = pushTriggers.announcedAwsLoginKeys
-            defaults.set(persistedAwsLoginKeys.sorted(), forKey: Self.announcedAwsLoginsKey)
+        if pushTriggers.memory != persistedPushMemory {
+            persistedPushMemory = pushTriggers.memory
+            if let data = try? JSONEncoder().encode(persistedPushMemory) { defaults.set(data, forKey: Self.pushMemoryKey) }
         }
         for msg in pushes where !isPlayground { push(msg) }
         if !isPlayground { await sync.tick() }

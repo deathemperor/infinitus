@@ -90,18 +90,47 @@ final class PushTriggersTests: XCTestCase {
         PushTriggers.Account(number: n, name: "a\(n)", dead: dead, worstPct: pct)
     }
     private let all = PushTriggers.Flags()
+    /// Minutes after a fixed origin: the sessions-done tests need the
+    /// clock to move (ten minutes of work before the finish counts).
+    private func at(_ minutes: Double) -> Date { Date(timeIntervalSince1970: 1_800_000_000 + minutes * 60) }
 
     func testSessionsDoneNeedsTwoQuietTicks() {
         var t = PushTriggers()
-        XCTAssertEqual(t.tick(busy: 3, total: 5, accounts: [], flags: all), [])
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all), [])
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all),
+        XCTAssertEqual(t.tick(busy: 3, total: 5, accounts: [], flags: all, now: at(0)), [])
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(11)), [])
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(12)),
                        ["all sessions finished — 0 of 5 working"])
         // Quiet stays quiet: no repeat until a new busy episode.
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all), [])
-        XCTAssertEqual(t.tick(busy: 2, total: 5, accounts: [], flags: all), [])
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all), [])
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all).count, 1)
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(13)), [])
+        XCTAssertEqual(t.tick(busy: 2, total: 5, accounts: [], flags: all, now: at(14)), [])
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(25)), [])
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(26)).count, 1)
+    }
+
+    func testShortBurstStaysSilentAndTheNextEpisodeStartsFresh() {
+        var t = PushTriggers()
+        _ = t.tick(busy: 1, total: 5, accounts: [], flags: all, now: at(0))
+        _ = t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(3))
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(4)), [], "three minutes of work is not a finish")
+        _ = t.tick(busy: 1, total: 5, accounts: [], flags: all, now: at(5))
+        _ = t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(16))
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(17)).count, 1, "the stretch counts from the new episode's start")
+    }
+
+    func testBusyStretchAndLastAliveWarningSurviveARelaunch() {
+        var first = PushTriggers()
+        let warn = [acct(1, dead: true), acct(2, dead: false, pct: 92)]
+        XCTAssertEqual(first.tick(busy: 3, total: 5, accounts: warn, flags: all, now: at(0)).count, 1)   // the last-alive warning
+        var relaunched = PushTriggers(memory: first.memory)
+        // Quiet from the first look after the relaunch: the finish still pushes, the warning does not repeat.
+        XCTAssertEqual(relaunched.tick(busy: 0, total: 5, accounts: warn, flags: all, now: at(11)), [])
+        XCTAssertEqual(relaunched.tick(busy: 0, total: 5, accounts: warn, flags: all, now: at(12)),
+                       ["all sessions finished — 0 of 5 working"])
+        XCTAssertNil(relaunched.memory.busySince)
+        XCTAssertEqual(relaunched.memory.warnedLastAlive, 2)
+        // The blob round-trips through JSON as the app stores it.
+        let data = try! JSONEncoder().encode(first.memory)
+        XCTAssertEqual(try! JSONDecoder().decode(PushTriggers.Memory.self, from: data), first.memory)
     }
 
     private func session(_ pid: Int, _ status: String) -> SessionDetail {
@@ -191,7 +220,7 @@ final class PushTriggersTests: XCTestCase {
         let fresh = need(3, "p", failedAt: now.addingTimeInterval(-60))
         XCTAssertEqual(first.tick(busy: 0, total: 1, accounts: [], flags: all,
                                   awsLogins: [fresh], now: now).count, 1)
-        var relaunched = PushTriggers(announcedAwsLogins: first.announcedAwsLoginKeys)
+        var relaunched = PushTriggers(memory: first.memory)
         XCTAssertEqual(relaunched.tick(busy: 0, total: 1, accounts: [], flags: all,
                                        awsLogins: [fresh], now: now.addingTimeInterval(30)), [])
         XCTAssertEqual(relaunched.tick(busy: 0, total: 1, accounts: [], flags: all,
@@ -255,9 +284,10 @@ final class PushTriggersTests: XCTestCase {
 
     func testSingleTickDipBetweenTurnsStaysSilent() {
         var t = PushTriggers()
-        for (busy, expect) in [(3, 0), (0, 0), (2, 0), (0, 0), (0, 1)] {
-            XCTAssertEqual(t.tick(busy: busy, total: 5, accounts: [], flags: all).count,
-                           expect, "busy=\(busy)")
+        // The dip at minute 5 does not restart the stretch: it counts from minute 0.
+        for (busy, minute, expect) in [(3, 0.0, 0), (0, 5, 0), (2, 6, 0), (0, 12, 0), (0, 13, 1)] {
+            XCTAssertEqual(t.tick(busy: busy, total: 5, accounts: [], flags: all, now: at(minute)).count,
+                           expect, "busy=\(busy) at \(minute)")
         }
     }
 
@@ -334,11 +364,11 @@ final class PushTriggersTests: XCTestCase {
         var t = PushTriggers()
         _ = t.tick(busy: nil, total: nil, accounts: [acct(1, dead: false, pct: 10)], flags: all)
         let off = PushTriggers.Flags(sessionsDone: false, allDead: true, lastAlive: true)
-        _ = t.tick(busy: 3, total: 5, accounts: [], flags: off)
-        _ = t.tick(busy: 0, total: 5, accounts: [], flags: off)
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: off), [])
+        _ = t.tick(busy: 3, total: 5, accounts: [], flags: off, now: at(0))
+        _ = t.tick(busy: 0, total: 5, accounts: [], flags: off, now: at(11))
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: off, now: at(12)), [])
         // Turning the flag on afterwards must not fire the stale episode.
-        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all), [])
+        XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(13)), [])
     }
 
     func testWorstPlanPctExcludesSpend() throws {
