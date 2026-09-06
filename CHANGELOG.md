@@ -44,6 +44,7 @@ publishes the matching section as the GitHub release body.
 - Review a turn's changes from the phone: the chat's Review button (or a checkpoint's diff) lists the hunks, a tap comments one, Approve / Request changes sends the review as the session's next message.
 - A profile can list tools its sessions run without asking (Settings › Profiles, `profile-set --allow "Edit, Bash git"`); the plugin's PreToolUse hook honours them from the session's first tool call.
 - Siri's and Shortcuts' Start a session take a profile name: its folder, engine, permissions, model and prompts apply.
+- Start a session from the Mac too: the sessions popover's Start a session takes a profile chip, folder, engine, permissions and a first prompt.
 
 ### Team (preview)
 - Reading the team store remembers each file's header, so a refresh pass reads only new files and the app's memory stays flat.

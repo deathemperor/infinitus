@@ -2,8 +2,8 @@ import SwiftUI
 import InfinitusCore
 import InfinitusUI
 
-/// The brain chip's popover: the live sessions card, then a collapsed
-/// "Past sessions" list (#164) — the newest transcripts under
+/// The brain chip's popover: the live sessions card, checkpoints, Start a
+/// session, then a collapsed "Past sessions" list (#164) — the newest transcripts under
 /// ~/.claude/projects, each resumable in a new terminal. The scan runs
 /// only when the disclosure opens, never per snapshot, so an idle
 /// pop-out stays idle.
@@ -26,6 +26,8 @@ struct MacSessionsPopover: View {
             SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
             Divider()
             CheckpointsSection(model: model, live: live)
+            Divider()
+            StartSessionSection(model: model)
             Divider()
             DisclosureGroup(isExpanded: $expanded) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -95,6 +97,8 @@ struct MacSessionsPopover: View {
             let reply = SessionLauncher.start(request, preferredHost: host)
             await MainActor.run {
                 if reply.outcome == "started" {
+                    // The row's "resumed" chip, as the phone's Resume gets.
+                    if let pid = reply.pid, let birth = SessionBirth(request: request) { model.recordBirth(pid: pid, birth) }
                     model.sessionsShown = false
                 } else {
                     note = reply.detail ?? reply.outcome
