@@ -81,6 +81,21 @@ struct StatsPane: View {
 
     // MARK: rhythm
 
+    /// One heatmap cell. Its own function with typed locals: inlined,
+    /// the fill maths plus three string interpolations was one
+    /// expression CI's compiler gave up type-checking (#249).
+    private func heatCell(day: String, hour: Int, count: Int, peak: Int) -> some View {
+        let alpha: Double = 0.08 + 0.92 * Double(count) / Double(peak)
+        let when: String = "\(day) \(hour):00"
+        let entries: String = "\(count) entries"
+        return RoundedRectangle(cornerRadius: 2)
+            .fill(Color.accentColor.opacity(alpha))
+            .frame(height: 12)
+            .help("\(when) — \(entries)")
+            .accessibilityLabel(when)
+            .accessibilityValue(entries)   // the tooltip is mouse-only
+    }
+
     private func heatmap(_ raw: [Int]) -> some View {
         // `model.summaries` is never compacted (that's the exporter's
         // form, which empties `hours`) — but index math on a 168-slot
@@ -94,12 +109,7 @@ struct StatsPane: View {
                 HStack(spacing: 2) {
                     Text(days[d]).font(.caption2).monospacedDigit().frame(width: 28, alignment: .leading)
                     ForEach(0..<24, id: \.self) { h in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.accentColor.opacity(0.08 + 0.92 * Double(hours[d * 24 + h]) / Double(peak)))
-                            .frame(height: 12)
-                            .help("\(days[d]) \(h):00 — \(hours[d * 24 + h]) entries")
-                            .accessibilityLabel("\(days[d]) \(h):00")
-                            .accessibilityValue("\(hours[d * 24 + h]) entries")
+                        heatCell(day: days[d], hour: h, count: hours[d * 24 + h], peak: peak)
                     }
                 }
             }
