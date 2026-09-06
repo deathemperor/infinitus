@@ -14,6 +14,12 @@ public struct Checkpoint: Codable, Sendable, Equatable {
     public let at: Date
     /// The prompt's first line, or what triggered the snapshot.
     public let subject: String
+    /// The working tree the snapshot was taken in — recorded in the
+    /// commit body, because a session's record keeps its STARTING folder
+    /// while the hook reports where it is now (a worktree of the same
+    /// clone, typically): diff and restore act on this folder, never on
+    /// the folder the refs happened to be looked up from.
+    public let root: String
 }
 
 public enum Checkpoints {
@@ -44,7 +50,7 @@ public enum Checkpoints {
             return last
         }
         let n = (existing.last?.n ?? 0) + 1
-        var args = ["commit-tree", tree, "-m", subjectLine(subject, n: n)]
+        var args = ["commit-tree", tree, "-m", subjectLine(subject, n: n), "-m", "root: \(root)"]
         if let parent = existing.last?.sha ?? head(root: root, git: git) { args += ["-p", parent] }
         let stamp = "\(Int(now.timeIntervalSince1970)) +0000"
         let sha = try git.run(args, cwd: root, env: [
@@ -54,20 +60,26 @@ public enum Checkpoints {
         ]).trimmingCharacters(in: .whitespacesAndNewlines)
         try git.run(["update-ref", refPrefix(sessionId: sessionId) + String(n), sha], cwd: root)
         return Checkpoint(n: n, sha: sha, at: Date(timeIntervalSince1970: TimeInterval(Int(now.timeIntervalSince1970))),
-                          subject: subjectLine(subject, n: n))
+                          subject: subjectLine(subject, n: n), root: root)
     }
 
     /// The session's checkpoints, oldest first.
     public static func list(cwd: String, sessionId: String, git: GitRunner = GitRunner()) throws -> [Checkpoint] {
         guard let root = toplevel(cwd: cwd, git: git) else { return [] }
         let prefix = refPrefix(sessionId: sessionId)
-        let out = try git.run(["for-each-ref", "--format=%(refname)%09%(objectname)%09%(creatordate:unix)%09%(subject)",
+        // One record per line: the body is a single "root: …" line, so a
+        // newline-separated listing stays parseable.
+        let out = try git.run(["for-each-ref",
+                               "--format=%(refname)%09%(objectname)%09%(creatordate:unix)%09%(subject)%09%(contents:body)",
                                prefix], cwd: root)
         return out.split(separator: "\n").compactMap { line -> Checkpoint? in
-            let parts = line.split(separator: "\t", maxSplits: 3, omittingEmptySubsequences: false)
-            guard parts.count == 4, parts[0].hasPrefix(prefix),
+            let parts = line.split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false)
+            guard parts.count >= 4, parts[0].hasPrefix(prefix),
                   let n = Int(parts[0].dropFirst(prefix.count)), let epoch = TimeInterval(parts[2]) else { return nil }
-            return Checkpoint(n: n, sha: String(parts[1]), at: Date(timeIntervalSince1970: epoch), subject: String(parts[3]))
+            let body = parts.count > 4 ? String(parts[4]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let recorded = body.hasPrefix("root: ") ? String(body.dropFirst("root: ".count)) : root
+            return Checkpoint(n: n, sha: String(parts[1]), at: Date(timeIntervalSince1970: epoch),
+                              subject: String(parts[3]), root: recorded)
         }.sorted { $0.n < $1.n }
     }
 
@@ -93,7 +105,7 @@ public enum Checkpoints {
             guard let c = all.first(where: { $0.n == to }) else { throw GitRunner.Failure(status: 1, stderr: "no checkpoint #\(to)") }
             b = c.sha
         } else {
-            b = try worktreeTree(root: root, git: git)
+            b = try worktreeTree(root: liveRoot(a.root, fallback: root), git: git)
         }
         let stat = try git.run(["diff", "--stat", a.sha, b], cwd: root)
         let patch = try git.run(["diff", a.sha, b], cwd: root)
@@ -114,14 +126,22 @@ public enum Checkpoints {
         guard let target = try list(cwd: root, sessionId: sessionId, git: git).first(where: { $0.n == n }) else {
             throw GitRunner.Failure(status: 1, stderr: "no checkpoint #\(n)")
         }
-        let backup = try snapshot(cwd: root, sessionId: sessionId, subject: "before restoring #\(n)", git: git)
+        let live = liveRoot(target.root, fallback: root)
+        let backup = try snapshot(cwd: live, sessionId: sessionId, subject: "before restoring #\(n)", git: git)
         // Two steps: the index first learns what the working tree holds
         // NOW (the backup's tree, untracked files included), then moves
         // to the target — read-tree only removes files it knows about,
         // so a one-step reset left everything born since in place.
-        if let backup { try git.run(["read-tree", "--reset", "-u", backup.sha], cwd: root) }
-        try git.run(["read-tree", "--reset", "-u", target.sha], cwd: root)
+        if let backup { try git.run(["read-tree", "--reset", "-u", backup.sha], cwd: live) }
+        try git.run(["read-tree", "--reset", "-u", target.sha], cwd: live)
         return (target, backup)
+    }
+
+    /// The folder a checkpoint was taken in, when it still exists (a
+    /// removed worktree falls back to where the refs were found).
+    private static func liveRoot(_ recorded: String, fallback: String) -> String {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: recorded, isDirectory: &isDir) && isDir.boolValue ? recorded : fallback
     }
 
     /// The working tree as a tree object, through a throwaway index so

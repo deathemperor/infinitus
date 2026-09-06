@@ -41,6 +41,8 @@ final class CheckpointsTests: XCTestCase {
                                                     subject: "Fix the crash\nmore detail"))
         XCTAssertEqual(c1.n, 1)
         XCTAssertEqual(c1.subject, "#1 Fix the crash")
+        XCTAssertEqual(URL(fileURLWithPath: c1.root).standardizedFileURL.resolvingSymlinksInPath(),
+                       repo.standardizedFileURL.resolvingSymlinksInPath())
         XCTAssertEqual(try git.run(["status", "--short"], cwd: repo.path).split(separator: "\n").map(String.init).sorted(),
                        [" M src/a.txt", "?? src/new.txt"])   // index untouched, .log stayed ignored
         XCTAssertEqual(try git.run(["branch", "--list"], cwd: repo.path).contains("infinitus"), false)
@@ -84,6 +86,28 @@ final class CheckpointsTests: XCTestCase {
         XCTAssertTrue(try git.run(["ls-tree", "-r", "--name-only", backup!.sha], cwd: repo.path).contains("src/untracked.txt"))
         XCTAssertEqual(try git.run(["status", "--short"], cwd: repo.path).contains("src/a.txt"), true) // vs HEAD: a.txt differs
         XCTAssertThrowsError(try Checkpoints.restore(cwd: repo.path, sessionId: "s", n: 9))
+    }
+
+    func testAWorktreeOfTheSameCloneIsDiffedAndRestoredWhereItWasTaken() throws {
+        // The session's record says the main checkout; the prompt lands in
+        // a worktree of the same clone. The checkpoint remembers the
+        // worktree, so a diff "vs now" and a restore act there.
+        let wt = repo.deletingLastPathComponent().appendingPathComponent(repo.lastPathComponent + "-wt")
+        defer { try? FileManager.default.removeItem(at: wt) }
+        try git.run(["worktree", "add", "-q", "--detach", wt.path], cwd: repo.path)
+        try "wt\n".write(to: wt.appendingPathComponent("src/a.txt"), atomically: true, encoding: .utf8)
+        let c1 = try XCTUnwrap(Checkpoints.snapshot(cwd: wt.path, sessionId: "s", subject: "in the worktree"))
+        XCTAssertEqual(URL(fileURLWithPath: c1.root).resolvingSymlinksInPath(), wt.resolvingSymlinksInPath())
+        // Looked up from the main checkout: found (shared refs), and the
+        // live diff compares against the WORKTREE, which is unchanged.
+        let listed = try Checkpoints.list(cwd: repo.path, sessionId: "s")
+        XCTAssertEqual(listed.map(\.n), [1])
+        XCTAssertEqual(try Checkpoints.diff(cwd: repo.path, sessionId: "s", from: 1, to: nil).stat, "")
+        try "wt2\n".write(to: wt.appendingPathComponent("src/a.txt"), atomically: true, encoding: .utf8)
+        XCTAssertTrue(try Checkpoints.diff(cwd: repo.path, sessionId: "s", from: 1, to: nil).stat.contains("src/a.txt"))
+        _ = try Checkpoints.restore(cwd: repo.path, sessionId: "s", n: 1)
+        XCTAssertEqual(try String(contentsOf: wt.appendingPathComponent("src/a.txt"), encoding: .utf8), "wt\n")
+        XCTAssertEqual(read("src/a.txt"), "a\n")   // the main checkout was never touched
     }
 
     func testOutsideARepositoryIsNil() throws {
