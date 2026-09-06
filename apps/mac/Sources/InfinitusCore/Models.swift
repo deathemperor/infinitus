@@ -402,7 +402,11 @@ public enum JSONValue: Codable, Equatable, Sendable {
         switch self {
         case .null: return ""
         case .bool(let b): return b ? "true" : "false"
-        case .number(let n): return n == n.rounded() ? String(Int(n)) : String(n)
+        // Int(Double) traps on NaN/∞ and out-of-range magnitudes;
+        // non-finite or oversized numbers fall back to String(n).
+        case .number(let n):
+            guard n.isFinite, abs(n) <= Double(Int.max) else { return String(n) }
+            return n == n.rounded() ? String(Int(n)) : String(n)
         case .string(let s): return s
         case .array, .object: return ""
         }

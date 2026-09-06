@@ -110,6 +110,30 @@ final class FleetPanelTests: XCTestCase {
         XCTAssertTrue(withEmpty.lines.allSatisfy {
             if case .account = $0 { return true } else { return false }
         }, "one populated fleet is still a lone fleet")
+
+        // Two populated fleets plus an empty one: the empty section
+        // paints nothing, not even a header.
+        let mixed = FleetPanel.panel(
+            fleets: [fleets()[0],
+                     EngineFleet(engineID: "9router", provider: .kiro, accounts: []),
+                     fleets()[2]],
+            live: nil, engineInstalled: true)
+        let mixedHeaders = mixed.lines.compactMap { line -> FleetLabel? in
+            if case .header(let l) = line { return l }
+            return nil
+        }
+        XCTAssertEqual(mixedHeaders.count, 2, "the empty section stays headerless")
+        guard case .account = mixed.lines.last else { return XCTFail("no trailing header either") }
+    }
+
+    /// The "primary" active account is the Claude fleet's even when a
+    /// non-Claude fleet stacks first.
+    func testActiveNumberPrefersTheClaudeFleet() {
+        let reordered = FleetPanel.panel(fleets: [fleets()[1], fleets()[0]], live: nil,
+                                         engineInstalled: true)
+        XCTAssertEqual(reordered.sections.first?.label.provider, .gemini)
+        XCTAssertEqual(reordered.activeNumber, fleets()[0].activeNumber,
+                       "the Claude section answers, not whichever is first")
     }
 
     /// Every row carries the fleet it came from, because 9Router's
@@ -148,11 +172,16 @@ final class FleetPanelTests: XCTestCase {
     }
 
     /// The empty states are copy, not errors: no engine says how to get
-    /// one, no fleets yet says it is still reading, an engine with zero
-    /// accounts says how to register one.
+    /// one (the host supplies its own install hint), no fleets yet says
+    /// it is still reading, an engine with zero accounts says how to
+    /// register one — without naming any engine.
     func testEmptyStatesDistinguishNoEngineFromNoAccounts() {
         let none = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false)
-        XCTAssertTrue(none.empty?.contains("uv tool install claude-swap") == true)
+        XCTAssertEqual(none.empty, "No account engine installed.")
+        XCTAssertFalse(none.empty?.contains("cswap") == true, "core copy names no engine")
+        let hinted = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false,
+                                      installHint: "`pip install claude-swap` adds one.")
+        XCTAssertEqual(hinted.empty, "No account engine installed. `pip install claude-swap` adds one.")
         XCTAssertTrue(none.sections.isEmpty)
 
         let reading = FleetPanel.panel(fleets: [], live: nil, engineInstalled: true)
@@ -161,7 +190,8 @@ final class FleetPanelTests: XCTestCase {
         let bare = FleetPanel.panel(
             fleets: [EngineFleet(engineID: "cswap", provider: .claude, accounts: [])],
             live: nil, engineInstalled: true)
-        XCTAssertTrue(bare.empty?.contains("cswap add") == true)
+        XCTAssertTrue(bare.empty?.contains("register the account you are logged into") == true)
+        XCTAssertFalse(bare.empty?.contains("cswap") == true, "core copy names no engine")
     }
 
     /// The footer counts sessions and accounts and names the engine —

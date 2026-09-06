@@ -196,15 +196,19 @@ public enum FleetPanel {
         /// Every row across every section, in paint order.
         public var rows: [Row] { sections.flatMap(\.rows) }
         /// The primary fleet's active account — what a single-fleet host
-        /// used to read off the `AccountList`.
-        public var activeNumber: Int? { sections.first?.activeNumber }
+        /// used to read off the `AccountList`. The primary fleet is the
+        /// Claude one wherever it stacks, not merely the first section.
+        public var activeNumber: Int? {
+            (sections.first { $0.label.provider == .claude } ?? sections.first)?.activeNumber
+        }
 
         /// Headers + rows interleaved. Headers only when more than one
-        /// section has anything to show.
+        /// section has anything to show, and empty sections paint nothing.
         public var lines: [Line] {
-            let showHeaders = sections.filter { !$0.rows.isEmpty }.count > 1
+            let shown = sections.filter { !$0.rows.isEmpty }
+            let showHeaders = shown.count > 1
             var out: [Line] = []
-            for section in sections {
+            for section in shown {
                 if showHeaders { out.append(.header(section.label)) }
                 out.append(contentsOf: section.rows.map(Line.account))
             }
@@ -215,17 +219,20 @@ public enum FleetPanel {
     /// Build the panel from every fleet the host's engines reported.
     /// `now` is injected so the countdown strings are testable.
     ///
-    /// `engineInstalled` false is the "no swap engine on this box" case,
-    /// which is a normal state with its own copy, not an error.
+    /// `engineInstalled` false is the "no account engine on this box"
+    /// case, which is a normal state with its own copy, not an error.
+    /// `installHint` lets a host name its own way to add one; core never
+    /// names an engine's install command.
     public static func panel(fleets: [EngineFleet], live: LiveSessions?,
                              engineInstalled: Bool,
                              engine: EngineIndicator? = nil,
                              caveats: [String: String] = [:],
+                             installHint: String? = nil,
                              now: Date = Date()) -> Panel {
         guard engineInstalled else {
             return Panel(sections: [], footer: footer(live: live, accounts: 0, engine: engine),
-                         empty: "No swap engine installed. "
-                              + "`uv tool install claude-swap` adds one.",
+                         empty: "No account engine installed."
+                              + (installHint.map { " " + $0 } ?? ""),
                          engine: engine)
         }
         let sections = fleets.map { fleet in
@@ -236,8 +243,8 @@ public enum FleetPanel {
             return Panel(sections: [], footer: footer(live: live, accounts: 0, engine: engine),
                          empty: fleets.isEmpty
                              ? "Reading accounts\u{2026}"
-                             : "No accounts yet \u{2014} `cswap add` registers "
-                               + "the one you are logged into.",
+                             : "No accounts yet \u{2014} register the account "
+                               + "you are logged into with your engine.",
                          engine: engine)
         }
         return Panel(sections: sections,

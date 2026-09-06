@@ -358,8 +358,7 @@ public enum QRCode {
 
         for maskPattern in 0..<8 {
             let (modules, _) = buildMatrix(version: version, correction: correction,
-                                           maskPattern: maskPattern, codewords: finalCodewords,
-                                           test: true)
+                                           maskPattern: maskPattern, codewords: finalCodewords)
             let lost = calculateLostPoint(modules: modules)
             if lost < minLostPoint {
                 minLostPoint = lost
@@ -369,8 +368,7 @@ public enum QRCode {
 
         // Final build with best mask
         let (finalModules, size) = buildMatrix(version: version, correction: correction,
-                                               maskPattern: bestMask, codewords: finalCodewords,
-                                               test: false)
+                                               maskPattern: bestMask, codewords: finalCodewords)
 
         var flat: [Bool] = []
         flat.reserveCapacity(size * size)
@@ -388,8 +386,7 @@ public enum QRCode {
         version: Int,
         correction: Correction,
         maskPattern: Int,
-        codewords: [UInt8],
-        test: Bool
+        codewords: [UInt8]
     ) -> (modules: [[Bool]], size: Int) {
         let size = version * 4 + 17
         var modules = [[Bool?]](repeating: [Bool?](repeating: nil, count: size), count: size)
@@ -447,9 +444,12 @@ public enum QRCode {
         let typeData = (correction.bits << 3) | maskPattern
         let typeBits = bchTypeInfo(data: typeData)
 
-        // Vertical type info
+        // Vertical type info. Written in trial builds too (test == true):
+        // mask scoring per ISO 18004 reads the fully-populated matrix, so
+        // the trial's own type bits must be in place or the penalty
+        // misranks masks.
         for i in 0..<15 {
-            let mod = !test && (((typeBits >> i) & 1) == 1)
+            let mod = ((typeBits >> i) & 1) == 1
             if i < 6 {
                 modules[i][8] = mod
             } else if i < 8 {
@@ -461,7 +461,7 @@ public enum QRCode {
 
         // Horizontal type info
         for i in 0..<15 {
-            let mod = !test && (((typeBits >> i) & 1) == 1)
+            let mod = ((typeBits >> i) & 1) == 1
             if i < 8 {
                 modules[8][size - i - 1] = mod
             } else if i < 9 {
@@ -472,13 +472,13 @@ public enum QRCode {
         }
 
         // Fixed dark module
-        modules[size - 8][8] = !test
+        modules[size - 8][8] = true
 
         // 5. Version info (v >= 7)
         if version >= 7 {
             let verBits = bchTypeNumber(version: version)
             for i in 0..<18 {
-                let mod = !test && (((verBits >> i) & 1) == 1)
+                let mod = ((verBits >> i) & 1) == 1
                 modules[i / 3][i % 3 + size - 11] = mod
                 modules[i % 3 + size - 11][i / 3] = mod
             }
