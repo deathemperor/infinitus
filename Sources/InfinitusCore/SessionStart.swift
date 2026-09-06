@@ -50,6 +50,23 @@ public enum SessionStart {
         ("auto", "Auto"),
         ("bypassPermissions", "Full access"),
     ]
+    /// The modes a running session can be moved to (#163 phase 2) through
+    /// the plugin's PreToolUse hook: `supervised` clears the hook mode.
+    /// `auto` is Claude Code's own classifier and has no hook equivalent.
+    public static let hookModes: [(mode: String, label: String)] = [
+        ("supervised", "Supervised"),
+        ("acceptEdits", "Auto-accept edits"),
+        ("bypassPermissions", "Full access"),
+    ]
+    /// How much a mode lets through, for "a start mode is a floor": the
+    /// hook can only widen what Claude Code would otherwise ask about.
+    public static func modeRank(_ mode: String?) -> Int {
+        switch mode {
+        case "bypassPermissions": return 2
+        case "acceptEdits", "auto": return 1
+        default: return 0
+        }
+    }
 
     public struct Reply: Codable, Sendable, Equatable {
         /// "started" | "badCwd" | "noHost" | "failed"

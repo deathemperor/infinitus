@@ -199,7 +199,7 @@ final class ControlServer {
                          "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
                          "kind": .string(row.kind),
                          "profile": model.sessionBirths[row.pid]?.profile.map { .string($0) } ?? .null,
-                         "permissionMode": model.sessionBirths[row.pid]?.permissionMode.map { .string($0) } ?? .null])
+                         "permissionMode": model.sessionBirths[row.pid]?.effectiveMode.map { .string($0) } ?? .null])
             }))
 
         case "profiles":
@@ -325,9 +325,19 @@ final class ControlServer {
                   let sessionId = event.sessionId, let tool = event.toolName else {
                 throw Fail("approve: a PreToolUse hook payload is expected on stdin")
             }
-            let allowed = model.toolApprovals.allows(sessionId: sessionId, tool: tool, command: event.toolCommand)
-            if allowed { model.logEvent("hook", icon: "checkmark.shield", "allowed \(tool) from the phone's session rule") }
-            return ControlReply(ok: true, result: .object(["decision": .string(allowed ? "allow" : "ask")]))
+            let reason = model.toolApprovals.reason(sessionId: sessionId, tool: tool, command: event.toolCommand)
+            if let reason { model.logEvent("hook", icon: "checkmark.shield", "allowed \(tool) from \(reason)") }
+            return ControlReply(ok: true, result: .object(["decision": .string(reason != nil ? "allow" : "ask")]))
+
+        case "session-mode":
+            guard r.args.count >= 2 else { throw Fail("usage: session-mode <pid|name> <\(SessionStart.hookModes.map(\.mode).joined(separator: "|"))>") }
+            guard let pid = model.sessionPid(matching: r.args[0]),
+                  let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { Int($0.pid) == pid })
+            else { throw Fail("no live session matches \(r.args[0]); see `infinitusctl sessions`") }
+            let reply = model.setSessionMode(r.args[1], pid: pid, record: record)
+            guard reply.outcome == "delivered" else { throw Fail(reply.detail ?? reply.outcome) }
+            return ControlReply(ok: true, result: .object(["mode": model.sessionBirths[pid]?.effectiveMode.map { .string($0) } ?? .null,
+                                                          "label": .string(reply.detail ?? "Supervised")]))
 
         case "event":
             guard let payload = r.secret, let event = HookEvent.parse(payload) else {

@@ -11,11 +11,28 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     public let permissionMode: String?
     /// The past session id this one resumed, when it did.
     public let resumedFrom: String?
+    /// The mode the phone moved the running session to (#163 phase 2),
+    /// answered by the plugin's PreToolUse hook; nil = as started.
+    public let hookMode: String?
 
-    public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil) {
+    public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil,
+                hookMode: String? = nil) {
         self.profile = profile
         self.permissionMode = permissionMode
         self.resumedFrom = resumedFrom
+        self.hookMode = hookMode
+    }
+
+    /// The same birth moved to `mode` (nil = back to how it started).
+    public func moved(to mode: String?) -> SessionBirth {
+        SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom, hookMode: mode)
+    }
+
+    /// The mode in force: the hook's when set, else the start mode.
+    public var effectiveMode: String? { hookMode ?? permissionMode }
+    /// The start mode as the pickers spell it, nil when supervised.
+    public var modeLabelForStart: String? {
+        permissionMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
     }
 
     public init?(request: SessionStart.Request) {
@@ -27,7 +44,7 @@ public struct SessionBirth: Codable, Sendable, Equatable {
 
     /// The mode as the pickers spell it ("Full access"), nil when supervised.
     public var modeLabel: String? {
-        permissionMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
+        effectiveMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
     }
 
     /// What the session row shows beside the name: "Review · Full access",
@@ -41,7 +58,7 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     }
 
     /// Full access is the one mode worth a warning color.
-    public var isUnrestricted: Bool { permissionMode == "bypassPermissions" }
+    public var isUnrestricted: Bool { effectiveMode == "bypassPermissions" }
 }
 
 public enum SessionBirths {

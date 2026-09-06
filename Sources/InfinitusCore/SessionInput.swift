@@ -15,7 +15,10 @@ public enum SessionInput {
         /// `approve` (#79): "allow for this session" from the phone —
         /// `text` is `ToolApproval.encode(tool:input:)`; the Mac records
         /// the rule and answers the prompt with Yes.
-        public enum Kind: String, Codable, Sendable { case message, key, resume, approve }
+        /// `mode` (#163 phase 2): `text` is one of `SessionStart.hookModes`;
+        /// the Mac moves the session's permission mode for the plugin's
+        /// PreToolUse hook — nothing is typed into the session.
+        public enum Kind: String, Codable, Sendable { case message, key, resume, approve, mode }
         public let kind: Kind
         /// `message`: free text. `key`: one of `SessionInput.allowedKeys`.
         public let text: String
@@ -179,6 +182,9 @@ extension SessionInput {
         let ancestors = ancestorsOf(record.pid)
 
         switch request.kind {
+        case .mode:
+            // The app's own state (#163 phase 2); nothing to type.
+            return Reply(outcome: "rejected", detail: "a mode change is handled by the app, not delivered")
         case .approve:
             // The rule itself is the app's to keep; here it is a Yes.
             return deliver(request: Request(kind: .key, text: "1"), record: record,

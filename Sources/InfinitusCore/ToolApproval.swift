@@ -59,8 +59,36 @@ public enum ToolApproval {
 public final class ToolApprovals: @unchecked Sendable {
     private let lock = NSLock()
     private var rules: [String: [ToolApproval.Rule]] = [:]
+    /// The phone's mid-session mode per session id (#163 phase 2):
+    /// "acceptEdits" allows the editing tools, "bypassPermissions" every
+    /// tool; nil = supervised, the rules alone decide.
+    private var modes: [String: String] = [:]
+    /// What "Auto-accept edits" lets through, Claude Code's own set.
+    public static let editTools: Set<String> = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
 
     public init() {}
+
+    public func setMode(_ mode: String?, sessionId: String) {
+        lock.lock(); defer { lock.unlock() }
+        modes[sessionId] = mode
+    }
+
+    public func mode(for sessionId: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return modes[sessionId]
+    }
+
+    /// Why a tool is allowed: the session's mode, or a rule from the
+    /// phone — nil when Claude Code should ask as usual.
+    public func reason(sessionId: String, tool: String, command: String?) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        switch modes[sessionId] {
+        case "bypassPermissions": return "the session's Full access mode"
+        case "acceptEdits" where ToolApprovals.editTools.contains(tool): return "the session's Auto-accept edits mode"
+        default: break
+        }
+        return (rules[sessionId] ?? []).contains { $0.matches(tool: tool, command: command) } ? "the phone's session rule" : nil
+    }
 
     public func add(_ rule: ToolApproval.Rule, sessionId: String) {
         lock.lock(); defer { lock.unlock() }
@@ -70,8 +98,7 @@ public final class ToolApprovals: @unchecked Sendable {
     }
 
     public func allows(sessionId: String, tool: String, command: String?) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return (rules[sessionId] ?? []).contains { $0.matches(tool: tool, command: command) }
+        reason(sessionId: sessionId, tool: tool, command: command) != nil
     }
 
     public func rules(for sessionId: String) -> [ToolApproval.Rule] {

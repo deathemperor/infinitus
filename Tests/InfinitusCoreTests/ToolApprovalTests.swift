@@ -2,6 +2,23 @@ import XCTest
 @testable import InfinitusCore
 
 final class ToolApprovalTests: XCTestCase {
+    func testSessionModeAnswersBeforeTheRules() {
+        let approvals = ToolApprovals()
+        XCTAssertFalse(approvals.allows(sessionId: "s", tool: "Edit", command: nil))
+        approvals.setMode("acceptEdits", sessionId: "s")
+        XCTAssertTrue(approvals.allows(sessionId: "s", tool: "Edit", command: nil))
+        XCTAssertTrue(approvals.allows(sessionId: "s", tool: "Write", command: nil))
+        XCTAssertFalse(approvals.allows(sessionId: "s", tool: "Bash", command: "rm -rf /"))
+        XCTAssertFalse(approvals.allows(sessionId: "other", tool: "Edit", command: nil))
+        approvals.setMode("bypassPermissions", sessionId: "s")
+        XCTAssertEqual(approvals.reason(sessionId: "s", tool: "Bash", command: "rm -rf /"), "the session's Full access mode")
+        approvals.setMode(nil, sessionId: "s")
+        XCTAssertNil(approvals.mode(for: "s"))
+        XCTAssertFalse(approvals.allows(sessionId: "s", tool: "Edit", command: nil))
+        approvals.add(.init(tool: "Edit"), sessionId: "s")
+        XCTAssertEqual(approvals.reason(sessionId: "s", tool: "Edit", command: nil), "the phone's session rule")
+    }
+
     func testBashRulesNarrowToTheCommandsFirstWord() {
         let rule = ToolApproval.Rule.from(tool: "Bash", input: "git status --short")
         XCTAssertEqual(rule.prefix, "git")

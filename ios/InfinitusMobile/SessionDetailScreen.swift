@@ -89,6 +89,8 @@ struct SessionDetailScreen: View {
     @ObservedObject var progress: MobileSessionProgress
     let session: SessionDetail
 
+    @State private var settingMode = false
+    @State private var modeResult: String?
     private var p: SessionProgress? { progress.byPid[session.pid] }
     private var summary: SessionAccountSummary? { model.accountSummary(forSessionPid: session.pid) }
 
@@ -113,6 +115,7 @@ struct SessionDetailScreen: View {
                 if let last = p?.lastActivityAt {
                     LabeledContent("Last activity", value: last.formatted(.relative(presentation: .numeric)))
                 }
+                permissionsRow
                 if let phase = p?.phase { LabeledContent("Phase", value: phase) }
                 if let title = p?.title { LabeledContent("Title", value: title) }
                 if let goal = p?.goal {
@@ -167,6 +170,44 @@ struct SessionDetailScreen: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Session detail")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// The session's permission mode (#163 phase 2), changeable while it
+    /// runs: the Mac answers the plugin's PreToolUse hook from it. Only
+    /// widening is offered past the start mode — Claude Code already lets
+    /// a start mode's tools through, so a narrower pick would only pretend.
+    @ViewBuilder private var permissionsRow: some View {
+        let birth = model.snapshot?.births?[session.pid]
+        let current = birth?.effectiveMode ?? "supervised"
+        let floor = SessionStart.modeRank(birth?.permissionMode)
+        Picker("Permissions", selection: Binding(
+            get: { current },
+            set: { mode in guard mode != current else { return }; setMode(mode) })) {
+            ForEach(SessionStart.hookModes.filter { SessionStart.modeRank($0.mode) >= floor }, id: \.mode) { choice in
+                Text(choice.label).tag(choice.mode)
+            }
+            if current == "auto" { Text("Auto").tag("auto") }
+        }
+        .disabled(settingMode)
+        if let modeResult {
+            Text(modeResult).font(.caption).foregroundStyle(.orange)
+        }
+    }
+
+    private func setMode(_ mode: String) {
+        settingMode = true
+        modeResult = nil
+        Task {
+            defer { settingMode = false }
+            do {
+                let reply = try await NetworkFleetMirror.shared.sessionInput(
+                    pid: Int32(session.pid), request: .init(kind: .mode, text: mode))
+                if reply.outcome != "delivered" { modeResult = reply.detail ?? reply.outcome }
+                await model.refresh()
+            } catch {
+                modeResult = "couldn't reach the Mac"
+            }
+        }
     }
 
     @ViewBuilder private var accountSection: some View {

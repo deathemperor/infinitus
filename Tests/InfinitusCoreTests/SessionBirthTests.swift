@@ -3,6 +3,20 @@ import XCTest
 
 /// Session birth records (#163 / #165): what a started session runs as.
 final class SessionBirthTests: XCTestCase {
+    func testAHookModeMovesTheChipAndTheStartModeStaysTheFloor() throws {
+        let born = SessionBirth(profile: "Review", permissionMode: "acceptEdits")
+        let moved = born.moved(to: "bypassPermissions")
+        XCTAssertEqual(moved.chip, "Review · Full access")
+        XCTAssertTrue(moved.isUnrestricted)
+        XCTAssertEqual(moved.permissionMode, "acceptEdits")
+        XCTAssertEqual(moved.moved(to: nil).chip, "Review · Auto-accept edits")
+        XCTAssertLessThan(SessionStart.modeRank(nil), SessionStart.modeRank("acceptEdits"))
+        XCTAssertLessThan(SessionStart.modeRank("auto"), SessionStart.modeRank("bypassPermissions"))
+        // A record written before hookMode existed still decodes.
+        let old = try JSONDecoder().decode(SessionBirth.self, from: Data(#"{"permissionMode":"auto"}"#.utf8))
+        XCTAssertEqual(old.effectiveMode, "auto")
+    }
+
     func testBirthComesFromTheStartRequest() {
         XCTAssertNil(SessionBirth(request: .init(cwd: "/r")))
         XCTAssertNil(SessionBirth(request: .init(cwd: "/r", permissionMode: "nonsense")))

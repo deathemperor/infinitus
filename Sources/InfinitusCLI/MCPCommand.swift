@@ -52,6 +52,20 @@ enum MCPCommand {
                         if let search = string(arguments["search"]), !search.isEmpty { options["search"] = search }
                         return control("past-sessions", options: options)
                     }),
+            MCPTool(name: "session_mode",
+                    description: "Moves a running session's permission mode through the Infinitus plugin's PreToolUse hook: acceptEdits allows the editing tools, bypassPermissions every tool, supervised clears it. A mode set at start cannot be narrowed.",
+                    inputSchema: .object(["type": .string("object"),
+                                          "properties": .object([
+                                            "session": .object(["type": .string("string"), "description": .string("pid or name")]),
+                                            "mode": .object(["type": .string("string"), "enum": .array([.string("supervised"), .string("acceptEdits"), .string("bypassPermissions")])]),
+                                          ]),
+                                          "required": .array([.string("session"), .string("mode")])]),
+                    call: { arguments in
+                        guard let session = string(arguments["session"]), let mode = string(arguments["mode"]) else {
+                            return .failure(.init("session and mode are required"))
+                        }
+                        return control("session-mode", args: [session, mode])
+                    }),
             MCPTool(name: "resume_session",
                     description: "Resume a past Claude Code session on this Mac: opens a new terminal in the folder it ran in with `claude --resume <id>`. Live sessions are refused — message them instead.",
                     inputSchema: .object(["type": .string("object"),

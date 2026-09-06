@@ -150,6 +150,27 @@ final class AppModel: ObservableObject {
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
+
+    /// Moves a running session's permission mode (#163 phase 2): the
+    /// plugin's PreToolUse hook answers from it. The start mode is a
+    /// floor — Claude Code itself already lets those tools through, so
+    /// narrowing from here would only pretend.
+    func setSessionMode(_ text: String, pid: Int, record: ClaudeSessionRecord) -> SessionInput.Reply {
+        let mode = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let choice = SessionStart.hookModes.first(where: { $0.mode == mode }) else {
+            return SessionInput.Reply(outcome: "rejected", detail: "mode must be one of \(SessionStart.hookModes.map(\.mode).joined(separator: ", "))")
+        }
+        let birth = sessionBirths[pid] ?? SessionBirth()
+        let target: String? = choice.mode == "supervised" ? nil : choice.mode
+        if SessionStart.modeRank(target) < SessionStart.modeRank(birth.permissionMode) {
+            let started = birth.modeLabelForStart ?? "supervised"
+            return SessionInput.Reply(outcome: "rejected", detail: "the session started as \(started); a start mode cannot be narrowed from here")
+        }
+        toolApprovals.setMode(target, sessionId: record.sessionId)
+        recordBirth(pid: pid, birth.moved(to: target))
+        logEvent("hook", icon: "checkmark.shield", "session \(pid) moved to \(choice.label)")
+        return SessionInput.Reply(outcome: "delivered", channel: "mac", detail: choice.label)
+    }
     @Published var lastError: String?
     /// #7 layer 2: the reset battle plan for the current sprint, recomputed
     /// every snapshot; nil when there is nothing to plan. Manual mode: the
@@ -1274,6 +1295,17 @@ final class AppModel: ObservableObject {
             else {
                 Task { @MainActor in self?.logMirrorInput("⚠️", "phone input not delivered: unknown session") }
                 return nil
+            }
+            // A mode change never reaches the terminal: it is the Mac's
+            // own state, decided on the main actor (the births live
+            // there). This queue never blocks main, so a hop is safe.
+            if request.kind == .mode {
+                return DispatchQueue.main.sync {
+                    MainActor.assumeIsolated {
+                        self?.setSessionMode(request.text, pid: Int(pid), record: record)
+                            ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
+                    }
+                }
             }
             // "Allow for this session": remember the rule for the plugin's
             // PreToolUse hook, then answer the prompt on screen with Yes.

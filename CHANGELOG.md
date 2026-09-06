@@ -40,6 +40,7 @@ publishes the matching section as the GitHub release body.
 - Past sessions: the sessions popover lists the newest transcripts with a Resume button, and `infinitusctl past-sessions` / `resume-session <id>` (also MCP tools) do the same from a terminal or another session.
 - Settings › Profiles saves named ways to start a session (folder, engine, permissions, model, appended system prompt, first prompt); `infinitusctl profiles` / `profile-set` / `profile-remove` manage the same list.
 - Every prompt checkpoints the repository as a hidden git ref (with the plugin; Display › toggle): `infinitusctl checkpoints <session>` lists them, `checkpoint-diff` compares two or one against the working tree, `checkpoint-restore --yes` puts the files back and keeps a backup checkpoint; the sessions popover's Checkpoints section shows a session's timeline with Restore; the phone shows the timeline (session detail › Checkpoints) with each checkpoint's diff and Restore.
+- A running session's permission mode can be widened from the phone (session detail › Permissions) or `infinitusctl session-mode <session> <mode>`; the plugin's PreToolUse hook answers from it and the row chip follows.
 
 ### Team (preview)
 - Reading the team store remembers each file's header, so a refresh pass reads only new files and the app's memory stays flat.
