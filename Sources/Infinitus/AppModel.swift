@@ -1142,6 +1142,15 @@ final class AppModel: ObservableObject {
             }
             return reply
         }
+        // A session's hook mode (#163 phase 2) is remembered in its birth
+        // across a relaunch, but the hook answers from ToolApprovals'
+        // memory — reseed it, or the chip would promise a mode the hook
+        // no longer grants.
+        let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+        for (pid, birth) in sessionBirths {
+            guard let mode = birth.hookMode, let record = live.first(where: { Int($0.pid) == pid }) else { continue }
+            toolApprovals.setMode(mode, sessionId: record.sessionId)
+        }
         mirrorServer.pastSessions.set { limit, search in
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                                            limit: limit, search: search))
