@@ -23,10 +23,12 @@ head=$(git --git-dir "$cache" rev-parse "$branch")
 if [ "${1:-}" = "--mark" ]; then
     new=$(git --git-dir "$cache" rev-parse "${2:-$branch}")
     python3 - "$manifest" "$new" <<'PY'
-import json, sys, datetime
+import re, sys, datetime
 p, sha = sys.argv[1], sys.argv[2]
-d = json.load(open(p)); d["commit"] = sha; d["markedAt"] = datetime.date.today().isoformat()
-json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+s = open(p).read()  # edit the two fields in place; json.dump would reflow the hand-formatted watch list
+s = re.sub(r'"commit": "[0-9a-f]+"', f'"commit": "{sha}"', s, count=1)
+s = re.sub(r'"markedAt": "[^"]*"', f'"markedAt": "{datetime.date.today().isoformat()}"', s, count=1)
+open(p, "w").write(s)
 PY
     echo "marked $name at $new"; exit 0
 fi
