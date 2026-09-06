@@ -252,6 +252,15 @@ final class SessionInputTests: XCTestCase {
                        "cd '/r' && exec claude --resume 'abc-1' 'go on'")
         XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, resume: "abc-1"),
                        "cd '/r' && exec codex")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", permissionMode: "acceptEdits"),
+                       "cd '/r' && exec claude --permission-mode acceptEdits 'go'")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", permissionMode: "bypassPermissions"),
+                       "cd '/r' && exec claude --resume 'abc-1' --permission-mode bypassPermissions")
+        // Unknown modes never reach the command line; Codex has no such flag.
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, permissionMode: "yolo; rm -rf /"),
+                       "cd '/r' && exec claude")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, permissionMode: "auto"),
+                       "cd '/r' && exec codex")
         // A phone from before resume existed sends no such field.
         let old = try JSONDecoder().decode(SessionStart.Request.self, from: Data(#"{"cwd":"/r"}"#.utf8))
         XCTAssertEqual(old, SessionStart.Request(cwd: "/r"))

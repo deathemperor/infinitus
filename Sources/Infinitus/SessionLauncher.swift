@@ -14,7 +14,7 @@ enum SessionLauncher {
             return SessionStart.Reply(outcome: "badCwd", detail: "no such folder on the Mac: \(request.cwd)")
         }
         let command = SessionStart.shellCommand(cwd: cwd, engine: request.engine, prompt: request.prompt,
-                                                resume: request.resume)
+                                                resume: request.resume, permissionMode: request.permissionMode)
         let claudeDir = ClaudeSessions.configHome()
         let before = Set(ClaudeSessions.list(claudeDir: claudeDir).map(\.pid))
         let host: String

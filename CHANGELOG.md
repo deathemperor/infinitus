@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 - The chat composer's placeholder speaks the theme's language too ("Send word…" in the Wild West, "Codec open…" while dictating in Metal Gear).
 - Allow… on a permission card offers "Allow for this session": the Mac remembers the tool (Bash by command verb) and the plugin's PreToolUse hook skips that prompt for the rest of the session.
 - The Sessions tab's clock button lists every session the Mac has ever run, newest first and searchable; swipe Resume reopens one in its folder and lands you in its chat.
+- Start a session picks its permissions: Supervised, Auto-accept edits, Auto or Full access, passed to Claude Code as its permission mode.
 
 ### Mac
 - An AWS sign-in that lapses inside a sub-agent shows up on the parent session — key badge, Sign in row, push — and the continue nudge after signing in goes to the parent.

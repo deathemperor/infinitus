@@ -17,13 +17,29 @@ public enum SessionStart {
         /// `claude --resume <id>`, from the folder it ran in. Optional
         /// so phones from before it still start sessions.
         public let resume: String?
-        public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil) {
+        /// Claude Code's `--permission-mode` for the new session (#163):
+        /// one of `permissionModes`; nil or unknown = the default
+        /// (supervised — every tool asks). Optional so older phones
+        /// still start sessions.
+        public let permissionMode: String?
+        public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil,
+                    permissionMode: String? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
             self.resume = resume
+            self.permissionMode = permissionMode
         }
     }
+
+    /// The modes a session can start in, as Claude Code spells them,
+    /// with the label the pickers show. The default (ask for every
+    /// tool) is "no flag", so it is not in this list.
+    public static let permissionModes: [(mode: String, label: String)] = [
+        ("acceptEdits", "Auto-accept edits"),
+        ("auto", "Auto"),
+        ("bypassPermissions", "Full access"),
+    ]
 
     public struct Reply: Codable, Sendable, Equatable {
         /// "started" | "badCwd" | "noHost" | "failed"
@@ -46,11 +62,16 @@ public enum SessionStart {
     /// the engine replaces the shell, the prompt as its argument; a
     /// resumed Claude session names its id first (Codex has no resume here).
     public static func shellCommand(cwd: String, engine: String?, prompt: String?,
-                                    resume: String? = nil) -> String {
+                                    resume: String? = nil, permissionMode: String? = nil) -> String {
         let bin = engine == "codex" ? "codex" : "claude"
         var line = "cd \(shellQuoted(cwd)) && exec \(bin)"
         if bin == "claude", let resume, !resume.isEmpty {
             line += " --resume " + shellQuoted(resume)
+        }
+        // Only a known mode reaches the command line; anything else is
+        // the default, never an arbitrary flag value.
+        if bin == "claude", let permissionMode, permissionModes.contains(where: { $0.mode == permissionMode }) {
+            line += " --permission-mode " + permissionMode
         }
         if let prompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
             line += " " + shellQuoted(prompt)

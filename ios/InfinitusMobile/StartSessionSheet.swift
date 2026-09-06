@@ -12,6 +12,8 @@ struct StartSessionSheet: View {
     @State private var custom = ""
     @State private var engine = "claude"
     @State private var prompt = ""
+    /// "" = supervised (Claude Code's default: every tool asks).
+    @State private var permissionMode = ""
     @State private var starting = false
     @State private var error: String?
 
@@ -43,6 +45,19 @@ struct StartSessionSheet: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                if engine == "claude" {
+                    Section {
+                        Picker("Permissions", selection: $permissionMode) {
+                            Text("Supervised").tag("")
+                            ForEach(SessionStart.permissionModes, id: \.mode) { Text($0.label).tag($0.mode) }
+                        }
+                        .pickerStyle(.menu)
+                    } header: {
+                        Text("Permissions")
+                    } footer: {
+                        Text(permissionFootnote)
+                    }
+                }
                 Section("First prompt") {
                     TextField("Optional — what to start on", text: $prompt, axis: .vertical)
                         .lineLimit(2...6)
@@ -67,6 +82,15 @@ struct StartSessionSheet: View {
         }
     }
 
+    private var permissionFootnote: String {
+        switch permissionMode {
+        case "acceptEdits": return "File edits go through without asking; other tools still ask here."
+        case "auto": return "Claude decides what needs asking."
+        case "bypassPermissions": return "Nothing asks. Only for folders you trust completely."
+        default: return "Every tool asks, and the prompts show up on this phone."
+        }
+    }
+
     private var chosen: String {
         (cwd == Self.other ? custom : cwd).trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -75,7 +99,8 @@ struct StartSessionSheet: View {
         starting = true
         error = nil
         let request = SessionStart.Request(cwd: chosen, engine: engine,
-                                           prompt: prompt.isEmpty ? nil : prompt)
+                                           prompt: prompt.isEmpty ? nil : prompt,
+                                           permissionMode: engine == "claude" && !permissionMode.isEmpty ? permissionMode : nil)
         Task {
             do {
                 let reply = try await NetworkFleetMirror.shared.startSession(request)
