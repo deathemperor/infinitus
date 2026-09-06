@@ -768,7 +768,7 @@ final class ControlServer {
             (.rename, "rename"), (.remove, "remove"), (.addCurrent, "addCurrent"),
             (.addToken, "addToken"), (.addOAuth, "addOAuth"), (.autoSwitch, "autoSwitch"),
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
-            (.prefer, "prefer"), (.ignite, "ignite"),
+            (.prefer, "prefer"), (.ignite, "ignite"), (.backup, "backup"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }
