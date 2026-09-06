@@ -258,6 +258,15 @@ struct ThemePreviewRow: View {
                 gauge(label: theme.weeklyLabel, color: theme.weeklyColor,
                       remaining: 38, dividers: (1..<7).map { Double($0) * 100 / 7 })
             }
+            HStack(spacing: 4) {
+                if let glyph = theme.rateGlyph {
+                    Text(PopupGlyph.text(glyph)).font(PopupFont.caption)
+                } else {
+                    Image(systemName: "bolt.horizontal.fill").font(PopupFont.caption).foregroundStyle(.yellow)
+                }
+                Text(TokenRate(perMinute: 1200, peakPerMinute: 1200).label(theme: theme))
+                    .font(PopupFont.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
         }
         .padding(.vertical, 2)
     }

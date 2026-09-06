@@ -105,13 +105,20 @@ public struct FooterChips<M: FleetModel, P: SessionProgressSource,
             // chip goes into overdrive (user 2026-09-03 "if current at
             // peak, animate it dramatically") — all Core Animation.
             let atPeak = rate.perMinute >= rate.peakPerMinute
+            let theme = model.rowTheme
             HStack(spacing: 4) {
-                Image(systemName: "bolt.horizontal.fill")
-                    .font(PopupFont.caption).foregroundStyle(.yellow)
-                    .overlay { if atPeak { TokenPeakGlow() } }
+                Group {
+                    if let glyph = theme.rateGlyph {
+                        Text(PopupGlyph.text(glyph))
+                    } else {
+                        Image(systemName: "bolt.horizontal.fill").foregroundStyle(.yellow)
+                    }
+                }
+                .font(PopupFont.caption)
+                .overlay { if atPeak { TokenPeakGlow() } }
                 TokenRateBar(fraction: rate.fraction, atPeak: atPeak)
                     .frame(width: 34, height: 6)
-                Text(rate.label)
+                Text(rate.label(theme: theme))
                     .font(PopupFont.caption).monospacedDigit()
                     .fontWeight(atPeak ? .bold : .regular)
                     .foregroundStyle(atPeak ? Color.yellow : Color.secondary)

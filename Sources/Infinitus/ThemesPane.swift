@@ -161,6 +161,13 @@ private struct ThemeCard: View {
                     GaugeBar(remaining: 26, color: ThemeColor.resolve(theme.scopedColor), animated: false)
                     Text(verbatim: "\(theme.cashIcon)1,131")
                         .font(.caption).foregroundStyle(.yellow)
+                    if let glyph = theme.rateGlyph {
+                        Text(glyph).font(.caption)
+                    } else {
+                        Image(systemName: "bolt.horizontal.fill").font(.caption).foregroundStyle(.yellow)
+                    }
+                    Text(TokenRate(perMinute: 1200, peakPerMinute: 1200).label(theme: theme))
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
                 .fixedSize()
             }

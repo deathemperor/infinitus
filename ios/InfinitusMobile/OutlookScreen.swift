@@ -53,7 +53,7 @@ struct OutlookScreen: View {
                     }
                     if let rate = model.snapshot?.tokenRate, rate.perMinute > 0 {
                         LabeledContent("Output tokens now") {
-                            Text("\(rate.label) · peak \(rate.peakPerMinute)/min").monospacedDigit()
+                            Text("\(rate.label(theme: model.rowTheme)) · peak \(rate.peakPerMinute)/min").monospacedDigit()
                         }
                     }
                     Text(forecast.basis).font(.caption).foregroundStyle(.secondary)

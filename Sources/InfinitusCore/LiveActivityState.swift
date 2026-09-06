@@ -45,10 +45,15 @@ public struct WorkingActivityState: Codable, Hashable, Sendable {
     public var tokenFraction: Double
     public var accent: String
     public var plain: Bool
+    /// The theme's tokens/minute icon and unit (#218); nil keeps the
+    /// bolt and "tok/min". Optional so older payloads still decode.
+    public var rateIcon: String? = nil
+    public var rateLabel: String? = nil
 
     public init(active: String, icon: String?, slot: String, plan: String?, cash: String?,
                 windows: [ActivityWindow], binding: Int?, busy: Int, total: Int, waiting: Int,
-                next: String?, tokensPerMinute: Int?, tokenFraction: Double, accent: String, plain: Bool) {
+                next: String?, tokensPerMinute: Int?, tokenFraction: Double, accent: String, plain: Bool,
+                rateIcon: String? = nil, rateLabel: String? = nil) {
         self.active = active
         self.icon = icon
         self.slot = slot
@@ -64,6 +69,8 @@ public struct WorkingActivityState: Codable, Hashable, Sendable {
         self.tokenFraction = tokenFraction
         self.accent = accent
         self.plain = plain
+        self.rateIcon = rateIcon
+        self.rateLabel = rateLabel
     }
 }
 
@@ -133,7 +140,9 @@ public enum LiveActivityBuilder {
             tokensPerMinute: tokenRate.flatMap { $0.perMinute > 0 ? $0.perMinute : nil },
             tokenFraction: tokenRate?.fraction ?? 0,
             accent: theme.flashColor,
-            plain: theme.plain)
+            plain: theme.plain,
+            rateIcon: theme.rateGlyph.map(glyph),
+            rateLabel: theme.rateUnit)
     }
 
     /// #1's state, or nil when the fleet isn't all-dead (the activity ends

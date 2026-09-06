@@ -11,6 +11,7 @@ import InfinitusCore
 /// length chart, footnotes, Refresh).
 struct StatsPane: View {
     @ObservedObject var model: StatsModel
+    @ObservedObject var app: AppModel
     @AppStorage("stats_period") private var periodRaw = Stats.Period.week.rawValue
 
     private var period: Stats.Period { Stats.Period(rawValue: periodRaw) ?? .week }
@@ -53,8 +54,8 @@ struct StatsPane: View {
     // MARK: tokens/min records (#89)
 
     private func recordBook(_ r: Stats.TokenRecords) -> some View {
-        Section("Tokens/min records") {
-            ForEach(Stats.Presentation.recordLines(r), id: \.self) { line in
+        Section(Stats.Presentation.recordTitle(theme: app.rowTheme)) {
+            ForEach(Stats.Presentation.recordLines(r, theme: app.rowTheme), id: \.self) { line in
                 Text(line).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             if r.dailyPeaks.contains(where: { $0 != 0 }) {
@@ -65,7 +66,7 @@ struct StatsPane: View {
                 .frame(height: 40)
             }
             ForEach(Stats.Presentation.recordRows(r), id: \.label) { row in
-                LabeledContent(row.label, value: Stats.Presentation.perMinute(row.count))
+                LabeledContent(row.label, value: Stats.Presentation.perMinute(row.count, theme: app.rowTheme))
                     .font(.caption).monospacedDigit()
             }
         }

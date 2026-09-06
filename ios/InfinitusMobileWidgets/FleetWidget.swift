@@ -178,7 +178,7 @@ private struct MediumFleet: View {
                         GridRow { WindowRow(window: window) }
                     }
                     if let tokens = state.tokensPerMinute {
-                        GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction) }
+                        GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction, icon: state.rateIcon, unit: state.rateLabel) }
                     }
                 }
                 Spacer(minLength: 0)

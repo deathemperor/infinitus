@@ -192,7 +192,7 @@ struct UtilizationPane: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let t = live.tokenRate {
-                    Text("Live: \(TokenFormat.compact(t.perMinute)) output tokens/min over the last 5 minutes "
+                    Text("Live: \(TokenFormat.compact(t.perMinute)) \(liveTheme.rateUnit ?? "output tokens/min") over the last 5 minutes "
                          + "(peak \(TokenFormat.compact(t.peakPerMinute)))")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }

@@ -336,25 +336,26 @@ disk.
 ## Themes
 
 Every theme reskins the whole row: gauge labels, the model name, the
-active / next / dead markers, and the reset countdown wording.
+active / next / dead markers, the reset countdown wording and the
+tokens/minute chip.
 
-| Theme | "Fable" becomes | active · next · dead | ready / resetting |
-|---|---|---|---|
-| Off — plain numbers | Fable | — | — |
-| RPG — HP/MP gauges + gold | Dragon | 👑 🎲 💀 | full HP / respawning… |
-| Movie — reels & box office | Epic | 🌟 🍿 🔚 | now showing / premiering… |
-| Hades — blades & darkness | Hydra | 🌿 🕯 ☠ | unscathed / raising the dead… |
-| Metal Gear — tactical espionage | FOXHOUND | 🐍 🎯 ☠ | all clear / extraction inbound… |
-| AI Agentic — tokens & context | frontier | 🧠 ⏭ 🔌 | ready to ship / rate limit lifting… |
-| Classic SWE — hand-written, no AI | mainframe | ⌨️ ⏭ 🐛 | compiles clean / recompiling… |
-| Sci-Fi — warp cores & shields | Mothership | 🧑‍🚀 📡 💥 | all systems go / recharging… |
-| Wild West — six-guns & gold rush | Outlaw | 🏇 🌵 🪦 | saddled up / sun's rising… |
-| Cyberpunk — chrome & neon | Netrunner | ⚡ 🕶 💀 | jacked in / rebooting… |
-| Gothic — candles & cathedrals | Vampire Lord | 🕯 🌹 ⚰️ | immortal / tolling midnight… |
-| Musical — tempo & encores | Maestro | 🎷 🎻 🔇 | in tune / tuning up… |
-| Planet Earth — wild documentary | Blue Whale | 🦁 🦋 🦴 | thriving / migrating… |
-| Cosmos — stars & black holes | Galaxy | 🪐 🔭 🕳 | shining / orbiting back… |
-| Ocean — tides & deep water | Leviathan | ⛵ 🐬 ⚓ | smooth sailing / tide turning… |
+| Theme | "Fable" becomes | active · next · dead | ready / resetting | tokens/min |
+|---|---|---|---|---|
+| Off — plain numbers | Fable | — | — | — |
+| RPG — HP/MP gauges + gold | Dragon | 👑 🎲 💀 | full HP / respawning… | 🔮 mana/min |
+| Movie — reels & box office | Epic | 🌟 🍿 🔚 | now showing / premiering… | 🎞 reels/min |
+| Hades — blades & darkness | Hydra | 🌿 🕯 ☠ | unscathed / raising the dead… | 💀 souls/min |
+| Metal Gear — tactical espionage | FOXHOUND | 🐍 🎯 ☠ | all clear / extraction inbound… | 📻 codec/min |
+| AI Agentic — tokens & context | frontier | 🧠 ⏭ 🔌 | ready to ship / rate limit lifting… | 🧮 tok/min |
+| Classic SWE — hand-written, no AI | mainframe | ⌨️ ⏭ 🐛 | compiles clean / recompiling… | 💻 LOC/min |
+| Sci-Fi — warp cores & shields | Mothership | 🧑‍🚀 📡 💥 | all systems go / recharging… | 🛸 warp/min |
+| Wild West — six-guns & gold rush | Outlaw | 🏇 🌵 🪦 | saddled up / sun's rising… | 🐎 stampede |
+| Cyberpunk — chrome & neon | Netrunner | ⚡ 🕶 💀 | jacked in / rebooting… | 📶 baud |
+| Gothic — candles & cathedrals | Vampire Lord | 🕯 🌹 ⚰️ | immortal / tolling midnight… | 🦇 whispers |
+| Musical — tempo & encores | Maestro | 🎷 🎻 🔇 | in tune / tuning up… | 🎵 notes/min |
+| Planet Earth — wild documentary | Blue Whale | 🦁 🦋 🦴 | thriving / migrating… | 🐝 buzz/min |
+| Cosmos — stars & black holes | Galaxy | 🪐 🔭 🕳 | shining / orbiting back… | 🌠 flux/min |
+| Ocean — tides & deep water | Leviathan | ⛵ 🐬 ⚓ | smooth sailing / tide turning… | 🌊 knots |
 
 ### Gallery
 

@@ -235,7 +235,7 @@ struct InfinitusApp: App {
         SettingsTab(title: "Stats", symbol: "chart.bar.xaxis", tint: .indigo,
                     keywords: ["stats", "metrics", "commits", "prs", "lines",
                                "messages", "sessions", "week", "month", "year"],
-                    view: AnyView(StatsPane(model: statsModel))),
+                    view: AnyView(StatsPane(model: statsModel, app: model))),
     ]
     + (MachineModel.paneShown
        ? [SettingsTab(title: "Machine", symbol: "cpu", tint: .brown,

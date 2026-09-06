@@ -86,14 +86,14 @@ extension Stats {
 
         /// The tokens/min record book as lines (#89): best ever, today,
         /// the trend, records this month — then the record days.
-        public static func recordLines(_ r: Stats.TokenRecords) -> [String] {
+        public static func recordLines(_ r: Stats.TokenRecords, theme: RowTheme = .off) -> [String] {
             var out: [String] = []
             if let best = r.best {
-                out.append("Best ever: \(perMinute(best.tokensPerMinute)) on \(best.day)")
+                out.append("Best ever: \(perMinute(best.tokensPerMinute, theme: theme)) on \(best.day)")
             } else {
                 return ["No busy minute on record yet."]
             }
-            out.append("Today's peak: \(perMinute(r.today))")
+            out.append("Today's peak: \(perMinute(r.today, theme: theme))")
             if let trend = r.trend {
                 let arrow = trend >= 1.15 ? "↑" : trend <= 0.87 ? "↓" : "→"
                 out.append("Trend: \(arrow) \(String(format: "%.2f", trend))× this week's median peak vs the week before")
@@ -108,8 +108,15 @@ extension Stats {
             r.records.map { (label: $0.day, count: $0.tokensPerMinute) }
         }
 
-        public static func perMinute(_ v: Int) -> String {
-            v >= 10_000 ? String(format: "%.1fk tok/min", Double(v) / 1000) : "\(v.formatted()) tok/min"
+        public static func perMinute(_ v: Int, theme: RowTheme = .off) -> String {
+            let unit = theme.rateUnit ?? "tok/min"
+            return v >= 10_000 ? String(format: "%.1fk \(unit)", Double(v) / 1000) : "\(v.formatted()) \(unit)"
+        }
+
+        /// The record book's section title, in the theme's words (#218).
+        public static func recordTitle(theme: RowTheme) -> String {
+            guard let unit = theme.rateUnit else { return "Tokens/min records" }
+            return unit.prefix(1).uppercased() + unit.dropFirst() + " records"
         }
 
         /// The four session-length buckets, in `Stats.Day.sessionBucket`

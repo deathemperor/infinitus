@@ -39,6 +39,31 @@ final class RowThemeLoadingTests: XCTestCase {
         XCTAssertTrue(theme.loadingWords.isEmpty)
         XCTAssertEqual(theme.loadingWord("noSessions"), "No live sessions")
         XCTAssertEqual(theme.loadingMotion, "")
+        XCTAssertEqual(theme.rateIcon, "")
+        XCTAssertEqual(theme.rateLabel, "")
+        XCTAssertNil(theme.rateUnit)
+    }
+
+    func testEveryThemedBuiltinNamesTheRate() {
+        for theme in RowTheme.builtins where !theme.plain {
+            XCTAssertFalse(theme.rateIcon.isEmpty, "\(theme.id) lacks a rate icon")
+            XCTAssertFalse(theme.rateLabel.isEmpty, "\(theme.id) lacks a rate unit")
+            XCTAssertLessThanOrEqual(theme.rateLabel.count, 9, "\(theme.id) rate unit widens the footer chip")
+            XCTAssertNotEqual(theme.rateIcon, theme.creditLabel, "\(theme.id) rate icon collides with the credit label")
+        }
+        XCTAssertNil(RowTheme.off.rateGlyph)
+    }
+
+    func testRateReadoutsSpeakTheTheme() {
+        let rate = TokenRate(perMinute: 1234, peakPerMinute: 2000)
+        XCTAssertEqual(rate.label, "1.2k/min")
+        XCTAssertEqual(rate.label(theme: .off), "1.2k/min")
+        XCTAssertEqual(rate.label(theme: .rpg), "1.2k mana/min")
+        XCTAssertEqual(TokenRate(perMinute: 340, peakPerMinute: 340).label(theme: .cyber), "340 baud")
+        XCTAssertEqual(Stats.Presentation.perMinute(12_345), "12.3k tok/min")
+        XCTAssertEqual(Stats.Presentation.perMinute(12_345, theme: .cyber), "12.3k baud")
+        XCTAssertEqual(Stats.Presentation.recordTitle(theme: .off), "Tokens/min records")
+        XCTAssertEqual(Stats.Presentation.recordTitle(theme: .rpg), "Mana/min records")
     }
 
     func testTemplateCarriesThePlaceholderFields() throws {
@@ -47,5 +72,7 @@ final class RowThemeLoadingTests: XCTestCase {
         XCTAssertEqual(synth.loadingWord("loading"), "Booting the grid…")
         XCTAssertEqual(synth.loadingIcon, "sf:waveform")
         XCTAssertEqual(synth.loadingMotion, "pulse")
+        XCTAssertEqual(synth.rateIcon, "🎛")
+        XCTAssertEqual(synth.rateLabel, "bpm")
     }
 }

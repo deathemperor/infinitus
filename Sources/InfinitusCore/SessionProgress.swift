@@ -577,7 +577,14 @@ public struct TokenRate: Codable, Sendable, Equatable {
     }
 
     /// "1.2k/min", "340/min".
-    public var label: String {
-        perMinute >= 1000 ? String(format: "%.1fk/min", Double(perMinute) / 1000) : "\(perMinute)/min"
+    public var label: String { count + "/min" }
+
+    /// The chip under a theme (#218): "1.2k mana/min", "340 baud".
+    public func label(theme: RowTheme) -> String {
+        theme.rateUnit.map { count + " " + $0 } ?? label
+    }
+
+    private var count: String {
+        perMinute >= 1000 ? String(format: "%.1fk", Double(perMinute) / 1000) : "\(perMinute)"
     }
 }

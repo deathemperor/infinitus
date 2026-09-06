@@ -54,6 +54,11 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
     /// Active-account marker — replaces the slot text on the account
     /// currently in use ("👑" instead of "P1"). "" keeps the slot text.
     public var activeIcon: String
+    /// The tokens-per-minute chip (#218): its icon ("" keeps the bolt)
+    /// and its unit — the whole phrase after the count ("mana/min",
+    /// "baud"); "" keeps the plain "tokens/min".
+    public var rateIcon: String
+    public var rateLabel: String
     /// Session status words on the phone's lists, keyed by the engine's
     /// raw status ("busy", "waiting", "idle", "shell"); missing keys keep
     /// the plain words (user 2026-09-04: "theme the listing and its
@@ -96,7 +101,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         planPrefix: String = "",
         slotPrefix: String = "",
         resetWord: String = "",
-        nextIcon: String = "", activeIcon: String = "",
+        nextIcon: String = "", activeIcon: String = "", rateIcon: String = "", rateLabel: String = "",
         sessionWords: [String: String] = [:],
         tabLabels: [String: String] = [:], tabIcons: [String: String] = [:],
         accountNames: [String] = [],
@@ -127,6 +132,8 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         self.resetWord = resetWord
         self.nextIcon = nextIcon
         self.activeIcon = activeIcon
+        self.rateIcon = rateIcon
+        self.rateLabel = rateLabel
         self.sessionWords = sessionWords
         self.tabLabels = tabLabels
         self.tabIcons = tabIcons
@@ -202,6 +209,8 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
             resetWord: try c.decodeIfPresent(String.self, forKey: .resetWord) ?? base.resetWord,
             nextIcon: try c.decodeIfPresent(String.self, forKey: .nextIcon) ?? base.nextIcon,
             activeIcon: try c.decodeIfPresent(String.self, forKey: .activeIcon) ?? base.activeIcon,
+            rateIcon: try c.decodeIfPresent(String.self, forKey: .rateIcon) ?? base.rateIcon,
+            rateLabel: try c.decodeIfPresent(String.self, forKey: .rateLabel) ?? base.rateLabel,
             sessionWords: try c.decodeIfPresent([String: String].self, forKey: .sessionWords) ?? [:],
             tabLabels: try c.decodeIfPresent([String: String].self, forKey: .tabLabels) ?? [:],
             tabIcons: try c.decodeIfPresent([String: String].self, forKey: .tabIcons) ?? [:],
@@ -211,6 +220,11 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
             loadingMotion: try c.decodeIfPresent(String.self, forKey: .loadingMotion) ?? ""
         )
     }
+
+    /// The tokens/minute chip's themed icon and unit, nil where the
+    /// plain bolt / "tokens/min" stay (Off and themes without one).
+    public var rateGlyph: String? { plain || rateIcon.isEmpty ? nil : rateIcon }
+    public var rateUnit: String? { plain || rateLabel.isEmpty ? nil : rateLabel }
 
     // MARK: random account names
 
@@ -267,7 +281,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "full HP", flashColor: "yellow",
         modelAlias: ["Fable": "Dragon", "Opus": "Golem",
                      "Sonnet": "Bard", "Haiku": "Imp"],
-        planPrefix: "Lv ", slotPrefix: "P", resetWord: "respawning…", nextIcon: "🎲", activeIcon: "👑",
+        planPrefix: "Lv ", slotPrefix: "P", resetWord: "respawning…", nextIcon: "🎲", activeIcon: "👑", rateIcon: "🔮", rateLabel: "mana/min",
         sessionWords: ["busy": "Questing", "waiting": "Awaiting orders", "idle": "Resting at camp", "shell": "In the forge"],
         tabLabels: ["sessions": "Quests", "fleet": "Party", "settings": "Inventory", "team": "Guild"],
         tabIcons: ["sessions": "sf:scroll", "fleet": "sf:person.3.fill", "settings": "sf:bag.fill", "team": "sf:shield.lefthalf.filled"],
@@ -286,7 +300,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "now showing", flashColor: "orange",
         modelAlias: ["Fable": "Epic", "Opus": "Blockbuster",
                      "Sonnet": "Indie", "Haiku": "Short"],
-        planPrefix: "Studio ", slotPrefix: "🎬", resetWord: "premiering…", nextIcon: "🍿", activeIcon: "🌟",
+        planPrefix: "Studio ", slotPrefix: "🎬", resetWord: "premiering…", nextIcon: "🍿", activeIcon: "🌟", rateIcon: "🎞", rateLabel: "reels/min",
         sessionWords: ["busy": "Rolling", "waiting": "Waiting for the cue", "idle": "Intermission", "shell": "Backstage"],
         tabLabels: ["sessions": "Scenes", "fleet": "Cast", "settings": "Studio", "team": "Crew"],
         tabIcons: ["sessions": "sf:film", "fleet": "sf:person.3.fill", "settings": "sf:slider.horizontal.3", "team": "sf:person.2.fill"],
@@ -305,7 +319,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "unscathed", flashColor: "red",
         modelAlias: ["Fable": "Hydra", "Opus": "Cerberus",
                      "Sonnet": "Fury", "Haiku": "Shade"],
-        planPrefix: "Heat ", slotPrefix: "†", resetWord: "raising the dead…", nextIcon: "🕯", activeIcon: "🌿",
+        planPrefix: "Heat ", slotPrefix: "†", resetWord: "raising the dead…", nextIcon: "🕯", activeIcon: "🌿", rateIcon: "💀", rateLabel: "souls/min",
         sessionWords: ["busy": "Fighting", "waiting": "Awaiting the call", "idle": "In the lounge", "shell": "At the forge"],
         tabLabels: ["sessions": "Runs", "fleet": "Pantheon", "settings": "Mirror", "team": "Clan"],
         tabIcons: ["sessions": "sf:flame", "fleet": "sf:person.3.fill", "settings": "sf:sparkles", "team": "sf:person.2.fill"],
@@ -324,7 +338,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "all clear", flashColor: "green",
         modelAlias: ["Fable": "FOXHOUND", "Opus": "REX",
                      "Sonnet": "RAY", "Haiku": "Mk.II"],
-        planPrefix: "Rank ", slotPrefix: "S", resetWord: "extraction inbound…", nextIcon: "🎯", activeIcon: "🐍",
+        planPrefix: "Rank ", slotPrefix: "S", resetWord: "extraction inbound…", nextIcon: "🎯", activeIcon: "🐍", rateIcon: "📻", rateLabel: "codec/min",
         sessionWords: ["busy": "On mission", "waiting": "Awaiting orders", "idle": "In the box", "shell": "At the armory"],
         tabLabels: ["sessions": "Missions", "fleet": "Squad", "settings": "Codec", "team": "Unit"],
         tabIcons: ["sessions": "sf:target", "fleet": "sf:person.3.fill", "settings": "sf:antenna.radiowaves.left.and.right", "team": "sf:person.2.fill"],
@@ -343,7 +357,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "ready to ship", flashColor: "cyan",
         modelAlias: ["Fable": "frontier", "Opus": "opus-4",
                      "Sonnet": "sonnet-4", "Haiku": "haiku-4"],
-        planPrefix: "tier-", slotPrefix: "agent-", resetWord: "rate limit lifting…", nextIcon: "⏭", activeIcon: "🧠",
+        planPrefix: "tier-", slotPrefix: "agent-", resetWord: "rate limit lifting…", nextIcon: "⏭", activeIcon: "🧠", rateIcon: "🧮", rateLabel: "tok/min",
         sessionWords: ["busy": "Reasoning", "waiting": "Blocked on a human", "idle": "Idle", "shell": "In the shell"],
         tabLabels: ["sessions": "Agents", "fleet": "Providers", "settings": "Config", "team": "Org"],
         tabIcons: ["sessions": "sf:cpu", "fleet": "sf:server.rack", "settings": "sf:gearshape", "team": "sf:building.2"],
@@ -362,7 +376,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "compiles clean", flashColor: "blue",
         modelAlias: ["Fable": "mainframe", "Opus": "kernel",
                      "Sonnet": "daemon", "Haiku": "script"],
-        planPrefix: "v", slotPrefix: "#", resetWord: "recompiling…", nextIcon: "⏭", activeIcon: "⌨️",
+        planPrefix: "v", slotPrefix: "#", resetWord: "recompiling…", nextIcon: "⏭", activeIcon: "⌨️", rateIcon: "💻", rateLabel: "LOC/min",
         sessionWords: ["busy": "Coding", "waiting": "Needs review", "idle": "Idle", "shell": "At the terminal"],
         tabLabels: ["sessions": "Tickets", "fleet": "Team", "settings": "Preferences", "team": "Squad"],
         tabIcons: ["sessions": "sf:ticket", "fleet": "sf:person.3.fill", "settings": "sf:gearshape", "team": "sf:person.2.fill"],
@@ -381,7 +395,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "all systems go", flashColor: "cyan",
         modelAlias: ["Fable": "Mothership", "Opus": "Cruiser",
                      "Sonnet": "Fighter", "Haiku": "Probe"],
-        planPrefix: "Class ", slotPrefix: "🚀", resetWord: "recharging…", nextIcon: "📡", activeIcon: "🧑\u{200D}🚀",
+        planPrefix: "Class ", slotPrefix: "🚀", resetWord: "recharging…", nextIcon: "📡", activeIcon: "🧑\u{200D}🚀", rateIcon: "🛸", rateLabel: "warp/min",
         sessionWords: ["busy": "Warping", "waiting": "Awaiting command", "idle": "Docked", "shell": "In engineering"],
         tabLabels: ["sessions": "Missions", "fleet": "Fleet", "settings": "Bridge", "team": "Alliance"],
         tabIcons: ["sessions": "sf:scope", "fleet": "sf:airplane", "settings": "sf:slider.horizontal.3", "team": "sf:person.2.fill"],
@@ -400,7 +414,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "saddled up", flashColor: "orange",
         modelAlias: ["Fable": "Outlaw", "Opus": "Sheriff",
                      "Sonnet": "Deputy", "Haiku": "Tumbleweed"],
-        planPrefix: "Bounty ", slotPrefix: "⭐", resetWord: "sun's rising…", nextIcon: "🌵", activeIcon: "🏇",
+        planPrefix: "Bounty ", slotPrefix: "⭐", resetWord: "sun's rising…", nextIcon: "🌵", activeIcon: "🏇", rateIcon: "🐎", rateLabel: "stampede",
         sessionWords: ["busy": "Riding", "waiting": "At the saloon", "idle": "Camped", "shell": "At the smithy"],
         tabLabels: ["sessions": "Posses", "fleet": "Ranch", "settings": "Saddlebag", "team": "Outfit"],
         tabIcons: ["sessions": "sf:hare", "fleet": "sf:house", "settings": "sf:bag", "team": "sf:person.2.fill"],
@@ -419,7 +433,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "jacked in", flashColor: "#ff2d95",
         modelAlias: ["Fable": "Netrunner", "Opus": "Militech",
                      "Sonnet": "Ripperdoc", "Haiku": "Gonk"],
-        planPrefix: "Cred ", slotPrefix: "◢", resetWord: "rebooting…", nextIcon: "🕶", activeIcon: "⚡",
+        planPrefix: "Cred ", slotPrefix: "◢", resetWord: "rebooting…", nextIcon: "🕶", activeIcon: "⚡", rateIcon: "📶", rateLabel: "baud",
         sessionWords: ["busy": "Jacked in", "waiting": "Awaiting handshake", "idle": "Idle", "shell": "In the terminal"],
         tabLabels: ["sessions": "Runs", "fleet": "Rig", "settings": "Deck", "team": "Crew"],
         tabIcons: ["sessions": "sf:bolt", "fleet": "sf:cpu", "settings": "sf:slider.horizontal.3", "team": "sf:person.2.fill"],
@@ -438,7 +452,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "immortal", flashColor: "purple",
         modelAlias: ["Fable": "Vampire Lord", "Opus": "Gargoyle",
                      "Sonnet": "Wraith", "Haiku": "Ghoul"],
-        planPrefix: "Crypt ", slotPrefix: "✟", resetWord: "tolling midnight…", nextIcon: "🌹", activeIcon: "🕯",
+        planPrefix: "Crypt ", slotPrefix: "✟", resetWord: "tolling midnight…", nextIcon: "🌹", activeIcon: "🕯", rateIcon: "🦇", rateLabel: "whispers",
         sessionWords: ["busy": "Chanting", "waiting": "Awaiting confession", "idle": "At rest", "shell": "In the crypt"],
         tabLabels: ["sessions": "Rites", "fleet": "Coven", "settings": "Sacristy", "team": "Order"],
         tabIcons: ["sessions": "sf:flame", "fleet": "sf:person.3.fill", "settings": "sf:gearshape", "team": "sf:person.2.fill"],
@@ -457,7 +471,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "in tune", flashColor: "purple",
         modelAlias: ["Fable": "Maestro", "Opus": "Opera",
                      "Sonnet": "Sonata", "Haiku": "Jingle"],
-        planPrefix: "Act ", slotPrefix: "♪", resetWord: "tuning up…", nextIcon: "🎻", activeIcon: "🎷",
+        planPrefix: "Act ", slotPrefix: "♪", resetWord: "tuning up…", nextIcon: "🎻", activeIcon: "🎷", rateIcon: "🎵", rateLabel: "notes/min",
         sessionWords: ["busy": "Performing", "waiting": "Awaiting the conductor", "idle": "Between sets", "shell": "Tuning"],
         tabLabels: ["sessions": "Sets", "fleet": "Ensemble", "settings": "Mixer", "team": "Troupe"],
         tabIcons: ["sessions": "sf:music.note.list", "fleet": "sf:person.3.fill", "settings": "sf:slider.horizontal.3", "team": "sf:person.2.fill"],
@@ -476,7 +490,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "thriving", flashColor: "green",
         modelAlias: ["Fable": "Blue Whale", "Opus": "Elephant",
                      "Sonnet": "Wolf", "Haiku": "Hummingbird"],
-        planPrefix: "Biome ", slotPrefix: "🐾", resetWord: "migrating…", nextIcon: "🦋", activeIcon: "🦁",
+        planPrefix: "Biome ", slotPrefix: "🐾", resetWord: "migrating…", nextIcon: "🦋", activeIcon: "🦁", rateIcon: "🐝", rateLabel: "buzz/min",
         sessionWords: ["busy": "Hunting", "waiting": "Waiting for the herd", "idle": "Grazing", "shell": "Burrowing"],
         tabLabels: ["sessions": "Herds", "fleet": "Habitat", "settings": "Field notes", "team": "Pack"],
         tabIcons: ["sessions": "sf:leaf", "fleet": "sf:globe.americas", "settings": "sf:book", "team": "sf:person.2.fill"],
@@ -495,7 +509,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "shining", flashColor: "indigo",
         modelAlias: ["Fable": "Galaxy", "Opus": "Supernova",
                      "Sonnet": "Nebula", "Haiku": "Comet"],
-        planPrefix: "Orbit ", slotPrefix: "✦", resetWord: "orbiting back…", nextIcon: "🔭", activeIcon: "🪐",
+        planPrefix: "Orbit ", slotPrefix: "✦", resetWord: "orbiting back…", nextIcon: "🔭", activeIcon: "🪐", rateIcon: "🌠", rateLabel: "flux/min",
         sessionWords: ["busy": "Orbiting", "waiting": "Awaiting ground control", "idle": "Drifting", "shell": "In the airlock"],
         tabLabels: ["sessions": "Missions", "fleet": "Constellation", "settings": "Mission control", "team": "Crew"],
         tabIcons: ["sessions": "sf:moon.stars", "fleet": "sf:sparkles", "settings": "sf:gearshape", "team": "sf:person.2.fill"],
@@ -514,7 +528,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
         readyLabel: "smooth sailing", flashColor: "teal",
         modelAlias: ["Fable": "Leviathan", "Opus": "Orca",
                      "Sonnet": "Dolphin", "Haiku": "Minnow"],
-        planPrefix: "Depth ", slotPrefix: "🪸", resetWord: "tide turning…", nextIcon: "🐬", activeIcon: "⛵",
+        planPrefix: "Depth ", slotPrefix: "🪸", resetWord: "tide turning…", nextIcon: "🐬", activeIcon: "⛵", rateIcon: "🌊", rateLabel: "knots",
         sessionWords: ["busy": "Diving", "waiting": "Surfacing", "idle": "Adrift", "shell": "In the hold"],
         tabLabels: ["sessions": "Voyages", "fleet": "Fleet", "settings": "Galley", "team": "Pod"],
         tabIcons: ["sessions": "sf:water.waves", "fleet": "sf:sailboat", "settings": "sf:gearshape", "team": "sf:person.2.fill"],
@@ -590,7 +604,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
                        "Sonnet": "TERMINAL", "Haiku": "CHIP"},
         "planPrefix": "MHz ", "slotPrefix": "▸",
         "resetWord": "rebooting the grid…", "nextIcon": "⏭",
-        "activeIcon": "🎧",
+        "activeIcon": "🎧", "rateIcon": "🎛", "rateLabel": "bpm",
         "sessionWords": {"busy": "Rendering", "waiting": "Awaiting input",
                          "idle": "On standby", "shell": "In the console"},
         "tabLabels": {"sessions": "Tracks", "fleet": "Grid", "settings": "Console"},

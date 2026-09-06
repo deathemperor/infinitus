@@ -20,7 +20,8 @@ everything in `index.json` and installs a copy into the user's local
      "creditLabel": "CR", "creditColor": "#39ff14",
      "cashIcon": "🕶", "aheadIcon": "⚡",
      "deadMarker": "✖", "revivePrefix": "↻ ",
-     "deadVerb": "offline", "flashColor": "#ff2d95"
+     "deadVerb": "offline", "flashColor": "#ff2d95",
+     "rateIcon": "🎛", "rateLabel": "bpm"
    }
    ```
 
@@ -55,6 +56,8 @@ everything in `index.json` and installs a copy into the user's local
 | `resetWord` | the live "resetting…" word ("respawning…") |
 | `nextIcon` | next-candidate marker ("" = green triangle) |
 | `activeIcon` | active-account marker, replaces the slot text ("" = plain slot) |
+| `rateIcon` | tokens/minute chip icon ("" = the bolt) |
+| `rateLabel` | tokens/minute unit after the count ("mana/min", "baud"; "" = tokens/min) |
 | `plain` | `true` renders text percentages instead of gauges |
 
 Colors are SwiftUI names (`red`, `cyan`, …) or `#rrggbb`.

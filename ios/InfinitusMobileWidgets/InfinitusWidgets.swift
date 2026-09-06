@@ -130,7 +130,7 @@ struct WorkingLiveActivity: Widget {
                                 GridRow { WindowRow(window: window) }
                             }
                             if let tokens = state.tokensPerMinute {
-                                GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction) }
+                                GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction, icon: state.rateIcon, unit: state.rateLabel) }
                             }
                         }
                         HStack {
@@ -186,7 +186,7 @@ private struct WorkingLockScreen: View {
                     GridRow { WindowRow(window: window) }
                 }
                 if let tokens = state.tokensPerMinute {
-                    GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction) }
+                    GridRow { TokenRow(perMinute: tokens, fraction: state.tokenFraction, icon: state.rateIcon, unit: state.rateLabel) }
                 }
             }
             HStack {
@@ -224,12 +224,18 @@ struct WindowRow: View {
 struct TokenRow: View {
     let perMinute: Int
     let fraction: Double
+    var icon: String? = nil
+    var unit: String? = nil
     var body: some View {
-        Image(systemName: "bolt.horizontal.fill").font(.caption).foregroundStyle(.yellow)
+        if let icon {
+            Text(icon).font(.caption)
+        } else {
+            Image(systemName: "bolt.horizontal.fill").font(.caption).foregroundStyle(.yellow)
+        }
         TokenRateBar(fraction: fraction)
             .frame(minWidth: 60, idealWidth: 120, maxWidth: 160, minHeight: 6, maxHeight: 6)
-        Text(perMinute >= 1000 ? String(format: "%.1fk tok/min", Double(perMinute) / 1000)
-                               : "\(perMinute) tok/min")
+        Text(perMinute >= 1000 ? String(format: "%.1fk \(unit ?? "tok/min")", Double(perMinute) / 1000)
+                               : "\(perMinute) \(unit ?? "tok/min")")
             .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
     }
 }
