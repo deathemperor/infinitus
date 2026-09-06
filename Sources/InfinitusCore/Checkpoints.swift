@@ -186,8 +186,10 @@ public struct GitRunner: Sendable {
 
     @discardableResult
     public func run(_ args: [String], cwd: String, env extra: [String: String] = [:]) throws -> String {
-        #if os(Windows)
-        throw Failure(status: 127, stderr: "checkpoints need git on PATH; not wired on Windows yet")
+        #if os(Windows) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+        // No child processes here (the phone reads checkpoints over the
+        // mirror); Windows needs a PATH lookup this does not do yet.
+        throw Failure(status: 127, stderr: "git checkpoints run on the Mac (and Linux) only")
         #else
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
