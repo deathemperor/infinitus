@@ -150,10 +150,26 @@ final class AppModel: ObservableObject {
         // reused pid after a reboot can never inherit a grant.
         let id = live.first { Int($0.pid) == pid }?.sessionId
         sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
+        // The profile's allow-list (#165) becomes the session's hook rules.
+        if let id { seedAllowList(birth, sessionId: id) }
         try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
+
+    private func profileAllowRules(_ birth: SessionBirth) -> [ToolApproval.Rule] {
+        guard let name = birth.profile else { return [] }
+        return sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }?.allowRules ?? []
+    }
+
+    /// A session born from a profile runs its allow-list without asking:
+    /// the same rules the phone's "Allow for this session" adds.
+    private func seedAllowList(_ birth: SessionBirth, sessionId: String) {
+        let rules = profileAllowRules(birth)
+        guard !rules.isEmpty, let name = birth.profile else { return }
+        for rule in rules { toolApprovals.add(rule, sessionId: sessionId) }
+        logEvent("hook", icon: "checkmark.shield", "profile \(name) allows \(rules.map(\.label).joined(separator: ", ")) in session \(sessionId.prefix(8))")
+    }
 
     /// Moves a running session's permission mode (#163 phase 2): the
     /// plugin's PreToolUse hook answers from it. The start mode is a
@@ -1152,9 +1168,9 @@ final class AppModel: ObservableObject {
         // no longer grants.
         let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
         for (pid, birth) in sessionBirths {
-            guard let mode = birth.hookMode, let record = live.first(where: { Int($0.pid) == pid }),
-                  birth.sessionId == record.sessionId else { continue }
-            toolApprovals.setMode(mode, sessionId: record.sessionId)
+            guard let record = live.first(where: { Int($0.pid) == pid }), birth.sessionId == record.sessionId else { continue }
+            if let mode = birth.hookMode { toolApprovals.setMode(mode, sessionId: record.sessionId) }
+            for rule in profileAllowRules(birth) { toolApprovals.add(rule, sessionId: record.sessionId) }
         }
         mirrorServer.pastSessions.set { limit, search in
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),

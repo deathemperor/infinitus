@@ -73,6 +73,8 @@ private struct ProfileRow: View {
                 .lineLimit(2...6)
             TextField("First prompt", text: field(\.prompt), axis: .vertical)
                 .lineLimit(1...4)
+            TextField("Allowed without asking (Edit, Write, Bash git)", text: allowField)
+                .font(.body.monospaced())
             HStack {
                 Spacer()
                 Button("Remove", role: .destructive) { profiles.remove(profile.name) }
@@ -84,6 +86,16 @@ private struct ProfileRow: View {
                 Text(profile.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
+    }
+
+    /// The allow-list as one comma-separated line; parsed on the way in.
+    private var allowField: Binding<String> {
+        Binding(get: { (profile.allowTools ?? []).joined(separator: ", ") },
+                set: { value in
+                    var next = profile
+                    next.allowTools = SessionProfiles.parseAllowList(value)
+                    profiles.set(next)
+                })
     }
 
     /// Every edit writes the whole row through the model, so the file

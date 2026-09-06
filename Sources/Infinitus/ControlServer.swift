@@ -207,7 +207,7 @@ final class ControlServer {
 
         case "profile-set":
             guard let name = r.args.first?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
-                throw Fail("usage: profile-set <name> [--cwd f] [--engine e] [--mode m] [--model m] [--system s] [--prompt p]")
+                throw Fail("usage: profile-set <name> [--cwd f] [--engine e] [--mode m] [--model m] [--system s] [--prompt p] [--allow \"Edit, Bash git\"]")
             }
             if let engine = r.options["engine"], !["claude", "codex"].contains(engine) { throw Fail("engine must be claude or codex") }
             if let mode = r.options["mode"], !SessionStart.permissionModes.contains(where: { $0.mode == mode }) {
@@ -215,7 +215,8 @@ final class ControlServer {
             }
             let profile = SessionProfile(name: name, cwd: r.options["cwd"], engine: r.options["engine"],
                                          permissionMode: r.options["mode"], model: r.options["model"],
-                                         systemPrompt: r.options["system"], prompt: r.options["prompt"])
+                                         systemPrompt: r.options["system"], prompt: r.options["prompt"],
+                                         allowTools: r.options["allow"].flatMap(SessionProfiles.parseAllowList))
             model.sessionProfiles.set(profile)
             if let err = model.sessionProfiles.lastError { throw Fail(err) }
             let saved = model.sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }

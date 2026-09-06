@@ -19,9 +19,14 @@ public struct SessionProfile: Codable, Sendable, Equatable, Identifiable {
     public var systemPrompt: String?
     /// The first prompt the session opens with.
     public var prompt: String?
+    /// Tools allowed without asking for a session born from this profile
+    /// (#165), in `ToolApproval.Rule.text` form ("Edit", "Bash git"); the
+    /// plugin's PreToolUse hook answers from them. Claude only.
+    public var allowTools: [String]?
 
     public init(name: String, cwd: String? = nil, engine: String? = nil, permissionMode: String? = nil,
-                model: String? = nil, systemPrompt: String? = nil, prompt: String? = nil) {
+                model: String? = nil, systemPrompt: String? = nil, prompt: String? = nil,
+                allowTools: [String]? = nil) {
         self.name = name
         self.cwd = cwd
         self.engine = engine
@@ -29,7 +34,11 @@ public struct SessionProfile: Codable, Sendable, Equatable, Identifiable {
         self.model = model
         self.systemPrompt = systemPrompt
         self.prompt = prompt
+        self.allowTools = allowTools
     }
+
+    /// The allow-list as rules, malformed entries dropped.
+    public var allowRules: [ToolApproval.Rule] { (allowTools ?? []).compactMap(ToolApproval.Rule.parse) }
 
     /// The fields set, as one caption: "codex · acceptEdits · opus".
     public var summary: String {
@@ -41,6 +50,7 @@ public struct SessionProfile: Codable, Sendable, Equatable, Identifiable {
         }
         if let model, !model.isEmpty { parts.append(model) }
         if let systemPrompt, !systemPrompt.isEmpty { parts.append("system prompt") }
+        if let allowTools, !allowTools.isEmpty { parts.append(allowTools.count == 1 ? "allows \(allowTools[0])" : "allows \(allowTools.count) tools") }
         return parts.isEmpty ? "nothing set — starts like a plain session" : parts.joined(separator: " · ")
     }
 }
@@ -75,7 +85,8 @@ public enum SessionProfiles {
         let clean = SessionProfile(name: profile.name.trimmingCharacters(in: .whitespaces),
                                    cwd: blankToNil(profile.cwd), engine: blankToNil(profile.engine),
                                    permissionMode: blankToNil(profile.permissionMode), model: blankToNil(profile.model),
-                                   systemPrompt: blankToNil(profile.systemPrompt), prompt: blankToNil(profile.prompt))
+                                   systemPrompt: blankToNil(profile.systemPrompt), prompt: blankToNil(profile.prompt),
+                                   allowTools: cleanList(profile.allowTools))
         if let i = out.firstIndex(where: { same($0.name, clean.name) }) {
             out[i] = clean
         } else {
@@ -86,6 +97,22 @@ public enum SessionProfiles {
 
     public static func removing(_ name: String, from profiles: [SessionProfile]) -> [SessionProfile] {
         profiles.filter { !same($0.name, name) }
+    }
+
+    /// Entries trimmed, blanks and duplicates dropped; an empty list is nil.
+    static func cleanList(_ list: [String]?) -> [String]? {
+        var seen = Set<String>(), out: [String] = []
+        for raw in list ?? [] {
+            let t = raw.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").joined(separator: " ")
+            if !t.isEmpty, seen.insert(t).inserted { out.append(t) }
+        }
+        return out.isEmpty ? nil : out
+    }
+
+    /// "Edit, Bash git" → ["Edit", "Bash git"]: the form the pane and
+    /// `profile-set --allow` take.
+    public static func parseAllowList(_ text: String) -> [String]? {
+        cleanList(text.split(separator: ",").map(String.init))
     }
 
     private static func blankToNil(_ s: String?) -> String? {

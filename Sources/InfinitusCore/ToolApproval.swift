@@ -38,6 +38,15 @@ public enum ToolApproval {
         }
 
         public var label: String { prefix.map { "\(tool) \($0) …" } ?? tool }
+
+        /// The typed form a profile's allow-list uses (#165): "Edit",
+        /// "Bash git" — the tool, then for Bash the command's first word.
+        public var text: String { prefix.map { "\(tool) \($0)" } ?? tool }
+        public static func parse(_ text: String) -> Rule? {
+            let words = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+            guard let tool = words.first else { return nil }
+            return Rule(tool: tool, prefix: tool == "Bash" && words.count > 1 ? words[1] : nil)
+        }
     }
 
     /// Wire form of the phone's "allow for this session": the tool on the
