@@ -119,6 +119,11 @@ public struct FleetLabel: Sendable, Equatable {
 
 public extension FleetModel {
     var capabilities: EngineCapabilities { .all }
+    /// The account that revives first while every account is limited
+    /// (#227) — nil whenever a next candidate exists.
+    var reviver: (number: Int, at: Date)? {
+        RecoveryMath.reviver(nextCandidate: nextCandidate, nextRecovery: nextRecovery)
+    }
     var reviveLead: TimeInterval { FleetAlarms.lead }
     var fleetLabel: FleetLabel? { nil }
     func startRelogin(_ account: Account) {}

@@ -74,4 +74,17 @@ public enum RecoveryMath {
            !AccountVitals.isDead(active.usage) { return nil }
         return nextRecovery(accounts: accounts, now: now) ?? engine
     }
+
+    /// The account to spotlight while every account is limited (#227): the
+    /// corrected pick, only when the engine names no candidate and the
+    /// reset is a real future instant inside the plausible horizon. nil
+    /// the moment a candidate exists — the highlight never fights the
+    /// next-up marker.
+    public static func reviver(nextCandidate: Int?, nextRecovery: NextRecovery?,
+                               now: Date = Date()) -> (number: Int, at: Date)? {
+        guard nextCandidate == nil, let rec = nextRecovery,
+              let at = WeeklyRoll.parse(rec.at), at > now,
+              at <= now.addingTimeInterval(plausibleHorizon) else { return nil }
+        return (rec.number, at)
+    }
 }

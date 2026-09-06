@@ -238,6 +238,17 @@ until revival_visible; do
     i=$((i + 1)); [ "$i" -lt 10 ] || fail "revival panel not shown during all-dead"
     sleep 1
 done
+# The reviver band (#227) is a CA breath on the pop-out: once the panel
+# is up and the re-sort has settled, the all-dead state must idle like
+# any other — a per-frame regression shows up here, not only in the
+# long idle gate at the end.
+sleep 4
+RA="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep 6
+RB="$("$CTL" perf | json "d['cpuSeconds']")"
+RPCT="$(python3 -c "print(round(($RB-$RA)/6*100,1))")"
+echo "all-dead CPU with the reviver band: ${RPCT}%"
+python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$INFINITUS_CSWAP" simulate off >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is not None" || fail "fleet didn't recover after simulate off"
 sleep 1

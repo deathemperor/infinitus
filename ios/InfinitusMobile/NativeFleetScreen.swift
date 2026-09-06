@@ -268,7 +268,8 @@ struct NativeFleetScreen: View {
             ForEach(Array(accounts.enumerated()),
                     id: \.element.number) { index, account in
                 row(account, fleet: fleet, index: index, wide: wide,
-                    full: account.active || fleet.nextCandidate == account.number || needsFullLines(account))
+                    full: account.active || fleet.nextCandidate == account.number
+                        || fleet.reviver?.number == account.number || needsFullLines(account))
             }
         } header: {
             VStack(alignment: .leading, spacing: 6) {
@@ -295,7 +296,8 @@ struct NativeFleetScreen: View {
         Section {
             ForEach(fleet.displayAccounts, id: \.number) { account in
                 otherRow(account, fleet: fleet, wide: wide,
-                        full: account.active || fleet.nextCandidate == account.number || needsFullLines(account))
+                        full: account.active || fleet.nextCandidate == account.number
+                        || fleet.reviver?.number == account.number || needsFullLines(account))
             }
         } header: {
             VStack(alignment: .leading, spacing: 6) {
@@ -399,6 +401,9 @@ struct NativeFleetScreen: View {
         // The Mac's dying alarm, over the row's own bounds.
         .overlay {
             if AccountRowVitals.isCritical(account), !reduceMotion { CriticalPulse() }
+            if fleet.reviver?.number == account.number, !reduceMotion {
+                CriticalPulse(cornerRadius: 0, color: ThemeColor.flashCG(fleet.rowTheme), period: 1.4)
+            }
         }
         // Same effect chain, same order as the Mac's stacked cards —
         // none of it under Reduce Motion.
@@ -467,6 +472,11 @@ struct NativeFleetScreen: View {
             }
             if account.active {
                 ThemeColor.flash(fleet.rowTheme).opacity(0.22)
+            }
+            // The reviver (#227): the row that comes back first, while
+            // every account is limited.
+            if fleet.reviver?.number == account.number {
+                ThemeColor.flash(fleet.rowTheme).opacity(0.18)
             }
         }
     }
@@ -538,6 +548,7 @@ private struct AccountDetailSheet: View {
     private var stateText: String {
         if account.active { return "active" }
         if account.disabled ?? false { return "disabled" }
+        if fleet.reviver?.number == account.number { return "revives first" }
         if AccountRowVitals.isDead(account) { return "at a limit" }
         if fleet.nextCandidate == account.number { return "next up" }
         return "standby"

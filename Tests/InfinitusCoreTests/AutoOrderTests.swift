@@ -89,6 +89,12 @@ final class DisplayOrderTests: XCTestCase {
         XCTAssertEqual(sorted.map(\.number), [4, 3, 2, 1, 5])
     }
 
+    func testReviverTakesTheNextSlotWhileAllDead() {
+        let accounts = [acct(1, five: 100), acct(2, five: 100), acct(3, five: 100)]
+        XCTAssertEqual(DisplayOrder.sort(accounts, active: 1, next: nil, reviver: 3)
+                        .map(\.number), [1, 3, 2])
+    }
+
     func testNoPinsFallsBackToHeadroom() {
         let accounts = [acct(1, five: 80), acct(2, five: 10)]
         XCTAssertEqual(DisplayOrder.sort(accounts, active: nil, next: nil)

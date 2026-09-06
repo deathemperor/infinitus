@@ -71,7 +71,7 @@ struct NextMarker<M: FleetModel>: View {
             // one to watch while everything is limited (todo 2026-09-01).
             Image(systemName: "arrowtriangle.right")
                 .font(PopupFont.caption2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ThemeColor.flash(theme))
                 .instantTip("All accounts are at a limit — this one "
                             + "recovers first\(Self.eta(recovery.at))")
         } else {
@@ -217,6 +217,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     @ViewBuilder func resetLabelView(resetsAt: String?, staticText: String?) -> some View {
         if let date = WeeklyRoll.parse(resetsAt),
            date.timeIntervalSinceNow < model.reviveLead {
+            let isReviver = model.reviver?.number == account.number
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let left = date.timeIntervalSince(ctx.date)
                 if left <= 0 {
@@ -225,6 +226,13 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                         .font(PopupFont.caption).bold().foregroundStyle(.green)
                         .opacity(0.35 + 0.65 * abs(sin(
                             ctx.date.timeIntervalSinceReferenceDate * 2.5)))
+                } else if isReviver {
+                    // The reviver's row (#227) carries the full countdown in
+                    // the theme's flash colour — the same digits as the
+                    // floating panel and the Live Activity.
+                    Text(RecoveryCountdown.label(until: date, now: ctx.date))
+                        .font(PopupFont.caption).bold().monospacedDigit()
+                        .foregroundStyle(ThemeColor.flash(theme))
                 } else {
                     Text(String(format: "%d:%02d", Int(left) / 60, Int(left) % 60))
                         .font(PopupFont.caption).bold().monospacedDigit()

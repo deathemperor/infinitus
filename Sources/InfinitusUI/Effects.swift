@@ -441,9 +441,19 @@ extension View {
 /// an ambient alarm, urgent but not seizure bait.
 public struct CriticalPulse: View {
     var cornerRadius: Double = 4
+    /// Red by default (the dying alarm); the reviver band (#227) breathes
+    /// in the theme's flash colour, slower.
+    var color: CGColor = CGColor(red: 1, green: 0, blue: 0, alpha: 1)
+    var period: Double = 0.8
 
     public init(cornerRadius: Double = 4) {
         self.cornerRadius = cornerRadius
+    }
+
+    public init(cornerRadius: Double, color: CGColor, period: Double) {
+        self.cornerRadius = cornerRadius
+        self.color = color
+        self.period = period
     }
 
     public var body: some View {
@@ -454,10 +464,10 @@ public struct CriticalPulse: View {
             let band = CALayer()
             band.frame = bounds
             band.cornerRadius = cornerRadius
-            band.backgroundColor = CGColor(red: 1, green: 0, blue: 0, alpha: 0.18)
+            band.backgroundColor = color.copy(alpha: 0.18)
             band.borderWidth = 1
-            band.borderColor = CGColor(red: 1, green: 0, blue: 0, alpha: 0.50)
-            band.add(CABasicAnimation.loop("opacity", from: 1, to: 0.29, duration: 0.8,
+            band.borderColor = color.copy(alpha: 0.50)
+            band.add(CABasicAnimation.loop("opacity", from: 1, to: 0.29, duration: period,
                            autoreverses: true, easeInOut: true), forKey: "breath")
             host.addSublayer(band)
         }

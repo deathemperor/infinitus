@@ -129,7 +129,8 @@ extension MirrorFleetModel: FleetModel {
     /// false` — same rule as before, now read off the shared host.
     var displayAccounts: [Account] {
         host.sortByHeadroom
-            ? DisplayOrder.sort(accounts, active: activeNumber, next: nextCandidate)
+            ? DisplayOrder.sort(accounts, active: activeNumber, next: nextCandidate,
+                                reviver: reviver?.number)
             : accounts
     }
     var rowTheme: RowTheme { host.rowTheme }

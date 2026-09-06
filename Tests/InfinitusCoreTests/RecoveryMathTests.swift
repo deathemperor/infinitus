@@ -8,6 +8,20 @@ private func account(_ json: String) throws -> Account {
 private let base = #""email": "dev@example.com", "organizationName": "o", "organizationUuid": "u", "isOrganization": true"#
 
 final class RecoveryMathTests: XCTestCase {
+    // #227: the spotlighted reviver is the corrected pick, only with no
+    // candidate and a plausible future reset.
+    func testReviverOnlyWhileAllDeadAndPlausible() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let soon = ISO8601DateFormatter().string(from: now.addingTimeInterval(3600))
+        let far = ISO8601DateFormatter().string(from: now.addingTimeInterval(400 * 24 * 3600))
+        let rec = NextRecovery(number: 2, at: soon)
+        XCTAssertEqual(RecoveryMath.reviver(nextCandidate: nil, nextRecovery: rec, now: now)?.number, 2)
+        XCTAssertNil(RecoveryMath.reviver(nextCandidate: 1, nextRecovery: rec, now: now))
+        XCTAssertNil(RecoveryMath.reviver(nextCandidate: nil, nextRecovery: nil, now: now))
+        XCTAssertNil(RecoveryMath.reviver(nextCandidate: nil, nextRecovery: NextRecovery(number: 2, at: far), now: now))
+        XCTAssertNil(RecoveryMath.reviver(nextCandidate: nil, nextRecovery: NextRecovery(number: 2, at: "garbage"), now: now))
+    }
+
     // (a) the reported bug: the active account is both dead and the
     // soonest reviver, but the engine's advisory (mirrored by
     // `_next_recovery`'s active-skip) would have named a later account.

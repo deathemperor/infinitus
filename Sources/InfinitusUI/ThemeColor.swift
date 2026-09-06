@@ -8,6 +8,16 @@ public enum ThemeColor {
         theme.flashColor.isEmpty ? .accentColor : resolve(theme.flashColor)
     }
 
+    /// `flash(theme)` for a Core Animation layer (LayerEffect hosts take
+    /// CGColor, not Color).
+    public static func flashCG(_ theme: RowTheme) -> CGColor {
+        #if canImport(AppKit)
+        return NSColor(flash(theme)).cgColor
+        #else
+        return UIColor(flash(theme)).cgColor
+        #endif
+    }
+
     public static func resolve(_ name: String) -> Color {
         switch name {
         case "red": return .red

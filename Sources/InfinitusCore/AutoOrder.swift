@@ -103,11 +103,14 @@ public enum AutoOrder {
 /// a display sort writes nothing, so flip-flop costs nothing. Engine
 /// slot numbers never move.
 public enum DisplayOrder {
+    /// `reviver` takes the next-candidate slot while all accounts are
+    /// limited (#227) — the row to watch floats up the way the next-up
+    /// row does when the fleet is alive.
     public static func sort(_ accounts: [Account],
-                            active: Int?, next: Int?) -> [Account] {
+                            active: Int?, next: Int?, reviver: Int? = nil) -> [Account] {
         func pin(_ a: Account) -> Int {
             if a.number == active { return 0 }
-            if a.number == next { return 1 }
+            if a.number == next || a.number == reviver { return 1 }
             return 2
         }
         return accounts.sorted { l, r in

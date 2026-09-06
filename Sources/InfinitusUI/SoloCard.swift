@@ -67,6 +67,11 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                 .overlay(RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(Color.accentColor.opacity(0.7)))
         }
+        .overlay {
+            if model.reviver?.number == account.number {
+                CriticalPulse(cornerRadius: 8, color: ThemeColor.flashCG(model.rowTheme), period: 1.4)
+            }
+        }
         .switchFlash(model.switchFlashTick, color: ThemeColor.flash(model.rowTheme))
         .deathFlash(model.deathTicks[account.number] ?? 0)
         .reviveFlash(model.reviveTicks[account.number] ?? 0)

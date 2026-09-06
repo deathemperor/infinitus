@@ -245,6 +245,11 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
         .overlayPreferenceValue(DeadRowBounds.self) { dict in
             criticalOverlay(dict, numbers: criticalNumbers)
         }
+        // The reviver (#227): while every account is limited, the row
+        // that comes back first breathes in the theme's flash colour.
+        .overlayPreferenceValue(DeadRowBounds.self) { dict in
+            reviverOverlay(dict, number: model.reviver?.number)
+        }
         // Death beats: a red band over each row whose account just went
         // dead (the slot cell reported its bounds; full grid width).
         .overlayPreferenceValue(DeadRowBounds.self) { dict in
@@ -353,6 +358,12 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
             if account.active {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.accentColor.opacity(0.26 * model.fillScale))
+                    .padding(.horizontal, -4)
+            }
+        }
+        .overlay {
+            if model.reviver?.number == account.number {
+                CriticalPulse(cornerRadius: 4, color: ThemeColor.flashCG(model.rowTheme), period: 1.4)
                     .padding(.horizontal, -4)
             }
         }
@@ -473,6 +484,11 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                                 .strokeBorder(Color.primary.opacity(0.12)))
                     }
                 }
+                .overlay {
+                    if model.reviver?.number == account.number {
+                        CriticalPulse(cornerRadius: 8, color: ThemeColor.flashCG(model.rowTheme), period: 1.4)
+                    }
+                }
                 .switchFlash(account.active ? model.switchFlashTick : 0,
                              color: ThemeColor.flash(model.rowTheme))
                 .deathFlash(model.deathTicks[account.number] ?? 0)
@@ -538,6 +554,20 @@ extension AccountGrid {
     /// `numbers` is computed by the caller, outside the GeometryReader:
     /// inside it, the headroom sort ran again on every geometry update
     /// (each pulse frame).
+    @ViewBuilder
+    func reviverOverlay(_ dict: [Int: [Anchor<CGRect>]], number: Int?) -> some View {
+        if let number {
+            GeometryReader { geo in
+                if let a = dict[number]?.first {
+                    let r = geo[a]
+                    CriticalPulse(cornerRadius: 4, color: ThemeColor.flashCG(model.rowTheme), period: 1.4)
+                        .frame(width: geo.size.width, height: r.height + 8)
+                        .offset(y: r.minY - 4)
+                }
+            }
+        }
+    }
+
     func criticalOverlay(_ dict: [Int: [Anchor<CGRect>]], numbers: [Int]) -> some View {
         GeometryReader { geo in
             ForEach(numbers, id: \.self) { n in
