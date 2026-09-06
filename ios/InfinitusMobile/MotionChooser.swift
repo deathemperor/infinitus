@@ -52,13 +52,15 @@ struct MotionChooserScreen<Preview: View>: View {
                             preview(option, selection == option.id ? playTick : 0)
                         }
                         .contentShape(Rectangle())
+                        // One announcement per tile, on the label like
+                        // ThemeChooserScreen's rows.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(option.label). \(option.caption)")
+                        .accessibilityAddTraits(selection == option.id
+                                                ? [.isButton, .isSelected] : [.isButton])
                     }
                     .buttonStyle(.plain)
                     .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(option.label). \(option.caption)")
-                    .accessibilityAddTraits(selection == option.id
-                                            ? [.isButton, .isSelected] : [.isButton])
                 }
             } footer: {
                 Text(footer)
@@ -126,6 +128,9 @@ struct EntranceTile: View {
     let style: String
     var playTick: Int
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Grows with the reader's text so the wordmark tile beside it and
+    /// this one stay one height and nothing clips at accessibility sizes.
+    @ScaledMetric(relativeTo: .headline) private var tileHeight = 74.0
     @State private var settled = true
 
     private var dy: CGFloat {
@@ -174,7 +179,7 @@ struct EntranceTile: View {
             }
             .padding(12)
         }
-        .frame(height: 74)
+        .frame(height: tileHeight)
         .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -208,6 +213,8 @@ struct FlourishTile: View {
     /// The glyph sits beside `.headline` text, so it tracks the reader's
     /// size with it rather than shrinking away at accessibility sizes.
     @ScaledMetric(relativeTo: .headline) private var glyphSize = 20.0
+    /// The wordmark neared the ceiling at accessibility sizes and clipped.
+    @ScaledMetric(relativeTo: .headline) private var tileHeight = 74.0
 
     private var startScale: CGFloat {
         switch style {
@@ -262,7 +269,7 @@ struct FlourishTile: View {
                 .brightness(glow)
                 .animation(spring, value: settled)
         }
-        .frame(height: 74)
+        .frame(height: tileHeight)
         .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)

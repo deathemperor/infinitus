@@ -40,6 +40,7 @@ struct SettingsForm: View {
     /// The pairing token is a bearer credential for the whole fleet, so
     /// it is covered until its owner asks to see it.
     @State private var tokenShown = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Form {
@@ -68,6 +69,12 @@ struct SettingsForm: View {
         }
         .onChange(of: fleetAlarms) { _, on in
             if !on { FleetAlarmCenter.shared.clearPending() }
+        }
+        // A revealed token is covered again when the app leaves: the
+        // Form outlives a trip to another app and the app switcher's
+        // snapshot must not carry the credential.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { tokenShown = false }
         }
         .sheet(isPresented: $scanning) {
             PairScannerSheet { payload in
@@ -148,6 +155,9 @@ struct SettingsForm: View {
                         tokenShown.toggle()
                     } label: {
                         Image(systemName: tokenShown ? "eye.slash" : "eye")
+                            // The glyph is 20 pt; the target is the 44 pt floor.
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -241,7 +251,7 @@ struct SettingsForm: View {
         } header: {
             Text("Appearance")
         } footer: {
-            Text("Follow Mac renders exactly what the Mac popup shows — its theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders the popup itself instead of the iPhone layout: portrait stacks the cards, landscape shows the wide rows.")
+            Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout.")
         }
     }
 
@@ -264,7 +274,7 @@ struct SettingsForm: View {
         } header: {
             Text("Theme")
         } footer: {
-            Text("A theme renames the tabs, the gauges, the status words and the fleet's own names, and gives them its colours. Compact rows put one account on a line.")
+            Text("A theme renames the tabs, the gauges, the status words and the fleet's own names, and gives them its colors. Compact rows put one account on a line.")
         }
     }
 
@@ -297,6 +307,7 @@ struct SettingsForm: View {
                     Slider(value: $model.localIntroSpeed, in: 0.4...2)
                         .accessibilityLabel("Intro speed")
                     Text(String(format: "%.1f×", model.localIntroSpeed))
+                        .font(.callout)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .fixedSize()
@@ -359,7 +370,7 @@ struct SettingsForm: View {
     /// or the mirror's own status line while it hasn't answered yet.
     private func otherCaption(_ other: MirrorModel.OtherMac) -> String {
         guard other.snapshot != nil else {
-            return other.status.isEmpty ? "Looking for this Mac…" : other.status
+            return other.status.isEmpty ? model.rowTheme.loadingWord("searching") : other.status
         }
         if other.parked, let seen = other.snapshot?.capturedAt {
             return "Parked — last seen \(seen.formatted(.relative(presentation: .named)))"

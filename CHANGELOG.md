@@ -16,7 +16,7 @@ publishes the matching section as the GitHub release body.
 - Forgetting a paired Mac asks first and says what it costs.
 - Settings leads with the Mac connection: with nothing paired, scanning the Mac's QR code is the first thing on screen.
 - Every group in Settings explains itself in a footer, and the Mac's addresses are labeled and editable.
-- Updating the Mac from the phone shows its progress and offers Try Again with a plain reason when it fails.
+- Updating the Mac from the phone shows its progress and says plainly why when it fails.
 - The chat header follows Dynamic Type in all three styles; the Game HUD stops growing at the second accessibility size (#209).
 - Other Macs: their sessions and past sessions never reach the primary by mistake, and "+" and Past sessions open once any paired Mac has answered (#215).
 - The all-limited Live Activity counts down to the real revival instead of 31 years out, and every surface picks the reviver by parsed reset date, ignoring implausible ones (#226).
