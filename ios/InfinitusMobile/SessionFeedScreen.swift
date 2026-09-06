@@ -30,6 +30,8 @@ struct SessionFeedScreen: View {
     @State private var previewing: PendingAttachment?
     @State private var attachmentError: String?
     @State private var awsLoginItem: AwsLogin.Item?
+    /// Review this turn's changes (#166): the newest checkpoint vs now.
+    @State private var reviewTarget: ReviewTarget?
     @State private var lastRowVisible = true
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var screenshots = ScreenshotWatch()
@@ -202,6 +204,9 @@ struct SessionFeedScreen: View {
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: lastRowVisible)
         }
         .sheet(item: $awsLoginItem) { AwsLoginScreen(item: $0) }
+        .sheet(item: $reviewTarget) { target in
+            NavigationStack { CheckpointDiffScreen(pid: Int32(session.pid), checkpoint: target.checkpoint) }
+        }
         .background(SwipeBackAnywhere().frame(width: 0, height: 0))
         // Pinned above the transcript, not in it: the feed opens scrolled
         // to the newest message, so a card at the top was out of reach
@@ -573,6 +578,13 @@ struct SessionFeedScreen: View {
                 }
             }
             HStack(spacing: 8) {
+                // This turn's diff with hunk comments (#166): the newest
+                // checkpoint is the state at the last prompt.
+                Button { openReview() } label: {
+                    Image(systemName: "text.badge.checkmark").font(.title2)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Review changes")
                 // One button for everything attachable (user 2026-09-05:
                 // "Combine the 3 items into one"): the capture of this
                 // screen first, then the library, camera, files, paste.
@@ -1008,6 +1020,22 @@ struct SessionFeedScreen: View {
     }
 
     private func sendKey(_ key: String) { sendInput(.init(kind: .key, text: key)) }
+
+    private func openReview() {
+        actionResult = nil
+        Task {
+            do {
+                let reply = try await NetworkFleetMirror.shared.checkpoints(pid: Int32(session.pid))
+                guard let last = reply.checkpoints.last else {
+                    actionResult = "No checkpoints yet — the plugin checkpoints a git folder at every prompt"
+                    return
+                }
+                reviewTarget = ReviewTarget(checkpoint: last)
+            } catch {
+                actionResult = "couldn't reach the Mac"
+            }
+        }
+    }
 
     private func sendInput(_ request: SessionInput.Request) {
         actionSending = true

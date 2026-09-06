@@ -88,12 +88,12 @@ public enum SessionInput {
 
 #if !os(iOS)
 extension SessionInput {
-    static let maxMessageLength = 4000
+    public static let maxMessageLength = 4000
 
     /// Non-empty, within the length cap, and free of control characters
     /// other than newline (a stray Tab/CR/ESC byte from a malformed
     /// client should never reach a real terminal).
-    static func isValidMessage(_ text: String) -> Bool {
+    public static func isValidMessage(_ text: String) -> Bool {
         guard !text.isEmpty, text.count <= maxMessageLength else { return false }
         for scalar in text.unicodeScalars where scalar != "\n" {
             if scalar.properties.generalCategory == .control { return false }
