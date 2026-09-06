@@ -4,7 +4,8 @@ import InfinitusCore
 /// Siri / Spotlight / Shortcuts: "Start a session in Infinitus" (#91,
 /// the "run a speed test" card the user pointed at). The repository is
 /// matched by folder name against what the Mac has run lately, else
-/// taken as a path.
+/// taken as a path. The Mac is matched by name against the paired ones
+/// (#144); left blank it is the one the start sheet would pick.
 struct StartSessionIntent: AppIntent {
     static let title: LocalizedStringResource = "Start a session"
     static let description = IntentDescription("Opens a new Claude Code session in a repository on your Mac.")
@@ -21,14 +22,35 @@ struct StartSessionIntent: AppIntent {
     @Parameter(title: "First prompt")
     var prompt: String?
 
+    @Parameter(title: "Mac")
+    var mac: String?
+
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let (recent, profiles) = await MainActor.run {
-            (MirrorModel.shared.recentCwds, MirrorModel.shared.snapshot?.profiles ?? [])
+        let (macId, machine, mirror, recent, profiles) = try await MainActor.run {
+            let model = MirrorModel.shared
+            let macId: String?
+            if let mac, !mac.trimmingCharacters(in: .whitespaces).isEmpty {
+                let wanted = mac.trimmingCharacters(in: .whitespaces)
+                if SessionProfiles.same(model.machineName(macId: nil), wanted) {
+                    macId = nil
+                } else if let hit = model.others.first(where: { SessionProfiles.same($0.pairing.name, wanted) }) {
+                    macId = hit.id
+                } else {
+                    throw StartSessionError(message: "No Mac named \(wanted) is paired.")
+                }
+            } else {
+                macId = model.defaultTargetMacId
+            }
+            if let macId, model.other(macId)?.parked == true {
+                throw StartSessionError(message: "\(model.machineName(macId: macId)) isn't reachable right now.")
+            }
+            return (macId, model.machineName(macId: macId), model.mirror(for: macId),
+                    model.recentCwds(macId: macId), model.profiles(macId: macId))
         }
         var chosen: SessionProfile?
         if let profile, !profile.trimmingCharacters(in: .whitespaces).isEmpty {
             guard let hit = profiles.first(where: { SessionProfiles.same($0.name, profile.trimmingCharacters(in: .whitespaces)) }) else {
-                throw StartSessionError(message: "No profile named \(profile) on the Mac.")
+                throw StartSessionError(message: "No profile named \(profile) on \(machine).")
             }
             chosen = hit
         }
@@ -43,7 +65,7 @@ struct StartSessionIntent: AppIntent {
         }
         let engine = chosen?.engine ?? "claude"
         let claude = engine == "claude"
-        let reply = try await NetworkFleetMirror.shared.startSession(
+        let reply = try await mirror.startSession(
             SessionStart.Request(cwd: cwd, engine: engine,
                                  prompt: prompt ?? chosen?.prompt,
                                  permissionMode: claude ? chosen?.permissionMode : nil,
@@ -53,15 +75,16 @@ struct StartSessionIntent: AppIntent {
         guard reply.outcome == "started" else { throw StartSessionError(message: reply.detail ?? reply.outcome) }
         if let pid = reply.pid {
             await MainActor.run {
-                // Shortcuts start on the primary; never inherit a stale other-Mac id.
-                MirrorModel.shared.requestedMacId = nil
+                // The Mac that started it, so the Sessions tab opens its feed.
+                MirrorModel.shared.requestedMacId = macId
                 MirrorModel.shared.requestedPid = pid
                 MirrorModel.shared.requestedTab = "sessions"
             }
         }
         let name = (cwd as NSString).lastPathComponent
         let born = chosen.map { " as \($0.name)" } ?? ""
-        return .result(dialog: "Started in \(name)\(born)\(reply.host.map { " via \($0)" } ?? "").")
+        let on = macId == nil ? "" : " on \(machine)"
+        return .result(dialog: "Started in \(name)\(born)\(on)\(reply.host.map { " via \($0)" } ?? "").")
     }
 }
 

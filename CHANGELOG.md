@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Phone
+- Siri and Shortcuts take a Mac name, so Start a session runs on any paired Mac, not only the primary (#144).
 - Team members say when they joined, on their row and in their detail (#219).
 - Face ID or the passcode can lock the whole app — on launch and on return from the background — not only the Team tab (#212).
 - Settings' theme chooser shows every theme as a live row — its gauges, spend line, status word and tab bar — and the Theme row carries its colors.
