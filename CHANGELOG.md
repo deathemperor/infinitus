@@ -5,7 +5,7 @@ links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
 publishes the matching section as the GitHub release body.
 
-## 0.4.4 (unreleased)
+## 0.4.4-alpha.1
 
 ### Stats
 - Stats show processed tokens, cached vs uncached input, cache writes and the estimated cache savings, per model and engine.
@@ -28,11 +28,10 @@ publishes the matching section as the GitHub release body.
 - Swipe or long-press an account to star it or pause/resume its rotation from the phone; the Mac popup's rows carry the same two buttons beside the name.
 
 ### Mac
-- Machine: the pip retry-loop warning names the venv the install goes into (a detached plugin bootstrap has no hook tree to blame) and answers to the hooks mute.
+- Infinitus is alpha software from this release on: the version reads 0.4.4-alpha.1 in About, `infinitusctl status` and the phone's Settings.
 - An AWS sign-in that lapses inside a sub-agent shows up on the parent session — key badge, Sign in row, push — and the continue nudge after signing in goes to the parent.
-- Settings › Machine mutes the hook and temp-directory notifications separately; the pane keeps listing them.
 - A dice button on each Settings › Accounts row re-rolls that one account's name to a fresh themed one nobody in the fleet wears; `infinitusctl randomize-names <fleet> <n>` does the same.
-- Settings › Machine watches what many sessions do to this Mac — load, swap, stuck hooks, runaway processes, residue — with confirmed kill, reclaim and hook-disable actions and notifications for new hook registrations and idle sessions.
+- Tab and Shift-Tab move between the account name fields in Settings › Accounts, and a click lands the caret at once.
 - Sessions whose sub-agents hit a limit get a nudge that the swapped-in account has headroom, so they stop waiting for the reset.
 - When a revival countdown ends the Mac asks the engine again right away (three tries a minute apart) instead of waiting for the next poll.
 - "<account> is back" notifications, with "reset early" when Anthropic reset before the advertised time and "all accounts are back" when the whole fleet returns (Settings › Notifications).

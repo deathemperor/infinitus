@@ -26,6 +26,9 @@ a glance and swaps before you stall.
 
 ## Install
 
+Infinitus is alpha software (0.4.4-alpha.1): it runs its author's fleet
+all day, but expect rough edges — please file issues.
+
 ### Homebrew
 
 ```sh
@@ -120,7 +123,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Sessions, named and narrated** — unnamed sessions get a Haiku title that follows the work; the phone opens on what's waiting, with Continue.
 - **A Claude Code plugin** — `infinitusctl plugin install`: hooks that reach the phone the moment a session needs you, an MCP server (`fleet_status`, `list_sessions`, `session_message`), `/infinitus:status` and `/infinitus:handoff`.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
-- **Machine guardian** — Settings › Machine: load, swap, stuck hooks by tool, runaway processes by session, temp/socket residue; kill, reclaim and park a tool's hooks after a confirm; `infinitusctl machine`.
 - **Capture the desktop into a session** — a region or window, a session, a note, delivered like a phone message.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
 - **All accounts limited, handled** — a floating countdown to the first account back and the sessions waiting to resume.
@@ -129,13 +131,19 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Live Activities that keep moving** — with an APNs key the lock-screen countdown and working card update with the app closed; the icon follows the theme.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
-- **Randomize names** — every account gets a fresh name from the theme's pool.
+- **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
+- **Star & pause anywhere** — the popup's rows and the phone's swipe or long-press star an account or pause/resume its rotation.
 - **Team (preview)** — a team on any git remote; members publish stats, sessions and chosen transcripts end-to-end encrypted to the people they pick, and leaders see who's on, who's blocked and what it costs per member, repo and model.
 - **Joining a team** — invite links and QR, team codes, `infinitus://join`, and same-network discovery; approve from the Mac; Linux members use `infinitusctl team` alone.
 - **Your team identity** — a local key behind Touch ID, a recovery key, a passphrase-sealed export.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
 - **Start on any Mac** — the "+" sheet and Past sessions pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.
+- **Profiles** — Settings › Profiles saves named ways to start a session (folder, engine, permissions, model, system prompt, first prompt, tools allowed without asking); the phone, Siri and the Mac's Start a session take one.
+- **Checkpoints** — every prompt checkpoints the repository as a hidden git ref (with the plugin); list them, diff one against now or restore it from `infinitusctl checkpoints`, the Mac or the phone.
+- **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
+- **Fork a session** — Past sessions on the Mac and the phone, or `infinitusctl resume-session --fork`, continue a transcript under a new session id.
+- **Start a session from the Mac** — the sessions popover takes a profile chip, folder, engine, permissions and a first prompt.
 - **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS logins, stats, perf; plus an agent-setup guide.
 
 ## Privacy

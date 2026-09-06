@@ -28,8 +28,18 @@ final class PackageVersionTests: XCTestCase {
 
     func testUnparseableIsRejected() {
         XCTAssertNil(PackageVersion(""))
+        XCTAssertNil(PackageVersion("0.4.4-"))
         XCTAssertNil(PackageVersion("not-a-version"))
         // A version that can't be ordered must never claim "newer".
         XCTAssertNil(PackageVersion("1.2.post1.dev3+local"))
+    }
+
+    func testSemverPreReleaseOrders() {
+        XCTAssertTrue(v("0.4.3") < v("0.4.4-alpha.1"))
+        XCTAssertTrue(v("0.4.4-alpha.1") < v("0.4.4-alpha.2"))
+        XCTAssertTrue(v("0.4.4-alpha.2") < v("0.4.4-beta.1"))
+        XCTAssertTrue(v("0.4.4-beta.1") < v("0.4.4"))
+        XCTAssertEqual(v("0.4.4-alpha.1").pre?.letter, "alpha")
+        XCTAssertEqual(v("0.4.4-alpha.1").pre?.number, 1)
     }
 }

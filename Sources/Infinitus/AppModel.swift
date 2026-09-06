@@ -2043,7 +2043,7 @@ final class AppModel: ObservableObject {
         // notifications — the same guard every other side effect here
         // uses) or a mock/e2e instance sharing this Mac's real process
         // table with the perf gate's launch-time samples.
-        if !isPlayground, !mockMode { Task { await machineModel.tick() } }
+        if !isPlayground, !mockMode, MachineModel.paneShown { Task { await machineModel.tick() } }
         let engines = registry.engines
         guard !engines.isEmpty else { return }
         var results: [(id: String, fleets: [EngineFleet]?, error: Error?)] = []

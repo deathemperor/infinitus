@@ -9,7 +9,7 @@ swift build -c release
 BIN="$(swift build -c release --show-bin-path)/Infinitus"
 APP=Infinitus.app
 
-VERSION="$(head -1 VERSION 2>/dev/null | tr -cd '0-9.')"
+VERSION="$(head -1 VERSION 2>/dev/null | tr -cd '0-9A-Za-z.-')"
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
 
 rm -rf "$APP"

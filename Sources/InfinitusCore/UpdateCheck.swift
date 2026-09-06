@@ -13,7 +13,18 @@ public struct PackageVersion: Comparable, Equatable, Sendable {
     public init?(_ text: String) {
         var release: [Int] = []
         var pre: (String, Int)? = nil
-        for (index, part) in text.split(separator: ".").enumerated() {
+        var body = Substring(text)
+        if let dash = text.firstIndex(of: "-") {
+            // "0.4.4-alpha.1" (semver): the dash splits the release from the
+            // pre-release marker; letters name it, the trailing digits number it.
+            let tail = text[text.index(after: dash)...]
+            let letter = tail.prefix(while: { $0.isLetter })
+            let digits = tail.drop(while: { !$0.isNumber })
+            guard !letter.isEmpty, let num = Int(digits.isEmpty ? "0" : String(digits)) else { return nil }
+            pre = (String(letter), num)
+            body = text[..<dash]
+        }
+        for (index, part) in body.split(separator: ".").enumerated() {
             if let n = Int(part) {
                 release.append(n)
             } else if index > 0,
