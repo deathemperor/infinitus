@@ -32,6 +32,7 @@ publishes the matching section as the GitHub release body.
 - The Game HUD chat header's bars play the Fleet card's effects: pace fire, the cool halo, HP drops, Lucky 7s, the switch, death and revival flashes.
 - The phone raises its own alarms, no push service needed: an exhausted account's limit lifting in 10 minutes, and the account the fleet just swapped to; off in Settings › Notifications.
 - Settings shows the Mac's and the phone's versions, can trigger the Mac's update, and says when a newer phone build is out.
+- `infinitusctl past-sessions` lists every Claude Code session this Mac has run, newest first, and `resume-session <id>` reopens one in its folder.
 
 ### Team (preview)
 - `infinitusctl team create --as <name>` names you as the team's founder instead of "Leader".

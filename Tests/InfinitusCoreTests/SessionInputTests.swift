@@ -244,4 +244,17 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "   "),
                        "cd '/r' && exec claude")
     }
+
+    func testSessionStartResumeNamesTheSessionForClaudeOnly() throws {
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1"),
+                       "cd '/r' && exec claude --resume 'abc-1'")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "go on", resume: "abc-1"),
+                       "cd '/r' && exec claude --resume 'abc-1' 'go on'")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, resume: "abc-1"),
+                       "cd '/r' && exec codex")
+        // A phone from before resume existed sends no such field.
+        let old = try JSONDecoder().decode(SessionStart.Request.self, from: Data(#"{"cwd":"/r"}"#.utf8))
+        XCTAssertEqual(old, SessionStart.Request(cwd: "/r"))
+        XCTAssertNil(old.resume)
+    }
 }

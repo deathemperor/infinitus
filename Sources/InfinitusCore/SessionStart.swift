@@ -13,10 +13,15 @@ public enum SessionStart {
         /// "claude" (default) or "codex".
         public let engine: String?
         public let prompt: String?
-        public init(cwd: String, engine: String? = nil, prompt: String? = nil) {
+        /// A past session's id to pick up where it left off (#164):
+        /// `claude --resume <id>`, from the folder it ran in. Optional
+        /// so phones from before it still start sessions.
+        public let resume: String?
+        public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
+            self.resume = resume
         }
     }
 
@@ -38,10 +43,15 @@ public enum SessionStart {
     }
 
     /// The one shell line the new terminal runs: into the folder, then
-    /// the engine replaces the shell, the prompt as its argument.
-    public static func shellCommand(cwd: String, engine: String?, prompt: String?) -> String {
+    /// the engine replaces the shell, the prompt as its argument; a
+    /// resumed Claude session names its id first (Codex has no resume here).
+    public static func shellCommand(cwd: String, engine: String?, prompt: String?,
+                                    resume: String? = nil) -> String {
         let bin = engine == "codex" ? "codex" : "claude"
         var line = "cd \(shellQuoted(cwd)) && exec \(bin)"
+        if bin == "claude", let resume, !resume.isEmpty {
+            line += " --resume " + shellQuoted(resume)
+        }
         if let prompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
             line += " " + shellQuoted(prompt)
         }

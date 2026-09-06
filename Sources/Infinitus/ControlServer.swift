@@ -200,6 +200,24 @@ final class ControlServer {
                          "kind": .string(row.kind)])
             }))
 
+        case "past-sessions":
+            let claudeDir = ClaudeSessions.configHome()
+            let live = Set(ClaudeSessions.list(claudeDir: claudeDir).map(\.sessionId))
+            let sessions = PastSessions.scan(claudeDir: claudeDir, liveIds: live,
+                                             limit: r.options["limit"].flatMap(Int.init) ?? 50,
+                                             search: r.options["search"])
+            return ControlReply(ok: true, result: try .of(["sessions": sessions]))
+
+        case "resume-session":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: resume-session <sessionId>") }
+            guard let past = PastSessions.find(sessionId: id, claudeDir: ClaudeSessions.configHome()) else {
+                throw Fail("no past session \(id); see `infinitusctl past-sessions`")
+            }
+            let reply = SessionLauncher.start(SessionStart.Request(cwd: past.cwd, resume: past.sessionId),
+                                              preferredHost: model.sessionHost)
+            return ControlReply(ok: reply.outcome == "started", result: try .of(reply),
+                                error: reply.outcome == "started" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
+
         case "send":
             guard let text = r.secret, !text.isEmpty else { throw Fail("send: the message is expected on stdin") }
             guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {

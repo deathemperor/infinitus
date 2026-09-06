@@ -13,7 +13,8 @@ enum SessionLauncher {
         guard FileManager.default.fileExists(atPath: cwd, isDirectory: &isDir), isDir.boolValue else {
             return SessionStart.Reply(outcome: "badCwd", detail: "no such folder on the Mac: \(request.cwd)")
         }
-        let command = SessionStart.shellCommand(cwd: cwd, engine: request.engine, prompt: request.prompt)
+        let command = SessionStart.shellCommand(cwd: cwd, engine: request.engine, prompt: request.prompt,
+                                                resume: request.resume)
         let claudeDir = ClaudeSessions.configHome()
         let before = Set(ClaudeSessions.list(claudeDir: claudeDir).map(\.pid))
         let host: String
