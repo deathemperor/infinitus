@@ -42,6 +42,7 @@ final class TeamSnapshotTests: XCTestCase {
         XCTAssertEqual(snap.members[0].role, "leader"); XCTAssertTrue(snap.members[0].founder); XCTAssertTrue(snap.members[0].isMe)
         let bo = snap.members[1]
         XCTAssertEqual(bo.role, "member"); XCTAssertFalse(bo.isMe)
+        XCTAssertEqual(bo.since, 2); XCTAssertEqual(snap.members[0].since, 1)   // #219
         XCTAssertEqual(bo.lastPublished, 100)
         XCTAssertEqual(bo.kinds, ["crashes", "now", "stats"])
         XCTAssertEqual(bo.sessionsNow, 1)

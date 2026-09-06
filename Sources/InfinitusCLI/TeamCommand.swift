@@ -18,7 +18,7 @@ func teamUsage() -> String {
       approve <kid> | decline <kid>                answer a request (leaders)
       remove <kid> | promote <kid>                 roster edits (leaders; the founder cannot be removed)
       fetch                                        pull the store and accept the roster
-      members [--period <p>]              every member's period totals (spend is an estimate), online, blockers, and what they share with you
+      members [--period <p>]              every member's period totals (spend is an estimate), online, blockers, when they joined, and what they share with you
       member <kid> [--period day|week|month|year]  one member's Stats summary (default week)
       insights [--period <p>]             leaderboards, repo coverage, blockers board, cost by member/model/repo, who's on, hours
       aggregates                          the leaders' published team picture
@@ -66,6 +66,8 @@ private struct MemberRow: Encodable {
     var sessionsNow: Int; var blockers: [String]; var crashes: Int; var lastPublished: Int?
     var usd: Double; var commits: Int; var messages: Int; var outputTokens: Int; var sessions: Int
     var sharesToMe: [String]
+    /// Unix seconds: roster approval; `removedAt` for a removed sender still readable.
+    var joined: Int?; var removedAt: Int?
 }
 
 func runTeam(_ args: [String]) -> Int32 {
@@ -269,7 +271,7 @@ func runTeam(_ args: [String]) -> Int32 {
                 MemberRow(kid: r.kid, name: r.name, role: r.role, online: r.online, sessionsNow: r.sessionsNow, blockers: r.blockers,
                           crashes: r.crashes, lastPublished: r.lastPublished, usd: r.summary.total.usd, commits: r.summary.total.commits,
                           messages: r.summary.total.messages, outputTokens: r.summary.total.outputTokens,
-                          sessions: r.summary.total.sessionCount, sharesToMe: shared[r.kid] ?? [])
+                          sessions: r.summary.total.sessionCount, sharesToMe: shared[r.kid] ?? [], joined: r.since, removedAt: r.removedAt)
             })
         case "member":
             guard let kid = positional.first else { return fail(teamUsage(), code: 2) }

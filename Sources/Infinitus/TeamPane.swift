@@ -258,6 +258,7 @@ struct TeamPane: View {
                     if m.founder { Text("founder").font(.caption2).foregroundStyle(.tertiary) }
                     if m.isMe { Text("you").font(.caption2).foregroundStyle(.tertiary) }
                 }
+                if let since = m.since { Text("joined \(relative(since))").font(.caption).foregroundStyle(.secondary) }
                 Text(m.kinds.isEmpty ? "nothing readable yet" : "shares \(m.kinds.joined(separator: ", ")) · last \(relative(m.lastPublished))")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("today \(m.todayUSD, format: .currency(code: "USD").precision(.fractionLength(2))) · \(m.todayMessages) messages · \(m.todayCommits) commits · \(m.sessionsNow) on now")

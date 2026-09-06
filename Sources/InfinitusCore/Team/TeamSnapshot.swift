@@ -13,6 +13,9 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
         public var role: String
         public var isMe: Bool
         public var founder: Bool
+        /// Unix seconds of the roster approval (team creation for the
+        /// founder). Optional so a phone decodes an older Mac's snapshot.
+        public var since: Int?
         /// Unix seconds of the newest envelope readable from this member.
         public var lastPublished: Int?
         /// Kinds readable from this member, sorted.
@@ -28,11 +31,11 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
         public var fleet: TeamDocs.FleetDoc?
         public var id: String { kid }
 
-        public init(kid: String, name: String, role: String, isMe: Bool, founder: Bool = false,
+        public init(kid: String, name: String, role: String, isMe: Bool, founder: Bool = false, since: Int? = nil,
                     lastPublished: Int? = nil, kinds: [String] = [], sessionsNow: Int = 0, blockers: [String] = [],
                     crashes: Int = 0, todayUSD: Double = 0, todayMessages: Int = 0, todayCommits: Int = 0,
                     fleet: TeamDocs.FleetDoc? = nil) {
-            self.kid = kid; self.name = name; self.role = role; self.isMe = isMe; self.founder = founder
+            self.kid = kid; self.name = name; self.role = role; self.isMe = isMe; self.founder = founder; self.since = since
             self.lastPublished = lastPublished; self.kinds = kinds; self.sessionsNow = sessionsNow
             self.blockers = blockers; self.crashes = crashes; self.todayUSD = todayUSD
             self.todayMessages = todayMessages; self.todayCommits = todayCommits; self.fleet = fleet
@@ -69,7 +72,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
     public static func make(status: TeamStatus, roster: TeamRoster?, reader: TeamReader?, requests: [Signed<TeamRequest>],
                             today: String, lastFetch: Int?, lastPublish: Int?, lastError: String?) -> TeamSnapshot {
         func row(_ m: TeamRoster.Member, role: String) -> Member {
-            var out = Member(kid: m.keys.kid, name: m.name, role: role, isMe: m.keys.kid == status.kid, founder: m.founder)
+            var out = Member(kid: m.keys.kid, name: m.name, role: role, isMe: m.keys.kid == status.kid, founder: m.founder, since: m.since)
             if let r = reader?.members[m.keys.kid] {
                 out.lastPublished = r.lastPublished
                 out.kinds = r.kinds.sorted()

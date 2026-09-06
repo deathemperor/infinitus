@@ -20,7 +20,13 @@ public struct TeamReader {
         public var transcripts: [String: [String]] = [:]
         public var lastPublished: Int?
         public var kinds: Set<String> = []
-        public init(kid: String, name: String, role: String) { self.kid = kid; self.name = name; self.role = role }
+        /// Roster approval (#219); nil for a removed sender.
+        public var since: Int?
+        /// When the roster removed this sender; nil while they are in it.
+        public var removedAt: Int?
+        public init(kid: String, name: String, role: String, since: Int? = nil, removedAt: Int? = nil) {
+            self.kid = kid; self.name = name; self.role = role; self.since = since; self.removedAt = removedAt
+        }
     }
 
     public private(set) var members: [String: Member] = [:]
@@ -36,7 +42,7 @@ public struct TeamReader {
                             read: (String) throws -> Data) -> TeamReader {
         var reader = TeamReader()
         for m in roster.everyone {
-            reader.members[m.keys.kid] = Member(kid: m.keys.kid, name: m.name, role: roster.isLeader(m.keys.kid) ? "leader" : "member")
+            reader.members[m.keys.kid] = Member(kid: m.keys.kid, name: m.name, role: roster.isLeader(m.keys.kid) ? "leader" : "member", since: m.since)
         }
         func decode<T: Decodable>(_ type: T.Type, _ path: String) -> T? {
             guard let data = try? read(path) else { return nil }
@@ -51,7 +57,8 @@ public struct TeamReader {
                 reader.aggregates[doc.period] = doc
                 continue
             }
-            var member = reader.members[header.from] ?? Member(kid: header.from, name: header.from, role: "removed")
+            var member = reader.members[header.from]
+                ?? Member(kid: header.from, name: header.from, role: "removed", removedAt: roster.removed.first { $0.kid == header.from }?.at)
             member.kinds.insert(header.kind)
             member.lastPublished = max(member.lastPublished ?? 0, header.at)
             switch header.kind {

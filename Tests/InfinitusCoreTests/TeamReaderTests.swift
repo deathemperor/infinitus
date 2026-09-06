@@ -58,6 +58,9 @@ final class TeamReaderTests: XCTestCase {
         XCTAssertEqual(reader.members[l.kid]?.role, "leader")
         XCTAssertEqual(reader.members[a.kid]?.role, "member")
         XCTAssertEqual(reader.members[gone.kid]?.role, "removed")
+        XCTAssertEqual(reader.members[a.kid]?.since, 2)
+        XCTAssertEqual(reader.members[gone.kid]?.removedAt, 900)   // #219: the roster's removal instant
+        XCTAssertNil(reader.members[gone.kid]?.since)
         XCTAssertEqual(reader.members[a.kid]?.name, "A")
         XCTAssertEqual(reader.members[a.kid]?.days["2026-09-04"]?.inputTokens, 10)
         XCTAssertEqual(reader.members[b.kid]?.days.count, 2)
@@ -159,6 +162,7 @@ final class TeamReaderTests: XCTestCase {
         _ = try leader.fetch()
         let after = try TeamReader.load(client: leader)
         XCTAssertEqual(after.members[bob.identity.kid]?.role, "removed")
+        XCTAssertEqual(after.members[bob.identity.kid]?.removedAt, removedAt)
         XCTAssertEqual(after.members[bob.identity.kid]?.days["2026-09-04"]?.inputTokens, 10)   // sealed before removal
         XCTAssertNil(after.members[bob.identity.kid]?.now)                                    // now.json was re-sealed after removal
         _ = try bob.fetch()

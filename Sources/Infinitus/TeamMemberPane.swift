@@ -24,6 +24,9 @@ struct TeamMemberPane: View {
                 if let s = summary {
                     Text("\(s.from) – \(s.to)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
+                if let since = team.snapshot?.members.first(where: { $0.kid == kid })?.since {
+                    LabeledContent("Joined", value: Self.relative(since))
+                }
             }
             if let s = summary, s.total != Stats.Day() {
                 StatsTiles(summary: s)

@@ -16,6 +16,8 @@ public enum TeamInsights {
         public var blockers: [String]
         public var crashes: Int
         public var lastPublished: Int?
+        public var since: Int?
+        public var removedAt: Int?
     }
 
     /// One row per roster member (and per removed sender still readable),
@@ -26,7 +28,8 @@ public enum TeamInsights {
             MemberRow(kid: m.kid, name: m.name, role: m.role,
                       summary: Stats.fold(days: m.days, period: period, now: now, calendar: calendar),
                       online: isOn(m, now: now), sessionsNow: m.now?.sessions.count ?? 0,
-                      blockers: m.now?.blockers ?? [], crashes: m.crashes.count, lastPublished: m.lastPublished)
+                      blockers: m.now?.blockers ?? [], crashes: m.crashes.count, lastPublished: m.lastPublished,
+                      since: m.since, removedAt: m.removedAt)
         }
         .sorted { x, y in
             (x.role == "leader" ? 0 : 1, x.name, x.kid) < (y.role == "leader" ? 0 : 1, y.name, y.kid)

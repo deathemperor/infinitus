@@ -25,6 +25,7 @@ struct TeamMemberScreen: View {
                 }
                 .pickerStyle(.segmented)
                 if let s = reply?.summary { Text("\(s.from) – \(s.to)").font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+                if let since = member?.since { LabeledContent("Joined", value: relative(since)) }
             }
             if let s = reply?.summary, s.total != Stats.Day() {
                 ForEach(Stats.Presentation.groups(s)) { group in

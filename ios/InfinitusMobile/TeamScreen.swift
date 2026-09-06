@@ -207,6 +207,7 @@ struct TeamScreen: View {
                     Text(member.role).font(.caption).foregroundStyle(.secondary)
                     if member.isMe { Text("you").font(.caption2).foregroundStyle(.tertiary) }
                 }
+                if let since = member.since { Text("joined \(relative(since))").font(.caption).foregroundStyle(.secondary) }
                 Text(member.kinds.isEmpty
                      ? "nothing readable yet"
                      : "shares \(member.kinds.joined(separator: ", ")) · last \(relative(member.lastPublished))")

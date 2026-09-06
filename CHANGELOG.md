@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Phone
+- Team members say when they joined, on their row and in their detail (#219).
 - Settings' theme chooser shows every theme as a live row — its gauges, spend line, status word and tab bar — and the Theme row carries its colors.
 - Pace fire, content entrance and title flourish are picked from tiles that show the effect instead of a menu of words.
 - The pairing token is covered until you tap to reveal it.
@@ -22,6 +23,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
 - Settings' sidebar is a real list: arrow keys, type-select, a focus ring and VoiceOver names, grouped into General, Accounts, Dashboards and Engines.
 - Settings search finds a setting by its own label, opens its pane and flashes the group it lives in; ⌘F jumps to the field.
 - The Settings window is called Settings and says which pane you're in.

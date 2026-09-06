@@ -42,6 +42,7 @@ struct TeamInsightsSection: View {
                     Circle().fill(r.online ? Color.green : Color.secondary.opacity(0.3)).frame(width: 8, height: 8)
                     Text(r.name).bold()
                     Text(r.role).font(.caption).foregroundStyle(.secondary)
+                    if let at = r.removedAt { Text(removedLabel(at)).font(.caption2).foregroundStyle(.tertiary) }
                     Spacer()
                     Text("\(teamUSD(r.summary.total.usd)) · \(r.summary.total.commits) commits · \(r.summary.total.humanMessages) messages · \(r.summary.total.sessionCount) sessions")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
@@ -261,6 +262,12 @@ fileprivate func teamRelative(_ at: Int?) -> String {
     guard let at else { return "never" }
     let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
     return f.localizedString(for: Date(timeIntervalSince1970: TimeInterval(at)), relativeTo: Date())
+}
+
+/// "removed 3 wk. ago", the panes' own relative style.
+fileprivate func removedLabel(_ at: Int) -> String {
+    let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
+    return "removed " + f.localizedString(for: Date(timeIntervalSince1970: TimeInterval(at)), relativeTo: Date())
 }
 
 fileprivate func teamUSD(_ usd: Double) -> String {
