@@ -198,8 +198,12 @@ public enum FleetPanel {
         /// The primary fleet's active account — what a single-fleet host
         /// used to read off the `AccountList`. The primary fleet is the
         /// Claude one wherever it stacks, not merely the first section.
+        /// Empty sections are skipped so an empty Claude fleet cannot
+        /// hide a populated sibling's active row (`lines` already hides
+        /// those sections).
         public var activeNumber: Int? {
-            (sections.first { $0.label.provider == .claude } ?? sections.first)?.activeNumber
+            let shown = sections.filter { !$0.rows.isEmpty }
+            return (shown.first { $0.label.provider == .claude } ?? shown.first)?.activeNumber
         }
 
         /// Headers + rows interleaved. Headers only when more than one

@@ -134,6 +134,14 @@ final class FleetPanelTests: XCTestCase {
         XCTAssertEqual(reordered.sections.first?.label.provider, .gemini)
         XCTAssertEqual(reordered.activeNumber, fleets()[0].activeNumber,
                        "the Claude section answers, not whichever is first")
+        // Empty Claude alongside a populated Gemini: the empty Claude
+        // cannot answer — `lines` already hides it, so the highlight
+        // has to come from a section that actually paints.
+        let emptyClaude = EngineFleet(engineID: "9router", provider: .claude, accounts: [])
+        let geminiOnly = FleetPanel.panel(fleets: [emptyClaude, fleets()[1]], live: nil,
+                                          engineInstalled: true)
+        XCTAssertTrue(geminiOnly.sections.contains { $0.label.provider == .claude && $0.rows.isEmpty })
+        XCTAssertEqual(geminiOnly.activeNumber, fleets()[1].activeNumber)
     }
 
     /// Every row carries the fleet it came from, because 9Router's
