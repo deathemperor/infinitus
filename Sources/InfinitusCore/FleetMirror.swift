@@ -62,6 +62,9 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// The Mac's team (Settings › Team) for the phone's Team tab (plan 8).
     /// Additive optional — a Mac without a team, or an older Mac, sends nil.
     public let team: TeamSnapshot?
+    /// The Mac's saved session profiles (#165) — the phone's Start a
+    /// session chips. Additive optional.
+    public let profiles: [SessionProfile]?
 
     public init(capturedAt: Date, machineName: String, listJSON: Data,
                 sessions: [SessionPanelRow], prefs: FleetPrefs? = nil,
@@ -76,7 +79,7 @@ public struct MirrorSnapshot: Codable, Sendable {
                 awsLogins: [AwsLogin.Item]? = nil,
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
-                app: AppInfo? = nil, team: TeamSnapshot? = nil) {
+                app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil) {
         self.capturedAt = capturedAt
         self.machineName = machineName
         self.listJSON = listJSON
@@ -96,6 +99,7 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.pushesAlerts = pushesAlerts
         self.app = app
         self.team = team
+        self.profiles = profiles
     }
 }
 

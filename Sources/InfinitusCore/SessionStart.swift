@@ -22,13 +22,23 @@ public enum SessionStart {
         /// (supervised — every tool asks). Optional so older phones
         /// still start sessions.
         public let permissionMode: String?
+        /// `claude --model` / `--append-system-prompt` (#165 profiles);
+        /// `profile` names the profile the session was born from, for
+        /// the log. All optional and absent-tolerant.
+        public let model: String?
+        public let systemPrompt: String?
+        public let profile: String?
         public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil,
-                    permissionMode: String? = nil) {
+                    permissionMode: String? = nil, model: String? = nil, systemPrompt: String? = nil,
+                    profile: String? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
             self.resume = resume
             self.permissionMode = permissionMode
+            self.model = model
+            self.systemPrompt = systemPrompt
+            self.profile = profile
         }
     }
 
@@ -62,7 +72,8 @@ public enum SessionStart {
     /// the engine replaces the shell, the prompt as its argument; a
     /// resumed Claude session names its id first (Codex has no resume here).
     public static func shellCommand(cwd: String, engine: String?, prompt: String?,
-                                    resume: String? = nil, permissionMode: String? = nil) -> String {
+                                    resume: String? = nil, permissionMode: String? = nil,
+                                    model: String? = nil, systemPrompt: String? = nil) -> String {
         let bin = engine == "codex" ? "codex" : "claude"
         var line = "cd \(shellQuoted(cwd)) && exec \(bin)"
         if bin == "claude", let resume, !resume.isEmpty {
@@ -72,6 +83,13 @@ public enum SessionStart {
         // the default, never an arbitrary flag value.
         if bin == "claude", let permissionMode, permissionModes.contains(where: { $0.mode == permissionMode }) {
             line += " --permission-mode " + permissionMode
+        }
+        if bin == "claude", let model = model?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            line += " --model " + shellQuoted(model)
+        }
+        if bin == "claude", let systemPrompt = systemPrompt?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !systemPrompt.isEmpty {
+            line += " --append-system-prompt " + shellQuoted(systemPrompt)
         }
         if let prompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
             line += " " + shellQuoted(prompt)

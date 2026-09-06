@@ -48,6 +48,7 @@ export INFINITUS_LOCK_GATE=open
 # Spec §11 e2e: the app is a team leader on a bare repo in $SOCKDIR with
 # its own team dir (file secrets, no keychain), and publishes a fixture
 # projects dir instead of this Mac's real transcripts.
+export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
 export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
 LOG="$(mktemp -t infinitus-e2e)"
@@ -201,8 +202,11 @@ REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
 "$CTL" randomize-names cswap/claude | expect "len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts']) and len(d['names'])==len(d['fleet']['accounts'])" || fail "randomize-names didn't give every account its own name"
 # One account re-rolls alone (#145): one name, worn by that account, still distinct from every other.
 "$CTL" randomize-names cswap/claude 2 | expect "len(d['names'])==1 and [a for a in d['fleet']['accounts'] if a['number']==2][0].get('alias')==d['names'][0] and len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts'])" || fail "randomize-names <n> didn't re-roll account 2 alone"
+"$CTL" profile-set e2e-review --cwd /tmp --mode acceptEdits --model opus | expect "d['profile']['name']=='e2e-review' and d['profile']['permissionMode']=='acceptEdits' and d['profile']['model']=='opus'" || fail "profile-set didn't save the fields"
+"$CTL" profiles | expect "[p['name'] for p in d['profiles']]==['e2e-review']" || fail "profiles didn't list the saved profile"
+"$CTL" profile-remove e2e-review | expect "d['removed'] is True" || fail "profile-remove didn't remove"
 "$CTL" past-sessions --limit 3 | expect "isinstance(d['sessions'], list) and len(d['sessions'])<=3" || fail "past-sessions didn't list"
-echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions)"
+echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions, profiles)"
 "$CTL" plan | expect "'plan' in d and (d['plan'] is None or 'steps' in d['plan'])" || fail "plan verb"
 "$CTL" ignite cswap/claude 2 | expect "'fleet' in d" || fail "ignite verb"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"

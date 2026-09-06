@@ -200,6 +200,31 @@ final class ControlServer {
                          "kind": .string(row.kind)])
             }))
 
+        case "profiles":
+            return ControlReply(ok: true, result: try .of(["profiles": model.sessionProfiles.profiles]))
+
+        case "profile-set":
+            guard let name = r.args.first?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
+                throw Fail("usage: profile-set <name> [--cwd f] [--engine e] [--mode m] [--model m] [--system s] [--prompt p]")
+            }
+            if let engine = r.options["engine"], !["claude", "codex"].contains(engine) { throw Fail("engine must be claude or codex") }
+            if let mode = r.options["mode"], !SessionStart.permissionModes.contains(where: { $0.mode == mode }) {
+                throw Fail("mode must be one of " + SessionStart.permissionModes.map(\.mode).joined(separator: ", "))
+            }
+            let profile = SessionProfile(name: name, cwd: r.options["cwd"], engine: r.options["engine"],
+                                         permissionMode: r.options["mode"], model: r.options["model"],
+                                         systemPrompt: r.options["system"], prompt: r.options["prompt"])
+            model.sessionProfiles.set(profile)
+            if let err = model.sessionProfiles.lastError { throw Fail(err) }
+            let saved = model.sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }
+            return ControlReply(ok: true, result: try .of(["profile": saved]))
+
+        case "profile-remove":
+            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: profile-remove <name>") }
+            let existed = model.sessionProfiles.profiles.contains { SessionProfiles.same($0.name, name) }
+            model.sessionProfiles.remove(name)
+            return ControlReply(ok: true, result: .object(["removed": .bool(existed)]))
+
         case "past-sessions":
             let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                              limit: r.options["limit"].flatMap(Int.init) ?? 50,

@@ -51,6 +51,8 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("randomize-names")?.args, ["<fleet>", "[n]"])
         XCTAssertEqual(ControlCommand.named("past-sessions")?.options, ["--limit <n, default 50>", "--search <text>"])
         XCTAssertEqual(ControlCommand.named("resume-session")?.args, ["<sessionId>"])
+        XCTAssertEqual(ControlCommand.named("profile-set")?.args, ["<name>"])
+        XCTAssertEqual(ControlCommand.named("profile-remove")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")
         XCTAssertEqual(ControlCommand.named("lock-status")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("lock-status")?.args, [])
