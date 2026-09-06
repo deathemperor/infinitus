@@ -456,7 +456,7 @@ final class MirrorModel: ObservableObject, FleetModel {
         let pairings = MacPairing.load(defaults)
         let ids = Set(pairings.map(\.id))
         otherMirrors = otherMirrors.filter { ids.contains($0.key) }
-        guard !pairings.isEmpty else { others = []; return }
+        guard !pairings.isEmpty else { others = []; refreshShortcutMacs(); return }
         let mirrors = pairings.map { ($0, otherMirror(for: $0)) }
         // `for await` yields in COMPLETION order, not the pairings' own
         // order — collecting by id and remapping keeps the Fleet/
@@ -498,6 +498,7 @@ final class MirrorModel: ObservableObject, FleetModel {
                                            hostUsage: false).fleets
             return other
         }
+        refreshShortcutMacs()
         // Per-Mac reachable edge: newly answering ids fire once; a Mac
         // still down stays out of the set and fires nothing. Keyed on
         // `parked`, not snapshot presence: `latest()` hands back the
@@ -507,6 +508,16 @@ final class MirrorModel: ObservableObject, FleetModel {
         let newlyReachable = answered.subtracting(othersReachable)
         othersReachable = answered
         for id in newlyReachable { otherReachable?(id) }
+    }
+
+    /// Siri's "on <Mac>" phrases are precomputed from the entity query, so
+    /// the system is told when the set of names changes (#144).
+    private var shortcutMacNames: [String] = []
+    private func refreshShortcutMacs() {
+        let names = MacEntity.all().map(\.name)
+        guard names != shortcutMacNames else { return }
+        shortcutMacNames = names
+        InfinitusShortcuts.updateAppShortcutParameters()
     }
 
     /// The cached actor for one other Mac — created once per pairing so
