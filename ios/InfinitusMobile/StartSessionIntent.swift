@@ -9,18 +9,47 @@ struct StartSessionIntent: AppIntent {
     static let title: LocalizedStringResource = "Start a session"
     static let description = IntentDescription("Opens a new Claude Code session in a repository on your Mac.")
 
+    /// A saved profile's name (#165) — its folder stands in for a
+    /// repository left blank; its engine, permissions, model, system
+    /// prompt and first prompt ride along the way the sheet's chips do.
+    @Parameter(title: "Profile")
+    var profile: String?
+
     @Parameter(title: "Repository")
-    var repo: String
+    var repo: String?
 
     @Parameter(title: "First prompt")
     var prompt: String?
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let recent = await MainActor.run { MirrorModel.shared.recentCwds }
-        let wanted = repo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let cwd = recent.first { ($0 as NSString).lastPathComponent.lowercased() == wanted } ?? repo
+        let (recent, profiles) = await MainActor.run {
+            (MirrorModel.shared.recentCwds, MirrorModel.shared.snapshot?.profiles ?? [])
+        }
+        var chosen: SessionProfile?
+        if let profile, !profile.trimmingCharacters(in: .whitespaces).isEmpty {
+            guard let hit = profiles.first(where: { SessionProfiles.same($0.name, profile.trimmingCharacters(in: .whitespaces)) }) else {
+                throw StartSessionError(message: "No profile named \(profile) on the Mac.")
+            }
+            chosen = hit
+        }
+        let typed = repo?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let cwd: String
+        if !typed.isEmpty {
+            cwd = recent.first { ($0 as NSString).lastPathComponent.lowercased() == typed.lowercased() } ?? typed
+        } else if let folder = chosen?.cwd, !folder.isEmpty {
+            cwd = folder
+        } else {
+            throw StartSessionError(message: "Which repository? Name one, or a profile that has a folder.")
+        }
+        let engine = chosen?.engine ?? "claude"
+        let claude = engine == "claude"
         let reply = try await NetworkFleetMirror.shared.startSession(
-            SessionStart.Request(cwd: cwd, engine: "claude", prompt: prompt))
+            SessionStart.Request(cwd: cwd, engine: engine,
+                                 prompt: prompt ?? chosen?.prompt,
+                                 permissionMode: claude ? chosen?.permissionMode : nil,
+                                 model: claude ? chosen?.model : nil,
+                                 systemPrompt: claude ? chosen?.systemPrompt : nil,
+                                 profile: chosen?.name))
         guard reply.outcome == "started" else { throw StartSessionError(message: reply.detail ?? reply.outcome) }
         if let pid = reply.pid {
             await MainActor.run {
@@ -29,7 +58,8 @@ struct StartSessionIntent: AppIntent {
             }
         }
         let name = (cwd as NSString).lastPathComponent
-        return .result(dialog: "Started in \(name)\(reply.host.map { " via \($0)" } ?? "").")
+        let born = chosen.map { " as \($0.name)" } ?? ""
+        return .result(dialog: "Started in \(name)\(born)\(reply.host.map { " via \($0)" } ?? "").")
     }
 }
 
