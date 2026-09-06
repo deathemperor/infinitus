@@ -64,22 +64,24 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                     // site would touch 13 call sites for the same union.
                     .anchorPreference(key: DeadRowBounds.self,
                                       value: .bounds) { [account.number: [$0]] }
-                    Button(action: {
-                        // disabled rows stay clickable, like rumps; the
-                        // popup-level alert asks before committing
-                        if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
-                    }, label: { cells.nameLabel })
-                    .buttonStyle(.plain)
-                    .contextMenu { AccountRowMenu(model: model, account: account) }
-                    .fontWeight(account.active ? .bold : .regular)
-                    .foregroundStyle((account.disabled ?? false) || cells.showAsDead
-                                     ? AnyShapeStyle(.secondary)
-                                     : account.active
-                                     ? AnyShapeStyle(Color.accentColor)
-                                     : AnyShapeStyle(.primary))
-                    .help(cells.dead ? "Out of at least one limit — unusable until it resets"
-                                     : "Switch to this account")
-                    .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Button(action: {
+                            // disabled rows stay clickable, like rumps; the
+                            // popup-level alert asks before committing
+                            if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
+                        }, label: { cells.nameLabel })
+                        .buttonStyle(.plain)
+                        .fontWeight(account.active ? .bold : .regular)
+                        .foregroundStyle((account.disabled ?? false) || cells.showAsDead
+                                         ? AnyShapeStyle(.secondary)
+                                         : account.active
+                                         ? AnyShapeStyle(Color.accentColor)
+                                         : AnyShapeStyle(.primary))
+                        .help(cells.dead ? "Out of at least one limit — unusable until it resets"
+                                         : "Switch to this account")
+                        .lineLimit(1)
+                        AccountRowActions(model: model, account: account)
+                    }
                     // The one deliberately flexible column: emails truncate,
                     // usage numbers and reset times never do.
                     .frame(minWidth: 110, maxWidth: 230, alignment: .leading)
@@ -323,11 +325,11 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                 if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
             }, label: { cells.nameLabel })
             .buttonStyle(.plain)
-            .contextMenu { AccountRowMenu(model: model, account: account) }
             .fontWeight(account.active ? .bold : .regular)
             .foregroundStyle((account.disabled ?? false) || cells.dead
                              ? .secondary : .primary)
             .lineLimit(1)
+            AccountRowActions(model: model, account: account)
             Spacer(minLength: 8)
             if cells.showAsDead {
                 cells.deadCell
@@ -400,11 +402,11 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                             if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                         }, label: { cells.nameLabel })
                             .buttonStyle(.plain)
-                            .contextMenu { AccountRowMenu(model: model, account: account) }
                             .fontWeight(account.active ? .bold : .regular)
                             .foregroundStyle((account.disabled ?? false) || cells.dead
                                              ? .secondary : .primary)
                             .lineLimit(1)
+                        AccountRowActions(model: model, account: account)
                         if let plan = cells.planText {
                             Text(plan).font(PopupFont.caption).foregroundStyle(.secondary)
                                 .instantTip("Subscription: \(account.plan ?? "?")")
@@ -580,12 +582,13 @@ extension View {
     func activeBand(_ on: Bool) -> some View { modifier(ActiveBand(active: on)) }
 }
 
-/// Right-click on an account's name: star it (the engine lands on it
-/// first, and switches to it now) or pause/resume its rotation — the
-/// Settings › Accounts buttons without leaving the popup. Each item
-/// shows only when the engine has the knob (nil `preferred` = no
+/// Two small buttons beside the account's name — star it (the engine
+/// lands on it first, and switches to it now) and pause/resume its
+/// rotation — the Settings › Accounts buttons, in the popup where the
+/// eye already is (user 2026-09-06: "nobody knows when to right-click").
+/// Each shows only when the engine has the knob (nil `preferred` = no
 /// pick-first setting in this build).
-struct AccountRowMenu<M: FleetModel>: View {
+struct AccountRowActions<M: FleetModel>: View {
     let model: M
     let account: Account
 
@@ -594,16 +597,24 @@ struct AccountRowMenu<M: FleetModel>: View {
             Button {
                 model.setPreferred(account.number, !starred)
             } label: {
-                Label(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star")
+                Image(systemName: starred ? "star.fill" : "star")
+                    .font(PopupFont.caption)
+                    .foregroundStyle(starred ? Color.yellow : Color.secondary)
             }
+            .buttonStyle(.plain)
+            .instantTip(starred ? "Unstar — stop landing here first" : "Star — land here first, and switch to it now")
         }
         if model.capabilities.contains(.hold) {
             let paused = account.disabled ?? false
             Button {
                 model.setRotation(account.number, enabled: paused)
             } label: {
-                Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
+                Image(systemName: paused ? "play.circle" : "pause.circle")
+                    .font(PopupFont.caption)
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
+            .instantTip(paused ? "Resume — back into rotation" : "Pause — hold out of rotation")
         }
     }
 }

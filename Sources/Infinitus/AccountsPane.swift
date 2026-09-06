@@ -634,6 +634,11 @@ private struct FleetAccountsSection: View {
     private var isCswap: Bool { fleet.engineID == CswapEngine.engineID }
     private var caps: EngineCapabilities { fleet.capabilities }
     private var canRelogin: Bool { isCswap || caps.contains(.addOAuth) }
+    /// Which account's name field has focus, by slot number — held here,
+    /// not per field, so Tab can hand it to the next row and the commit's
+    /// snapshot refresh can't drop it (user 2026-09-06: "press tab -> go
+    /// to rename next account").
+    @FocusState private var renaming: Int?
 
     var body: some View {
         Section("\(fleet.provider.displayName) \u{00B7} \(fleet.engine.displayName)") {
@@ -656,11 +661,6 @@ private struct FleetAccountsSection: View {
             List {
                 ForEach(fleet.accounts, id: \.number) { a in
                     row(a).moveDisabled(!caps.contains(.reorder))
-                        .contextMenu {
-                            if caps.contains(.rename) {
-                                Button("Re-roll name") { fleet.randomizeName(a.number) }
-                            }
-                        }
                 }
                 .onMove { from, to in
                     guard caps.contains(.reorder) else { return }
@@ -687,6 +687,14 @@ private struct FleetAccountsSection: View {
         }
     }
 
+    /// The slot numbers before and after `a` in this list's order — Tab
+    /// and Shift-Tab targets for its name field.
+    private func neighbours(of a: Account) -> (previous: Int?, next: Int?) {
+        let numbers = fleet.accounts.map(\.number)
+        guard let i = numbers.firstIndex(of: a.number) else { return (nil, nil) }
+        return (i > 0 ? numbers[i - 1] : nil, i + 1 < numbers.count ? numbers[i + 1] : nil)
+    }
+
     @ViewBuilder private func row(_ a: Account) -> some View {
         HStack(spacing: 8) {
             if caps.contains(.reorder) {
@@ -696,7 +704,13 @@ private struct FleetAccountsSection: View {
             Text("\(a.number)").monospacedDigit()
                 .foregroundStyle(.secondary)
             if caps.contains(.rename) {
-                RenameField(fleet: fleet, account: a)
+                RenameField(fleet: fleet, account: a, focus: $renaming,
+                            neighbours: neighbours(of: a))
+                Button { fleet.randomizeName(a.number) } label: {
+                    Image(systemName: "dice")
+                }
+                .buttonStyle(.borderless)
+                .help("Re-roll name: a fresh themed name nobody in the fleet wears")
             }
             Text(a.email).lineLimit(1)
                 .font(.caption).foregroundStyle(.secondary)
@@ -930,22 +944,32 @@ private struct CswapAddFlow: View {
 
 /// One account's editable display name. Local draft, committed on Enter or
 /// focus loss — never on every keystroke (each commit is a `cswap alias`
-/// subprocess + snapshot refresh).
+/// subprocess + snapshot refresh). Tab commits and moves to the next
+/// account's field, Shift-Tab to the previous one.
 private struct RenameField: View {
     @ObservedObject var fleet: FleetState
     let account: Account
+    var focus: FocusState<Int?>.Binding
+    let neighbours: (previous: Int?, next: Int?)
     @State private var draft = ""
-    @FocusState private var focused: Bool
 
     var body: some View {
         TextField("Name", text: $draft)
             .textFieldStyle(.roundedBorder)
             .frame(width: 150)
-            .focused($focused)
+            .focused(focus, equals: account.number)
             .onAppear { draft = account.alias ?? "" }
             .onChange(of: account.alias) { draft = account.alias ?? "" }
             .onSubmit { commit() }
-            .onChange(of: focused) { if !focused { commit() } }
+            .onChange(of: focus.wrappedValue) { old, new in
+                if old == account.number, new != account.number { commit() }
+            }
+            .onKeyPress(.tab) {
+                let target = NSEvent.modifierFlags.contains(.shift) ? neighbours.previous : neighbours.next
+                guard let target else { return .ignored }
+                focus.wrappedValue = target
+                return .handled
+            }
     }
 
     private func commit() {
