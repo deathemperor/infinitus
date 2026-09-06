@@ -12,6 +12,8 @@ import InfinitusUI
 struct RootView: View {
     @ObservedObject var model: MirrorModel
     @StateObject private var usage = MobileUsage()
+    @ObservedObject private var lock = MobileLock.shared
+    @Environment(\.scenePhase) private var scenePhase
     /// A launch can name the tab to open on — the same dev seam
     /// `INFINITUS_MIRROR_PATH` is, so a headless simulator capture can
     /// show a screen no one can tap to.
@@ -20,17 +22,17 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if model.macPopupView {
-                // The Mac popup renders on dark glass in every capture,
-                // and the shared views' text is picked for that; the
-                // native shell honors the system scheme instead.
-                FleetScreen(model: model).preferredColorScheme(.dark)
+            // #212: the whole app behind Face ID — the shell is not on
+            // screen at all while locked (either shell; a shake on the
+            // lock screen captures nothing).
+            if lock.scope == .app && lock.locked {
+                lockedScreen
             } else {
-                tabs
+                shell
             }
         }
-        // Shake on any screen: capture it, pick a session, describe it there.
-        .background(ShakeToSend(model: model))
+        // The poll keeps going while locked: badges and the Live
+        // Activities stay current for the moment it opens.
         .task {
             while !Task.isCancelled {
                 await model.refresh()
@@ -47,6 +49,49 @@ struct RootView: View {
             tab = requested
             model.requestedTab = nil
         }
+        // Relock on background only: the Face ID sheet itself takes the
+        // scene through inactive and back, and relocking there loops.
+        .onChange(of: scenePhase) { _, phase in
+            guard lock.scope == .app else { return }
+            if phase == .background { lock.relock() }
+            if phase == .active { promptIfLocked() }
+        }
+    }
+
+    private var shell: some View {
+        Group {
+            if model.macPopupView {
+                // The Mac popup renders on dark glass in every capture,
+                // and the shared views' text is picked for that; the
+                // native shell honors the system scheme instead.
+                FleetScreen(model: model).preferredColorScheme(.dark)
+            } else {
+                tabs
+            }
+        }
+        // Shake on any screen: capture it, pick a session, describe it there.
+        .background(ShakeToSend(model: model))
+    }
+
+    private var lockedScreen: some View {
+        VStack(spacing: 16) {
+            ThemedPlaceholder(theme: model.rowTheme, key: "empty", plainSymbol: "lock.fill",
+                              description: "Unlock with \(lock.methodName).")
+            Button("Unlock") { promptIfLocked() }
+                .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Launch lands here already active, so the scene-phase change
+        // above never fires: ask as the screen appears instead.
+        .task { promptIfLocked() }
+    }
+
+    /// The prompt, once: MobileLock drops a second ask while one is up,
+    /// and a backgrounded scene waits for `.active` rather than burning
+    /// a prompt the OS would cancel.
+    private func promptIfLocked() {
+        guard lock.locked, scenePhase == .active else { return }
+        Task { _ = await lock.unlock() }
     }
 
     @ViewBuilder private var tabs: some View {

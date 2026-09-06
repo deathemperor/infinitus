@@ -9,42 +9,49 @@ struct ClaudeEnginePane: View {
     @ObservedObject var settings: SettingsModel
     @ObservedObject var update: UpdateModel
     @ObservedObject var reliability: ResumeReliabilityModel
+    /// Stopping halts rotation while sessions are running, so it asks.
+    @State private var confirmStop = false
 
     var body: some View {
         Form {
-            Section("Claude — cswap engine") {
+            Section {
                 Toggle("Engine on (credential swap under Claude Code)", isOn: $model.cswapEnabled)
                 EngineToggleNotes(model: model)
-                LabeledContent("Auto-switch") {
+                LabeledContent("Rotation") {
                     HStack {
                         stateText
-                        Button(toggleTitle) { model.toggleEngine() }
-                            .disabled(!togglable)
+                        Button(toggleTitle) {
+                            if rotating { confirmStop = true } else { model.toggleEngine() }
+                        }
+                        .disabled(!togglable)
                     }
                 }
-                Text("Rotates Claude accounts before limits stall a session.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Claude \u{2014} cswap engine")
+            } footer: {
+                Text("Rotating swaps the Claude account under Claude Code before a limit "
+                     + "stalls a session. When it is stopped, the account in use stays put.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
-            Section("Mock data") {
+            Section {
                 Toggle("Demo fleet (fabricated accounts)", isOn: $model.mockMode)
-                Text("Five made-up accounts standing in for the engine — "
-                     + "bravo burns ahead of pace, charlie is dead, rotate "
-                     + "and reorder play along. Nothing reads or touches "
-                     + "your real accounts; flipping this restarts the app.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Mock data")
+            } footer: {
+                Text("Five made-up accounts standing in for the engine \u{2014} one burns "
+                     + "ahead of pace, one is dead, rotate and reorder play along. Nothing "
+                     + "reads or touches your real accounts; flipping this restarts the app.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
             ResumeNudgesSection(service: model.resume)
             ResumeReliabilitySection(model: reliability)
             // Engine updates live WITH the engine (user 2026-08-30:
             // "move all of updates of engine to its engine setting");
             // About keeps the app's own release channel.
-            Section("Engine updates") {
+            Section {
                 Toggle("Update automatically", isOn: Binding(
                     get: { update.autoCheck && update.autoInstall },
                     set: { update.autoCheck = $0; update.autoInstall = $0 }))
-                    .help("Watch PyPI daily; when a newer claude-swap "
-                          + "appears, run `cswap upgrade` unattended and "
-                          + "restart the engine.")
                 LabeledContent {
                     HStack {
                         if update.updateAvailable {
@@ -52,7 +59,7 @@ struct ClaudeEnginePane: View {
                                 .disabled(update.busy)
                                 .buttonStyle(.borderedProminent)
                         }
-                        Button(update.busy ? "Checking…" : "Check for Updates…") {
+                        Button(update.busy ? "Checking\u{2026}" : "Check for Updates") {
                             Task { await update.check() }
                         }
                         .disabled(update.busy)
@@ -76,7 +83,7 @@ struct ClaudeEnginePane: View {
                     Label("Engine — claude-swap", systemImage: "gearshape.2")
                 }
                 if let output = update.upgradeOutput, !output.isEmpty {
-                    DisclosureGroup("upgrade output") {
+                    DisclosureGroup("Upgrade output") {
                         ScrollView {
                             Text(output)
                                 .font(.system(.caption, design: .monospaced))
@@ -86,12 +93,26 @@ struct ClaudeEnginePane: View {
                         .frame(maxHeight: 160)
                     }
                 }
+            } header: {
+                Text("Engine updates")
+            } footer: {
+                Text("Automatic updates check daily for a newer engine release, install it "
+                     + "unattended and restart the engine. Nothing else changes.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
             SettingsFormBody(model: settings)
         }
         .formStyle(.grouped)
         .task { await settings.load() }
         .onAppear { if update.current == nil { Task { await update.check() } } }
+        .confirmationDialog("Stop rotating Claude accounts?", isPresented: $confirmStop) {
+            Button("Stop", role: .destructive) { model.toggleEngine() }
+            Button("Keep Rotating", role: .cancel) { }
+        } message: {
+            Text("Sessions stall at their limits until you start it again. The account in "
+                 + "use keeps working, and your accounts are untouched \u{2014} Start puts "
+                 + "rotation back exactly as it was.")
+        }
     }
 
     private var releaseNotesURL: URL {
@@ -105,19 +126,23 @@ struct ClaudeEnginePane: View {
     private var stateText: some View {
         Group {
             switch model.cswapState {
-            case .running: Text("running").foregroundStyle(.green)
-            case .stopped: Text("stopped").foregroundStyle(.secondary)
-            case .refused: Text("held elsewhere").foregroundStyle(.orange)
-            case .backingOff(let s): Text("retrying in \(Int(s))s")
-            case .schemaMismatch: Text("update the app")
+            case .running: Text("Running").foregroundStyle(.green)
+            case .stopped: Text("Stopped").foregroundStyle(.secondary)
+            case .refused: Text("Held Elsewhere").foregroundStyle(.orange)
+            case .backingOff(let s): Text("Retrying in \(Int(s))s")
+            case .schemaMismatch: Text("Update the App")
             }
         }.font(.caption)
     }
 
-    private var toggleTitle: String {
-        if case .running = model.cswapState { return "Stop" }
-        if case .backingOff = model.cswapState { return "Stop" }
-        return "Start"
+    /// Stop opens the confirmation, so it wears the ellipsis; Start acts.
+    private var toggleTitle: String { rotating ? "Stop\u{2026}" : "Start" }
+
+    /// Whether rotation is currently active, i.e. the button would stop it.
+    private var rotating: Bool {
+        if case .running = model.cswapState { return true }
+        if case .backingOff = model.cswapState { return true }
+        return false
     }
 
     private var togglable: Bool {
@@ -144,6 +169,7 @@ struct CLIProxyEnginePane: View {
     @State private var key = ""
     @State private var probe: String?
     @State private var probing = false
+    @State private var confirmForgetKey = false
 
     var body: some View {
         Form {
@@ -156,22 +182,22 @@ struct CLIProxyEnginePane: View {
                 }
                 EngineToggleNotes(model: model)
             }
-            Section("Management API") {
+            Section {
                 TextField("Base URL", text: $baseURL, prompt: Text(CLIProxyEngine.defaultBaseURL.absoluteString))
                     .textFieldStyle(.roundedBorder)
                 SecureField("Management key", text: $key,
                             prompt: Text(model.cliproxyKeyPresent ? "•••••••• (stored in keychain)" : "remote-management.secret-key"))
                     .textFieldStyle(.roundedBorder)
                 HStack {
-                    Button(probing ? "Testing…" : "Test connection") { test() }
+                    Button(probing ? "Testing\u{2026}" : "Test Connection") { test() }
                         .disabled(probing)
-                    Button("Save & restart") {
+                    Button("Save & Restart") {
                         model.saveCLIProxy(baseURL: baseURL.isEmpty ? model.cliproxyBaseURL : baseURL,
                                            key: key.isEmpty ? (Keychain.read(account: model.cliproxyBaseURL) ?? "") : key)
                     }
                     .buttonStyle(.borderedProminent)
                     if model.cliproxyKeyPresent {
-                        Button("Forget key") { model.saveCLIProxy(baseURL: model.cliproxyBaseURL, key: "") }
+                        Button("Forget Key\u{2026}", role: .destructive) { confirmForgetKey = true }
                     }
                 }
                 if let probe {
@@ -184,17 +210,20 @@ struct CLIProxyEnginePane: View {
                 if let caveat = model.fleetCaveats[CLIProxyEngine.engineID] {
                     Text(caveat).font(.caption).foregroundStyle(.orange)
                 }
-                Text("The key is the proxy's remote-management.secret-key; it is kept "
-                     + "in the keychain and sent as a bearer header. Infinitus never "
-                     + "reads the proxy's config or credential files.")
-                    .font(.caption).foregroundStyle(.secondary)
                 if let proxy = model.cliProxy {
                     Text(DetectionLines.proxyLine(proxy, live: model.cliProxyLive))
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
+            } header: {
+                Text("Management API")
+            } footer: {
+                Text("The key is the proxy's own management secret. It is kept in the "
+                     + "keychain and sent as a bearer header; Infinitus never reads the "
+                     + "proxy's config or credential files.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
             if model.cliproxyEnabled {
-                Section("Routing") {
+                Section {
                     Picker("Strategy", selection: Binding(
                         get: { model.proxyRoutingStrategy ?? "fill-first" },
                         set: { model.setProxyRoutingStrategy($0) })) {
@@ -208,23 +237,34 @@ struct CLIProxyEnginePane: View {
                     }
                     RoutingNotes(strategy: model.proxyRoutingStrategy,
                                  affinity: model.proxySessionAffinity)
-                }
-                Section("Accounts") {
-                    Text("The proxy's credentials are managed in the Accounts tab, "
-                         + "next to cswap's.")
-                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text("Routing")
+                } footer: {
+                    Text("The proxy's credentials are managed in the Accounts tab, next to "
+                         + "the other engines'.")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear { baseURL = model.cliproxyBaseURL }
+        .confirmationDialog("Forget the management key?", isPresented: $confirmForgetKey) {
+            Button("Forget", role: .destructive) { model.saveCLIProxy(baseURL: model.cliproxyBaseURL, key: "") }
+            Button("Keep Key", role: .cancel) { }
+        } message: {
+            Text("The key leaves the keychain and Infinitus restarts. This engine can't "
+                 + "reach the proxy until you save a key again.")
+        }
     }
 
     private func test() {
         let urlString = baseURL.isEmpty ? model.cliproxyBaseURL : baseURL
-        guard let url = URL(string: urlString) else { probe = "bad URL"; return }
+        guard let url = URL(string: urlString) else {
+            probe = "That isn't a valid address \u{2014} it should look like \(CLIProxyEngine.defaultBaseURL.absoluteString)."
+            return
+        }
         let k = key.isEmpty ? (Keychain.read(account: model.cliproxyBaseURL) ?? "") : key
-        guard !k.isEmpty else { probe = "enter the management key first"; return }
+        guard !k.isEmpty else { probe = "Enter the management key first, then test."; return }
         probing = true
         Task {
             let engine = CLIProxyEngine(baseURL: url, managementKey: k)
@@ -233,7 +273,7 @@ struct CLIProxyEnginePane: View {
                 probe = "reachable — \(p.credentialFiles) credential file\(p.credentialFiles == 1 ? "" : "s")"
                     + (p.strategy.map { ", routing \($0)" } ?? "")
             } catch {
-                probe = (error as? EngineError)?.errorDescription ?? "\(error)"
+                probe = EngineFailure.sentence(error)
             }
             probing = false
         }
@@ -248,27 +288,31 @@ struct NineRouterEnginePane: View {
     @State private var password = ""
     @State private var probe: String?
     @State private var probing = false
+    @State private var confirmForgetPassword = false
 
     var body: some View {
         Form {
-            Section("Claude — 9Router engine") {
+            Section {
                 Toggle("Engine on (rotates behind its own endpoint)", isOn: $model.nineRouterEnabled)
                 EngineToggleNotes(model: model)
+            } header: {
+                Text("Claude \u{2014} 9Router engine")
+            } footer: {
                 Text("9Router rotates its connections per request in priority order and "
                      + "falls back on quota errors. Infinitus reads the roster and quotas, "
                      + "and sets priority / hold; the rotation policy stays 9Router's.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.secondary)
             }
-            Section("Dashboard API") {
+            Section {
                 TextField("Base URL", text: $baseURL, prompt: Text(NineRouterEngine.defaultBaseURL.absoluteString))
                     .textFieldStyle(.roundedBorder)
                 SecureField("Dashboard password", text: $password,
                             prompt: Text(model.nineRouterPasswordPresent ? "•••••••• (stored in keychain)" : "the dashboard login password"))
                     .textFieldStyle(.roundedBorder)
                 HStack {
-                    Button(probing ? "Testing…" : "Test connection") { test() }
+                    Button(probing ? "Testing\u{2026}" : "Test Connection") { test() }
                         .disabled(probing)
-                    Button("Save & restart") {
+                    Button("Save & Restart") {
                         model.saveNineRouter(
                             baseURL: baseURL.isEmpty ? model.nineRouterBaseURL : baseURL,
                             password: password.isEmpty
@@ -277,7 +321,7 @@ struct NineRouterEnginePane: View {
                     }
                     .buttonStyle(.borderedProminent)
                     if model.nineRouterPasswordPresent {
-                        Button("Forget password") { model.saveNineRouter(baseURL: model.nineRouterBaseURL, password: "") }
+                        Button("Forget Password\u{2026}", role: .destructive) { confirmForgetPassword = true }
                     }
                 }
                 if let probe {
@@ -286,33 +330,50 @@ struct NineRouterEnginePane: View {
                 if let err = model.engineErrors[NineRouterEngine.engineID] {
                     Text(err).font(.caption).foregroundStyle(.orange)
                 }
-                Text("The password is the one the 9Router dashboard asks for; it is kept in "
-                     + "the keychain and exchanged for a session cookie on demand. Leave it "
-                     + "empty if 9Router's \"require login\" is off. Infinitus never reads "
+            } header: {
+                Text("Dashboard API")
+            } footer: {
+                Text("The password is the one the 9Router dashboard asks for. It is kept in "
+                     + "the keychain and exchanged for a session cookie on demand; leave it "
+                     + "empty if 9Router's require-login is off. Infinitus never reads "
                      + "9Router's database or config.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.secondary)
             }
             if model.nineRouterEnabled {
-                Section("Accounts") {
-                    Text("9Router's connections are managed in the Accounts tab, next to the "
-                         + "other engines'. Adding one is done in the 9Router dashboard "
-                         + "(Providers → Connect Claude Code).")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Button("Open 9Router dashboard") {
+                Section {
+                    Button("Open 9Router Dashboard") {
                         if let url = URL(string: (baseURL.isEmpty ? model.nineRouterBaseURL : baseURL) + "/dashboard") {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                } header: {
+                    Text("Accounts")
+                } footer: {
+                    Text("9Router's connections are managed in the Accounts tab, next to "
+                         + "the other engines'. Adding one is done in the 9Router dashboard "
+                         + "under Providers \u{2192} Connect Claude Code.")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear { baseURL = model.nineRouterBaseURL }
+        .confirmationDialog("Forget the dashboard password?", isPresented: $confirmForgetPassword) {
+            Button("Forget", role: .destructive) { model.saveNineRouter(baseURL: model.nineRouterBaseURL, password: "") }
+            Button("Keep Password", role: .cancel) { }
+        } message: {
+            Text("The password leaves the keychain and Infinitus restarts. If the dashboard "
+                 + "requires a login, this engine can't reach it until you save the "
+                 + "password again.")
+        }
     }
 
     private func test() {
         let urlString = baseURL.isEmpty ? model.nineRouterBaseURL : baseURL
-        guard let url = URL(string: urlString) else { probe = "bad URL"; return }
+        guard let url = URL(string: urlString) else {
+            probe = "That isn't a valid address \u{2014} it should look like \(NineRouterEngine.defaultBaseURL.absoluteString)."
+            return
+        }
         let pw = password.isEmpty
             ? (Keychain.read(account: model.nineRouterBaseURL, service: Keychain.nineRouterService) ?? "")
             : password
@@ -324,7 +385,7 @@ struct NineRouterEnginePane: View {
                 probe = "reachable — \(p.connections) connection\(p.connections == 1 ? "" : "s"), "
                     + "\(p.claudeConnections) Claude"
             } catch {
-                probe = (error as? EngineError)?.errorDescription ?? "\(error)"
+                probe = EngineFailure.sentence(error)
             }
             probing = false
         }

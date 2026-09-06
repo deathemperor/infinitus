@@ -343,11 +343,15 @@ struct SettingsForm: View {
 
     private var teamSection: some View {
         Section {
-            Toggle("Lock the Team tab with \(lock.methodName)", isOn: $lock.enabled)
+            Picker("Lock with \(lock.methodName)", selection: $lock.scope) {
+                Text("Off").tag(MobileLock.Scope.off)
+                Text("Team tab").tag(MobileLock.Scope.team)
+                Text("Whole app").tag(MobileLock.Scope.app)
+            }
         } header: {
             Text("Team")
         } footer: {
-            Text("Joining a team from this phone needs the lock on; the Mac has the same rule.")
+            Text("Whole app asks when the app opens and when you come back to it. Joining a team from this phone needs a lock on; the Mac has the same rule.")
         }
     }
 

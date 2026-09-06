@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - Team members say when they joined, on their row and in their detail (#219).
+- Face ID or the passcode can lock the whole app — on launch and on return from the background — not only the Team tab (#212).
 - Settings' theme chooser shows every theme as a live row — its gauges, spend line, status word and tab bar — and the Theme row carries its colors.
 - Pace fire, content entrance and title flourish are picked from tiles that show the effect instead of a menu of words.
 - The pairing token is covered until you tap to reveal it.
@@ -24,6 +25,11 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
+- Settings › Accounts leads with Add Account, shows Sign In Again only on the account that needs it, and renames an account in its own field, Tab moving to the next.
+- Randomize Names can be undone for 30 seconds.
+- Regenerating the pairing token, stopping rotation, signing in again, forgetting a stored key or token, and removing a push channel, a profile or a crash report all ask first.
+- Settings › Devices puts one QR code and one address up front, with the rest behind Other addresses.
+- Every icon button in Settings says what it does and to which account, and an engine error now reads as a sentence with a next step.
 - Settings' sidebar is a real list: arrow keys, type-select, a focus ring and VoiceOver names, grouped into General, Accounts, Dashboards and Engines.
 - Settings search finds a setting by its own label, opens its pane and flashes the group it lives in; ⌘F jumps to the field.
 - The Settings window is called Settings and says which pane you're in.

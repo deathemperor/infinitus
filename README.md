@@ -186,9 +186,9 @@ An invite link, its QR, a team code or `infinitus://join/…` — from the
 Mac's Settings › Team or the phone's Team tab. Nearby, on either, finds
 a discoverable leader on the same network to request from — or a leader
 invites a discoverable machine straight from their Nearby list, and the
-invitee accepts it from Invitations. Turn on the Team lock first:
-creating, joining and approving stay disabled until biometric unlock is
-on. An invite link approves the one request it was minted for by itself
+invitee accepts it from Invitations. Turn on the lock first (the Team
+tab or, on the phone, the whole app): creating, joining and approving
+stay disabled until biometric unlock is on. An invite link approves the one request it was minted for by itself
 while the pane's auto-approve switch is on (it is by default); a team
 code always waits for a leader's Approve.
 

@@ -1,6 +1,52 @@
 import SwiftUI
 import InfinitusCore
 
+/// Every engine failure a settings pane shows the user, as a sentence
+/// with a next step. The raw `Error` never reaches the window: a
+/// `CLIError`'s text carries the engine's argv ("cswap notify slack -
+/// exited 1"), a `DecodingError` its coding path, and an `NSError` its
+/// debug description — none of the three tells anyone what to do next
+/// (the critique's [P2], four sites). Lives here because every pane in
+/// this settings group calls it and they are all one module.
+enum EngineFailure {
+    static func sentence(_ error: Error) -> String {
+        if let engine = error as? EngineError {
+            switch engine {
+            case .unsupported:
+                return "This engine doesn't support that action. Nothing changed."
+            case .unreachable:
+                return "Infinitus can't reach the engine. Check it is running at the address above, then try again."
+            case .unauthorized:
+                return "The engine refused the key. Check the key and save it again."
+            case .remote(let status, _):
+                return "The engine answered with an error (\(status)). Check the engine, then try again."
+            }
+        }
+        if error is CLIError {
+            return "The engine refused that change. Check it is running, then try again."
+        }
+        if error is DecodingError {
+            return "The engine answered in a form this version doesn't understand. Update the engine, then try again."
+        }
+        let ns = error as NSError
+        switch (ns.domain, ns.code) {
+        case (NSCocoaErrorDomain, NSFileNoSuchFileError), (NSPOSIXErrorDomain, Int(ENOENT)):
+            return "The engine isn't where Infinitus expects it. Reinstall it, then try again."
+        case (NSCocoaErrorDomain, NSFileWriteNoPermissionError), (NSPOSIXErrorDomain, Int(EACCES)):
+            return "Infinitus isn't allowed to run the engine. Check its permissions, then try again."
+        case (NSURLErrorDomain, NSURLErrorNotConnectedToInternet):
+            return "No network connection \u{2014} reconnect, then try again."
+        case (NSURLErrorDomain, NSURLErrorTimedOut):
+            return "The engine didn't answer in time. Check it is running, then try again."
+        case (NSURLErrorDomain, NSURLErrorCannotConnectToHost),
+             (NSURLErrorDomain, NSURLErrorCannotFindHost):
+            return "Nothing answered at that address. Check the address and that the engine is running."
+        default:
+            return "Couldn't save \u{2014} try again."
+        }
+    }
+}
+
 /// The cswap settings pane, rendered from the SettingSpec metadata that
 /// `cswap config list --json` exports (spec §3.1). No per-key widgets: a new
 /// SettingSpec in Python appears here with no Swift change.
@@ -30,7 +76,7 @@ final class SettingsModel: ObservableObject {
                 ($0.key, $0.isSet ? $0.value.editableText : "")
             })
             loadError = nil
-        } catch { loadError = "\(error)" }
+        } catch { loadError = EngineFailure.sentence(error) }
     }
 
     func commit(_ entry: SettingEntry) {
@@ -45,7 +91,7 @@ final class SettingsModel: ObservableObject {
                 do {
                     _ = try await cli.run(["config", "set", entry.key, value])
                     await load()
-                } catch { errors[entry.key] = "\(error)" }
+                } catch { errors[entry.key] = EngineFailure.sentence(error) }
             }
         case .unset:
             errors[entry.key] = nil
@@ -53,7 +99,7 @@ final class SettingsModel: ObservableObject {
                 do {
                     _ = try await cli.run(["config", "unset", entry.key])
                     await load()
-                } catch { errors[entry.key] = "\(error)" }
+                } catch { errors[entry.key] = EngineFailure.sentence(error) }
             }
         }
     }
@@ -119,8 +165,7 @@ struct SettingsFormBody: View {
         }
     }
 
-    /// "limitScanIntervalSeconds" → "Limit scan interval seconds". The raw
-    /// key stays reachable as the control's tooltip.
+    /// "limitScanIntervalSeconds" → "Limit scan interval seconds".
     static func humanLabel(_ key: String) -> String {
         let tail = key.split(separator: ".").dropFirst().joined(separator: " ")
         guard !tail.isEmpty else { return key }
@@ -137,17 +182,15 @@ struct SettingsFormBody: View {
             switch entry.kind {
             case "bool":
                 Toggle(Self.humanLabel(entry.key), isOn: boolBinding(entry))
-                    .help(entry.key)
             case "choice":
                 Picker(Self.humanLabel(entry.key), selection: draftBinding(entry)) {
                     Text("(default)").tag("")
                     ForEach(entry.choices ?? [], id: \.self) { Text($0).tag($0) }
                 }
                 .onChange(of: model.drafts[entry.key]) { model.commit(entry) }
-                .help(entry.key)
             default:
                 HStack {
-                    Text(Self.humanLabel(entry.key)).help(entry.key)
+                    Text(Self.humanLabel(entry.key))
                     Spacer()
                     TextField(placeholder(entry), text: draftBinding(entry))
                         .frame(maxWidth: 140)
