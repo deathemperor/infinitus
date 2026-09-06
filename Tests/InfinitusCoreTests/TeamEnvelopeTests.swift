@@ -30,6 +30,16 @@ final class TeamEnvelopeTests: XCTestCase {
         }
     }
 
+    func testAnotherVersionIsRefusedBeforeAnythingElse() throws {
+        let file = try Envelope.seal(Data("x".utf8), kind: "now", from: alice, to: [bob.keys])
+        let text = String(decoding: file, as: UTF8.self)
+        let bumped = Data(text.replacingOccurrences(of: "\"v\":1", with: "\"v\":2").utf8)
+        XCTAssertNotEqual(bumped, file)
+        XCTAssertThrowsError(try Envelope.open(bumped, as: bob, senderKey: lookup)) {
+            XCTAssertEqual($0 as? Envelope.EnvelopeError, .badVersion)
+        }
+    }
+
     func testTamperingAndUnknownSendersAreRejected() throws {
         let file = try Envelope.seal(Data("x".utf8), kind: "now", from: alice, to: [bob.keys])
         // Flip a ciphertext byte.

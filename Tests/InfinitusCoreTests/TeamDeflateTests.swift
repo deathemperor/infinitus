@@ -12,6 +12,7 @@ final class TeamDeflateTests: XCTestCase {
 
     func testGarbageAndOversizedOutputAreRejected() throws {
         XCTAssertThrowsError(try Deflate.decompress(Data([1, 2, 3, 4])))
+        XCTAssertThrowsError(try Deflate.decompress(Data()))   // nothing is not an empty stream
         let big = Data(repeating: 0, count: 100_000)
         XCTAssertThrowsError(try Deflate.decompress(try Deflate.compress(big), maxBytes: 50_000))
         // A cap below the 1 KiB floor still holds.

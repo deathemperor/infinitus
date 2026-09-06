@@ -24,6 +24,14 @@ public struct TeamPaths {
         #endif
     }
 
+    /// A team id is one path segment: the lowercase UUID `create` mints,
+    /// or anything else made of letters, digits and dashes. `--team
+    /// ../../x` must not walk out of `base` (#55).
+    public static func isValidID(_ id: String) -> Bool {
+        !id.isEmpty && id.count <= 64
+            && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+    }
+
     public var secretsDir: URL { base.appendingPathComponent("secrets") }
     public func teamDir(_ id: String) -> URL { base.appendingPathComponent(id) }
     public func configFile(_ id: String) -> URL { teamDir(id).appendingPathComponent("config.json") }

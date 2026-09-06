@@ -24,8 +24,10 @@ public struct Signed<T: Codable & Equatable & Sendable>: Codable, Equatable, Sen
     /// to have signed (a leader for rosters, the requester for requests).
     public func verify(with keys: TeamKeys) throws {
         guard keys.kid == by else { throw SignedError.wrongSigner }
-        guard let sigData = Data(base64Encoded: sig),
-              try keys.signingKey().isValidSignature(sigData, for: try CanonicalJSON.encode(doc))
+        // Garbled key bytes surface as `badSignature` too, not as a
+        // `TeamKeys.KeyError` the caller never expects here (#55).
+        guard let sigData = Data(base64Encoded: sig), let key = try? keys.signingKey(),
+              key.isValidSignature(sigData, for: try CanonicalJSON.encode(doc))
         else { throw SignedError.badSignature }
     }
 }

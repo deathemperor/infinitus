@@ -46,11 +46,16 @@ private let nearbyPlatform = "windows"
 private func emit<T: Encodable>(_ value: T) {
     let enc = JSONEncoder()
     enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    if let data = try? enc.encode(value) { print(String(decoding: data, as: UTF8.self)) }
+    do {
+        print(String(decoding: try enc.encode(value), as: UTF8.self))
+    } catch {
+        exit(fail("could not encode the result: \(error)"))   // not silence and 0 (#55)
+    }
 }
 
 private func fail(_ message: String, code: Int32 = 1) -> Int32 {
-    FileHandle.standardError.write(Data("error: \(message)\n".utf8))
+    let prefix = message.hasPrefix("usage:") ? "" : "error: "
+    FileHandle.standardError.write(Data("\(prefix)\(TeamGit.masked(message))\n".utf8))
     return code
 }
 

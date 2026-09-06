@@ -264,6 +264,32 @@ final class TeamGitTests: XCTestCase {
     /// #55: `GitError.failed` quotes git's stderr, which echoes the
     /// remote as configured — and the remote a team code carries IS the
     /// write credential.
+    func testFeedingAChildThatAlreadyExitedDoesNotKillTheProcess() throws {
+        // Under the old sequential write this raised SIGPIPE (#55).
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        p.arguments = ["true"]
+        let input = Pipe()
+        p.standardInput = input
+        try p.run(); p.waitUntilExit()
+        // Off the test thread with a deadline: a regression that blocks in
+        // the write must fail the test, not hang the suite.
+        let fed = expectation(description: "feed returns")
+        DispatchQueue.global().async {
+            TeamGit.feed(input.fileHandleForWriting, Data(repeating: 0x2a, count: 1 << 20))   // 1 MiB, far past the pipe buffer
+            fed.fulfill()
+        }
+        wait(for: [fed], timeout: 10)
+        XCTAssertEqual(p.terminationStatus, 0)
+    }
+
+    func testTeamIDsAreOnePathSegment() {
+        XCTAssertTrue(TeamPaths.isValidID(UUID().uuidString.lowercased()))
+        for bad in ["", ".", "..", "../x", "a/b", "a b", "ünï", String(repeating: "a", count: 65)] {
+            XCTAssertFalse(TeamPaths.isValidID(bad), bad)
+        }
+    }
+
     func testCredentialedRemotesAreMasked() {
         XCTAssertEqual(TeamGit.masked("fatal: unable to access 'https://infinitus:ghp_secret@github.com/o/r.git/'"),
                        "fatal: unable to access 'https://•••@github.com/o/r.git/'")

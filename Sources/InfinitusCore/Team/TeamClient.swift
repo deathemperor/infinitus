@@ -32,6 +32,8 @@ public struct TeamStatus: Codable, Equatable, Sendable {
 public final class TeamClient {
     public enum ClientError: Error, Equatable {
         case notALeader, notInTeam, noRoster, unknownRequest, badCode, alreadyJoined
+        /// Not one path segment (`TeamPaths.isValidID`).
+        case badTeamID
         /// The kid is already a leader of this roster.
         case alreadyLeader
         /// The kid is already a member under different keys.
@@ -171,6 +173,7 @@ public final class TeamClient {
     }
 
     public static func open(id: String, paths: TeamPaths, secrets: TeamSecrets) throws -> TeamClient {
+        guard TeamPaths.isValidID(id) else { throw ClientError.badTeamID }
         let config = try CanonicalJSON.decode(TeamConfig.self, from: try Data(contentsOf: paths.configFile(id)))
         let me = try identity(paths: paths, secrets: secrets)
         let token = secrets.read(tokenName(id)).map { String(decoding: $0, as: UTF8.self) }

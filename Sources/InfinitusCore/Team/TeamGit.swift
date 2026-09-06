@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Glibc)
+import Glibc   // signal / SIGPIPE for `feed`
+#endif
 
 /// `TeamStore` over git plumbing (spec §4.2). The local side is a bare
 /// mirror — no working tree, no checkouts: writes build a tree on top of
@@ -365,6 +368,25 @@ public final class TeamGit: TeamStore {
         return (stdout, buffer.data)
     }
 
+    /// Writes the child's stdin and closes it, off the draining thread:
+    /// written first and in full, a blob larger than the pipe would block
+    /// against a child that is itself blocked writing stdout (#55). A
+    /// child that exited without reading (bad `--git-dir`, a refused
+    /// command) makes the write fail with EPIPE instead of raising
+    /// SIGPIPE at the process; its exit status carries the story.
+    static func feed(_ handle: FileHandle, _ data: Data) {
+        #if canImport(Darwin)
+        _ = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
+        #else
+        _ = ignoreSigpipe   // Linux has no per-descriptor switch
+        #endif
+        try? handle.write(contentsOf: data)
+        try? handle.close()
+    }
+    #if !canImport(Darwin)
+    private static let ignoreSigpipe: Void = { _ = signal(SIGPIPE, SIG_IGN) }()
+    #endif
+
     private func runOnce(_ args: [String], stdin: Data?, env extra: [String: String], useGitDir: Bool) throws -> Data {
         #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         // Foundation has no Process here; InfinitusCore is linked into the
@@ -385,19 +407,20 @@ public final class TeamGit: TeamStore {
         p.environment = Self.childEnvironment(base: ProcessInfo.processInfo.environment, extra: extra, token: token)
         let out = Pipe(), err = Pipe()
         p.standardOutput = out; p.standardError = err
+        let feeding = DispatchGroup()
         if let stdin {
             let input = Pipe()
             p.standardInput = input
             try p.run()
-            input.fileHandleForWriting.write(stdin)
-            input.fileHandleForWriting.closeFile()
+            DispatchQueue.global(qos: .utility).async(group: feeding) { Self.feed(input.fileHandleForWriting, stdin) }
         } else {
             p.standardInput = FileHandle.nullDevice
             try p.run()
         }
-        // Both pipes at once (see `drain`), then wait: either one filling
-        // up while we read the other would hang the publish.
+        // Both pipes at once (see `drain`) while stdin is fed, then wait:
+        // any one of the three blocking on another would hang the publish.
         let (data, errData) = Self.drain(out: out.fileHandleForReading, err: err.fileHandleForReading)
+        feeding.wait()
         p.waitUntilExit()
         guard p.terminationStatus == 0 else {
             throw GitError.failed(command: args.joined(separator: " "), status: p.terminationStatus,

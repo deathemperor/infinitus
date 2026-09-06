@@ -45,7 +45,12 @@ func teamUsage() -> String {
 private func emit<T: Encodable>(_ value: T) {
     let enc = JSONEncoder()
     enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    if let data = try? enc.encode(value) { print(String(decoding: data, as: UTF8.self)) }
+    do {
+        print(String(decoding: try enc.encode(value), as: UTF8.self))
+    } catch {
+        // Silence and exit 0 would read as "nothing to report" (#55).
+        exit(fail("could not encode the result: \(error)"))
+    }
 }
 
 /// Every error path prints through here, so the mask lives here: git's
@@ -53,7 +58,8 @@ private func emit<T: Encodable>(_ value: T) {
 private func masked(_ message: String) -> String { TeamGit.masked(message) }
 
 private func fail(_ message: String, code: Int32 = 1) -> Int32 {
-    FileHandle.standardError.write(Data("error: \(masked(message))\n".utf8))
+    let prefix = message.hasPrefix("usage:") ? "" : "error: "   // not "error: usage:"
+    FileHandle.standardError.write(Data("\(prefix)\(masked(message))\n".utf8))
     return code
 }
 

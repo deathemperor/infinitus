@@ -70,6 +70,16 @@ final class TeamRosterTests: XCTestCase {
         XCTAssertEqual(String(decoding: try CanonicalJSON.encode(TeamRoster.ShareTarget.leaders), as: UTF8.self), "\"leaders\"")
         XCTAssertEqual(String(decoding: try CanonicalJSON.encode(TeamRoster.ShareTarget.members(["a"])), as: UTF8.self), "[\"a\"]")
         XCTAssertEqual(try CanonicalJSON.decode(TeamRoster.ShareTarget.self, from: Data("\"team\"".utf8)), .team)
+        XCTAssertEqual(try CanonicalJSON.decode(TeamRoster.ShareTarget.self, from: Data("[\"a\",\"b\"]".utf8)), .members(["a", "b"]))
+    }
+
+    func testGarbledSignerKeysReadAsABadSignature() throws {
+        let signed = try Signed.make(roster(rev: 1, leaders: [leader], members: []), by: leader)
+        let garbled = TeamKeys(kid: leader.kid, enc: leader.keys.enc, sig: "not base64!")
+        XCTAssertThrowsError(try signed.verify(with: garbled)) {
+            XCTAssertEqual($0 as? Signed<TeamRoster>.SignedError, .badSignature)
+        }
+        XCTAssertNoThrow(try signed.verify(with: leader.keys))
     }
 
     func testTeamCodeRoundTripExpiryAndSignature() throws {
