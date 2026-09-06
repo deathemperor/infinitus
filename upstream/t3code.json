@@ -1,0 +1,21 @@
+{
+  "repo": "pingdotgg/t3code",
+  "branch": "main",
+  "commit": "281b92b48810062275798dd4107364384ebaf432",
+  "markedAt": "2026-09-06",
+  "issue": 223,
+  "watch": [
+    { "phase": 1, "theme": "Claude adapter (spawn, event normalization, permissions, usage limits)",
+      "paths": ["apps/server/src/provider/Layers/ClaudeAdapter.ts", "apps/server/src/provider/Layers/ClaudeProvider.ts", "apps/server/src/provider/Layers/claudeUsageLimits.ts", "apps/server/src/provider/Drivers/Claude*.ts", "apps/server/src/provider/ClaudeModelCatalog.ts", "apps/server/src/provider/Services/ProviderAdapter.ts", "packages/contracts/src/providerRuntime.ts", "packages/contracts/src/providerUsageLimits.ts"],
+      "ours": ["Sources/InfinitusCore/SessionFeed.swift", "Sources/InfinitusCore/Transcript.swift", "Sources/InfinitusCore/SessionInput.swift"] },
+    { "phase": 2, "theme": "Orchestration read model (projector, ingestion, coalescing, cursors, checkpoints, settlement)",
+      "paths": ["apps/server/src/orchestration/", "apps/server/src/checkpointing/", "packages/contracts/src/orchestration.ts"],
+      "ours": ["Sources/InfinitusCore/SessionFeed.swift", "Sources/InfinitusCore/Checkpoints.swift", "Sources/InfinitusCore/SessionProgress.swift"] },
+    { "phase": 3, "theme": "Mobile threads (feed presentation, list status, composer, approvals, outbox, cache, agent awareness)",
+      "paths": ["apps/mobile/src/lib/threadActivity.ts", "apps/mobile/src/features/threads/", "apps/mobile/src/features/home/", "apps/mobile/src/features/agent-awareness/", "apps/mobile/src/features/review/", "apps/mobile/src/state/", "apps/mobile/src/persistence/", "apps/mobile/src/connection/", "packages/client-runtime/src/work-log/", "packages/client-runtime/src/state/"],
+      "ours": ["ios/InfinitusMobile/SessionFeedScreen.swift", "ios/InfinitusMobile/SessionsScreen.swift", "ios/InfinitusMobile/MirrorModel.swift", "ios/InfinitusMobile/OutboxDelivery.swift", "ios/InfinitusMobile/LiveActivities.swift"] },
+    { "phase": 4, "theme": "Wire contract (RPC catalogue, subscriptions, auth, connection runtime, discovery)",
+      "paths": ["packages/contracts/src/rpc.ts", "packages/contracts/src/environmentHttp.ts", "packages/contracts/src/environment.ts", "packages/contracts/src/auth.ts", "packages/contracts/src/background.ts", "packages/client-runtime/src/rpc/", "packages/client-runtime/src/connection/", "apps/server/src/ws.ts", "apps/server/src/auth/", "docs/internals/"],
+      "ours": ["Sources/InfinitusCore/MirrorTransport.swift", "Sources/Infinitus/MirrorServer.swift", "ios/InfinitusMobile/NetworkFleetMirror.swift"] }
+  ]
+}

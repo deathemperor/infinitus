@@ -1,0 +1,39 @@
+name: Upstream Watch
+# Weekly: what changed in the repos we mirror (upstream/*.json) since the
+# marked commit, posted to one issue per upstream so a session can apply
+# the batch and move the mark (tools/upstream-diff.sh <name> --mark).
+on:
+  schedule:
+    - cron: "0 1 * * 1"   # Mondays 01:00 UTC = 08:00 GMT+7
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report and file
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          for manifest in upstream/*.json; do
+            name=$(basename "$manifest" .json)
+            report=$(tools/upstream-diff.sh "$name")
+            echo "$report"
+            commits=$(echo "$report" | head -1 | sed -E 's/.*: ([0-9]+) commits.*/\1/')
+            [ "$commits" = 0 ] && continue
+            marker="<!-- upstream-watch:$name -->"
+            title="upstream: $name changes to apply"
+            body=$(printf '%s\n%s\n\nRun `tools/upstream-diff.sh %s` locally for the full log; after applying, `tools/upstream-diff.sh %s --mark <sha>` and ship the manifest with the batch.\n' "$marker" "$report" "$name" "$name")
+            existing=$(gh issue list --label upstream --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --body "$body"
+              echo "updated #$existing"
+            else
+              gh label create upstream --color 5319e7 --description "Changes in a mirrored upstream repo to apply here." --force >/dev/null
+              gh issue create --title "$title" --label upstream --body "$body"
+            fi
+          done
