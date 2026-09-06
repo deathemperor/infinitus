@@ -187,7 +187,9 @@ public struct PushTriggers: Sendable {
                 if quietTicks >= 2 {
                     memory.busySince = nil
                     quietTicks = 0
-                    if flags.sessionsDone, now.timeIntervalSince(since) >= Self.sessionsDoneMinBusy {
+                    // A stretch persisted across a long gap (quit mid-work, sessions
+                    // closed meanwhile) must not announce "0 of 0 working".
+                    if flags.sessionsDone, (total ?? 0) > 0, now.timeIntervalSince(since) >= Self.sessionsDoneMinBusy {
                         out.append("all sessions finished — 0 of \(total ?? 0) working")
                     }
                 }

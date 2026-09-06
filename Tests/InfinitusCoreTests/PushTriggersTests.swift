@@ -117,6 +117,16 @@ final class PushTriggersTests: XCTestCase {
         XCTAssertEqual(t.tick(busy: 0, total: 5, accounts: [], flags: all, now: at(17)).count, 1, "the stretch counts from the new episode's start")
     }
 
+    func testAStretchOutlivingEverySessionStaysSilent() {
+        var first = PushTriggers()
+        _ = first.tick(busy: 2, total: 2, accounts: [], flags: all, now: at(0))
+        // Quit mid-work; the sessions closed while the app was down.
+        var relaunched = PushTriggers(memory: first.memory)
+        _ = relaunched.tick(busy: 0, total: 0, accounts: [], flags: all, now: at(300))
+        XCTAssertEqual(relaunched.tick(busy: 0, total: 0, accounts: [], flags: all, now: at(301)), [])
+        XCTAssertNil(relaunched.memory.busySince)
+    }
+
     func testBusyStretchAndLastAliveWarningSurviveARelaunch() {
         var first = PushTriggers()
         let warn = [acct(1, dead: true), acct(2, dead: false, pct: 92)]
