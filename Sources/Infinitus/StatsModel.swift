@@ -44,6 +44,11 @@ final class StatsModel: ObservableObject {
     private var repoNotes: [String] = []
     private var transcriptDays: [String: Stats.Day] = [:]
     private var repoDays: [String: Stats.Day] = [:]
+    /// Every live transcript file as of the last finished scan, for the
+    /// team publisher (#251: it publishes from this instead of scanning
+    /// the same corpus a second time). nil until a scan of this launch
+    /// has run to its end.
+    private(set) var scanEntries: [String: StatsScanner.FileEntry]?
 
     /// What the mirror exporter sends: eight folds, two of them
     /// full-year. Built OFF the main actor after every `recomputeDays`
@@ -165,12 +170,14 @@ final class StatsModel: ObservableObject {
             var firstBytesTotal: Int?
             var previousBytesRemaining = Int.max
             let cacheHandle = StatsScanner.CacheHandle()   // decoded once per loop, not per pass
+            var entries: [String: StatsScanner.FileEntry] = [:]
             while remaining > 0 {
                 passCount += 1
                 let transcripts = StatsScanner.scan(projectsDir: projectsDir, codexDir: codexDir, cacheURL: cacheURL,
                                                     calendar: calendar, byteBudget: Self.chunkByteBudget,
                                                     handle: cacheHandle)
                 remaining = transcripts.remaining
+                entries = transcripts.entries
                 if firstBytesTotal == nil { firstBytesTotal = transcripts.bytesTotal }
                 let consumedThisPass = transcripts.bytesTotal - transcripts.bytesRemaining
                 cumulativeConsumed += max(0, consumedThisPass)
@@ -230,6 +237,7 @@ final class StatsModel: ObservableObject {
             }
             await MainActor.run {
                 self.progress = nil
+                self.scanEntries = entries
                 self.markTranscriptsDone()
             }
         }

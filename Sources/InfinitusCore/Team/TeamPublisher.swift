@@ -124,10 +124,17 @@ public struct TeamPublisher {
                                                 calendar: Calendar = .current, now: Date = Date()) -> [TranscriptSession] {
         guard let data = try? Data(contentsOf: cacheURL),
               let cache = try? JSONDecoder().decode(StatsScanner.Cache.self, from: data) else { return [] }
+        return recentTranscriptSessions(entries: cache.files, days: days, exclusions: exclusions, calendar: calendar, now: now)
+    }
+
+    /// The same list off a scan already in hand (`Sources.entries`).
+    public static func recentTranscriptSessions(entries: [String: StatsScanner.FileEntry], days: Int,
+                                                exclusions: TeamExclusions = TeamExclusions(),
+                                                calendar: Calendar = .current, now: Date = Date()) -> [TranscriptSession] {
         let floorDate = calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: now)) ?? .distantPast
         let floor = Stats.dayKey(floorDate, calendar: calendar)
         var out: [String: TranscriptSession] = [:]
-        for (path, entry) in cache.files {
+        for (path, entry) in entries {
             guard entry.engine == Stats.Engine.claude.rawValue else { continue }
             let identity = transcriptIdentity(path)
             if exclusions.excludes(cwd: entry.cwd, projectDir: identity.projectDir) { continue }
@@ -159,6 +166,12 @@ public struct TeamPublisher {
         /// A scan cache of the publisher's OWN (never the app's, which
         /// the app writes concurrently).
         public var cacheURL: URL?
+        /// A scan the caller already has (the app's StatsModel, which
+        /// scans on its own cadence): set, `publish` scans nothing and
+        /// `cacheURL` is left alone (#251 — two scans of one corpus at
+        /// once took the app to 5.5 GB). Files without a day inside
+        /// `historyDays` are dropped, as the scanner's `maxAge` drops them.
+        public var entries: [String: StatsScanner.FileEntry]?
         public var liveSessions: [ClaudeSessionRecord] = []
         public var crashes: [CrashReport] = []
         public var fleets: [TeamDocs.Fleet] = []
@@ -327,10 +340,17 @@ public struct TeamPublisher {
         var state = TeamPublishState.load(teamDir: teamDir)
         let at = Int(now.timeIntervalSince1970)
         let calendar = sources.calendar
-        let scan = StatsScanner.scan(projectsDir: sources.projectsDir, codexDir: sources.codexDir, cacheURL: sources.cacheURL,
-                                     calendar: calendar, maxAge: Double(sources.historyDays) * 86_400, now: now)
+        let entries: [String: StatsScanner.FileEntry]
+        if let given = sources.entries {
+            let floor = calendar.date(byAdding: .day, value: -sources.historyDays, to: calendar.startOfDay(for: now)) ?? .distantPast
+            let floorDay = Stats.dayKey(floor, calendar: calendar)
+            entries = given.filter { ($0.value.days.keys.max() ?? "") >= floorDay }
+        } else {
+            entries = StatsScanner.scan(projectsDir: sources.projectsDir, codexDir: sources.codexDir, cacheURL: sources.cacheURL,
+                                        calendar: calendar, maxAge: Double(sources.historyDays) * 86_400, now: now).entries
+        }
         let transcriptFloor = calendar.date(byAdding: .day, value: -sources.transcriptDays, to: calendar.startOfDay(for: now)) ?? .distantPast
-        let collected = Self.collect(entries: scan.entries, exclusions: exclusions,
+        let collected = Self.collect(entries: entries, exclusions: exclusions,
                                      transcriptFloorDay: Stats.dayKey(transcriptFloor, calendar: calendar))
         let choices = TeamTranscriptChoices.load(teamDir: teamDir)
         let toChunk = transcriptsOff ? [] : collected.transcripts.filter { choices.includes($0.session) }

@@ -1267,6 +1267,10 @@ final class AppModel: ObservableObject {
         }
         team.gate = { [weak self] in TeamGate.check(lockEnabled: self?.lock.enabled) }
         team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
+        // The fixture instance (e2e) publishes what the publisher scans itself.
+        let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"] ?? ""
+        team.ownsScan = { [weak self] in fixture.isEmpty && self?.statsModel.enabled == true }
+        team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
         team.load()
         crashReports = crashStore.list()
         scanMacCrashReports()

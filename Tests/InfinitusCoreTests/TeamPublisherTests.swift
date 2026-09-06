@@ -426,6 +426,37 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(TeamPublisher.recentTranscriptSessions(cacheURL: scratch.appendingPathComponent("nope.json"), days: 10_000), [])
     }
 
+    /// The app hands the publisher its own StatsModel scan (#251): the
+    /// publisher then scans nothing — a projects dir that does not
+    /// exist publishes the same set — and writes no cache of its own.
+    func testAScanHandedInSkipsTheScannerAndItsCache() throws {
+        let t = try team()
+        let projects = try writeProjects(scratch)
+        let scanned = StatsScanner.scan(projectsDir: projects, cacheURL: nil).entries
+        var s = sources(scratch.appendingPathComponent("nonexistent"))
+        s.entries = scanned
+        s.cacheURL = scratch.appendingPathComponent("never.json")
+        let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s)
+        let me = "m/\(t.alice.identity.kid)/"
+        XCTAssertEqual(Set(report.published), [
+            me + "days/2026-09-04.json", me + "sessions/index.json", me + "now.json", me + "crashes.json",
+            me + "transcripts/s1/1.jsonl", me + "transcripts/s1/subagents/agent-a1/1.jsonl", me + "transcripts/s2/1.jsonl",
+        ])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: s.cacheURL!.path))
+        // The picker lists the same sessions off the same entries.
+        XCTAssertEqual(TeamPublisher.recentTranscriptSessions(entries: scanned, days: 10_000).map(\.id).sorted(), ["s1", "s2"])
+
+        // `historyDays` still bounds what goes out: ten days on with a
+        // one-day window, the fixture's day is not published.
+        var narrow = s
+        narrow.historyDays = 1
+        let later = Date(timeIntervalSince1970: 1_789_000_000)
+        let second = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: narrow, now: later)
+        XCTAssertFalse(second.published.contains { $0.contains("/days/") || $0.contains("/transcripts/") })
+        let index = try CanonicalJSON.decode(TeamDocs.SessionsIndex.self, from: try t.alice.read(me + "sessions/index.json").1)
+        XCTAssertEqual(index.sessions, [])
+    }
+
     /// `published/` is the only part of a team dir that grows without
     /// bound (a month of transcripts was 9 GB): the oldest transcript
     /// copies go, and only those.

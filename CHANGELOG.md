@@ -24,6 +24,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Settings polish: every engine error reads as a sentence, the search highlight fades in and out, Machine labels share one casing, and a `-mock_mode YES` dev instance shows mock accounts (#249).
+- Team publishing reuses the Stats scan instead of scanning every transcript a second time, which had taken the app to 5.5 GB (#251).
 - Settings › Accounts leads with Add Account, shows Sign In Again only on the account that needs it, and renames an account in its own field, Tab moving to the next.
 - Randomize Names can be undone for 30 seconds.
 - Regenerating the pairing token, stopping rotation, signing in again, forgetting a stored key or token, and removing a push channel, a profile or a crash report all ask first.
