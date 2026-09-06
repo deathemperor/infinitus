@@ -123,6 +123,12 @@ struct DisplayPane: View {
             }
             .help("The phone's + button opens a terminal here running the engine "
                   + "in the repository you picked; takes effect at the next launch.")
+            Toggle("Checkpoint the repository at every prompt", isOn: $model.checkpointsEnabled)
+                .help("With the Claude Code plugin installed, each prompt records the "
+                      + "working tree as a hidden git ref (refs/infinitus/checkpoints/…) — "
+                      + "`infinitusctl checkpoints <session>` lists them, checkpoint-diff "
+                      + "compares, checkpoint-restore puts the files back. Ignored files "
+                      + "stay out; git status is untouched.")
             Toggle("Menu bar follows the theme", isOn: $model.menuBarThemed)
                 .help("The loop in the theme's color with the theme's icon "
                       + "beside it; off, or the Off theme, keeps the plain loop.")

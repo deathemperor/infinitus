@@ -11,10 +11,12 @@ public struct HookEvent: Equatable, Sendable {
     /// PreToolUse: the tool, and for Bash its command.
     public let toolName: String?
     public let toolCommand: String?
+    /// UserPromptSubmit: the prompt's text — a checkpoint's subject (#167).
+    public let prompt: String?
 
     public init(name: String, sessionId: String? = nil, cwd: String? = nil,
                 message: String? = nil, notificationType: String? = nil,
-                toolName: String? = nil, toolCommand: String? = nil) {
+                toolName: String? = nil, toolCommand: String? = nil, prompt: String? = nil) {
         self.name = name
         self.sessionId = sessionId
         self.cwd = cwd
@@ -22,6 +24,7 @@ public struct HookEvent: Equatable, Sendable {
         self.notificationType = notificationType
         self.toolName = toolName
         self.toolCommand = toolCommand
+        self.prompt = prompt
     }
 
     public static func parse(_ json: String) -> HookEvent? {
@@ -33,7 +36,8 @@ public struct HookEvent: Equatable, Sendable {
                          message: object["message"] as? String,
                          notificationType: object["notification_type"] as? String,
                          toolName: object["tool_name"] as? String,
-                         toolCommand: (object["tool_input"] as? [String: Any])?["command"] as? String)
+                         toolCommand: (object["tool_input"] as? [String: Any])?["command"] as? String,
+                         prompt: object["prompt"] as? String)
     }
 
     public var repo: String {

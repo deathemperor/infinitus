@@ -53,6 +53,8 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("resume-session")?.args, ["<sessionId>"])
         XCTAssertEqual(ControlCommand.named("profile-set")?.args, ["<name>"])
         XCTAssertEqual(ControlCommand.named("profile-remove")?.effect, .write)
+        XCTAssertEqual(ControlCommand.named("checkpoint-restore")?.effect, .destructive)
+        XCTAssertEqual(ControlCommand.named("checkpoint-diff")?.args, ["<pid|name>", "<n>", "[m]"])
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")
         XCTAssertEqual(ControlCommand.named("lock-status")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("lock-status")?.args, [])

@@ -15,6 +15,12 @@ final class HookEventTests: XCTestCase {
                        "Notification — limitless (permission_prompt): Claude needs your permission to use Bash")
     }
 
+    func testUserPromptSubmitCarriesThePrompt() {
+        let event = HookEvent.parse(#"{"session_id":"abc","cwd":"/r","hook_event_name":"UserPromptSubmit","prompt":"Fix the crash"}"#)
+        XCTAssertEqual(event?.prompt, "Fix the crash")
+        XCTAssertNil(event?.pushLine)
+    }
+
     func testMessagelessPromptFallsBackToThePollWording() {
         let event = HookEvent(name: "Notification", cwd: "/r/app", notificationType: "permission_prompt")
         XCTAssertEqual(event.pushLine, "waiting on you — app needs an answer")

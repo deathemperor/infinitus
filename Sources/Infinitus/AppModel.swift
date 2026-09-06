@@ -479,6 +479,9 @@ final class AppModel: ObservableObject {
     /// Where a session started from the phone opens (#91): "auto" (cmux
     /// when installed, else Terminal), "cmux", "terminal".
     @Published var sessionHost: String { didSet { defaults.set(sessionHost, forKey: "session_host") } }
+    /// Per-turn workspace checkpoints (#167): a hidden git ref per prompt,
+    /// recorded when the plugin's UserPromptSubmit hook fires.
+    @Published var checkpointsEnabled: Bool { didSet { defaults.set(checkpointsEnabled, forKey: "checkpoints_enabled") } }
     /// The status item in the theme's color with the theme's icon (#90),
     /// and its effects (switch/death/revival flash, the burn breath).
     @Published var menuBarThemed: Bool { didSet { defaults.set(menuBarThemed, forKey: "menubar_themed") } }
@@ -627,6 +630,10 @@ final class AppModel: ObservableObject {
             ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
                 .first { $0.sessionId == id }.map { Int($0.pid) }
         }
+        if event.name == "UserPromptSubmit", checkpointsEnabled, !isPlayground,
+           let sessionId = event.sessionId, let cwd = event.cwd {
+            recordCheckpoint(sessionId: sessionId, cwd: cwd, subject: event.prompt ?? "")
+        }
         if let line = event.pushLine, !isPlayground {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
             if let pid { pushTriggers.announceWaiting(pid: pid) }
@@ -650,6 +657,31 @@ final class AppModel: ObservableObject {
     }
     private var hookRefresh: Task<Void, Never>?
     private var lastHookRefresh = Date.distantPast
+
+    /// The snapshot runs git in the session's repository, off the main
+    /// thread; the first checkpoint of a session is logged, the rest are
+    /// quiet (one per prompt would drown the Activity pane). A failure
+    /// is logged once per session too.
+    private var checkpointed: Set<String> = []
+    private func recordCheckpoint(sessionId: String, cwd: String, subject: String) {
+        let first = !checkpointed.contains(sessionId)
+        checkpointed.insert(sessionId)
+        let repo = (cwd as NSString).lastPathComponent
+        Task.detached(priority: .utility) { [weak self] in
+            do {
+                guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
+                if first {
+                    await MainActor.run { self?.logEvent("other", icon: "clock.arrow.2.circlepath",
+                                                         "checkpointing \(repo) — \(made.subject)") }
+                }
+            } catch {
+                if first {
+                    await MainActor.run { self?.logEvent("other", icon: "exclamationmark.triangle",
+                                                         "checkpoint of \(repo) failed: \(error)") }
+                }
+            }
+        }
+    }
     static let hookRefreshSpacing: TimeInterval = 30
 
     func notify(_ body: String) {
@@ -788,6 +820,7 @@ final class AppModel: ObservableObject {
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
+        checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
@@ -908,6 +941,7 @@ final class AppModel: ObservableObject {
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
+        checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
     }
