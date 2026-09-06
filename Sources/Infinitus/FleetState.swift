@@ -176,7 +176,7 @@ final class FleetState: ObservableObject, Identifiable {
             do {
                 try await op()
                 host.lastError = nil
-            } catch { host.lastError = "\(error)" }
+            } catch { host.lastError = EngineFailure.sentence(error) }
             await host.refreshSnapshot()
             settle()
         }

@@ -893,7 +893,10 @@ final class AppModel: ObservableObject {
         burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
         // Local: init reads it again below before every stored
         // property is set (two-phase init forbids self.mockMode there).
-        let mock = defaults.object(forKey: "mock_mode") as? Bool ?? false
+        // `bool(forKey:)`, not `object as? Bool`: the argument domain of
+        // a dev launch (`-mock_mode YES`) holds the String "YES", which
+        // only the typed getter reads as true (#249).
+        let mock = defaults.bool(forKey: "mock_mode")
         mockMode = mock
         cswapEnabled = defaults.object(forKey: "engine_cswap_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
@@ -1930,7 +1933,10 @@ final class AppModel: ObservableObject {
                 _ = try await cswap.run(["add"])
                 await refreshSnapshot()
             } catch {
-                firstAccountMessage = (error as? CLIError)?.message ?? "\(error)"
+                // The engine's own text when it gave one (`cswap add` says
+                // what went wrong in its login); otherwise a sentence, never
+                // the raw error.
+                firstAccountMessage = (error as? CLIError)?.message ?? EngineFailure.sentence(error)
             }
             addingFirstAccount = false
         }

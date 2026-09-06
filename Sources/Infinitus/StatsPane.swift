@@ -98,6 +98,8 @@ struct StatsPane: View {
                             .fill(Color.accentColor.opacity(0.08 + 0.92 * Double(hours[d * 24 + h]) / Double(peak)))
                             .frame(height: 12)
                             .help("\(days[d]) \(h):00 — \(hours[d * 24 + h]) entries")
+                            .accessibilityLabel("\(days[d]) \(h):00")
+                            .accessibilityValue("\(hours[d * 24 + h]) entries")
                     }
                 }
             }

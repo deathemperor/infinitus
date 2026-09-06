@@ -65,23 +65,41 @@ private struct SettingsAnchor: ViewModifier {
     let anchor: String
     @Environment(\.settingsHighlight) private var highlight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The tint is a row background only while it shows — nil otherwise,
+    /// not a clear fill: in a grouped Form the section's card IS its row
+    /// backgrounds, so a permanent listRowBackground strips the card off
+    /// every anchored section. A view-or-nil swap alone snaps, so the
+    /// tint is mounted transparent a frame before it fades in and
+    /// unmounted once it has faded out.
+    @State private var mounted = false
+    @State private var opacity = 0.0
 
     private var lit: Bool { highlight == anchor }
+    private var fade: Animation? { reduceMotion ? nil : .easeInOut(duration: 0.35) }
 
     func body(content: Content) -> some View {
         content
             .id(anchor)
-            // nil, not a clear fill: in a grouped Form the section's
-            // card IS its row backgrounds, so a permanent
-            // listRowBackground would strip the card off every
-            // anchored section.
-            .listRowBackground(lit
-                ? RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.accentColor.opacity(0.18))
+            .listRowBackground(mounted
+                ? RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.18)).opacity(opacity)
                 : nil)
-            // One shot, ~0.35s, cleared by the caller after 1.2s: no
+            // One shot, cleared by the caller after 1.2s: no
             // repeatForever, no TimelineView, nothing ticking (repo
             // rule — idle CPU stays ~0%).
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: lit)
+            .onChange(of: lit) { _, on in
+                if on {
+                    mounted = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(16))
+                        withAnimation(fade) { opacity = 1 }
+                    }
+                } else {
+                    withAnimation(fade) { opacity = 0 }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(400))
+                        if !lit { mounted = false }
+                    }
+                }
+            }
     }
 }
