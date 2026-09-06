@@ -74,6 +74,12 @@ final class TeamModel: ObservableObject {
     var gate: () -> TeamGate.Verdict = { .allowed }
     /// Set by AppModel: what this Mac publishes (projects dir, live sessions, crashes, fleets, blockers).
     var sources: () -> TeamPublisher.Sources = { TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
+    /// Set by AppModel: true when this instance scans its transcripts for
+    /// itself (StatsModel), in which case the publisher never scans on
+    /// its own (#251) — it publishes from `scanEntries`, and waits a tick
+    /// while that is still nil (the first scan after launch).
+    var ownsScan: () -> Bool = { false }
+    var scanEntries: () -> [String: StatsScanner.FileEntry]? = { nil }
     var showSettings: (() -> Void)?
 
     let paths: TeamPaths
@@ -171,6 +177,7 @@ final class TeamModel: ObservableObject {
     func load() -> Task<Void, Never> {
         guard enabled else { return Task {} }
         let fetch = lastFetchAt, publish = lastPublishAt, err = lastError
+        let scan = appScan()
         return Task {
             do {
                 let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker) = try await run { paths, secrets in
@@ -184,11 +191,18 @@ final class TeamModel: ObservableObject {
                     let (snap, reader) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err)
                     let pendingNearby = client.isLeader ? TeamNearby.Store.pending(team: client.config.id, paths: paths) : []
                     let choices = TeamTranscriptChoices.load(teamDir: dir)
-                    let picker = TranscriptPicker(choices: choices, recent: choices.mode == .chosen
-                        ? TeamPublisher.recentTranscriptSessions(cacheURL: dir.appendingPathComponent("scan-cache.json"),
-                                                                 days: TeamPublisher.Sources.defaultTranscriptDays,
-                                                                 exclusions: exclusions)
-                        : [])
+                    let recent: [TeamPublisher.TranscriptSession]
+                    if choices.mode != .chosen { recent = [] }
+                    else if let entries = scan.entries {
+                        recent = TeamPublisher.recentTranscriptSessions(entries: entries, days: TeamPublisher.Sources.defaultTranscriptDays,
+                                                                        exclusions: exclusions)
+                    } else if scan.owns { recent = [] }   // the app's first scan is still running
+                    else {
+                        recent = TeamPublisher.recentTranscriptSessions(cacheURL: dir.appendingPathComponent("scan-cache.json"),
+                                                                        days: TeamPublisher.Sources.defaultTranscriptDays,
+                                                                        exclusions: exclusions)
+                    }
+                    let picker = TranscriptPicker(choices: choices, recent: recent)
                     return (snap, reader, TeamShares.load(teamDir: dir), exclusions, kid, client.roster, pendingNearby, picker)
                 }
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -226,6 +240,11 @@ final class TeamModel: ObservableObject {
         let auto = autoApprove
         let aggregatesDue = lastAggregatesAt.map { Int(Date().timeIntervalSince1970) - $0 >= Self.aggregatesInterval } ?? true
         var sources = sources
+        let scan = appScan()
+        sources.entries = scan.entries
+        // The app's own scan has not finished since launch: fetch now,
+        // publish next tick — never scan the corpus a second time.
+        let publish = publish && (scan.entries != nil || !scan.owns)
         let stop = stopRequested
         sources.onProgress = { [weak self] p in Task { @MainActor in self?.progress = p } }
         sources.shouldStop = { stop.withLock { $0 } }
@@ -241,7 +260,7 @@ final class TeamModel: ObservableObject {
                 var aggregated = false
                 if publish, client.isMember {
                     var s = sources
-                    s.cacheURL = paths.teamDir(client.config.id).appendingPathComponent("scan-cache.json")
+                    if s.entries == nil { s.cacheURL = paths.teamDir(client.config.id).appendingPathComponent("scan-cache.json") }
                     report = try TeamPublisher(client: client, paths: paths).publish(sources: s)
                     published = Int(Date().timeIntervalSince1970)
                     if aggregatesDue, client.isLeader {
@@ -602,6 +621,14 @@ final class TeamModel: ObservableObject {
         guard inTeam else { lastError = "not in a team"; return }
         busy = "Publishing…"; defer { busy = nil }
         await loop(sources: sources(), publish: true)
+        let scan = appScan()
+        if scan.owns, scan.entries == nil, lastError == nil { lastError = "publishing waits for this Mac's transcript scan to finish" }
+    }
+
+    /// (owns, entries): what the publisher works from in this instance.
+    private func appScan() -> (owns: Bool, entries: [String: StatsScanner.FileEntry]?) {
+        let owns = ownsScan()
+        return (owns, owns ? scanEntries() : nil)
     }
 
     func create(name: String, remote: String, token: String?, leaderName: String) async {

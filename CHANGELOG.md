@@ -25,6 +25,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
+- Team publishing reuses the Stats scan instead of scanning every transcript a second time, which had taken the app to 5.5 GB (#251).
 - Settings › Accounts leads with Add Account, shows Sign In Again only on the account that needs it, and renames an account in its own field, Tab moving to the next.
 - Randomize Names can be undone for 30 seconds.
 - Regenerating the pairing token, stopping rotation, signing in again, forgetting a stored key or token, and removing a push channel, a profile or a crash report all ask first.
