@@ -17,7 +17,7 @@ struct StatsScreen: View {
             .pickerStyle(.segmented)
             .listRowBackground(Color.clear)
             if let s = model.stats?.summary(period) {
-                ForEach(Stats.Presentation.groups(s)) { group in
+                ForEach(Stats.Presentation.groups(s, theme: model.rowTheme)) { group in
                     Section(group.id) {
                         ForEach(group.tiles) { tile in
                             LabeledContent(tile.id) {

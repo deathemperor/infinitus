@@ -64,6 +64,7 @@ final class RowThemeLoadingTests: XCTestCase {
         XCTAssertEqual(Stats.Presentation.perMinute(12_345, theme: .cyber), "12.3k baud")
         XCTAssertEqual(Stats.Presentation.recordTitle(theme: .off), "Tokens/min records")
         XCTAssertEqual(Stats.Presentation.recordTitle(theme: .rpg), "Mana/min records")
+        XCTAssertTrue(Stats.Presentation.groups(Stats.Summary(period: .week, from: "2026-09-01", to: "2026-09-07", total: Stats.Day(), previous: Stats.Day(), daily: [], streak: 0), theme: .rpg).flatMap { $0.tiles.map(\.id) }.contains("Peak mana/min"))
     }
 
     func testTemplateCarriesThePlaceholderFields() throws {

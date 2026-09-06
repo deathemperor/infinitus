@@ -34,7 +34,7 @@ struct StatsPane: View {
                 }
             }
             if let s = summary {
-                StatsTiles(summary: s)
+                StatsTiles(summary: s, theme: app.rowTheme)
                 effort(s)
                 if let records = model.bundle?.tokenRecords { recordBook(records) }
                 Section("Rhythm") {

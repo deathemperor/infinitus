@@ -21,7 +21,7 @@ extension Stats {
             public let tiles: [Tile]
         }
 
-        public static func groups(_ s: Stats.Summary) -> [Group] {
+        public static func groups(_ s: Stats.Summary, theme: RowTheme = .off) -> [Group] {
             [
                 Group(id: "Throughput", tiles: [
                     tile("Commits", s, \.commits),
@@ -32,7 +32,7 @@ extension Stats {
                     tile("Turns", s, \.turns),
                     tile("Tool calls", s, \.totalToolCalls),
                     tile("Output tokens", s, \.outputTokens),
-                    tile("Peak tokens/min", s, \.peakTokensPerMinute),
+                    tile(theme.rateUnit.map { "Peak \($0)" } ?? "Peak tokens/min", s, \.peakTokensPerMinute),
                     tile("Files touched", s, \.filesTouched),
                     tile("Co-authored by Claude", s, \.coAuthoredByClaude),
                     tile("Reverts", s, \.reverts),

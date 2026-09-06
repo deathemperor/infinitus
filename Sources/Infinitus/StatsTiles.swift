@@ -7,9 +7,10 @@ import InfinitusCore
 /// Stats pane and a teammate's detail render the same view.
 struct StatsTiles: View {
     let summary: Stats.Summary
+    var theme: RowTheme = .off
 
     var body: some View {
-        ForEach(Stats.Presentation.groups(summary)) { group($0) }
+        ForEach(Stats.Presentation.groups(summary, theme: theme)) { group($0) }
     }
 
     private func group(_ g: Stats.Presentation.Group) -> some View {
