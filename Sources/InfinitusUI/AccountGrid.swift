@@ -71,6 +71,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                         }, label: { cells.nameLabel })
                         .buttonStyle(.plain)
+                        .contextMenu { AccountRowMenu(model: model, account: account) }
                         .fontWeight(account.active ? .bold : .regular)
                         .foregroundStyle((account.disabled ?? false) || cells.showAsDead
                                          ? AnyShapeStyle(.secondary)
@@ -80,7 +81,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                         .help(cells.dead ? "Out of at least one limit — unusable until it resets"
                                          : "Switch to this account")
                         .lineLimit(1)
-                        AccountRowActions(model: model, account: account)
+                        AccountResumeButton(model: model, account: account)
                     }
                     // The one deliberately flexible column: emails truncate,
                     // usage numbers and reset times never do.
@@ -325,11 +326,12 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                 if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
             }, label: { cells.nameLabel })
             .buttonStyle(.plain)
+            .contextMenu { AccountRowMenu(model: model, account: account) }
             .fontWeight(account.active ? .bold : .regular)
             .foregroundStyle((account.disabled ?? false) || cells.dead
                              ? .secondary : .primary)
             .lineLimit(1)
-            AccountRowActions(model: model, account: account)
+            AccountResumeButton(model: model, account: account)
             Spacer(minLength: 8)
             if cells.showAsDead {
                 cells.deadCell
@@ -402,11 +404,12 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                             if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                         }, label: { cells.nameLabel })
                             .buttonStyle(.plain)
+                            .contextMenu { AccountRowMenu(model: model, account: account) }
                             .fontWeight(account.active ? .bold : .regular)
                             .foregroundStyle((account.disabled ?? false) || cells.dead
                                              ? .secondary : .primary)
                             .lineLimit(1)
-                        AccountRowActions(model: model, account: account)
+                        AccountResumeButton(model: model, account: account)
                         if let plan = cells.planText {
                             Text(plan).font(PopupFont.caption).foregroundStyle(.secondary)
                                 .instantTip("Subscription: \(account.plan ?? "?")")
@@ -582,13 +585,15 @@ extension View {
     func activeBand(_ on: Bool) -> some View { modifier(ActiveBand(active: on)) }
 }
 
-/// Two small buttons beside the account's name — star it (the engine
-/// lands on it first, and switches to it now) and pause/resume its
-/// rotation — the Settings › Accounts buttons, in the popup where the
-/// eye already is (user 2026-09-06: "nobody knows when to right-click").
-/// Each shows only when the engine has the knob (nil `preferred` = no
-/// pick-first setting in this build).
-struct AccountRowActions<M: FleetModel>: View {
+/// Right-click on an account's name: star it (the engine lands on it
+/// first, and switches to it now) or pause/resume its rotation — the
+/// Settings › Accounts buttons without leaving the popup. #201 put both
+/// on the row as buttons; that read as clutter (user 2026-09-06:
+/// "pause/resume, star on UI looks clunky -> make it right click action
+/// except for paused account -> press to resume"), so the row keeps only
+/// `AccountResumeButton`. Each item shows only when the engine has the
+/// knob (nil `preferred` = no pick-first setting in this build).
+struct AccountRowMenu<M: FleetModel>: View {
     let model: M
     let account: Account
 
@@ -597,24 +602,38 @@ struct AccountRowActions<M: FleetModel>: View {
             Button {
                 model.setPreferred(account.number, !starred)
             } label: {
-                Image(systemName: starred ? "star.fill" : "star")
-                    .font(PopupFont.caption)
-                    .foregroundStyle(starred ? Color.yellow : Color.secondary)
+                Label(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star")
             }
-            .buttonStyle(.plain)
-            .instantTip(starred ? "Unstar — stop landing here first" : "Star — land here first, and switch to it now")
         }
         if model.capabilities.contains(.hold) {
             let paused = account.disabled ?? false
             Button {
                 model.setRotation(account.number, enabled: paused)
             } label: {
-                Image(systemName: paused ? "play.circle" : "pause.circle")
+                Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
+            }
+        }
+    }
+}
+
+/// The one row-level control that survives: a paused account shows a
+/// play button, one press puts it back into rotation. Starred state
+/// needs no button — the name label already leads with ★.
+struct AccountResumeButton<M: FleetModel>: View {
+    let model: M
+    let account: Account
+
+    var body: some View {
+        if model.capabilities.contains(.hold), account.disabled == true {
+            Button {
+                model.setRotation(account.number, enabled: true)
+            } label: {
+                Image(systemName: "play.circle")
                     .font(PopupFont.caption)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .instantTip(paused ? "Resume — back into rotation" : "Pause — hold out of rotation")
+            .instantTip("Resume — back into rotation")
         }
     }
 }

@@ -137,7 +137,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
-- **Star & pause anywhere** — the popup's rows and the phone's swipe or long-press star an account or pause/resume its rotation.
+- **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
 - **Team (preview)** — a team on any git remote; members publish stats, sessions and chosen transcripts end-to-end encrypted to the people they pick, and leaders see who's on, who's blocked and what it costs per member, repo and model.
 - **Joining a team** — invite links and QR, team codes, `infinitus://join`, same-network discovery, and leader-initiated LAN invites accepted from Invitations; approve from the Mac; the phone's Team tab has its own Nearby (scan, request to join, invite, accept); Linux members use `infinitusctl team` alone.
 - **Share settings** — "off" per kind (stats, sessions, transcripts, crashes) keeps it on this machine entirely; a Mac picker chooses which recent sessions' transcripts go out; a publish shows its progress, and the plaintext copies it keeps are capped at 1 GB.

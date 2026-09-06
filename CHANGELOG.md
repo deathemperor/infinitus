@@ -40,7 +40,7 @@ publishes the matching section as the GitHub release body.
 - Start a session picks its permissions: Supervised, Auto-accept edits, Auto or Full access, passed to Claude Code as its permission mode.
 - Start a session offers the Mac's saved profiles as chips; one tap fills folder, engine, permissions, model, system prompt and first prompt.
 - A session started from a profile or in a permission mode says so on its row ("Review · Full access"), on the phone and in the Mac popover.
-- Swipe or long-press an account to star it or pause/resume its rotation from the phone; the Mac popup's rows carry the same two buttons beside the name.
+- Swipe or long-press an account to star it or pause/resume its rotation from the phone; on the Mac, right-click the name in the popup for the same, and a paused row shows a play button to resume.
 
 ### Mac
 - Infinitus is alpha software from this release on: the version reads 0.4.4-alpha.1 in About, `infinitusctl status` and the phone's Settings.
