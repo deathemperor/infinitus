@@ -219,12 +219,14 @@ struct CheckpointDiffScreen: View {
     }
 
     private var commentList: [PatchReview.Comment] {
-        comments.keys.sorted().compactMap { key in
+        // In patch order (numerically — "10" sorts before "2" as text).
+        comments.compactMap { key, text -> (Int, Int, String)? in
             let parts = key.split(separator: ":").compactMap { Int($0) }
-            guard parts.count == 2, let text = comments[key], parts[0] < files.count,
-                  parts[1] < files[parts[0]].hunks.count else { return nil }
-            return PatchReview.Comment(path: files[parts[0]].path, hunk: files[parts[0]].hunks[parts[1]], text: text)
+            guard parts.count == 2, parts[0] < files.count, parts[1] < files[parts[0]].hunks.count else { return nil }
+            return (parts[0], parts[1], text)
         }
+        .sorted { ($0.0, $0.1) < ($1.0, $1.1) }
+        .map { PatchReview.Comment(path: files[$0.0].path, hunk: files[$0.0].hunks[$0.1], text: $0.2) }
     }
 
     private var verdictBar: some View {

@@ -9,6 +9,7 @@ final class SessionBirthTests: XCTestCase {
         XCTAssertEqual(moved.chip, "Review · Full access")
         XCTAssertTrue(moved.isUnrestricted)
         XCTAssertEqual(moved.permissionMode, "acceptEdits")
+        XCTAssertEqual(moved.identified(as: "sid").moved(to: nil).sessionId, "sid")
         XCTAssertEqual(moved.moved(to: nil).chip, "Review · Auto-accept edits")
         XCTAssertLessThan(SessionStart.modeRank(nil), SessionStart.modeRank("acceptEdits"))
         XCTAssertLessThan(SessionStart.modeRank("auto"), SessionStart.modeRank("bypassPermissions"))

@@ -14,18 +14,31 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     /// The mode the phone moved the running session to (#163 phase 2),
     /// answered by the plugin's PreToolUse hook; nil = as started.
     public let hookMode: String?
+    /// Claude Code's session id, once the roster showed it. The record is
+    /// keyed by pid for the row, but a pid comes back after a reboot on
+    /// some other process — anything that grants (the hook mode) is
+    /// reseeded only when the live session's id is this one.
+    public let sessionId: String?
 
     public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil,
-                hookMode: String? = nil) {
+                hookMode: String? = nil, sessionId: String? = nil) {
         self.profile = profile
         self.permissionMode = permissionMode
         self.resumedFrom = resumedFrom
         self.hookMode = hookMode
+        self.sessionId = sessionId
     }
 
     /// The same birth moved to `mode` (nil = back to how it started).
     public func moved(to mode: String?) -> SessionBirth {
-        SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom, hookMode: mode)
+        SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
+                     hookMode: mode, sessionId: sessionId)
+    }
+
+    /// The same birth pinned to the session id the roster showed.
+    public func identified(as sessionId: String) -> SessionBirth {
+        SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
+                     hookMode: hookMode, sessionId: sessionId)
     }
 
     /// The mode in force: the hook's when set, else the start mode.

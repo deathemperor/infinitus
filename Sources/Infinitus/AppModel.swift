@@ -143,9 +143,13 @@ final class AppModel: ObservableObject {
     static let birthsURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Infinitus/session-births.json")
     func recordBirth(pid: Int, _ birth: SessionBirth) {
-        let alive = Set(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { Int($0.pid) })
+        let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+        let alive = Set(live.map { Int($0.pid) })
         sessionBirths = SessionBirths.pruned(sessionBirths, alive: alive.union([pid]))
-        sessionBirths[pid] = birth
+        // Pinned to the session id whenever the roster has it, so a
+        // reused pid after a reboot can never inherit a grant.
+        let id = live.first { Int($0.pid) == pid }?.sessionId
+        sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
         try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
@@ -1148,7 +1152,8 @@ final class AppModel: ObservableObject {
         // no longer grants.
         let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
         for (pid, birth) in sessionBirths {
-            guard let mode = birth.hookMode, let record = live.first(where: { Int($0.pid) == pid }) else { continue }
+            guard let mode = birth.hookMode, let record = live.first(where: { Int($0.pid) == pid }),
+                  birth.sessionId == record.sessionId else { continue }
             toolApprovals.setMode(mode, sessionId: record.sessionId)
         }
         mirrorServer.pastSessions.set { limit, search in
