@@ -70,6 +70,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                         if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                     }, label: { cells.nameLabel })
                     .buttonStyle(.plain)
+                    .contextMenu { AccountRowMenu(model: model, account: account) }
                     .fontWeight(account.active ? .bold : .regular)
                     .foregroundStyle((account.disabled ?? false) || cells.showAsDead
                                      ? AnyShapeStyle(.secondary)
@@ -322,6 +323,7 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                 if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
             }, label: { cells.nameLabel })
             .buttonStyle(.plain)
+            .contextMenu { AccountRowMenu(model: model, account: account) }
             .fontWeight(account.active ? .bold : .regular)
             .foregroundStyle((account.disabled ?? false) || cells.dead
                              ? .secondary : .primary)
@@ -398,6 +400,7 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                             if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                         }, label: { cells.nameLabel })
                             .buttonStyle(.plain)
+                            .contextMenu { AccountRowMenu(model: model, account: account) }
                             .fontWeight(account.active ? .bold : .regular)
                             .foregroundStyle((account.disabled ?? false) || cells.dead
                                              ? .secondary : .primary)
@@ -575,4 +578,32 @@ private struct ActiveBand: ViewModifier {
 
 extension View {
     func activeBand(_ on: Bool) -> some View { modifier(ActiveBand(active: on)) }
+}
+
+/// Right-click on an account's name: star it (the engine lands on it
+/// first, and switches to it now) or pause/resume its rotation — the
+/// Settings › Accounts buttons without leaving the popup. Each item
+/// shows only when the engine has the knob (nil `preferred` = no
+/// pick-first setting in this build).
+struct AccountRowMenu<M: FleetModel>: View {
+    let model: M
+    let account: Account
+
+    var body: some View {
+        if model.capabilities.contains(.prefer), let starred = account.preferred {
+            Button {
+                model.setPreferred(account.number, !starred)
+            } label: {
+                Label(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star")
+            }
+        }
+        if model.capabilities.contains(.hold) {
+            let paused = account.disabled ?? false
+            Button {
+                model.setRotation(account.number, enabled: paused)
+            } label: {
+                Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
+            }
+        }
+    }
 }

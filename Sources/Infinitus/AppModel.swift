@@ -171,6 +171,44 @@ final class AppModel: ObservableObject {
         logEvent("hook", icon: "checkmark.shield", "profile \(name) allows \(rules.map(\.label).joined(separator: ", ")) in session \(sessionId.prefix(8))")
     }
 
+    /// The phone's star/pause verbs (`POST /accounts/action`), with the
+    /// popup's own semantics: the same capability guards the control
+    /// server runs, and a star lands on the account right away when it
+    /// isn't the active one (FleetState.setPreferred).
+    func performAccountAction(_ request: AccountAction.Request) async -> AccountAction.Reply {
+        guard let fleet = fleets.first(where: { $0.id == request.fleet }) else {
+            return AccountAction.Reply(outcome: "notFound", detail: "no fleet \(request.fleet)")
+        }
+        guard let account = fleet.accounts.first(where: { $0.number == request.number }) else {
+            return AccountAction.Reply(outcome: "notFound", detail: "no account #\(request.number) in \(fleet.id)")
+        }
+        let engine = fleet.engine, provider = fleet.provider, number = request.number
+        do {
+            switch request.action {
+            case "hold", "unhold":
+                guard fleet.capabilities.contains(.hold) else {
+                    return AccountAction.Reply(outcome: "unsupported", detail: "\(fleet.id) does not support hold")
+                }
+                try await engine.setHold(fleet: provider, number: number, held: request.action == "hold")
+            case "prefer", "unprefer":
+                guard fleet.capabilities.contains(.prefer), account.preferred != nil else {
+                    return AccountAction.Reply(outcome: "unsupported", detail: "\(fleet.id) has no pick-first setting")
+                }
+                let on = request.action == "prefer"
+                try await engine.setPreferred(fleet: provider, number: number, on)
+                if on, !account.active, fleet.capabilities.contains(.switch) {
+                    try await engine.switchTo(fleet: provider, number: number)
+                }
+            default:
+                return AccountAction.Reply(outcome: "unsupported", detail: "unknown action \(request.action)")
+            }
+        } catch {
+            return AccountAction.Reply(outcome: "failed", detail: "\(error)")
+        }
+        await refreshSnapshot()
+        return AccountAction.Reply(outcome: "done")
+    }
+
     /// Moves a running session's permission mode (#163 phase 2): the
     /// plugin's PreToolUse hook answers from it. The start mode is a
     /// floor — Claude Code itself already lets those tools through, so
@@ -1146,6 +1184,10 @@ final class AppModel: ObservableObject {
         mirrorServer.appUpdate.set { [weak self] in
             guard let self else { return AppUpdate.Reply(outcome: "unavailable", detail: nil) }
             return await self.triggerAppUpdate()
+        }
+        mirrorServer.accountAction.set { [weak self] request in
+            guard let self else { return AccountAction.Reply(outcome: "failed", detail: "app gone") }
+            return await self.performAccountAction(request)
         }
         let host = sessionHost
         mirrorServer.sessionStart.set { [weak self] request in
@@ -2162,7 +2204,7 @@ final class AppModel: ObservableObject {
             let serviceStatus = ServiceStatusSummary(
                 indicator: ServiceStatusModel.shared.indicator)
             let engine = engineBadge ?? .stopped
-            let allFleets = fleets.compactMap(\.lastFleet)
+            let allFleets = fleets.compactMap { $0.lastFleet?.with(capabilities: $0.capabilities) }
             let forecast = forecast
             let plan = battlePlan
             let awsLogins = awsLogins
@@ -2359,6 +2401,7 @@ final class AppModel: ObservableObject {
     func setRotation(_ number: Int, enabled: Bool) {
         primary?.setRotation(number, enabled: enabled)
     }
+    func setPreferred(_ number: Int, _ on: Bool) { primary?.setPreferred(number, on) }
     func reorder(_ order: [Int], done: (() -> Void)? = nil) {
         guard let primary else { done?(); return }
         primary.reorder(order, done: done)

@@ -26,6 +26,9 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
     @Published private(set) var nextCandidate: Int?
     @Published private(set) var nextRecovery: NextRecovery?
     @Published private(set) var liveSessions: LiveSessions?
+    /// What the Mac's engine can do to these accounts (nil from an older
+    /// Mac): gates the row's star/pause actions.
+    @Published private(set) var capabilities: EngineCapabilities?
     @Published private(set) var switchFlashTick = 0
     @Published private(set) var deathTicks: [Int: Int] = [:]
     @Published private(set) var dying: Set<Int> = []
@@ -81,6 +84,7 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
             nextRecovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: list, activeNumber: fleet.activeNumber)
             liveSessions = fleet.liveSessions
         }
+        capabilities = fleet.capabilities
         if let now = fleet.activeNumber, let previousActive,
            previousActive != now {
             switchFlashTick += 1
@@ -169,7 +173,8 @@ extension MirrorModel {
         fleets.map {
             EngineFleet(engineID: $0.engineID, provider: $0.provider, accounts: $0.accounts,
                         activeNumber: $0.activeNumber, nextCandidate: $0.nextCandidate,
-                        nextRecovery: $0.nextRecovery, liveSessions: $0.liveSessions)
+                        nextRecovery: $0.nextRecovery, liveSessions: $0.liveSessions,
+                        capabilities: $0.capabilities)
         }
     }
 

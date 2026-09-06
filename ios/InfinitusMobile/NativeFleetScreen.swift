@@ -16,6 +16,10 @@ struct NativeFleetScreen: View {
     @State private var detail: AccountRef?
     @State private var scanning = false
     @State private var pairedWith: String?
+    /// A star/pause is in flight — the subprocess plus the refresh take
+    /// seconds, so the actions disable meanwhile.
+    @State private var acting = false
+    @State private var actionError: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Row width, for the wide (landscape / regular) row order. Measured
     /// from a background probe rather than a GeometryReader WRAPPER — a
@@ -129,6 +133,12 @@ struct NativeFleetScreen: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .alert("Couldn't do that", isPresented: Binding(
+                get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
+                Button("OK") {}
+            } message: {
+                Text(actionError ?? "")
+            }
         }
     }
 
@@ -375,11 +385,15 @@ struct NativeFleetScreen: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
+            accountActions(account, fleet: fleet)
             Button {
                 UIPasteboard.general.string = account.email
             } label: {
                 Label("Copy email", systemImage: "doc.on.doc")
             }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            accountActions(account, fleet: fleet)
         }
         .listRowBackground(rowBackground(account, fleet: fleet))
         // The Mac's dying alarm, over the row's own bounds.
@@ -393,6 +407,51 @@ struct NativeFleetScreen: View {
         .deathFlash(reduceMotion ? 0 : fleet.deathTicks[account.number] ?? 0)
         .reviveFlash(reduceMotion ? 0 : fleet.reviveTicks[account.number] ?? 0)
         .introRowUnlessReduced(fleet, index: index, reduced: reduceMotion)
+    }
+
+    /// Star/unstar and pause/resume, in the row's context menu and its
+    /// trailing swipe — the Mac popup's right-click, on the primary Mac
+    /// only (other Macs stay read-only, #144). The star shows when the
+    /// Mac's engine has the pick-first knob (non-nil `preferred`), pause
+    /// when it reports the hold capability.
+    @ViewBuilder private func accountActions(_ account: Account, fleet: MirrorFleetModel) -> some View {
+        if let starred = account.preferred {
+            Button {
+                act(starred ? "unprefer" : "prefer", on: account, fleet: fleet)
+            } label: {
+                Label(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star")
+            }
+            .tint(.yellow)
+            .disabled(acting)
+        }
+        if fleet.capabilities?.contains(.hold) == true {
+            let paused = account.disabled ?? false
+            Button {
+                act(paused ? "unhold" : "hold", on: account, fleet: fleet)
+            } label: {
+                Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
+            }
+            .tint(paused ? .green : .orange)
+            .disabled(acting)
+        }
+    }
+
+    private func act(_ action: String, on account: Account, fleet: MirrorFleetModel) {
+        acting = true
+        Task {
+            defer { acting = false }
+            do {
+                let reply = try await NetworkFleetMirror.shared.accountAction(
+                    .init(fleet: fleet.id, number: account.number, action: action))
+                guard reply.outcome == "done" else {
+                    actionError = reply.detail ?? reply.outcome
+                    return
+                }
+                await model.refresh()
+            } catch {
+                actionError = error.localizedDescription
+            }
+        }
     }
 
     /// The Mac's active band, as a native row fill: the theme's flash
@@ -429,7 +488,8 @@ struct NativeFleetScreen: View {
 
 /// A row tap opens the whole account: every window in full (labels,
 /// gauges, percentages, absolute reset times), plus the plan and the
-/// cash estimate. Read-only by design — the phone drives no engine.
+/// cash estimate. Read-only: the row's swipe and long-press carry the
+/// star/pause actions, the sheet only shows.
 private struct AccountDetailSheet: View {
     @ObservedObject var fleet: MirrorFleetModel
     @ObservedObject var usage: MobileUsage

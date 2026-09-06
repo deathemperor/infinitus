@@ -163,6 +163,23 @@ final class MirrorAppUpdateBox: @unchecked Sendable {
     }
 }
 
+/// Answers `POST /accounts/action`: star/unstar, pause/resume one
+/// account of this Mac's fleets. Async like `MirrorAppUpdateBox` — the
+/// engine call is a subprocess and the reply waits for it.
+final class MirrorAccountActionBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable (AccountAction.Request) async -> AccountAction.Reply)?
+
+    func set(_ new: @escaping @Sendable (AccountAction.Request) async -> AccountAction.Reply) {
+        lock.lock(); handler = new; lock.unlock()
+    }
+
+    func call(_ request: AccountAction.Request) async -> AccountAction.Reply? {
+        lock.lock(); let current = handler; lock.unlock()
+        return await current?(request)
+    }
+}
+
 final class MirrorCrashBox: @unchecked Sendable {
     private let lock = NSLock()
     private var sink: (@Sendable (CrashReport) -> Void)?
@@ -352,6 +369,7 @@ final class MirrorServer: ObservableObject {
     let checkpoints = MirrorCheckpointsBox()
     /// Answers `POST /app/update` (#121); set by AppModel once at start.
     let appUpdate = MirrorAppUpdateBox()
+    let accountAction = MirrorAccountActionBox()
     /// Event-log sink (icon, text), set by AppModel.
     var log: ((String, String) -> Void)?
     /// Fires with the bound port once the listener is up — the quick
@@ -453,6 +471,7 @@ final class MirrorServer: ObservableObject {
         let pastSessions = self.pastSessions
         let checkpoints = self.checkpoints
         let appUpdate = self.appUpdate
+        let accountAction = self.accountAction
         let sessionInput = self.sessionInput
         let sessionImage = self.sessionImage
         let activityTokens = self.activityTokens
@@ -471,7 +490,7 @@ final class MirrorServer: ObservableObject {
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
                        sessionInput: sessionInput, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-                       team: team, appUpdate: appUpdate, awsLogin: awsLogin, teamMirror: teamMirror, queue: queue, onServed: served)
+                       team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in self?.handle(state, wasFixedPort: rawPort != 0, name: name) }
@@ -550,7 +569,7 @@ final class MirrorServer: ObservableObject {
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                           team: MirrorTeamBox, appUpdate: MirrorAppUpdateBox,
-                                          awsLogin: MirrorAwsLoginBox,
+                                          awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                           teamMirror: MirrorTeamMirrorBox,
                                           queue: DispatchQueue,
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
@@ -558,7 +577,7 @@ final class MirrorServer: ObservableObject {
         receive(connection, buffer: Data(), payload: payload, token: token,
                sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-               team: team, appUpdate: appUpdate, awsLogin: awsLogin, teamMirror: teamMirror, onServed: onServed)
+               team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
 
     private nonisolated static func receive(_ connection: NWConnection,
@@ -570,7 +589,7 @@ final class MirrorServer: ObservableObject {
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                             team: MirrorTeamBox, appUpdate: MirrorAppUpdateBox,
-                                            awsLogin: MirrorAwsLoginBox,
+                                            awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                             teamMirror: MirrorTeamMirrorBox,
                                             onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) {
@@ -792,6 +811,22 @@ final class MirrorServer: ObservableObject {
                                         completion: .contentProcessed { _ in connection.cancel() })
                     }
                     return
+                } else if request.method == "POST", request.path == AccountAction.path {
+                    guard let decoded = try? JSONDecoder().decode(AccountAction.Request.self, from: request.body)
+                    else {
+                        connection.send(content: MirrorTransport.badRequestResponse(),
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                        return
+                    }
+                    Task {
+                        let reply = await accountAction.call(decoded)
+                        let response = reply.flatMap { try? JSONEncoder().encode($0) }
+                            .map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
                 } else if request.method == "POST", request.path == MirrorTransport.appUpdatePath {
                     Task {
                         let reply = await appUpdate.call()
@@ -841,7 +876,7 @@ final class MirrorServer: ObservableObject {
             receive(connection, buffer: buffer, payload: payload, token: token,
                    sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-                   team: team, appUpdate: appUpdate, awsLogin: awsLogin, teamMirror: teamMirror, onServed: onServed)
+                   team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
     }
 }

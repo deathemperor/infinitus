@@ -93,6 +93,12 @@ public protocol FleetModel: ObservableObject {
     /// card hides the button.
     func addAccount()
     var canAddAccount: Bool { get }
+    /// A row's context menu: star/unstar (the engine's pick-first knob)
+    /// and pause/resume (hold out of rotation) — the Settings › Accounts
+    /// buttons, reachable from the popup. Mac-only; a mirroring host
+    /// leaves them no-ops.
+    func setPreferred(_ number: Int, _ on: Bool)
+    func setRotation(_ number: Int, enabled: Bool)
 }
 
 /// One fleet's header line in a multi-fleet popup.
@@ -128,6 +134,8 @@ public extension FleetModel {
     func ignite(_ number: Int) {}
     func addAccount() {}
     var canAddAccount: Bool { false }
+    func setPreferred(_ number: Int, _ on: Bool) {}
+    func setRotation(_ number: Int, enabled: Bool) {}
     /// A host with no resume nudge (the phone) simply has no count —
     /// the banner then drops its suffix.
     var waitingResume: Int? { nil }

@@ -71,11 +71,16 @@ public struct EngineFleet: Codable, Sendable {
     /// (cswap: `list --json`) — the mirror exporter forwards them so the
     /// phone keeps decoding `AccountList` untouched.
     public let raw: Data?
+    /// What the engine can do to these accounts, stamped on the mirrored
+    /// copy so the phone gates its actions the way the popup does. Nil
+    /// from an older Mac: the phone then offers nothing.
+    public let capabilities: EngineCapabilities?
 
     public init(engineID: String, provider: Provider, accounts: [Account],
                 activeNumber: Int? = nil, nextCandidate: Int? = nil,
                 nextRecovery: NextRecovery? = nil,
-                liveSessions: LiveSessions? = nil, raw: Data? = nil) {
+                liveSessions: LiveSessions? = nil, raw: Data? = nil,
+                capabilities: EngineCapabilities? = nil) {
         self.engineID = engineID
         self.provider = provider
         self.accounts = accounts
@@ -84,6 +89,15 @@ public struct EngineFleet: Codable, Sendable {
         self.nextRecovery = nextRecovery
         self.liveSessions = liveSessions
         self.raw = raw
+        self.capabilities = capabilities
+    }
+
+    /// The same fleet with its engine's capabilities attached.
+    public func with(capabilities: EngineCapabilities) -> EngineFleet {
+        EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
+                    activeNumber: activeNumber, nextCandidate: nextCandidate,
+                    nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    capabilities: capabilities)
     }
 
     /// Registry key: one FleetState per (engine, provider).

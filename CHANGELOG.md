@@ -23,6 +23,7 @@ publishes the matching section as the GitHub release body.
 - Start a session picks its permissions: Supervised, Auto-accept edits, Auto or Full access, passed to Claude Code as its permission mode.
 - Start a session offers the Mac's saved profiles as chips; one tap fills folder, engine, permissions, model, system prompt and first prompt.
 - A session started from a profile or in a permission mode says so on its row ("Review · Full access"), on the phone and in the Mac popover.
+- Swipe or long-press an account to star it or pause/resume its rotation from the phone; the Mac popup offers the same on a right-click of the name.
 
 ### Mac
 - An AWS sign-in that lapses inside a sub-agent shows up on the parent session — key badge, Sign in row, push — and the continue nudge after signing in goes to the parent.

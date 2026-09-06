@@ -356,6 +356,12 @@ actor NetworkFleetMirror: FleetMirror {
 
     /// A plain GET decoded as JSON: the stored endpoint first, discovery
     /// as the fallback — the `pastSessions` path, generalised.
+    /// Star/unstar, pause/resume one account of the primary Mac
+    /// (`POST /accounts/action`); the Mac runs the popup's own guards.
+    func accountAction(_ request: AccountAction.Request) async throws -> AccountAction.Reply {
+        try await postJSON(AccountAction.path, body: request)
+    }
+
     private func getJSON<R: Decodable>(_ path: String, dates: Bool = false) async throws -> R {
         let token = pairToken()
         let data: Data
