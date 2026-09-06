@@ -512,8 +512,10 @@ final class MirrorModel: ObservableObject, FleetModel {
 
     /// The share sheet's suggestions row: every paired Mac's sessions
     /// (#144), a Mac that's away left out since a share can't reach it.
+    /// The primary's rows go bare while it is the only Mac, or while its
+    /// own name is still unknown ("the Mac" is no suffix).
     private func syncShareSuggestions() {
-        let several = !others.isEmpty
+        let several = !others.isEmpty && snapshot?.machineName != nil
         var sources = [ShareSuggestions.Source(macId: nil, mac: several ? machineName(macId: nil) : nil,
                                                sessions: liveSessions?.sessions ?? [],
                                                name: { [sessionProgress] in sessionProgress.byPid[$0]?.name })]

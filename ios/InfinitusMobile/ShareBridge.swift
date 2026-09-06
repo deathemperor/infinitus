@@ -69,13 +69,14 @@ enum ShareBridge {
 
     /// A suggestions-row conversation names one session on one Mac
     /// (#144): the primary's by cwd alone — what every donation was
-    /// before other Macs existed — another Mac's by pairing id and cwd.
+    /// before other Macs existed — another Mac's as "mac:<id>\u{1F}<cwd>"
+    /// (the unit separator: a pairing id is a UUID, a path never holds it).
     static func conversation(macId: String?, cwd: String) -> String {
-        macId.map { "mac:\($0)\n\(cwd)" } ?? cwd
+        macId.map { "mac:\($0)\u{1F}\(cwd)" } ?? cwd
     }
 
     static func session(conversation: String) -> (macId: String?, cwd: String) {
-        guard conversation.hasPrefix("mac:"), let cut = conversation.firstIndex(of: "\n") else {
+        guard conversation.hasPrefix("mac:"), let cut = conversation.firstIndex(of: "\u{1F}") else {
             return (nil, conversation)
         }
         let id = conversation[conversation.index(conversation.startIndex, offsetBy: 4)..<cut]

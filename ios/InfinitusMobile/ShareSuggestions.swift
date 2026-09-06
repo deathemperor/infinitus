@@ -28,8 +28,12 @@ enum ShareSuggestions {
         let all = sources.flatMap { source in source.sessions.map { (source, $0) } }
         var wanted: [String: String] = [:]
         for (source, session) in all.sorted(by: { $0.1.startedAt > $1.1.startedAt }).prefix(maxDonations) {
+            let key = ShareBridge.conversation(macId: source.macId, cwd: session.cwd)
+            // Two sessions in one folder on one Mac share a conversation:
+            // the newer one, sorted first, names it.
+            guard wanted[key] == nil else { continue }
             let name = source.name(session.pid) ?? URL(fileURLWithPath: session.cwd).lastPathComponent
-            wanted[ShareBridge.conversation(macId: source.macId, cwd: session.cwd)] = source.mac.map { "\(name) · \($0)" } ?? name
+            wanted[key] = source.mac.map { "\(name) · \($0)" } ?? name
         }
         guard wanted != donated else { return }
         for key in donated.keys where wanted[key] == nil {
