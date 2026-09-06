@@ -210,7 +210,13 @@ final class ControlServer {
 
         case "resume-session":
             guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: resume-session <sessionId>") }
-            guard let past = PastSessions.find(sessionId: id, claudeDir: ClaudeSessions.configHome()) else {
+            let claudeDir = ClaudeSessions.configHome()
+            // A live session's transcript is another process's to write —
+            // talk to it instead of resuming it twice.
+            if let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
+                throw Fail("session \(id) is live (pid \(live.pid)); use `infinitusctl send \(live.pid)`")
+            }
+            guard let past = PastSessions.find(sessionId: id, claudeDir: claudeDir) else {
                 throw Fail("no past session \(id); see `infinitusctl past-sessions`")
             }
             let reply = SessionLauncher.start(SessionStart.Request(cwd: past.cwd, resume: past.sessionId),

@@ -70,8 +70,17 @@ final class PastSessionsTests: XCTestCase {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir, limit: 2).map(\.sessionId), ["a"])
         XCTAssertEqual(PastSessions.scan(claudeDir: dir, search: "BETA").map(\.sessionId), ["b"])
         XCTAssertEqual(PastSessions.scan(claudeDir: dir, search: "/p/gamma").map(\.sessionId), ["c"])
-        XCTAssertEqual(PastSessions.find(sessionId: "c", claudeDir: dir)?.cwd, "/p/gamma")
         XCTAssertNil(PastSessions.find(sessionId: "nope", claudeDir: dir))
+    }
+
+    func testFindReachesPastTheNewestFilesByName() throws {
+        for i in 0..<6 {
+            try write(cwd: "/p", id: "s\(i)", lines: [user("Task \(i)", cwd: "/p/repo\(i)")], age: Double(i) * 100)
+        }
+        let oldest = PastSessions.find(sessionId: "s5", claudeDir: dir, liveIds: ["s5"])
+        XCTAssertEqual(oldest?.cwd, "/p/repo5")
+        XCTAssertEqual(oldest?.firstMessage, "Task 5")
+        XCTAssertTrue(oldest?.live ?? false)
     }
 
     func testMissingProjectsDirIsEmpty() {
