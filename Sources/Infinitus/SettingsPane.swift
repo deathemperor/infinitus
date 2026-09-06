@@ -15,7 +15,7 @@ enum EngineFailure {
             case .unsupported:
                 return "This engine doesn't support that action. Nothing changed."
             case .unreachable:
-                return "Infinitus can't reach the engine. Check it is running at the address above, then try again."
+                return "Infinitus can't reach the engine. Check it is running and its address is right, then try again."
             case .unauthorized:
                 return "The engine refused the key. Check the key and save it again."
             case .remote(let status, _):

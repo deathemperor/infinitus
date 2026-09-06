@@ -700,7 +700,9 @@ private struct FleetAccountsSection: View {
     @State private var undoNames: [Int: String]?
     @State private var undoTask: Task<Void, Never>?
 
-    @ScaledMetric private var rowHeight: CGFloat = 30
+    /// A constant: macOS ignores Dynamic Type (see PopupScale), so a
+    /// @ScaledMetric here only looked like it answered the critique.
+    private let rowHeight: CGFloat = 30
 
     private var isCswap: Bool { fleet.engineID == CswapEngine.engineID }
     private var caps: EngineCapabilities { fleet.capabilities }

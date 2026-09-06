@@ -142,7 +142,6 @@ struct SyncPane: View {
                     } else {
                         LabeledContent("Cloudflare quick tunnel") {
                             Button("Copy Install Command") { copy("brew install cloudflared") }
-                                .help("Copies: brew install cloudflared")
                         }
                         Text("Not installed. Paste the copied command into Terminal and a "
                              + "toggle appears here to reach this Mac through a random "
@@ -277,7 +276,7 @@ struct SyncPane: View {
             if pusher.keyStored {
                 Button("Forget Key\u{2026}", role: .destructive) { confirmForgetKey = true }
             }
-            Text(pusher.keyStored ? "In the keychain" : "Not Set Up")
+            Text(pusher.keyStored ? "In the Keychain" : "Not Set Up")
                 .font(.caption).foregroundStyle(.secondary)
         }
         if pusher.registrations.isEmpty {
@@ -377,7 +376,6 @@ struct SyncPane: View {
             .font(.caption).foregroundStyle(.secondary)
         HStack {
             Button("Copy the Config File Path") { copy("~/.cloudflared/config.yml") }
-                .help("Copies: ~/.cloudflared/config.yml")
             Spacer()
         }
     }

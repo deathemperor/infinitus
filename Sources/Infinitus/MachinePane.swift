@@ -198,11 +198,11 @@ struct MachinePane: View {
 
     private func kindLabel(_ kind: HookRegistration.OwnerKind) -> String {
         switch kind {
-        case .brew: return "brew"
-        case .vendored: return "vendored"
-        case .handInstalled: return "hand-installed"
-        case .plugin: return "plugin"
-        case .unknown: return "unknown"
+        case .brew: return "Brew"
+        case .vendored: return "Vendored"
+        case .handInstalled: return "Hand-installed"
+        case .plugin: return "Plugin"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -224,7 +224,7 @@ struct MachinePane: View {
                 Text(group.owner).bold()
                 Text("(\(kindLabel(group.kind)))").foregroundStyle(.secondary)
                 if group.heavy {
-                    Text("heavy").font(.caption2).padding(.horizontal, 4)
+                    Text("Heavy").font(.caption2).padding(.horizontal, 4)
                         .background(Color.orange.opacity(0.2), in: Capsule())
                 }
                 Spacer()
@@ -337,6 +337,7 @@ struct MachinePane: View {
             Text("\(Int(session.idleHours())) h idle")
             Text((session.cwd as NSString).lastPathComponent)
                 .foregroundStyle(.secondary).help(session.cwd)
+                .accessibilityValue(session.cwd)   // the tooltip is mouse-only
         }
         .font(PopupFont.caption).monospacedDigit()
         .accessibilityElement(children: .combine)
