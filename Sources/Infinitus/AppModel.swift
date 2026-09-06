@@ -1125,6 +1125,35 @@ final class AppModel: ObservableObject {
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                                            limit: limit, search: search))
         }
+        // The phone's checkpoint routes (#167 phase 2) act on the live
+        // session's record — the same lookup `infinitusctl checkpoints`
+        // makes; an unknown pid is a 404.
+        let session: @Sendable (Int32) -> ClaudeSessionRecord? = { pid in
+            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.pid == pid }
+        }
+        mirrorServer.checkpoints.set(.init(
+            list: { pid in
+                guard let record = session(pid) else { return nil }
+                let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
+                return Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list)
+            },
+            diff: { pid, n, m in
+                guard let record = session(pid) else { return nil }
+                return try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: m)
+            },
+            restore: { [weak self] pid, n in
+                guard let record = session(pid) else { return nil }
+                do {
+                    let (restored, backup) = try Checkpoints.restore(cwd: record.cwd, sessionId: record.sessionId, n: n)
+                    Task { @MainActor in
+                        self?.logEvent("other", icon: "clock.arrow.2.circlepath",
+                                       "phone restored \((record.cwd as NSString).lastPathComponent) to checkpoint \(restored.subject)")
+                    }
+                    return Checkpoints.RestoreReply(outcome: "restored", backup: backup?.n)
+                } catch {
+                    return Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)")
+                }
+            }))
         team.gate = { [weak self] in TeamGate.check(lockEnabled: self?.lock.enabled) }
         team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
         team.load()

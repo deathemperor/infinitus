@@ -63,6 +63,29 @@ public enum Checkpoints {
                           subject: subjectLine(subject, n: n), root: root)
     }
 
+    /// `GET /sessions/<pid>/checkpoints` (#167 phase 2): the timeline the
+    /// phone shows.
+    public struct Reply: Codable, Sendable, Equatable {
+        public let sessionId: String
+        public let cwd: String
+        public let checkpoints: [Checkpoint]
+        public init(sessionId: String, cwd: String, checkpoints: [Checkpoint]) {
+            self.sessionId = sessionId; self.cwd = cwd; self.checkpoints = checkpoints
+        }
+    }
+    /// `POST …/checkpoints/<n>/restore`: `outcome` is "restored" or
+    /// "failed" (`detail` carries git's words). Date-free on purpose — the
+    /// phone decodes POST replies without a date strategy.
+    public struct RestoreReply: Codable, Sendable, Equatable {
+        public let outcome: String
+        public let detail: String?
+        /// The checkpoint that holds the state from just before the restore.
+        public let backup: Int?
+        public init(outcome: String, detail: String? = nil, backup: Int? = nil) {
+            self.outcome = outcome; self.detail = detail; self.backup = backup
+        }
+    }
+
     /// The session's checkpoints, oldest first.
     public static func list(cwd: String, sessionId: String, git: GitRunner = GitRunner()) throws -> [Checkpoint] {
         guard let root = toplevel(cwd: cwd, git: git) else { return [] }

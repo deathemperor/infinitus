@@ -128,6 +128,20 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertNil(MirrorTransport.sessionImageRef("/sessions/7/images/"))
     }
 
+    func testCheckpointPathsRoundTrip() {
+        XCTAssertEqual(MirrorTransport.sessionCheckpointsPath(pid: 9), "/sessions/9/checkpoints")
+        XCTAssertEqual(MirrorTransport.sessionCheckpointsPid("/sessions/9/checkpoints"), 9)
+        XCTAssertNil(MirrorTransport.sessionCheckpointsPid("/sessions/x/checkpoints"))
+        XCTAssertNil(MirrorTransport.sessionCheckpointsPid("/sessions/9/checkpoints/3"))
+        let diff = MirrorTransport.sessionCheckpointRef(MirrorTransport.sessionCheckpointPath(pid: 9, n: 3, action: .diff))
+        XCTAssertEqual(diff?.pid, 9)
+        XCTAssertEqual(diff?.n, 3)
+        XCTAssertEqual(diff?.action, .diff)
+        XCTAssertEqual(MirrorTransport.sessionCheckpointRef("/sessions/9/checkpoints/3/restore")?.action, .restore)
+        XCTAssertNil(MirrorTransport.sessionCheckpointRef("/sessions/9/checkpoints/3/fork"))
+        XCTAssertNil(MirrorTransport.sessionCheckpointRef("/sessions/9/checkpoints/three/diff"))
+    }
+
     func testSessionTailPidRejectsNonNumericOrWrongShape() {
         XCTAssertNil(MirrorTransport.sessionTailPid("/sessions/x/tail"))
         XCTAssertNil(MirrorTransport.sessionTailPid("/sessions/123"))

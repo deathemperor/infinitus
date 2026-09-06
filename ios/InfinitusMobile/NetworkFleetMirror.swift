@@ -289,6 +289,43 @@ actor NetworkFleetMirror: FleetMirror {
         return try decoder.decode(PastSessions.Reply.self, from: data)
     }
 
+    /// A session's checkpoint timeline (#167 phase 2): `GET /sessions/<pid>/checkpoints`.
+    func checkpoints(pid: Int32) async throws -> Checkpoints.Reply {
+        try await getJSON(MirrorTransport.sessionCheckpointsPath(pid: pid), dates: true)
+    }
+
+    /// One checkpoint against another (`to`) or the working tree now.
+    func checkpointDiff(pid: Int32, n: Int, to: Int? = nil) async throws -> Checkpoints.Diff {
+        var path = MirrorTransport.sessionCheckpointPath(pid: pid, n: n, action: .diff)
+        if let to { path += "?\(MirrorTransport.checkpointToQueryName)=\(to)" }
+        return try await getJSON(path)
+    }
+
+    /// Rewrites the session's folder to checkpoint `n` on the Mac (the
+    /// state before is checkpointed first, so this is undoable there).
+    func restoreCheckpoint(pid: Int32, n: Int) async throws -> Checkpoints.RestoreReply {
+        try await postJSON(MirrorTransport.sessionCheckpointPath(pid: pid, n: n, action: .restore),
+                           body: [String: String](), timeout: Self.attachmentInputTimeout)
+    }
+
+    /// A plain GET decoded as JSON: the stored endpoint first, discovery
+    /// as the fallback — the `pastSessions` path, generalised.
+    private func getJSON<R: Decodable>(_ path: String, dates: Bool = false) async throws -> R {
+        let token = pairToken()
+        let data: Data
+        if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) {
+            data = stored
+        } else {
+            startBrowsing()
+            guard let discovered = await firstEndpoint() else { throw MirrorTransportError.timedOut }
+            (data, _) = try await fetch(discovered, path: path, hostHeader: "infinitus",
+                                        useTLS: false, token: token, timeout: Self.candidateTimeout)
+        }
+        let decoder = JSONDecoder()
+        if dates { decoder.dateDecodingStrategy = .iso8601 }
+        return try decoder.decode(R.self, from: data)
+    }
+
     /// The session feed (#17 layer 1): same candidate/token/Host picking
     /// logic as `latest()`, factored into `fetchFromStored` so both share
     /// it — no snapshot-style caching here, a failed fetch just throws.

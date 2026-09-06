@@ -142,6 +142,14 @@ struct SessionDetailScreen: View {
             accountSection
 
             Section {
+                NavigationLink(value: CheckpointsRoute(session: session)) {
+                    Label("Checkpoints", systemImage: "clock.arrow.2.circlepath")
+                }
+            } footer: {
+                Text("The repository as it was at each prompt, with Restore.")
+            }
+
+            Section {
                 Text(model.transportStatus.isEmpty ? model.rowTheme.loadingWord("searching") : model.transportStatus)
                     .font(.caption).foregroundStyle(.secondary)
             } header: {

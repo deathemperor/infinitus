@@ -47,6 +47,9 @@ struct SessionsScreen: View {
                 .navigationDestination(for: SessionDetailRoute.self) { route in
                     SessionDetailScreen(model: model, progress: progress, session: route.session)
                 }
+                .navigationDestination(for: CheckpointsRoute.self) { route in
+                    CheckpointsScreen(session: route.session)
+                }
         }
         // A shake staged a capture for a session: open its feed (which
         // takes the capture into its composer). A feed already open for

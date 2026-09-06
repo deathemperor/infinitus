@@ -39,6 +39,32 @@ public enum MirrorTransport {
         else { return nil }
         return (pid, id)
     }
+    /// A session's checkpoint timeline (#167 phase 2): `GET /sessions/<pid>/checkpoints`.
+    public static func sessionCheckpointsPath(pid: Int32) -> String { "/sessions/\(pid)/checkpoints" }
+    /// The `pid` out of `/sessions/<pid>/checkpoints` exactly.
+    public static func sessionCheckpointsPid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "checkpoints" else { return nil }
+        return Int32(parts[1])
+    }
+    /// One checkpoint's actions: `GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]`
+    /// (against checkpoint `m`, or the working tree now) and
+    /// `POST /sessions/<pid>/checkpoints/<n>/restore`.
+    public static func sessionCheckpointPath(pid: Int32, n: Int, action: CheckpointAction) -> String {
+        "/sessions/\(pid)/checkpoints/\(n)/\(action.rawValue)"
+    }
+    public enum CheckpointAction: String, Sendable { case diff, restore }
+    /// The pid, checkpoint number and action out of a checkpoint path,
+    /// when it matches exactly.
+    public static func sessionCheckpointRef(_ path: String) -> (pid: Int32, n: Int, action: CheckpointAction)? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 5, parts[0] == "sessions", parts[2] == "checkpoints",
+              let pid = Int32(parts[1]), let n = Int(parts[3]), let action = CheckpointAction(rawValue: String(parts[4]))
+        else { return nil }
+        return (pid, n, action)
+    }
+    /// Query parameter naming the second checkpoint of a diff.
+    public static let checkpointToQueryName = "to"
     /// The per-session input route (#17 layer 2): `POST /sessions/<pid>/input`.
     public static func sessionInputPath(pid: Int32) -> String { "/sessions/\(pid)/input" }
     /// The `pid` out of a request path, when it matches
