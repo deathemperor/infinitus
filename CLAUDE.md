@@ -36,9 +36,12 @@ Native macOS menu bar app for the claude-swap engine. Split out of
 - **Push nothing to any remote** unless explicitly asked. Commit locally.
 - **main takes commits only through pull requests** (GitHub ruleset
   "main via pull requests", user 2026-09-04): no direct push, no
-  force-push, no deletion; 0 required approvals (solo repo). Work on a
-  branch, `gh pr create`, merge with `gh pr merge --squash` (or
-  `--merge` when the branch history matters) once tests pass.
+  force-push, no deletion; 0 required approvals (solo repo); required
+  checks test, e2e, linux, ios green on the PR head (never windows,
+  2026-09-06, #206). Work on a branch, `gh pr create`, merge with
+  `gh pr merge --squash` (or `--merge` when the branch history matters)
+  once tests pass; `--auto` queues the merge behind the checks. PRs get
+  `size:*` and `vouch:*` labels automatically.
 - **Every commit carries `Co-Authored-By: Claude Code
   <noreply@anthropic.com>`** (user 2026-09-04: "some commits still
   missing Claude in author"). `tools/githooks/prepare-commit-msg`
