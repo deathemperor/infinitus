@@ -144,7 +144,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Your team identity** — a local key behind Touch ID, a recovery key, a passphrase-sealed export.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
-- **Start on any Mac** — the "+" sheet and Past sessions pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.
+- **Start on any Mac** — the "+" sheet, Past sessions and Siri's Start a session pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.
 - **Profiles** — Settings › Profiles saves named ways to start a session (folder, engine, permissions, model, system prompt, first prompt, tools allowed without asking); the phone, Siri and the Mac's Start a session take one.
 - **Checkpoints** — every prompt checkpoints the repository as a hidden git ref (with the plugin); list them, diff one against now or restore it from `infinitusctl checkpoints`, the Mac or the phone.
 - **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
