@@ -947,6 +947,18 @@ final class RenameFields: ObservableObject {
     var fields: [Int: NSTextField] = [:]
 }
 
+/// A text field that takes first responder on the mouse-down itself.
+/// Inside a List row (an NSTableView row underneath, draggable for the
+/// reorder handle) the table arbitrates the click first — row select or
+/// drag? — and only hands it to the field on mouse-up, which is why a
+/// click into a name lagged while Tab was instant (user 2026-09-06).
+private final class ClickToEditField: NSTextField {
+    override func mouseDown(with event: NSEvent) {
+        if currentEditor() == nil { window?.makeFirstResponder(self) }
+        super.mouseDown(with: event)
+    }
+}
+
 /// One account's editable display name: an AppKit field, because Tab
 /// must hop to the NEXT account's field and SwiftUI's TextField lets the
 /// field editor swallow Tab before any key handler sees it. Committed on
@@ -959,7 +971,7 @@ private struct RenameField: NSViewRepresentable {
     let neighbours: (previous: Int?, next: Int?)
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField(string: account.alias ?? "")
+        let field = ClickToEditField(string: account.alias ?? "")
         field.placeholderString = "Name"
         field.bezelStyle = .roundedBezel
         field.delegate = context.coordinator
