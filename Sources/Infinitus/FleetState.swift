@@ -294,6 +294,7 @@ extension FleetState: FleetModel {
     }
     var rowTheme: RowTheme { host.rowTheme }
     var compactRows: Bool { host.compactRows }
+    var reviveLead: TimeInterval { host.reviveLead }
     var burnStyle: String { host.burnStyle }
     var popupLayout: String { host.popupLayout }
     var waitingResume: Int? { host.waitingResume }

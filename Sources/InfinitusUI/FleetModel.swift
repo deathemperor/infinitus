@@ -19,6 +19,9 @@ public protocol FleetModel: ObservableObject {
     var popupLayout: String { get }
     var nextCandidate: Int? { get }
     var nextRecovery: NextRecovery? { get }
+    /// How far ahead of an account's reset its countdown goes live
+    /// (Settings › Notifications; the phone follows the Mac).
+    var reviveLead: TimeInterval { get }
     /// Limit-stopped sessions the resume nudge is holding — the all-dead
     /// banner's suffix.
     var waitingResume: Int? { get }
@@ -116,6 +119,7 @@ public struct FleetLabel: Sendable, Equatable {
 
 public extension FleetModel {
     var capabilities: EngineCapabilities { .all }
+    var reviveLead: TimeInterval { FleetAlarms.lead }
     var fleetLabel: FleetLabel? { nil }
     func startRelogin(_ account: Account) {}
     func toggleEngine() {}

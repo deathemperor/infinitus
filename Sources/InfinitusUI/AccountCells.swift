@@ -206,7 +206,8 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         return (w.pct >= 100 ? PopupGlyph.text(theme.revivePrefix) : "") + when
     }
 
-    /// Reset label that goes LIVE under ten minutes: a per-second m:ss
+    /// Reset label that goes LIVE inside the revive lead (ten minutes by
+    /// default): a per-second m:ss
     /// countdown, then a pulsing "resetting…" until the next snapshot
     /// replaces the data. No numericText roll here: on macOS 26 a
     /// per-second `.contentTransition(.numericText)` grows the CG glyph
@@ -215,7 +216,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     /// texts, which change once a minute at most.
     @ViewBuilder func resetLabelView(resetsAt: String?, staticText: String?) -> some View {
         if let date = WeeklyRoll.parse(resetsAt),
-           date.timeIntervalSinceNow < 600 {
+           date.timeIntervalSinceNow < model.reviveLead {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let left = date.timeIntervalSince(ctx.date)
                 if left <= 0 {

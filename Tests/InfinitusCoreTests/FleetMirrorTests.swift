@@ -32,7 +32,8 @@ final class FleetMirrorTests: XCTestCase {
         let prefs = FleetPrefs(themeID: "rpg", compactRows: true, popupLayout: "stacked",
                                 burnStyle: "ash", introStyle: "fade", introTitle: "slide",
                                 introSpeed: 1.5, customThemes: [.off],
-                                sortByHeadroom: false, popupTextSize: "large")
+                                sortByHeadroom: false, popupTextSize: "large",
+                                reviveLeadMinutes: 25)
         let usageJSON = Data("{\"days\":7,\"totalCost\":1.5}".utf8)
         let snapshot = MirrorSnapshot(
             capturedAt: Date(),
@@ -85,6 +86,7 @@ final class FleetMirrorTests: XCTestCase {
         let got = try XCTUnwrap(read?.prefs)
         XCTAssertEqual(got.sortByHeadroom, true)
         XCTAssertEqual(got.popupTextSize, "default")
+        XCTAssertEqual(got.reviveLeadMinutes, 10)
     }
 
     func testRoundTripWithFooterChipStateAndProgress() async throws {

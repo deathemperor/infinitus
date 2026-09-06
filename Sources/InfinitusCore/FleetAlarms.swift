@@ -7,7 +7,8 @@ import Foundation
 /// each as a local `UNNotificationRequest`, re-planned on every snapshot.
 /// No push service, no polling, nothing hosted.
 public enum FleetAlarms {
-    /// How far ahead of the reset the banner lands.
+    /// How far ahead of the reset the banner lands by default; the Mac's
+    /// revive lead (Settings › Notifications) overrides it per snapshot.
     public static let lead: TimeInterval = 10 * 60
 
     public struct Alarm: Equatable, Sendable {
@@ -27,7 +28,8 @@ public enum FleetAlarms {
     /// popup counts down. Resets already inside the lead window get no
     /// alarm: the countdown is on screen, and a past trigger never fires.
     /// A credit cap with no reset blocks indefinitely: nothing to plan.
-    public static func resets(accounts: [Account], now: Date) -> [Alarm] {
+    public static func resets(accounts: [Account], now: Date,
+                              lead: TimeInterval = lead) -> [Alarm] {
         accounts.compactMap { account in
             guard !(account.disabled ?? false),
                   let cause = AccountVitals.cause(account.usage),
@@ -42,7 +44,7 @@ public enum FleetAlarms {
             case .credit: return nil
             }
             return Alarm(id: "reset-\(account.number)", fireAt: fireAt,
-                         title: "\(name(account)) resets in 10 min",
+                         title: "\(name(account)) resets in \(Int(lead / 60)) min",
                          body: "the \(window) limit lifts at \(clock.string(from: reset))")
         }
     }

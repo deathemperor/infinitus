@@ -125,6 +125,11 @@ struct NotifyPane: View {
                     .help("Fires once per session and profile when an aws "
                           + "command fails on an expired sign-in — sign in "
                           + "from the phone's sessions list.")
+                Stepper(value: $app.reviveLeadMinutes, in: 1...120) {
+                    Text("Revive countdown lead: \(app.reviveLeadMinutes) min")
+                }
+                    .help("How far ahead of an exhausted account's reset its row "
+                          + "starts a live countdown and the phone's reset alarm fires.")
             }
             Section("Slack") {
                 LabeledContent("Configured", value: model.slackStatus ?? "no")

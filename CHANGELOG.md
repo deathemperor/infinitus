@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- Settings › Notifications sets the revive lead (default 10 min): how far ahead of an exhausted account's reset its row counts down live and the phone's reset alarm fires.
 - Phone messages and resume nudges reach sessions in every permission mode again: Claude Code 2.1.263 holds a peer message that claims a different permission class than the receiver's, so the app now asserts the session's own (#213).
 
 ## 0.4.4-alpha.1

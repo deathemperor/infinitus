@@ -386,7 +386,8 @@ final class MirrorModel: ObservableObject, FleetModel {
             AwsLoginAlerts.shared.sync(snapshot.awsLogins ?? [])
             if let fleet = fleets.first(where: { $0.provider == .claude }) ?? fleets.first {
                 FleetAlarmCenter.shared.sync(accounts: fleet.accounts, activeNumber: fleet.activeNumber,
-                                             macPushesAlerts: snapshot.pushesAlerts ?? false)
+                                             macPushesAlerts: snapshot.pushesAlerts ?? false,
+                                             lead: reviveLead)
             }
             LiveActivities.shared.sync(
                 fleet: fleets.first { $0.provider == .claude } ?? fleets.first,
@@ -623,6 +624,9 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// Follow Mac's mirrored `sortByHeadroom`, else always-on. No local
     /// override exists for this pref.
     var sortByHeadroom: Bool { macPrefs?.sortByHeadroom ?? true }
+    /// Seconds before a reset that a row's countdown goes live and the
+    /// reset alarm fires — the Mac's knob, or its default when not mirrored.
+    var reviveLead: TimeInterval { TimeInterval((macPrefs?.reviveLeadMinutes ?? 10) * 60) }
 
     /// Custom skins ride in the snapshot — the phone has no themes.json.
     var availableThemes: [RowTheme] { RowTheme.builtins + (prefs?.customThemes ?? []) }

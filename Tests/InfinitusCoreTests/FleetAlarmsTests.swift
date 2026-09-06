@@ -26,6 +26,17 @@ final class FleetAlarmsTests: XCTestCase {
         XCTAssertTrue(alarms[0].body.hasPrefix("the session limit lifts at "))
     }
 
+    func testLeadIsAKnobAndNamesItselfInTheTitle() {
+        let reset = now.addingTimeInterval(3 * 3600)
+        let alarms = FleetAlarms.resets(accounts: [account(1, five: 100, resets: reset, alias: "papaya")],
+                                        now: now, lead: 30 * 60)
+        XCTAssertEqual(alarms.map(\.fireAt), [reset.addingTimeInterval(-30 * 60)])
+        XCTAssertEqual(alarms[0].title, "papaya resets in 30 min")
+        // A reset inside a long lead plans nothing, same as inside the default.
+        XCTAssertEqual(FleetAlarms.resets(accounts: [account(1, five: 100, resets: now.addingTimeInterval(20 * 60))],
+                                          now: now, lead: 30 * 60), [])
+    }
+
     func testResetInsideTheLeadWindowDisabledAndNoResetInstantPlanNothing() {
         XCTAssertEqual(FleetAlarms.resets(accounts: [
             account(1, five: 100, resets: now.addingTimeInterval(5 * 60)),

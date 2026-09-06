@@ -183,12 +183,16 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
     /// `sort_headroom` / `popup_text_size`.
     public let sortByHeadroom: Bool
     public let popupTextSize: String
+    /// Minutes before an account's reset that its countdown goes live and
+    /// the phone's reset alarm fires (`revive_lead_minutes`, default 10).
+    public let reviveLeadMinutes: Int
 
     public init(themeID: String = "off", compactRows: Bool = false,
                 popupLayout: String = "wide", burnStyle: String = "ember",
                 introStyle: String = "top", introTitle: String = "zoom",
                 introSpeed: Double = 1.0, customThemes: [RowTheme] = [],
-                sortByHeadroom: Bool = true, popupTextSize: String = "default") {
+                sortByHeadroom: Bool = true, popupTextSize: String = "default",
+                reviveLeadMinutes: Int = 10) {
         self.themeID = themeID
         self.compactRows = compactRows
         self.popupLayout = popupLayout
@@ -199,6 +203,7 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
         self.customThemes = customThemes
         self.sortByHeadroom = sortByHeadroom
         self.popupTextSize = popupTextSize
+        self.reviveLeadMinutes = reviveLeadMinutes
     }
 
     // Custom Decodable: sortByHeadroom/popupTextSize are non-optional, so
@@ -206,7 +211,8 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
     // that lacks them. Encode stays synthesized (Codable = both halves).
     enum CodingKeys: String, CodingKey {
         case themeID, compactRows, popupLayout, burnStyle, introStyle,
-             introTitle, introSpeed, customThemes, sortByHeadroom, popupTextSize
+             introTitle, introSpeed, customThemes, sortByHeadroom, popupTextSize,
+             reviveLeadMinutes
     }
 
     public init(from decoder: Decoder) throws {
@@ -221,6 +227,7 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
         customThemes = try c.decode([RowTheme].self, forKey: .customThemes)
         sortByHeadroom = try c.decodeIfPresent(Bool.self, forKey: .sortByHeadroom) ?? true
         popupTextSize = try c.decodeIfPresent(String.self, forKey: .popupTextSize) ?? "default"
+        reviveLeadMinutes = try c.decodeIfPresent(Int.self, forKey: .reviveLeadMinutes) ?? 10
     }
 }
 

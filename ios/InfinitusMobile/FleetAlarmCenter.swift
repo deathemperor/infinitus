@@ -19,7 +19,8 @@ final class FleetAlarmCenter {
         UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
     }
 
-    func sync(accounts: [Account], activeNumber: Int?, macPushesAlerts: Bool, now: Date = Date()) {
+    func sync(accounts: [Account], activeNumber: Int?, macPushesAlerts: Bool,
+              lead: TimeInterval = FleetAlarms.lead, now: Date = Date()) {
         let center = UNUserNotificationCenter.current()
         defer { previousActive = .some(activeNumber) }
         if enabled, case .some(let previous) = previousActive,
@@ -28,7 +29,7 @@ final class FleetAlarmCenter {
             center.add(UNNotificationRequest(identifier: Self.prefix + swap.id,
                                              content: content(swap), trigger: nil))
         }
-        let alarms = enabled ? FleetAlarms.resets(accounts: accounts, now: now) : []
+        let alarms = enabled ? FleetAlarms.resets(accounts: accounts, now: now, lead: lead) : []
         let plan = Dictionary(uniqueKeysWithValues: alarms.compactMap { a in a.fireAt.map { (a.id, $0) } })
         guard plan != planned else { return }
         let stale = planned.keys.filter { plan[$0] != planned[$0] }

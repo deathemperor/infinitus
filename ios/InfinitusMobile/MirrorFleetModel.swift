@@ -134,6 +134,7 @@ extension MirrorFleetModel: FleetModel {
     }
     var rowTheme: RowTheme { host.rowTheme }
     var compactRows: Bool { host.compactRows }
+    var reviveLead: TimeInterval { host.reviveLead }
     var burnStyle: String { host.burnStyle }
     var popupLayout: String { host.popupLayout }
     /// A row tap stages a switch on the mac, where an alert commits it.
