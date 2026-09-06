@@ -131,7 +131,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Capture the desktop into a session** — a region or window, a session, a note, delivered like a phone message.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
 - **All accounts limited, handled** — a floating countdown to the first account back and the sessions waiting to resume.
-- **Share → Infinitus from any app** — images, files, a link or text into a session with a note; your sessions sit in the share sheet's suggestions.
+- **Share → Infinitus from any app** — images, files, a link or text into a session on any paired Mac with a note; your sessions sit in the share sheet's suggestions.
 - **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
 - **Live Activities that keep moving** — with an APNs key the lock-screen countdown and working card update with the app closed; the icon follows the theme.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.

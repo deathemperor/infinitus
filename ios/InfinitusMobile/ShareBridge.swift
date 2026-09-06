@@ -15,6 +15,9 @@ enum ShareBridge {
         var token: String
         var deviceId: String
         var deviceName: String
+        /// The other paired Macs (#144), reached by the extension through
+        /// their own mirrors; absent in items written before it knew them.
+        var others: [MacPairing]?
     }
 
     static let service = "run.infinitus.share"
@@ -35,7 +38,8 @@ enum ShareBridge {
             lastGood: defaults.string(forKey: NetworkFleetMirror.lastGoodKey),
             token: MirrorPairing.normalize(defaults.string(forKey: NetworkFleetMirror.tokenKey) ?? ""),
             deviceId: NetworkFleetMirror.deviceId,
-            deviceName: NetworkFleetMirror.deviceName)
+            deviceName: NetworkFleetMirror.deviceName,
+            others: MacPairing.load(defaults))
         guard pairing != lastWritten, let data = try? JSONEncoder().encode(pairing) else { return }
         let status = SharedKeychain.write(service: service, account: account, data: data)
         guard status == errSecSuccess else {
@@ -43,7 +47,7 @@ enum ShareBridge {
             return
         }
         lastWritten = pairing
-        log.notice("share bridge: \(pairing.endpoints.count) routes, token \(pairing.token.isEmpty ? "none" : "****", privacy: .public)")
+        log.notice("share bridge: \(pairing.endpoints.count) routes, token \(pairing.token.isEmpty ? "none" : "****", privacy: .public), \(pairing.others?.count ?? 0) other Macs")
     }
 
     /// The extension's side: copies the bridged pairing into the
@@ -61,5 +65,13 @@ enum ShareBridge {
         defaults.set(pairing.deviceId, forKey: NetworkFleetMirror.deviceIdKey)
         defaults.set(pairing.deviceName, forKey: deviceNameKey)
         return true
+    }
+
+    /// The extension's side too: the other paired Macs, each reached
+    /// through `NetworkFleetMirror(pairing:)` rather than the defaults.
+    static func others() -> [MacPairing] {
+        guard let data = SharedKeychain.read(service: service, account: account),
+              let pairing = try? JSONDecoder().decode(Pairing.self, from: data) else { return [] }
+        return pairing.others ?? []
     }
 }
