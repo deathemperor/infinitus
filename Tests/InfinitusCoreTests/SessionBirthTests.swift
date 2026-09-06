@@ -25,6 +25,8 @@ final class SessionBirthTests: XCTestCase {
         XCTAssertEqual(born?.chip, "Review · Full access")
         XCTAssertEqual(born?.isUnrestricted, true)
         XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc"))?.chip, "resumed")
+        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc", fork: true))?.chip, "forked")
+        XCTAssertNil(SessionBirth(request: .init(cwd: "/r", fork: true)), "a fork flag alone is not a birth worth a chip")
         XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc", permissionMode: "acceptEdits"))?.chip,
                        "Auto-accept edits")
     }

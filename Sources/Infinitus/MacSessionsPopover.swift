@@ -72,6 +72,10 @@ struct MacSessionsPopover: View {
                     .buttonStyle(.borderless)
                     .font(PopupFont.caption)
             }
+            Button("Fork") { resume(session, fork: true) }
+                .buttonStyle(.borderless)
+                .font(PopupFont.caption)
+                .help("A new session continuing from this transcript; this one is left as it is.")
         }
         .help(session.cwd)
     }
@@ -81,7 +85,6 @@ struct MacSessionsPopover: View {
         loading = true
         Task.detached(priority: .userInitiated) {
             let list = PastSessions.list(claudeDir: ClaudeSessions.configHome(), limit: 30)
-                .filter { !$0.live }
             await MainActor.run {
                 past = list
                 loading = false
@@ -89,10 +92,10 @@ struct MacSessionsPopover: View {
         }
     }
 
-    private func resume(_ session: PastSession) {
+    private func resume(_ session: PastSession, fork: Bool = false) {
         note = nil
         let host = model.sessionHost
-        let request = SessionStart.Request(cwd: session.cwd, resume: session.sessionId)
+        let request = SessionStart.Request(cwd: session.cwd, resume: session.sessionId, fork: fork ? true : nil)
         Task.detached(priority: .userInitiated) {
             let reply = SessionLauncher.start(request, preferredHost: host)
             await MainActor.run {

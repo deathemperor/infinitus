@@ -15,7 +15,8 @@ enum SessionLauncher {
         }
         let command = SessionStart.shellCommand(cwd: cwd, engine: request.engine, prompt: request.prompt,
                                                 resume: request.resume, permissionMode: request.permissionMode,
-                                                model: request.model, systemPrompt: request.systemPrompt)
+                                                model: request.model, systemPrompt: request.systemPrompt,
+                                                fork: request.fork == true)
         let claudeDir = ClaudeSessions.configHome()
         let before = Set(ClaudeSessions.list(claudeDir: claudeDir).map(\.pid))
         let host: String

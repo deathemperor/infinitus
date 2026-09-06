@@ -46,6 +46,7 @@ publishes the matching section as the GitHub release body.
 - A profile can list tools its sessions run without asking (Settings › Profiles, `profile-set --allow "Edit, Bash git"`); the plugin's PreToolUse hook honours them from the session's first tool call.
 - Siri's and Shortcuts' Start a session take a profile name: its folder, engine, permissions, model and prompts apply.
 - Start a session from the Mac too: the sessions popover's Start a session takes a profile chip, folder, engine, permissions and a first prompt.
+- Fork a session: Past sessions (Mac popover, phone) and `infinitusctl resume-session --fork` continue a transcript under a new session id, the original untouched — live sessions included.
 
 ### Team (preview)
 - Reading the team store remembers each file's header, so a refresh pass reads only new files and the app's memory stays flat.

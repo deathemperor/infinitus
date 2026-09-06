@@ -252,6 +252,10 @@ final class SessionInputTests: XCTestCase {
                        "cd '/r' && exec claude --resume 'abc-1' 'go on'")
         XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, resume: "abc-1"),
                        "cd '/r' && exec codex")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", fork: true),
+                       "cd '/r' && exec claude --resume 'abc-1' --fork-session")
+        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, fork: true),
+                       "cd '/r' && exec claude", "a fork without a resume is a plain start")
         XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", permissionMode: "acceptEdits"),
                        "cd '/r' && exec claude --permission-mode acceptEdits 'go'")
         XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", permissionMode: "bypassPermissions"),

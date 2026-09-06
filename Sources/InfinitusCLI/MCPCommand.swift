@@ -67,17 +67,20 @@ enum MCPCommand {
                         return control("session-mode", args: [session, mode])
                     }),
             MCPTool(name: "resume_session",
-                    description: "Resume a past Claude Code session on this Mac: opens a new terminal in the folder it ran in with `claude --resume <id>`. Live sessions are refused — message them instead.",
+                    description: "Resume a past Claude Code session on this Mac: opens a new terminal in the folder it ran in with `claude --resume <id>`. Live sessions are refused — message them instead — unless `fork` is true, which branches the transcript into a new session id (`--fork-session`) and leaves the original alone.",
                     inputSchema: .object(["type": .string("object"),
                                           "properties": .object([
                                             "session_id": .object(["type": .string("string")]),
+                                            "fork": .object(["type": .string("boolean")]),
                                           ]),
                                           "required": .array([.string("session_id")])]),
                     call: { arguments in
                         guard let id = string(arguments["session_id"]), !id.isEmpty else {
                             return .failure(.init("session_id is required"))
                         }
-                        return control("resume-session", args: [id])
+                        var options: [String: String] = [:]
+                        if case .bool(true)? = arguments["fork"] { options["fork"] = "true" }
+                        return control("resume-session", args: [id], options: options)
                     }),
             MCPTool(name: "session_message",
                     description: "Send a message to another live session on this Mac, by pid or name, as if typed into its prompt.",

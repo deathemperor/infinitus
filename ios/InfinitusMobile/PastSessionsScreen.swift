@@ -5,8 +5,8 @@ import InfinitusCore
 struct PastSessionsRoute: Hashable {}
 
 /// Every session the Mac has run (#164), newest first — repo, opening
-/// prompt, last activity — with Resume: the Mac opens a terminal in the
-/// session's folder with `claude --resume`, and the chat opens here once
+/// prompt, last activity — with Resume (and Fork, #167): the Mac opens a
+/// terminal in the session's folder with `claude --resume`, and the chat opens here once
 /// the new pid shows up in the snapshot (the same `requestedPid` path a
 /// started session takes).
 struct PastSessionsScreen: View {
@@ -84,11 +84,14 @@ struct PastSessionsScreen: View {
                 Button { resume(session) } label: { Label("Resume", systemImage: "play.fill") }
                     .tint(.accentColor)
             }
+            Button { resume(session, fork: true) } label: { Label("Fork", systemImage: "arrow.triangle.branch") }
+                .tint(.indigo)
         }
         .contextMenu {
             if !session.live {
                 Button { resume(session) } label: { Label("Resume", systemImage: "play.fill") }
             }
+            Button { resume(session, fork: true) } label: { Label("Fork", systemImage: "arrow.triangle.branch") }
             Button { UIPasteboard.general.string = session.sessionId } label: {
                 Label("Copy session id", systemImage: "doc.on.doc")
             }
@@ -112,10 +115,12 @@ struct PastSessionsScreen: View {
         }
     }
 
-    private func resume(_ session: PastSession) {
+    /// Fork (#167 phase 3): a new session continuing from the transcript,
+    /// this one untouched — so a live session can be branched too.
+    private func resume(_ session: PastSession, fork: Bool = false) {
         resuming = session.sessionId
         error = nil
-        let request = SessionStart.Request(cwd: session.cwd, resume: session.sessionId)
+        let request = SessionStart.Request(cwd: session.cwd, resume: session.sessionId, fork: fork ? true : nil)
         Task {
             defer { resuming = nil }
             do {

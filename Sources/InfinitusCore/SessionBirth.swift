@@ -11,6 +11,8 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     public let permissionMode: String?
     /// The past session id this one resumed, when it did.
     public let resumedFrom: String?
+    /// The resume was a fork (#167 phase 3): a new id from that transcript.
+    public let forked: Bool?
     /// The mode the phone moved the running session to (#163 phase 2),
     /// answered by the plugin's PreToolUse hook; nil = as started.
     public let hookMode: String?
@@ -21,24 +23,25 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     public let sessionId: String?
 
     public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil,
-                hookMode: String? = nil, sessionId: String? = nil) {
+                hookMode: String? = nil, sessionId: String? = nil, forked: Bool? = nil) {
         self.profile = profile
         self.permissionMode = permissionMode
         self.resumedFrom = resumedFrom
         self.hookMode = hookMode
         self.sessionId = sessionId
+        self.forked = forked
     }
 
     /// The same birth moved to `mode` (nil = back to how it started).
     public func moved(to mode: String?) -> SessionBirth {
         SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
-                     hookMode: mode, sessionId: sessionId)
+                     hookMode: mode, sessionId: sessionId, forked: forked)
     }
 
     /// The same birth pinned to the session id the roster showed.
     public func identified(as sessionId: String) -> SessionBirth {
         SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
-                     hookMode: hookMode, sessionId: sessionId)
+                     hookMode: hookMode, sessionId: sessionId, forked: forked)
     }
 
     /// The mode in force: the hook's when set, else the start mode.
@@ -52,7 +55,8 @@ public struct SessionBirth: Codable, Sendable, Equatable {
         let profile = request.profile?.trimmingCharacters(in: .whitespaces)
         let mode = request.permissionMode.flatMap { m in SessionStart.permissionModes.contains { $0.mode == m } ? m : nil }
         guard (profile?.isEmpty == false) || mode != nil || request.resume != nil else { return nil }
-        self.init(profile: profile?.isEmpty == false ? profile : nil, permissionMode: mode, resumedFrom: request.resume)
+        self.init(profile: profile?.isEmpty == false ? profile : nil, permissionMode: mode, resumedFrom: request.resume,
+                  forked: request.resume != nil && request.fork == true ? true : nil)
     }
 
     /// The mode as the pickers spell it ("Full access"), nil when supervised.
@@ -66,7 +70,7 @@ public struct SessionBirth: Codable, Sendable, Equatable {
         var parts: [String] = []
         if let profile { parts.append(profile) }
         if let modeLabel { parts.append(modeLabel) }
-        if parts.isEmpty, resumedFrom != nil { parts.append("resumed") }
+        if parts.isEmpty, resumedFrom != nil { parts.append(forked == true ? "forked" : "resumed") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

@@ -28,9 +28,13 @@ public enum SessionStart {
         public let model: String?
         public let systemPrompt: String?
         public let profile: String?
+        /// With `resume` (#167 phase 3): `--fork-session`, a new session id
+        /// continuing from that transcript, the original left as it was —
+        /// so a live session can be branched too.
+        public let fork: Bool?
         public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil,
                     permissionMode: String? = nil, model: String? = nil, systemPrompt: String? = nil,
-                    profile: String? = nil) {
+                    profile: String? = nil, fork: Bool? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
@@ -39,6 +43,7 @@ public enum SessionStart {
             self.model = model
             self.systemPrompt = systemPrompt
             self.profile = profile
+            self.fork = fork
         }
     }
 
@@ -90,11 +95,12 @@ public enum SessionStart {
     /// resumed Claude session names its id first (Codex has no resume here).
     public static func shellCommand(cwd: String, engine: String?, prompt: String?,
                                     resume: String? = nil, permissionMode: String? = nil,
-                                    model: String? = nil, systemPrompt: String? = nil) -> String {
+                                    model: String? = nil, systemPrompt: String? = nil, fork: Bool = false) -> String {
         let bin = engine == "codex" ? "codex" : "claude"
         var line = "cd \(shellQuoted(cwd)) && exec \(bin)"
         if bin == "claude", let resume, !resume.isEmpty {
             line += " --resume " + shellQuoted(resume)
+            if fork { line += " --fork-session" }
         }
         // Only a known mode reaches the command line; anything else is
         // the default, never an arbitrary flag value.
