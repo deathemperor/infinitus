@@ -193,4 +193,62 @@ final class SessionTimelineTests: XCTestCase {
         ])]))
         XCTAssertEqual(tl.activity(id: "perm:q1/resolved")?.payload["answers"]?.stringValue?.contains("Blue"), true)
     }
+
+    // MARK: Task 5 — agents, plans, warnings, compaction
+    func testLimitStopIsARuntimeWarningNotAnError() throws {
+        let tl = build(try entries("limit"))
+        XCTAssertEqual(tl.activities.map(\.kind), ["runtime.warning"])
+        XCTAssertEqual(tl.activities[0].payload["code"], .string("limit"))
+        XCTAssertEqual(tl.activities[0].summary, Transcript.limitText(try entries("limit")[1]))
+        XCTAssertEqual(tl.turn(id: "u1")?.state, .completed)
+    }
+
+    func testHeldPeerMessageIsAWarningAndAPeerPromptCarriesItsSender() throws {
+        let tl = build(try entries("peer"))
+        XCTAssertEqual(tl.message(id: "u1")?.sender, "Infi3")
+        XCTAssertEqual(tl.message(id: "u1")?.text, "merged #277")
+        XCTAssertEqual(tl.activities.map(\.kind), ["runtime.warning"])
+        XCTAssertEqual(tl.activities[0].payload["code"], .string("held"))
+        XCTAssertTrue(tl.activities[0].summary.hasPrefix("Claude Code held this message"))
+    }
+
+    func testCompactBoundaryIsAnActivityAndTheSummaryPromptIsNotAMessage() throws {
+        let tl = build(try entries("compact"))
+        XCTAssertEqual(tl.activities.map(\.kind), ["context-compaction"])
+        XCTAssertEqual(tl.activities[0].payload["beforeTokens"], .number(468265))
+        XCTAssertEqual(tl.activities[0].payload["afterTokens"], .number(12384))
+        XCTAssertEqual(tl.messages.map(\.id), ["u1"])
+        XCTAssertEqual(tl.turns.map(\.id), ["u1"])
+    }
+
+    func testTodoWriteIsAPlanUpdateNotATool() throws {
+        let tl = build(try entries("todo"))
+        XCTAssertEqual(tl.activities.map(\.kind), ["turn.plan.updated"])
+        let plan = tl.activities[0]
+        XCTAssertEqual(plan.id, "td1")
+        XCTAssertEqual(plan.summary, "1 of 3 steps")
+        XCTAssertEqual(plan.payload["completed"], .number(1))
+        XCTAssertEqual(plan.payload["total"], .number(3))
+        XCTAssertEqual(plan.payload["steps"], .array([
+            .object(["text": .string("Write tests"), "status": .string("completed")]),
+            .object(["text": .string("Implement"), "status": .string("in_progress")]),
+            .object(["text": .string("Commit"), "status": .string("pending")]),
+        ]))
+    }
+
+    func testAgentSpawnIsATaskWithTheSubagentSummaryAttached() throws {
+        let agent = SessionFeedItem.Agent(id: "abc", type: "Explore", description: "Map session feed rendering",
+                                          toolCalls: 46, lastTool: "Read · SessionFeed.swift", running: false,
+                                          lastActivityAt: nil)
+        let tl = build(try entries("agent"), agents: ["ag1": agent])
+        XCTAssertEqual(tl.activities.map(\.kind), ["task.started", "task.completed"])
+        XCTAssertEqual(tl.activities.map(\.id), ["task:ag1", "task:ag1/completed"])
+        XCTAssertEqual(tl.activities[0].summary, "Map session feed rendering")
+        XCTAssertEqual(tl.activities[0].payload["agentType"], .string("Explore"))
+        XCTAssertEqual(tl.activities[0].payload["toolCalls"], .number(46))
+        XCTAssertEqual(tl.activities[1].payload["running"], .bool(false))
+        XCTAssertEqual(tl.activities[1].summary, "Map session feed rendering")
+        // without a summary the row still exists
+        XCTAssertEqual(build(try entries("agent")).activities[0].payload["agentType"], .string("Explore"))
+    }
 }

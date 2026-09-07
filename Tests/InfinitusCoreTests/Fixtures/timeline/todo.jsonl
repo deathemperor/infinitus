@@ -1,0 +1,3 @@
+{"type":"user","uuid":"u1","timestamp":"2026-09-06T10:00:00.000Z","message":{"content":"plan it"}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-06T10:00:01.000Z","message":{"content":[{"type":"tool_use","id":"td1","name":"TodoWrite","input":{"todos":[{"content":"Write tests","status":"completed","activeForm":"Writing tests"},{"content":"Implement","status":"in_progress","activeForm":"Implementing"},{"content":"Commit","status":"pending","activeForm":"Committing"}]}}]}}
+{"type":"user","uuid":"r1","timestamp":"2026-09-06T10:00:02.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"td1","content":"Todos have been modified successfully."}]}}

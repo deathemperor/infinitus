@@ -91,6 +91,20 @@ public enum SessionTimelineBuilder {
                 visitUser(entry, at: at)
             case "assistant":
                 visitAssistant(entry, at: at)
+            case "system":
+                let subtype = entry["subtype"] as? String
+                if subtype == "informational", let content = entry["content"] as? String,
+                   let text = SessionFeedReader.heldText(content) {
+                    append("runtime.warning", id: entry["uuid"] as? String ?? "held:\(seq)", tone: .info,
+                           summary: text, payload: ["code": .string("held")], at: at)
+                } else if subtype == "compact_boundary" {
+                    let meta = entry["compactMetadata"] as? [String: Any] ?? [:]
+                    var payload: [String: JSONValue] = [:]
+                    if let n = meta["preTokens"] as? NSNumber { payload["beforeTokens"] = .number(n.doubleValue) }
+                    if let n = meta["postTokens"] as? NSNumber { payload["afterTokens"] = .number(n.doubleValue) }
+                    append("context-compaction", id: entry["uuid"] as? String ?? "compact:\(seq)", tone: .info,
+                           summary: "Context compacted", payload: payload, at: at)
+                }
             default:
                 break
             }
@@ -108,6 +122,8 @@ public enum SessionTimelineBuilder {
         }
 
         mutating func visitUser(_ entry: [String: Any], at: Date) {
+            // The post-compaction summary is Claude Code's, not a prompt.
+            if (entry["isCompactSummary"] as? Bool) == true { return }
             guard let message = entry["message"] as? [String: Any] else { return }
             let raw: String?
             if let plain = message["content"] as? String {
@@ -161,6 +177,26 @@ public enum SessionTimelineBuilder {
                        payload: ["requestId": .string("perm:" + id), "questions": .array(questions)], at: at)
                 return
             }
+            if name == "TodoWrite" || name == "TaskCreate" || name == "TaskUpdate" {
+                let todos = input["todos"] as? [[String: Any]] ?? []
+                let steps = todos.map { t -> JSONValue in
+                    .object(["text": .string(t["content"] as? String ?? ""), "status": .string(t["status"] as? String ?? "pending")])
+                }
+                let done = todos.filter { ($0["status"] as? String) == "completed" }.count
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                append("turn.plan.updated", id: id, tone: .info, summary: "\(done) of \(todos.count) steps",
+                       payload: ["steps": .array(steps), "completed": .number(Double(done)),
+                                 "total": .number(Double(todos.count))], at: at)
+                return
+            }
+            if name == "Agent" {
+                let description = input["description"] as? String ?? "sub-agent"
+                let type = input["subagent_type"] as? String ?? "agent"
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                append("task.started", id: "task:" + id, tone: .info, summary: description,
+                       payload: agentPayload(id: id, type: type, description: description), at: at)
+                return
+            }
             let title = SessionFeedReader.describeTool(name: name, input: input)
             let command = name == "Bash" ? (input["command"] as? String) : nil
             let files = (input["file_path"] as? String).map { [$0] } ?? []
@@ -168,6 +204,18 @@ public enum SessionTimelineBuilder {
             var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name))]
             if !title.isEmpty { payload["title"] = .string(title) }
             append("tool.started", id: id, tone: .tool, summary: title.isEmpty ? name : title, payload: payload, at: at)
+        }
+
+        /// The `attachAgents` summary for a spawn, when the sub-agent's
+        /// meta/log were read; the row exists without it.
+        func agentPayload(id toolUseId: String, type: String, description: String) -> [String: JSONValue] {
+            var p: [String: JSONValue] = ["agentType": .string(type), "description": .string(description)]
+            if let a = agents[toolUseId] {
+                p["agentId"] = .string(a.id); p["agentType"] = .string(a.type)
+                p["toolCalls"] = .number(Double(a.toolCalls)); p["running"] = .bool(a.running)
+                if let t = a.lastTool { p["lastTool"] = .string(t) }
+            }
+            return p
         }
 
         /// The result closes the pair as one `tool.completed` row whose
@@ -189,6 +237,17 @@ public enum SessionTimelineBuilder {
                 openPrompts.remove("perm:" + toolUseId)
                 append("user-input.resolved", id: "perm:\(toolUseId)/resolved", tone: .approval, summary: "Answered",
                        payload: ["requestId": .string("perm:" + toolUseId), "answers": .string(String(text.prefix(2000)))], at: at)
+                return
+            }
+            if name == "TodoWrite" || name == "TaskCreate" || name == "TaskUpdate" { return }
+            if name == "Agent" {
+                let started = activities.first { $0.id == "task:" + toolUseId }
+                let description = started?.summary ?? "sub-agent"
+                var p = agentPayload(id: toolUseId, type: started?.payload["agentType"]?.stringValue ?? "agent",
+                                     description: description)
+                p["running"] = .bool(false)
+                append("task.completed", id: "task:\(toolUseId)/completed", tone: isError ? .error : .info,
+                       summary: description, payload: p, at: at)
                 return
             }
             var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name)),
@@ -214,7 +273,12 @@ public enum SessionTimelineBuilder {
             guard let message = entry["message"] as? [String: Any],
                   let content = message["content"] as? [[String: Any]] else { return }
             if !turns.isEmpty, turns[turns.count - 1].startedAt == nil { turns[turns.count - 1].startedAt = at }
-            if (entry["isApiErrorMessage"] as? Bool) == true, !Transcript.isLimitStop(entry) {
+            if Transcript.isLimitStop(entry) {
+                append("runtime.warning", id: entry["uuid"] as? String ?? "limit:\(seq)", tone: .info,
+                       summary: Transcript.limitText(entry), payload: ["code": .string("limit")], at: at)
+                return
+            }
+            if (entry["isApiErrorMessage"] as? Bool) == true {
                 let text = content.first(where: { ($0["type"] as? String) == "text" })?["text"] as? String ?? "API error"
                 var payload: [String: JSONValue] = ["message": .string(text)]
                 if let status = entry["apiErrorStatus"] as? NSNumber { payload["status"] = .number(status.doubleValue) }
