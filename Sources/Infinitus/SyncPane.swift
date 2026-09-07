@@ -101,6 +101,13 @@ struct SyncPane: View {
                                     addressRow(primary)
                                 }
                                 Button("Copy Pair Link") { copy(app.pairURL) }
+                                if let primary = app.pairRoutes.first {
+                                    // #151: Linux/Windows open this in a browser.
+                                    Button("Copy Browser Link") {
+                                        copy(MirrorWebClient.url(endpoint: primary.endpoint, token: app.mirrorPairToken))
+                                    }
+                                    .help("The sessions and chat page for a machine without the Infinitus app; the pairing token is in the link.")
+                                }
                             }
                             Spacer(minLength: 0)
                         }
