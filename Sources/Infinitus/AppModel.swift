@@ -679,6 +679,21 @@ final class AppModel: ObservableObject {
     let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
     /// Numbers every timeline change for `/timeline` resumes (#223 phase 4).
     let sequenceLog = SequenceLog()
+
+    /// The Mac's own popup / pop-out / chat window is a client too (#223
+    /// phase 5): while one is open, nothing the user sees here depends on
+    /// a phone holding a lease. StatusItemController and the chat window
+    /// call it on show / hide; the cap is the TTL, so a UI that dies
+    /// never pins work for more than five minutes.
+    func reportLocalActivity(visible: Bool) {
+        if visible {
+            mirrorServer.leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
+                                             recentlyInteracted: true, scopes: [.sessions, .fleets, .stats],
+                                             ttlMs: ClientActivity.ttlCapMs))
+        } else {
+            mirrorServer.leases.release(clientId: ClientActivity.localClientId)
+        }
+    }
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
@@ -2418,7 +2433,7 @@ final class AppModel: ObservableObject {
                 updateChannel: BrewUpdater.channel.rawValue,
                 phoneLatest: appReleaseLatest)
             let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
-            let sequenceLog = sequenceLog
+            let sequenceLog = sequenceLog, leases = mirrorServer.leases
             Task.detached(priority: .utility) { [mirrorExporter] in
                 await mirrorExporter.record(listJSON: raw, prefs: prefs,
                                             serviceStatus: serviceStatus,
@@ -2431,8 +2446,12 @@ final class AppModel: ObservableObject {
                                             profiles: self.sessionProfiles.profiles,
                                             births: self.sessionBirths,
                                             facts: { records in
-                                                timelineCache.facts(records: records, claudeDir: ClaudeSessions.configHome(),
-                                                                    attention: attentionStore) { ownedBox.existing?.pending(pid: $0) ?? [] }
+                                                // Only leased sessions get a timeline rebuild (#223
+                                                // phase 5); an unleased pid is absent from factsByPid
+                                                // and the phone falls back to today's rows.
+                                                let wanted = leases.leasedPids().map { pids in records.filter { pids.contains($0.pid) } } ?? records
+                                                return timelineCache.facts(records: wanted, claudeDir: ClaudeSessions.configHome(),
+                                                                           attention: attentionStore) { ownedBox.existing?.pending(pid: $0) ?? [] }
                                             },
                                             sequence: sequenceLog)
             }
