@@ -154,6 +154,18 @@ final class OwnedSessionsProcessTests: XCTestCase {
         XCTAssertFalse(ClaudeSessions.isAlive(pid))
     }
 
+    func testTheLedgerHoldsThePidWithItsSessionIdAndClearsOnStop() async throws {
+        try writeFake()
+        let ledgerURL = cwd.appendingPathComponent("ledger.json")
+        let ledger = OwnedLedger(url: ledgerURL)
+        let owned = OwnedSessions(binaryPath: scriptURL.path, ledger: ledger, onState: { _, _ in })
+        let pid = Int32(await owned.start(request()).pid!)
+        waitFor("ledger sees the session id") { ledger.entries().first(where: { $0.pid == pid })?.sessionId == "S-FAKE" }
+        await owned.stop(pid: pid)
+        // `forget` runs in the termination handler, off `stop`'s own thread.
+        waitFor("ledger cleared") { ledger.entries().isEmpty }
+    }
+
     func testAnOldClaudeIsRefusedWithTheVersionInTheDetail() async throws {
         try writeFake(version: "2.1.200 (Claude Code)")
         let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { _, _ in })

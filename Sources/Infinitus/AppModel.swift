@@ -1267,6 +1267,11 @@ final class AppModel: ObservableObject {
         // real events log either.
         if !isPlayground, !mockMode {
             Task.detached(priority: .utility) { [eventStore] in await eventStore.prune() }
+            Task.detached(priority: .utility) { [weak self] in
+                let swept = Self.sweepOwnedOrphans()
+                guard !swept.isEmpty else { return }
+                await MainActor.run { self?.logEvent("other", icon: "terminal", "swept \(swept.count) orphaned headless sessions") }
+            }
         }
         resume.log = { [weak self] icon, text in
             self?.logEvent("nudge", icon: icon, text)
@@ -2716,11 +2721,13 @@ final class AppModel: ObservableObject {
     /// stdin. Made on first use, off the main actor — locating `claude`
     /// may run a login shell.
     let ownedBox = OwnedSessionsBox()
+    nonisolated static let ownedLedgerURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Infinitus/owned-sessions.json")
 
     nonisolated func ownedSessions() -> OwnedSessions? {
         ownedBox.get { [weak self] in
             guard let path = ClaudeLocator.locate() else { return nil }
-            return OwnedSessions(binaryPath: path) { pid, state in
+            return OwnedSessions(binaryPath: path, ledger: OwnedLedger(url: Self.ownedLedgerURL)) { pid, state in
                 Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
             }
         }
@@ -2742,6 +2749,12 @@ final class AppModel: ObservableObject {
     nonisolated func overlayingOwnedStatus(_ fleet: EngineFleet) -> EngineFleet {
         guard let live = fleet.liveSessions, let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return fleet }
         return fleet.with(liveSessions: live.overlaying { owned.status(pid: Int32($0)) })
+    }
+
+    /// A headless child from a crashed prior launch (no PDEATHSIG on
+    /// Darwin) — swept once at startup, off the main actor (#151 follow-up).
+    nonisolated static func sweepOwnedOrphans() -> [Int32] {
+        OwnedSessions.sweepOrphans(ledger: OwnedLedger(url: ownedLedgerURL), claudeDir: ClaudeSessions.configHome())
     }
 
     private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {
