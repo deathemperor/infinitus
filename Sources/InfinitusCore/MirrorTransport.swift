@@ -81,6 +81,15 @@ public enum MirrorTransport {
         guard parts.count == 3, parts[0] == "sessions", parts[2] == "attention" else { return nil }
         return Int32(parts[1])
     }
+    /// `GET /sessions/<pid>/timeline` (#223 phase 4): sequence-resumable timeline.
+    public static func sessionTimelinePath(pid: Int32) -> String { "/sessions/\(pid)/timeline" }
+    public static func sessionTimelinePid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "timeline" else { return nil }
+        return Int32(parts[1])
+    }
+    public static let timelineAfterQueryName = "afterSequence"
+    public static let timelineEpochQueryName = "epoch"
     /// Query parameter carrying the item limit for the tail route.
     /// `POST /activities/token` — the phone's Live Activity push tokens
     /// (an `ActivityPushRegistration` body; 204 when stored).
