@@ -387,6 +387,35 @@ public final class TeamGit: TeamStore {
     private static let ignoreSigpipe: Void = { _ = signal(SIGPIPE, SIG_IGN) }()
     #endif
 
+    /// The git binary, found once. On a Mac `/usr/bin/git` is the xcrun
+    /// shim: every call re-resolves the developer dir (~100 ms, three
+    /// times git's own start), and a publish is dozens of calls — the
+    /// Team test suites spent 17 CI minutes mostly there (2026-09-07).
+    /// `xcrun --find` names the real binary; elsewhere the first `git`
+    /// on PATH; `/usr/bin/env git` when neither answers.
+    static let gitExecutable: URL = {
+        #if os(macOS)
+        let xcrun = Process()
+        xcrun.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        xcrun.arguments = ["--find", "git"]
+        let out = Pipe()
+        xcrun.standardOutput = out; xcrun.standardError = FileHandle.nullDevice
+        if (try? xcrun.run()) != nil {
+            let path = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            xcrun.waitUntilExit()
+            if xcrun.terminationStatus == 0, !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+        #endif
+        for dir in (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
+            let candidate = String(dir) + "/git"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return URL(fileURLWithPath: candidate) }
+        }
+        return URL(fileURLWithPath: "/usr/bin/env")
+    }()
+
     private func runOnce(_ args: [String], stdin: Data?, env extra: [String: String], useGitDir: Bool) throws -> Data {
         #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         // Foundation has no Process here; InfinitusCore is linked into the
@@ -395,15 +424,15 @@ public final class TeamGit: TeamStore {
         throw GitError.unavailable
         #else
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        var argv = ["git"]
+        p.executableURL = Self.gitExecutable
+        var argv: [String] = []
         if useGitDir { argv += ["--git-dir", gitDir.path] }
         if token != nil {
             argv += ["-c", "credential.helper=",
                      "-c", "credential.helper=!f() { echo username=infinitus; echo \"password=$\(Self.tokenEnv)\"; }; f"]
         }
         argv += args
-        p.arguments = argv
+        p.arguments = Self.gitExecutable.path == "/usr/bin/env" ? ["git"] + argv : argv
         p.environment = Self.childEnvironment(base: ProcessInfo.processInfo.environment, extra: extra, token: token)
         let out = Pipe(), err = Pipe()
         p.standardOutput = out; p.standardError = err

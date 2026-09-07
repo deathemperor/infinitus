@@ -10,7 +10,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test:
+  # The unit tests run as two halves on two runners: the Team suites
+  # drive real git (a publish is dozens of subprocesses) and took 17 of
+  # the old single job's 20 minutes (2026-09-07). Both halves run test
+  # classes in parallel. `test` below is the one check the main ruleset
+  # requires; it just needs both halves green, so open PRs and the
+  # ruleset stayed as they were.
+  test-core:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +31,27 @@ jobs:
             spm-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}-
             spm-${{ github.repository }}-${{ runner.os }}-
       - run: swift build
-      - run: swift test
+      - run: swift test --parallel --skip Team
+  test-team:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            spm-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}-
+            spm-${{ github.repository }}-${{ runner.os }}-
+      - run: swift build
+      - run: swift test --parallel --filter Team
+  test:
+    runs-on: ubuntu-latest
+    needs: [test-core, test-team]
+    if: always()
+    steps:
+      - run: |
+          test "${{ needs.test-core.result }}" = success && test "${{ needs.test-team.result }}" = success
   # End-to-end + performance gate (#18): the debug app against the demo
   # engine, driven through infinitusctl; fails on a broken command, a
   # missing pop-out, or idle CPU / RSS over budget (tools/e2e.sh).

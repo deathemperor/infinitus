@@ -34,6 +34,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
 - The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
 - Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
 - Settings › Machine shows on dev builds and stays hidden on releases.
@@ -67,6 +68,7 @@ publishes the matching section as the GitHub release body.
 
 ### Team (preview)
 - Saving the Cloudflare token and giving a hostname sit behind biometric unlock, like grants (#220).
+- Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
 - A leader can give each member a stable hostname — a Cloudflare named tunnel under the team's zone, minted from Settings › Team or `infinitusctl team hostname give`, started by their Mac on its next fetch (#220).
 - Team session control, driver side: drive a teammate's granted session from their detail on the Mac or with `infinitusctl team send|approve|mode|tail` — over LAN, a tunnel, or the store on their next fetch, each command answered with its lane and outcome (#220).
 - Team session control on the Mac, grantor side: grant teammates view, send, approve, mode, resume or key on chosen sessions from Settings › Team or `infinitusctl team grant`; commands arrive at the mirror server, every one is audited, and the sessions popover says who is driving (#220).
@@ -131,6 +133,7 @@ publishes the matching section as the GitHub release body.
 - The Mac's Checkpoints section shows a checkpoint's diff against now (the stat inline, the patch a Copy away).
 
 ### Team (preview)
+- Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
 - Team: a leader invites a discoverable Mac over the local network, and the invitee accepts from Invitations.
 - Team: the phone's Nearby — scan the network, ask a leader to join, invite a Mac, accept an invitation.
 - `infinitusctl team nearby invite`, `team invites`, `team accept` and `team ignore` do the same from a terminal.
@@ -237,6 +240,7 @@ publishes the matching section as the GitHub release body.
 - AWS login: the in-app sign-in page gets the account id and user name filled in.
 
 ### Team (preview)
+- Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
 - `infinitusctl team` creates a team on any git remote and exchanges end-to-end encrypted files between members (create, code, request, approve, publish, read).
 - Nearby: a discoverable Mac or Linux box shows up to teammates on the same network, and `infinitusctl team request --nearby <kid>` sends a join request straight to a leader — no code to paste.
 - Settings › Lock puts the pop-out and Settings behind Touch ID (password fallback), re-locking at once, after 5 min, after 1 h or on sleep; teams need it on.

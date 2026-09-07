@@ -59,6 +59,25 @@ private let addAccountFooter =
         m[email] = id.uuidString
         UserDefaults.standard.set(m, forKey: mapKey)
     }
+    /// Google's cookies (only Google's — never Anthropic's, that would
+    /// be the cross-account bleed again) live in one shared jar: a
+    /// fresh account's private window seeds from it, so Google shows
+    /// its account chooser instead of the email field (user
+    /// 2026-09-07: "keep what belong to Google so I won't have to type
+    /// emails again"); every private window harvests back on close.
+    private static let googleJarKey = "auth_web_store_google"
+    private static var googleJar: WKWebsiteDataStore {
+        let d = UserDefaults.standard
+        let id = d.string(forKey: googleJarKey).flatMap(UUID.init) ?? {
+            let id = UUID(); d.set(id.uuidString, forKey: googleJarKey); return id
+        }()
+        return WKWebsiteDataStore(forIdentifier: id)
+    }
+    private static func copyGoogleCookies(from: WKWebsiteDataStore, to: WKWebsiteDataStore) async {
+        for c in await from.httpCookieStore.allCookies() where c.domain.hasSuffix("google.com") {
+            await to.httpCookieStore.setCookie(c)
+        }
+    }
 
     private var process: Process?
     private weak var model: AppModel?
@@ -392,7 +411,8 @@ private let addAccountFooter =
         guard let url = authURL else { return }
         if let w = webWindow { w.makeKeyAndOrderFront(nil); return }
         let cfg = WKWebViewConfiguration()
-        cfg.websiteDataStore = WKWebsiteDataStore(forIdentifier: storeID)
+        let store = WKWebsiteDataStore(forIdentifier: storeID)
+        cfg.websiteDataStore = store
         let web = WKWebView(frame: .zero, configuration: cfg)
         web.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -400,7 +420,14 @@ private let addAccountFooter =
         let delegate = AuthWebDelegate()
         webDelegate = delegate
         web.uiDelegate = delegate
-        web.load(URLRequest(url: url))
+        if Self.storeMap().values.contains(storeID.uuidString) {
+            web.load(URLRequest(url: url))     // this account's own jar
+        } else {
+            Task { @MainActor in               // fresh jar: seed Google first
+                await Self.copyGoogleCookies(from: Self.googleJar, to: store)
+                web.load(URLRequest(url: url))
+            }
+        }
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 720),
                          styleMask: [.titled, .closable, .resizable],
                          backing: .buffered, defer: false)
@@ -451,6 +478,10 @@ private let addAccountFooter =
     private func closeAuthWindow() {
         authWindow?.orderOut(nil)
         authWindow = nil
+        if let web = webWindow?.contentView as? WKWebView {
+            let store = web.configuration.websiteDataStore
+            Task { await Self.copyGoogleCookies(from: store, to: Self.googleJar); _ = web }
+        }
         webWindow?.orderOut(nil)
         webWindow = nil
         webDelegate?.closePopups()
