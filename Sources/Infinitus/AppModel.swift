@@ -1989,6 +1989,11 @@ final class AppModel: ObservableObject {
     /// proxy); the popup swaps its rows for the onboarding card. A
     /// proxy-only setup is a working setup, not a missing engine.
     var engineMissing: Bool { registry.engines.isEmpty || simulateNoEngine }
+    /// A setup step (no engine / no account yet) is on screen: the popup
+    /// paints solid over the glass so the steps read against any desktop
+    /// (user 2026-09-07 from the phone: "Disable liquid glass for set up
+    /// steps", photo of the card over a Finder icon grid).
+    var setupStepShown: Bool { engineMissing || (accounts.isEmpty && snapshotLoaded) }
     /// cswap is on and its binary was found — the only case the rail's
     /// auto-switch toggle and badge mean anything.
     var cswapRegistered: Bool { registry.engines.contains { $0.id == CswapEngine.engineID } }

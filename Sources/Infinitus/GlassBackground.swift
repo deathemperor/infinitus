@@ -409,6 +409,9 @@ struct ThemedGlassChrome: View {
                 GlassBackground().opacity(1 - 0.75 * clarity)
             }
             ThemeWash(theme: model.rowTheme, milk: milk)
+            if model.setupStepShown {
+                Color(nsColor: .windowBackgroundColor)   // setup steps: no glass
+            }
         }
         .ignoresSafeArea()
     }
