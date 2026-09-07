@@ -63,6 +63,7 @@ struct InfinitusMobileApp: App {
     init() {
         // Must happen before the app finishes launching.
         BackgroundRefresh.register(model: MirrorModel.shared)
+        LeaseReporter.shared.model = MirrorModel.shared
     }
 
     var body: some Scene {
@@ -90,6 +91,7 @@ struct InfinitusMobileApp: App {
             // for the 10 s loop.
             if phase == .background { BackgroundRefresh.schedule() }
             if phase == .active { Task { await model.refresh() } }
+            LeaseReporter.shared.scenePhase(active: phase != .background)
         }
     }
 }

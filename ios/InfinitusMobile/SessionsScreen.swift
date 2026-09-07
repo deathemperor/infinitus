@@ -18,6 +18,8 @@ struct SessionsScreen: View {
         NavigationStack(path: $path) {
             content
                 .navigationTitle(model.rowTheme.tabLabel("sessions"))
+                .onAppear { LeaseReporter.shared.acquire(.sessions, on: .everyMac) }
+                .onDisappear { LeaseReporter.shared.release(.sessions, on: .everyMac) }
                 .refreshable { await model.refresh() }
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {

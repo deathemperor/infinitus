@@ -310,6 +310,8 @@ struct SessionFeedScreen: View {
                 composer
             }
         }
+        .onAppear { LeaseReporter.shared.acquire(.session(Int32(session.pid)), on: .mac(macId)) }
+        .onDisappear { LeaseReporter.shared.release(.session(Int32(session.pid)), on: .mac(macId)) }
         .onAppear {
             screenshots.check()
             takeStagedCapture()

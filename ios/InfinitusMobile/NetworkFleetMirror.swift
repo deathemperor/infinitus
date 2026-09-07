@@ -631,8 +631,19 @@ actor NetworkFleetMirror: FleetMirror {
         try await postJSON(TeamMirror.nearbyIgnorePath, body: TeamMirror.KidRequest(kid: fromKid), timeout: 60)
     }
 
+    /// `POST /client-activity` (#223 phase 5): what this phone watches on
+    /// this Mac, for the Mac's lease table. The Mac answers 204.
+    func reportClientActivity(_ report: ClientActivity.Report) async throws {
+        _ = try await post(ClientActivity.path, body: report, timeout: 10)
+    }
+
     private func postJSON<B: Encodable, R: Decodable>(_ path: String, body: B,
                                                       timeout: TimeInterval = NetworkFleetMirror.inputTimeout) async throws -> R {
+        try JSONDecoder().decode(R.self, from: try await post(path, body: body, timeout: timeout))
+    }
+
+    /// One POST to the Mac, the reply's body as is (empty on a 204).
+    private func post<B: Encodable>(_ path: String, body: B, timeout: TimeInterval) async throws -> Data {
         let token = pairToken()
         let payload = try JSONEncoder().encode(body)
         let data: Data
@@ -649,7 +660,7 @@ actor NetworkFleetMirror: FleetMirror {
                                         useTLS: false, token: token, timeout: timeout,
                                         method: "POST", body: payload)
         }
-        return try JSONDecoder().decode(R.self, from: data)
+        return data
     }
 
     /// A crash/hang report to the Mac (`POST /crashes`). Best effort:
@@ -849,7 +860,7 @@ actor NetworkFleetMirror: FleetMirror {
             var buffer = buffer
             if let data { buffer.append(data) }
             if let response = MirrorTransport.parseResponse(buffer) {
-                guard response.status == 200 else {
+                guard (200..<300).contains(response.status) else {
                     once.finish(.failure(MirrorTransportError.http(response.status)))
                     return
                 }

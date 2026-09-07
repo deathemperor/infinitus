@@ -62,6 +62,8 @@ struct StatsScreen: View {
             }
         }
         .navigationTitle("Stats")
+        .onAppear { LeaseReporter.shared.acquire(.stats) }
+        .onDisappear { LeaseReporter.shared.release(.stats) }
         .navigationBarTitleDisplayMode(.inline)
     }
 
