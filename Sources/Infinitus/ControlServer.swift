@@ -91,14 +91,20 @@ final class ControlServer {
         guard listener != nil, boundInode != 0 else { return }
         let path = ControlProtocol.socketURL().path
         var st = stat()
+        let why: String
         if stat(path, &st) == 0 {
             if st.st_ino == boundInode { return }
             if Self.answers(path) {
                 NSLog("Infinitus control: another instance listens at %@; leaving it", path)
                 return
             }
+            why = "inode \(st.st_ino) is not ours (\(boundInode)), nobody answers"
+        } else {
+            why = String(cString: strerror(errno))
         }
-        NSLog("Infinitus control: socket path lost at %@; rebinding", path)
+        // The reason is the next flake's evidence (#265: two re-binds in a
+        // run with no dev instance around, cause unknown).
+        NSLog("Infinitus control: socket path lost at %@ (%@); rebinding", path, why)
         listener?.cancel()
         listener = nil
         boundInode = 0

@@ -82,6 +82,13 @@ let request = ControlRequest(command: command, args: positional, options: option
 // MARK: socket round-trip (blocking; a CLI has no reason to be async)
 
 #if canImport(Darwin)
+/// errno of the last failed connect — what "not running" gets to say.
+var lastConnectErrno: Int32 = 0
+
+/// The app re-binds its socket in ~2 ms when the path went stale
+/// (ControlServer.heal); a call landing in that gap, or on the dead
+/// inode a moment before, said "not running" (#265, an e2e flake twice
+/// in a day). `roundTripRetrying` below retries for a second.
 func connect(path: String) -> Int32? {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { return nil }
@@ -98,7 +105,8 @@ func connect(path: String) -> Int32? {
     let rc = withUnsafePointer(to: &addr) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, len) }
     }
-    guard rc == 0 else { close(fd); return nil }
+    guard rc == 0 else { lastConnectErrno = errno; close(fd); return nil }
+    lastConnectErrno = 0
     return fd
 }
 
@@ -126,8 +134,21 @@ func roundTrip(_ req: ControlRequest, path: String) -> ControlReply? {
 }
 
 let path = ControlProtocol.socketURL().path
-guard let reply = roundTrip(request, path: path) else {
-    FileHandle.standardError.write(Data("Infinitus is not running (no socket at \(path))\n".utf8))
+/// A connect that lands while the app's listener is half re-bound gets
+/// accepted and then nothing (#265: "no reply" a second before the app
+/// logged the re-bind); the whole round trip gets the retry, not just
+/// the connect.
+func roundTripRetrying(_ req: ControlRequest, path: String) -> ControlReply? {
+    for attempt in 0..<10 {
+        if let reply = roundTrip(req, path: path) { return reply }
+        guard attempt < 9, lastConnectErrno == 0 || lastConnectErrno == ENOENT || lastConnectErrno == ECONNREFUSED else { return nil }
+        usleep(100_000)
+    }
+    return nil
+}
+guard let reply = roundTripRetrying(request, path: path) else {
+    let why = lastConnectErrno == 0 ? "no reply at" : "\(String(cString: strerror(lastConnectErrno))) at"
+    FileHandle.standardError.write(Data("Infinitus is not running (\(why) \(path))\n".utf8))
     exit(3)
 }
 if reply.schemaVersion > ControlProtocol.schemaVersion {
