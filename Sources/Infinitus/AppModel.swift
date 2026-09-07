@@ -675,6 +675,9 @@ final class AppModel: ObservableObject {
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
     let mirrorExporter = MirrorExporter()
+    /// T3 attention flags and the per-session timeline cache (#223 phase 3).
+    let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
+    let timelineCache = TimelineCache()
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
@@ -1469,6 +1472,17 @@ final class AppModel: ObservableObject {
                   let thumb = ImageThumbnail.jpeg(image.data, maxPixels: 640) else { return nil }
             thumbnails[key] = thumb
             return (thumb, "image/jpeg")
+        }
+        // T3 attention (#223 phase 3): settle / snooze / pin one session.
+        let timelineCache = timelineCache, attentionStore = attentionStore
+        mirrorServer.attention.set { pid, request in
+            let claudeDir = ClaudeSessions.configHome()
+            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+                  let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
+            let pending = ownedBox.existing?.pending(pid: pid) ?? []
+            return SessionAttention.apply(request, sessionId: record.sessionId,
+                                          timeline: timeline.appending(pending: pending),
+                                          status: record.status, store: attentionStore)
         }
         mirrorServer.sessionInput.set { [weak self] pid, request in
             self?.deliverSessionInput(pid: pid, request, from: "phone")
@@ -2372,6 +2386,7 @@ final class AppModel: ObservableObject {
                 updateVersion: appUpdateVersion,
                 updateChannel: BrewUpdater.channel.rawValue,
                 phoneLatest: appReleaseLatest)
+            let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
             Task.detached(priority: .utility) { [mirrorExporter] in
                 await mirrorExporter.record(listJSON: raw, prefs: prefs,
                                             serviceStatus: serviceStatus,
@@ -2382,7 +2397,11 @@ final class AppModel: ObservableObject {
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo, team: teamSnapshot,
                                             profiles: self.sessionProfiles.profiles,
-                                            births: self.sessionBirths)
+                                            births: self.sessionBirths,
+                                            facts: { records in
+                                                timelineCache.facts(records: records, claudeDir: ClaudeSessions.configHome(),
+                                                                    attention: attentionStore) { ownedBox.existing?.pending(pid: $0) ?? [] }
+                                            })
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be
