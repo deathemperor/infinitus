@@ -32,9 +32,13 @@ public enum SessionStart {
         /// continuing from that transcript, the original left as it was —
         /// so a live session can be branched too.
         public let fork: Bool?
+        /// #151: run the session headless — the app owns the `claude`
+        /// process over stdin/stdout (`OwnedSessions`) instead of opening
+        /// a terminal. Optional so older phones still start sessions.
+        public let headless: Bool?
         public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil,
                     permissionMode: String? = nil, model: String? = nil, systemPrompt: String? = nil,
-                    profile: String? = nil, fork: Bool? = nil) {
+                    profile: String? = nil, fork: Bool? = nil, headless: Bool? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
@@ -44,6 +48,7 @@ public enum SessionStart {
             self.systemPrompt = systemPrompt
             self.profile = profile
             self.fork = fork
+            self.headless = headless
         }
     }
 

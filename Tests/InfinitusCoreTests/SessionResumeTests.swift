@@ -63,10 +63,11 @@ final class SessionResumeTests: XCTestCase {
     }
 
     private func writeSession(pid: Int32, id: String, cwd: String, socket: String? = nil,
-                              kind: String = "interactive") throws {
+                              kind: String = "interactive", entrypoint: String? = nil) throws {
         var obj: [String: Any] = ["pid": pid, "sessionId": id, "cwd": cwd, "kind": kind,
                                   "startedAt": 1, "status": "idle"]
         if let socket { obj["messagingSocketPath"] = socket; obj["peerProtocol"] = 1 }
+        if let entrypoint { obj["entrypoint"] = entrypoint }
         let data = try JSONSerialization.data(withJSONObject: obj)
         try data.write(to: dir.appendingPathComponent("sessions/\(pid).json"))
     }
@@ -117,6 +118,15 @@ final class SessionResumeTests: XCTestCase {
         XCTAssertEqual(stopped[0].stopUuid, "stop-1")
         // Dead pids drop out.
         XCTAssertEqual(ClaudeSessions.list(claudeDir: dir, alive: { $0 == 12 }).map(\.pid), [12])
+    }
+
+    /// #151: a session the app owns registers itself as `entrypoint:
+    /// "sdk-cli"` (kind stays "interactive"), the card's only static tell.
+    func testListCarriesTheEntrypoint() throws {
+        try writeSession(pid: 21, id: "s1", cwd: "/p")
+        try writeSession(pid: 22, id: "s2", cwd: "/p", entrypoint: "sdk-cli")
+        let sessions = ClaudeSessions.list(claudeDir: dir, alive: { _ in true })
+        XCTAssertEqual(sessions.map(\.entrypoint), [nil, "sdk-cli"])
     }
 
     func testVerdicts() throws {

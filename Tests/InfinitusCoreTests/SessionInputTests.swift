@@ -15,14 +15,57 @@ final class SessionInputTests: XCTestCase {
 
     private func deliver(_ request: SessionInput.Request, hosts: [any PtyHost],
                          socket: String = "", attachmentsDir: URL? = nil,
-                         socketSend: @escaping (ClaudeSessionRecord, String) -> Bool = { _, _ in false }
+                         socketSend: @escaping (ClaudeSessionRecord, String) -> Bool = { _, _ in false },
+                         owned: ((SessionInput.Request, ClaudeSessionRecord) -> SessionInput.Reply?)? = nil
     ) -> SessionInput.Reply {
         SessionInput.deliver(request: request, record: record(socket: socket), hosts: hosts,
                              claudeDir: FileManager.default.temporaryDirectory,
                              attachmentsDir: attachmentsDir ?? FileManager.default.temporaryDirectory
                                  .appendingPathComponent("infinitus-attachment-tests-\(UUID().uuidString)"),
                              ttyOfPid: { _ in "ttys009" }, ancestorsOf: { _ in [] },
-                             socketSend: socketSend, sleep: { _ in })
+                             socketSend: socketSend, owned: owned, sleep: { _ in })
+    }
+
+    // MARK: owned sessions (#151): the stdin hook goes first and short-circuits
+
+    func testOwnedHookHandlesKeysBeforeAnyHostIsTouched() {
+        var seen: [SessionInput.Request] = []
+        let reply = deliver(SessionInput.Request(kind: .key, text: "1"), hosts: [host(["should not be read"])],
+                            owned: { req, _ in seen.append(req); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(reply, SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        XCTAssertEqual(seen.map(\.text), ["1"])
+    }
+
+    func testOwnedHookSeesApproveAsApproveNotAsKeyOne() {
+        // A key "1" means "first option" to a question; approve means allow.
+        var seen: [SessionInput.Request.Kind] = []
+        _ = deliver(SessionInput.Request(kind: .approve, text: ""), hosts: [host(["should not be read"])],
+                    owned: { req, _ in seen.append(req.kind); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(seen, [.approve])
+    }
+
+    func testOwnedHookReturningNilFallsThroughToSocketAndPty() {
+        let reply = deliver(SessionInput.Request(kind: .message, text: "hi"), hosts: [host(["❯ "])],
+                            socket: "/tmp/x.sock", socketSend: { _, _ in true }, owned: { _, _ in nil })
+        XCTAssertEqual(reply.channel, "socket")
+    }
+
+    func testOwnedHookGetsTheFramedMessageWithAttachmentPaths() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("owned-att-\(UUID().uuidString)")
+        var got = ""
+        let reply = deliver(SessionInput.Request(kind: .message, text: "look", attachments: [tinyPNG()]),
+                            hosts: [], attachmentsDir: dir,
+                            owned: { req, _ in got = req.text; return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(reply.channel, "stdin")
+        XCTAssertTrue(got.hasPrefix(PeerSocket.phonePreface + "look"), got)
+        XCTAssertTrue(got.contains("[attached: \(dir.path)"), got)
+    }
+
+    func testOwnedHookSeesResumeAsTheContinueMessage() {
+        var got = ""
+        _ = deliver(SessionInput.Request(kind: .resume, text: ""), hosts: [],
+                    owned: { req, _ in got = req.text; return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertTrue(got.hasPrefix("[Infinitus] Continue where you left off"), got)
     }
 
     private func tinyPNG() -> SessionInput.Attachment {

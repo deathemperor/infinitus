@@ -177,6 +177,11 @@ extension SessionInput {
     /// socket (its terminal when there is none), a key into its terminal
     /// — the send side of layer 1's read-only feed. `hosts`/`claudeDir` come from the same `PtyHosts.available()`
     /// / `ClaudeSessions.configHome()` call `ResumeService` makes.
+    /// `owned` (#151) is asked first with the request as it would be
+    /// delivered — messages already framed, attachments on disk — and a
+    /// non-nil reply ends it there: a session the app owns takes input on
+    /// its stdin (`OwnedSessions.deliver`), which the socket and the
+    /// terminal never reach. nil means "not mine", and the search goes on.
     public static func deliver(
         request: Request,
         record: ClaudeSessionRecord,
@@ -192,6 +197,7 @@ extension SessionInput {
                                    pid: record.pid, claudeDir: claudeDir,
                                    mode: Transcript.peerModeClass(at: transcript))
         },
+        owned: ((Request, ClaudeSessionRecord) -> Reply?)? = nil,
         sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
     ) -> Reply {
         let tty = ttyOfPid(record.pid)
@@ -202,22 +208,25 @@ extension SessionInput {
             // The app's own state (#163 phase 2); nothing to type.
             return Reply(outcome: "rejected", detail: "a mode change is handled by the app, not delivered")
         case .approve:
-            // The rule itself is the app's to keep; here it is a Yes.
+            // An owned session gets the verdict as such — key "1" would read
+            // as "first option" to a question. Elsewhere it is a Yes keypress.
+            if let reply = owned?(request, record) { return reply }
             return deliver(request: Request(kind: .key, text: "1"), record: record,
                            hosts: hosts, claudeDir: claudeDir, attachmentsDir: attachmentsDir,
                            ttyOfPid: ttyOfPid, ancestorsOf: ancestorsOf, socketSend: socketSend,
-                           sleep: sleep)
+                           owned: owned, sleep: sleep)
         case .resume:
             // The message path, with the Mac's own text: socket first,
             // terminal fallback, the same outcomes.
             return deliver(request: Request(kind: .message, text: continueText()), record: record,
                            hosts: hosts, claudeDir: claudeDir, attachmentsDir: attachmentsDir,
                            ttyOfPid: ttyOfPid, ancestorsOf: ancestorsOf, socketSend: socketSend,
-                           sleep: sleep)
+                           owned: owned, sleep: sleep)
         case .key:
             guard allowedKeys.contains(request.text) else {
                 return Reply(outcome: "rejected", detail: "unsupported key")
             }
+            if let reply = owned?(request, record) { return reply }
             for host in hosts {
                 switch PtyNudge.press(host: host, pid: record.pid, key: request.text,
                                       tty: tty, ancestors: ancestors, name: record.name, sleep: sleep) {
@@ -271,6 +280,10 @@ extension SessionInput {
             // marker already; a phone message gets the preface.
             let framed = deliveredText.hasPrefix("[Infinitus]")
                 ? deliveredText : PeerSocket.phonePreface + deliveredText
+            if let reply = owned?(Request(kind: .message, text: framed, requestId: request.requestId,
+                                          queuedAt: request.queuedAt, sessionId: request.sessionId), record) {
+                return reply
+            }
             if !record.messagingSocketPath.isEmpty, socketSend(record, framed) {
                 return Reply(outcome: "delivered", channel: "socket")
             }

@@ -24,10 +24,13 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
     public let peerProtocol: Int
     /// The session's name (`/rename`, or Claude Code's own), when it has one.
     public let name: String?
+    /// How Claude Code was entered: "cli" for a terminal, "sdk-cli" for a
+    /// stream-json host such as `OwnedSessions` (#151); nil on older builds.
+    public let entrypoint: String?
 
     public init(pid: Int32, sessionId: String, cwd: String, kind: String = "interactive",
                 status: String? = nil, messagingSocketPath: String = "", peerProtocol: Int = 0,
-                name: String? = nil, statusUpdatedAt: Date? = nil) {
+                name: String? = nil, statusUpdatedAt: Date? = nil, entrypoint: String? = nil) {
         self.pid = pid
         self.sessionId = sessionId
         self.cwd = cwd
@@ -37,6 +40,7 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
         self.peerProtocol = peerProtocol
         self.name = name
         self.statusUpdatedAt = statusUpdatedAt
+        self.entrypoint = entrypoint
     }
 }
 
@@ -98,7 +102,8 @@ public enum ClaudeSessions {
                 peerProtocol: proto.map { isBool($0) ? 0 : $0.intValue } ?? 0,
                 name: (obj["name"] as? String).flatMap { $0.isEmpty ? nil : $0 },
                 statusUpdatedAt: (obj["statusUpdatedAt"] as? NSNumber)
-                    .flatMap { isBool($0) ? nil : Date(timeIntervalSince1970: $0.doubleValue / 1000) }))
+                    .flatMap { isBool($0) ? nil : Date(timeIntervalSince1970: $0.doubleValue / 1000) },
+                entrypoint: obj["entrypoint"] as? String))
         }
         return out.sorted { $0.pid < $1.pid }
     }

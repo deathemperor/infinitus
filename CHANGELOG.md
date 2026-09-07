@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Sessions
+- The Mac can own a Claude Code session outright — no terminal — and answer its permission prompts and questions from the phone or the popup (#151).
+
 ### Phone
 - Tapping a "Fleet on a Mac" widget opens the sessions list at that Mac's section (#144).
 - A "Fleet on a Mac" widget joins the Fleet widget: pick which paired Mac it shows in the widget's editor (#144).
