@@ -43,7 +43,9 @@ final class MirrorTokenBox: @unchecked Sendable {
 /// its own file read (`ClaudeSessions.list` + `SessionFeedReader.read`)
 /// on that queue — off the main actor, same as every other route here.
 final class MirrorSessionFeedBox: @unchecked Sendable {
-    typealias Provider = @Sendable (_ pid: Int32, _ limit: Int, _ since: String?, _ wait: TimeInterval) -> Data?
+    /// `rows`: also serve the presented timeline rows (`?rows=1`, the
+    /// browser page — it folds client-side).
+    typealias Provider = @Sendable (_ pid: Int32, _ limit: Int, _ since: String?, _ wait: TimeInterval, _ rows: Bool) -> Data?
     private let lock = NSLock()
     private var provider: Provider?
 
@@ -53,9 +55,9 @@ final class MirrorSessionFeedBox: @unchecked Sendable {
 
     /// May block for up to `wait` seconds (the long-poll) — call it off
     /// the network queue when `wait > 0`.
-    func call(_ pid: Int32, _ limit: Int, since: String? = nil, wait: TimeInterval = 0) -> Data? {
+    func call(_ pid: Int32, _ limit: Int, since: String? = nil, wait: TimeInterval = 0, rows: Bool = false) -> Data? {
         lock.lock(); let current = provider; lock.unlock()
-        return current?(pid, limit, since, wait)
+        return current?(pid, limit, since, wait, rows)
     }
 }
 
@@ -885,12 +887,13 @@ final class MirrorServer: ObservableObject {
                     let limit = request.query(MirrorTransport.tailLimitQueryName).flatMap(Int.init) ?? 30
                     let since = request.query(MirrorTransport.tailSinceQueryName)
                     let wait = request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0
+                    let rows = request.query(MirrorTransport.tailRowsQueryName) == "1"
                     // Off this queue either way: a long-poll sleeps until
                     // the transcript moves, and even the plain form reads
                     // a 256 KiB tail — every connection shares this queue,
                     // so nothing that takes time may run on it.
                     DispatchQueue.global(qos: .utility).async {
-                        let data = sessionFeed.call(pid, limit, since: since, wait: wait)
+                        let data = sessionFeed.call(pid, limit, since: since, wait: wait, rows: rows)
                         let response = data.map(MirrorTransport.snapshotResponse)
                             ?? MirrorTransport.notFoundResponse()
                         onServed(request)

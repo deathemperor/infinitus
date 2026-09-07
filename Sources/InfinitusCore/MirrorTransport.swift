@@ -108,6 +108,9 @@ public enum MirrorTransport {
     /// (capped at `tailWaitMax`) — then answers with the current feed.
     public static let tailSinceQueryName = "since"
     public static let tailWaitQueryName = "wait"
+    /// `?rows=1`: the reply also carries `rows`, the presented timeline
+    /// with every fold open and the hidden rows flagged (the browser page).
+    public static let tailRowsQueryName = "rows"
     public static let tailWaitMax: TimeInterval = 25
     /// Query parameter carrying the pairing token when a header can't
     /// (a QR-pasted URL opened in a browser, `curl "…?t=TOKEN"`).

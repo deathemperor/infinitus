@@ -1452,7 +1452,7 @@ final class AppModel: ObservableObject {
         mirrorServer.start(machineName: machineName,
                            token: mirrorPairToken)
         let ownedBox = ownedBox
-        mirrorServer.sessionFeed.set { pid, limit, since, wait in
+        mirrorServer.sessionFeed.set { pid, limit, since, wait, rows in
             let claudeDir = ClaudeSessions.configHome()
             let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
             SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: OwnedFeed.transcriptStamp(since),
@@ -1464,7 +1464,14 @@ final class AppModel: ObservableObject {
             if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid)) }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
-            return try? encoder.encode(feed)
+            guard rows, let timeline = feed.timeline,
+                  let data = try? encoder.encode(feed),
+                  var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let rowData = try? encoder.encode(ThreadFeedPresentation.deriveExpanded(timeline)),
+                  let rowJSON = try? JSONSerialization.jsonObject(with: rowData)
+            else { return try? encoder.encode(feed) }
+            object["rows"] = rowJSON
+            return try? JSONSerialization.data(withJSONObject: object)
         }
         mirrorServer.awsLogin.set(
             start: { [weak self] request in
