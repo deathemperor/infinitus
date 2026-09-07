@@ -117,6 +117,7 @@ button:disabled { opacity: .5; cursor: default; }
   // The Mac serves every timeline row with the fold's hidden ones flagged
   // (`rows=1`); folding and the work-group toggles are this page's state.
   let expandedTurns = new Set(), expandedGroups = new Set();
+  let promptKey = null, picks = [];   // answers picked so far; survive the poll's redraws
 
   // Inline markdown: fences, `code`, **bold**; the rest is text.
   function md(text) {
@@ -243,12 +244,13 @@ button:disabled { opacity: .5; cursor: default; }
       btn("Allow " + (last.toolName || "") + " for this session", () => send({ kind: "approve", text: (last.toolName || "") + "\n" + last.text }));
     } else if (last.questions && last.questions.length) {
       // An owned session's prompt: every question, answered at once.
-      const qs = last.questions; const picks = qs.map(() => new Set());
+      const qs = last.questions; const key = (last.at || "") + "|" + last.text;
+      if (key !== promptKey) { promptKey = key; picks = qs.map(() => new Set()); }
       $("ptitle").textContent = "❓ " + (qs.length > 1 ? qs.length + " questions" : qs[0].question); $("pbody").textContent = "";
       qs.forEach((q, qi) => {
         const h = document.createElement("div"); h.className = "q"; h.textContent = (q.header ? q.header + " — " : "") + q.question; acts.appendChild(h);
         q.options.forEach((o, oi) => {
-          const b = document.createElement("button"); b.textContent = o;
+          const b = document.createElement("button"); b.textContent = o; b.classList.toggle("picked", picks[qi].has(oi));
           b.onclick = () => {
             if (picks[qi].has(oi)) picks[qi].delete(oi); else if (q.multiSelect) picks[qi].add(oi); else picks[qi] = new Set([oi]);
             acts.querySelectorAll("button[data-q='" + qi + "']").forEach(x => x.classList.toggle("picked", picks[qi].has(+x.dataset.o)));
