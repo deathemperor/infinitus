@@ -1057,6 +1057,14 @@ private struct PopupScale: ViewModifier {
 /// First-run card when no cswap binary exists (todo 2026-08-30):
 /// explains the engine, offers a one-click install (uv), never
 /// auto-installs. The rest of the popup chrome stays functional.
+/// The onboarding cards' text column. A fixed width, not `maxWidth`:
+/// the popup measures its content under two-axis `fixedSize()`, where a
+/// `maxWidth` cap proposes an unbounded width and the text measures as
+/// ONE line — then renders wrapped at the cap, pushing the footer past
+/// the measured height (user photo 2026-09-07: toolbar icons cut in
+/// half under "Almost there"). A fixed width wraps the same both times.
+let onboardingTextWidth: CGFloat = 480
+
 struct OnboardingCard: View {
     @ObservedObject var model: AppModel
 
@@ -1072,7 +1080,7 @@ struct OnboardingCard: View {
                      + "your accounts.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: 300, alignment: .leading)
+                    .frame(width: onboardingTextWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Button {
                     model.openSettings()
@@ -1094,7 +1102,7 @@ struct OnboardingCard: View {
              + "the cockpit; cswap is the engine.")
             .font(.caption)
             .foregroundStyle(.secondary)
-            .frame(maxWidth: 300, alignment: .leading)
+            .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
         HStack(spacing: 8) {
             Button {
@@ -1136,7 +1144,7 @@ struct OnboardingBriefButton: View {
     @State private var copied = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 3) {
             Button(copied ? "Copied" : "Copy for an AI agent") {
                 let text = OnboardingBrief.text(engineInstalled: engineInstalled,
                                                 claude: model.claudeCLI, proxy: model.cliProxy,
@@ -1147,8 +1155,8 @@ struct OnboardingBriefButton: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
             }
             .font(PopupFont.caption)
-            Text("paste into Claude Code; it does the steps")
-                .font(.caption).foregroundStyle(.tertiary)
+            Text("Paste it into Claude Code and it does the steps for you.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }
@@ -1165,7 +1173,7 @@ struct FirstAccountCard: View {
             Text("The engine is running but manages no accounts yet.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: 300, alignment: .leading)
+                .frame(width: onboardingTextWidth, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             if let claude = model.claudeCLI, let email = claude.email {
                 Button {
@@ -1181,13 +1189,14 @@ struct FirstAccountCard: View {
                     }
                 }
                 .disabled(model.addingFirstAccount)
-                if let org = claude.organization {
-                    Text("Claude Code on this Mac is signed in as "
-                         + "\(email) — \(org).")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: 300, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // The button already names the account; this line says
+                // where it comes from. The org rides along only when it
+                // is a real one — "<email>'s Organization" is the default
+                // personal org and would print the address a third time.
+                Text(Self.signedInLine(email: email, organization: claude.organization))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: onboardingTextWidth, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Sign in with Claude Code first, then:  cswap add")
                     .font(.caption).monospaced()
@@ -1196,13 +1205,20 @@ struct FirstAccountCard: View {
             }
             if let msg = model.firstAccountMessage {
                 Text(msg).font(.caption).foregroundStyle(.orange)
-                    .frame(maxWidth: 300, alignment: .leading)
+                    .frame(width: onboardingTextWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             DetectionLines(model: model, afterInstall: false)
             OnboardingBriefButton(model: model, engineInstalled: true)
         }
         .padding(6)
+    }
+
+    static func signedInLine(email: String, organization: String?) -> String {
+        let base = "That is the account Claude Code on this Mac is signed in to"
+        guard let org = organization?.trimmingCharacters(in: .whitespaces), !org.isEmpty,
+              org.lowercased() != "\(email.lowercased())'s organization" else { return base + "." }
+        return base + " (\(org))."
     }
 }
 
@@ -1224,7 +1240,7 @@ struct DetectionLines: View {
                     .font(.caption2).foregroundStyle(.tertiary)
             }
         }
-        .frame(maxWidth: 300, alignment: .leading)
+        .frame(width: onboardingTextWidth, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
 

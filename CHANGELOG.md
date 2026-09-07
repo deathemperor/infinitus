@@ -35,6 +35,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- The "Almost there" setup card no longer clips the popup's toolbar, names your account once, and explains the AI-agent brief under its button.
 - A sign-in code Claude rejects (half-copied, or a failed exchange) comes straight back to the paste field with the reason, instead of waiting forever.
 - The setup steps (install the engine, add the first account) show on a solid background instead of glass.
 - The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
