@@ -91,19 +91,24 @@ final class SessionChatStore: ObservableObject {
 
     func start() {
         guard loop == nil else { return }
+        let box = model?.ownedBox
         loop = Task.detached(priority: .utility) { [pid, weak self] in
             var since: String?
             while !Task.isCancelled {
                 let claudeDir = ClaudeSessions.configHome()
-                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since,
-                                                wait: MirrorTransport.tailWaitMax)
+                // An owned session's prompts live in memory, not the
+                // transcript: poll short so they show (OwnedFeed).
+                let owned = box?.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: OwnedFeed.transcriptStamp(since),
+                                                wait: owned == nil ? MirrorTransport.tailWaitMax : OwnedFeed.ownedWait)
                 if Task.isCancelled { return }
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else {
                     await MainActor.run { self?.gone = true }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     continue
                 }
-                let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 200)
+                var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 200)
+                if let owned, let f = feed { feed = OwnedFeed.augment(f, pending: owned.pending(pid: pid)) }
                 if let feed, feed.stamp != since || since == nil {
                     since = feed.stamp
                     await MainActor.run {

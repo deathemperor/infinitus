@@ -174,6 +174,7 @@ struct DisplayPane: View {
                 Text("cmux when installed, else Terminal").tag("auto")
                 Text("cmux").tag("cmux")
                 Text("Terminal").tag("terminal")
+                Text("No terminal — Infinitus runs it, chat from the app or phone").tag("owned")
             }
         } header: {
             Text("Sessions")
@@ -332,7 +333,7 @@ extension DisplayPane {
             entry(wall, "Enter Full-Screen Fleet Wall", ["wall", "full screen", "kiosk"]),
             entry(sessions, "Checkpoint the repository at every prompt", ["checkpoint", "git", "restore", "diff", "undo"]),
             entry(sessions, "Name unnamed sessions with Claude Haiku", ["haiku", "name", "title", "auto name"]),
-            entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host"]),
+            entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host", "headless", "owned"]),
             entry(startup, "Refresh interval", ["poll", "interval", "refresh", "seconds"],
                   anchor: startupAnchor),
             entry(startup, "Start at login", ["login item", "startup", "launch", "boot"],

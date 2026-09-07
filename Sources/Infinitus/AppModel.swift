@@ -1213,16 +1213,22 @@ final class AppModel: ObservableObject {
         }
         let host = sessionHost
         mirrorServer.sessionStart.set { [weak self] request in
-            let reply = SessionLauncher.start(request, preferredHost: host)
+            guard let self else { return SessionStart.Reply(outcome: "failed", detail: "app gone") }
+            // The box is synchronous (the terminal launcher blocks too);
+            // an owned start awaits the actor from this off-main thread.
+            let done = DispatchSemaphore(value: 0)
+            nonisolated(unsafe) var reply = SessionStart.Reply(outcome: "failed", detail: "start did not complete")
+            Task { reply = await self.startSession(request, preferredHost: host); done.signal() }
+            done.wait()
             let label = (request.cwd as NSString).lastPathComponent
             let verb = request.resume == nil ? "started" : "resumed"
             let born = request.profile.map { " (profile \($0))" } ?? ""
             Task { @MainActor in
                 if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request) {
-                    self?.recordBirth(pid: pid, birth)
+                    self.recordBirth(pid: pid, birth)
                 }
-                self?.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
-                                     "phone \(verb) a session in \(label)\(born): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
+                self.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
+                                    "phone \(verb) a session in \(label)\(born): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
             }
             return reply
         }
@@ -1356,13 +1362,17 @@ final class AppModel: ObservableObject {
         Task { [mirrorExporter] in await mirrorExporter.attach(payload: payload) }
         mirrorServer.start(machineName: machineName,
                            token: mirrorPairToken)
+        let ownedBox = ownedBox
         mirrorServer.sessionFeed.set { pid, limit, since, wait in
             let claudeDir = ClaudeSessions.configHome()
-            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait)
+            let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
+            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: OwnedFeed.transcriptStamp(since),
+                                            wait: owned == nil ? wait : min(wait, OwnedFeed.ownedWait))
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
             else { return nil }
-            guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
+            guard var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
             else { return nil }
+            if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid)) }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             return try? encoder.encode(feed)
@@ -1441,7 +1451,8 @@ final class AppModel: ObservableObject {
                 request = SessionInput.Request(kind: .key, text: "1")
             }
             let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
+                                             hosts: PtyHosts.available(), claudeDir: claudeDir,
+                                             owned: self.ownedBox.existing?.deliver)
             let label = URL(fileURLWithPath: record.cwd).lastPathComponent
             Task { @MainActor in
                 if reply.outcome == "delivered" {
@@ -2438,10 +2449,58 @@ final class AppModel: ObservableObject {
         quickTunnel.stop()
         namedTunnel.stop()
         let supervisor = supervisor
+        let owned = ownedBox.existing
         Task {
             await supervisor?.stop()
+            // Owned Claude sessions are this process's children (#151):
+            // they don't outlive the app either (the #274 lesson).
+            await owned?.stopAll()
             await MainActor.run { NSApplication.shared.terminate(nil) }
         }
+    }
+
+    // MARK: - Owned sessions (#151)
+
+    /// Headless Claude Code sessions this app spawned and talks to over
+    /// stdin. Made on first use, off the main actor — locating `claude`
+    /// may run a login shell.
+    let ownedBox = OwnedSessionsBox()
+
+    nonisolated func ownedSessions() -> OwnedSessions? {
+        ownedBox.get { [weak self] in
+            guard let path = ClaudeLocator.locate() else { return nil }
+            return OwnedSessions(binaryPath: path) { pid, state in
+                Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
+            }
+        }
+    }
+
+    private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {
+        switch state {
+        case .exited: logEvent("other", icon: "terminal", "headless session \(pid) ended")
+        case .waiting: logEvent("other", icon: "hand.raised", "headless session \(pid) is waiting for an answer")
+        default: break
+        }
+    }
+
+    /// Start a session the way the phone, the popup and Past sessions ask:
+    /// `headless` (or the "owned" host) spawns a child this app talks to,
+    /// anything else opens a terminal through `SessionLauncher`.
+    nonisolated func startSession(_ request: SessionStart.Request, preferredHost: String) async -> SessionStart.Reply {
+        let headless = request.headless ?? (preferredHost == "owned")
+        guard headless else {
+            return SessionLauncher.start(request, preferredHost: preferredHost == "owned" ? "auto" : preferredHost)
+        }
+        // Locating `claude` may block on a login shell: never on the
+        // cooperative pool (Infi4, 2026-09-07) — a GCD thread does it.
+        let located = await withCheckedContinuation { (c: CheckedContinuation<OwnedSessions?, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async { c.resume(returning: self.ownedSessions()) }
+        }
+        guard let owned = located else {
+            return SessionStart.Reply(outcome: "failed",
+                                      detail: "claude isn't on this Mac's PATH; a headless session needs Claude Code \(ClaudeLocator.minimumVersion.map(String.init).joined(separator: ".")) or newer")
+        }
+        return await owned.start(request)
     }
 
     func rename(_ number: Int, to name: String) { primary?.rename(number, to: name) }

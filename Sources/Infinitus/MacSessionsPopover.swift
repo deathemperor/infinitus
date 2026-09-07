@@ -101,7 +101,7 @@ struct MacSessionsPopover: View {
         let host = model.sessionHost
         let request = SessionStart.Request(cwd: session.cwd, resume: session.sessionId, fork: fork ? true : nil)
         Task.detached(priority: .userInitiated) {
-            let reply = SessionLauncher.start(request, preferredHost: host)
+            let reply = await model.startSession(request, preferredHost: host)
             await MainActor.run {
                 if reply.outcome == "started" {
                     // The row's "resumed" chip, as the phone's Resume gets.

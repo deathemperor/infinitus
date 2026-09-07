@@ -14,6 +14,8 @@ struct StartSessionSheet: View {
     @State private var prompt = ""
     /// "" = supervised (Claude Code's default: every tool asks).
     @State private var permissionMode = ""
+    /// #151: the Mac runs the session with no terminal; this chat is it.
+    @State private var headless = false
     /// The chip applied last (#165): its model and system prompt ride
     /// along unseen; the visible fields it set can still be changed.
     @State private var profile: SessionProfile?
@@ -90,6 +92,7 @@ struct StartSessionSheet: View {
                             ForEach(SessionStart.permissionModes, id: \.mode) { Text($0.label).tag($0.mode) }
                         }
                         .pickerStyle(.menu)
+                        Toggle("Headless — no terminal on the Mac", isOn: $headless)
                     } header: {
                         Text("Permissions")
                     } footer: {
@@ -165,7 +168,8 @@ struct StartSessionSheet: View {
                                            permissionMode: engine == "claude" && !permissionMode.isEmpty ? permissionMode : nil,
                                            model: engine == "claude" ? profile?.model : nil,
                                            systemPrompt: engine == "claude" ? profile?.systemPrompt : nil,
-                                           profile: profile?.name)
+                                           profile: profile?.name,
+                                           headless: engine == "claude" && headless)
         Task {
             do {
                 let reply = try await model.mirror(for: macId).startSession(request)
