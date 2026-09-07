@@ -11,6 +11,7 @@ import InfinitusCore
 struct TeamPane: View {
     @ObservedObject var team: TeamModel
     @ObservedObject var lock: LockModel
+    @ObservedObject var feed: TeamControlFeed
 
     var body: some View {
         // NavigationStack so a member row's "Detail" link pushes TeamMemberPane.
@@ -45,6 +46,7 @@ struct TeamPane: View {
             .sheet(isPresented: $showRecovery) { TeamRecoveryKeySheet(team: team) }
             .sheet(isPresented: $showExport) { TeamExportSheet(team: team) }
             .sheet(isPresented: $showImport) { TeamImportSheet(team: team) }
+            .sheet(isPresented: $showGrant) { if let snap = team.snapshot { TeamGrantSheet(team: team, snap: snap) } }
         }
     }
 
@@ -59,6 +61,7 @@ struct TeamPane: View {
     @State private var showRecovery = false
     @State private var showExport = false
     @State private var showImport = false
+    @State private var showGrant = false
 
     private var gateOpen: Bool { if case .allowed = team.gate() { return true } else { return false } }
 
@@ -229,6 +232,7 @@ struct TeamPane: View {
             if snap.role == "leader" { inviteSection }
             if snap.role == "leader", let policy = team.policy { policySection(policy) }
             sharingSection(snap)
+            controlSection(snap)
             exclusionsSection
             Section("Privacy") {
                 Text("You publish \(sharedKinds()) to the audiences above; everything is encrypted to them before it leaves this Mac. The store host sees file names and sizes only.")
@@ -365,6 +369,52 @@ struct TeamPane: View {
                 }
             Text("Nobody keeps a kind on this Mac entirely. Live state off makes you look offline to the team; stats off leaves you out of the leaders' totals.")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Team session control (#220 §7.1): grants, the add sheet, the feed.
+    private func controlSection(_ snap: TeamSnapshot) -> some View {
+        Section("Session control") {
+            if team.grants.grants.isEmpty {
+                Text("Nobody can drive your sessions.").foregroundStyle(.secondary)
+            }
+            ForEach(team.grants.grants) { g in
+                HStack {
+                    Text("\(audienceLabel(g.audience, snap)) · \(sessionsLabel(g.sessions)) · \(g.capabilities.sorted().joined(separator: ", "))")
+                    Spacer()
+                    Button("Remove") { Task { await team.revokeGrant(id: g.id) } }.controlSize(.small)
+                }
+            }
+            Button("Add grant…") { showGrant = true }
+            Text("A grant lets the people named send prompts, answer tool prompts or switch modes on the sessions named — from their Mac or `infinitusctl`. Every command is logged below.")
+                .font(.caption).foregroundStyle(.secondary)
+            if !feed.lines.isEmpty {
+                DisclosureGroup("Recent commands") {
+                    ForEach(feed.lines.suffix(50).reversed()) { line in
+                        HStack {
+                            Text(line.text).font(.caption)
+                            Spacer()
+                            Text(line.at, format: .dateTime.hour().minute()).font(.caption).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func audienceLabel(_ t: TeamRoster.ShareTarget, _ snap: TeamSnapshot) -> String {
+        switch t {
+        case .off: "nobody"
+        case .leaders: "leaders"
+        case .team: "whole team"
+        case .members(let kids): kids.map { kid in snap.members.first { $0.kid == kid }?.name ?? String(kid.prefix(8)) }.joined(separator: ", ")
+        }
+    }
+
+    private func sessionsLabel(_ s: TeamGrants.Sessions) -> String {
+        switch s {
+        case .all: "all sessions"
+        case .some(let ids): ids.count == 1 ? "1 session" : "\(ids.count) sessions"
         }
     }
 

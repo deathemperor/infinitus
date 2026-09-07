@@ -22,6 +22,13 @@ public enum MirrorRendezvous {
 
     public static func url(token: String, base: String = defaultBase) -> URL? {
         guard let key = key(token: token) else { return nil }
+        return url(key: key, base: base)
+    }
+
+    /// A slot addressed by an already-derived key (the team control key,
+    /// `TeamControl.rendezvousKey`): 64 lower-case hex or nothing.
+    public static func url(key: String, base: String = defaultBase) -> URL? {
+        guard key.count == 64, key.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else { return nil }
         return URL(string: "\(base)/\(key)")
     }
 

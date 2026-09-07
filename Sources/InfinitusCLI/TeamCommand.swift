@@ -36,6 +36,10 @@ func teamUsage() -> String {
       put --kind <k> --path <p> --file <f> [--audience leaders|team|<kid,kid>]   one opaque file (debugging)
       list                                         envelopes addressed to me
       read <path> [--out <file>]                   decrypt one envelope
+      grant <leaders|team|kid,…> [--sessions a,b] [--view] [--send] [--approve] [--mode] [--resume] [--key]
+                                                   let those people drive the sessions named (default: all)
+      revoke <grant id>                            take a grant back
+      grants                                       the grants on this machine
 
     Narrowing an audience cannot recall ciphertext teammates already fetched.
 
@@ -78,6 +82,7 @@ private struct MemberRow: Encodable {
 
 func runTeam(_ args: [String]) -> Int32 {
     if let code = runTeamNearby(args) { return code }   // nearby | --discoverable | request --nearby (TeamNearbyCommand.swift)
+    if let code = runTeamControl(args) { return code }  // grant | revoke | grants (TeamControlCommand.swift)
     guard let sub = args.first, sub != "--help", sub != "-h" else {
         print(teamUsage(), terminator: "")
         return args.isEmpty ? 2 : 0
@@ -358,6 +363,9 @@ func runTeam(_ args: [String]) -> Int32 {
             sources.liveSessions = ClaudeSessions.list(claudeDir: claudeDir)
             sources.crashes = CrashStore(directory: CrashStore.defaultDirectory()).list()
             if let days = options["days"].flatMap(Int.init) { sources.historyDays = days }
+            // #220: what this machine lets whom do rides now.json from here too.
+            let hints = TeamGrants.load(teamDir: paths.teamDir(c.config.id)).hints
+            sources.grantsTo = hints.isEmpty ? nil : hints
             emit(try TeamPublisher(client: c, paths: paths).publish(sources: sources))
         case "reshare":
             let c = try client(); _ = try c.fetch()

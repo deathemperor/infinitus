@@ -142,6 +142,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Joining a team** — invite links and QR, team codes, `infinitus://join`, same-network discovery, and leader-initiated LAN invites accepted from Invitations; approve from the Mac; the phone's Team tab has its own Nearby (scan, request to join, invite, accept); Linux members use `infinitusctl team` alone.
 - **Share settings** — "off" per kind (stats, sessions, transcripts, crashes, fleet) keeps it on this machine entirely; a Mac picker chooses which recent sessions' transcripts go out; a publish shows its progress, and the plaintext copies it keeps are capped at 1 GB.
 - **Your team identity** — a local key behind Touch ID, a recovery key, a passphrase-sealed export.
+- **Team session control (preview)** — grant teammates the right to read, prompt, approve, switch modes or nudge chosen sessions on your Mac; every command is verified against the roster and the grant, audited, and shown as "<name> is driving" while it happens.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
 - **Start on any Mac** — the "+" sheet, Past sessions and Siri's Start a session pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.

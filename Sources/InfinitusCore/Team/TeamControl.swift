@@ -141,8 +141,29 @@ public enum TeamControl {
         public var lan: String?
         public var hostname: String?
         public var rendezvous: String?
-        public init(lan: String?, hostname: String?, rendezvous: String?) {
+        public init(lan: String? = nil, hostname: String? = nil, rendezvous: String? = nil) {
             self.lan = lan; self.hostname = hostname; self.rendezvous = rendezvous
+        }
+    }
+
+    /// A verified command as the input the session lane understands
+    /// (Mac grantor plan, ruling 2): `approve` is the prompt's Yes or Esc,
+    /// never a session-wide ToolApproval rule; `key` only the allowed
+    /// keys; `send` and `mode` need text. nil = nothing to run.
+    public static func request(action: String, text: String?) -> SessionInput.Request? {
+        let text = text ?? ""
+        switch action {
+        case TeamGrants.send: return text.isEmpty ? nil : SessionInput.Request(kind: .message, text: text)
+        case TeamGrants.key: return SessionInput.allowedKeys.contains(text) ? SessionInput.Request(kind: .key, text: text) : nil
+        case TeamGrants.approve:
+            switch text {
+            case "allow": return SessionInput.Request(kind: .key, text: "1")
+            case "deny": return SessionInput.Request(kind: .key, text: "esc")
+            default: return nil
+            }
+        case TeamGrants.mode: return text.isEmpty ? nil : SessionInput.Request(kind: .mode, text: text)
+        case TeamGrants.resume: return SessionInput.Request(kind: .resume, text: text)
+        default: return nil
         }
     }
 

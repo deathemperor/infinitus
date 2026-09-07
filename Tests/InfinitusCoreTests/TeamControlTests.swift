@@ -101,6 +101,30 @@ final class TeamControlTests: XCTestCase {
         XCTAssertTrue(limit.allow(kid: "a", now: t0.addingTimeInterval(10.5)), "the first one slid out of the window")
     }
 
+    func testActionsMapToSessionInputRequests() {
+        XCTAssertEqual(TeamControl.request(action: "send", text: "hi")?.kind, .message)
+        XCTAssertEqual(TeamControl.request(action: "send", text: "hi")?.text, "hi")
+        XCTAssertNil(TeamControl.request(action: "send", text: ""), "an empty prompt is nothing to type")
+        XCTAssertEqual(TeamControl.request(action: "key", text: "esc")?.kind, .key)
+        XCTAssertNil(TeamControl.request(action: "key", text: "rm -rf"), "only the allowed keys")
+        XCTAssertEqual(TeamControl.request(action: "approve", text: "allow")?.text, "1")
+        XCTAssertEqual(TeamControl.request(action: "approve", text: "deny")?.text, "esc")
+        XCTAssertEqual(TeamControl.request(action: "approve", text: "deny")?.kind, .key)
+        XCTAssertNil(TeamControl.request(action: "approve", text: "maybe"))
+        XCTAssertEqual(TeamControl.request(action: "mode", text: "plan")?.kind, .mode)
+        XCTAssertNil(TeamControl.request(action: "mode", text: nil))
+        XCTAssertEqual(TeamControl.request(action: "resume", text: nil)?.kind, .resume)
+        XCTAssertNil(TeamControl.request(action: "reboot", text: "x"))
+    }
+
+    func testRendezvousKeyHasAURLAndTheCommandRouteTheInputCap() {
+        let key = TeamControl.rendezvousKey(team: "team-1", kid: "k1")
+        XCTAssertEqual(MirrorRendezvous.url(key: key)?.absoluteString, MirrorRendezvous.defaultBase + "/" + key)
+        XCTAssertNil(MirrorRendezvous.url(key: "not-hex"))
+        XCTAssertEqual(MirrorTransport.bodyCap(method: "POST", path: TeamControlRoute.commandPath), MirrorTransport.sessionInputBodyCap)
+        XCTAssertEqual(MirrorTransport.bodyCap(method: "GET", path: TeamControlRoute.commandPath), MirrorTransport.defaultBodyCap)
+    }
+
     // MARK: verification
 
     struct Executed: Equatable { var action: String; var text: String?; var pid: Int32 }

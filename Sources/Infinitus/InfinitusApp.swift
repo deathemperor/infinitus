@@ -263,8 +263,8 @@ struct InfinitusApp: App {
                                "unlock", "privacy", "team"],
                     view: AnyView(LockPane(lock: model.lock))),
         SettingsTab(title: TeamModel.paneTitle, symbol: "person.3", tint: .teal,
-                    keywords: ["team", "invite", "code", "join", "members", "leader", "share", "publish", "exclude"],
-                    view: AnyView(TeamPane(team: model.team, lock: model.lock))),
+                    keywords: ["team", "invite", "code", "join", "members", "leader", "share", "publish", "exclude", "control", "grant", "drive"],
+                    view: AnyView(TeamPane(team: model.team, lock: model.lock, feed: model.teamControlFeed))),
     ]
     + (model.debugMenu
        ? [SettingsTab(title: "Animations", symbol: "sparkles", tint: .pink,

@@ -273,6 +273,43 @@ final class MirrorSessionInputBox: @unchecked Sendable {
     }
 }
 
+/// Team session control (#220): the grantor's endpoint, boxed like the
+/// rest. Rebuilt off main when the team standing changes (`refreshTeamControl`);
+/// `respond` runs under `MirrorServer.controlQueue` only, so the replay
+/// set and the rate limit are mutated by one thread, and execution hops
+/// to `mirrorInputQueue` inside the endpoint's `execute`.
+final class MirrorTeamControlBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var endpoint: TeamControl.Endpoint?
+    private var teamDir: URL?
+    /// The live feed by session id (the phone's tail, keyed by pid).
+    var tail = TeamControlRoute.Tail { _, _ in nil }
+    /// Every command, accepted or refused, with the driver's roster name.
+    var onAudit: (@Sendable (TeamControl.Audit, String?) -> Void)?
+
+    func set(_ new: TeamControl.Endpoint?, teamDir dir: URL?) {
+        lock.lock(); endpoint = new; teamDir = dir; lock.unlock()
+    }
+
+    /// `controlQueue` only.
+    func respond(_ request: MirrorTransport.Request) -> Data? {
+        lock.lock(); var ep = endpoint; let dir = teamDir; lock.unlock()
+        ep?.lastAudit = nil
+        let response = TeamControlRoute.respond(request, endpoint: &ep, tail: tail)
+        guard let ep else { return response }
+        lock.lock()
+        endpoint?.seen = ep.seen
+        endpoint?.limit = ep.limit
+        lock.unlock()
+        if let audit = ep.lastAudit {
+            if let dir { try? ep.seen.save(teamDir: dir) }
+            let name = ep.roster()?.everyone.first { $0.keys.kid == audit.driver }?.name
+            onAudit?(audit, name)
+        }
+        return response
+    }
+}
+
 /// The Nearby standing (TXT record + `/team/*` routes, spec §6.4), boxed
 /// like the rest: the main actor refreshes it when the discoverable
 /// switch flips, the connection handlers read it on the network queue.
@@ -373,6 +410,10 @@ final class MirrorServer: ObservableObject {
     /// Answers `POST /app/update` (#121); set by AppModel once at start.
     let appUpdate = MirrorAppUpdateBox()
     let accountAction = MirrorAccountActionBox()
+    /// Team session control (#220): `/team/command` and `/team/sessions/<id>/tail`.
+    let teamControl = MirrorTeamControlBox()
+    /// The shared input deliverer (AppModel.deliverSessionInput); set once at start.
+    var teamControlDeliver: (@Sendable (Int32, SessionInput.Request, String) -> SessionInput.Reply)?
     /// Event-log sink (icon, text), set by AppModel.
     var log: ((String, String) -> Void)?
     /// Fires with the bound port once the listener is up — the quick
@@ -385,6 +426,9 @@ final class MirrorServer: ObservableObject {
     /// race `TeamGit`'s bare-repo push (no in-process lock of its own) and
     /// turn each other's request into an unearned 503.
     private static let teamStoreQueue = DispatchQueue(label: "run.infinitus.team-store")
+    /// Control commands only (#220): verification, the replay set and the
+    /// rate limit are single-threaded here; delivery hops to `mirrorInputQueue`.
+    private static let controlQueue = DispatchQueue(label: "run.infinitus.team-control")
 
     func start(machineName: String, token: String) {
         self.token.set(token)
@@ -408,6 +452,7 @@ final class MirrorServer: ObservableObject {
         status = "starting…"
         listen(on: MirrorTransport.defaultPort, name: machineName)
         refreshTeamStanding(force: true)
+        refreshTeamControl()
     }
 
     func stop() {
@@ -415,6 +460,52 @@ final class MirrorServer: ObservableObject {
         listener = nil
         port = nil
         status = nil
+    }
+
+    /// Rebuilds the grantor endpoint (#220) off the main actor: at start
+    /// and after every TeamModel load (a team created mid-run). Grants,
+    /// roster and the replay set are read from disk per request, so
+    /// `infinitusctl team grant` takes effect with no IPC. No team, or no
+    /// identity this process can read ⇒ no endpoint ⇒ every control route
+    /// answers 404.
+    func refreshTeamControl() {
+        let deliver = teamControlDeliver
+        let feed = sessionFeed
+        let box = teamControl
+        DispatchQueue.global(qos: .utility).async {
+            let paths = TeamPaths.standard()
+            let secrets = TeamSecretsFactory.make(paths: paths)()
+            guard let id = paths.teamIDs().sorted().first,
+                  let identity = try? TeamClient.identity(paths: paths, secrets: secrets) else {
+                box.set(nil, teamDir: nil); return
+            }
+            let dir = paths.teamDir(id)
+            let live: @Sendable () -> [String: Int32] = {
+                Dictionary(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { ($0.sessionId, $0.pid) },
+                           uniquingKeysWith: { _, newer in newer })
+            }
+            let endpoint = TeamControl.Endpoint(
+                identity: identity,
+                roster: {
+                    (try? Data(contentsOf: paths.rosterFile(id)))
+                        .flatMap { try? CanonicalJSON.decode(Signed<TeamRoster>.self, from: $0) }?.doc
+                },
+                grants: { TeamGrants.load(teamDir: dir) },
+                liveSessions: live,
+                execute: { action, text, pid in
+                    guard let request = TeamControl.request(action: action, text: text) else {
+                        return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
+                    }
+                    guard let deliver else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
+                    return mirrorInputQueue.sync { deliver(pid, request, "team") }
+                },
+                seen: TeamControl.SeenIDs.load(teamDir: dir), limit: TeamControl.RateLimit())
+            box.tail = TeamControlRoute.Tail { sessionId, since in
+                guard let pid = live()[sessionId] else { return nil }
+                return feed.call(pid, 200, since: since, wait: 0)
+            }
+            box.set(endpoint, teamDir: dir)
+        }
     }
 
     /// Reads the switch and, when it changed, rebuilds the standing off
@@ -482,6 +573,7 @@ final class MirrorServer: ObservableObject {
         let crashes = self.crashes
         let team = self.team
         let teamMirror = self.teamMirror
+        let teamControl = self.teamControl
         let served: @Sendable (MirrorTransport.Request) -> Void = { [weak self] request in
             let client = MirrorClient(request: request)
             Task { @MainActor in
@@ -493,7 +585,7 @@ final class MirrorServer: ObservableObject {
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
                        sessionInput: sessionInput, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-                       team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
+                       team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in self?.handle(state, wasFixedPort: rawPort != 0, name: name) }
@@ -571,7 +663,7 @@ final class MirrorServer: ObservableObject {
                                           sessionInput: MirrorSessionInputBox,
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
-                                          team: MirrorTeamBox, appUpdate: MirrorAppUpdateBox,
+                                          team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
                                           awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                           teamMirror: MirrorTeamMirrorBox,
                                           queue: DispatchQueue,
@@ -580,7 +672,7 @@ final class MirrorServer: ObservableObject {
         receive(connection, buffer: Data(), payload: payload, token: token,
                sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-               team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
+               team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
 
     private nonisolated static func receive(_ connection: NWConnection,
@@ -591,7 +683,7 @@ final class MirrorServer: ObservableObject {
                                             sessionInput: MirrorSessionInputBox,
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
-                                            team: MirrorTeamBox, appUpdate: MirrorAppUpdateBox,
+                                            team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
                                             awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                             teamMirror: MirrorTeamMirrorBox,
                                             onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
@@ -612,9 +704,16 @@ final class MirrorServer: ObservableObject {
             // routed on its own (TeamNearby.respond answers 404 while
             // hidden); everything else — including `/team/*` from a
             // tunnel — still needs the token before a body byte is buffered.
-            let teamRoute = (head.map { $0.path.hasPrefix(TeamNearby.routePrefix) } ?? false)
+            // Team session control (#220): a sealed command or a signed
+            // tail header authenticates itself, so neither the pairing
+            // token nor the LAN gate applies — a teammate drives over the
+            // tunnel too. Without grants the route answers 404.
+            let controlRoute = head.map {
+                $0.path == TeamControlRoute.commandPath || TeamControlRoute.tailSessionId($0.path) != nil
+            } ?? false
+            let teamRoute = !controlRoute && (head.map { $0.path.hasPrefix(TeamNearby.routePrefix) } ?? false)
                 && Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint)
-            if let head, !teamRoute, !MirrorTransport.isAuthorized(head, token: token.current) {
+            if let head, !teamRoute, !controlRoute, !MirrorTransport.isAuthorized(head, token: token.current) {
                 connection.send(content: MirrorTransport.unauthorizedResponse(),
                                 completion: .contentProcessed { _ in connection.cancel() })
                 return
@@ -628,6 +727,13 @@ final class MirrorServer: ObservableObject {
             // above; the check below stays as the route dispatch's own
             // defense in depth (e.g. a token regenerated mid-request).
             if let request = MirrorTransport.parseRequestWithBody(buffer, bodyCap: cap) {
+                if request.path == TeamControlRoute.commandPath || TeamControlRoute.tailSessionId(request.path) != nil {
+                    controlQueue.async {
+                        let response = teamControl.respond(request) ?? MirrorTransport.notFoundResponse()
+                        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                }
                 if request.path.hasPrefix(TeamNearby.routePrefix),
                    Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint) {
                     // Off this queue, and serialized: a stored request
@@ -882,7 +988,7 @@ final class MirrorServer: ObservableObject {
             receive(connection, buffer: buffer, payload: payload, token: token,
                    sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
-                   team: team, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
+                   team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
     }
 }

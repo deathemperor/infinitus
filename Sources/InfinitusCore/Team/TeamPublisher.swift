@@ -179,6 +179,11 @@ public struct TeamPublisher {
         /// which has no fleet view, sends none and the file is left alone.
         public var fleetRows: [TeamDocs.FleetDoc.FleetRow] = []
         public var blockers: [String] = []
+        /// Team session control (#220): where a driver reaches this
+        /// machine and what it lets whom do. Hints only; both optional so
+        /// the CLI publisher (no listener) sends neither.
+        public var endpoints: TeamControl.Endpoints?
+        public var grantsTo: [TeamDocs.GrantHint]?
         public var home: String
         public var includeImages = false
         /// Days of `days/` files published and files scanned (`maxAge`).
@@ -439,13 +444,14 @@ public struct TeamPublisher {
             // once — the hash going away is what makes it once.
             if state.hashes.removeValue(forKey: "now.json") != nil { try client.unpublish(path: "now.json") }
         } else {
-            try stage(TeamKinds.now, "now.json",
-                      try CanonicalJSON.encode(TeamDocs.Now(at: at, sessions: live, fleets: sources.fleets, blockers: sources.blockers,
-                                                            crashesToday: crashesToday,
-                                                            // An older client's ShareTarget decoder throws on "off";
-                                                            // the hint carries only kinds that actually travel.
-                                                            sharesTo: shares.byKind.filter { $0.value != .off })),
-                      always: true)
+            var doc = TeamDocs.Now(at: at, sessions: live, fleets: sources.fleets, blockers: sources.blockers,
+                                   crashesToday: crashesToday,
+                                   // An older client's ShareTarget decoder throws on "off";
+                                   // the hint carries only kinds that actually travel.
+                                   sharesTo: shares.byKind.filter { $0.value != .off })
+            doc.endpoints = sources.endpoints
+            doc.grantsTo = sources.grantsTo
+            try stage(TeamKinds.now, "now.json", try CanonicalJSON.encode(doc), always: true)
         }
         if off(TeamKinds.fleet) {
             // Retired once, like now.json: a stale fleet would keep showing

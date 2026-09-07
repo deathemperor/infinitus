@@ -369,6 +369,19 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts leaders \
 "$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
 echo "team: ok (leader Ann, member Bo $KID)"
 
+# --- team control (#220, grantor) ------------------------------------------
+# Bo lets leaders send to one session; the hint rides Bo's now.json and
+# Ann's snapshot says what Bo lets her do. Driving itself lands with the
+# driver PR (the mirror listener is off in mock mode).
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grant leaders --sessions s-e2e --send \
+    | expect "d['audience']=='leaders' and d['sessions']==['s-e2e'] and d['capabilities']==['send']" || fail "team grant"
+GRANT="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grants | json "d['grants'][0]['id']")"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish --projects "$SOCKDIR/fixture/projects" >/dev/null || fail "publish with a grant"
+"$CTL" team-fetch | expect "[m for m in d['members'] if m['name']=='Bo'][0].get('controls')==['send']" || fail "the grant hint did not reach the leader's snapshot"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team revoke "$GRANT" | expect "d['removed']" || fail "team revoke"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grants | expect "d['grants']==[]" || fail "revoke left the grant"
+echo "team control: ok"
+
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed wall
 # or a scenario swap shows up as idle cost.

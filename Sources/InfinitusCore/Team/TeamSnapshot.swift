@@ -29,6 +29,9 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
         /// The member's fleets as last published (#221); additive, so an
         /// older phone decodes the row without it.
         public var fleet: TeamDocs.FleetDoc?
+        /// What this member lets ME do to their sessions (#220), sorted;
+        /// nil when nothing. Additive, so an older phone decodes without it.
+        public var controls: [String]?
         public var id: String { kid }
 
         public init(kid: String, name: String, role: String, isMe: Bool, founder: Bool = false, since: Int? = nil,
@@ -69,6 +72,17 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
     public var lastPublish: Int?
     public var lastError: String?
 
+    /// The union of every hint whose audience names `me`, sorted; nil
+    /// when no hint does (the row reads as "cannot drive").
+    public static func controls(hints: [TeamDocs.GrantHint]?, roster: TeamRoster?, me: String) -> [String]? {
+        guard let hints, let roster else { return nil }
+        var out = Set<String>()
+        for hint in hints where roster.recipients(for: hint.audience).contains(where: { $0.kid == me }) {
+            out.formUnion(hint.capabilities)
+        }
+        return out.isEmpty ? nil : out.sorted()
+    }
+
     public static func make(status: TeamStatus, roster: TeamRoster?, reader: TeamReader?, requests: [Signed<TeamRequest>],
                             today: String, lastFetch: Int?, lastPublish: Int?, lastError: String?) -> TeamSnapshot {
         func row(_ m: TeamRoster.Member, role: String) -> Member {
@@ -80,6 +94,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
                 out.blockers = r.now?.blockers ?? []
                 out.crashes = r.crashes.count
                 out.fleet = r.fleet
+                out.controls = TeamSnapshot.controls(hints: r.now?.grantsTo, roster: roster, me: status.kid)
                 if let day = r.days[today] {
                     out.todayUSD = day.usd
                     out.todayMessages = day.messages

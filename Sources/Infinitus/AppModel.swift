@@ -113,6 +113,45 @@ final class AppModel: ObservableObject {
     }
     @Published var eventLog: [EventEntry] = []
     let eventStore = EventStore()
+    /// Team session control (#220): the audit feed and who is driving
+    /// which session (by session id) until when — read at render time,
+    /// no timer.
+    let teamControlFeed = TeamControlFeed()
+    struct Driven { let name: String; let project: String; let until: Date }
+    @Published var drivenBy: [String: Driven] = [:]
+    /// One "your commands are failing" notification per driver per hour.
+    private var controlRefusalNotified: [String: Date] = [:]
+    static let drivenByWindow: TimeInterval = 60
+    static let executedOutcomes: Set<String> = ["delivered", "running", "captured"]
+    static let notifiedRefusals: Set<String> = ["expired", "replayed", "notLive", "rateLimited", "badRequest"]
+
+    func recordTeamControl(_ audit: TeamControl.Audit, driverName: String?) {
+        let driver = driverName ?? String(audit.driver.prefix(8))
+        let project = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+            .first { $0.sessionId == audit.session }.map { URL(fileURLWithPath: $0.cwd).lastPathComponent } ?? audit.session
+        let line = TeamControlFeed.Line(driver: driver, session: project, action: audit.action, outcome: audit.outcome, detail: audit.detail)
+        teamControlFeed.append(line)
+        logEvent("team-control", icon: "person.2", line.text)
+        if Self.executedOutcomes.contains(audit.outcome) {
+            drivenBy[audit.session] = Driven(name: driver, project: project, until: Date().addingTimeInterval(Self.drivenByWindow))
+        }
+        if driverName != nil, Self.notifiedRefusals.contains(audit.outcome),
+           controlRefusalNotified[audit.driver].map({ Date().timeIntervalSince($0) > 3600 }) ?? true {
+            controlRefusalNotified[audit.driver] = Date()
+            notify("\(driver)'s commands are failing: \(audit.outcome)")
+        }
+    }
+
+    /// Where a teammate reaches this Mac right now (#220 §5.1), for now.json.
+    var controlEndpoints: TeamControl.Endpoints {
+        var e = TeamControl.Endpoints()
+        if let port = mirrorServer.port, let lan = MirrorPairing.lanAddress(in: LocalAddresses.ipv4()) { e.lan = "\(lan):\(port)" }
+        if namedTunnel.connected { e.hostname = namedTunnel.hostname }
+        if quickTunnel.url != nil, let kid = team.kid, let id = team.paths.teamIDs().sorted().first {
+            e.rendezvous = TeamControl.rendezvousKey(team: id, kid: kid)
+        }
+        return e
+    }
     lazy var statsModel = StatsModel(eventStore: eventStore)
 
     /// Every event goes through here: the Activity pane's tail and the
@@ -1192,6 +1231,10 @@ final class AppModel: ObservableObject {
         mirrorServer.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
+        mirrorServer.teamControl.onAudit = { [weak self] audit, name in
+            Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
+        }
+        team.onLoaded = { [weak self] in self?.mirrorServer.refreshTeamControl() }
         quickTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
@@ -1407,6 +1450,11 @@ final class AppModel: ObservableObject {
             self?.deliverSessionInput(pid: pid, request, from: "phone")
                 ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
         }
+        // Team session control (#220): the same path, origin "team".
+        mirrorServer.teamControlDeliver = { [weak self] pid, request, origin in
+            self?.deliverSessionInput(pid: pid, request, from: origin)
+                ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
+        }
         applyQuickTunnel()
         applyNamedTunnel()
     }
@@ -1462,7 +1510,7 @@ final class AppModel: ObservableObject {
                     let why = reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome
                     self.logMirrorInput("⚠️", "\(source) input not delivered: \(why)")
                 }
-                if request.queuedAt != nil, ["delivered", "running", "captured"].contains(reply.outcome) {
+                if source == "phone", request.queuedAt != nil, ["delivered", "running", "captured"].contains(reply.outcome) {
                     // The phone queued this while the Mac was away; the
                     // push reaches it even when the app is closed.
                     self.liveActivityPusher.pushAlert(title: "Delivered to \(label)",
@@ -1611,6 +1659,11 @@ final class AppModel: ObservableObject {
         }
         s.liveSessions = ClaudeSessions.list(claudeDir: claudeDir)
         s.crashes = crashStore.list()
+        s.endpoints = controlEndpoints
+        if let id = team.paths.teamIDs().sorted().first {
+            let hints = TeamGrants.load(teamDir: team.paths.teamDir(id)).hints
+            s.grantsTo = hints.isEmpty ? nil : hints
+        }
         let lastFleets = fleets.compactMap(\.lastFleet)
         s.fleets = lastFleets.map { fleet in
             let active = fleet.accounts.first { $0.number == fleet.activeNumber }
@@ -1769,8 +1822,15 @@ final class AppModel: ObservableObject {
     /// (MirrorRendezvous). Best effort: the QR still carries the URL, this
     /// only spares the rescan after a restart.
     func publishRendezvous(_ url: String) {
-        guard mirrorRendezvousEnabled,
-              let target = MirrorRendezvous.url(token: mirrorPairToken) else { return }
+        guard mirrorRendezvousEnabled else { return }
+        if let target = MirrorRendezvous.url(token: mirrorPairToken) { publish(url, at: target, label: "tunnel address") }
+        // #220: teammates derive this key from the roster alone.
+        if let key = controlEndpoints.rendezvous, let target = MirrorRendezvous.url(key: key) {
+            publish(url, at: target, label: "team control address")
+        }
+    }
+
+    private func publish(_ url: String, at target: URL, label: String) {
         var request = URLRequest(url: target, timeoutInterval: 10)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1779,10 +1839,10 @@ final class AppModel: ObservableObject {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             Task { @MainActor in
                 if code == 204 {
-                    self?.logEvent("other", icon: "📍", "tunnel address published to infinitus.run")
+                    self?.logEvent("other", icon: "mappin", "\(label) published to infinitus.run")
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code)"
-                    self?.logEvent("other", icon: "⚠️", "rendezvous publish failed: \(why)")
+                    self?.logEvent("other", icon: "exclamationmark.triangle", "rendezvous publish failed (\(label)): \(why)")
                 }
             }
         }.resume()

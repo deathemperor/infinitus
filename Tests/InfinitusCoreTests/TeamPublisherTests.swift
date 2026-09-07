@@ -91,7 +91,10 @@ final class TeamPublisherTests: XCTestCase {
         var ex = TeamExclusions(); ex.set("/r/secret", excluded: true); try ex.save(paths: t.alicePaths)
 
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
-        let report = try publisher.publish(sources: sources(projects))
+        var src = sources(projects)
+        src.endpoints = TeamControl.Endpoints(lan: "10.0.0.2:47824")
+        src.grantsTo = [TeamDocs.GrantHint(audience: .leaders, sessions: nil, capabilities: ["send"])]
+        let report = try publisher.publish(sources: src)
         let me = "m/\(t.alice.identity.kid)/"
         XCTAssertEqual(Set(report.published), [
             me + "days/2026-09-04.json", me + "sessions/index.json", me + "now.json", me + "crashes.json",
@@ -120,6 +123,8 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(now.sessions.first?.project, "app")
         XCTAssertEqual(now.crashesToday, 1)
         XCTAssertEqual(now.sharesTo["stats"], .team)
+        XCTAssertEqual(now.endpoints?.lan, "10.0.0.2:47824")
+        XCTAssertEqual(now.grantsTo?.first?.capabilities, ["send"])
         let crashes = try CanonicalJSON.decode(TeamDocs.Crashes.self, from: try t.leader.read(me + "crashes.json").1)
         XCTAssertEqual(crashes.crashes, ["Mac · crash · SIGSEGV"])
         XCTAssertFalse(try t.leader.readable().map(\.path).contains { $0.contains("/s2/") })

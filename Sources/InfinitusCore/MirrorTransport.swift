@@ -190,7 +190,9 @@ public enum MirrorTransport {
     /// large body has fully arrived. Every route but `POST
     /// /sessions/*/input` keeps the small default.
     public static func bodyCap(method: String, path: String) -> Int {
-        method == "POST" && sessionInputPid(path) != nil ? sessionInputBodyCap : defaultBodyCap
+        guard method == "POST" else { return defaultBodyCap }
+        // A sealed team command carries a prompt (#220) — the input cap.
+        return sessionInputPid(path) != nil || path == TeamControlRoute.commandPath ? sessionInputBodyCap : defaultBodyCap
     }
 
     /// A whole request, body included: `nil` while the head or (when

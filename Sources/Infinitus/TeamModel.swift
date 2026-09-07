@@ -35,6 +35,8 @@ final class TeamModel: ObservableObject {
     /// publishing. Set once per source and once per batch, never per chunk.
     @Published private(set) var progress: TeamPublisher.Progress?
     @Published private(set) var shares = TeamShares()
+    /// Team session control (#220): who may drive which of my sessions.
+    @Published private(set) var grants = TeamGrants()
     @Published private(set) var exclusions = TeamExclusions()
     /// Spec §7: which sessions' transcripts travel. `recentTranscripts`
     /// is filled only in `chosen` mode — the scan cache is tens of MB and
@@ -72,6 +74,8 @@ final class TeamModel: ObservableObject {
     var enabled = true
     /// Set by AppModel: the biometric-lock verdict for create / join / approve (spec §2.2).
     var gate: () -> TeamGate.Verdict = { .allowed }
+    /// After every load: the mirror server rebuilds its control endpoint (#220).
+    var onLoaded: (() -> Void)?
     /// Set by AppModel: what this Mac publishes (projects dir, live sessions, crashes, fleets, blockers).
     var sources: () -> TeamPublisher.Sources = { TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
     /// Set by AppModel: true when this instance scans its transcripts for
@@ -180,13 +184,13 @@ final class TeamModel: ObservableObject {
         let scan = appScan()
         return Task {
             do {
-                let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker) = try await run { paths, secrets in
+                let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker, TeamGrants) = try await run { paths, secrets in
                     // Non-creating: showing a kid must never mint (and, on
                     // a denied keychain read, clobber) an identity that
                     // exists but the process could not decrypt.
                     let kid = secrets.read(TeamClient.identitySecretName).flatMap { try? TeamIdentity(secret: $0) }?.kid
                     let exclusions = TeamExclusions.load(paths: paths)
-                    guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, [], TranscriptPicker()) }
+                    guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, [], TranscriptPicker(), TeamGrants()) }
                     let dir = paths.teamDir(client.config.id)
                     let (snap, reader) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err)
                     let pendingNearby = client.isLeader ? TeamNearby.Store.pending(team: client.config.id, paths: paths) : []
@@ -203,13 +207,15 @@ final class TeamModel: ObservableObject {
                                                                         exclusions: exclusions)
                     }
                     let picker = TranscriptPicker(choices: choices, recent: recent)
-                    return (snap, reader, TeamShares.load(teamDir: dir), exclusions, kid, client.roster, pendingNearby, picker)
+                    return (snap, reader, TeamShares.load(teamDir: dir), exclusions, kid, client.roster, pendingNearby, picker, TeamGrants.load(teamDir: dir))
                 }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     snapshot = result.0; reader = result.1; shares = result.2; exclusions = result.3; kid = result.4
                     roster = result.5; pendingNearby = result.6
                     transcriptChoices = result.7.choices; recentTranscripts = result.7.recent
+                    grants = result.8
                 }
+                onLoaded?()
             } catch {
                 lastError = Self.mask(error)
             }
@@ -713,6 +719,27 @@ final class TeamModel: ObservableObject {
 
     /// Local setting (never sent): where one kind goes. Applies to the
     /// next publish; `reshare(days:)` re-wraps history on request.
+    /// Team session control (#220): who may drive which of my sessions.
+    func addGrant(audience: TeamRoster.ShareTarget, sessions: TeamGrants.Sessions, capabilities: Set<String>) async {
+        await action("Saving…") { paths, _ in
+            guard let id = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
+            let dir = paths.teamDir(id)
+            var grants = TeamGrants.load(teamDir: dir)
+            grants.add(audience: audience, sessions: sessions, capabilities: capabilities, now: Int(Date().timeIntervalSince1970))
+            try grants.save(teamDir: dir)
+        }
+    }
+
+    func revokeGrant(id: String) async {
+        await action("Saving…") { paths, _ in
+            guard let team = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
+            let dir = paths.teamDir(team)
+            var grants = TeamGrants.load(teamDir: dir)
+            _ = grants.remove(id: id)
+            try grants.save(teamDir: dir)
+        }
+    }
+
     func setShare(kind: String, target: TeamRoster.ShareTarget) async {
         await action("Saving…") { paths, secrets in
             guard let id = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
