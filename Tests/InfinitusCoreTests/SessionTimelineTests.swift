@@ -334,4 +334,15 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(feed.timeline?.activities.count, 6)
         XCTAssertEqual(feed.items.map(\.kind), [.user, .tool, .result])   // legacy untouched
     }
+
+    func testAResultWhoseCallAgedOutOfTheTailIsDropped() {
+        // T3 pairs results only against in-flight tools; a blank row is
+        // worse than no row.
+        let tl = build(lines([
+            #"{"type":"user","uuid":"r0","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"gone","content":"old output"}]}}"#,
+            #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:01.000Z","message":{"content":"next"}}"#,
+        ]))
+        XCTAssertTrue(tl.activities.isEmpty)
+        XCTAssertEqual(tl.turns.map(\.id), ["u1"])
+    }
 }

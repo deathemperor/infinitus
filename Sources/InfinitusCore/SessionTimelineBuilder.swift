@@ -223,8 +223,10 @@ public enum SessionTimelineBuilder {
         mutating func visitToolResult(_ block: [String: Any], entry: [String: Any], at: Date) {
             guard let toolUseId = block["tool_use_id"] as? String else { return }
             let isError = (block["is_error"] as? Bool) == true
-            let open = openTools.removeValue(forKey: toolUseId)
-            let name = open?.name ?? ""
+            // T3 pairs a result only with an in-flight call; one whose call
+            // aged out of the tail window is dropped, not shown blank.
+            guard let open = openTools.removeValue(forKey: toolUseId) else { return }
+            let name = open.name
             let text: String
             if let s = block["content"] as? String {
                 text = s
@@ -254,19 +256,18 @@ public enum SessionTimelineBuilder {
                                                 "status": .string(isError ? "failed" : "completed")]
             let line = Slim.output(text)
             if !line.isEmpty { payload["output"] = .string(line) }
-            var files = open?.files ?? []
+            var files = open.files
             if let r = entry["toolUseResult"] as? [String: Any], let fp = r["filePath"] as? String, !files.contains(fp) {
                 files.append(fp)
             }
             if !files.isEmpty, Slim.itemType(for: name) == "file_change" {
                 payload["changedFiles"] = .array(Slim.files(files).map(JSONValue.string))
             }
-            let summary = open.map {
-                $0.command ?? SessionFeedReader.describeTool(name: name, input: ["file_path": $0.files.first ?? ""])
-            } ?? name
+            let summary = open.command
+                ?? SessionFeedReader.describeTool(name: name, input: ["file_path": open.files.first ?? ""])
             append("tool.completed", id: toolUseId + "/completed", tone: isError ? .error : .tool,
                    summary: summary.isEmpty ? name : summary,
-                   detail: Slim.outputDetail(text, command: open?.command), payload: payload, at: at)
+                   detail: Slim.outputDetail(text, command: open.command), payload: payload, at: at)
         }
 
         mutating func visitAssistant(_ entry: [String: Any], at: Date) {
@@ -333,7 +334,7 @@ public enum SessionTimelineBuilder {
         /// Request ids of prompts nothing has resolved yet.
         var openPrompts: Set<String> = []
 
-        /// SessionTimeline.Turn state follows the session status, as T3's projector does
+        /// Turn state follows the session status, as T3's projector does
         /// (`projector.ts:78-93`): the last turn is running while the
         /// record is busy; every earlier turn is closed by the next prompt.
         func finish(status: String?, statusUpdatedAt: Date?) -> SessionTimeline {

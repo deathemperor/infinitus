@@ -164,19 +164,19 @@ public enum SessionFeedReader {
         guard !record.sessionId.isEmpty else { return nil }
         let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
         var window = tailBytes
-        var lines = tail(of: url, maxBytes: window)
-        var parsed = parse(lines: lines, limit: limit)
+        var entries = tail(of: url, maxBytes: window).compactMap(decodeLine)
+        var parsed = parse(entries: entries, limit: limit)
         let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
         while parsed.count < limit, window < size, window < tailBytesMax {
             window *= 4
-            lines = tail(of: url, maxBytes: window)
-            parsed = parse(lines: lines, limit: limit)
+            entries = tail(of: url, maxBytes: window).compactMap(decodeLine)
+            parsed = parse(entries: entries, limit: limit)
         }
         let raw = attachAgents(parsed, transcript: url)
         let (items, waiting) = finalize(items: raw, status: record.status,
                                         statusUpdatedAt: record.statusUpdatedAt)
-        // The T3 timeline (#223): a second walk over the same tail.
-        let timeline = SessionTimelineBuilder.build(entries: lines.compactMap(decodeLine), status: record.status,
+        // The T3 timeline (#223): a second walk over the entries already decoded.
+        let timeline = SessionTimelineBuilder.build(entries: entries, status: record.status,
                                                     statusUpdatedAt: record.statusUpdatedAt, agents: agents(in: raw))
         return SessionFeed(pid: record.pid, sessionId: record.sessionId, cwd: record.cwd,
                            status: record.status, waiting: waiting, items: items,
@@ -331,7 +331,10 @@ public enum SessionFeedReader {
     }
 
     public static func parse(lines: [String], limit: Int) -> [SessionFeedItem] {
-        let entries: [[String: Any]] = lines.compactMap(decodeLine)
+        parse(entries: lines.compactMap(decodeLine), limit: limit)
+    }
+
+    static func parse(entries: [[String: Any]], limit: Int) -> [SessionFeedItem] {
 
         /// A run of consecutive `.tool` items — any tools (user 2026-09-03:
         /// "all the tool uses should be combined into one") — collapsed
