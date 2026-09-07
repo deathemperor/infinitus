@@ -50,9 +50,11 @@ final class SessionAttentionTests: XCTestCase {
         XCTAssertEqual(facts.snoozedUntil, t0 + 1)
     }
 
-    func testRequestDecodesWithoutUntilAndIgnoresUnknownKeys() throws {
+    func testRequestDecodesWithoutUntilAndWithACommandId() throws {
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        XCTAssertEqual(try dec.decode(SessionAttention.Request.self, from: Data(#"{"action":"pin","commandId":"c1"}"#.utf8)),
+        XCTAssertEqual(try dec.decode(SessionAttention.Request.self, from: Data(#"{"action":"pin"}"#.utf8)),
                        .init(action: .pin, until: nil))
+        XCTAssertEqual(try dec.decode(SessionAttention.Request.self, from: Data(#"{"action":"pin","commandId":"c1"}"#.utf8)),
+                       .init(action: .pin, until: nil, commandId: "c1"))
     }
 }

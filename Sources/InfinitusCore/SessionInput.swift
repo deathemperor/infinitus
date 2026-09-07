@@ -35,15 +35,19 @@ public enum SessionInput {
         public let requestId: String?
         public let queuedAt: Date?
         public let sessionId: String?
+        /// Client-minted id for retry-safe delivery (#223 phase 4); absent = today's behaviour.
+        public let commandId: String?
 
         public init(kind: Kind, text: String, attachments: [Attachment]? = nil,
-                    requestId: String? = nil, queuedAt: Date? = nil, sessionId: String? = nil) {
+                    requestId: String? = nil, queuedAt: Date? = nil, sessionId: String? = nil,
+                    commandId: String? = nil) {
             self.kind = kind
             self.text = text
             self.attachments = attachments
             self.requestId = requestId
             self.queuedAt = queuedAt
             self.sessionId = sessionId
+            self.commandId = commandId
         }
     }
 

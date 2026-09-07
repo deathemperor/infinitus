@@ -10,7 +10,11 @@ public enum SessionAttention {
         public let action: AttentionStore.Action
         /// The wake time; snooze only (T3 `snoozedUntil`).
         public let until: Date?
-        public init(action: AttentionStore.Action, until: Date?) { self.action = action; self.until = until }
+        /// Client-minted id for retry-safe delivery (#223 phase 4); absent = today's behaviour.
+        public let commandId: String?
+        public init(action: AttentionStore.Action, until: Date?, commandId: String? = nil) {
+            self.action = action; self.until = until; self.commandId = commandId
+        }
     }
 
     public enum Outcome: Sendable, Equatable {

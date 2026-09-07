@@ -36,9 +36,12 @@ public enum SessionStart {
         /// process over stdin/stdout (`OwnedSessions`) instead of opening
         /// a terminal. Optional so older phones still start sessions.
         public let headless: Bool?
+        /// Client-minted id for retry-safe delivery (#223 phase 4); absent = today's behaviour.
+        public let commandId: String?
         public init(cwd: String, engine: String? = nil, prompt: String? = nil, resume: String? = nil,
                     permissionMode: String? = nil, model: String? = nil, systemPrompt: String? = nil,
-                    profile: String? = nil, fork: Bool? = nil, headless: Bool? = nil) {
+                    profile: String? = nil, fork: Bool? = nil, headless: Bool? = nil,
+                    commandId: String? = nil) {
             self.cwd = cwd
             self.engine = engine
             self.prompt = prompt
@@ -49,6 +52,7 @@ public enum SessionStart {
             self.profile = profile
             self.fork = fork
             self.headless = headless
+            self.commandId = commandId
         }
     }
 
