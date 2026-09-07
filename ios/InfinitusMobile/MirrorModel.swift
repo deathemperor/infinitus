@@ -104,7 +104,22 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// this phone (or another client) leases it; nil falls back to the
     /// engine's status word.
     func facts(macId: String?, pid: Int) -> SessionFacts? {
-        (macId == nil ? snapshot : other(macId!)?.snapshot)?.factsByPid?[pid]
+        let snap = macId == nil ? snapshot : other(macId!)?.snapshot
+        // An attention reply is newer than the snapshot it landed over;
+        // the next snapshot from that Mac takes over.
+        if let o = factsOverride[Self.factsKey(macId, pid)], o.at > (snap?.capturedAt ?? .distantPast) { return o.facts }
+        return snap?.factsByPid?[pid]
+    }
+    private var factsOverride: [String: (at: Date, facts: SessionFacts)] = [:]
+    private static func factsKey(_ macId: String?, _ pid: Int) -> String { "\(macId ?? "")/\(pid)" }
+
+    /// Settle / snooze / pin a session on its Mac (#223 phase 3). Best
+    /// effort: a Mac that doesn't answer leaves the row as it was.
+    func attention(_ action: AttentionStore.Action, macId: String?, pid: Int, until: Date? = nil) async {
+        let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString.lowercased())
+        guard let facts = try? await mirror(for: macId).sessionAttention(pid: Int32(pid), request: request) else { return }
+        factsOverride[Self.factsKey(macId, pid)] = (Date(), facts)
+        objectWillChange.send()
     }
 
     func accountSummary(macId: String?, pid: Int) -> SessionAccountSummary? {

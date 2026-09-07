@@ -177,17 +177,27 @@ struct SessionsScreen: View {
         }
     }
 
-    /// Sessions waiting on you first — they're what the phone is opened for.
-    private func waitingFirst(_ sessions: [SessionDetail]) -> [SessionDetail] {
-        sessions.sorted { ($0.status == "waiting" ? 0 : 1) < ($1.status == "waiting" ? 0 : 1) }
+    /// Pinned sessions lead, then the active ones with those waiting on
+    /// you first, then the snoozed and settled shelves — dimmed, never
+    /// hidden, so a Live Activity tap still lands (#223 phase 3).
+    private func ordered(_ sessions: [SessionDetail], macId: String? = nil) -> [SessionDetail] {
+        func rank(_ s: SessionDetail) -> (Int, Double) {
+            guard let f = model.facts(macId: macId, pid: s.pid) else { return (s.status == "waiting" ? 1 : 2, 0) }
+            if let p = f.pinnedAt { return (0, p.timeIntervalSince1970) }
+            if SessionListPresentation.isSnoozed(f) { return (3, 0) }
+            if SessionListPresentation.isSettled(f) { return (4, 0) }
+            return (s.status == "waiting" ? 1 : 2, 0)
+        }
+        return sessions.map { ($0, rank($0)) }.sorted { $0.1 < $1.1 }.map(\.0)
     }
 
     private var primarySections: some View {
         ForEach(fleetsWithSessions) { fleet in
             let live = fleet.liveSessions!
             Section {
-                ForEach(waitingFirst(live.sessions ?? []), id: \.pid) { session in
+                ForEach(ordered(live.sessions ?? []), id: \.pid) { session in
                     NavigationLink(value: session) { row(session) }
+                        .modifier(AttentionActions(model: model, session: session, macId: nil))
                 }
             } header: {
                 sectionHeader(fleet: fleet, live: live)
@@ -197,12 +207,13 @@ struct SessionsScreen: View {
 
     private var otherMacSections: some View {
         ForEach(othersWithSessions) { other in
-            let sessions = waitingFirst(other.fleets.flatMap { $0.liveSessions?.sessions ?? [] })
+            let sessions = ordered(other.fleets.flatMap { $0.liveSessions?.sessions ?? [] }, macId: other.id)
             Section {
                 ForEach(sessions, id: \.pid) { session in
                     NavigationLink(value: OtherSessionRoute(macId: other.id, session: session)) {
                         row(session, macId: other.id)
                     }
+                    .modifier(AttentionActions(model: model, session: session, macId: other.id))
                 }
             } header: {
                 HStack(spacing: 6) {
@@ -288,6 +299,7 @@ struct SessionsScreen: View {
         // leases the session (#223 phase 3); the status word until then.
         let facts = model.facts(macId: macId, pid: session.pid)
         let attention = SessionListPresentation.attention(facts, fallbackStatus: session.status)
+        let shelf = facts.flatMap { AttentionActions.shelfLabel($0) }
         return HStack(alignment: .top, spacing: 10) {
             Circle()
                 .fill(SessionWords.color(attention, raw: session.status))
@@ -336,17 +348,15 @@ struct SessionsScreen: View {
                     Label(plan, systemImage: "checklist")
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
+                if let shelf {
+                    Label(shelf.text, systemImage: shelf.icon)
+                        .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
         }
+        .opacity(shelf == nil ? 1 : 0.55)
         .padding(.vertical, 4)
         .frame(minHeight: 44)
-        .contextMenu {
-            Button {
-                UIPasteboard.general.string = session.cwd
-            } label: {
-                Label("Copy path", systemImage: "doc.on.doc")
-            }
-        }
     }
 
     /// The summary line wears the theme (user 2026-09-04 "style the
@@ -423,4 +433,64 @@ struct SessionsScreen: View {
             : n >= 1000 ? "\(n / 1000)k" : "\(n)"
     }
 
+}
+
+/// Swipe and long-press actions over a session row (#223 phase 3, T3's
+/// settle / snooze / pin overlays): leading swipe pins, trailing swipe
+/// settles or snoozes an hour; the menu adds "until tomorrow". Every
+/// action is a `POST /sessions/<pid>/attention` on that session's Mac.
+private struct AttentionActions: ViewModifier {
+    @ObservedObject var model: MirrorModel
+    let session: SessionDetail
+    let macId: String?
+
+    private var facts: SessionFacts? { model.facts(macId: macId, pid: session.pid) }
+    private var pinned: Bool { facts?.pinnedAt != nil }
+    private var snoozed: Bool { facts.map { SessionListPresentation.isSnoozed($0) } ?? false }
+    private var settled: Bool { facts.map { SessionListPresentation.isSettled($0) } ?? false }
+
+    static func shelfLabel(_ f: SessionFacts) -> (text: String, icon: String)? {
+        if SessionListPresentation.isSnoozed(f), let until = f.snoozedUntil {
+            return ("snoozed until " + until.formatted(date: .omitted, time: .shortened), "moon.zzz")
+        }
+        if SessionListPresentation.isSettled(f) { return ("settled", "checkmark.circle") }
+        return nil
+    }
+
+    private func act(_ action: AttentionStore.Action, until: Date? = nil) {
+        Task { await model.attention(action, macId: macId, pid: session.pid, until: until) }
+    }
+    private var tomorrowMorning: Date {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: Date())!)
+        return cal.date(bySettingHour: 9, minute: 0, second: 0, of: start) ?? start
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button { act(pinned ? .unpin : .pin) } label: {
+                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                }.tint(.orange)
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button { act(settled ? .unsettle : .settle) } label: {
+                    Label(settled ? "Unsettle" : "Settle", systemImage: settled ? "arrow.uturn.backward" : "checkmark.circle")
+                }.tint(.green)
+                Button { snoozed ? act(.unsnooze) : act(.snooze, until: Date().addingTimeInterval(3600)) } label: {
+                    Label(snoozed ? "Unsnooze" : "Snooze 1h", systemImage: snoozed ? "bell" : "moon.zzz")
+                }.tint(.indigo)
+            }
+            .contextMenu {
+                Button { act(pinned ? .unpin : .pin) } label: { Label(pinned ? "Unpin" : "Pin", systemImage: "pin") }
+                Button { act(settled ? .unsettle : .settle) } label: { Label(settled ? "Unsettle" : "Settle", systemImage: "checkmark.circle") }
+                if snoozed {
+                    Button { act(.unsnooze) } label: { Label("Unsnooze", systemImage: "bell") }
+                } else {
+                    Button { act(.snooze, until: Date().addingTimeInterval(3600)) } label: { Label("Snooze 1 hour", systemImage: "moon.zzz") }
+                    Button { act(.snooze, until: tomorrowMorning) } label: { Label("Snooze until tomorrow", systemImage: "sunrise") }
+                }
+                Button { UIPasteboard.general.string = session.cwd } label: { Label("Copy path", systemImage: "doc.on.doc") }
+            }
+    }
 }

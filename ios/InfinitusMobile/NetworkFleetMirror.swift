@@ -643,9 +643,20 @@ actor NetworkFleetMirror: FleetMirror {
     }
 
     /// One POST to the Mac, the reply's body as is (empty on a 204).
-    private func post<B: Encodable>(_ path: String, body: B, timeout: TimeInterval) async throws -> Data {
+    /// `POST /sessions/<pid>/attention` (#223 phase 3): settle / snooze /
+    /// pin, answered with the session's facts as they now stand. Dates go
+    /// both ways as ISO 8601, the way the snapshot carries them.
+    func sessionAttention(pid: Int32, request: SessionAttention.Request) async throws -> SessionFacts {
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let data = try await post(MirrorTransport.sessionAttentionPath(pid: pid), body: request, timeout: 10, encoder: encoder)
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SessionFacts.self, from: data)
+    }
+
+    private func post<B: Encodable>(_ path: String, body: B, timeout: TimeInterval,
+                                    encoder: JSONEncoder = JSONEncoder()) async throws -> Data {
         let token = pairToken()
-        let payload = try JSONEncoder().encode(body)
+        let payload = try encoder.encode(body)
         let data: Data
         if let text = candidateEndpoints().first, let manual = MirrorTransport.parseEndpoint(text) {
             let endpoint = NWEndpoint.hostPort(
