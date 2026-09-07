@@ -1,4 +1,8 @@
-#if !os(iOS)
+// macOS only: swift-corelibs-foundation's `Process` learns of the exit
+// through a socket the child inherits, so on Linux `waitUntilExit` returns
+// only once the backgrounded grandchild lets go of it too (30 s here,
+// CI 2026-09-07) — the file-not-pipe fix is for the Mac's login shell.
+#if os(macOS)
 import XCTest
 @testable import InfinitusCore
 
