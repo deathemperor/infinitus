@@ -34,6 +34,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
 - The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
 - Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
 - Settings › Machine shows on dev builds and stays hidden on releases.
