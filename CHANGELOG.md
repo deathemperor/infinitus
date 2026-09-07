@@ -8,7 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Sessions
-- The browser page draws the timeline rows too — tool groups and folded turns open in place — with the Mac serving every row on `?rows=1` (#223).
+- The browser page draws the timeline rows too — tool groups and folded turns open in place (#223).
 - The phone and the Mac chat window draw the new feed: tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works (#223).
 - Session timelines reduce to feed rows: grouped tool runs, folded turns, one live row while Claude works (#223).
 - Sessions ship a T3-shaped timeline — turns, messages and tool activities with stable ids — next to the flat feed, the base for the new phone and Mac feed (#223).
