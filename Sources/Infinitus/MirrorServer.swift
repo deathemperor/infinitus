@@ -235,6 +235,21 @@ final class MirrorAwsLoginBox: @unchecked Sendable {
     }
 }
 
+/// The `POST /sessions/<pid>/attention` handler (#223 phase 3), boxed
+/// like `sessionInput`: AppModel sets it once, the network queue calls
+/// it. `nil` means "no such pid" (404); the closure resolves the record,
+/// the cached timeline and the attention store itself.
+final class MirrorAttentionBox: @unchecked Sendable {
+    typealias Provider = @Sendable (_ pid: Int32, _ request: SessionAttention.Request) -> SessionAttention.Outcome?
+    private let lock = NSLock()
+    private var provider: Provider?
+    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
+    func call(_ pid: Int32, _ request: SessionAttention.Request) -> SessionAttention.Outcome? {
+        lock.lock(); let current = provider; lock.unlock()
+        return current?(pid, request)
+    }
+}
+
 /// Where `POST /sessions/<pid>/input` deliveries run, one at a time.
 private let mirrorInputQueue = DispatchQueue(label: "run.infinitus.mirror-input", qos: .userInitiated)
 
@@ -427,6 +442,8 @@ final class MirrorServer: ObservableObject {
     /// Answers `POST /sessions/<pid>/input` (#17 layer 2); set by AppModel
     /// once at start.
     let sessionInput = MirrorSessionInputBox()
+    /// Answers `POST /sessions/<pid>/attention` (#223 phase 3); set by AppModel once at start.
+    let attention = MirrorAttentionBox()
     /// Answers `/sessions/<pid>/images/<id>`; set by AppModel once at start.
     let sessionImage = MirrorSessionImageBox()
     let awsLogin = MirrorAwsLoginBox()
@@ -598,6 +615,7 @@ final class MirrorServer: ObservableObject {
         let appUpdate = self.appUpdate
         let accountAction = self.accountAction
         let sessionInput = self.sessionInput
+        let attention = self.attention
         let sessionImage = self.sessionImage
         let activityTokens = self.activityTokens
         let awsLogin = self.awsLogin
@@ -615,7 +633,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -692,6 +710,7 @@ final class MirrorServer: ObservableObject {
                                           token: MirrorTokenBox,
                                           sessionFeed: MirrorSessionFeedBox,
                                           sessionInput: MirrorSessionInputBox,
+                                          attention: MirrorAttentionBox,
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                           team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -701,7 +720,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -712,6 +731,7 @@ final class MirrorServer: ObservableObject {
                                             token: MirrorTokenBox,
                                             sessionFeed: MirrorSessionFeedBox,
                                             sessionInput: MirrorSessionInputBox,
+                                          attention: MirrorAttentionBox,
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                             team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -894,6 +914,36 @@ final class MirrorServer: ObservableObject {
                                         completion: .contentProcessed { _ in connection.cancel() })
                     }
                     return
+                } else if request.method == "POST",
+                          let pid = MirrorTransport.sessionAttentionPid(request.path) {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    guard let decoded = try? decoder.decode(SessionAttention.Request.self, from: request.body) else {
+                        connection.send(content: MirrorTransport.badRequestResponse(),
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                        return
+                    }
+                    // Resolves the record and may parse a transcript tail: off this queue.
+                    DispatchQueue.global(qos: .utility).async {
+                        let encoder = JSONEncoder()
+                        encoder.dateEncodingStrategy = .iso8601
+                        let response: Data
+                        switch attention.call(pid, decoded) {
+                        case .applied(let facts)?:
+                            response = (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse)
+                                ?? MirrorTransport.unavailableResponse()
+                        case .refused(let reason)?:
+                            response = MirrorTransport.conflictResponse(Data(#"{"error":"\#(reason)"}"#.utf8))
+                        case .badRequest?:
+                            response = MirrorTransport.badRequestResponse()
+                        case nil:
+                            response = MirrorTransport.notFoundResponse()
+                        }
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
                 } else if request.path.hasPrefix(TeamMirror.prefix + "/") {
                     // The phone's Team tab (spec §9): TeamModel work runs
                     // on its own queue behind the main actor, so off this
@@ -1017,7 +1067,7 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
