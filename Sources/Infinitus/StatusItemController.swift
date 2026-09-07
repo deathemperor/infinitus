@@ -437,6 +437,10 @@ final class StatusItemController {
     /// (Pin now holds the popover itself); it remains the guaranteed way in
     /// via `open Infinitus.app` -> applicationShouldHandleReopen when the
     /// status item is hidden or the bar refuses it.
+    /// `infinitusctl hide popout` (#223 phase 5's e2e no-lease window):
+    /// the same order-out the wall uses; the window is kept for reuse.
+    func hidePinnedWindow() { pinned?.orderOut(nil) }
+
     func showPinnedWindow(activate: Bool = true) {
         if wall.isVisible { wall.dismissForPopup() }
         if pinned == nil {

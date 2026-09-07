@@ -630,6 +630,16 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
+        case "hide":
+            guard let controller = AppDelegate.shared?.statusHolder?.controller else {
+                throw Fail("no status item yet")
+            }
+            switch r.args.first {
+            case "popout": controller.hidePinnedWindow()
+            default: throw Fail("usage: hide popout")
+            }
+            return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
+
         case "engine":
             guard r.args.count == 2, ["on", "off"].contains(r.args[1]) else {
                 throw Fail("usage: engine cswap|cliproxy|9router on|off")

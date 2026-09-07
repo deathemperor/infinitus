@@ -416,4 +416,19 @@ echo "idle CPU with pop-out open (rpg + ember): ${PCT}%  rss: ${RSS} MB  heap gr
 python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
 [ "$RSS" -le "$RSS_BUDGET_MB" ] || fail "RSS ${RSS} MB over budget ${RSS_BUDGET_MB} MB"
 [ "$GROWTH" -le "$GROWTH_BUDGET_KB_MIN" ] || fail "idle heap growth ${GROWTH} KB/min over budget ${GROWTH_BUDGET_KB_MIN} KB/min"
+
+# --- no lease (#223 phase 5) --------------------------------------------
+# The Mac's own pop-out is a client-activity lease; with it closed and no
+# phone reporting, nothing per-session runs, so idle must match the gate.
+"$CTL" hide popout | expect "d['hidden']=='popout'" || fail "hide popout"
+popout_visible && fail "pop-out still visible for the no-lease window"
+sleep 5
+A="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep "$WINDOW_S"
+B="$("$CTL" perf | json "d['cpuSeconds']")"
+PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
+echo "idle CPU with no lease (pop-out closed, no phone): ${PCT}%  (budget ${IDLE_BUDGET_PCT}%)"
+python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU with no lease ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
+"$CTL" show popout >/dev/null || fail "show popout (restore)"
+popout_visible || fail "pop-out not restored after the no-lease window"
 echo "E2E PASS"
