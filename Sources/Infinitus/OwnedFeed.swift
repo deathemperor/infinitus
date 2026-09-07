@@ -20,7 +20,8 @@ enum OwnedFeed {
         }
         let mark = pending.map(\.requestId).joined(separator: ",")
         return SessionFeed(pid: feed.pid, sessionId: feed.sessionId, cwd: feed.cwd, status: feed.status,
-                           waiting: true, items: items, name: feed.name, stamp: (feed.stamp ?? "") + "+" + mark)
+                           waiting: true, items: items, name: feed.name, stamp: (feed.stamp ?? "") + "+" + mark,
+                           timeline: feed.timeline?.appending(pending: pending))
     }
 
     /// The transcript stamp a client hands back, without our suffix.
