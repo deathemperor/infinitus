@@ -158,6 +158,19 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertNil(MirrorTransport.sessionInputPid("/sessions/x/input"))
     }
 
+    func testSessionAttentionPathRoundTrips() {
+        XCTAssertEqual(MirrorTransport.sessionAttentionPath(pid: 123), "/sessions/123/attention")
+        XCTAssertEqual(MirrorTransport.sessionAttentionPid("/sessions/123/attention"), 123)
+        XCTAssertNil(MirrorTransport.sessionAttentionPid("/sessions/123/input"))
+        XCTAssertNil(MirrorTransport.sessionAttentionPid("/sessions/x/attention"))
+    }
+
+    func testConflictResponseIs409JSON() {
+        let body = Data(#"{"error":"waiting"}"#.utf8)
+        XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.conflictResponse(body)),
+                       MirrorTransport.HTTPResponse(status: 409, body: body))
+    }
+
     func testJsonAndBadRequestResponses() {
         let body = Data(#"{"outcome":"delivered"}"#.utf8)
         let ok = MirrorTransport.parseResponse(MirrorTransport.jsonResponse(body))

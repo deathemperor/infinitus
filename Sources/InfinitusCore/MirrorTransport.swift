@@ -74,6 +74,13 @@ public enum MirrorTransport {
         guard parts.count == 3, parts[0] == "sessions", parts[2] == "input" else { return nil }
         return Int32(parts[1])
     }
+    /// `POST /sessions/<pid>/attention` (#223 phase 3): settle / snooze / pin.
+    public static func sessionAttentionPath(pid: Int32) -> String { "/sessions/\(pid)/attention" }
+    public static func sessionAttentionPid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "attention" else { return nil }
+        return Int32(parts[1])
+    }
     /// Query parameter carrying the item limit for the tail route.
     /// `POST /activities/token` — the phone's Live Activity push tokens
     /// (an `ActivityPushRegistration` body; 204 when stored).
@@ -262,6 +269,12 @@ public enum MirrorTransport {
     /// for now that there's more than one JSON route.
     public static func jsonResponse(_ body: Data) -> Data {
         response(status: 200, reason: "OK", contentType: "application/json", body: body)
+    }
+
+    /// 409 with a JSON body — a command the session's state refuses
+    /// (`SessionAttention.Outcome.refused`).
+    public static func conflictResponse(_ body: Data) -> Data {
+        response(status: 409, reason: "Conflict", contentType: "application/json", body: body)
     }
 
     /// An image body (`/sessions/<pid>/images/<id>`); a thumbnail never
