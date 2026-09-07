@@ -384,6 +384,35 @@ final class SessionFeedLongPollTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 0.45)
     }
 
+    /// An owned session's parked prompt lives in memory (#151): the
+    /// decorated stamp makes it a change, and the actor's broadcast ends
+    /// the wait at once instead of on the next poll.
+    func testDecoratedStateCountsAsAChangeAndAWakeCutsThePollShort() {
+        let stamp = SessionFeedReader.stamp(record: record, claudeDir: dir)!
+        let wake = NSCondition()
+        let mark = Mark()
+        let start = Date()
+        SessionFeedReader.waitForChange(pid: pid, claudeDir: dir, since: stamp, wait: 5, poll: 5,
+                                        decorate: { $0 + "+a" }, wake: wake)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.5, "a prompt parked since the client's stamp: no wait")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.15) {
+            mark.value = "+b"
+            wake.lock(); wake.broadcast(); wake.unlock()
+        }
+        SessionFeedReader.waitForChange(pid: pid, claudeDir: dir, since: stamp + "+a", wait: 5, poll: 5,
+                                        decorate: { $0 + mark.value }, wake: wake)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 2, "woken well before the 5 s poll")
+    }
+
+    private final class Mark: @unchecked Sendable {
+        private let lock = NSLock()
+        private var v = "+a"
+        var value: String {
+            get { lock.lock(); defer { lock.unlock() }; return v }
+            set { lock.lock(); v = newValue; lock.unlock() }
+        }
+    }
+
     func testWakesWhenTheTranscriptGrows() throws {
         let stamp = SessionFeedReader.stamp(record: record, claudeDir: dir)
         let url = Transcript.path(cwd: "/p", sessionId: "s1", claudeDir: dir)

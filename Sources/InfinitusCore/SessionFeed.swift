@@ -209,15 +209,28 @@ public enum SessionFeedReader {
     /// actor or a network queue — until the session's stamp differs from
     /// `since` or `wait` seconds (capped at `MirrorTransport.tailWaitMax`)
     /// pass, re-resolving the record each poll so a status flip counts.
-    /// Returns at once when there is nothing to wait for.
+    /// Returns at once when there is nothing to wait for. `decorate`
+    /// folds in-memory state into the disk stamp (an owned session's
+    /// parked prompts, #151) so it counts as a change too; `wake` is
+    /// broadcast by whoever owns that state, cutting the poll short.
     public static func waitForChange(pid: Int32, claudeDir: URL, since: String?,
-                                     wait: TimeInterval, poll: TimeInterval = 0.3) {
+                                     wait: TimeInterval, poll: TimeInterval = 0.3,
+                                     decorate: (String) -> String = { $0 },
+                                     wake: NSCondition? = nil) {
         guard let since, wait > 0 else { return }
         let deadline = Date().addingTimeInterval(min(wait, MirrorTransport.tailWaitMax))
         while Date() < deadline {
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                  stamp(record: record, claudeDir: claudeDir) == since else { return }
-            Thread.sleep(forTimeInterval: poll)
+                  stamp(record: record, claudeDir: claudeDir).map(decorate) == since else { return }
+            if let wake {
+                // A broadcast between the check above and this wait is
+                // lost, and costs one poll — the disk poll runs regardless.
+                wake.lock()
+                wake.wait(until: min(Date().addingTimeInterval(poll), deadline))
+                wake.unlock()
+            } else {
+                Thread.sleep(forTimeInterval: poll)
+            }
         }
     }
 

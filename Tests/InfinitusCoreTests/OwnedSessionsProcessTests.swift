@@ -106,6 +106,30 @@ final class OwnedSessionsProcessTests: XCTestCase {
         await owned.stopAll()
     }
 
+    /// The long-poll's wake (#151 follow-up): every transition and every
+    /// parked prompt broadcasts on `wake`, so a waiter blocked on it
+    /// returns at once.
+    func testATransitionBroadcastsTheWakeCondition() async throws {
+        let (owned, _) = try await make()
+        let reply = await owned.start(request())
+        let pid = Int32(reply.pid!)
+        waitFor("idle") { owned.registry[pid]?.state == .idle }
+        let woke = expectation(description: "woken")
+        let started = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            owned.wake.lock()
+            started.signal()
+            let ok = owned.wake.wait(until: Date().addingTimeInterval(5))
+            owned.wake.unlock()
+            if ok { woke.fulfill() }
+        }
+        started.wait()
+        XCTAssertTrue(owned.send(pid: pid, text: "go"))   // idle → busy, then the fake parks a can_use_tool
+        await fulfillment(of: [woke], timeout: 5)
+        waitFor("parked") { !owned.pending(pid: pid).isEmpty }
+        await owned.stop(pid: pid)
+    }
+
     func testSendMarksBusyAndInterruptGoesAsAControlRequest() async throws {
         let (owned, states) = try await make()
         let pid = Int32(await owned.start(request()).pid!)

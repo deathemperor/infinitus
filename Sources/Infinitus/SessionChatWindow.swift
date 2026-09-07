@@ -99,10 +99,12 @@ final class SessionChatStore: ObservableObject {
             while !Task.isCancelled {
                 let claudeDir = ClaudeSessions.configHome()
                 // An owned session's prompts live in memory, not the
-                // transcript: poll short so they show (OwnedFeed).
+                // transcript: they ride the stamp, and its actor wakes
+                // this wait the moment one parks (OwnedFeed).
                 let owned = box?.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
-                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: OwnedFeed.transcriptStamp(since),
-                                                wait: owned == nil ? MirrorTransport.tailWaitMax : OwnedFeed.ownedWait)
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax,
+                                                decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp },
+                                                wake: owned?.wake)
                 if Task.isCancelled { return }
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else {
                     await MainActor.run { self?.gone = true }

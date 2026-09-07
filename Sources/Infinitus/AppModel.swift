@@ -1474,8 +1474,9 @@ final class AppModel: ObservableObject {
         mirrorServer.sessionFeed.set { pid, limit, since, wait, rows in
             let claudeDir = ClaudeSessions.configHome()
             let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
-            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: OwnedFeed.transcriptStamp(since),
-                                            wait: owned == nil ? wait : min(wait, OwnedFeed.ownedWait))
+            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait,
+                                            decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp },
+                                            wake: owned?.wake)
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
             else { return nil }
             guard var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
@@ -1539,11 +1540,13 @@ final class AppModel: ObservableObject {
             // Rebuilt first, so a change since the client's last reply
             // answers at once; the long-poll only when THIS pid has
             // nothing after the cursor (a gap snapshots without waiting).
-            // Same wait rule as /tail: the record stamp, owned pids capped.
+            // Same wait rule as /tail: the record stamp, an owned pid's
+            // parked prompts folded in and its actor's wake-up.
             if wait > 0, let after, sequenceLog.events(pid: pid, after: after)?.isEmpty == true {
+                let decorate = { (stamp: String) in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp }
                 SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
-                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir),
-                                                wait: owned == nil ? wait : min(wait, OwnedFeed.ownedWait))
+                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir).map(decorate),
+                                                wait: wait, decorate: decorate, wake: owned?.wake)
                 if let fresh = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
                    let rebuilt = timelineCache.timeline(record: fresh, claudeDir: claudeDir) {
                     record = fresh; timeline = rebuilt

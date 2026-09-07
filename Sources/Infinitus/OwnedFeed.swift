@@ -18,19 +18,15 @@ enum OwnedFeed {
                                              at: p.receivedAt, toolName: p.toolName))
             }
         }
-        let mark = pending.map(\.requestId).joined(separator: ",")
         return SessionFeed(pid: feed.pid, sessionId: feed.sessionId, cwd: feed.cwd, status: feed.status,
-                           waiting: true, items: items, name: feed.name, stamp: (feed.stamp ?? "") + "+" + mark,
+                           waiting: true, items: items, name: feed.name, stamp: decorate(feed.stamp ?? "", pending: pending),
                            timeline: feed.timeline?.appending(pending: pending))
     }
 
-    /// The transcript stamp a client hands back, without our suffix.
-    static func transcriptStamp(_ since: String?) -> String? {
-        guard let since, let plus = since.firstIndex(of: "+") else { return since }
-        return String(since[..<plus])
+    /// The disk stamp plus the parked prompts, so a prompt parking or
+    /// being answered counts as a change for `waitForChange` — the same
+    /// string `augment` hands the client back as the feed's stamp.
+    static func decorate(_ stamp: String, pending: [PendingRequest]) -> String {
+        pending.isEmpty ? stamp : stamp + "+" + pending.map(\.requestId).joined(separator: ",")
     }
-
-    /// A parked prompt changes nothing on disk, so an owned session's
-    /// long-poll is capped: the prompt shows within this many seconds.
-    static let ownedWait: TimeInterval = 2
 }

@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 
 ### Sessions
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.
+- A headless session's permission prompt reaches the phone, the browser page and the Mac window the moment it parks, instead of up to two seconds later (#151).
 - Clicking a session row in the popup's footer sessions card opens its chat window again, with past sessions and the driving line, like the rail's card.
 - A "needs AWS login" line met by a login that finished before the Mac app relaunched no longer comes back as unmet after the relaunch.
 - The Mac popup's session rows take their dot and word from the same facts as the phone — a raised hand for an approval, a question mark for a prompt, snoozed and settled rows dimmed (#223).

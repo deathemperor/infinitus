@@ -91,6 +91,11 @@ public actor OwnedSessions {
     }
 
     nonisolated let registry = Registry()
+    /// Broadcast on every parked prompt and state transition, so a
+    /// long-poll on an owned pid (`SessionFeedReader.waitForChange`)
+    /// wakes at once instead of on its next disk poll — the prompt shows
+    /// the moment it parks, not up to two seconds later.
+    public nonisolated let wake = NSCondition()
     private let binaryPath: String
     private let onState: @Sendable (Int32, State) -> Void
     private var processes: [Int32: Process] = [:]
@@ -104,6 +109,16 @@ public actor OwnedSessions {
 
     /// Pids of the children alive right now — the session card's "owned" tell.
     public nonisolated var ownedPids: Set<Int32> { registry.pids }
+
+    /// A transition (or a parked prompt) to the app and to every waiter.
+    private nonisolated func publish(_ pid: Int32, _ state: State) {
+        onState(pid, state)
+        poke()
+    }
+
+    private nonisolated func poke() {
+        wake.lock(); wake.broadcast(); wake.unlock()
+    }
 
     // MARK: lifecycle
 
@@ -151,10 +166,9 @@ public actor OwnedSessions {
         registry.add(child)
         processes[child.pid] = p
         attach(stdout.fileHandleForReading, to: child)
-        let onState = self.onState
         p.terminationHandler = { [weak self, registry] _ in
             stdout.fileHandleForReading.readabilityHandler = nil
-            if child.set(.exited) { onState(child.pid, .exited) }
+            if child.set(.exited) { self?.publish(child.pid, .exited) }
             child.closeStdin()
             registry.remove(child.pid)
             Task { [weak self] in await self?.forget(child.pid) }
@@ -176,22 +190,23 @@ public actor OwnedSessions {
     /// The pipe reader: lines to states, prompts to the parked list.
     /// Nothing is published per line — `onState` fires on transitions.
     private nonisolated func attach(_ handle: FileHandle, to child: Child) {
-        let onState = self.onState
         let buffer = LineBuffer()
-        handle.readabilityHandler = { h in
+        handle.readabilityHandler = { [weak self] h in
             let chunk = h.availableData
             guard !chunk.isEmpty else { h.readabilityHandler = nil; return }
             for line in buffer.feed(chunk) {
                 switch OwnedWire.decode(line: line) {
                 case .initialized(let sid, _):
                     child.sessionId = sid
-                    if !child.turnOpen, child.set(.idle) { onState(child.pid, .idle) }
+                    if !child.turnOpen, child.set(.idle) { self?.publish(child.pid, .idle) }
                 case .canUseTool(let pending):
                     child.park(pending)
-                    if child.set(.waiting) { onState(child.pid, .waiting) }
+                    // A second prompt parks under an unchanged state:
+                    // waiters still need to hear about it.
+                    if child.set(.waiting) { self?.publish(child.pid, .waiting) } else { self?.poke() }
                 case .result:
                     child.turnOpen = false
-                    if child.set(child.pending.isEmpty ? .idle : .waiting) { onState(child.pid, child.state) }
+                    if child.set(child.pending.isEmpty ? .idle : .waiting) { self?.publish(child.pid, child.state) }
                 case .controlResponse, .other:
                     break
                 }
@@ -245,7 +260,7 @@ public actor OwnedSessions {
     public nonisolated func send(pid: Int32, text: String) -> Bool {
         guard let child = registry[pid], child.write(OwnedWire.userLine(text)) else { return false }
         child.turnOpen = true
-        if child.set(.busy) { onState(pid, .busy) }
+        if child.set(.busy) { publish(pid, .busy) }
         return true
     }
 
@@ -267,7 +282,8 @@ public actor OwnedSessions {
     public nonisolated func answer(pid: Int32, requestId: String, decision: OwnedWire.Decision) -> Bool {
         guard let child = registry[pid], let pending = child.take(requestId: requestId) else { return false }
         guard child.write(OwnedWire.answerLine(pending, decision)) else { return false }
-        if child.pending.isEmpty, child.set(.busy) { onState(pid, .busy) }
+        // The answered prompt leaves the parked list either way.
+        if child.pending.isEmpty, child.set(.busy) { publish(pid, .busy) } else { poke() }
         return true
     }
 
