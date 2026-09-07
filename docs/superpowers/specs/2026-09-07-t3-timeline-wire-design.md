@@ -221,7 +221,11 @@ public struct SessionFacts: Codable, Sendable, Equatable {
 }
 ```
 
-`SessionDetail.facts: SessionFacts?` (additive, `Models.swift`). `status`
+Facts ride the snapshot as `MirrorSnapshot.factsByPid: [Int: SessionFacts]?`
+(additive, `FleetMirror.swift`), the app-owned per-pid sibling of
+`progressByPid` — not `SessionDetail`, which is decoded verbatim from the
+engine's list output and can't carry app fields (amended 2026-09-07 while
+planning P2). `status`
 maps the record: `busy → running`, `waiting → running` with a pending
 request, `idle → ready` after a completed turn else `idle`, exited → `stopped`.
 
