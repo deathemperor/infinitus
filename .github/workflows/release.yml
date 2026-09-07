@@ -105,6 +105,19 @@ jobs:
           grep -q '^  binary ' Casks/infinitus.rb || perl -0pi -e \
             's|^  app "Infinitus.app"\n|  app "Infinitus.app"\n  binary "#{appdir}/Infinitus.app/Contents/MacOS/infinitusctl"\n|m' \
             Casks/infinitus.rb
+          # The caveats follow the build: a Developer ID + notarized
+          # release needs no Gatekeeper workaround, an ad-hoc one (no
+          # signing secrets) keeps it. Rewritten whole every release so
+          # the cask can't drift — 0.4.3 and 0.4.4-alpha.1 shipped
+          # notarized while the cask still said "ad-hoc, not notarized".
+          if [ "$HAS_DEVID" = "true" ]; then
+            GATE=""
+          else
+            GATE=$'Builds are ad-hoc signed, not notarized. If Gatekeeper refuses the\nfirst launch:\n  xattr -dr com.apple.quarantine "/Applications/Infinitus.app"\nor install with --no-quarantine.\n\n'
+          fi
+          CAVEATS="${GATE}The app drives the claude-swap engine:"$'\n'"  uv tool install claude-swap   (or pipx install claude-swap)" \
+            perl -0pi -e 's|^  caveats <<~EOS\n.*?^  EOS\n|"  caveats <<~EOS\n" . join("", map { $_ eq "" ? "\n" : "    $_\n" } split(/\n/, $ENV{CAVEATS})) . "  EOS\n"|mse' \
+            Casks/infinitus.rb
           git -c user.name="infinitus-release" \
               -c user.email="actions@github.com" \
               commit -am "infinitus ${VERSION}"
