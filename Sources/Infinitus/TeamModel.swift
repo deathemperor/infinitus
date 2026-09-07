@@ -1018,7 +1018,8 @@ final class TeamModel: ObservableObject {
     func leave() async {
         await action("Leaving…") { paths, secrets in
             guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
-            _ = try? client.fetch()
+            // Withdrawing a pending request must not first pull every branch (#321).
+            _ = try? client.fetch(branches: client.isMember ? nil : TeamClient.joinBranches)
             try client.leave()
             secrets.delete(TeamClient.tokenName(client.config.id))
             try FileManager.default.removeItem(at: paths.teamDir(client.config.id))
