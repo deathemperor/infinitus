@@ -26,7 +26,7 @@ private func controlFail(_ message: String, code: Int32 = 1) -> Int32 {
 
 /// nil when `args` is not one of ours.
 func runTeamControl(_ args: [String]) -> Int32? {
-    guard let sub = args.first, ["grant", "revoke", "grants", "send", "approve", "mode", "tail", "acks"].contains(sub) else { return nil }
+    guard let sub = args.first, ["grant", "revoke", "grants", "send", "approve", "mode", "tail", "acks", "hostname"].contains(sub) else { return nil }
     let capabilityFlags: Set<String> = [TeamGrants.view, TeamGrants.send, TeamGrants.approve, TeamGrants.mode, TeamGrants.resume, TeamGrants.key]
     var positional: [String] = []
     var options: [String: String] = [:]
@@ -141,6 +141,44 @@ func runTeamControl(_ args: [String]) -> Int32? {
                 .sorted { $0.at > $1.at }
             _ = try TeamControl.Store.driverReap(client: client, acks: reader.ackIDs)
             emit(rows)
+        case "hostname":
+            // §5.4 / §7.3: the leader's Cloudflare token on stdin once, then a hostname per member.
+            func cloudflare() throws -> TeamHostnames.Cloudflare {
+                guard let data = secrets.read(TeamHostnames.secretName), let token = String(data: data, encoding: .utf8) else {
+                    throw TeamHostnames.HostnameError.notConfigured
+                }
+                return .init(token: token, http: controlHTTP)
+            }
+            switch positional.first ?? "" {
+            case "token":
+                guard positional.count >= 2 else {
+                    return controlFail("usage: infinitusctl team hostname token <zone> [--label team]   # Cloudflare API token on stdin", code: 2)
+                }
+                let token = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !token.isEmpty else { return controlFail("no token on stdin", code: 2) }
+                var ledger = try TeamHostnames.ledger(zone: positional[1], label: options["label"] ?? TeamHostnames.defaultLabel, teamDir: teamDir)
+                let ids = try TeamHostnames.Cloudflare(token: token, http: controlHTTP).ids(ledger: &ledger)
+                try secrets.write(TeamHostnames.secretName, Data(token.utf8))
+                try ledger.save(teamDir: teamDir)
+                emit(["zone": ledger.zone, "label": ledger.label, "account": ids.account, "zoneID": ids.zone])
+            case "give":
+                guard positional.count >= 2 else { return controlFail("usage: infinitusctl team hostname give <kid>", code: 2) }
+                guard var ledger = TeamHostnames.Ledger.load(teamDir: teamDir) else { throw TeamHostnames.HostnameError.notConfigured }
+                _ = try client.fetch()
+                let record = try TeamHostnames.give(client: client, kid: positional[1], cloudflare: try cloudflare(), ledger: &ledger)
+                try ledger.save(teamDir: teamDir)
+                emit(["kid": positional[1], "hostname": record.hostname])
+            case "list":
+                struct Row: Encodable { var kid: String; var name: String?; var hostname: String; var at: Int; var orphaned: Bool }
+                let roster = client.roster?.doc
+                let rows = (TeamHostnames.Ledger.load(teamDir: teamDir)?.records ?? [:]).map { kid, r in
+                    Row(kid: kid, name: roster?.everyone.first { $0.keys.kid == kid }?.name, hostname: r.hostname, at: r.at,
+                        orphaned: roster?.keys(for: kid) == nil)
+                }
+                emit(rows.sorted { $0.hostname < $1.hostname })
+            default:
+                return controlFail("usage: infinitusctl team hostname <token <zone> [--label team] | give <kid> | list>", code: 2)
+            }
         default:
             emit(grants)
         }
@@ -151,7 +189,7 @@ func runTeamControl(_ args: [String]) -> Int32? {
 }
 
 /// One exchange with a grantor's endpoint; the lane's timeout caps it.
-private let controlHTTP: TeamControl.Deliver.HTTP = { method, url, headers, body, timeout in
+let controlHTTP: TeamControl.Deliver.HTTP = { method, url, headers, body, timeout in
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.httpBody = body

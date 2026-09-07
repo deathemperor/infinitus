@@ -144,6 +144,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Your team identity** — a local key behind Touch ID, a recovery key, a passphrase-sealed export.
 - **Team session control (preview)** — grant teammates the right to read, prompt, approve, switch modes or nudge chosen sessions on your Mac; every command is verified against the roster and the grant, audited, and shown as "<name> is driving" while it happens.
 - **Drive a granted session** — from a teammate's detail on the Mac or `infinitusctl team send|approve|mode|tail`; commands try LAN, then a tunnel, then wait in the team store for their next fetch, and each one reports its lane and outcome.
+- **Stable hostnames per member** — a leader with a Cloudflare API token mints `<name>.team.<zone>` for a member (Settings › Team › Hostnames or `infinitusctl team hostname give`); the tunnel token travels sealed in the team store, the member's Mac runs the tunnel, and removing them deletes the records.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
 - **Start on any Mac** — the "+" sheet, Past sessions and Siri's Start a session pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.

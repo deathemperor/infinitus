@@ -10,13 +10,16 @@ extension TeamControl {
     public struct Handled: Codable, Equatable, Sendable {
         public var versions: [String: String] = [:]
         public init() {}
-        public static func file(teamDir: URL) -> URL { teamDir.appendingPathComponent("control-handled.json") }
-        public static func load(teamDir: URL) -> Handled {
-            (try? Data(contentsOf: file(teamDir: teamDir))).flatMap { try? JSONDecoder().decode(Handled.self, from: $0) } ?? Handled()
+        public static let commandsFile = "control-handled.json"
+        /// The member side of §5.4: which `hostname` blobs this Mac applied.
+        public static let hostnamesFile = "control-hostname.json"
+        public static func file(teamDir: URL, name: String = commandsFile) -> URL { teamDir.appendingPathComponent(name) }
+        public static func load(teamDir: URL, name: String = commandsFile) -> Handled {
+            (try? Data(contentsOf: file(teamDir: teamDir, name: name))).flatMap { try? JSONDecoder().decode(Handled.self, from: $0) } ?? Handled()
         }
-        public func save(teamDir: URL) throws {
+        public func save(teamDir: URL, name: String = commandsFile) throws {
             try FileManager.default.createDirectory(at: teamDir, withIntermediateDirectories: true)
-            try JSONEncoder().encode(self).write(to: Self.file(teamDir: teamDir), options: .atomic)
+            try JSONEncoder().encode(self).write(to: Self.file(teamDir: teamDir, name: name), options: .atomic)
         }
         public func contains(_ entry: StoreEntry) -> Bool { versions[entry.path] == entry.version }
         public mutating func mark(_ entry: StoreEntry) { versions[entry.path] = entry.version }
@@ -52,10 +55,11 @@ extension TeamControl {
 
         /// The driver deletes its own commands once acked, or once too old
         /// for any grantor to accept. Returns how many went.
-        public static func driverReap(client: TeamClient, acks: Set<String>, now: Int = Int(Date().timeIntervalSince1970)) throws -> Int {
+        public static func driverReap(client: TeamClient, acks: Set<String>, headers: [TeamClient.ReadableHeader]? = nil,
+                                      now: Int = Int(Date().timeIntervalSince1970)) throws -> Int {
             let me = client.identity.kid
             var gone = 0
-            for (entry, header) in try client.readableHeaders() where header.kind == TeamKinds.command && header.from == me {
+            for (entry, header) in try headers ?? client.readableHeaders() where header.kind == TeamKinds.command && header.from == me {
                 let id = URL(fileURLWithPath: entry.path).deletingPathExtension().lastPathComponent
                 guard acks.contains(id) || header.at + storeTTL + maxFutureSkew < now else { continue }
                 try client.unpublish(path: String(entry.path.dropFirst("m/\(me)/".count)))

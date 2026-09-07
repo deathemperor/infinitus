@@ -35,6 +35,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
 - The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
 - Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
 - Settings › Machine shows on dev builds and stays hidden on releases.
@@ -67,6 +68,7 @@ publishes the matching section as the GitHub release body.
 - A phone showing the revival countdown skips the duplicate all-dead alert, and a working activity starts silently.
 
 ### Team (preview)
+- A leader can give each member a stable hostname — a Cloudflare named tunnel under the team's zone, minted from Settings › Team or `infinitusctl team hostname give`, started by their Mac on its next fetch (#220).
 - Team session control, driver side: drive a teammate's granted session from their detail on the Mac or with `infinitusctl team send|approve|mode|tail` — over LAN, a tunnel, or the store on their next fetch, each command answered with its lane and outcome (#220).
 - Team session control on the Mac, grantor side: grant teammates view, send, approve, mode, resume or key on chosen sessions from Settings › Team or `infinitusctl team grant`; commands arrive at the mirror server, every one is audited, and the sessions popover says who is driving (#220).
 - Team session control, core: grants, sealed command and ack envelopes, the verification pipeline and the control routes land in InfinitusCore with tests; nothing is mounted yet (#220).

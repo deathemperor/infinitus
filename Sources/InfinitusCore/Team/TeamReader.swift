@@ -109,9 +109,10 @@ public struct TeamReader {
         Int(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent) ?? 0
     }
 
-    public static func load(client: TeamClient) throws -> TeamReader {
+    /// `headers`: a scan the caller already ran this tick (one per `load()`), else a fresh one.
+    public static func load(client: TeamClient, headers: [TeamClient.ReadableHeader]? = nil) throws -> TeamReader {
         guard let roster = client.roster?.doc else { throw TeamClient.ClientError.noRoster }
-        return fold(headers: try client.readableHeaders(), roster: roster) { try client.read($0).1 }
+        return fold(headers: try headers ?? client.readableHeaders(), roster: roster) { try client.read($0).1 }
     }
 
     /// One member's period summary in the app's own shape (`Stats.fold`).

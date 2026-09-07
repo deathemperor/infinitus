@@ -62,6 +62,9 @@ struct TeamPane: View {
     @State private var showExport = false
     @State private var showImport = false
     @State private var showGrant = false
+    @State private var cfZone = ""
+    @State private var cfLabel = TeamHostnames.defaultLabel
+    @State private var cfToken = ""
 
     private var gateOpen: Bool { if case .allowed = team.gate() { return true } else { return false } }
 
@@ -233,6 +236,7 @@ struct TeamPane: View {
             if snap.role == "leader", let policy = team.policy { policySection(policy) }
             sharingSection(snap)
             controlSection(snap)
+            if snap.role == "leader" { hostnamesSection(snap) }
             exclusionsSection
             Section("Privacy") {
                 Text("You publish \(sharedKinds()) to the audiences above; everything is encrypted to them before it leaves this Mac. The store host sees file names and sizes only.")
@@ -399,6 +403,58 @@ struct TeamPane: View {
                     }
                 }
             }
+        }
+    }
+
+    /// §5.4: the leader's Cloudflare token (a secret, never shown back), a
+    /// hostname per member under `<label>.<zone>`, orphans deletable.
+    private func hostnamesSection(_ snap: TeamSnapshot) -> some View {
+        Section("Hostnames") {
+            if team.cloudflareConfigured, let ledger = team.hostnames {
+                HStack {
+                    Text("Cloudflare zone \(ledger.zone) · label \(ledger.label)")
+                    Spacer()
+                    Button("Forget token") { Task { await team.forgetCloudflare() } }.controlSize(.small)
+                }
+                ForEach(snap.members) { m in
+                    HStack {
+                        Text(m.name)
+                        Spacer()
+                        if let host = team.hostname(of: m.kid) {
+                            Text(host).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        } else {
+                            Button("Give hostname") { Task { await team.giveHostname(kid: m.kid) } }.controlSize(.small)
+                        }
+                    }
+                }
+                let orphans = team.roster.map { ledger.orphans(roster: $0.doc) } ?? []
+                if !orphans.isEmpty {
+                    Text("Orphaned").font(.caption).foregroundStyle(.secondary)
+                    ForEach(orphans, id: \.kid) { o in
+                        HStack {
+                            Text(o.record.hostname).font(.caption)
+                            Spacer()
+                            Button("Delete", role: .destructive) { Task { await team.deleteHostname(kid: o.kid) } }.controlSize(.small)
+                        }
+                    }
+                }
+            } else {
+                TextField("Zone", text: $cfZone, prompt: Text("example.com"))
+                TextField("Label", text: $cfLabel, prompt: Text(TeamHostnames.defaultLabel))
+                SecureField("Cloudflare API token", text: $cfToken, prompt: Text("Account: Cloudflare Tunnel Edit · Zone: DNS Edit"))
+                Button("Save") {
+                    let token = cfToken
+                    cfToken = ""
+                    Task { await team.saveCloudflare(zone: cfZone, label: cfLabel, token: token) }
+                }
+                .disabled(cfZone.isEmpty || cfLabel.isEmpty || cfToken.isEmpty)
+                if let count = team.hostnames?.records.count, count > 0 {
+                    Text("\(count) hostname\(count == 1 ? "" : "s") minted earlier; paste the token again to manage them.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Text("A hostname is a Cloudflare named tunnel under your zone (`<name>.<label>.<zone>`), minted per member; their Mac starts it on the next fetch and keeps the same address across restarts.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 

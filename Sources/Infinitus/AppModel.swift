@@ -1235,6 +1235,22 @@ final class AppModel: ObservableObject {
             Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
         }
         team.onLoaded = { [weak self] in self?.mirrorServer.refreshTeamControl() }
+        // #220 §5.4: a leader's hostname for this Mac — token to the keychain,
+        // the named tunnel on. The LAN listener is the user's switch, not ours.
+        team.onHostname = { [weak self] hostname, from in
+            guard let self else { return }
+            let host = NamedTunnel.normalizeHostname(hostname.hostname)
+            guard !host.isEmpty else { return }
+            // A re-give mints a fresh token for the same host: the running
+            // cloudflared holds the old one, so it restarts below.
+            if namedTunnel.isRunning, namedTunnel.hostname == host { namedTunnel.stop() }
+            NamedTunnel.setToken(hostname.token, for: host)
+            mirrorNamedTunnelHost = host
+            mirrorNamedTunnelEnabled = true
+            let who = team.snapshot?.members.first { $0.kid == from }?.name ?? String(from.prefix(8))
+            let hint = mirrorLANEnabled ? "" : " — turn on the LAN listener to run it"
+            logEvent("team", icon: "network", "\(who) gave this Mac the hostname \(host)\(hint)")
+        }
         // Team session control (#220): the phone's delivery path, origin
         // "team". Wired here, not in applyMirrorLAN — the store lane runs
         // with the LAN listener off.

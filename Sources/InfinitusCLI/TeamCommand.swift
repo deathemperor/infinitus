@@ -45,6 +45,9 @@ func teamUsage() -> String {
       mode <kid> <sessionId> <supervised|acceptEdits|bypassPermissions>
       tail <kid> <sessionId> [--follow]            their session's feed (needs the view grant; --follow polls every 3 s)
       acks                                         answers to my store-lane commands (and forgets the answered ones)
+      hostname token <zone> [--label team]         leader: the Cloudflare API token on stdin (Tunnel Edit + DNS Edit on that zone)
+      hostname give <kid>                          leader: mint <name>.<label>.<zone> for a member; their Mac starts it next fetch
+      hostname list                                the hostnames minted from this machine
 
     Narrowing an audience cannot recall ciphertext teammates already fetched.
 
@@ -235,7 +238,14 @@ func runTeam(_ args: [String]) -> Int32 {
             else { FileHandle.standardOutput.write(plain) }
         case "remove":
             guard let kid = positional.first else { return fail(teamUsage(), code: 2) }
-            let c = try client(); _ = try c.fetch(); try c.remove(kid: kid); emit(try c.status())
+            let c = try client(); _ = try c.fetch(); try c.remove(kid: kid)
+            if var ledger = TeamHostnames.Ledger.load(teamDir: c.teamDir) {
+                let cf = secrets.read(TeamHostnames.secretName).flatMap { String(data: $0, encoding: .utf8) }
+                    .map { TeamHostnames.Cloudflare(token: $0, http: controlHTTP) }
+                _ = try TeamHostnames.forget(client: c, kid: kid, cloudflare: cf, ledger: &ledger)
+                try ledger.save(teamDir: c.teamDir)
+            }
+            emit(try c.status())
         case "promote":
             guard let kid = positional.first else { return fail(teamUsage(), code: 2) }
             let c = try client(); _ = try c.fetch(); try c.promote(kid: kid); emit(try c.status())
