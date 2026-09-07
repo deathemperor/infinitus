@@ -48,8 +48,11 @@ public final class TimelineCache: @unchecked Sendable {
 
     /// Facts for every record, owned sessions' parked prompts appended
     /// per call (never cached: they arrive over stdin, not the
-    /// transcript). Sessions absent from `records` are evicted.
+    /// transcript). Sessions absent from `roster` (default: `records`)
+    /// have left and are evicted; a leased subset (#223 phase 5) passes
+    /// the full roster so the others keep their slots and rings.
     public func facts(records: [ClaudeSessionRecord], claudeDir: URL, attention: AttentionStore,
+                      roster: [ClaudeSessionRecord]? = nil,
                       pending: (Int32) -> [PendingRequest]) -> [Int: SessionFacts] {
         var out: [Int: SessionFacts] = [:]
         for record in records where !record.sessionId.isEmpty {
@@ -60,7 +63,7 @@ public final class TimelineCache: @unchecked Sendable {
             out[Int(record.pid)] = facts
             _ = log?.record(pid: record.pid, facts: facts)
         }
-        let keep = Set(records.map(\.sessionId))
+        let keep = Set((roster ?? records).map(\.sessionId))
         lock.lock()
         let gone = slots.filter { !keep.contains($0.key) }
         slots = slots.filter { keep.contains($0.key) }

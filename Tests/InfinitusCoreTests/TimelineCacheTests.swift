@@ -106,4 +106,24 @@ final class TimelineCacheTests: XCTestCase {
         XCTAssertNil(log.events(pid: 41, after: 0))
         XCTAssertEqual(log.events(pid: 41, after: before)?.map(\.entity), [.turn, .message, .message])
     }
+
+    func testFactsForASubsetKeepsTheRosterCached() throws {
+        // Lease gating (#223 phase 5) computes facts for a subset; the
+        // other sessions are still on the roster, so their slots and
+        // rings stay — eviction is for sessions that LEFT.
+        _ = try write([prompt], sessionId: "s1")
+        _ = try write([prompt, reply], sessionId: "s2", cwd: "/Users/me/other")
+        let r1 = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")
+        let r2 = ClaudeSessionRecord(pid: 42, sessionId: "s2", cwd: "/Users/me/other", status: "idle")
+        let log = SequenceLog(epoch: "e1")
+        let cache = TimelineCache(log: log)
+        let store = AttentionStore(url: root.appendingPathComponent("attention.json"))
+        _ = cache.facts(records: [r1, r2], claudeDir: root, attention: store) { _ in [] }
+        let parsed = cache.parses
+        let facts = cache.facts(records: [r1], claudeDir: root, attention: store, roster: [r1, r2]) { _ in [] }
+        XCTAssertEqual(Array(facts.keys), [41])
+        XCTAssertNotNil(log.events(pid: 42, after: 0))
+        _ = cache.timeline(record: r2, claudeDir: root)
+        XCTAssertEqual(cache.parses, parsed)
+    }
 }
