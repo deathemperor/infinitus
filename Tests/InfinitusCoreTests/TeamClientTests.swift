@@ -21,6 +21,18 @@ final class TeamClientTests: XCTestCase {
     }
 
     /// One "machine": its own paths and secrets.
+    /// `refs/remotes/origin/*` of a store dir, sorted.
+    func remoteBranches(in storeDir: URL) -> [String] {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        p.arguments = ["git", "--git-dir", storeDir.appendingPathComponent("store.git").path,
+                       "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"]
+        let out = Pipe(); p.standardOutput = out
+        try? p.run(); p.waitUntilExit()
+        return String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .split(separator: "\n").map(String.init).sorted()
+    }
+
     func machine(_ name: String) -> (TeamPaths, FileSecrets) {
         let paths = TeamPaths(base: scratch.appendingPathComponent(name))
         return (paths, FileSecrets(dir: paths.secretsDir))
@@ -90,6 +102,9 @@ final class TeamClientTests: XCTestCase {
         let member = try TeamClient.request(code: code, name: "Bo", devices: ["Mac"], platform: "macos",
                                             paths: mp, secrets: ms, now: 1_010)
         XCTAssertFalse(member.isMember)
+        // The request fetched roster and requests only — not the leader's
+        // branch, which carries the transcripts (#321).
+        XCTAssertEqual(remoteBranches(in: mp.storeDir(leader.config.id)), ["origin/requests", "origin/roster"])
         XCTAssertEqual(try member.status().role, "pending")
         XCTAssertEqual(member.config.leaderKid, leader.identity.kid)
         XCTAssertThrowsError(try member.code()) { XCTAssertEqual($0 as? TeamClient.ClientError, .notALeader) }

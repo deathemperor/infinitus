@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Team
+- Requesting to join fetches only the roster and the requests, not every member's transcript history — a join that pulled 1.3 GB now moves kilobytes (#321).
 - A slow store never looks hung: Team shows git's own progress, a stalled fetch or push times out with a message, and Approve no longer waits behind a running publish.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
 

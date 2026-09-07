@@ -91,6 +91,12 @@ public final class TeamGit: TeamStore {
     /// Creates the bare mirror on first use and fetches only then: an
     /// existing mirror opens offline and callers `sync()` when they want
     /// the network (so `team status` never waits on a remote).
+    /// Branches a fresh store's first sync fetches; nil = every branch.
+    /// A join needs `roster` and `requests` only (#321): fetching every
+    /// branch meant the leader's 1.2 GB of transcripts, twenty minutes
+    /// at 1 MB/s, before the request was even pushed. Set before `open()`.
+    public var firstSyncBranches: [String]?
+
     public func open() throws {
         let fresh = !FileManager.default.fileExists(atPath: gitDir.appendingPathComponent("HEAD").path)
         if fresh {
@@ -104,14 +110,20 @@ public final class TeamGit: TeamStore {
             // stderr, not `os.Logger`: InfinitusCore builds on Linux too.
             FileHandle.standardError.write(Data("infinitus: cleared stale git locks: \(sweptLocks.joined(separator: ", "))\n".utf8))
         }
-        if fresh { try sync() }
+        if fresh { try sync(branches: firstSyncBranches) }
     }
 
     // MARK: TeamStore
 
-    public func sync() throws {
+    public func sync() throws { try sync(branches: nil) }
+
+    /// `branches` nil fetches them all; a list fetches just those (the
+    /// prune then only touches those refs).
+    public func sync(branches: [String]?) throws {
         heads = [:]
-        _ = try run(["fetch", "--progress", "--prune", "origin", "+refs/heads/*:refs/remotes/origin/*"], network: true)
+        let refspecs = branches?.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
+            ?? ["+refs/heads/*:refs/remotes/origin/*"]
+        _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
     }
 
     /// Spec §6.1's "empty private repo", asked of the REMOTE. Not
