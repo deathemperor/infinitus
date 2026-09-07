@@ -330,7 +330,7 @@ Gated by lease (call sites in AppModel, each an announced hook):
 | `TimelineCache` rebuilds for snapshot facts | `sessions` or `session(pid)` |
 | transcript tail reads for the mirror | `session(pid)` (a long-poll in flight is itself a lease) |
 | stats scans (`StatsScanner`) | `stats` |
-| checkpoint diffs on turn end | `session(pid)` |
+| checkpoint diffs on turn end | none — a checkpoint's value is realized later in the review diff, so a watcher-now lease would leave gaps nobody can recover (amended 2026-09-07) |
 
 Unleased ⇒ `SessionDetail.facts` is omitted (phone falls back to today's
 rows), no tail is read, no scan runs. `tools/e2e.sh` adds: with no lease,
