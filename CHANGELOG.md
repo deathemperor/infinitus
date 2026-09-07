@@ -41,6 +41,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- Add account and Re-login open your browser logged out of claude.ai, so you pick the account from Google's chooser with passkeys and never hit the account switch; the sheet and private window stay a click away.
 - The "Almost there" setup card no longer clips the popup's toolbar, names your account once, and explains the AI-agent brief under its button.
 - A sign-in code Claude rejects (half-copied, or a failed exchange) comes straight back to the paste field with the reason, instead of waiting forever.
 - The setup steps (install the engine, add the first account) show on a solid background instead of glass.

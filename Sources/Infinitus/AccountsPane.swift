@@ -414,12 +414,29 @@ private let addAccountFooter =
         authWindow = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        // ALWAYS the sheet: it does passkeys AND passwords. The
-        // saved-session auto-routing sent a passkey account into the
-        // private window — where WebAuthn can never run — and hit the
-        // Bluetooth-fallback wall again (user screenshot 2026-08-31).
-        // The private window stays strictly opt-in.
-        startSystemSheet()
+        // The default browser, logged out of claude.ai first (user
+        // 2026-09-07): it is the only surface with BOTH Google's
+        // remembered accounts and passkeys — the sheet is throwaway
+        // (Google asks for the email every time), the private window
+        // has no WebAuthn (entitlement-locked to browsers). Logging out
+        // first is what removes the "switch account → back to sign-in"
+        // detour: claude.ai would otherwise authorize whoever the
+        // browser is already signed in as. Sheet and private window
+        // stay one click away below.
+        openInBrowser()
+    }
+
+    /// claude.ai's logout is a plain visit (user-verified 2026-09-07);
+    /// the sign-in link follows once it has had time to land.
+    static let logoutURL = URL(string: "https://claude.ai/logout")!
+
+    func openInBrowser() {
+        guard let url = authURL else { return }
+        NSWorkspace.shared.open(Self.logoutURL)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, self.authURL == url, self.running else { return }
+            NSWorkspace.shared.open(url)
+        }
     }
 
     /// The opt-in private window: this account's own isolated session
@@ -567,8 +584,8 @@ private struct AuthWebView: NSViewRepresentable {
 }
 
 /// The companion window: sign-in status + the paste-code bar. The
-/// actual signing-in happens in the system sheet (passkeys work
-/// there), which this window anchors.
+/// actual signing-in happens in the default browser (logged out of
+/// claude.ai first), or in the system sheet / private window on request.
 private struct AuthWindowRoot: View {
     @ObservedObject var flow: TokenFlow
 
@@ -579,10 +596,9 @@ private struct AuthWindowRoot: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             if flow.pasteCode {
-                Text("1. Sign in and approve in the sign-in sheet or window "
-                     + "(the sheet is a fresh private session \u{2014} "
-                     + "passkeys and Touch ID work; it never remembers "
-                     + "another account).\n"
+                Text("1. Your browser opened logged out of claude.ai, then "
+                     + "the sign-in page: pick the account (Google's chooser, "
+                     + "passkeys) and approve.\n"
                      + "2. Copy the code it shows and paste it here.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
@@ -596,10 +612,10 @@ private struct AuthWindowRoot: View {
                     Button("Cancel") { flow.cancel() }
                 }
             } else {
-                Text("Sign in and approve in the sign-in sheet or window "
-                     + "(the sheet is a fresh private session \u{2014} "
-                     + "passkeys and Touch ID work). This closes by "
-                     + "itself once the engine holds the credential.")
+                Text("Your browser opened logged out of claude.ai, then "
+                     + "the sign-in page: pick the account and approve. "
+                     + "This closes by itself once the engine holds the "
+                     + "credential.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     if flow.phase == .registering {
@@ -612,8 +628,14 @@ private struct AuthWindowRoot: View {
                 }
             }
             HStack(spacing: 6) {
-                Button("Reopen sign-in sheet") { flow.startSystemSheet() }
-                Button("Use private window (no passkeys)") {
+                Button("Open in browser again") { flow.openInBrowser() }
+                    .help("Logs your browser out of claude.ai, then opens "
+                          + "the sign-in page there \u{2014} Google's account "
+                          + "chooser and passkeys, no account switch.")
+                Button("Sign-in sheet") { flow.startSystemSheet() }
+                    .help("A throwaway session: passkeys work, Google "
+                          + "asks for the email every time.")
+                Button("Private window (no passkeys)") {
                     flow.openPrivateWindow()
                 }
                 .help("An isolated per-account browser session \u{2014} "
@@ -1174,7 +1196,7 @@ private struct CswapAddFlow: View {
                     Text("Re-login for \(target): sign in as that account.")
                         .font(.caption).foregroundStyle(.orange)
                 }
-                Text("1. Sign in and approve in the login window "
+                Text("1. Sign in and approve in your browser "
                      + "(reopen: button below).\n2. Copy the code it "
                      + "shows, paste it here.")
                     .font(.caption).foregroundStyle(.secondary)
