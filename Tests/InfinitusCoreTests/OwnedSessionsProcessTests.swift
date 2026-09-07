@@ -8,40 +8,74 @@ final class OwnedSessionsProcessTests: XCTestCase {
     private var scriptURL: URL!
     private var cwd: URL!
 
-    /// The fake: `--version` prints a banner; otherwise it answers
-    /// `initialize` with init, a user turn with the fixture's permission
-    /// request, an allow with a result, and echoes every control request.
-    private func writeFake(version: String = "2.1.263 (Claude Code)") throws {
+    /// Common setup for every fake `claude`: a fresh temp dir as `cwd`, the
+    /// script written and made executable. `body` builds the script text
+    /// from the dir it will run in.
+    private func writeScript(_ body: (URL) -> String) throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("owned-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         cwd = dir
         scriptURL = dir.appendingPathComponent("claude")
+        try body(dir).write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+    }
+
+    /// The fake: `--version` prints a banner; otherwise it answers
+    /// `initialize` with init, a user turn with the fixture's permission
+    /// request, an allow with a result, and echoes every control request.
+    private func writeFake(version: String = "2.1.263 (Claude Code)") throws {
         let ask = Bundle.module.url(forResource: "owned-can-use-tool-write", withExtension: "json", subdirectory: "Fixtures")!.path
         let question = Bundle.module.url(forResource: "owned-can-use-tool-ask", withExtension: "json", subdirectory: "Fixtures")!.path
-        try """
-        #!/bin/sh
-        case "$1" in --version) echo '\(version)'; exit 0;; esac
-        echo "$@" > "\(dir.path)/argv"
-        echo "$PATH" > "\(dir.path)/path"
-        while IFS= read -r line; do
-          case "$line" in
-            *'"initialize"'*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"1","response":{}}}'
-                              echo '{"type":"system","subtype":"init","session_id":"S-FAKE","permissionMode":"default"}';;
-            *'"type": "user"'*|*'"type":"user"'*) echo "$line" >> "\(dir.path)/users"
-                              case "$line" in *colour*) cat '\(question)';; *) cat '\(ask)';; esac;;
-            *'"behavior": "allow"'*|*'"behavior":"allow"'*) echo "$line" >> "\(dir.path)/answers"
-                              echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
-            *'"behavior": "deny"'*|*'"behavior":"deny"'*) echo "$line" >> "\(dir.path)/answers"
-                              echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
-            *'"interrupt"'*) echo "$line" >> "\(dir.path)/controls"
-                              echo '{"type":"control_response","response":{"subtype":"success","request_id":"x","response":{"still_queued":[]}}}'
-                              echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
-            *) echo "$line" >> "\(dir.path)/controls";;
-          esac
-        done
-        exit 0
-        """.write(to: scriptURL, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        try writeScript { dir in
+            """
+            #!/bin/sh
+            case "$1" in --version) echo '\(version)'; exit 0;; esac
+            echo "$@" > "\(dir.path)/argv"
+            echo "$PATH" > "\(dir.path)/path"
+            while IFS= read -r line; do
+              case "$line" in
+                *'"initialize"'*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"1","response":{}}}'
+                                  echo '{"type":"system","subtype":"init","session_id":"S-FAKE","permissionMode":"default"}';;
+                *'"type": "user"'*|*'"type":"user"'*) echo "$line" >> "\(dir.path)/users"
+                                  case "$line" in *colour*) cat '\(question)';; *) cat '\(ask)';; esac;;
+                *'"behavior": "allow"'*|*'"behavior":"allow"'*) echo "$line" >> "\(dir.path)/answers"
+                                  echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
+                *'"behavior": "deny"'*|*'"behavior":"deny"'*) echo "$line" >> "\(dir.path)/answers"
+                                  echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
+                *'"interrupt"'*) echo "$line" >> "\(dir.path)/controls"
+                                  echo '{"type":"control_response","response":{"subtype":"success","request_id":"x","response":{"still_queued":[]}}}'
+                                  echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
+                *) echo "$line" >> "\(dir.path)/controls";;
+              esac
+            done
+            exit 0
+            """
+        }
+    }
+
+    /// A `claude` that answers `--version` but never reads stdin again — the
+    /// pid replaces itself with `sleep`, so `send`'s frame fills the pipe
+    /// and blocks (#151 debt: `closeStdin` must not wedge behind it).
+    private func writeNonReadingFake(version: String = "2.1.263 (Claude Code)") throws {
+        try writeScript { _ in
+            """
+            #!/bin/sh
+            case "$1" in --version) echo '\(version)'; exit 0;; esac
+            exec sleep 60
+            """
+        }
+    }
+
+    /// A `claude` that answers `--version` then exits immediately on the
+    /// real invocation, before the app's `terminationHandler` is installed.
+    private func writeExitingFake(version: String = "2.1.263 (Claude Code)") throws {
+        try writeScript { _ in
+            """
+            #!/bin/sh
+            case "$1" in --version) echo '\(version)'; exit 0;; esac
+            exit 3
+            """
+        }
     }
 
     private func file(_ name: String) -> String {
@@ -278,6 +312,53 @@ final class OwnedSessionsProcessTests: XCTestCase {
         waitFor("mode echoed") { self.file("controls").contains("set_permission_mode") && self.file("controls").contains("plan") }
         XCTAssertFalse(owned.setPermissionMode(pid: pid, mode: "rm -rf"), "only Claude Code's own mode names")
         await owned.stopAll()
+    }
+
+    // MARK: #151 debt (PR #278) — a wedged stdin write, a child that beats the handler
+
+    /// A frame write blocked on a full stdin pipe (child alive, not
+    /// reading) must not wedge `stop` behind it forever — `closeStdin`
+    /// gives up and `stop` moves straight to `terminate()`.
+    private final class ResultBox: @unchecked Sendable {
+        private let lock = NSLock(); private var value: Bool?
+        func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
+        func get() -> Bool? { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
+    func testStopDoesNotWedgeBehindAWriteBlockedOnAFullPipe() async throws {
+        try writeNonReadingFake()
+        let states = States()
+        let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
+        let reply = await owned.start(request())
+        XCTAssertEqual(reply.outcome, "started", reply.detail ?? "")
+        let pid = Int32(reply.pid!)
+        let big = String(repeating: "x", count: 200_000) // > the 64 KiB pipe buffer
+        let sent = ResultBox()
+        DispatchQueue.global().async { sent.set(owned.send(pid: pid, text: big)) }
+        try await Task.sleep(nanoseconds: 400_000_000) // let the writer actually fill the pipe and block
+        let start = Date()
+        await owned.stop(pid: pid)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 6, "stop must not wait behind the wedged writer")
+        waitFor("gone") { !owned.ownedPids.contains(pid) }
+        XCTAssertFalse(ClaudeSessions.isAlive(pid))
+        // false proves the write was still blocked when stop ran (a write
+        // that had already completed would return true) and that
+        // terminate()'s SIGTERM freed it with EPIPE rather than stop
+        // wedging behind it forever.
+        waitFor("writer unblocked with EPIPE") { sent.get() == false }
+    }
+
+    /// `!p.isRunning` hand-fires the termination handler for a child that
+    /// exited before `run()` returned — `.exited` must still reach `onState`
+    /// and the pid must leave the registry.
+    func testAChildThatExitsBeforeTheHandlerIsInstalledStillReportsExited() async throws {
+        try writeExitingFake()
+        let states = States()
+        let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
+        let reply = await owned.start(request())
+        let pid = Int32(reply.pid!)
+        waitFor("exited") { states.all.contains(.exited) }
+        waitFor("forgotten") { !owned.ownedPids.contains(pid) }
     }
 }
 

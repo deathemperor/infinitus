@@ -51,7 +51,13 @@ public enum ClaudeLocator {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = arguments
-        let out = Pipe()
+        // A file, not a pipe: an rc that backgrounds a process holding the
+        // inherited stdout would keep `readDataToEndOfFile` waiting on that
+        // descendant long after `terminate()` killed the shell.
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        FileManager.default.createFile(atPath: tmp.path, contents: nil)
+        guard let out = FileHandle(forWritingAtPath: tmp.path) else { return nil }
+        defer { try? out.close(); try? FileManager.default.removeItem(at: tmp) }
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice
         guard (try? p.run()) != nil else { return nil }
@@ -59,9 +65,9 @@ public enum ClaudeLocator {
         // forever; past the deadline it is killed and the caller falls back.
         let deadline = DispatchWorkItem { p.terminate() }
         DispatchQueue.global().asyncAfter(deadline: .now() + 10, execute: deadline)
-        let data = out.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
         deadline.cancel()
+        let data = (try? Data(contentsOf: tmp)) ?? Data()
         return String(decoding: data, as: UTF8.self)
     }
     #endif

@@ -77,7 +77,15 @@ public actor OwnedSessions {
             if s == .exited { pendingList.removeAll() }
             return true
         }
-        func closeStdin() { writeLock.lock(); try? stdin.close(); writeLock.unlock() }
+        /// False when a frame write is stuck on a full pipe — the fd is
+        /// left open (still owned by that writer) so `stop` can move on to
+        /// `terminate()` instead of wedging behind it forever.
+        @discardableResult
+        func closeStdin(timeout: TimeInterval = 3) -> Bool {
+            guard writeLock.lock(before: Date().addingTimeInterval(timeout)) else { return false }
+            try? stdin.close(); writeLock.unlock()
+            return true
+        }
     }
 
     final class Registry: @unchecked Sendable {
@@ -189,7 +197,9 @@ public actor OwnedSessions {
         p.terminationHandler = { [weak self, registry] _ in
             stdout.fileHandleForReading.readabilityHandler = nil
             if child.set(.exited) { self?.publish(child.pid, .exited) }
-            child.closeStdin()
+            // The child is already gone — any blocked write has failed with
+            // EPIPE by now, so a short wait is enough.
+            child.closeStdin(timeout: 0.5)
             registry.remove(child.pid)
             ledger?.forget(pid: child.pid)
             Task { [weak self] in await self?.forget(child.pid) }
@@ -243,9 +253,12 @@ public actor OwnedSessions {
     /// (#274's lesson).
     public func stop(pid: Int32) async {
         guard let child = registry[pid] else { return }
-        child.closeStdin()
-        for _ in 0..<30 where processes[pid]?.isRunning == true {
-            try? await Task.sleep(nanoseconds: 100_000_000)
+        // A frame write stuck on a full pipe holds `writeLock`; closeStdin
+        // gives up rather than wait behind it, straight to terminate().
+        if child.closeStdin() {
+            for _ in 0..<30 where processes[pid]?.isRunning == true {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
         }
         if processes[pid]?.isRunning == true {
             processes[pid]?.terminate()

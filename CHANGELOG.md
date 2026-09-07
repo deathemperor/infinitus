@@ -25,6 +25,7 @@ publishes the matching section as the GitHub release body.
 - A headless session's row says busy, idle or waiting like any other, and wears a "headless" chip, instead of reading "unknown" (#151).
 - "Ask every time" is a permission choice on both start forms and in profiles: every tool asks, even the ones Claude Code would allow on its own (#151).
 - A headless session left behind by a crashed Mac app is stopped at the next launch instead of running on unattended (#151).
+- Quitting the Mac app never hangs behind a stuck headless session: a child that stops reading its input is terminated instead of waited on (#151).
 - Clicking a session row in the popup's footer sessions card opens its chat window again, with past sessions and the driving line, like the rail's card.
 - A "needs AWS login" line met by a login that finished before the Mac app relaunched no longer comes back as unmet after the relaunch.
 - The Mac popup's session rows take their dot and word from the same facts as the phone — a raised hand for an approval, a question mark for a prompt, snoozed and settled rows dimmed (#223).
