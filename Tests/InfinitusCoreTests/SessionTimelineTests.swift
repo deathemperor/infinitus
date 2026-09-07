@@ -136,4 +136,61 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(SessionTimelineBuilder.Slim.itemType(for: "Grep"), "search")
         XCTAssertEqual(SessionTimelineBuilder.Slim.itemType(for: "mcp__x__y"), "dynamic_tool_call")
     }
+
+    // MARK: Task 4 — prompts and turn states
+    func testInterruptMarkerClosesTheTurnInterruptedAndIsNotAMessage() throws {
+        let tl = build(try entries("interrupted"))
+        XCTAssertEqual(tl.turn(id: "u1")?.state, .interrupted)
+        XCTAssertNil(tl.message(id: "i1"))
+        XCTAssertEqual(tl.turn(id: "u1")?.completedAt, UsageHistory.parseISO("2026-09-01T10:00:05.000Z"))
+    }
+
+    func testAnApiErrorEndsTheTurnInErrorWithARuntimeErrorRow() throws {
+        let tl = build(try entries("interrupted"), status: "idle")
+        XCTAssertEqual(tl.turn(id: "u2")?.state, .error)
+        let err = tl.activities.last!
+        XCTAssertEqual(err.kind, "runtime.error")
+        XCTAssertEqual(err.tone, .error)
+        XCTAssertEqual(err.summary, "API Error: 500 Internal server error")
+        XCTAssertEqual(err.payload["status"], .number(500))
+        XCTAssertNil(tl.message(id: "a2"))   // the synthetic text is the error row, not an answer
+    }
+
+    func testWaitingRecordTurnsTheTrailingToolIntoAnApprovalRequest() {
+        let e = lines([
+            #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"write it"}}"#,
+            #"{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:01.000Z","message":{"content":[{"type":"tool_use","id":"t1","name":"Write","input":{"file_path":"/p/hello.txt","content":"hi"}}]}}"#,
+        ])
+        let tl = build(e, status: "waiting")
+        XCTAssertEqual(tl.activities.map(\.kind), ["tool.started", "approval.requested"])
+        let ask = tl.activity(id: "perm:t1")!
+        XCTAssertEqual(ask.tone, .approval)
+        XCTAssertEqual(ask.payload["requestId"], .string("perm:t1"))
+        XCTAssertEqual(ask.payload["toolName"], .string("Write"))
+        XCTAssertEqual(ask.payload["requestType"], .string("file_change_approval"))
+        XCTAssertEqual(ask.payload["input"], .object(["file_path": .string("/p/hello.txt"), "content": .string("hi")]))
+        XCTAssertEqual(tl.turn(id: "u1")?.state, .running)
+        // a "waiting" older than the newest entry is stale (2026-09-04 bypass-permissions case)
+        let stale = build(e, status: "waiting", statusUpdatedAt: UsageHistory.parseISO("2026-09-01T09:00:00.000Z"))
+        XCTAssertEqual(stale.activities.map(\.kind), ["tool.started"])
+        XCTAssertEqual(stale.turn(id: "u1")?.state, .completed)
+    }
+
+    func testAskUserQuestionIsAUserInputRequestResolvedByItsResult() {
+        let tl = build(lines([
+            #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"pick"}}"#,
+            #"{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:01.000Z","message":{"content":[{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{"questions":[{"question":"Which colour?","header":"Colour","multiSelect":false,"options":[{"label":"Red","description":"warm"},{"label":"Blue","description":"cool"}]}]}}]}}"#,
+            #"{"type":"user","uuid":"r1","timestamp":"2026-09-01T10:00:20.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"q1","content":"User has answered your questions: \"Which colour?\"=\"Blue\". You can now continue with these answers in mind."}]}}"#,
+        ]), status: "busy")
+        XCTAssertEqual(tl.activities.map(\.kind), ["user-input.requested", "user-input.resolved"])
+        let ask = tl.activity(id: "perm:q1")!
+        XCTAssertEqual(ask.summary, "Which colour?")
+        XCTAssertEqual(ask.payload["questions"], .array([.object([
+            "id": .string("Which colour?"), "header": .string("Colour"), "question": .string("Which colour?"),
+            "multiSelect": .bool(false),
+            "options": .array([.object(["label": .string("Red"), "description": .string("warm")]),
+                               .object(["label": .string("Blue"), "description": .string("cool")])]),
+        ])]))
+        XCTAssertEqual(tl.activity(id: "perm:q1/resolved")?.payload["answers"]?.stringValue?.contains("Blue"), true)
+    }
 }

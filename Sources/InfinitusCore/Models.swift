@@ -282,6 +282,10 @@ public enum JSONValue: Codable, Equatable, Sendable {
         case .object(let o): try c.encode(o)
         }
     }
+
+    public var stringValue: String? { if case .string(let s) = self { return s }; return nil }
+    public var arrayValue: [JSONValue]? { if case .array(let a) = self { return a }; return nil }
+    public var objectValue: [String: JSONValue]? { if case .object(let o) = self { return o }; return nil }
 }
 
 /// `cswap usage --json` — estimated per-account token spend. The dollar

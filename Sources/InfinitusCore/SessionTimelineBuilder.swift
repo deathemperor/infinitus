@@ -117,6 +117,14 @@ public enum SessionTimelineBuilder {
             } else {
                 raw = nil
             }
+            // Esc in the terminal: the turn ends `interrupted`, the marker
+            // is not something anyone typed.
+            if let raw, raw.hasPrefix("[Request interrupted by user") {
+                if !turns.isEmpty { turns[turns.count - 1].interrupted = true }
+                openTools.removeAll()
+                openAssistant = nil
+                return
+            }
             if let raw, let user = SessionFeedReader.presentableUser(raw) {
                 let images = SessionFeedReader.imageIds(entry: entry, text: user.text)
                 openTurn(id: entry["uuid"] as? String ?? "u:\(seq)", at: at,
@@ -132,6 +140,27 @@ public enum SessionTimelineBuilder {
         }
 
         mutating func visitToolUse(name: String, id: String, input: [String: Any], at: Date) {
+            if name == "AskUserQuestion" {
+                let (text, _) = SessionFeedReader.describeQuestion(["input": input])
+                let questions = (input["questions"] as? [[String: Any]] ?? []).map { q -> JSONValue in
+                    let question = q["question"] as? String ?? ""
+                    let options = (q["options"] as? [[String: Any]] ?? []).map { o -> JSONValue in
+                        .object(["label": .string(o["label"] as? String ?? ""),
+                                 "description": .string(o["description"] as? String ?? "")])
+                    }
+                    // `id` == the question text: Claude Code maps answers by it.
+                    return .object(["id": .string(question), "question": .string(question),
+                                    "header": .string(q["header"] as? String ?? ""),
+                                    "multiSelect": .bool((q["multiSelect"] as? Bool) ?? false),
+                                    "options": .array(options)])
+                }
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                openPrompts.insert("perm:" + id)
+                append("user-input.requested", id: "perm:" + id, tone: .approval,
+                       summary: text.split(separator: "\n").first.map(String.init) ?? "Question",
+                       payload: ["requestId": .string("perm:" + id), "questions": .array(questions)], at: at)
+                return
+            }
             let title = SessionFeedReader.describeTool(name: name, input: input)
             let command = name == "Bash" ? (input["command"] as? String) : nil
             let files = (input["file_path"] as? String).map { [$0] } ?? []
@@ -156,6 +185,12 @@ public enum SessionTimelineBuilder {
             } else {
                 text = ""
             }
+            if name == "AskUserQuestion" {
+                openPrompts.remove("perm:" + toolUseId)
+                append("user-input.resolved", id: "perm:\(toolUseId)/resolved", tone: .approval, summary: "Answered",
+                       payload: ["requestId": .string("perm:" + toolUseId), "answers": .string(String(text.prefix(2000)))], at: at)
+                return
+            }
             var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name)),
                                                 "status": .string(isError ? "failed" : "completed")]
             let line = Slim.output(text)
@@ -179,6 +214,15 @@ public enum SessionTimelineBuilder {
             guard let message = entry["message"] as? [String: Any],
                   let content = message["content"] as? [[String: Any]] else { return }
             if !turns.isEmpty, turns[turns.count - 1].startedAt == nil { turns[turns.count - 1].startedAt = at }
+            if (entry["isApiErrorMessage"] as? Bool) == true, !Transcript.isLimitStop(entry) {
+                let text = content.first(where: { ($0["type"] as? String) == "text" })?["text"] as? String ?? "API error"
+                var payload: [String: JSONValue] = ["message": .string(text)]
+                if let status = entry["apiErrorStatus"] as? NSNumber { payload["status"] = .number(status.doubleValue) }
+                append("runtime.error", id: entry["uuid"] as? String ?? "err:\(seq)", tone: .error,
+                       summary: String(text.prefix(180)), payload: payload, at: at)
+                if !turns.isEmpty { turns[turns.count - 1].errored = true }
+                return
+            }
             for block in content {
                 switch block["type"] as? String {
                 case "text":
@@ -222,13 +266,31 @@ public enum SessionTimelineBuilder {
             openAssistant = nil
         }
 
-        /// An approval or user-input request nothing has resolved yet.
-        var hasOpenPrompt: Bool { false }
+        /// Request ids of prompts nothing has resolved yet.
+        var openPrompts: Set<String> = []
 
         /// Turn state follows the session status, as T3's projector does
         /// (`projector.ts:78-93`): the last turn is running while the
         /// record is busy; every earlier turn is closed by the next prompt.
         func finish(status: String?, statusUpdatedAt: Date?) -> SessionTimeline {
+            var activities = self.activities
+            var openPrompts = self.openPrompts
+            // The legacy `finalize` rule: a tool still open when the record
+            // says "waiting" is a permission prompt — unless the "waiting"
+            // predates the newest entry (a peer-started turn runs under
+            // the previous turn's status, 2026-09-04).
+            var recordWaiting = status == "waiting"
+            if recordWaiting, let flipped = statusUpdatedAt, let at = lastAt, flipped < at { recordWaiting = false }
+            if recordWaiting, let last = activities.last, last.kind == "tool.started", let tool = openTools[last.id] {
+                let id = "perm:" + last.id
+                openPrompts.insert(id)
+                activities.append(Activity(id: id, tone: .approval, kind: "approval.requested", summary: last.summary,
+                                           detail: nil,
+                                           payload: ["requestId": .string(id), "toolName": .string(tool.name),
+                                                     "requestType": .string(Slim.requestType(for: tool.name)),
+                                                     "input": tool.input],
+                                           turnId: last.turnId, sequence: seq, createdAt: last.createdAt))
+            }
             var out: [Turn] = []
             var messages = self.messages
             for (i, d) in turns.enumerated() {
@@ -237,7 +299,7 @@ public enum SessionTimelineBuilder {
                 if d.interrupted { state = .interrupted }
                 else if d.errored { state = .error }
                 else if isLast, status == "busy" { state = .running }
-                else if isLast, status == "waiting", hasOpenPrompt { state = .running }
+                else if isLast, status == "waiting", !openPrompts.isEmpty { state = .running }
                 else { state = .completed }
                 out.append(Turn(id: d.id, state: state, requestedAt: d.requestedAt, startedAt: d.startedAt,
                                 completedAt: state == .running ? nil : d.lastAt,
@@ -281,6 +343,16 @@ public enum SessionTimelineBuilder {
         static func files(_ paths: [String]) -> [String] {
             paths.prefix(12).map { path in
                 path.split(separator: "/").suffix(4).joined(separator: "/")
+            }
+        }
+
+        /// T3's requestType heuristic (`ClaudeAdapter.ts:954-964`).
+        static func requestType(for tool: String) -> String {
+            switch itemType(for: tool) {
+            case "file_read", "search": return "file_read_approval"
+            case "command_execution": return "command_execution_approval"
+            case "file_change": return "file_change_approval"
+            default: return "dynamic_tool_call"
             }
         }
 
