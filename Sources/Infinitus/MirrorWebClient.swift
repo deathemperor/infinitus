@@ -75,6 +75,8 @@ button:disabled { opacity: .5; cursor: default; }
 #prompt { border-top: 1px solid var(--line); padding: 12px 16px; background: var(--card); display: none; gap: 8px; flex-direction: column; }
 #prompt.on { display: flex; }
 #prompt .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#prompt .actions .q { flex-basis: 100%; font-weight: 600; margin-top: 4px; }
+#prompt .actions button.picked { outline: 2px solid var(--accent, #4c8dff); }
 #prompt .body { font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; max-height: 8em; overflow: auto; }
 #compose { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 8px; align-items: flex-end; }
 #compose textarea { flex: 1; resize: none; min-height: 38px; max-height: 160px; }
@@ -239,6 +241,26 @@ button:disabled { opacity: .5; cursor: default; }
       btn("Deny", () => send({ kind: "key", text: "3" }));
       btn("Allow", () => send({ kind: "key", text: "1" }), true);
       btn("Allow " + (last.toolName || "") + " for this session", () => send({ kind: "approve", text: (last.toolName || "") + "\n" + last.text }));
+    } else if (last.questions && last.questions.length) {
+      // An owned session's prompt: every question, answered at once.
+      const qs = last.questions; const picks = qs.map(() => new Set());
+      $("ptitle").textContent = "❓ " + (qs.length > 1 ? qs.length + " questions" : qs[0].question); $("pbody").textContent = "";
+      qs.forEach((q, qi) => {
+        const h = document.createElement("div"); h.className = "q"; h.textContent = (q.header ? q.header + " — " : "") + q.question; acts.appendChild(h);
+        q.options.forEach((o, oi) => {
+          const b = document.createElement("button"); b.textContent = o;
+          b.onclick = () => {
+            if (picks[qi].has(oi)) picks[qi].delete(oi); else if (q.multiSelect) picks[qi].add(oi); else picks[qi] = new Set([oi]);
+            acts.querySelectorAll("button[data-q='" + qi + "']").forEach(x => x.classList.toggle("picked", picks[qi].has(+x.dataset.o)));
+          };
+          b.dataset.q = qi; b.dataset.o = oi; acts.appendChild(b);
+        });
+      });
+      btn("Send answers", () => {
+        if (picks.some(s => !s.size)) { $("note").textContent = "answer every question first"; return; }
+        const a = {}; qs.forEach((q, qi) => { a[q.question] = [...picks[qi]].sort((x, y) => x - y).map(i => q.options[i]).join(", "); });
+        send({ kind: "answers", text: JSON.stringify(a) });
+      }, true);
     } else {
       $("ptitle").textContent = "❓ " + last.text; $("pbody").textContent = "";
       (last.options || []).forEach((o, i) => btn((i + 1) + ". " + o, () => send({ kind: "key", text: String(i + 1) })));

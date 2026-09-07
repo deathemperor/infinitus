@@ -5,14 +5,14 @@ import InfinitusCore
 /// they arrive as control requests over stdin — so the feed the phone,
 /// the browser page and the Mac window read gets them appended here, in
 /// the item shapes those clients already render and answer (`.key`
-/// "1"/"3"/N, `.approve`). The stamp moves with them so a long-poll wakes.
+/// "1"/"3"/N, `.approve`, `.answers` for every question at once). The stamp moves with them so a long-poll wakes.
 enum OwnedFeed {
     static func augment(_ feed: SessionFeed, pending: [PendingRequest]) -> SessionFeed {
         guard !pending.isEmpty else { return feed }
         var items = feed.items
         for p in pending {
-            if p.toolName == "AskUserQuestion", let q = p.questions.first {
-                items.append(SessionFeedItem(kind: .question, text: q.question, at: p.receivedAt, options: q.options))
+            if p.toolName == "AskUserQuestion", !p.questions.isEmpty {
+                items.append(p.feedItem)
             } else {
                 items.append(SessionFeedItem(kind: .permission, text: p.description ?? p.inputJSON,
                                              at: p.receivedAt, toolName: p.toolName))

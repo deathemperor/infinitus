@@ -556,6 +556,12 @@ struct SessionFeedScreen: View {
                 } message: {
                     Text(item.text).lineLimit(6)
                 }
+            } else if let questions = item.questions, !questions.isEmpty {
+                // An owned session's prompt: every question, answered at once.
+                QuestionsPrompt(questions: questions, sending: actionSending) {
+                    sendInput(.init(kind: .answers, text: $0))
+                }
+                .id("\(item.at?.timeIntervalSince1970 ?? 0)|\(item.text)")
             } else {
                 Label(item.text, systemImage: "questionmark.circle.fill")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.yellow)

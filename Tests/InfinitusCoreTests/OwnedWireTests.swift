@@ -175,6 +175,43 @@ final class OwnedWireTests: XCTestCase {
         XCTAssertNotNil(updated["questions"], "the original questions ride along")
     }
 
+    private func twoQuestions() -> PendingRequest {
+        let colour = PendingRequest.Question(question: "Which colour?", header: "Colour", options: ["Red", "Blue"], multiSelect: false)
+        let sizes = PendingRequest.Question(question: "Which sizes?", header: "", options: ["S", "M", "L"], multiSelect: true)
+        return PendingRequest(requestId: "r-2q", toolName: "AskUserQuestion", toolUseId: nil, description: nil,
+                              inputJSON: "{}", suggestionsJSON: nil, questions: [colour, sizes],
+                              receivedAt: Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    func testWholePromptAnswersMustCoverEveryQuestionWithRealOptions() throws {
+        let ask = twoQuestions()
+        let good = ["Which colour?": "Blue", "Which sizes?": "S, L"]
+        XCTAssertEqual(OwnedWire.decision(answers: SessionInput.Answers.encode(good), pending: ask), .answers(good))
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Blue"]), pending: ask),
+                     "the second question went unanswered")
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Green", "Which sizes?": "S"]), pending: ask),
+                     "not one of the options")
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Red, Blue", "Which sizes?": "S"]), pending: ask),
+                     "a single-select takes one label")
+        XCTAssertNil(OwnedWire.decision(answers: "not json", pending: ask))
+        guard case .canUseTool(let write) = OwnedWire.decode(line: try fixture("owned-can-use-tool-write")) else { return XCTFail() }
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(good), pending: write), "a permission takes no answers")
+    }
+
+    func testAParkedPromptBecomesOneFeedItemCarryingEveryQuestion() throws {
+        let item = twoQuestions().feedItem
+        XCTAssertEqual(item.kind, .question)
+        XCTAssertEqual(item.text, "Which colour?", "an older client still reads the first question")
+        XCTAssertEqual(item.options, ["Red", "Blue"], "…and answers it with a key")
+        XCTAssertEqual(item.questions?.map(\.question), ["Which colour?", "Which sizes?"])
+        XCTAssertEqual(item.questions?[1].multiSelect, true)
+        let back = try JSONDecoder().decode(SessionFeedItem.self, from: JSONEncoder().encode(item))
+        XCTAssertEqual(back, item)
+        let old = try JSONDecoder().decode(SessionFeedItem.self,
+                                           from: Data(#"{"kind":"question","text":"Which colour?","options":["Red","Blue"]}"#.utf8))
+        XCTAssertNil(old.questions, "a feed without the field decodes")
+    }
+
     func testAKeyPicksAnOptionForEveryQuestionOrAPermissionVerdict() throws {
         guard case .canUseTool(let ask) = OwnedWire.decode(line: try fixture("owned-can-use-tool-ask")) else { return XCTFail() }
         XCTAssertEqual(OwnedWire.decision(forKey: "2", pending: ask), .answers(["Which colour?": "Blue"]))

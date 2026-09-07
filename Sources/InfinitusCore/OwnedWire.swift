@@ -100,6 +100,14 @@ public struct PendingRequest: Sendable, Equatable, Codable {
     public let suggestionsJSON: String?
     public let questions: [Question]
     public let receivedAt: Date
+
+    /// The feed item a parked AskUserQuestion shows as: the first question
+    /// as the text and options an older client answers with a key, every
+    /// question in `questions` for one that answers them all (#151).
+    public var feedItem: SessionFeedItem {
+        SessionFeedItem(kind: .question, text: questions.first?.question ?? "Question", at: receivedAt,
+                        options: questions.first?.options, questions: questions)
+    }
 }
 
 /// The stream-json protocol between the app and a `claude` it owns:
@@ -191,6 +199,20 @@ public enum OwnedWire {
         }
         return line(["type": "control_response",
                      "response": ["subtype": "success", "request_id": pending.requestId, "response": response]])
+    }
+
+    /// A client's whole-prompt answers (`SessionInput.Request.Kind.answers`)
+    /// against a parked question: every question answered, every label a
+    /// real option (a multi-select's labels joined by `Answers.separator`,
+    /// in any order). nil = not an answer to this prompt.
+    public static func decision(answers text: String, pending: PendingRequest) -> Decision? {
+        guard !pending.questions.isEmpty, let answers = SessionInput.Answers.decode(text) else { return nil }
+        for q in pending.questions {
+            guard let answer = answers[q.question] else { return nil }
+            let labels = q.multiSelect ? answer.components(separatedBy: SessionInput.Answers.separator) : [answer]
+            guard !labels.isEmpty, labels.allSatisfy({ q.options.contains($0) }) else { return nil }
+        }
+        return .answers(answers)
     }
 
     /// What a phone key means against a parked prompt, mirroring Claude

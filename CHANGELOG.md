@@ -16,6 +16,7 @@ publishes the matching section as the GitHub release body.
 
 ### Sessions
 - The Mac chat window wears the phone's chat header — Compact, Stat strip or Game HUD, chosen in Settings › Display › Sessions (#151).
+- A question with several parts from a session the app runs shows every part on the Mac window, the phone and the browser page, with one Send that answers them all (#151).
 - A "needs AWS login" line met by a sign-in outside the app clears on its own: while it shows, the app asks the CLI every five minutes whether the profile works (#313).
 - An `aws login` the app left running when it relaunched is killed at the next launch, and a login past its ten minutes is killed for good — a leftover held the credential broker's lock and failed every caller on that profile (#274).
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.

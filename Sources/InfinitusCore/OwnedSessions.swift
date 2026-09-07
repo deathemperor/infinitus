@@ -308,6 +308,16 @@ public actor OwnedSessions {
             }
             return answer(pid: pid, requestId: first.requestId, decision: .allow(forSession: true)) ? delivered
                 : SessionInput.Reply(outcome: "noChannel", detail: "the session has exited")
+        case .answers:
+            // Every question of the oldest parked AskUserQuestion at once.
+            guard let ask = pending(pid: pid).first(where: { !$0.questions.isEmpty }) else {
+                return SessionInput.Reply(outcome: "rejected", detail: "no pending question")
+            }
+            guard let decision = OwnedWire.decision(answers: request.text, pending: ask) else {
+                return SessionInput.Reply(outcome: "rejected", detail: "no such option")
+            }
+            return answer(pid: pid, requestId: ask.requestId, decision: decision) ? delivered
+                : SessionInput.Reply(outcome: "noChannel", detail: "the session has exited")
         case .key:
             guard SessionInput.allowedKeys.contains(request.text) else {
                 return SessionInput.Reply(outcome: "rejected", detail: "unsupported key")

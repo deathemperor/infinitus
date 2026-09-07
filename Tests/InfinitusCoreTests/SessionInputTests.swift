@@ -81,6 +81,19 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(h.commands, [])
     }
 
+    func testAnswersGoToTheOwnedHookOrAreRejectedWithoutTouchingAHost() {
+        let h = host(["> "])
+        let reply = deliver(.init(kind: .answers, text: "{}"), hosts: [h])
+        XCTAssertEqual(reply, .init(outcome: "rejected", detail: "answers need a session the app runs"))
+        XCTAssertEqual(h.commands, [])
+        var seen: [SessionInput.Request.Kind] = []
+        let owned = deliver(.init(kind: .answers, text: "{}"), hosts: [h],
+                            owned: { req, _ in seen.append(req.kind); return .init(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(owned.channel, "stdin")
+        XCTAssertEqual(seen, [.answers])
+        XCTAssertEqual(h.commands, [])
+    }
+
     func testKeyWhileRunningIsRunning() {
         let h = host(["Thinking… (esc to interrupt)"])
         let reply = deliver(.init(kind: .key, text: "1"), hosts: [h])

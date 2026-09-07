@@ -17,6 +17,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
         cwd = dir
         scriptURL = dir.appendingPathComponent("claude")
         let ask = Bundle.module.url(forResource: "owned-can-use-tool-write", withExtension: "json", subdirectory: "Fixtures")!.path
+        let question = Bundle.module.url(forResource: "owned-can-use-tool-ask", withExtension: "json", subdirectory: "Fixtures")!.path
         try """
         #!/bin/sh
         case "$1" in --version) echo '\(version)'; exit 0;; esac
@@ -26,7 +27,8 @@ final class OwnedSessionsProcessTests: XCTestCase {
           case "$line" in
             *'"initialize"'*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"1","response":{}}}'
                               echo '{"type":"system","subtype":"init","session_id":"S-FAKE","permissionMode":"default"}';;
-            *'"type": "user"'*|*'"type":"user"'*) echo "$line" >> "\(dir.path)/users"; cat '\(ask)';;
+            *'"type": "user"'*|*'"type":"user"'*) echo "$line" >> "\(dir.path)/users"
+                              case "$line" in *colour*) cat '\(question)';; *) cat '\(ask)';; esac;;
             *'"behavior": "allow"'*|*'"behavior":"allow"'*) echo "$line" >> "\(dir.path)/answers"
                               echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
             *'"behavior": "deny"'*|*'"behavior":"deny"'*) echo "$line" >> "\(dir.path)/answers"
@@ -223,6 +225,27 @@ final class OwnedSessionsProcessTests: XCTestCase {
         // The clients' approve button reads "Allow <tool> for this session":
         // the suggested rule rides along. A plain Allow is key "1".
         XCTAssertTrue(file("answers").contains("updatedPermissions"), file("answers"))
+        await owned.stopAll()
+    }
+
+    func testDeliverAnswersEveryQuestionOfTheParkedPrompt() async throws {
+        let (owned, states) = try await make()
+        let pid = Int32(await owned.start(request()).pid!)
+        waitFor("init") { states.all.contains(.idle) }
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .answers, text: "{}"), record: record(pid))?.detail,
+                       "no pending question")
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .message, text: "[Infinitus] pick a colour"), record: record(pid))?.outcome,
+                       "delivered")
+        waitFor("question parked") { owned.pending(pid: pid).first?.questions.isEmpty == false }
+        let wrong = owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "Green"])),
+                                  record: record(pid))
+        XCTAssertEqual(wrong?.outcome, "rejected")
+        XCTAssertEqual(wrong?.detail, "no such option")
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "Blue"])),
+                                     record: record(pid)),
+                       SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("answered") { self.file("answers").contains("\"Blue\"") }
+        XCTAssertTrue(owned.pending(pid: pid).isEmpty)
         await owned.stopAll()
     }
 

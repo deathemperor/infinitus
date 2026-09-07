@@ -73,11 +73,18 @@ public struct SessionFeedItem: Codable, Sendable, Equatable {
     /// pasted in the terminal (a base64 block in the transcript entry),
     /// `a:<file>` for one sent from the phone (saved by SessionInput).
     public let images: [String]?
+    /// `.question` items from an owned session's parked prompt (new
+    /// optional field, #151): every question with its options, so a
+    /// client answers them all at once (`Kind.answers`). Nil for a
+    /// question read off a transcript — there `text`/`options` are all
+    /// there is, and a key answers it.
+    public let questions: [PendingRequest.Question]?
 
     public init(kind: Kind, text: String, at: Date? = nil, toolName: String? = nil,
                 options: [String]? = nil, agent: Agent? = nil, toolUseId: String? = nil,
-                images: [String]? = nil, sender: String? = nil) {
+                images: [String]? = nil, sender: String? = nil, questions: [PendingRequest.Question]? = nil) {
         self.kind = kind
+        self.questions = questions
         self.images = images
         self.sender = sender
         self.text = text
@@ -88,7 +95,7 @@ public struct SessionFeedItem: Codable, Sendable, Equatable {
         self.toolUseId = toolUseId
     }
 
-    enum CodingKeys: String, CodingKey { case kind, text, at, toolName, options, agent, images, sender }
+    enum CodingKeys: String, CodingKey { case kind, text, at, toolName, options, agent, images, sender, questions }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -100,6 +107,7 @@ public struct SessionFeedItem: Codable, Sendable, Equatable {
         agent = try c.decodeIfPresent(Agent.self, forKey: .agent)
         images = try c.decodeIfPresent([String].self, forKey: .images)
         sender = try c.decodeIfPresent(String.self, forKey: .sender)
+        questions = try c.decodeIfPresent([PendingRequest.Question].self, forKey: .questions)
         toolUseId = nil
     }
 }

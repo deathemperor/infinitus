@@ -18,9 +18,14 @@ public enum SessionInput {
         /// `mode` (#163 phase 2): `text` is one of `SessionStart.hookModes`;
         /// the Mac moves the session's permission mode for the plugin's
         /// PreToolUse hook — nothing is typed into the session.
-        public enum Kind: String, Codable, Sendable { case message, key, resume, approve, mode }
+        /// `answers` (#151 follow-up): every question of a parked
+        /// AskUserQuestion at once — `text` is `Answers.encode`'s JSON
+        /// object, question text → chosen label(s). Only a session the
+        /// app runs can take it (the terminal has no such channel).
+        public enum Kind: String, Codable, Sendable { case message, key, resume, approve, mode, answers }
         public let kind: Kind
         /// `message`: free text. `key`: one of `SessionInput.allowedKeys`.
+        /// `answers`: a JSON object, question text → label(s).
         public let text: String
         /// Images/files riding along with a `message` (2026-09-03 "add
         /// features to allow attachments"). Optional so an old client's
@@ -93,6 +98,21 @@ public enum SessionInput {
             self.outcome = outcome
             self.channel = channel
             self.detail = detail
+        }
+    }
+
+    /// The `answers` request's text: a JSON object, question text → the
+    /// chosen label, labels of a multi-select joined with `separator` —
+    /// the shape Claude Code itself records ("multi-select answers are
+    /// comma-separated"). Keys sorted so the same picks encode the same.
+    public enum Answers {
+        public static let separator = ", "
+        public static func encode(_ answers: [String: String]) -> String {
+            let data = try? JSONSerialization.data(withJSONObject: answers, options: [.sortedKeys])
+            return data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        }
+        public static func decode(_ text: String) -> [String: String]? {
+            (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: String]
         }
     }
 
@@ -226,6 +246,11 @@ extension SessionInput {
                            hosts: hosts, claudeDir: claudeDir, attachmentsDir: attachmentsDir,
                            ttyOfPid: ttyOfPid, ancestorsOf: ancestorsOf, socketSend: socketSend,
                            owned: owned, sleep: sleep)
+        case .answers:
+            // Whole-prompt answers ride the control channel only an owned
+            // session has; a terminal's menu takes one key at a time.
+            if let reply = owned?(request, record) { return reply }
+            return Reply(outcome: "rejected", detail: "answers need a session the app runs")
         case .key:
             guard allowedKeys.contains(request.text) else {
                 return Reply(outcome: "rejected", detail: "unsupported key")

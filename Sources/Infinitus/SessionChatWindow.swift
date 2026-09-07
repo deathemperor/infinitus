@@ -306,6 +306,12 @@ private struct SessionChatRoot: View {
                     }
                     if store.sending { ProgressView().controlSize(.small) }
                 }
+            } else if let questions = item.questions, !questions.isEmpty {
+                // An owned session's prompt: every question, answered at once.
+                QuestionsPrompt(questions: questions, sending: store.sending) {
+                    store.send(.init(kind: .answers, text: $0))
+                }
+                .id("\(item.at?.timeIntervalSince1970 ?? 0)|\(item.text)")
             } else {
                 Label(item.text, systemImage: "questionmark.circle.fill")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.yellow)
