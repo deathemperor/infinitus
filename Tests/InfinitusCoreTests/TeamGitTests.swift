@@ -139,10 +139,11 @@ final class TeamGitTests: XCTestCase {
             p.standardError = err
             p.standardInput = FileHandle.nullDevice
             do { try p.run() } catch { return XCTFail("\(error)") }
-            let (stdout, stderr) = TeamGit.drain(out: out.fileHandleForReading, err: err.fileHandleForReading)
+            let (stdout, stderr, stalled) = TeamGit.drain(out: out.fileHandleForReading, err: err.fileHandleForReading)
             p.waitUntilExit()
             XCTAssertEqual(String(decoding: stdout, as: UTF8.self), "ok\n")
             XCTAssertEqual(stderr.count, 200_000, "the whole chatty stderr, not one pipe buffer's worth")
+            XCTAssertFalse(stalled)
             XCTAssertEqual(p.terminationStatus, 0)
             done.fulfill()
         }
@@ -264,6 +265,81 @@ final class TeamGitTests: XCTestCase {
     /// #55: `GitError.failed` quotes git's stderr, which echoes the
     /// remote as configured — and the remote a team code carries IS the
     /// write credential.
+    /// A child that spawns and then says nothing: the drain reads "ok" on
+    /// stdout, waits `idle` for stderr, kills it, and reports the stall
+    /// — after the "waiting" notice.
+    func testASilentNetworkChildIsKilledAndReportedAsStalled() throws {
+        let done = expectation(description: "drained")
+        let notices = Locked<[String]>([])
+        DispatchQueue.global().async {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", "echo ok; sleep 60"]
+            let out = Pipe(), err = Pipe()
+            p.standardOutput = out; p.standardError = err
+            p.standardInput = FileHandle.nullDevice
+            do { try p.run() } catch { return XCTFail("\(error)") }
+            let start = Date()
+            let watch = TeamGit.Watch(idle: 3, quiet: 1, activity: { line in notices.with { $0.append(line) } },
+                                      kill: { TeamGit.terminate(p) })
+            let (stdout, _, stalled) = TeamGit.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
+            p.waitUntilExit()
+            XCTAssertTrue(stalled)
+            XCTAssertLessThan(Date().timeIntervalSince(start), 10, "killed at the idle limit, not at the child's own exit")
+            XCTAssertEqual(String(decoding: stdout, as: UTF8.self), "ok\n", "what arrived before the stall is kept")
+            XCTAssertNotEqual(p.terminationStatus, 0)
+            XCTAssertEqual(notices.value, ["waiting for the store to answer…"])
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 20)
+    }
+
+    /// A slow child that keeps talking is never a stall, and its latest
+    /// `\r`-updated line reaches the sink.
+    func testAChattySlowChildIsNotAStallAndReportsItsLastLine() throws {
+        let done = expectation(description: "drained")
+        let notices = Locked<[String]>([])
+        DispatchQueue.global().async {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", "for i in 1 2 3 4 5 6; do printf 'Receiving objects: %d0%%\\r' $i >&2; sleep 0.5; done; echo ok"]
+            let out = Pipe(), err = Pipe()
+            p.standardOutput = out; p.standardError = err
+            p.standardInput = FileHandle.nullDevice
+            do { try p.run() } catch { return XCTFail("\(error)") }
+            let watch = TeamGit.Watch(idle: 2, quiet: 1, activity: { line in notices.with { $0.append(line) } },
+                                      kill: { TeamGit.terminate(p) })
+            let (stdout, stderr, stalled) = TeamGit.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
+            p.waitUntilExit()
+            XCTAssertFalse(stalled)
+            XCTAssertEqual(p.terminationStatus, 0)
+            XCTAssertEqual(String(decoding: stdout, as: UTF8.self), "ok\n")
+            XCTAssertEqual(stderr.count, "Receiving objects: 10%\r".utf8.count * 6, "every byte, not one per report")
+            let lines = notices.value
+            XCTAssertFalse(lines.isEmpty)
+            XCTAssertTrue(lines.allSatisfy { $0.hasPrefix("Receiving objects: ") }, "\(lines)")
+            XCTAssertFalse(lines.contains("waiting for the store to answer…"), "a talking child is not quiet")
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 20)
+    }
+
+    func testProgressStderrCollapsesToItsFinalLines() {
+        let raw = Data("remote: Counting objects:  10%\rremote: Counting objects: 100%, done.\nReceiving objects:   1%\rReceiving objects:  50%\nfatal: early EOF\n".utf8)
+        XCTAssertEqual(TeamGit.collapsed(raw), "remote: Counting objects: 100%, done.\nReceiving objects:  50%\nfatal: early EOF\n")
+        XCTAssertEqual(TeamGit.lastLine("a\rb\nc\r  "), "c")
+        XCTAssertEqual(TeamGit.lastLine("\r\n"), "")
+    }
+
+    /// A stall is its own error: the race retry keys on `.failed` with
+    /// git's rejection words, so a killed push is never re-pushed as if a
+    /// teammate had won.
+    func testAStallIsNotARaceRejection() {
+        let error: TeamGit.GitError = .stalled(command: "push --progress origin abc:refs/heads/roster", idle: 90)
+        if case .failed = error { XCTFail("a stall must not read as a failed command") }
+        XCTAssertEqual("\(error)", "the store did not answer for 90 s (git push gave up)")
+    }
+
     func testFeedingAChildThatAlreadyExitedDoesNotKillTheProcess() throws {
         // Under the old sequential write this raised SIGPIPE (#55).
         let p = Process()
@@ -298,4 +374,13 @@ final class TeamGitTests: XCTestCase {
         XCTAssertEqual(TeamGit.masked("no credential here"), "no credential here")
         XCTAssertEqual(TeamGit.masked("file:///tmp/remote.git"), "file:///tmp/remote.git")
     }
+}
+
+/// A boxed value the reader threads and the test share.
+final class Locked<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var v: T
+    init(_ v: T) { self.v = v }
+    var value: T { lock.lock(); defer { lock.unlock() }; return v }
+    func with(_ body: (inout T) -> Void) { lock.lock(); body(&v); lock.unlock() }
 }

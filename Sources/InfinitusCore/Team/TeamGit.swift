@@ -29,6 +29,37 @@ public final class TeamGit: TeamStore {
         /// Spec §6.1: a team is created on an EMPTY repository, and this
         /// one already has refs.
         case notEmpty
+        /// A network command printed nothing for `stallTimeout` and was
+        /// killed. Not `.failed`: `putAll`'s race retry must never fire
+        /// on a stall, and the pane words it differently.
+        case stalled(command: String, idle: TimeInterval)
+    }
+
+    /// The idle watchdog on `fetch`, `push` and `ls-remote`: a child that
+    /// prints NOTHING to stderr for this long is killed and the command
+    /// throws `.stalled`. Idle, not slow — `--progress` keeps a moving
+    /// transfer talking, however slow the link, so only a dead one dies.
+    /// The 2026-09-07 "Approving…" hang was a 55 s silent fetch that did
+    /// succeed; the default has to outlast one of those. Plumbing
+    /// (`hash-object` on a big file, `read-tree`) is never watched.
+    nonisolated(unsafe) public static var stallTimeout: TimeInterval = 90
+    /// After this long with nothing said, `activity` gets one "waiting"
+    /// line so a silent connect does not look like a hung app.
+    nonisolated(unsafe) public static var quietNotice: TimeInterval = 10
+    /// git's latest progress line ("Receiving objects: 45% (…)") for a
+    /// UI. Process-wide: the app opens a fresh `TeamClient` per call, so
+    /// an instance property would have to be threaded through every one.
+    /// Called on the reading thread, at most every ~2 s.
+    public static let activity = ActivitySink()
+
+    public final class ActivitySink: @unchecked Sendable {
+        private let lock = NSLock()
+        private var sink: (@Sendable (String) -> Void)?
+        public func set(_ sink: (@Sendable (String) -> Void)?) { lock.lock(); self.sink = sink; lock.unlock() }
+        func fire(_ line: String) {
+            lock.lock(); let s = sink; lock.unlock()
+            s?(line)
+        }
     }
 
     /// A blob's bytes: in memory, or a file git reads itself — a sealed
@@ -80,7 +111,7 @@ public final class TeamGit: TeamStore {
 
     public func sync() throws {
         heads = [:]
-        _ = try run(["fetch", "-q", "--prune", "origin", "+refs/heads/*:refs/remotes/origin/*"])
+        _ = try run(["fetch", "--progress", "--prune", "origin", "+refs/heads/*:refs/remotes/origin/*"], network: true)
     }
 
     /// Spec §6.1's "empty private repo", asked of the REMOTE. Not
@@ -90,7 +121,7 @@ public final class TeamGit: TeamStore {
     /// way.
     public func requireEmptyRemote() throws {
         guard opened else { throw GitError.notOpen }
-        let text = String(decoding: try run(["ls-remote", "origin"]), as: UTF8.self)
+        let text = String(decoding: try run(["ls-remote", "origin"], network: true), as: UTF8.self)
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw GitError.notEmpty }
     }
 
@@ -253,7 +284,7 @@ public final class TeamGit: TeamStore {
             "GIT_AUTHOR_NAME": "Infinitus", "GIT_AUTHOR_EMAIL": "\(author)@infinitus.run",
             "GIT_COMMITTER_NAME": "Infinitus", "GIT_COMMITTER_EMAIL": "\(author)@infinitus.run",
         ]), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = try run(["push", "-q", "origin", "\(commit):refs/heads/\(branch)"])
+        _ = try run(["push", "--progress", "origin", "\(commit):refs/heads/\(branch)"], network: true)
         _ = try run(["update-ref", "refs/remotes/origin/\(branch)", commit])
     }
 
@@ -272,12 +303,14 @@ public final class TeamGit: TeamStore {
 
     /// Runs git synchronously. Callers are the CLI (blocking is fine) and
     /// the app's background publish task (never the main thread).
+    /// `network` puts the command under the idle watchdog and feeds its
+    /// progress to `activity`.
     @discardableResult
     private func run(_ args: [String], stdin: Data? = nil, env extra: [String: String] = [:],
-                     useGitDir: Bool = true) throws -> Data {
+                     useGitDir: Bool = true, network: Bool = false) throws -> Data {
         // NSTask/NSPipe objects and their blob buffers are autoreleased;
         // see DrainingPool.swift.
-        try drainingPool { try runOnce(args, stdin: stdin, env: extra, useGitDir: useGitDir) }
+        try drainingPool { try runOnce(args, stdin: stdin, env: extra, useGitDir: useGitDir, network: network) }
     }
 
     /// git's own words for "you are not on the tip". A server-side hook
@@ -351,21 +384,97 @@ public final class TeamGit: TeamStore {
                                               withTemplate: "$1•••@")
     }
 
-    /// The stderr reader's landing pad; `drain` joins the group before
-    /// anyone reads it, so there is nothing to synchronise past that.
-    private final class Buffer: @unchecked Sendable { var data = Data() }
+    /// The readers' landing pad. Locked, not group-joined: a watched
+    /// drain that killed its child may return before a reader has seen
+    /// EOF (a helper process can hold the pipe a moment longer).
+    private final class Buffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var out = Data(), err = Data()
+        private var lastByte = Date()
+        func append(out data: Data) { lock.lock(); out.append(data); lock.unlock() }
+        func append(err data: Data) { lock.lock(); err.append(data); lastByte = Date(); lock.unlock() }
+        var idle: TimeInterval { lock.lock(); defer { lock.unlock() }; return Date().timeIntervalSince(lastByte) }
+        var contents: (out: Data, err: Data) { lock.lock(); defer { lock.unlock() }; return (out, err) }
+    }
+
+    /// The idle watchdog on a network command (see `stallTimeout`).
+    struct Watch {
+        var idle: TimeInterval = TeamGit.stallTimeout
+        var quiet: TimeInterval = TeamGit.quietNotice
+        /// git's latest stderr line, throttled; the "waiting" notice.
+        var activity: (@Sendable (String) -> Void)?
+        /// Kills the child; the pipes close behind it.
+        var kill: @Sendable () -> Void
+    }
 
     /// stdout and stderr read at the SAME time. Sequentially, a child
     /// that fills the other pipe's 64 KB buffer first never exits: `git
     /// push` writes progress to stderr while we block on stdout, and the
-    /// publish hangs (2026-09-06). Same bytes, same order, no timeout.
-    static func drain(out: FileHandle, err: FileHandle) -> (out: Data, err: Data) {
+    /// publish hangs (2026-09-06). Same bytes, same order. Unwatched: no
+    /// timeout. Watched: stderr is read as it arrives, every byte resets
+    /// the idle clock, and a child silent for `watch.idle` is killed —
+    /// `stalled` says so, and the caller throws instead of parsing.
+    static func drain(out: FileHandle, err: FileHandle, watch: Watch? = nil) -> (out: Data, err: Data, stalled: Bool) {
         let buffer = Buffer()
         let group = DispatchGroup()
-        DispatchQueue.global(qos: .utility).async(group: group) { buffer.data = err.readDataToEndOfFile() }
-        let stdout = out.readDataToEndOfFile()
-        group.wait()
-        return (stdout, buffer.data)
+        let queue = DispatchQueue.global(qos: .utility)
+        queue.async(group: group) {
+            var lastReport = Date.distantPast, tail = ""
+            while true {
+                let chunk = err.availableData
+                if chunk.isEmpty { break }
+                buffer.append(err: chunk)
+                guard let watch, let activity = watch.activity else { continue }
+                // Progress lines are `\r`-updated; the last segment of the
+                // last line is what a terminal would show right now.
+                tail = Self.lastLine(tail + String(decoding: chunk, as: UTF8.self))
+                let now = Date()
+                if !tail.isEmpty, now.timeIntervalSince(lastReport) >= 2 { lastReport = now; activity(tail) }
+            }
+        }
+        queue.async(group: group) { buffer.append(out: out.readDataToEndOfFile()) }
+        guard let watch else {
+            group.wait()
+            let (o, e) = buffer.contents
+            return (o, e, false)
+        }
+        var stalled = false, noticed = false
+        while group.wait(timeout: .now() + 1) == .timedOut {
+            let idle = buffer.idle
+            if idle >= watch.idle {
+                stalled = true
+                watch.kill()
+                // The readers finish when the pipes close; a helper that
+                // survives its parent may hold them a little longer.
+                _ = group.wait(timeout: .now() + 5)
+                break
+            }
+            if !noticed, idle >= watch.quiet {
+                noticed = true
+                watch.activity?("waiting for the store to answer…")
+            }
+        }
+        let (o, e) = buffer.contents
+        return (o, e, stalled)
+    }
+
+    /// The last non-empty `\r`/`\n`-separated segment of `text`, so a
+    /// progress stream reads as its current line.
+    static func lastLine(_ text: String) -> String {
+        for piece in text.split(whereSeparator: { $0 == "\r" || $0 == "\n" || $0 == "\r\n" }).reversed() {
+            let line = piece.trimmingCharacters(in: .whitespaces)
+            if !line.isEmpty { return line }
+        }
+        return ""
+    }
+
+    /// stderr for an error message: each `\r`-updated progress line
+    /// collapsed to its final state, so `--progress` output does not
+    /// land in the pane as a hundred half-drawn percentages.
+    static func collapsed(_ stderr: Data) -> String {
+        String(decoding: stderr, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in line.split(separator: "\r").last.map(String.init) ?? "" }
+            .joined(separator: "\n")
     }
 
     /// Writes the child's stdin and closes it, off the draining thread:
@@ -416,7 +525,7 @@ public final class TeamGit: TeamStore {
         return URL(fileURLWithPath: "/usr/bin/env")
     }()
 
-    private func runOnce(_ args: [String], stdin: Data?, env extra: [String: String], useGitDir: Bool) throws -> Data {
+    private func runOnce(_ args: [String], stdin: Data?, env extra: [String: String], useGitDir: Bool, network: Bool) throws -> Data {
         #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         // Foundation has no Process here; InfinitusCore is linked into the
         // phone app, which never drives git itself (spec §6.2: the phone
@@ -448,16 +557,29 @@ public final class TeamGit: TeamStore {
         }
         // Both pipes at once (see `drain`) while stdin is fed, then wait:
         // any one of the three blocking on another would hang the publish.
-        let (data, errData) = Self.drain(out: out.fileHandleForReading, err: err.fileHandleForReading)
+        let watch = network ? Watch(activity: { Self.activity.fire($0) }, kill: { Self.terminate(p) }) : nil
+        let (data, errData, stalled) = Self.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
         feeding.wait()
         p.waitUntilExit()
+        let command = args.joined(separator: " ")
+        if stalled { throw GitError.stalled(command: command, idle: watch?.idle ?? Self.stallTimeout) }
         guard p.terminationStatus == 0 else {
-            throw GitError.failed(command: args.joined(separator: " "), status: p.terminationStatus,
-                                  stderr: String(decoding: errData, as: UTF8.self))
+            throw GitError.failed(command: command, status: p.terminationStatus, stderr: Self.collapsed(errData))
         }
         return data
         #endif
     }
+
+    #if !os(iOS) && !os(tvOS) && !os(watchOS) && !os(visionOS)
+    /// SIGTERM, then SIGKILL for a child that ignores it. git dying
+    /// closes its helper's stdin, so `git-remote-https` follows on its own.
+    static func terminate(_ p: Process) {
+        guard p.isRunning else { return }
+        p.terminate()
+        for _ in 0..<30 where p.isRunning { Thread.sleep(forTimeInterval: 0.1) }
+        if p.isRunning { _ = kill(p.processIdentifier, SIGKILL) }
+    }
+    #endif
 }
 
 /// What the pane and the CLI print. Both interpolate the error
@@ -474,6 +596,8 @@ extension TeamGit.GitError: CustomStringConvertible {
         case .raceLost: return "another writer pushed first"
         case .unavailable: return "this platform runs no git (the phone hands team work to its Mac)"
         case .notEmpty: return "That remote already has content — use an empty repository"
+        case .stalled(let command, let idle):
+            return "the store did not answer for \(Int(idle)) s (git \(command.split(separator: " ").first ?? "") gave up)"
         }
     }
 }
