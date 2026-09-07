@@ -18,6 +18,16 @@ public enum ThemeColor {
         #endif
     }
 
+    /// The window's own ground, for the rings and discs that must cut a
+    /// gap out of whatever they overlap.
+    public static var background: Color {
+        #if canImport(AppKit)
+        return Color(nsColor: .windowBackgroundColor)
+        #else
+        return Color(uiColor: .systemBackground)
+        #endif
+    }
+
     public static func resolve(_ name: String) -> Color {
         switch name {
         case "red": return .red

@@ -196,25 +196,46 @@ private struct SessionChatRoot: View {
         .reloadOnInjection()
     }
 
+    /// The phone's chat header (#151) in the style Settings › Display ›
+    /// Sessions picks; the pid and folder keep a caption under it.
     private var header: some View {
-        let progress = model.sessionProgress.byPid[store.session.pid]
-        return HStack(spacing: 8) {
-            Circle().fill(color(for: status)).frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(SessionNaming.displayName(name: store.feed?.name ?? progress?.name,
-                                               autoName: progress?.autoName, cwd: store.session.cwd))
-                    .font(.headline).lineLimit(1)
-                Text("\(status) · pid \(String(store.session.pid)) · \((store.session.cwd as NSString).abbreviatingWithTildeInPath)")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-            }
-            Spacer()
-            if status == "busy" {
-                Button("Interrupt") { store.sendKey("esc") }
-                    .help("Stop the current turn (Esc)")
-            }
+        let theme = model.rowTheme
+        return VStack(alignment: .leading, spacing: 0) {
+            ChatHeaderView(style: model.chatHeader, theme: theme, data: headerData, showsBack: false,
+                           onInterrupt: status == "busy" ? { store.sendKey("esc") } : nil)
+            Text("pid \(String(store.session.pid)) · \((store.session.cwd as NSString).abbreviatingWithTildeInPath)")
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle)
+                .padding(.horizontal, 14).padding(.bottom, 6)
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, 6).padding(.top, 4)
+        .background(theme.plain ? Color.clear : ThemeColor.flash(theme).opacity(0.16))
+    }
+
+    /// What the header shows, built the way the phone's feed screen
+    /// builds it: the session's account through the fleet that owns
+    /// it, every window on that account, and that fleet's beats.
+    private var headerData: ChatHeaderData {
+        let progress = model.sessionProgress.byPid[store.session.pid]
+        let theme = model.rowTheme
+        let summary = SessionAccountLookup.summarize(pid: store.session.pid,
+                                                     fleets: model.fleets.compactMap { $0.lastFleet })
+        let account = summary?.account
+        var data = ChatHeaderData(
+            name: SessionNaming.displayName(name: store.feed?.name ?? progress?.name,
+                                            autoName: progress?.autoName, cwd: store.session.cwd),
+            status: status,
+            accountName: account.map { ChatHeaderData.accountName($0) },
+            plan: account?.plan,
+            chips: account.map { ChatHeaderData.chips($0, theme: theme, burnStyle: model.burnStyle) } ?? [])
+        if let account, let fleet = model.fleets.first(where: { $0.engineID == summary?.engineID }) {
+            data.switchTick = account.active ? fleet.switchFlashTick : 0
+            data.deathTick = fleet.deathTicks[account.number] ?? 0
+            data.reviveTick = fleet.reviveTicks[account.number] ?? 0
+            data.critical = AccountRowVitals.isCritical(account)
+            data.lucky = AccountRowVitals.isLucky(account, theme: theme)
+        }
+        return data
     }
 
     private var feedList: some View {

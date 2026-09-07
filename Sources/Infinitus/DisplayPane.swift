@@ -1,5 +1,6 @@
 import SwiftUI
 import InfinitusCore
+import InfinitusUI
 
 /// App-local display preferences — the rumps Settings menu's four display
 /// items (menubar.py `MenuBarSettings`), same choices and defaults.
@@ -176,6 +177,9 @@ struct DisplayPane: View {
                 Text("Terminal").tag("terminal")
                 Text("No terminal — Infinitus runs it, chat from the app or phone").tag("owned")
             }
+            // The phone's picker with its live previews (#151): one row
+            // per style, drawn in the current theme.
+            ChatHeaderPicker(selection: $model.chatHeader, theme: model.rowTheme)
         } header: {
             Text("Sessions")
         } footer: {
@@ -334,6 +338,7 @@ extension DisplayPane {
             entry(sessions, "Checkpoint the repository at every prompt", ["checkpoint", "git", "restore", "diff", "undo"]),
             entry(sessions, "Name unnamed sessions with Claude Haiku", ["haiku", "name", "title", "auto name"]),
             entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host", "headless", "owned"]),
+            entry(sessions, "Chat header", ["hud", "compact", "strip", "chat", "header", "unit frame"]),
             entry(startup, "Refresh interval", ["poll", "interval", "refresh", "seconds"],
                   anchor: startupAnchor),
             entry(startup, "Start at login", ["login item", "startup", "launch", "boot"],

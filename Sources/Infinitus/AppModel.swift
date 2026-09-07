@@ -407,6 +407,9 @@ final class AppModel: ObservableObject {
     @Published var introTitle: String { didSet { defaults.set(introTitle, forKey: "intro_title") } }
     /// Pace fire on 7d/model bars ("off"/"ember"/"flame"/"limit").
     @Published var burnStyle: String { didSet { defaults.set(burnStyle, forKey: "burn_style") } }
+    /// The chat window's header — "compact", "strip" or "hud" (#151), the
+    /// phone's own `chat_header` choices.
+    @Published var chatHeader: String { didSet { defaults.set(chatHeader, forKey: "chat_header") } }
     /// Mock mode (user 2026-08-31): the bundled demo fleet stands in
     /// for the engine. Machine-local, deliberately never synced. cswap
     /// is a let, so flipping this relaunches — the restart IS the
@@ -979,6 +982,7 @@ final class AppModel: ObservableObject {
         introSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
         introTitle = defaults.string(forKey: "intro_title") ?? "zoom"
         burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
+        chatHeader = defaults.string(forKey: "chat_header") ?? "compact"
         // Local: init reads it again below before every stored
         // property is set (two-phase init forbids self.mockMode there).
         // `bool(forKey:)`, not `object as? Bool`: the argument domain of
@@ -1149,6 +1153,7 @@ final class AppModel: ObservableObject {
         introSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
         introTitle = defaults.string(forKey: "intro_title") ?? "zoom"
         burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
+        chatHeader = defaults.string(forKey: "chat_header") ?? "compact"
     }
 
     // MARK: battle plan (#7)

@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
 
 ### Sessions
+- The Mac chat window wears the phone's chat header — Compact, Stat strip or Game HUD, chosen in Settings › Display › Sessions (#151).
 - A "needs AWS login" line met by a sign-in outside the app clears on its own: while it shows, the app asks the CLI every five minutes whether the profile works (#313).
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.
 - A headless session's permission prompt reaches the phone, the browser page and the Mac window the moment it parks, instead of up to two seconds later (#151).

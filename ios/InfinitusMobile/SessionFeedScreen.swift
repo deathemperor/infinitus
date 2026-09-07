@@ -277,7 +277,11 @@ struct SessionFeedScreen: View {
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
                     ChatHeaderView(style: headerStyle, theme: theme, data: headerData,
-                                   route: SessionDetailRoute(session: session, macId: macId),
+                                   link: { middle in
+                                       AnyView(NavigationLink(value: SessionDetailRoute(session: session, macId: macId)) { middle }
+                                           .buttonStyle(.plain)
+                                           .accessibilityLabel("Session details"))
+                                   },
                                    onBack: { dismiss() },
                                    onInterrupt: feed?.status == "busy" ? { sendKey("esc") } : nil)
                 }

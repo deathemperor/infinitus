@@ -1,51 +1,59 @@
 import SwiftUI
 import InfinitusCore
-import InfinitusUI
 
-/// What a chat header shows, apart from where it comes from: the feed
-/// screen builds it from the live session and its account, Settings
+/// What a chat header shows, apart from where it comes from: the phone's
+/// feed screen and the Mac's chat window build it from the live session and its account, Settings
 /// builds a sample so every header style can be previewed (user
 /// 2026-09-05: "hud settings should show a preview per options").
-struct ChatHeaderData {
-    var name: String
+public struct ChatHeaderData {
+    public var name: String
     /// The engine's raw status ("busy", "waiting", "idle", "shell").
-    var status: String
-    var accountName: String?
-    var plan: String?
+    public var status: String
+    public var accountName: String?
+    public var plan: String?
     /// The Mac this session lives on, when it isn't the primary (#144
     /// phase 2).
-    var macName: String? = nil
-    var chips: [WindowChip]
+    public var macName: String? = nil
+    public var chips: [WindowChip]
     /// The fleet's one-shot beats for this account (0 = never armed):
     /// the switch celebration, the death hit, the revival fanfare.
-    var switchTick = 0
-    var deathTick = 0
-    var reviveTick = 0
+    public var switchTick = 0
+    public var deathTick = 0
+    public var reviveTick = 0
     /// Dying (binding window in the 90s) and All Lucky 7s (RPG).
-    var critical = false
-    var lucky = false
+    public var critical = false
+    public var lucky = false
+
+    public init(name: String, status: String, accountName: String? = nil, plan: String? = nil,
+                chips: [WindowChip]) {
+        self.name = name
+        self.status = status
+        self.accountName = accountName
+        self.plan = plan
+        self.chips = chips
+    }
 
     /// One window per row of the Fleet card, ready for a line: the
     /// session and weekly windows first, then the per-model ones.
-    struct WindowChip: Identifiable {
-        let id: String
-        let glyph: String
+    public struct WindowChip: Identifiable {
+        public let id: String
+        public let glyph: String
         /// The model's themed name alone ("Dragon"), the glyph for the
         /// session and weekly windows.
-        let name: String
-        let color: Color
-        let window: UsageWindow
-        let session: Bool
+        public let name: String
+        public let color: Color
+        public let window: UsageWindow
+        public let session: Bool
         /// The bar's pace fire, the Fleet card's rules: 5h calm, 7d the
         /// pref (limit break RPG-only), Fable always limit under RPG.
-        let burnStyle: String
+        public let burnStyle: String
         /// The fever digits: the 5h/7d pair only when BOTH sit at 77,
         /// a model bar when it does itself (RPG only).
-        let lucky: Bool
-        var isModel: Bool { id.hasPrefix("m:") }
+        public let lucky: Bool
+        public var isModel: Bool { id.hasPrefix("m:") }
     }
 
-    static func chips(_ account: Account, theme: RowTheme, burnStyle: String = "off") -> [WindowChip] {
+    public static func chips(_ account: Account, theme: RowTheme, burnStyle: String = "off") -> [WindowChip] {
         var out: [WindowChip] = []
         let pref = theme.plain ? "off" : burnStyle
         let rpg = theme.id == "rpg"
@@ -74,14 +82,14 @@ struct ChatHeaderData {
         return out
     }
 
-    static func accountName(_ account: Account) -> String {
+    public static func accountName(_ account: Account) -> String {
         account.alias ?? String(account.email.prefix(while: { $0 != "@" }))
     }
 
     /// The Settings preview: a busy session on a Max account, part-way
     /// through its windows, under the first name in the theme's pool;
     /// the model window runs ahead of pace so the preview shows the burn.
-    static func sample(theme: RowTheme) -> ChatHeaderData {
+    public static func sample(theme: RowTheme) -> ChatHeaderData {
         let alias = theme.accountNames.first ?? "player1"
         let account = Account(number: 1, email: "\(alias.lowercased())@example.com", active: true,
                               usage: Usage(fiveHour: UsageWindow(pct: 71, expectedPct: 58),
@@ -104,18 +112,36 @@ struct ChatHeaderData {
 /// accessibility size, where the unit frame still reads as one. The
 /// clamp sits here, above the body, because `@ScaledMetric` reads the
 /// environment of the view that declares it.
-struct ChatHeaderView: View {
-    let style: String
-    let theme: RowTheme
-    let data: ChatHeaderData
-    var route: SessionDetailRoute? = nil
-    var onBack: (() -> Void)? = nil
+public struct ChatHeaderView: View {
+    public let style: String
+    public let theme: RowTheme
+    public let data: ChatHeaderData
+    /// Wraps the middle in the route into the session's details (the
+    /// phone's NavigationLink); nil leaves the header inert.
+    public var link: ((AnyView) -> AnyView)? = nil
+    /// The chevron at the left: the phone's screens pop with it, the
+    /// Mac's window has none.
+    public var showsBack = true
+    public var onBack: (() -> Void)? = nil
     /// Set while the session works: the stop button the Mac's chat
     /// window and the browser page already have (sends Esc, #223).
-    var onInterrupt: (() -> Void)? = nil
+    public var onInterrupt: (() -> Void)? = nil
 
-    var body: some View {
-        let header = ChatHeaderBody(style: style, theme: theme, data: data, route: route, onBack: onBack)
+    public init(style: String, theme: RowTheme, data: ChatHeaderData,
+                link: ((AnyView) -> AnyView)? = nil, showsBack: Bool = true,
+                onBack: (() -> Void)? = nil, onInterrupt: (() -> Void)? = nil) {
+        self.style = style
+        self.theme = theme
+        self.data = data
+        self.link = link
+        self.showsBack = showsBack
+        self.onBack = onBack
+        self.onInterrupt = onInterrupt
+    }
+
+    public var body: some View {
+        let header = ChatHeaderBody(style: style, theme: theme, data: data, link: link,
+                                    showsBack: showsBack, onBack: onBack)
         Group {
             if style == "hud" {
                 header.dynamicTypeSize(...DynamicTypeSize.accessibility2)
@@ -145,7 +171,8 @@ private struct ChatHeaderBody: View {
     let style: String
     let theme: RowTheme
     let data: ChatHeaderData
-    var route: SessionDetailRoute? = nil
+    var link: ((AnyView) -> AnyView)? = nil
+    var showsBack = true
     var onBack: (() -> Void)? = nil
     /// The Fleet card's gate: no flashes, pulses or fire under Reduce Motion.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -168,33 +195,44 @@ private struct ChatHeaderBody: View {
     }
 
     @ViewBuilder private func link<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        if let route {
-            NavigationLink(value: route) { content().contentShape(Rectangle()) }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Session details")
+        if let link {
+            link(AnyView(content().contentShape(Rectangle())))
         } else {
             content()
         }
     }
 
-    private var backButton: some View {
-        Button { onBack?() } label: {
-            Image(systemName: "chevron.left")
-                .font(.title3.weight(.semibold))
-                .frame(width: 40, height: 40)
-                .contentShape(Rectangle())
+    @ViewBuilder private var backButton: some View {
+        if showsBack {
+            Button { onBack?() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .allowsHitTesting(onBack != nil)
+            .accessibilityLabel("Back")
         }
-        .buttonStyle(.plain)
-        .allowsHitTesting(onBack != nil)
-        .accessibilityLabel("Back")
     }
 
     /// One tap puts what's on screen into the composer as an attachment
     /// (user 2026-09-05: "put the captured in attachment instead of send
     /// immediately as I need to describe the request").
 
-    private var statusWord: String { SessionWords.status(data.status, theme: theme) }
-    private var statusColor: Color { SessionWords.color(data.status) }
+    /// The theme's word for the state ("Questing" for busy under RPG);
+    /// the colors are the sessions card's.
+    private var statusWord: String { theme.sessionWord(data.status) }
+    private var statusColor: Color {
+        switch data.status {
+        case "busy": return .orange
+        case "waiting": return .yellow
+        case "idle": return .green
+        case "shell": return .blue
+        case "failed": return .red
+        default: return .gray
+        }
+    }
     private var planText: String? {
         data.plan.map { theme.plain ? $0 : theme.planLabel($0, compact: true) }
     }
@@ -268,7 +306,7 @@ private struct ChatHeaderBody: View {
         .frame(width: 38, height: 38)
         .overlay(alignment: .bottomTrailing) {
             Circle().fill(statusColor).frame(width: 10, height: 10)
-                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                .overlay(Circle().stroke(ThemeColor.background, lineWidth: 2))
                 .offset(x: 1, y: 1)
         }
     }
@@ -454,7 +492,7 @@ private struct ChatHeaderBody: View {
         ZStack {
             Circle().fill(RadialGradient(
                 colors: [ThemeColor.flash(theme).opacity(theme.plain ? 0.15 : 0.45),
-                         theme.plain ? Color(.systemBackground) : Color.black.opacity(0.7)],
+                         theme.plain ? ThemeColor.background : Color.black.opacity(0.7)],
                 center: .center, startRadius: 4, endRadius: portraitSize / 2))
             Circle().strokeBorder(ring, lineWidth: 3.5)
             Circle().inset(by: 4.5).strokeBorder(Color.black.opacity(theme.plain ? 0.15 : 0.55), lineWidth: 1.5)
@@ -477,14 +515,14 @@ private struct ChatHeaderBody: View {
                     .foregroundStyle(theme.plain ? Color.primary : ring)
                     .frame(minWidth: tierDisc, minHeight: tierDisc)
                     .padding(.horizontal, 2)
-                    .background(theme.plain ? Color(.systemBackground) : Color.black.opacity(0.88), in: Capsule())
+                    .background(theme.plain ? ThemeColor.background : Color.black.opacity(0.88), in: Capsule())
                     .overlay(Capsule().stroke(ring, lineWidth: 1.5))
                     .offset(x: -4, y: 4)
             }
         }
         .overlay(alignment: .topTrailing) {
             Circle().fill(statusColor).frame(width: 11, height: 11)
-                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                .overlay(Circle().stroke(ThemeColor.background, lineWidth: 2))
                 .offset(x: 1, y: -1)
         }
     }
@@ -519,13 +557,18 @@ private struct ChatHeaderBody: View {
 
 /// The Settings picker with a live preview of each header style, drawn
 /// with the current theme on the same tint the chat uses.
-struct ChatHeaderPicker: View {
+public struct ChatHeaderPicker: View {
     @Binding var selection: String
     let theme: RowTheme
 
+    public init(selection: Binding<String>, theme: RowTheme) {
+        _selection = selection
+        self.theme = theme
+    }
+
     private static let styles = [("compact", "Compact"), ("strip", "Stat strip"), ("hud", "Game HUD")]
 
-    var body: some View {
+    public var body: some View {
         ForEach(Self.styles, id: \.0) { tag, label in
             Button { selection = tag } label: {
                 VStack(alignment: .leading, spacing: 6) {
