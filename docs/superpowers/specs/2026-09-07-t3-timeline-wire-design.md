@@ -292,17 +292,23 @@ accept a snapshot at any time (T3 rule).
 `POST /sessions/{pid}/input`, `POST /sessions/start` and the attention route
 accept `commandId` (client-minted UUID). `Receipts` (Core, in-memory, cap
 1,000, 1 h TTL): same id + same target ⇒ the cached reply (200); same id +
-different target ⇒ 409; a tombstone per interrupted/removed input so a
-retry cannot resurrect it (T3 outbox doctrine). Absent `commandId` behaves
-as today.
+different target ⇒ 409; a duplicate while the first is still running ⇒ 409
+`in-flight`; tombstones are per pid — an interrupt (`kind: key`, `escape`)
+tombstones that pid's receipts so a retry cannot resurrect the stopped
+input (410), and a pid leaving the roster drops them (T3 outbox doctrine;
+amended 2026-09-07 while planning P3: the phone's ids are not known
+server-side, so tombstoning is by pid). Absent `commandId` behaves as
+today.
 
 ### 3.5 `GET /.well-known/infinitus` (unauthenticated)
 
 `{machineId, label, platform: "macos", appVersion, capabilities:
 {timeline, sequence, attention, leases, ownedSessions, checkpoints, team,
 pastSessions, images}}` — booleans, absent = unsupported, so the phone hides a
-feature on skew instead of failing to decode. `machineId` is the existing
-per-Mac identity used by the multi-Mac mirror (#144).
+feature on skew instead of failing to decode. `machineId` is a UUID minted
+once per Mac and kept in UserDefaults (`machine_id`, `MachineIdentity`):
+no Mac-side identity existed — the multi-Mac mirror's `MacPairing.id` is
+phone-local (amended 2026-09-07 while planning P3).
 
 ## 4. Phase 5 — leases
 
