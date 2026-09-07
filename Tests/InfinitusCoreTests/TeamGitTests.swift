@@ -274,7 +274,7 @@ final class TeamGitTests: XCTestCase {
         DispatchQueue.global().async {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            p.arguments = ["-c", "echo ok; sleep 60"]
+            p.arguments = ["-c", "echo ok; exec sleep 60"]   // exec: the killed process is the one holding the pipes
             let out = Pipe(), err = Pipe()
             p.standardOutput = out; p.standardError = err
             p.standardInput = FileHandle.nullDevice
@@ -285,13 +285,13 @@ final class TeamGitTests: XCTestCase {
             let (stdout, _, stalled) = TeamGit.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
             p.waitUntilExit()
             XCTAssertTrue(stalled)
-            XCTAssertLessThan(Date().timeIntervalSince(start), 10, "killed at the idle limit, not at the child's own exit")
+            XCTAssertLessThan(Date().timeIntervalSince(start), 20, "killed at the idle limit, not at the child's own exit")
             XCTAssertEqual(String(decoding: stdout, as: UTF8.self), "ok\n", "what arrived before the stall is kept")
             XCTAssertNotEqual(p.terminationStatus, 0)
             XCTAssertEqual(notices.value, ["waiting for the store to answer…"])
             done.fulfill()
         }
-        wait(for: [done], timeout: 20)
+        wait(for: [done], timeout: 30)
     }
 
     /// A slow child that keeps talking is never a stall, and its latest

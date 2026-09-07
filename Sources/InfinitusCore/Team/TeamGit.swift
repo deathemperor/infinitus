@@ -577,7 +577,9 @@ public final class TeamGit: TeamStore {
         guard p.isRunning else { return }
         p.terminate()
         for _ in 0..<30 where p.isRunning { Thread.sleep(forTimeInterval: 0.1) }
-        if p.isRunning { _ = kill(p.processIdentifier, SIGKILL) }
+        #if canImport(Darwin) || canImport(Glibc)
+        if p.isRunning { _ = kill(p.processIdentifier, SIGKILL) }   // Windows' terminate() is already TerminateProcess
+        #endif
     }
     #endif
 }
