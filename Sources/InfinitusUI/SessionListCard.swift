@@ -27,11 +27,17 @@ public struct SessionListCard<P: SessionProgressSource>: View {
     /// How Infinitus started each session (#163/#165) — a chip beside the
     /// name; empty on hosts that don't know.
     let births: [Int: SessionBirth]
+    /// A host with a chat surface of its own (the Mac's window, #151)
+    /// gets each row as a click-through; the phone routes rows itself
+    /// and leaves this nil.
+    let onOpen: ((SessionDetail) -> Void)?
 
-    public init(live: LiveSessions, progress: P, births: [Int: SessionBirth] = [:]) {
+    public init(live: LiveSessions, progress: P, births: [Int: SessionBirth] = [:],
+                onOpen: ((SessionDetail) -> Void)? = nil) {
         self.live = live
         self.progress = progress
         self.births = births
+        self.onOpen = onOpen
     }
 
     public var body: some View {
@@ -62,12 +68,19 @@ public struct SessionListCard<P: SessionProgressSource>: View {
                             Text(age(s.startedAt))
                                 .font(PopupFont.caption2).foregroundStyle(.tertiary)
                                 .monospacedDigit()
+                            if onOpen != nil {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .font(PopupFont.caption2).foregroundStyle(.tertiary)
+                            }
                         }
                         if let p = progress.byPid[s.pid], p.hasProgressSignal {
                             SessionProgressLine(progress: p)
                         }
                     }
-                    .help(tooltip(s, progress.byPid[s.pid]))
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpen?(s) }
+                    .help(onOpen == nil ? tooltip(s, progress.byPid[s.pid])
+                                        : tooltip(s, progress.byPid[s.pid]) + " · click to chat")
                 }
             } else {
                 Text("Session detail needs a newer cswap engine.")

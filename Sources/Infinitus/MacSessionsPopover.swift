@@ -23,7 +23,11 @@ struct MacSessionsPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
+            SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths,
+                            onOpen: { session in
+                                model.sessionsShown = false
+                                model.openSessionChat?(session)
+                            })
             Divider()
             CheckpointsSection(model: model, live: live)
             Divider()
