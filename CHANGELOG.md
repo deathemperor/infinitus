@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Sessions
+- The Mac only computes per-session facts for sessions someone is watching: the phone leases the list, the open feed and the stats tab every 25 s, and the Mac's own popup, pop-out and chat windows count too (#223).
 - The browser page draws the timeline rows too — tool groups and folded turns open in place (#223).
 - The phone and the Mac chat window draw the new feed: tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works (#223).
 - Session timelines reduce to feed rows: grouped tool runs, folded turns, one live row while Claude works (#223).
