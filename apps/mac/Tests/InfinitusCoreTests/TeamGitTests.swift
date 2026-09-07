@@ -246,6 +246,7 @@ final class TeamGitTests: XCTestCase {
     /// used to be the same error, so `approve` retried a dead network
     /// three times and reported "raceLost" for it.
     func testOnlyARejectedPushCountsAsALostRace() throws {
+        try skipOffPOSIX()
         XCTAssertTrue(TeamGit.isRaceRejection(" ! [rejected]        abc -> roster (fetch first)\n"))
         XCTAssertTrue(TeamGit.isRaceRejection("Updates were rejected because of a non-fast-forward\n"))
         XCTAssertFalse(TeamGit.isRaceRejection("fatal: 'origin' does not appear to be a git repository\n"))
@@ -292,6 +293,7 @@ final class TeamGitTests: XCTestCase {
     /// refuses to run. A lock a LIVE child holds is young, so only old
     /// ones go.
     func testOpenSweepsStaleLocksAndLeavesFreshOnes() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let dir = scratch.appendingPathComponent("locks")
         let first = TeamGit(dir: dir, remote: remote, token: nil, author: "k")
@@ -323,6 +325,7 @@ final class TeamGitTests: XCTestCase {
     /// stray feature branch); the store reads only the branches §4.2
     /// defines.
     func testOnlyTheStoresOwnBranchesAreListed() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let bare = scratch.appendingPathComponent("remote.git")
         let g = TeamGit(dir: scratch.appendingPathComponent("filtered"), remote: remote, token: nil, author: "k")
@@ -365,6 +368,7 @@ final class TeamGitTests: XCTestCase {
     /// rewritten, the mirror rebuilt, the object gc'd). Re-listing the
     /// branch is always correct — it is what a nil cursor does.
     func testAnUnreachableCursorFallsBackToTheFullListing() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let g = TeamGit(dir: scratch.appendingPathComponent("cursor"), remote: remote, token: nil, author: "k")
         try g.open()
@@ -456,6 +460,7 @@ final class TeamGitTests: XCTestCase {
     }
 
     func testFeedingAChildThatAlreadyExitedDoesNotKillTheProcess() throws {
+        try skipOffPOSIX()
         // Under the old sequential write this raised SIGPIPE (#55).
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")

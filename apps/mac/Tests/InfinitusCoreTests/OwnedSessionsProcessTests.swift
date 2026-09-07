@@ -8,6 +8,15 @@ final class OwnedSessionsProcessTests: XCTestCase {
     private var scriptURL: URL!
     private var cwd: URL!
 
+    override func setUpWithError() throws {
+        #if os(Windows)
+        // The fake is a `#!/bin/sh` script and spawn uses POSIX pipes /
+        // SIGKILL. Not ported — OwnedSessions itself compiles, this suite
+        // does not run here.
+        try XCTSkipIf(true, "OwnedSessions process tests spawn a POSIX shell fake; not ported to Windows yet")
+        #endif
+    }
+
     /// Common setup for every fake `claude`: a fresh temp dir as `cwd`, the
     /// script written and made executable. `body` builds the script text
     /// from the dir it will run in.

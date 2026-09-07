@@ -193,6 +193,7 @@ final class TeamMembershipTests: XCTestCase {
     /// the removal — the earlier one (sealed AT the removal instant)
     /// stays readable, the later one does not.
     func testTheEnvelopeSealedAtTheRemovalInstantIsStillReadable() throws {
+        try skipOffPOSIX()
         let (leader, member, _) = try team()
         let at = try member.publish(kind: TeamKinds.stats, path: "days/2026-09-01.json",
                                     plaintext: Data("{\"schema\":1}".utf8), audience: .leaders, now: 1_040)
@@ -310,6 +311,7 @@ final class TeamMembershipTests: XCTestCase {
     /// read. A garbled blob is counted and skipped, and nothing is
     /// decrypted just to list it.
     func testReadableScanSkipsUnreadableBlobsAndCountsThem() throws {
+        try skipOffPOSIX()
         let (leader, member, remote) = try team()
         let good = try member.publish(kind: TeamKinds.now, path: "now.json", plaintext: Data("{}".utf8),
                                       audience: .leaders, now: 1_030)
@@ -340,6 +342,7 @@ final class TeamMembershipTests: XCTestCase {
     /// Spec §6.5: "Member key rotation is offered so even the member
     /// can't reopen old envelopes."
     func testLeaveCanRotateThisMachinesIdentity() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let (lp, ls) = machine("leader"), (mp, ms) = machine("member")
         let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
@@ -369,6 +372,7 @@ final class TeamMembershipTests: XCTestCase {
     /// another team on the same Mac knows the old kid would silently
     /// unmake that membership.
     func testRotationIsRefusedWhileAnotherTeamOnThisMacKnowsTheKid() throws {
+        try skipOffPOSIX()
         let remote = try makeRemote()
         let (lp, ls) = machine("leader"), (mp, ms) = machine("member")
         let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
