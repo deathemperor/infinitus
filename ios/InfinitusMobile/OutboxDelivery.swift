@@ -68,6 +68,13 @@ enum OutboxDelivery {
             case "rejected" where reply.detail == "session ended": return .ended
             default: return .refused(reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome)
             }
+        } catch MirrorTransportError.http(409) {
+            // The first delivery is still running on the Mac (#223 receipts);
+            // the next pass gets its reply replayed.
+            return .transport
+        } catch MirrorTransportError.http(410) {
+            // The user stopped the turn after this was sent: it stays stopped.
+            return .refused("stopped before it landed")
         } catch MirrorTransportError.http(let code) {
             // The Mac answered — a rotated pairing token, most likely. Not
             // "gone", so the item must not retry forever as queued.

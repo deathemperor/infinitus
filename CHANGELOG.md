@@ -17,6 +17,7 @@ publishes the matching section as the GitHub release body.
 - The Mac can own a Claude Code session outright — no terminal — and answer its permission prompts and questions from the phone or the popup (#151).
 
 ### Phone
+- A send the phone retries lands once: the Mac answers the retry with the first reply, and a turn you stopped keeps its late input out (#223).
 - Swipe a session to pin it, settle it or snooze it an hour (long-press for "until tomorrow"); pinned rows lead, snoozed and settled ones sit dimmed at the tail (#223).
 - Session rows take their dot and word from the host's facts — a raised hand for an approval, a question mark for a prompt, the plan's "2 of 5" under the row — and the chat header gets a stop button while Claude works (#223).
 - Closing the keyboard on a session chat drops the composer straight back to the bottom instead of leaving it floating mid-screen (#294).

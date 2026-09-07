@@ -1146,9 +1146,12 @@ struct SessionFeedScreen: View {
                 // token, a stale route) — not something a retry later
                 // fixes, so it is shown, not queued; the draft stays put.
                 if case MirrorTransportError.http(let code) = error {
-                    messageResult = code == 401
-                        ? "the Mac refused it — check the pairing token in Settings"
-                        : "the Mac refused it (HTTP \(code))"
+                    switch code {
+                    case 401: messageResult = "the Mac refused it — check the pairing token in Settings"
+                    case 409: messageResult = "the Mac is still taking the last send — it lands once"
+                    case 410: messageResult = "the turn was stopped before it landed"
+                    default: messageResult = "the Mac refused it (HTTP \(code))"
+                    }
                     return
                 }
                 if (try? OutboxDelivery.outbox.enqueue(

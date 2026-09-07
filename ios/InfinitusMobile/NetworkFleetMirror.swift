@@ -516,11 +516,14 @@ actor NetworkFleetMirror: FleetMirror {
     func sessionInput(pid: Int32, request: SessionInput.Request) async throws -> SessionInput.Reply {
         // #168: a retried delivery needs its own id for the Mac's dedup —
         // give every hand-typed send one too, so a timeout-then-retry from
-        // the composer is never mistaken for the same request twice.
-        let request = request.requestId == nil
-            ? SessionInput.Request(kind: request.kind, text: request.text, attachments: request.attachments,
-                                   requestId: UUID().uuidString, queuedAt: request.queuedAt, sessionId: request.sessionId)
-            : request
+        // the composer is never mistaken for the same request twice. The
+        // same id rides as the `commandId` receipt (#223 phase 4): the Mac
+        // replays the first reply to a retry, answers 409 while the first
+        // send is still running, 410 once the user stopped the turn.
+        let requestId = request.requestId ?? UUID().uuidString
+        let request = SessionInput.Request(kind: request.kind, text: request.text, attachments: request.attachments,
+                                           requestId: requestId, queuedAt: request.queuedAt, sessionId: request.sessionId,
+                                           commandId: request.commandId ?? requestId)
         let timeout = (request.attachments?.isEmpty == false) ? Self.attachmentInputTimeout : Self.inputTimeout
         let token = pairToken()
         let path = MirrorTransport.sessionInputPath(pid: pid)
