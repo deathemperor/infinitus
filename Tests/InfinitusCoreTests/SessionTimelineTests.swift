@@ -40,4 +40,54 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertTrue(tl.turns.isEmpty && tl.messages.isEmpty && tl.activities.isEmpty)
         XCTAssertNil(tl.latestTurn)
     }
+
+    // MARK: Task 2 — turns and messages
+    func testPlainTranscriptGivesTwoTurnsAndMergedAssistantText() throws {
+        let tl = build(try entries("plain"))
+        XCTAssertEqual(tl.turns.map(\.id), ["u1", "u2"])
+        XCTAssertEqual(tl.messages.map(\.id), ["u1", "a1", "u2", "a3"])
+        XCTAssertEqual(tl.messages.map(\.role), [.user, .assistant, .user, .assistant])
+        XCTAssertEqual(tl.message(id: "a1")?.text, "Looking into it.\n\nFound it.")
+        XCTAssertEqual(tl.message(id: "a1")?.turnId, "u1")
+        XCTAssertEqual(tl.turn(id: "u1")?.assistantMessageId, "a1")
+        XCTAssertEqual(tl.turn(id: "u1")?.startedAt, UsageHistory.parseISO("2026-09-01T10:00:01.000Z"))
+        XCTAssertEqual(tl.turn(id: "u1")?.completedAt, UsageHistory.parseISO("2026-09-01T10:00:03.000Z"))
+        XCTAssertEqual(tl.turn(id: "u1")?.state, .completed)
+        XCTAssertEqual(tl.turn(id: "u2")?.state, .completed)   // record idle ⇒ completed (T3 projector.ts:78-93)
+        XCTAssertTrue(tl.activities.isEmpty)
+    }
+
+    func testBusyRecordMakesTheLastTurnRunningAndItsAnswerStreaming() throws {
+        let tl = build(try entries("plain"), status: "busy")
+        XCTAssertEqual(tl.turn(id: "u1")?.state, .completed)
+        XCTAssertEqual(tl.turn(id: "u2")?.state, .running)
+        XCTAssertNil(tl.turn(id: "u2")?.completedAt)
+        XCTAssertEqual(tl.messages.filter(\.streaming).map(\.id), ["a3"])
+    }
+
+    func testIdsAreStableAcrossBuilds() throws {
+        let e = try entries("plain")
+        XCTAssertEqual(build(e), build(e))
+        XCTAssertFalse(build(e).turns.isEmpty)
+    }
+
+    func testSidechainAndMachineryEntriesAreSkipped() {
+        let tl = build(lines([
+            #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"go"}}"#,
+            #"{"type":"user","uuid":"side","isSidechain":true,"timestamp":"2026-09-01T10:00:01.000Z","message":{"content":"sub-agent prompt"}}"#,
+            #"{"type":"user","uuid":"u2","timestamp":"2026-09-01T10:00:02.000Z","message":{"content":"<system-reminder>noise</system-reminder>"}}"#,
+            #"{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:03.000Z","message":{"content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"ok"}]}}"#,
+        ]))
+        XCTAssertEqual(tl.messages.map(\.id), ["u1", "a1"])
+        XCTAssertEqual(tl.message(id: "a1")?.text, "ok")
+    }
+
+    func testAQueuedCommandAttachmentIsAUserMessageAndOpensATurn() {
+        let tl = build(lines([
+            #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"first"}}"#,
+            #"{"type":"attachment","uuid":"q1","timestamp":"2026-09-01T10:00:05.000Z","attachment":{"type":"queued_command","prompt":"and this too"}}"#,
+        ]), status: "busy")
+        XCTAssertEqual(tl.turns.map(\.id), ["u1", "q1"])
+        XCTAssertEqual(tl.message(id: "q1")?.text, "and this too")
+    }
 }
