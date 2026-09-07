@@ -118,10 +118,12 @@ public final class TeamGit: TeamStore {
     public func sync() throws { try sync(branches: nil) }
 
     /// `branches` nil fetches them all; a list fetches just those (the
-    /// prune then only touches those refs).
+    /// prune then only touches those refs). Each is a pattern, not an
+    /// exact ref: a branch nobody has pushed yet (`requests`, before the
+    /// first join) then matches nothing instead of failing the fetch.
     public func sync(branches: [String]?) throws {
         heads = [:]
-        let refspecs = branches?.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
+        let refspecs = branches?.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
             ?? ["+refs/heads/*:refs/remotes/origin/*"]
         _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
     }

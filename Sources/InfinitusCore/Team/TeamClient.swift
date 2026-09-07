@@ -73,6 +73,9 @@ public final class TeamClient {
 
     public var isLeader: Bool { roster?.doc.isLeader(identity.kid) ?? false }
     public var isMember: Bool { roster?.doc.keys(for: identity.kid) != nil }
+    /// All a join needs, and all a pending member's fetch pulls until the
+    /// roster admits it (#321): the member branches carry the transcripts.
+    public static let joinBranches = ["roster", "requests"]
 
     // MARK: identity
 
@@ -160,12 +163,13 @@ public final class TeamClient {
         let config = TeamConfig(id: code.team, name: code.name, remote: code.remote, kid: me.kid,
                                 joinedAt: now, leaderKid: code.leader.kid)
         let store = TeamGit(dir: paths.storeDir(code.team), remote: code.remote, token: code.token, author: me.kid)
+        store.firstSyncBranches = joinBranches
         try store.open()
         let client = TeamClient(config: config, identity: me, roster: nil, paths: paths, secrets: secrets, store: store)
         // The roster must be led by the leader the code named, or the code
         // points at someone else's store: any roster-acceptance failure on
         // this first fetch is the code's fault, not the store's.
-        do { _ = try client.fetch() } catch is TeamRoster.RosterError { throw ClientError.badCode }
+        do { _ = try client.fetch(branches: joinBranches) } catch is TeamRoster.RosterError { throw ClientError.badCode }
         if let token = code.token { try secrets.write(tokenName(code.team), Data(token.utf8)) }
         let request = TeamRequest(keys: me.keys, name: name, devices: devices, platform: platform, at: now, proof: code.nonce.map { TeamRequest.proof(nonce: $0, kid: me.kid) })
         try store.put("requests/\(me.kid).json", try CanonicalJSON.encode(try Signed.make(request, by: me)))
@@ -198,8 +202,14 @@ public final class TeamClient {
     /// Pulls the remote and accepts its roster if the rules allow; a bad
     /// roster throws and the last accepted one stays.
     @discardableResult
-    public func fetch() throws -> TeamRoster {
-        try store.sync()
+    public func fetch() throws -> TeamRoster { try fetch(branches: nil) }
+
+    /// `branches` nil syncs every branch; a list syncs just those, which
+    /// must include `roster` for the acceptance check below to see a
+    /// new roster.
+    @discardableResult
+    public func fetch(branches: [String]?) throws -> TeamRoster {
+        try store.sync(branches: branches)
         guard let data = try store.get("roster/team.json") else { throw ClientError.noRoster }
         let candidate = try CanonicalJSON.decode(Signed<TeamRoster>.self, from: data)
         if let roster {

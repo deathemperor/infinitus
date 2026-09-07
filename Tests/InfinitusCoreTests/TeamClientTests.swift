@@ -98,12 +98,18 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(try leader.status().role, "leader")
         XCTAssertEqual(lp.teamIDs(), [leader.config.id])
 
+        // The leader's own branch exists before anyone joins: it is what a
+        // join must NOT fetch (#321 — it carries the transcripts).
+        let seed = try leader.publish(kind: "aggregates", path: "aggregates/seed.json", plaintext: Data("s".utf8),
+                                      audience: .team, now: 1_005)
+        let leaderBranch = "origin/m/\(leader.identity.kid)"
         let code = try leader.code(expiresIn: 60, now: 1_000)
         let member = try TeamClient.request(code: code, name: "Bo", devices: ["Mac"], platform: "macos",
                                             paths: mp, secrets: ms, now: 1_010)
         XCTAssertFalse(member.isMember)
-        // The request fetched roster and requests only — not the leader's
-        // branch, which carries the transcripts (#321).
+        XCTAssertEqual(remoteBranches(in: mp.storeDir(leader.config.id)), ["origin/requests", "origin/roster"])
+        // A pending member keeps to those two on every fetch, too.
+        _ = try member.fetch(branches: TeamClient.joinBranches)
         XCTAssertEqual(remoteBranches(in: mp.storeDir(leader.config.id)), ["origin/requests", "origin/roster"])
         XCTAssertEqual(try member.status().role, "pending")
         XCTAssertEqual(member.config.leaderKid, leader.identity.kid)
@@ -144,7 +150,7 @@ final class TeamClientTests: XCTestCase {
                                       audience: .leaders, now: 1_030)
         XCTAssertEqual(path, "m/\(member.identity.kid)/now.json")
         _ = try leader.fetch()
-        XCTAssertEqual(try leader.readable().map(\.path), [path])
+        XCTAssertEqual(try leader.readable().map(\.path).sorted(), [path, seed].sorted())
         let (header, plain) = try leader.read(path)
         XCTAssertEqual(header.kind, "now")
         XCTAssertEqual(header.from, member.identity.kid)
@@ -161,6 +167,8 @@ final class TeamClientTests: XCTestCase {
                                       audience: .team, now: 1_050)
         _ = try member.fetch()
         XCTAssertEqual(try member.read(team).1, Data("w".utf8))
+        // An admitted member's full fetch brings the leader's branch along.
+        XCTAssertTrue(remoteBranches(in: mp.storeDir(leader.config.id)).contains(leaderBranch))
 
         // Reopen from disk keeps identity, roster and role.
         let reopened = try TeamClient.open(id: member.config.id, paths: mp, secrets: ms)
