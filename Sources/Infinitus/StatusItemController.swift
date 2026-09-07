@@ -223,6 +223,7 @@ final class StatusItemController {
         fitAnchored(to: anchoredIdeal)
         positionAnchored()
         anchored?.orderFrontRegardless()
+        syncLocalLease()
         updateDismissMonitors()
         model.introOpened()
     }
@@ -236,6 +237,7 @@ final class StatusItemController {
     private func closeAnchored(feedLock: Bool = true) {
         if feedLock { model.lock.surfaceHidden() }
         anchored?.orderOut(nil)
+        syncLocalLease()
         updateDismissMonitors()
     }
 
@@ -439,7 +441,15 @@ final class StatusItemController {
     /// status item is hidden or the bar refuses it.
     /// `infinitusctl hide popout` (#223 phase 5's e2e no-lease window):
     /// the same order-out the wall uses; the window is kept for reuse.
-    func hidePinnedWindow() { pinned?.orderOut(nil) }
+    func hidePinnedWindow() { pinned?.orderOut(nil); syncLocalLease() }
+
+    /// The Mac's own UI is a lease-holding client (#223 phase 5): tell
+    /// the model which of the two popup surfaces are up. Every show /
+    /// order-out path ends here; the chat windows report their own.
+    private func syncLocalLease() {
+        model.uiSurface("popup", visible: anchored?.isVisible == true)
+        model.uiSurface("popout", visible: pinned?.isVisible == true)
+    }
 
     func showPinnedWindow(activate: Bool = true) {
         if wall.isVisible { wall.dismissForPopup() }
@@ -520,6 +530,7 @@ final class StatusItemController {
         } else {
             pinned?.orderFrontRegardless()
         }
+        syncLocalLease()
         pinnedKeyChanged()
     }
 
@@ -551,6 +562,7 @@ final class StatusItemController {
         guard !AppDelegate.terminating else { return }
         model.lock.surfaceHidden()
         UserDefaults.standard.set(false, forKey: "popout_shown")
+        syncLocalLease()
     }
 
     /// Nudge a window fully back into its screen's visible frame — a
@@ -702,6 +714,7 @@ final class StatusItemController {
         let hadPinned = pinned?.isVisible == true
         if anchored?.isVisible == true { closeAnchored() }
         if hadPinned { pinned?.orderOut(nil) }
+        syncLocalLease()
         wall.restore = { [weak self] in
             if hadPinned { self?.showPinnedWindow() }
         }

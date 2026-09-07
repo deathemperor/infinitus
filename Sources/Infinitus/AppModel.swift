@@ -685,9 +685,17 @@ final class AppModel: ObservableObject {
     /// a phone holding a lease. StatusItemController and the chat window
     /// call it on show / hide; the cap is the TTL, so a UI that dies
     /// never pins work for more than five minutes.
-    private var localUIVisible = false
-    func reportLocalActivity(visible: Bool) {
-        localUIVisible = visible
+    /// The local surfaces on screen by id — "popup", "popout",
+    /// "chat:<pid>" — the lease holds while any is up, so closing the
+    /// popup over an open chat window drops nothing.
+    private var visibleSurfaces = Set<String>()
+    private var localUIVisible: Bool { !visibleSurfaces.isEmpty }
+    func uiSurface(_ id: String, visible: Bool) {
+        let was = localUIVisible
+        if visible { visibleSurfaces.insert(id) } else { visibleSurfaces.remove(id) }
+        if localUIVisible != was || visible { reportLocalActivity(visible: localUIVisible) }
+    }
+    private func reportLocalActivity(visible: Bool) {
         if visible {
             mirrorServer.leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
                                              recentlyInteracted: true, scopes: [.sessions, .fleets, .stats],
@@ -1054,6 +1062,7 @@ final class AppModel: ObservableObject {
         // backfill or write real App Support caches under
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
+        statsModel.leases = mirrorServer.leases
         if !isPlayground, !mockMode {
             let namer = SessionNamer(appSupport: FileManager.default
                 .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

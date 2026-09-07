@@ -56,6 +56,7 @@ final class SessionChatWindows: NSObject, NSWindowDelegate {
         windows[pid] = w
         store.start()
         w.makeKeyAndOrderFront(nil)
+        model.uiSurface("chat:\(pid)", visible: true)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -64,6 +65,7 @@ final class SessionChatWindows: NSObject, NSWindowDelegate {
               let pid = windows.first(where: { $0.value == w })?.key else { return }
         w.contentViewController = nil
         stores[pid]?.stop()
+        stores[pid]?.model?.uiSurface("chat:\(pid)", visible: false)
     }
 }
 
@@ -80,7 +82,7 @@ final class SessionChatStore: ObservableObject {
     @Published private(set) var gone = false
     @Published private(set) var sending = false
     @Published var note: String?
-    private weak var model: AppModel?
+    private(set) weak var model: AppModel?
     private var loop: Task<Void, Never>?
 
     init(pid: Int32, session: SessionDetail, model: AppModel) {

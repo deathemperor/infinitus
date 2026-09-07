@@ -150,8 +150,12 @@ final class StatsModel: ObservableObject {
     ///   into whatever `days` currently holds and republishes.
     ///
     /// `scanning` stays true until both are done.
+    /// The lease table (#223 phase 5): a scan runs only while some client
+    /// — the Mac's own popup counts — holds `stats`; nil scans freely.
+    var leases: LeaseTable?
+
     func refresh() {
-        guard enabled, !scanning else { return }
+        guard enabled, !scanning, leases?.holds(.stats) ?? true else { return }
         scanning = true
         transcriptsFinished = false
         let store = eventStore
