@@ -4,16 +4,20 @@ import Foundation
 /// `SessionFeedReader.stamp` (size, mtime, record status) moves — the
 /// snapshot's facts and phase 4's sequence log both read from here, so
 /// an unchanged transcript costs one `stat` per pass (#223 phase 3).
-/// Keyed by session id: a pid can change sessions under a resume.
+/// Keyed by session id: a pid can change sessions under a resume. Every
+/// rebuild and facts change is numbered into the `SequenceLog` when one
+/// is attached (#223 phase 4).
 public final class TimelineCache: @unchecked Sendable {
-    private struct Slot { let stamp: String; let timeline: SessionTimeline }
+    private struct Slot { let stamp: String; let pid: Int32; let timeline: SessionTimeline }
     private let lock = NSLock()
     private var slots: [String: Slot] = [:]
+    private var sessionByPid: [Int32: String] = [:]
     private let limit: Int
+    private let log: SequenceLog?
     /// Perf probe: transcript parses so far.
     public private(set) var parses = 0
 
-    public init(limit: Int = 30) { self.limit = limit }
+    public init(limit: Int = 30, log: SequenceLog? = nil) { self.limit = limit; self.log = log }
 
     public func timeline(record: ClaudeSessionRecord, claudeDir: URL) -> SessionTimeline? {
         let stamp = SessionFeedReader.stamp(record: record, claudeDir: claudeDir)
@@ -22,6 +26,12 @@ public final class TimelineCache: @unchecked Sendable {
             lock.unlock()
             return slot.timeline
         }
+        // A resumed pid (new session id) starts over: the old ring is a gap.
+        if let previousSession = sessionByPid[record.pid], previousSession != record.sessionId {
+            slots[previousSession] = nil
+            log?.drop(pid: record.pid)
+        }
+        let previous = slots[record.sessionId]?.timeline
         lock.unlock()
         guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit),
               let timeline = feed.timeline else { return nil }
@@ -29,8 +39,10 @@ public final class TimelineCache: @unchecked Sendable {
         // between the stat above and the read is re-parsed next pass.
         lock.lock()
         parses += 1
-        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", timeline: timeline)
+        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", pid: record.pid, timeline: timeline)
+        sessionByPid[record.pid] = record.sessionId
         lock.unlock()
+        _ = log?.record(pid: record.pid, old: previous, new: timeline)
         return timeline
     }
 
@@ -42,12 +54,19 @@ public final class TimelineCache: @unchecked Sendable {
         var out: [Int: SessionFacts] = [:]
         for record in records where !record.sessionId.isEmpty {
             guard let timeline = timeline(record: record, claudeDir: claudeDir) else { continue }
-            out[Int(record.pid)] = SessionFacts.derive(timeline: timeline.appending(pending: pending(record.pid)),
-                                                       status: record.status,
-                                                       attention: attention.entry(sessionId: record.sessionId))
+            let facts = SessionFacts.derive(timeline: timeline.appending(pending: pending(record.pid)),
+                                            status: record.status,
+                                            attention: attention.entry(sessionId: record.sessionId))
+            out[Int(record.pid)] = facts
+            _ = log?.record(pid: record.pid, facts: facts)
         }
         let keep = Set(records.map(\.sessionId))
-        lock.lock(); slots = slots.filter { keep.contains($0.key) }; lock.unlock()
+        lock.lock()
+        let gone = slots.filter { !keep.contains($0.key) }
+        slots = slots.filter { keep.contains($0.key) }
+        for (_, slot) in gone { sessionByPid[slot.pid] = nil }
+        lock.unlock()
+        for (_, slot) in gone { log?.drop(pid: slot.pid) }
         return out
     }
 }

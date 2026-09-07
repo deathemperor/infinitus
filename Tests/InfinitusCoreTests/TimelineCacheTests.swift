@@ -70,4 +70,40 @@ final class TimelineCacheTests: XCTestCase {
         _ = cache.timeline(record: r1, claudeDir: root)
         XCTAssertEqual(cache.parses, 2)
     }
+
+    func testRebuildsAndFactsFlowIntoTheSequenceLog() throws {
+        let url = try write([prompt], sessionId: "s1")
+        let busy = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")
+        let log = SequenceLog(epoch: "e1")
+        let cache = TimelineCache(log: log)
+        let store = AttentionStore(url: root.appendingPathComponent("attention.json"))
+        _ = cache.facts(records: [busy], claudeDir: root, attention: store) { _ in [] }
+        let first = log.current
+        XCTAssertEqual(log.events(pid: 41, after: 0)?.map(\.entity).suffix(1), [.facts])
+        XCTAssertGreaterThan(first, 1)
+        // Unchanged: nothing appended.
+        _ = cache.facts(records: [busy], claudeDir: root, attention: store) { _ in [] }
+        XCTAssertEqual(log.current, first)
+        // Transcript grows and the turn closes: turn upsert, message upsert, facts.
+        try (prompt + "\n" + reply + "\n").write(to: url, atomically: true, encoding: .utf8)
+        let idle = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle")
+        _ = cache.facts(records: [idle], claudeDir: root, attention: store) { _ in [] }
+        XCTAssertEqual(log.events(pid: 41, after: first)?.map(\.entity), [.turn, .message, .facts])
+        // Gone: dropped from the ring.
+        _ = cache.facts(records: [], claudeDir: root, attention: store) { _ in [] }
+        XCTAssertNil(log.events(pid: 41, after: 0))
+    }
+
+    func testAResumedPidStartsItsRingOver() throws {
+        _ = try write([prompt], sessionId: "s1")
+        _ = try write([prompt, reply], sessionId: "s2")
+        let log = SequenceLog(epoch: "e1")
+        let cache = TimelineCache(log: log)
+        _ = cache.timeline(record: ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy"), claudeDir: root)
+        let before = log.current
+        _ = cache.timeline(record: ClaudeSessionRecord(pid: 41, sessionId: "s2", cwd: "/Users/me/repo", status: "idle"), claudeDir: root)
+        // Only s2's fresh upserts remain reachable; s1's are gone with the drop.
+        XCTAssertNil(log.events(pid: 41, after: 0))
+        XCTAssertEqual(log.events(pid: 41, after: before)?.map(\.entity), [.turn, .message, .message])
+    }
 }

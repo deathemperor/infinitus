@@ -37,6 +37,9 @@ public final class SequenceLog: @unchecked Sendable {
     }
     private var rings: [Int32: Ring] = [:]
     private var lastFacts: [Int32: SessionFacts] = [:]
+    /// Where a dropped pid's ring ended: a cursor from before a resume or
+    /// a roster exit is a gap, never a partial replay.
+    private var droppedAt: [Int32: Int] = [:]
 
     public init(epoch: String = UUID().uuidString, maxEvents: Int = 1000, maxBytes: Int = 8 * 1024 * 1024) {
         self.epoch = epoch; self.maxEvents = maxEvents; self.maxBytes = maxBytes
@@ -84,13 +87,13 @@ public final class SequenceLog: @unchecked Sendable {
 
     /// The session left the roster: its ring and facts go with it.
     public func drop(pid: Int32) {
-        lock.lock(); rings[pid] = nil; lastFacts[pid] = nil; lock.unlock()
+        lock.lock(); rings[pid] = nil; lastFacts[pid] = nil; droppedAt[pid] = next - 1; lock.unlock()
     }
 
     private func append(pid: Int32, op: TimelineEvent.Op, entity: TimelineEvent.Entity, id: String, body: JSONValue?) {
         let event = TimelineEvent(sequence: next, pid: pid, op: op, entity: entity, id: id, body: body)
         next += 1
-        var ring = rings[pid] ?? Ring()
+        var ring = rings[pid] ?? Ring(evictedThrough: droppedAt[pid] ?? 0)
         let size = (try? JSONEncoder().encode(event))?.count ?? 0
         ring.events.append(event); ring.bytes.append(size); ring.total += size
         while ring.events.count > maxEvents || (ring.total > maxBytes && ring.events.count > 1) {
