@@ -258,4 +258,12 @@ final class FleetMirrorTests: XCTestCase {
             #"{"capturedAt":"2026-01-01T00:00:00Z","machineName":"m","listJSON":"e30=","sessions":[]}"#.utf8))
         XCTAssertNil(older.factsByPid)
     }
+
+    func testSnapshotCarriesEpochAndSequence() throws {
+        let snap = MirrorSnapshot(capturedAt: Date(timeIntervalSince1970: 1), machineName: "m", listJSON: Data("{}".utf8),
+                                  sessions: [], epoch: "e1", sequence: 42)
+        let back = try JSONDecoder().decode(MirrorSnapshot.self, from: try JSONEncoder().encode(snap))
+        XCTAssertEqual(back.epoch, "e1")
+        XCTAssertEqual(back.sequence, 42)
+    }
 }

@@ -32,6 +32,11 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// of each session, next to `progressByPid`; `SessionDetail` is the
     /// engine's and can't carry it. Additive optional.
     public let factsByPid: [Int: SessionFacts]?
+    /// The `SequenceLog`'s launch epoch and last sequence at capture (#223
+    /// phase 4): a phone that sees a new epoch re-syncs every timeline.
+    /// Additive optionals.
+    public let epoch: String?
+    public let sequence: Int?
     /// Every engine's last fleet (#8 multi-engine), in popup order —
     /// `listJSON` stays the primary cswap fleet for older phones; a
     /// phone that knows this field stacks one section per fleet.
@@ -88,7 +93,8 @@ public struct MirrorSnapshot: Codable, Sendable {
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
                 app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil,
                 births: [Int: SessionBirth]? = nil,
-                factsByPid: [Int: SessionFacts]? = nil) {
+                factsByPid: [Int: SessionFacts]? = nil,
+                epoch: String? = nil, sequence: Int? = nil) {
         self.capturedAt = capturedAt
         self.machineName = machineName
         self.listJSON = listJSON
@@ -111,6 +117,8 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.profiles = profiles
         self.births = births
         self.factsByPid = factsByPid
+        self.epoch = epoch
+        self.sequence = sequence
     }
 }
 
