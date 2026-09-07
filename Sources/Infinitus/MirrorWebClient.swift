@@ -62,6 +62,11 @@ button:disabled { opacity: .5; cursor: default; }
 .permission { align-self: stretch; max-width: none; background: rgba(255,159,10,.15); font: 12px ui-monospace, Menlo, monospace; }
 .question { align-self: stretch; max-width: none; background: rgba(255,214,10,.15); }
 .limit, .held, .other, .agent { align-self: flex-start; color: var(--muted); font-size: 12px; max-width: 100%; }
+.fold, .toggle { align-self: flex-start; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.toggle.err { color: #ff453a; } .fold .chev, .toggle .chev { display: inline-block; width: 1em; } .open .chev { transform: rotate(90deg); }
+.work { align-self: flex-start; display: flex; flex-direction: column; gap: 4px; max-width: 100%; padding-left: 1em; }
+.work .tool { align-self: flex-start; } .work .tool .detail { display: block; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thinking { align-self: flex-start; color: var(--muted); font-size: 12px; }
 .limit { color: #ff453a; } .held { color: var(--warn); }
 .row pre { margin: 6px 0; padding: 8px; background: rgba(127,127,127,.15); border-radius: 8px; overflow: auto; font: 12px ui-monospace, Menlo, monospace; white-space: pre; }
 .row code { font: 12px ui-monospace, Menlo, monospace; background: rgba(127,127,127,.15); border-radius: 4px; padding: 0 3px; }
@@ -107,6 +112,9 @@ button:disabled { opacity: .5; cursor: default; }
   const $ = id => document.getElementById(id);
   const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   let pid = null, since = null, feed = null, pollGen = 0, snapshot = null, progress = {}, names = {};
+  // The Mac serves every timeline row with the fold's hidden ones flagged
+  // (`rows=1`); folding and the work-group toggles are this page's state.
+  let expandedTurns = new Set(), expandedGroups = new Set();
 
   // Inline markdown: fences, `code`, **bold**; the rest is text.
   function md(text) {
@@ -167,10 +175,55 @@ button:disabled { opacity: .5; cursor: default; }
       default: return `<div class="${esc(item.kind)}">${esc(item.text)}</div>`;
     }
   }
+  const ICON = { read: "📄", edit: "✏️", command: "⌘", browser: "🌐", codeSearch: "🔍", search: "🔍", update: "ℹ️", other: "🔧" };
+  function optionLabels(e) {
+    const q = e.payload && Array.isArray(e.payload.questions) && e.payload.questions[0];
+    return q && Array.isArray(q.options) ? q.options.map(o => o && o.label).filter(Boolean) : [];
+  }
+  function entry(e) {
+    const p = e.payload || {};
+    switch (e.kind) {
+      case "approval.requested": return row({ kind: "permission", text: e.summary, toolName: p.toolName });
+      case "user-input.requested": return row({ kind: "question", text: e.summary, options: optionLabels(e) });
+      case "user-input.resolved": return `<div class="other">✓ ${esc(typeof p.answers === "string" ? "Answered: " + p.answers : "Answered")}</div>`;
+      case "runtime.warning": return `<div class="${p.code === "held" ? "held" : "limit"}">${p.code === "held" ? "✋" : "⏳"} ${esc(e.summary)}</div>`;
+      case "runtime.error": return `<div class="tool err">⚠ ${esc(e.summary)}</div>`;
+      case "context-compaction": return `<div class="other">⇲ ${esc(e.summary)}</div>`;
+      case "turn.plan.updated": return `<div class="other">☑ ${esc(e.summary)}</div>`;
+      default:
+        if (!e.kind.startsWith("tool.")) return `<div class="other">${esc(e.summary)}</div>`;
+        return `<div class="tool ${e.status === "failure" ? "err" : ""}">${e.status === "inProgress" ? "…" : ICON[e.action] || ICON.other} ${esc(e.summary)}`
+          + `${e.changedFiles && e.changedFiles.length > 1 ? " · " + e.changedFiles.length + " files" : ""}`
+          + `${e.detail ? `<span class="detail">${esc(e.detail)}</span>` : ""}</div>`;
+    }
+  }
+  function visible(r) {
+    if (r.hidden && !expandedTurns.has(r.turnId)) return false;
+    return !(r.id.startsWith("work-details:") && !expandedGroups.has(r.id.slice("work-details:".length)));
+  }
+  function timelineRow(r) {
+    switch (r.type) {
+      case "message": { const m = r.message; return row({ kind: m.role === "user" ? "user" : "assistant", text: m.text, images: m.images, sender: m.sender }); }
+      case "activityGroup": return `<div class="work">${r.activities.map(entry).join("")}</div>`;
+      case "workToggle": {
+        const t = r.toggle, open = expandedGroups.has(t.groupId);
+        const mark = t.live ? "…" : t.hasFailure ? "!" : `<span class="chev">›</span>`;
+        return `<button class="toggle ${t.hasFailure ? "err" : ""} ${open ? "open" : ""}" data-group="${esc(t.groupId)}">${mark} ${esc(t.summary)}${!t.live && t.hiddenCount > 1 ? " · " + t.hiddenCount : ""}</button>`;
+      }
+      case "turnFold": { const open = expandedTurns.has(r.turnId); return `<button class="fold ${open ? "open" : ""}" data-turn="${esc(r.turnId)}"><span class="chev">›</span> ${esc(r.fold.label)}</button>`; }
+      case "thinking": return `<div class="thinking">… Thinking</div>`;
+      case "agentSpawn": { const a = r.agents; return `<div class="agent">⚙ ${esc(a.title)}${a.members.map(m => `<br>${esc(m.agentType + " — " + m.title)} · ${m.failed ? "failed" : m.running ? "running" + (m.lastTool ? " · " + m.lastTool : "") : "done"}`).join("")}</div>`; }
+      default: return "";
+    }
+  }
+  function flip(set, key) { if (set.has(key)) set.delete(key); else set.add(key); renderFeed(); }
   function renderFeed() {
     const el = $("feed"); const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     if (!feed) { el.innerHTML = '<div class="empty">Reading the transcript…</div>'; return; }
-    el.innerHTML = feed.items.length ? feed.items.map(row).join("") : '<div class="empty">Messages show up here as the session works.</div>';
+    const html = feed.rows ? feed.rows.filter(visible).map(timelineRow).join("") : feed.items.map(row).join("");
+    el.innerHTML = html || '<div class="empty">Messages show up here as the session works.</div>';
+    el.querySelectorAll(".fold").forEach(b => b.onclick = () => flip(expandedTurns, b.dataset.turn));
+    el.querySelectorAll(".toggle").forEach(b => b.onclick = () => flip(expandedGroups, b.dataset.group));
     if (atBottom) el.scrollTop = el.scrollHeight;
     renderHead(); renderPrompt();
   }
@@ -195,7 +248,7 @@ button:disabled { opacity: .5; cursor: default; }
     while (gen === pollGen && pid) {
       const started = Date.now(); let ok = true, changed = false;
       try {
-        const url = `/sessions/${pid}/tail?n=200` + (since ? `&since=${encodeURIComponent(since)}&wait=25` : "");
+        const url = `/sessions/${pid}/tail?n=200&rows=1` + (since ? `&since=${encodeURIComponent(since)}&wait=25` : "");
         const r = await fetch(url, { headers: H });
         if (gen !== pollGen) return;
         if (r.status === 404) { feed = feed || { items: [], status: "ended", waiting: false }; feed.status = "ended"; renderFeed(); ok = false; }
@@ -208,6 +261,7 @@ button:disabled { opacity: .5; cursor: default; }
   }
   function open(p) {
     pid = p; since = null; feed = null; pollGen++; document.body.className = "";
+    expandedTurns = new Set(); expandedGroups = new Set();
     renderSessions(); renderFeed(); renderHead(); poll(pollGen); $("draft").focus();
   }
   async function send(req) {
