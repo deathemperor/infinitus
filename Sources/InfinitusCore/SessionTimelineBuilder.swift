@@ -45,8 +45,14 @@ public enum SessionTimelineBuilder {
         /// JSONSerialization's Any → the closed `JSONValue`. A JSON `true`
         /// bridges as NSNumber too, so the boolean check comes first.
         static func json(_ any: Any) -> JSONValue {
+            #if !canImport(Darwin)
+            // swift-corelibs-foundation bridges JSON booleans to Bool, never NSNumber.
+            if let b = any as? Bool { return .bool(b) }
+            #endif
             if let n = any as? NSNumber {
+                #if canImport(Darwin)
                 if CFGetTypeID(n) == CFBooleanGetTypeID() { return .bool(n.boolValue) }
+                #endif
                 return .number(n.doubleValue)
             }
             switch any {
