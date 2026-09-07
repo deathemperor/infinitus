@@ -33,6 +33,8 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
+- Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
 - Settings › Machine shows on dev builds and stays hidden on releases.
 - Fewer stray notifications: "all sessions finished" needs ten minutes of work first, its stretch and the last-alive warning survive a relaunch, and engine housekeeping events no longer post banners (#231).
 - Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
@@ -63,6 +65,7 @@ publishes the matching section as the GitHub release body.
 - A phone showing the revival countdown skips the duplicate all-dead alert, and a working activity starts silently.
 
 ### Team (preview)
+- Team session control, core: grants, sealed command and ack envelopes, the verification pipeline and the control routes land in InfinitusCore with tests; nothing is mounted yet (#220).
 - Team store hardening: `--team` ids are one path segment, git's stdin is fed without a pipe deadlock or SIGPIPE, the CLI reports encoding failures instead of exiting 0, garbled signer keys read as a bad signature (#55).
 - A teammate's fleet — every account with tier, state and headroom — shows in their detail on the Mac and the phone, with a Fleet share row (default: leaders) and a headroom board for leaders (#221).
 - A removed teammate's files stay readable up to the moment they were removed, and only later ones are ignored.

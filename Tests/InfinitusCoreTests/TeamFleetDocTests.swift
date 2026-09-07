@@ -42,6 +42,23 @@ final class TeamFleetDocTests: XCTestCase {
 
     func testFleetPathShapeNamesTheKindAndItsSender() {
         XCTAssertEqual(TeamKinds.expected(at: "m/k/fleet.json")?.kind, "fleet")
+    }
+
+    func testControlPathsNameTheirKindAndOwner() {
+        XCTAssertEqual(TeamKinds.expected(at: "m/k/control/commands/abc.json")?.kind, TeamKinds.command)
+        XCTAssertEqual(TeamKinds.expected(at: "m/k/control/commands/abc.json")?.from, "k")
+        XCTAssertEqual(TeamKinds.expected(at: "m/k/control/acks/abc.json")?.kind, TeamKinds.ack)
+        XCTAssertEqual(TeamKinds.expected(at: "m/leader/control/hostnames/member.json")?.kind, TeamKinds.hostname)
+        XCTAssertNil(TeamKinds.expected(at: "m/k/control/commands/abc.txt"))
+        XCTAssertNil(TeamKinds.expected(at: "m/k/control/other/abc.json"))
+        XCTAssertNil(TeamKinds.expected(at: "roster/control/commands/abc.json"), "no control under roster/")
+        // A command replayed under another member's branch is a sender mismatch, as for every kind.
+        XCTAssertThrowsError(try TeamKinds.check(kind: TeamKinds.command, from: "k", at: "m/other/control/commands/abc.json")) {
+            XCTAssertEqual($0 as? TeamKinds.KindError, .senderMismatch)
+        }
+        XCTAssertThrowsError(try TeamKinds.check(kind: TeamKinds.ack, from: "k", at: "m/k/control/commands/abc.json")) {
+            XCTAssertEqual($0 as? TeamKinds.KindError, .kindMismatch)
+        }
         XCTAssertEqual(TeamKinds.expected(at: "m/k/fleet.json")?.from, "k")
         XCTAssertNil(TeamKinds.expected(at: "m/k/fleet/1.json"))
         let h = Envelope.Header(v: 1, kind: "fleet", from: "k", eph: "", to: [], at: 1, nonce: "", sig: nil)

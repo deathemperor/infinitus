@@ -6,10 +6,12 @@ import SwiftUI
 /// done here: fenced code, headings, bullet/numbered lists, quotes,
 /// paragraphs — each paragraph's inline bold/italic/code/links through
 /// `AttributedString(markdown:)`.
-struct MarkdownText: View {
-    let text: String
+public struct MarkdownText: View {
+    public let text: String
 
-    var body: some View {
+    public init(text: String) { self.text = text }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(Self.blocks(text).enumerated()), id: \.offset) { _, block in
                 render(block)

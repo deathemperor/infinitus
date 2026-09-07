@@ -643,6 +643,9 @@ final class MirrorServer: ObservableObject {
                 let response: Data
                 if !MirrorTransport.isAuthorized(request, token: token.current) {
                     response = MirrorTransport.unauthorizedResponse()
+                } else if request.method == "GET", request.path == MirrorWebClient.path {
+                    // The browser client (#151): Linux/Windows have no app.
+                    response = MirrorWebClient.response()
                 } else if request.method == "GET",
                           request.path == MirrorTransport.snapshotPath {
                     response = payload.latest.map(MirrorTransport.snapshotResponse)
