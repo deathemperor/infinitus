@@ -57,6 +57,7 @@ cleanup() {
     # sleeping from earlier runs, 2026-09-03).
     pkill -f "$INFINITUS_CSWAP auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
+    pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
@@ -100,6 +101,8 @@ if [ "$1" = "sts" ]; then
 fi
 profile=""
 while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; shift; done
+# The orphan fixture (#274): a login that never finishes.
+[ "$profile" = "e2e-orphan" ] && exec sleep 3600
 echo "Please visit the following URL:"
 echo "https://e2e.invalid/authorize?profile=$profile"
 printf 'Enter the authorization code: '
@@ -169,6 +172,11 @@ EOF
 cat >"$INFINITUS_AWS_LEDGER" <<EOF
 [{"phase":"done","flow":"remote","message":"signed in","startedAt":$(date +%s),"pid":$SEED_PID,"profile":"e2e-seeded"}]
 EOF
+# A login wrapper an earlier instance left behind (#274): spawned from a
+# subshell that exits, so it is launchd's child like the real leftover.
+( /usr/bin/script -q /dev/null "$SOCKDIR/aws" login --remote --profile e2e-orphan </dev/null >/dev/null 2>&1 & )
+sleep 1
+pgrep -f "profile e2e-orphan" >/dev/null || fail "orphan login fixture did not start"
 
 "$APP" >"$LOG" 2>&1 &
 APP_PID=$!
@@ -188,6 +196,12 @@ until "$CTL" status >/dev/null 2>&1; do
     sleep 1
 done
 echo "app up after ${i}s"
+i=0
+while pgrep -f "profile e2e-orphan" >/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 15 ] || fail "orphan login wrapper from an earlier instance not swept at launch"
+    sleep 1
+done
+echo "aws: orphan login wrapper swept at launch"
 
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"

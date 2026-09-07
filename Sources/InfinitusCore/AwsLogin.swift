@@ -472,4 +472,22 @@ public enum AwsLogin {
         "[Infinitus] AWS login for profile \(profile) completed\(fromPhone ? " from the phone" : ""). "
             + "Retry the command that needed it and continue."
     }
+
+    /// Pids of login wrappers an earlier app instance left behind (#274):
+    /// the runner's own `script -q /dev/null <aws> login …`, reparented to
+    /// launchd (ppid 1) once that instance died — a relaunch by SIGTERM
+    /// never reaches the quit hook that kills them, and one was found
+    /// alive 1d 21h later holding the cred broker's refresh lock. `ps` is
+    /// `ps -axo pid=,ppid=,command=`; `aws` the CLI path this instance
+    /// runs, so a dev instance on its own stub never touches the real
+    /// app's logins.
+    public static func orphanLogins(ps: String, aws: String) -> [Int32] {
+        let marker = "script -q /dev/null \(aws) login"
+        return ps.split(separator: "\n").compactMap { line in
+            let fields = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+            guard fields.count == 3, let pid = Int32(fields[0]), fields[1] == "1",
+                  fields[2].contains(marker) else { return nil }
+            return pid
+        }
+    }
 }

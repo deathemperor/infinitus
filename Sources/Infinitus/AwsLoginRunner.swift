@@ -50,6 +50,21 @@ actor AwsLoginRunner {
             for state in AwsLogin.Ledger.decode(data) { finished[state.profile] = state }
         }
         if !finished.isEmpty { onChange(Array(finished.values)) }
+        Task.detached(priority: .utility) { Self.sweepOrphans() }
+    }
+
+    /// Kills the login wrappers an earlier instance left behind (#274):
+    /// each holds the cred broker's refresh lock, so every caller on
+    /// that profile fails until it dies. Once, at launch, off the actor.
+    nonisolated static func sweepOrphans() {
+        let aws = ProcessInfo.processInfo.environment["INFINITUS_AWS_CLI"] ?? Subprocess.find(awsCandidates) ?? "aws"
+        guard let ps = try? Subprocess.run("/bin/ps", ["-axo", "pid=,ppid=,command="]) else { return }
+        for pid in AwsLogin.orphanLogins(ps: ps, aws: aws) {
+            kill(pid, SIGTERM)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) {
+                if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+            }
+        }
     }
 
     static let awsCandidates = [
@@ -238,6 +253,12 @@ actor AwsLoginRunner {
     private func expire(profile: String) {
         guard let run = runs[profile], run.process.isRunning else { return }
         run.process.terminate()
+        // `script` can sit on its pty past SIGTERM; SIGKILL after a grace
+        // (a wrapper found alive 1d 21h after its 600 s, #274).
+        let process = run.process
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) {
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        }
     }
 
     /// Records a profile as signed in without a run of its own — its need

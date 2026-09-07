@@ -239,4 +239,18 @@ final class AwsLoginSubagentTests: XCTestCase {
         try write([failed] + Array(repeating: fine, count: SessionProgress.awsLoginScanEntries * 2), agent: "busy")
         XCTAssertNil(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile)
     }
+
+    func testOrphanLoginWrappersAreTheLaunchdChildrenRunningThisInstancesAws() {
+        let ps = """
+            81429     1 /usr/bin/script -q /dev/null /opt/homebrew/bin/aws login --remote --profile papaya-login
+            81430 81429 /opt/homebrew/bin/aws login --remote --profile papaya-login
+             9001   777 /usr/bin/script -q /dev/null /opt/homebrew/bin/aws login --profile live
+             9002     1 /usr/bin/script -q /dev/null /tmp/e2e/aws login --remote --profile e2e-orphan
+             9003     1 /opt/homebrew/bin/aws sts get-caller-identity --profile papaya
+            """
+        // Only the wrapper (its child goes with it), only launchd's, only this aws.
+        XCTAssertEqual(AwsLogin.orphanLogins(ps: ps, aws: "/opt/homebrew/bin/aws"), [81429])
+        XCTAssertEqual(AwsLogin.orphanLogins(ps: ps, aws: "/tmp/e2e/aws"), [9002])
+        XCTAssertEqual(AwsLogin.orphanLogins(ps: "", aws: "/opt/homebrew/bin/aws"), [])
+    }
 }

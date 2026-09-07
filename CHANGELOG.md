@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 
 ### Sessions
 - A "needs AWS login" line met by a sign-in outside the app clears on its own: while it shows, the app asks the CLI every five minutes whether the profile works (#313).
+- An `aws login` the app left running when it relaunched is killed at the next launch, and a login past its ten minutes is killed for good — a leftover held the credential broker's lock and failed every caller on that profile (#274).
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.
 - A headless session's permission prompt reaches the phone, the browser page and the Mac window the moment it parks, instead of up to two seconds later (#151).
 - Clicking a session row in the popup's footer sessions card opens its chat window again, with past sessions and the driving line, like the rail's card.
