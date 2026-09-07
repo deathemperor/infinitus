@@ -3,14 +3,12 @@ import AppKit
 import CoreImage.CIFilterBuiltins
 import InfinitusCore
 
-/// Settings › Team (spec §9). Not in a team: Create / Join, both behind
-/// the biometric-lock gate (§2.2). In a team: header + loop state,
+/// Settings › Team (spec §9). Not in a team: Create / Join. In a team: header + loop state,
 /// requests (leaders), members, invite / team code (leaders), sharing,
 /// exclusions, privacy (Leave). Grouped Form like LockPane; every action
 /// goes through TeamModel and re-renders from its snapshot.
 struct TeamPane: View {
     @ObservedObject var team: TeamModel
-    @ObservedObject var lock: LockModel
     @ObservedObject var feed: TeamControlFeed
 
     var body: some View {
@@ -66,8 +64,6 @@ struct TeamPane: View {
     @State private var cfLabel = TeamHostnames.defaultLabel
     @State private var cfToken = ""
 
-    private var gateOpen: Bool { if case .allowed = team.gate() { return true } else { return false } }
-
     /// Bonjour rides the LAN mirror's listener: off, this Mac neither
     /// advertises nor answers, whatever Discoverable says.
     @ViewBuilder private var nearbyHint: some View {
@@ -79,17 +75,6 @@ struct TeamPane: View {
 
     private var notInTeam: some View {
         Group {
-            if !gateOpen {
-                Section {
-                    HStack {
-                        Label(TeamGate.reason, systemImage: "lock")
-                        Spacer()
-                        Button("Open Lock settings") { lock.revealSetting() }
-                    }
-                    Text("Create team and Request to join stay disabled until biometric unlock is on.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
             Section("Create a team") {
                 TextField("Team name", text: $createName)
                 TextField("Your name", text: $leaderName)
@@ -100,7 +85,7 @@ struct TeamPane: View {
                 Button("Create team") {
                     Task { await team.create(name: createName, remote: remote, token: token, leaderName: leaderName); token = "" }
                 }
-                .disabled(!gateOpen || createName.isEmpty || remote.isEmpty || leaderName.isEmpty)
+                .disabled(createName.isEmpty || remote.isEmpty || leaderName.isEmpty)
             }
             Section("Join a team") {
                 TextField("Your name", text: $joinName)
@@ -108,7 +93,7 @@ struct TeamPane: View {
                     .onAppear { if let pending = team.pendingCode { joinCode = pending } }
                     .onChange(of: team.pendingCode) { _, pending in if let pending { joinCode = pending } }
                 Button("Request to join") { Task { await team.join(code: joinCode, name: joinName) } }
-                    .disabled(!gateOpen || joinCode.isEmpty || joinName.isEmpty)
+                    .disabled(joinCode.isEmpty || joinName.isEmpty)
                 if let kid = team.kid {
                     LabeledContent("Your identity") { Text(kid).font(.caption.monospaced()).textSelection(.enabled) }
                 }
@@ -121,7 +106,7 @@ struct TeamPane: View {
                     HStack {
                         VStack(alignment: .leading) { Text(peer.name).bold(); Text("leads a team · \(peer.host)").font(.caption).foregroundStyle(.secondary) }
                         Spacer()
-                        Button("Request to join") { Task { await team.requestNearby(peer, name: joinName) } }.disabled(!gateOpen || joinName.isEmpty)
+                        Button("Request to join") { Task { await team.requestNearby(peer, name: joinName) } }.disabled(joinName.isEmpty)
                     }
                 }
                 HStack {
@@ -143,7 +128,7 @@ struct TeamPane: View {
                             }
                             Spacer()
                             Button("Accept") { Task { await team.acceptInvite(invite, name: joinName) } }
-                                .disabled(!gateOpen || joinName.isEmpty)
+                                .disabled(joinName.isEmpty)
                             Button("Ignore") { Task { await team.ignoreInvite(invite) } }
                         }
                     }
@@ -200,7 +185,7 @@ struct TeamPane: View {
                                 Text(r.kid).font(.caption2.monospaced()).foregroundStyle(.tertiary)
                             }
                             Spacer()
-                            Button("Approve") { Task { await team.approve(kid: r.kid) } }.disabled(!gateOpen)
+                            Button("Approve") { Task { await team.approve(kid: r.kid) } }
                             Button("Decline") { Task { await team.decline(kid: r.kid) } }
                         }
                     }
@@ -224,7 +209,7 @@ struct TeamPane: View {
                             }
                             Spacer()
                             if peer.team == nil {
-                                Button("Invite") { Task { await team.inviteNearby(peer) } }.disabled(!gateOpen)
+                                Button("Invite") { Task { await team.inviteNearby(peer) } }
                             }
                         }
                     }
@@ -466,10 +451,6 @@ struct TeamPane: View {
             }
             Text("A hostname is a Cloudflare named tunnel under your zone (`<name>.<label>.<zone>`), minted per member; their Mac starts it on the next fetch and keeps the same address across restarts.")
                 .font(.caption).foregroundStyle(.secondary)
-            if !gateOpen {
-                Label("Saving a token and giving hostnames need biometric unlock (Settings › Lock).", systemImage: "lock")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         }
     }
 

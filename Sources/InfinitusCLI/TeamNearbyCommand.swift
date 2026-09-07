@@ -155,11 +155,6 @@ func runTeamNearby(_ args: [String]) -> Int32? {
             guard let kid = positional.first, positional.count == 1, let name = options["name"] else {
                 return fail(teamNearbyUsage(), code: 2)
             }
-            // Accepting is joining (spec §2.2), so it takes the same gate
-            // `team request` takes in TeamCommand.swift.
-            if case .needsLock(let why) = TeamGate.check(lockEnabled: LockSetting.enabledOnThisMachine()) {
-                return fail("\(why) (Infinitus › Settings › Lock)")
-            }
             guard let invite = TeamNearby.Store.invites(paths: paths).first(where: { $0.from.kid == kid }) else {
                 return fail("no invitation from \(kid) (`infinitusctl team invites` lists them)")
             }

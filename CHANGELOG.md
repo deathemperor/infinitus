@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Team
+- Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
+
 ### Sessions
 - The Mac popup's session rows take their dot and word from the same facts as the phone — a raised hand for an approval, a question mark for a prompt, snoozed and settled rows dimmed (#223).
 - The Mac only computes per-session facts for sessions someone is watching: the phone leases the list, the open feed and the stats tab every 25 s, and the Mac's own popup, pop-out and chat windows count too (#223).

@@ -217,7 +217,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Settings › Team: the team this Mac is in — members with what they last published, today's effort and blockers, pending requests, the loop's last fetch/publish — or null when there is none.",
                        replyShape: "{id, name, remote (masked), kid, role: leader|member|pending, rev, members: [{kid, name, role, isMe, founder, lastPublished, kinds, sessionsNow, blockers, crashes, todayUSD, todayMessages, todayCommits, fleet, controls}], requests: [{kid, name, platform, devices, at}], lastFetch, lastPublish, lastError} | null"),
         ControlCommand(name: "team-create", args: ["<name>"], options: ["--remote <url>", "--as <your name>"], effect: .write,
-                       summary: "Create a team on an empty git remote (no credential over the socket: use a file:// or ssh remote, or the pane). Needs the biometric lock on (INFINITUS_LOCK_GATE=open in CI).",
+                       summary: "Create a team on an empty git remote (no credential over the socket: use a file:// or ssh remote, or the pane).",
                        replyShape: "team-status"),
         ControlCommand(name: "team-code", options: ["--days <n>", "--invite"], effect: .write,
                        summary: "Mint a team code (leaders): `infinitus://join/…`, valid --days (default 7); --invite adds a one-time nonce the app auto-approves when Settings › Team's switch is on (off by default). Carries the store credential when one is set.",

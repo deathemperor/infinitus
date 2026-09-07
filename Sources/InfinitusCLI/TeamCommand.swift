@@ -117,17 +117,6 @@ func runTeam(_ args: [String]) -> Int32 {
         i += 1
     }
 
-    // Team gate (spec §2.2): starting, joining or admitting into a team
-    // needs the biometric lock on wherever a lock exists — the Mac app's
-    // setting, read from its prefs domain. Linux is open until its
-    // passphrase lock ships; INFINITUS_LOCK_GATE=open is the CI/dev hatch
-    // (TeamGate.swift).
-    if (["create", "request", "approve", "policy"].contains(sub)
-        || (sub == "identity" && ["recovery", "export"].contains(positional.first ?? ""))),
-       case .needsLock(let why) = TeamGate.check(lockEnabled: LockSetting.enabledOnThisMachine()) {
-        return fail("\(why) (Infinitus › Settings › Lock)")
-    }
-
     let paths = TeamPaths.standard()
     let secrets = FileSecrets(dir: paths.secretsDir)
 

@@ -110,10 +110,6 @@ public enum LockSetting {
     /// `LockPolicy.Relock.rawValue`, default 3600.
     public static let enabledKey = "biometric_lock"
     public static let relockKey = "biometric_relock"
-    /// The bundled app's prefs domain (CLAUDE.md: the bundle id). A debug
-    /// binary's domain is its executable name ("Infinitus"), which the
-    /// CLI cannot see — dev instances use the gate hatch (TeamGate).
-    public static let appDomain = "run.infinitus"
 
     public static func enabled(stored: Any?) -> Bool {
         stored as? Bool ?? false
@@ -121,21 +117,5 @@ public enum LockSetting {
 
     public static func relock(stored: Any?) -> LockPolicy.Relock {
         (stored as? Int).flatMap(LockPolicy.Relock.init(rawValue:)) ?? .default
-    }
-
-    /// The Mac app's setting as seen from any process of this user — the
-    /// CLI's input to `TeamGate`. nil = this platform has no lock yet
-    /// (Linux until the passphrase lock, Windows until Windows Hello),
-    /// which the gate treats as open. Reads the domain the way
-    /// AppModel.migrateLegacyDefaults does: `persistentDomain(forName:)`
-    /// works from a foreign process, while `UserDefaults(suiteName:)`
-    /// with the main bundle id is unsupported (the bundled infinitusctl
-    /// lives inside Infinitus.app, so that IS its main bundle id).
-    public static func enabledOnThisMachine() -> Bool? {
-        #if os(macOS)
-        return enabled(stored: UserDefaults.standard.persistentDomain(forName: appDomain)?[enabledKey])
-        #else
-        return nil
-        #endif
     }
 }

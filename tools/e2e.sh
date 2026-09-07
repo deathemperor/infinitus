@@ -42,9 +42,6 @@ SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_CSWAP="$PWD/tools/demo-cswap"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
-# The team gate (spec §2.2) needs the biometric lock on; CI cannot answer
-# a Touch ID prompt, so the gate is opened for this run (TeamGate.swift).
-export INFINITUS_LOCK_GATE=open
 # Spec §11 e2e: the app is a team leader on a bare repo in $SOCKDIR with
 # its own team dir (file secrets, no keychain), and publishes a fixture
 # projects dir instead of this Mac's real transcripts.

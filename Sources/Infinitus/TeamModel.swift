@@ -77,8 +77,6 @@ final class TeamModel: ObservableObject {
 
     /// False in mock / playground instances: every action is a no-op.
     var enabled = true
-    /// Set by AppModel: the biometric-lock verdict for create / join / approve (spec §2.2).
-    var gate: () -> TeamGate.Verdict = { .allowed }
     /// After every load: the mirror server rebuilds its control endpoint (#220).
     var onLoaded: (() -> Void)?
     /// After every user action (create/join/leave/approve…): the Bonjour
@@ -448,7 +446,6 @@ final class TeamModel: ObservableObject {
     }
 
     func requestNearby(_ peer: TeamNearby.Peer, name: String) async {
-        guard gated() else { return }
         let device = Host.current().localizedName ?? "Mac"
         await action("Asking \(peer.name) to join…") { paths, secrets in
             _ = try TeamNearby.Client.request(to: peer, name: name, devices: [device], platform: "macos",
@@ -510,7 +507,6 @@ final class TeamModel: ObservableObject {
     /// exactly as sealed, then drop the invitation file. The leader
     /// auto-approves it — the nonce is one it minted.
     func acceptInvite(_ invite: TeamNearby.Invite, name: String) async {
-        guard gated() else { return }
         let device = Host.current().localizedName ?? "Mac"
         await action("Accepting…") { paths, secrets in
             let me = try TeamClient.identity(paths: paths, secrets: secrets)
@@ -618,11 +614,6 @@ final class TeamModel: ObservableObject {
     }
 
     // MARK: user actions
-
-    private func gated() -> Bool {
-        if case .needsLock(let why) = gate() { lastError = why; return false }
-        return true
-    }
 
     /// Wraps a user action: busy label, error capture, reload. Returns
     /// THIS call's error, nil when it worked — `lastError` may already
@@ -788,7 +779,6 @@ final class TeamModel: ObservableObject {
     }
 
     func create(name: String, remote: String, token: String?, leaderName: String) async {
-        guard gated() else { return }
         let token = token.flatMap { $0.isEmpty ? nil : $0 }
         await action("Creating team…") { paths, secrets in
             _ = try TeamClient.create(name: name, remote: remote, token: token, leaderName: leaderName, paths: paths, secrets: secrets)
@@ -798,7 +788,6 @@ final class TeamModel: ObservableObject {
 
     @discardableResult
     func join(code: String, name: String) async -> String? {
-        guard gated() else { return lastError }
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
         let device = Host.current().localizedName ?? "Mac"
         let failure = await action("Requesting to join…") { paths, secrets in
@@ -834,8 +823,7 @@ final class TeamModel: ObservableObject {
 
     @discardableResult
     func approve(kid: String) async -> String? {
-        guard gated() else { return lastError }
-        return await action("Approving…") { paths, secrets in
+        await action("Approving…") { paths, secrets in
             guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
             _ = try client.fetch()
             try client.approve(kid: kid)
@@ -880,7 +868,6 @@ final class TeamModel: ObservableObject {
 
     /// The token is checked against the zone before it is kept; ids cached, records of the same zone carried over.
     func saveCloudflare(zone: String, label: String, token: String) async {
-        guard gated() else { return }
         await action("Checking the token…") { paths, secrets in
             guard let team = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
             let dir = paths.teamDir(team)
@@ -897,7 +884,6 @@ final class TeamModel: ObservableObject {
     }
 
     func giveHostname(kid: String) async {
-        guard gated() else { return }
         await action("Minting…") { paths, secrets in
             guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
             guard var ledger = TeamHostnames.Ledger.load(teamDir: client.teamDir), let cf = Self.cloudflare(secrets) else {
