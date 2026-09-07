@@ -245,4 +245,17 @@ final class FleetMirrorTests: XCTestCase {
             // expected
         }
     }
+
+    func testSnapshotCarriesFactsByPidAndOlderSnapshotsDecodeWithoutIt() throws {
+        let facts = SessionFacts.derive(timeline: .init(), status: "idle", attention: .init())
+        let snap = MirrorSnapshot(capturedAt: Date(timeIntervalSince1970: 1), machineName: "m", listJSON: Data("{}".utf8),
+                                  sessions: [], factsByPid: [7: facts])
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        let back = try dec.decode(MirrorSnapshot.self, from: try enc.encode(snap))
+        XCTAssertEqual(back.factsByPid?[7], facts)
+        let older = try dec.decode(MirrorSnapshot.self, from: Data(
+            #"{"capturedAt":"2026-01-01T00:00:00Z","machineName":"m","listJSON":"e30=","sessions":[]}"#.utf8))
+        XCTAssertNil(older.factsByPid)
+    }
 }

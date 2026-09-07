@@ -28,6 +28,10 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// Per-pid transcript progress for the sessions card, keyed by the
     /// session record's pid (`SessionDetail.pid` in `listJSON`).
     public let progressByPid: [Int: SessionProgress]?
+    /// T3's shell-row facts per pid (#223 phase 3) — the app's own read
+    /// of each session, next to `progressByPid`; `SessionDetail` is the
+    /// engine's and can't carry it. Additive optional.
+    public let factsByPid: [Int: SessionFacts]?
     /// Every engine's last fleet (#8 multi-engine), in popup order —
     /// `listJSON` stays the primary cswap fleet for older phones; a
     /// phone that knows this field stacks one section per fleet.
@@ -83,7 +87,8 @@ public struct MirrorSnapshot: Codable, Sendable {
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
                 app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil,
-                births: [Int: SessionBirth]? = nil) {
+                births: [Int: SessionBirth]? = nil,
+                factsByPid: [Int: SessionFacts]? = nil) {
         self.capturedAt = capturedAt
         self.machineName = machineName
         self.listJSON = listJSON
@@ -105,6 +110,7 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.team = team
         self.profiles = profiles
         self.births = births
+        self.factsByPid = factsByPid
     }
 }
 
