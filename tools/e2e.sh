@@ -422,6 +422,7 @@ python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail 
 # phone reporting, nothing per-session runs, so idle must match the gate.
 "$CTL" hide popout | expect "d['hidden']=='popout'" || fail "hide popout"
 popout_visible && fail "pop-out still visible for the no-lease window"
+"$CTL" perf | expect "d.get('leases', 0) == 0" || fail "the local lease survives hide popout"
 sleep 5
 A="$("$CTL" perf | json "d['cpuSeconds']")"
 sleep "$WINDOW_S"

@@ -73,7 +73,9 @@ import InfinitusCore
 
     private func send() async {
         guard let model else { return }
-        let macs: [String?] = [nil] + model.others.map { $0.id }
+        // Parked Macs (not answering) are skipped: a report there would
+        // wait out a discovery timeout every tick for nothing.
+        let macs: [String?] = [nil] + model.others.filter { !$0.parked }.map { $0.id }
         var next = Set<String?>()
         for macId in Set(macs).union(reported) {
             let scopes = scopes(for: macId)

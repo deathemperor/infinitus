@@ -1063,6 +1063,7 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = mirrorServer.leases
+        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
         if !isPlayground, !mockMode {
             let namer = SessionNamer(appSupport: FileManager.default
                 .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

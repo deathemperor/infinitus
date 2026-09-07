@@ -567,6 +567,7 @@ final class ControlServer {
             malloc_zone_statistics(nil, &stats)
             return ControlReply(ok: true, result: .object([
                 "cpuSeconds": .number(cpu),
+                "leases": .number(Double(model.mirrorServer.leases.clientCount())),
                 "rssBytes": .number(rss),
                 "heapBytes": .number(Double(stats.size_in_use)),
                 "threads": .number(Double(threadCount)),

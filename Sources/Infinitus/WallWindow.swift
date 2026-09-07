@@ -68,7 +68,12 @@ final class WallWindowController {
             return event
         }
         w.makeKeyAndOrderFront(nil)
+        visibilityChanged?()
     }
+
+    /// Runs after every show and close (the wall is a lease-holding
+    /// surface like the popup, #223 phase 5).
+    var visibilityChanged: (() -> Void)?
 
     func close() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
@@ -80,6 +85,7 @@ final class WallWindowController {
         window?.orderOut(nil)
         restore?()
         restore = nil
+        visibilityChanged?()
     }
 }
 

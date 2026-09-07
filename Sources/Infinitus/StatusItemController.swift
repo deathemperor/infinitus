@@ -100,7 +100,11 @@ final class StatusItemController {
     private lazy var effects = MenuBarEffects(button: item.button)
     private let model: AppModel
     private let usage: UsageModel
-    private let wall = WallWindowController()
+    private lazy var wall: WallWindowController = {
+        let w = WallWindowController()
+        w.visibilityChanged = { [weak self] in self?.syncLocalLease() }
+        return w
+    }()
     private let settingsTabs: () -> [SettingsTab]
     private var sink: AnyCancellable?
 
@@ -449,6 +453,7 @@ final class StatusItemController {
     private func syncLocalLease() {
         model.uiSurface("popup", visible: anchored?.isVisible == true)
         model.uiSurface("popout", visible: pinned?.isVisible == true)
+        model.uiSurface("wall", visible: wall.isVisible)
     }
 
     func showPinnedWindow(activate: Bool = true) {
