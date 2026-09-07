@@ -29,6 +29,7 @@ publishes the matching section as the GitHub release body.
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
 
 ### Mac
+- Settings › Machine shows on dev builds and stays hidden on releases.
 - Fewer stray notifications: "all sessions finished" needs ten minutes of work first, its stretch and the last-alive warning survive a relaunch, and engine housekeeping events no longer post banners (#231).
 - Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
 - Settings polish: every engine error reads as a sentence, the search highlight fades in and out, Machine labels share one casing, and a `-mock_mode YES` dev instance shows mock accounts (#249).

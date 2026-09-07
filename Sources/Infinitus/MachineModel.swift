@@ -9,10 +9,17 @@ import InfinitusCore
 /// persistence and the notification/action glue.
 @MainActor
 final class MachineModel: ObservableObject {
-    /// The Settings › Machine pane and its background sampling are hidden for
-    /// the alpha (`defaults write run.infinitus show_machine_pane -bool YES`
-    /// brings them back); `infinitusctl machine*` samples on demand regardless.
-    static var paneShown: Bool { UserDefaults.standard.bool(forKey: "show_machine_pane") }
+    /// The Settings › Machine pane and its background sampling show on dev
+    /// (debug) builds and stay hidden on releases (user 2026-09-07);
+    /// `defaults write run.infinitus show_machine_pane -bool YES` brings them
+    /// back on a release, and `infinitusctl machine*` samples on demand regardless.
+    static var paneShown: Bool {
+        #if DEBUG
+        return true
+        #else
+        return UserDefaults.standard.bool(forKey: "show_machine_pane")
+        #endif
+    }
 
     @Published private(set) var report: MachineReport?
     @Published private(set) var sampling = false
