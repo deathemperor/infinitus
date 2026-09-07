@@ -293,7 +293,7 @@ accept a snapshot at any time (T3 rule).
 accept `commandId` (client-minted UUID). `Receipts` (Core, in-memory, cap
 1,000, 1 h TTL): same id + same target ⇒ the cached reply (200); same id +
 different target ⇒ 409; a duplicate while the first is still running ⇒ 409
-`in-flight`; tombstones are per pid — an interrupt (`kind: key`, `escape`)
+`in-flight`; tombstones are per pid — an interrupt (`kind: key`, `text: "esc"`, every client's spelling)
 tombstones that pid's receipts so a retry cannot resurrect the stopped
 input (410), and a pid leaving the roster drops them (T3 outbox doctrine;
 amended 2026-09-07 while planning P3: the phone's ids are not known

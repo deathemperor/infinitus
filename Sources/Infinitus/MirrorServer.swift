@@ -988,7 +988,7 @@ final class MirrorServer: ObservableObject {
                     mirrorInputQueue.async {
                         // A stop tombstones this pid's receipts first: the
                         // interrupted input must not come back on a retry.
-                        if decoded.kind == .key, decoded.text == "escape" { receipts.tombstone(pid: pid) }
+                        if decoded.kind == .key, decoded.text == "esc" { receipts.tombstone(pid: pid) }
                         let response = withReceipt(receipts, commandId: decoded.commandId,
                                                    target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
                             sessionInput.call(pid, decoded)
