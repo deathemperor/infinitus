@@ -37,6 +37,9 @@ private let addAccountFooter =
     @Published var phase: Phase = .idle
     @Published var authURL: URL?
     @Published var code = ""
+    /// The CLI's "OAuth error: …" line after a paste, handed back with
+    /// the field (nil once a new code goes in).
+    @Published var codeError: String?
     /// Which account this flow is for (relogin) — display only; cswap
     /// matches the credential identity itself.
     @Published var reloginTarget: String?
@@ -126,6 +129,7 @@ private let addAccountFooter =
     }
 
     func cancel() {
+        codeError = nil
         process?.terminate()
         engineTask?.cancel()
         cleanup()
@@ -201,6 +205,8 @@ private let addAccountFooter =
     func submitCode() {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        buffer = ""            // only the CLI's answer to this paste matters now
+        codeError = nil
         master?.write(Data((trimmed + "\r").utf8))
         phase = .waitingForToken
         closeAuthWindow()
@@ -294,6 +300,19 @@ private let addAccountFooter =
     private func consume(_ chunk: String) {
         buffer += Self.plain(chunk)
         if buffer.count > 20_000 { buffer = String(buffer.suffix(10_000)) }
+        // A half-copied code ("Invalid code. Please make sure the full
+        // code was copied" — the CLI wants `code#state`) or a failed
+        // exchange comes back as an "OAuth error: …" line plus "Press
+        // Enter to try again"; unsurfaced, the flow spun at "Waiting for
+        // the token" forever (user 2026-09-07). Hand the field back.
+        if case .waitingForToken = phase, let r = buffer.range(of: "OAuth error: ") {
+            let line = buffer[r.upperBound...].split(whereSeparator: \.isNewline).first
+            codeError = line.map { String($0).trimmingCharacters(in: .whitespaces) } ?? "the code was rejected"
+            code = ""
+            phase = .awaitingLogin
+            master?.write(Data("\r".utf8))    // back to the paste prompt
+            buffer = ""
+        }
         // OAuth URL: the shim's stash first — it gets the exact argv
         // URL with no tty wrapping risk; stdout regex is the fallback.
         if authURL == nil {
@@ -1159,6 +1178,12 @@ private struct CswapAddFlow: View {
                      + "(reopen: button below).\n2. Copy the code it "
                      + "shows, paste it here.")
                     .font(.caption).foregroundStyle(.secondary)
+                if let err = flow.codeError {
+                    Text("Claude rejected it: \(err) Copy the whole code, "
+                         + "including the part after #, and paste again.")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 HStack(spacing: 8) {
                     Button("Reopen Login Window") { flow.reopenAuth() }
                     TextField("Paste the code", text: $flow.code)
