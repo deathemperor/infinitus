@@ -106,6 +106,15 @@ public struct EngineFleet: Codable, Sendable {
                     capabilities: capabilities)
     }
 
+    /// The same fleet with its live-session list replaced (the owned
+    /// status overlay, #151).
+    public func with(liveSessions: LiveSessions?) -> EngineFleet {
+        EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
+                    activeNumber: activeNumber, nextCandidate: nextCandidate,
+                    nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    capabilities: capabilities)
+    }
+
     /// Registry key: one FleetState per (engine, provider).
     public var key: String { "\(engineID)/\(provider.rawValue)" }
 }

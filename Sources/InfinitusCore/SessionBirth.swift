@@ -21,27 +21,32 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     /// some other process — anything that grants (the hook mode) is
     /// reseeded only when the live session's id is this one.
     public let sessionId: String?
+    /// Infinitus owns the process (#151): no terminal, stdin is the
+    /// input. The roster can't tell (its record says "interactive",
+    /// entrypoint "sdk-cli" like any SDK host), so the birth remembers.
+    public let headless: Bool?
 
     public init(profile: String? = nil, permissionMode: String? = nil, resumedFrom: String? = nil,
-                hookMode: String? = nil, sessionId: String? = nil, forked: Bool? = nil) {
+                hookMode: String? = nil, sessionId: String? = nil, forked: Bool? = nil, headless: Bool? = nil) {
         self.profile = profile
         self.permissionMode = permissionMode
         self.resumedFrom = resumedFrom
         self.hookMode = hookMode
         self.sessionId = sessionId
         self.forked = forked
+        self.headless = headless
     }
 
     /// The same birth moved to `mode` (nil = back to how it started).
     public func moved(to mode: String?) -> SessionBirth {
         SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
-                     hookMode: mode, sessionId: sessionId, forked: forked)
+                     hookMode: mode, sessionId: sessionId, forked: forked, headless: headless)
     }
 
     /// The same birth pinned to the session id the roster showed.
     public func identified(as sessionId: String) -> SessionBirth {
         SessionBirth(profile: profile, permissionMode: permissionMode, resumedFrom: resumedFrom,
-                     hookMode: hookMode, sessionId: sessionId, forked: forked)
+                     hookMode: hookMode, sessionId: sessionId, forked: forked, headless: headless)
     }
 
     /// The mode in force: the hook's when set, else the start mode.
@@ -51,12 +56,15 @@ public struct SessionBirth: Codable, Sendable, Equatable {
         permissionMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
     }
 
-    public init?(request: SessionStart.Request) {
+    /// `host` is the reply's: a request without `headless` still lands
+    /// on the owned actor when Settings makes "owned" the default.
+    public init?(request: SessionStart.Request, host: String? = nil) {
         let profile = request.profile?.trimmingCharacters(in: .whitespaces)
         let mode = request.permissionMode.flatMap { m in SessionStart.permissionModes.contains { $0.mode == m } ? m : nil }
-        guard (profile?.isEmpty == false) || mode != nil || request.resume != nil else { return nil }
+        let headless = request.headless == true || host == "owned"
+        guard (profile?.isEmpty == false) || mode != nil || request.resume != nil || headless else { return nil }
         self.init(profile: profile?.isEmpty == false ? profile : nil, permissionMode: mode, resumedFrom: request.resume,
-                  forked: request.resume != nil && request.fork == true ? true : nil)
+                  forked: request.resume != nil && request.fork == true ? true : nil, headless: headless ? true : nil)
     }
 
     /// The mode as the pickers spell it ("Full access"), nil when supervised.
@@ -65,12 +73,14 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     }
 
     /// What the session row shows beside the name: "Review · Full access",
-    /// "resumed", or nil when there is nothing worth a chip.
+    /// "resumed", "Ask every time · headless", or nil when there is
+    /// nothing worth a chip.
     public var chip: String? {
         var parts: [String] = []
         if let profile { parts.append(profile) }
         if let modeLabel { parts.append(modeLabel) }
         if parts.isEmpty, resumedFrom != nil { parts.append(forked == true ? "forked" : "resumed") }
+        if headless == true { parts.append("headless") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

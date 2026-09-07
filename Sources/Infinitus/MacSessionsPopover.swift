@@ -111,7 +111,7 @@ struct MacSessionsPopover: View {
             await MainActor.run {
                 if reply.outcome == "started" {
                     // The row's "resumed" chip, as the phone's Resume gets.
-                    if let pid = reply.pid, let birth = SessionBirth(request: request) { model.recordBirth(pid: pid, birth) }
+                    if let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) { model.recordBirth(pid: pid, birth) }
                     model.sessionsShown = false
                 } else {
                     note = reply.detail ?? reply.outcome

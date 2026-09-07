@@ -38,7 +38,8 @@ actor MirrorExporter {
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
                 profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:],
                 facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
-                sequence: SequenceLog? = nil, now: Bool = false) {
+                sequence: SequenceLog? = nil, now: Bool = false,
+                roster: @Sendable () -> [ClaudeSessionRecord] = { ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()) }) {
         // `now`: news the phone is waiting on (an AWS-login need that just
         // surfaced) skips the 30 s throttle.
         guard now || Date().timeIntervalSince(lastWrite) > minInterval else { return }
@@ -46,7 +47,7 @@ actor MirrorExporter {
         let claudeDir = ClaudeSessions.configHome()
         // Same selection as InfinitusTray.swift's panel rows: busy/waiting
         // first, busy before waiting, capped at 6.
-        let allRecords = ClaudeSessions.list(claudeDir: claudeDir)
+        let allRecords = roster()
         let sessionRecords = allRecords
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }

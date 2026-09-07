@@ -149,6 +149,7 @@ struct StartSessionSheet: View {
 
     private var permissionFootnote: String {
         switch permissionMode {
+        case "manual": return "Every tool asks here, including the ones Claude Code would normally allow."
         case "acceptEdits": return "File edits go through without asking; other tools still ask here."
         case "auto": return "Claude decides what needs asking."
         case "bypassPermissions": return "Nothing asks. Only for folders you trust completely."

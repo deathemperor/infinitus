@@ -120,6 +120,18 @@ public actor OwnedSessions {
         wake.lock(); wake.broadcast(); wake.unlock()
     }
 
+    /// The roster's word for a child's state — the CLI leaves an sdk-cli
+    /// record's `status` empty, so the card would say "unknown" without
+    /// this. Nil for a pid that isn't ours or has exited.
+    public nonisolated func status(pid: Int32) -> String? {
+        switch registry[pid]?.state {
+        case .busy?: return "busy"
+        case .idle?: return "idle"
+        case .waiting?: return "waiting"
+        case .exited?, nil: return nil
+        }
+    }
+
     // MARK: lifecycle
 
     /// Spawns the session and answers as soon as the child runs: the pid

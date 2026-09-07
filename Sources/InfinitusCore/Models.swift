@@ -87,6 +87,34 @@ public struct SessionDetail: Codable, Sendable, Hashable {
     }
 }
 
+extension LiveSessions {
+    /// The same list with `status(pid)` overriding a session's status
+    /// where it answers — an owned session's actor knows busy/idle/
+    /// waiting, the roster record the engine scanned says nothing (#151),
+    /// so the card read "unknown". The counts follow the rows.
+    public func overlaying(status: (Int) -> String?) -> LiveSessions {
+        guard let sessions else { return self }
+        var busy = busy, idle = idle ?? 0, waiting = waiting ?? 0, unknown = unknown ?? 0
+        let rows = sessions.map { s -> SessionDetail in
+            guard let fresh = status(s.pid), fresh != s.status else { return s }
+            for (name, delta) in [(s.status, -1), (fresh, 1)] {
+                switch name {
+                case "busy": busy += delta
+                case "idle": idle += delta
+                case "waiting": waiting += delta
+                case "unknown": unknown += delta
+                default: break
+                }
+            }
+            return SessionDetail(pid: s.pid, cwd: s.cwd, status: fresh, kind: s.kind, startedAt: s.startedAt)
+        }
+        guard rows != sessions else { return self }
+        return LiveSessions(busy: max(0, busy), total: total, idle: self.idle == nil ? nil : max(0, idle),
+                            waiting: self.waiting == nil ? nil : max(0, waiting), shell: shell,
+                            unknown: self.unknown == nil ? nil : max(0, unknown), sessions: rows)
+    }
+}
+
 public struct Account: Codable, Sendable {
     public let number: Int
     public let email: String

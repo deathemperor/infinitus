@@ -42,6 +42,13 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
         self.statusUpdatedAt = statusUpdatedAt
         self.entrypoint = entrypoint
     }
+
+    /// The same record with another status (the owned overlay, #151).
+    public func with(status: String?) -> ClaudeSessionRecord {
+        ClaudeSessionRecord(pid: pid, sessionId: sessionId, cwd: cwd, kind: kind, status: status,
+                            messagingSocketPath: messagingSocketPath, peerProtocol: peerProtocol,
+                            name: name, statusUpdatedAt: statusUpdatedAt, entrypoint: entrypoint)
+    }
 }
 
 public enum ClaudeSessions {

@@ -124,7 +124,7 @@ struct StartSessionSection: View {
             await MainActor.run {
                 starting = false
                 if reply.outcome == "started" {
-                    if let pid = reply.pid, let birth = SessionBirth(request: request) {
+                    if let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
                         model.recordBirth(pid: pid, birth)
                     }
                     model.logEvent("other", icon: "terminal", "started a session in \((chosenFolder as NSString).lastPathComponent)\(profile.map { " (profile \($0.name))" } ?? "")\(reply.host.map { " via \($0)" } ?? "")")

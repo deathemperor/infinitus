@@ -749,7 +749,7 @@ final class AppModel: ObservableObject {
     /// The live sessions as the control socket lists them (#79): the
     /// record plus the name the popup shows.
     func sessionRows() -> [SessionRow] {
-        ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { record in
+        ownedRoster(claudeDir: ClaudeSessions.configHome()).map { record in
             let pid = Int(record.pid)
             let progress = sessionProgress.byPid[pid]
             let shown = SessionNaming.displayName(name: progress?.name ?? record.name,
@@ -1338,7 +1338,7 @@ final class AppModel: ObservableObject {
             let verb = request.resume == nil ? "started" : "resumed"
             let born = request.profile.map { " (profile \($0))" } ?? ""
             Task { @MainActor in
-                if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request) {
+                if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
                     self.recordBirth(pid: pid, birth)
                 }
                 self.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
@@ -2360,7 +2360,7 @@ final class AppModel: ObservableObject {
             // Only publish a change: every @Published set re-runs each
             // observer's body, once per refresh, even for an identical value (#18).
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
-            for fleet in fleets {
+            for fleet in fleets.map(overlayingOwnedStatus) {
                 let state = registry.state(for: fleet)
                 let before = state.lastFleet
                 let change = state.apply(fleet)
@@ -2548,7 +2548,8 @@ final class AppModel: ObservableObject {
                                                 Task { @MainActor [weak self] in self?.sessionProgress.setFacts(facts) }
                                                 return facts
                                             },
-                                            sequence: sequenceLog, now: mirrorNow)
+                                            sequence: sequenceLog, now: mirrorNow,
+                                            roster: { self.ownedRoster(claudeDir: ClaudeSessions.configHome()) })
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be
@@ -2723,6 +2724,21 @@ final class AppModel: ObservableObject {
                 Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
             }
         }
+    }
+
+    /// The roster with an owned child's status filled in from its actor
+    /// (the CLI leaves an sdk-cli record's status empty).
+    nonisolated func ownedRoster(claudeDir: URL) -> [ClaudeSessionRecord] {
+        let records = ClaudeSessions.list(claudeDir: claudeDir)
+        guard let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return records }
+        return records.map { r in owned.status(pid: r.pid).map { r.with(status: $0) } ?? r }
+    }
+
+    /// The engine's live-session list with the same overlay, so the card
+    /// says busy/idle/waiting for an owned session, not "unknown".
+    nonisolated func overlayingOwnedStatus(_ fleet: EngineFleet) -> EngineFleet {
+        guard let live = fleet.liveSessions, let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return fleet }
+        return fleet.with(liveSessions: live.overlaying { owned.status(pid: Int32($0)) })
     }
 
     private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {

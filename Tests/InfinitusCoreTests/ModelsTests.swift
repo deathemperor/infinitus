@@ -79,6 +79,21 @@ final class ModelsTests: XCTestCase {
         let resume = cfg.settings.first { $0.key == "autoswitch.resumeStoppedSessions" }!
         if case .bool = resume.value {} else { XCTFail("bool value expected") }
     }
+
+    /// The owned status overlay (#151): the actor's word replaces the
+    /// roster's empty one, the counts follow, everything else is untouched.
+    func testLiveSessionsOverlayRewritesRowsAndCounts() {
+        let live = LiveSessions(busy: 1, total: 3, idle: 0, waiting: 0, shell: 0, unknown: 2, sessions: [
+            SessionDetail(pid: 1, cwd: "/a", status: "busy", kind: "interactive", startedAt: 0),
+            SessionDetail(pid: 2, cwd: "/b", status: "unknown", kind: "interactive", startedAt: 0),
+            SessionDetail(pid: 3, cwd: "/c", status: "unknown", kind: "interactive", startedAt: 0),
+        ])
+        let out = live.overlaying { pid in pid == 2 ? "waiting" : pid == 3 ? "idle" : nil }
+        XCTAssertEqual(out.sessions?.map(\.status), ["busy", "waiting", "idle"])
+        XCTAssertEqual([out.busy, out.idle, out.waiting, out.unknown, out.total], [1, 1, 1, 0, 3])
+        XCTAssertEqual(live.overlaying { _ in nil }, live)
+        XCTAssertEqual(LiveSessions(busy: 0, total: 0).overlaying { _ in "busy" }, LiveSessions(busy: 0, total: 0))
+    }
 }
 
 final class ChillDepthTests: XCTestCase {

@@ -31,6 +31,23 @@ final class SessionBirthTests: XCTestCase {
                        "Auto-accept edits")
     }
 
+    /// #151 follow-up: an owned session is worth a chip on its own, and the
+    /// host in the reply counts when the request left `headless` unset.
+    func testAHeadlessStartIsAChipOfItsOwn() throws {
+        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", headless: true))?.chip, "headless")
+        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r"), host: "owned")?.chip, "headless")
+        XCTAssertNil(SessionBirth(request: .init(cwd: "/r"), host: "terminal"))
+        let supervised = SessionBirth(request: .init(cwd: "/r", permissionMode: "manual", headless: true))
+        XCTAssertEqual(supervised?.chip, "Ask every time · headless")
+        XCTAssertEqual(supervised?.moved(to: "acceptEdits").chip, "Auto-accept edits · headless")
+        XCTAssertEqual(supervised?.identified(as: "s").headless, true)
+        // A record written before `headless` existed still decodes, chip unchanged.
+        let old = try JSONDecoder().decode(SessionBirth.self, from: Data(#"{"permissionMode":"auto"}"#.utf8))
+        XCTAssertEqual(old.chip, "Auto")
+        XCTAssertEqual(SessionStart.modeRank("manual"), 0)
+        XCTAssertTrue(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: nil, permissionMode: "manual").contains("--permission-mode manual"))
+    }
+
     func testStoreRoundTripsAndPrunesDeadPids() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("infinitus-births-\(UUID().uuidString)/session-births.json")

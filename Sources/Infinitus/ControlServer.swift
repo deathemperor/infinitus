@@ -283,7 +283,7 @@ final class ControlServer {
             }
             let request = SessionStart.Request(cwd: past.cwd, resume: past.sessionId, fork: fork ? true : nil)
             let reply = SessionLauncher.start(request, preferredHost: model.sessionHost)
-            if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request) {
+            if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
                 model.recordBirth(pid: pid, birth)
             }
             return ControlReply(ok: reply.outcome == "started", result: try .of(reply),

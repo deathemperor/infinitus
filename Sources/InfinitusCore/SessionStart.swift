@@ -60,6 +60,7 @@ public enum SessionStart {
     /// with the label the pickers show. The default (ask for every
     /// tool) is "no flag", so it is not in this list.
     public static let permissionModes: [(mode: String, label: String)] = [
+        ("manual", "Ask every time"),
         ("acceptEdits", "Auto-accept edits"),
         ("auto", "Auto"),
         ("bypassPermissions", "Full access"),
