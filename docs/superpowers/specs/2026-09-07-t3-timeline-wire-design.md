@@ -214,9 +214,11 @@ public struct SessionFacts: Codable, Sendable, Equatable {
     public let latestTurn: Turn?
     public let planProgress: PlanProgress?   // {step, completed, total}
     public let latestUserMessageAt: Date?
-    public let settledOverride: Bool?        // nil = not set
+    public let settledOverride: SettledOverride?  // "settled" | "active" | nil (T3 orchestration.ts ThreadShell)
     public let settledAt: Date?
+    public let unsettledAt: Date?            // re-entry stamp for active-list order
     public let snoozedUntil: Date?
+    public let snoozedAt: Date?
     public let pinnedAt: Date?
 }
 ```
@@ -230,7 +232,11 @@ maps the record: `busy → running`, `waiting → running` with a pending
 request, `idle → ready` after a completed turn else `idle`, exited → `stopped`.
 
 `AttentionStore` (Core) persists `{sessionId: {settledOverride, settledAt,
-snoozedUntil, pinnedAt}}` as JSON in App Support `Infinitus/attention.json`,
+unsettledAt, snoozedUntil, snoozedAt, pinnedAt}}` with T3's decider rules
+(`apps/server/src/orchestration/decider.ts` @ acc0a219e: settle also unpins
+and unsnoozes; unsettle → "active", `unsettledAt` = now unless already
+active; snooze needs `until` > now, `snoozedAt` = existing ?? now; pin keeps
+the first `pinnedAt` and un-settles / unsnoozes; unpin clears) as JSON in App Support `Infinitus/attention.json`,
 keyed by **session id** (not pid) so it survives restarts and resumes.
 Route `POST /sessions/{pid}/attention` body `{action: settle | unsettle |
 snooze | unsnooze | pin | unpin, until?: Date, commandId?}` mirrors
