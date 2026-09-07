@@ -83,3 +83,42 @@ public struct Activity: Codable, Sendable, Equatable {
         self.payload = payload; self.turnId = turnId; self.sequence = sequence; self.createdAt = createdAt
     }
 }
+
+extension SessionTimeline {
+    /// An owned session's parked prompts (#151) never reach its
+    /// transcript — they arrive as control requests over stdin — so they
+    /// join the timeline here, on the latest turn, id = `requestId`, the
+    /// same id `OwnedSessions.answer(pid:requestId:decision:)` takes.
+    public func appending(pending: [PendingRequest]) -> SessionTimeline {
+        guard !pending.isEmpty else { return self }
+        var out = self
+        let turnId = latestTurn?.id ?? "owned:\(pending[0].requestId)"
+        var seq = (activities.last?.sequence ?? -1) + 1
+        for p in pending {
+            let payload: [String: JSONValue]
+            let kind: String
+            let summary: String
+            if p.toolName == "AskUserQuestion" {
+                kind = "user-input.requested"
+                summary = p.questions.first?.question ?? "Question"
+                payload = ["requestId": .string(p.requestId),
+                           "questions": .array(p.questions.map { q in
+                               .object(["id": .string(q.question), "question": .string(q.question),
+                                        "header": .string(q.header), "multiSelect": .bool(q.multiSelect),
+                                        "options": .array(q.options.map { .object(["label": .string($0), "description": .string("")]) })])
+                           })]
+            } else {
+                kind = "approval.requested"
+                summary = p.description ?? p.toolName
+                let input = (try? JSONDecoder().decode(JSONValue.self, from: Data(p.inputJSON.utf8))) ?? .object([:])
+                payload = ["requestId": .string(p.requestId), "toolName": .string(p.toolName),
+                           "requestType": .string(SessionTimelineBuilder.Slim.requestType(for: p.toolName)),
+                           "input": input]
+            }
+            out.activities.append(Activity(id: p.requestId, tone: .approval, kind: kind, summary: summary, detail: nil,
+                                           payload: payload, turnId: turnId, sequence: seq, createdAt: p.receivedAt))
+            seq += 1
+        }
+        return out
+    }
+}

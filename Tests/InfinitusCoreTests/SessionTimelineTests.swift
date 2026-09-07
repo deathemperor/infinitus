@@ -251,4 +251,27 @@ final class SessionTimelineTests: XCTestCase {
         // without a summary the row still exists
         XCTAssertEqual(build(try entries("agent")).activities[0].payload["agentType"], .string("Explore"))
     }
+
+    // MARK: Task 6 — owned prompts
+    func testOwnedPendingRequestsBecomeApprovalAndUserInputRows() throws {
+        let base = build(try entries("plain"), status: "busy")
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        let write = PendingRequest(requestId: "r1", toolName: "Write", toolUseId: "tu1", description: "hello.txt",
+                                   inputJSON: #"{"file_path":"/p/hello.txt","content":"hi"}"#, suggestionsJSON: nil,
+                                   questions: [], receivedAt: t0)
+        let ask = PendingRequest(requestId: "r2", toolName: "AskUserQuestion", toolUseId: "tu2", description: nil,
+                                 inputJSON: "{}", suggestionsJSON: nil,
+                                 questions: [.init(question: "Which colour?", header: "Colour", options: ["Red", "Blue"], multiSelect: false)],
+                                 receivedAt: t0)
+        let tl = base.appending(pending: [write, ask])
+        XCTAssertEqual(tl.activities.suffix(2).map(\.kind), ["approval.requested", "user-input.requested"])
+        XCTAssertEqual(tl.activities.suffix(2).map(\.id), ["r1", "r2"])
+        XCTAssertTrue(tl.activities.suffix(2).allSatisfy { $0.turnId == "u2" })
+        XCTAssertEqual(tl.activity(id: "r1")?.payload["input"], .object(["file_path": .string("/p/hello.txt"), "content": .string("hi")]))
+        XCTAssertEqual(tl.activity(id: "r1")?.payload["requestType"], .string("file_change_approval"))
+        XCTAssertEqual(tl.activity(id: "r1")?.summary, "hello.txt")
+        XCTAssertEqual(tl.activity(id: "r2")?.payload["questions"]?.arrayValue?.count, 1)
+        XCTAssertEqual(tl.activities.suffix(2).map(\.sequence), [base.activities.count, base.activities.count + 1])
+        XCTAssertEqual(base.appending(pending: []), base)
+    }
 }
