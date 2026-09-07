@@ -14,6 +14,9 @@ public enum MirrorTransport {
     public static let bonjourType = "_infinitus._tcp"
     /// The one route the server answers.
     public static let snapshotPath = "/snapshot"
+    /// Unauthenticated: what this Mac supports, read before pairing (#223
+    /// phase 4; T3 `/.well-known/t3/environment`).
+    public static let wellKnownPath = "/.well-known/infinitus"
     /// The per-session feed route (#17 layer 1): `GET /sessions/<pid>/tail`.
     public static func sessionTailPath(pid: Int32) -> String { "/sessions/\(pid)/tail" }
     /// The `pid` out of a request path, when it matches
