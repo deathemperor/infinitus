@@ -68,6 +68,15 @@ struct TeamPane: View {
 
     private var gateOpen: Bool { if case .allowed = team.gate() { return true } else { return false } }
 
+    /// Bonjour rides the LAN mirror's listener: off, this Mac neither
+    /// advertises nor answers, whatever Discoverable says.
+    @ViewBuilder private var nearbyHint: some View {
+        if !team.nearbyAvailable {
+            Label("Nearby needs the LAN mirror on (Settings › Phone) — this Mac is not advertising and other Macs can't reach it.", systemImage: "wifi.slash")
+                .font(.caption).foregroundStyle(.orange)
+        }
+    }
+
     private var notInTeam: some View {
         Group {
             if !gateOpen {
@@ -119,6 +128,7 @@ struct TeamPane: View {
                     Button(team.scanning ? "Scanning…" : "Scan") { Task { await team.scanNearby() } }.disabled(team.scanning)
                     Toggle("Discoverable", isOn: $team.discoverable).toggleStyle(.switch)
                 }
+                nearbyHint
                 Text("Discoverable Macs show their name, kid and team on this network (nothing secret). Leaders see your request in Requests.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -222,6 +232,7 @@ struct TeamPane: View {
                         Button(team.scanning ? "Scanning…" : "Scan") { Task { await team.scanNearby() } }.disabled(team.scanning)
                         Toggle("Discoverable", isOn: $team.discoverable).toggleStyle(.switch)
                     }
+                    nearbyHint
                     Text("Members can request to join from their Team pane, or you can invite a discoverable Mac; either way they appear in Requests once approved.")
                         .font(.caption).foregroundStyle(.secondary)
                 }

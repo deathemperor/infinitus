@@ -81,6 +81,12 @@ final class TeamModel: ObservableObject {
     var gate: () -> TeamGate.Verdict = { .allowed }
     /// After every load: the mirror server rebuilds its control endpoint (#220).
     var onLoaded: (() -> Void)?
+    /// After every user action (create/join/leave/approve…): the Bonjour
+    /// standing re-advertises with the new role.
+    var onActed: (() -> Void)?
+    /// False while the LAN mirror is off: no listener, so no Bonjour
+    /// service either way — the pane says so instead of a silent toggle.
+    @Published var nearbyAvailable = true
     /// After every fetch, on the team queue: the grantor's store-lane pass (#220 §5.3).
     var onFetched: (@Sendable (TeamClient) -> Void)?
     /// Set by AppModel: what this Mac publishes (projects dir, live sessions, crashes, fleets, blockers).
@@ -420,8 +426,13 @@ final class TeamModel: ObservableObject {
         scanning = true
         defer { scanning = false }
         do {
-            let me = kid
-            let peers = try await run { _, _ in try TeamNearby.Client.browse(seconds: 2) }
+            // My kid read beside the browse, not from `kid` (nil until the
+            // first load() lands — the pane's scan can run first, and nil
+            // matched nothing, so the Mac listed itself). Non-creating.
+            let (peers, me) = try await run { _, secrets -> ([TeamNearby.Peer], String?) in
+                let me = secrets.read(TeamClient.identitySecretName).flatMap { try? TeamIdentity(secret: $0) }?.kid
+                return (try TeamNearby.Client.browse(seconds: 2), me)
+            }
             nearby = peers.filter { $0.discoverable && $0.kid != me }
         } catch { lastError = Self.mask(error) }
         await loadInvites()
@@ -632,6 +643,7 @@ final class TeamModel: ObservableObject {
             lastError = failure
         }
         await load().value
+        onActed?()
         return failure
     }
 

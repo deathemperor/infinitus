@@ -70,6 +70,7 @@ publishes the matching section as the GitHub release body.
 - A phone showing the revival countdown skips the duplicate all-dead alert, and a working activity starts silently.
 
 ### Team (preview)
+- Nearby no longer lists this Mac as a stranger, re-advertises your role right after you create or join a team, and says when the LAN mirror is off.
 - Saving the Cloudflare token and giving a hostname sit behind biometric unlock, like grants (#220).
 - Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
 - A leader can give each member a stable hostname — a Cloudflare named tunnel under the team's zone, minted from Settings › Team or `infinitusctl team hostname give`, started by their Mac on its next fetch (#220).

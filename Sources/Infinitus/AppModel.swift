@@ -1238,6 +1238,7 @@ final class AppModel: ObservableObject {
             Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
         }
         team.onLoaded = { [weak self] in self?.mirrorServer.refreshTeamControl() }
+        team.onActed = { [weak self] in self?.mirrorServer.refreshTeamStanding(force: true) }
         // #220 §5.4: a leader's hostname for this Mac — token to the keychain,
         // the named tunnel on. The LAN listener is the user's switch, not ours.
         team.onHostname = { [weak self] hostname, from in
@@ -1422,6 +1423,7 @@ final class AppModel: ObservableObject {
             && ProcessInfo.processInfo.processName != "Infinitus"
             && defaults.bool(forKey: "mirror_lan_allow_mock")
         let allowed = !isPlayground && (!mockMode || mockAllowed)
+        team.nearbyAvailable = allowed && mirrorLANEnabled
         guard allowed, mirrorLANEnabled else {
             mirrorServer.stop()
             quickTunnel.stop()

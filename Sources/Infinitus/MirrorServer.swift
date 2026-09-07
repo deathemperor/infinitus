@@ -385,8 +385,11 @@ final class MirrorTeamBox: @unchecked Sendable {
     /// sealed until the Team pane's Accept opens it.
     var endpoint: TeamNearby.Endpoint {
         TeamNearby.Endpoint(local: current, store: { request in
+            // The app's secrets store (keychain on a real Mac), never the
+            // CLI's file store: a request sealed to the file identity's keys
+            // is one the pane can never open.
             let paths = TeamPaths.standard()
-            return try TeamNearby.Store.save(request, paths: paths, secrets: FileSecrets(dir: paths.secretsDir))
+            return try TeamNearby.Store.save(request, paths: paths, secrets: TeamSecretsFactory.make(paths: paths)())
         }, storeInvite: { invite in
             try TeamNearby.Store.saveInvite(invite, paths: TeamPaths.standard())
         })
@@ -558,15 +561,23 @@ final class MirrorServer: ObservableObject {
 
     /// Reads the switch and, when it changed, rebuilds the standing off
     /// the main actor (it opens the team clones) and re-advertises.
-    private func refreshTeamStanding(force: Bool = false) {
+    /// `force`: re-read the standing even with the toggle unchanged — after
+    /// create/join/leave/approve the role in the TXT record moved (a Mac
+    /// that became leader after launch kept advertising `r=none`, user
+    /// screenshot 2026-09-07).
+    func refreshTeamStanding(force: Bool = false) {
         let on = UserDefaults.standard.bool(forKey: TeamNearby.discoverableDefaultsKey)
         guard force || on != teamDiscoverable else { return }
         teamDiscoverable = on
         let name = advertisedName
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            // The same secrets store as TeamModel (keychain on a real Mac).
+            // With the CLI's file store here the advert carried a second,
+            // teamless identity: the Mac listed ITSELF as "none · not in
+            // this team" and advertised r=none while leading (2026-09-07).
             let paths = TeamPaths.standard()
             let local = TeamNearby.Local.load(name: name, discoverable: on, paths: paths,
-                                              secrets: FileSecrets(dir: paths.secretsDir))
+                                              secrets: TeamSecretsFactory.make(paths: paths)())
             Task { @MainActor in
                 // A newer toggle may have already landed while this one
                 // was opening team clones on the concurrent queue — an
