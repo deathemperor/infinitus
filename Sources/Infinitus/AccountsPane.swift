@@ -433,49 +433,15 @@ private let addAccountFooter =
         authWindow = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        // ALWAYS a sheet: it does passkeys AND passwords. The
+        // ALWAYS the sheet: it does passkeys AND passwords. The
         // saved-session auto-routing sent a passkey account into the
         // private window — where WebAuthn can never run — and hit the
         // Bluetooth-fallback wall again (user screenshot 2026-08-31).
-        // The private window stays strictly opt-in.
-        startSharedSheet()
-    }
-
-    /// claude.ai's logout is a plain visit (user-verified 2026-09-07).
-    static let logoutURL = URL(string: "https://claude.ai/logout")!
-
-    /// The default (user 2026-09-07, "option 2"): the sheet SHARING the
-    /// browser's cookies — Google's remembered accounts and passkeys, no
-    /// email to type — after a short hop through claude.ai's logout, so
-    /// the sign-in page comes up instead of an authorize page for whoever
-    /// was signed in before. The 2026-08-31 bleed ("it opens my
-    /// account1") was this same shared store WITHOUT the hop.
-    func startSharedSheet() {
-        guard let url = authURL else { return }
-        let hop = makeSheet(Self.logoutURL, ephemeral: false)
-        systemSession = hop
-        hop.start()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self, self.authURL == url, self.running, self.systemSession === hop else { return }
-            hop.cancel()
-            let sheet = self.makeSheet(url, ephemeral: false)
-            self.systemSession = sheet
-            sheet.start()
-        }
-    }
-
-    private func makeSheet(_ url: URL, ephemeral: Bool) -> ASWebAuthenticationSession {
-        let session = ASWebAuthenticationSession(
-            url: url, callbackURLScheme: nil) { [weak self] _, _ in
-            // No custom-scheme callback exists — the flow ends when the
-            // user copies the code and closes the sheet; nothing to do.
-            self?.systemSession = nil
-        }
-        let provider = AuthAnchorProvider(window: authWindow)
-        anchorProvider = provider
-        session.presentationContextProvider = provider
-        session.prefersEphemeralWebBrowserSession = ephemeral
-        return session
+        // The private window stays strictly opt-in. A sheet SHARING the
+        // browser's cookies behind a claude.ai logout hop was tried
+        // (2026-09-07): Google remembered, but the double sheet flash
+        // bothered more than typing the email — reverted the same day.
+        startSystemSheet()
     }
 
     /// The opt-in private window: this account's own isolated session
@@ -520,12 +486,23 @@ private let addAccountFooter =
     /// (Safari's out-of-process service) has full passkey support.
     /// Its cookie store is app-shared, not per-account — Google's own
     /// account chooser covers multi-account there.
-    /// The fresh, throwaway sheet (button): passkeys work, nothing is
-    /// remembered, so Google asks for the email — the escape hatch when
-    /// the shared store misbehaves.
     func startSystemSheet() {
         guard let url = authURL else { return }
-        let session = makeSheet(url, ephemeral: true)
+        let session = ASWebAuthenticationSession(
+            url: url, callbackURLScheme: nil) { [weak self] _, _ in
+            // No custom-scheme callback exists — the flow ends when the
+            // user copies the code and closes the sheet; nothing to do.
+            self?.systemSession = nil
+        }
+        let provider = AuthAnchorProvider(window: authWindow)
+        anchorProvider = provider
+        session.presentationContextProvider = provider
+        // EPHEMERAL, non-negotiably: the shared sheet store carried
+        // account 1's claude session into account 2's relogin ("it
+        // opens my account1", user screenshot 2026-08-31). Passkeys
+        // don't need cookies — they live in the OS keychain — so a
+        // fresh session costs one Touch ID tap and bleeds nothing.
+        session.prefersEphemeralWebBrowserSession = true
         systemSession = session
         session.start()
     }
@@ -613,8 +590,7 @@ private struct AuthWebView: NSViewRepresentable {
 
 /// The companion window: sign-in status + the paste-code bar. The
 /// actual signing-in happens in the system sheet (passkeys work
-/// there, and it shares the browser's Google accounts), which this
-/// window anchors.
+/// there), which this window anchors.
 private struct AuthWindowRoot: View {
     @ObservedObject var flow: TokenFlow
 
@@ -625,9 +601,10 @@ private struct AuthWindowRoot: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             if flow.pasteCode {
-                Text("1. Sign in and approve in the sheet: it opens signed "
-                     + "out of claude.ai, with your remembered Google "
-                     + "accounts and passkeys.\n"
+                Text("1. Sign in and approve in the sign-in sheet or window "
+                     + "(the sheet is a fresh private session \u{2014} "
+                     + "passkeys and Touch ID work; it never remembers "
+                     + "another account).\n"
                      + "2. Copy the code it shows and paste it here.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
@@ -641,10 +618,10 @@ private struct AuthWindowRoot: View {
                     Button("Cancel") { flow.cancel() }
                 }
             } else {
-                Text("Sign in and approve in the sheet: it opens signed "
-                     + "out of claude.ai, with your remembered Google "
-                     + "accounts and passkeys. This closes by itself "
-                     + "once the engine holds the credential.")
+                Text("Sign in and approve in the sign-in sheet or window "
+                     + "(the sheet is a fresh private session \u{2014} "
+                     + "passkeys and Touch ID work). This closes by "
+                     + "itself once the engine holds the credential.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     if flow.phase == .registering {
@@ -657,13 +634,8 @@ private struct AuthWindowRoot: View {
                 }
             }
             HStack(spacing: 6) {
-                Button("Reopen sign-in sheet") { flow.startSharedSheet() }
-                    .help("Signs claude.ai out first, then the sign-in "
-                          + "page with your Google accounts and passkeys.")
-                Button("Fresh sheet (no memory)") { flow.startSystemSheet() }
-                    .help("A throwaway session: passkeys work, Google "
-                          + "asks for the email.")
-                Button("Private window (no passkeys)") {
+                Button("Reopen sign-in sheet") { flow.startSystemSheet() }
+                Button("Use private window (no passkeys)") {
                     flow.openPrivateWindow()
                 }
                 .help("An isolated per-account browser session \u{2014} "
