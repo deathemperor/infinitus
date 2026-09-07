@@ -16,6 +16,12 @@ final class ThreadFeedPresentationTests: XCTestCase {
     }
     func lines(_ rows: [ThreadFeedRow]) -> [String] {
         rows.map { r in
+            let line = line(r)
+            return r.hidden ? line + " (hidden)" : line
+        }
+    }
+    func line(_ r: ThreadFeedRow) -> String {
+        {
             switch r.kind {
             case .message(let m):
                 return "msg:\(m.id) \(m.role.rawValue)\(m.streaming ? "*" : "") \(m.text.split(separator: "\n").first ?? "")"
@@ -30,7 +36,7 @@ final class ThreadFeedPresentationTests: XCTestCase {
             case .agentSpawn(let a):
                 return "agents:\(r.id) \"\(a.title)\" " + a.members.map { "\($0.title)\($0.running ? "…" : "")\($0.failed ? "!" : "")" }.joined(separator: ",")
             }
-        }
+        }()
     }
     func rows(_ name: String, status: String = "idle", drop: Set<String> = [], turns: Set<String> = [],
               groups: Set<String> = []) throws -> [String] {
@@ -88,6 +94,24 @@ final class ThreadFeedPresentationTests: XCTestCase {
         XCTAssertEqual(try rows("tools", status: "busy", drop: ["a4", "a3", "r3"]).suffix(1), [
             "toggle:live-activity-row \"Changed File.swift\" [2]~",
         ])
+    }
+
+    func testExpandedDerivationFlagsWhatTheFoldHides() throws {
+        // The browser folds client-side: every row is served, hidden ones marked.
+        let tl = try timeline("tools")
+        XCTAssertEqual(lines(ThreadFeedPresentation.deriveExpanded(tl)), [
+            "msg:u1 user run the tests and fix",
+            "fold:turn-fold:u1 \"Worked for 13s\" [1]+",
+            "toggle:work-toggle:work-group:tool:u1:t1 \"Ran 2 commands and changed 1 file\" [3]!+ (hidden)",
+            "group:work-details:work-group:tool:u1:t1 tool.completed/success,tool.completed/success,tool.completed/failure (hidden)",
+            "msg:a4 assistant Push failed; tests pass.",
+        ])
+        // A working turn's live row is never behind a fold.
+        XCTAssertFalse(ThreadFeedPresentation.deriveExpanded(try timeline("tools", status: "busy", drop: ["a4", "a3", "r3"]))
+            .contains { $0.hidden && $0.turnId == tl.latestTurn?.id })
+        let data = try JSONEncoder().encode(ThreadFeedPresentation.deriveExpanded(tl))
+        let wire = try JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(wire.map { $0["hidden"] as? Bool }, [nil, nil, true, true, nil])
     }
 
     func testInterruptAndErrorTurns() throws {

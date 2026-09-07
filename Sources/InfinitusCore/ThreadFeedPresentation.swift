@@ -22,23 +22,30 @@ public struct ThreadFeedRow: Identifiable, Equatable, Codable, Sendable {
     public let turnId: String
     public let createdAt: Date
     public let kind: Kind
+    /// Set by `deriveExpanded`: the turn's fold hides this row while the
+    /// turn is collapsed. A viewer that folds client-side (the browser
+    /// page) keys on it; `derive` never emits hidden rows.
+    public let hidden: Bool
 
     /// The id the one shimmering row carries (T3 `LIVE_ACTIVITY_ROW_ID`).
     public static let liveRowId = "live-activity-row"
 
-    public init(id: String, turnId: String, createdAt: Date, kind: Kind) {
-        self.id = id; self.turnId = turnId; self.createdAt = createdAt; self.kind = kind
+    public init(id: String, turnId: String, createdAt: Date, kind: Kind, hidden: Bool = false) {
+        self.id = id; self.turnId = turnId; self.createdAt = createdAt; self.kind = kind; self.hidden = hidden
     }
+
+    func hiding() -> ThreadFeedRow { ThreadFeedRow(id: id, turnId: turnId, createdAt: createdAt, kind: kind, hidden: true) }
 
     // The wire shape is flat — `{"id","turnId","createdAt","type":"workToggle","toggle":{…}}`
     // — so the browser page binds to names, not to Swift's `_0` synthesis.
-    enum CodingKeys: String, CodingKey { case id, turnId, createdAt, type, message, activities, toggle, fold, agents }
+    enum CodingKeys: String, CodingKey { case id, turnId, createdAt, hidden, type, message, activities, toggle, fold, agents }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         turnId = try c.decode(String.self, forKey: .turnId)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
+        hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
         switch try c.decode(String.self, forKey: .type) {
         case "message": kind = .message(try c.decode(SessionTimeline.Message.self, forKey: .message))
         case "activityGroup": kind = .activityGroup(try c.decode([WorkEntry].self, forKey: .activities))
@@ -53,6 +60,7 @@ public struct ThreadFeedRow: Identifiable, Equatable, Codable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id); try c.encode(turnId, forKey: .turnId); try c.encode(createdAt, forKey: .createdAt)
+        if hidden { try c.encode(true, forKey: .hidden) }
         switch kind {
         case .message(let m): try c.encode("message", forKey: .type); try c.encode(m, forKey: .message)
         case .activityGroup(let e): try c.encode("activityGroup", forKey: .type); try c.encode(e, forKey: .activities)
@@ -123,6 +131,19 @@ public enum ThreadFeedPresentation {
     /// Pure: the same timeline and toggles give the same rows.
     public static func derive(_ timeline: SessionTimeline, expandedTurnIds: Set<String> = [],
                               expandedWorkGroupIds: Set<String> = []) -> [ThreadFeedRow] {
+        derive(timeline, expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds, expandAll: false)
+    }
+
+    /// Every row with every fold and group open, the ones a collapsed
+    /// turn would hide flagged `hidden` — for a viewer that keeps its own
+    /// toggles and folds client-side (the browser page). The served
+    /// `expanded` flags read true and mean nothing there.
+    public static func deriveExpanded(_ timeline: SessionTimeline) -> [ThreadFeedRow] {
+        derive(timeline, expandedTurnIds: [], expandedWorkGroupIds: [], expandAll: true)
+    }
+
+    static func derive(_ timeline: SessionTimeline, expandedTurnIds: Set<String>, expandedWorkGroupIds: Set<String>,
+                       expandAll: Bool) -> [ThreadFeedRow] {
         let turns = Dictionary(timeline.turns.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let latest = timeline.latestTurn
         let isWorking = latest?.state == .running
@@ -168,7 +189,7 @@ public enum ThreadFeedPresentation {
                 }
             }
             let foldRow = foldable && (!hidden.isEmpty || turn?.state == .interrupted)
-            let turnExpanded = expandedTurnIds.contains(turnId)
+            let turnExpanded = expandAll || expandedTurnIds.contains(turnId)
             var foldInserted = false
 
             for (i, g) in groupsOfTurn.enumerated() {
@@ -178,19 +199,22 @@ public enum ThreadFeedPresentation {
                     foldInserted = true
                 }
                 if hidden.contains(i), !turnExpanded { continue }
+                var groupRows: [ThreadFeedRow] = []
                 switch g {
                 case .message(let m):
-                    rows.append(ThreadFeedRow(id: "message:\(m.id)", turnId: turnId, createdAt: m.createdAt, kind: .message(m)))
+                    groupRows.append(ThreadFeedRow(id: "message:\(m.id)", turnId: turnId, createdAt: m.createdAt, kind: .message(m)))
                 case .standalone(let e):
-                    rows.append(ThreadFeedRow(id: "activity:\(e.id)", turnId: turnId, createdAt: e.createdAt, kind: .activityGroup([e])))
+                    groupRows.append(ThreadFeedRow(id: "activity:\(e.id)", turnId: turnId, createdAt: e.createdAt, kind: .activityGroup([e])))
                 case .agents(let members):
-                    rows.append(agentRow(members, turnId: turnId))
+                    groupRows.append(agentRow(members, turnId: turnId))
                 case .tools(let entries):
-                    let (toggle, details) = toolRows(entries, turnId: turnId, activeTail: isTail, expanded: expandedWorkGroupIds)
+                    let (toggle, details) = toolRows(entries, turnId: turnId, activeTail: isTail,
+                                                     expanded: expandedWorkGroupIds, expandAll: expandAll)
                     if toggle.id == ThreadFeedRow.liveRowId { liveRowPresent = true }
-                    rows.append(toggle)
-                    if let details { rows.append(details) }
+                    groupRows.append(toggle)
+                    if let details { groupRows.append(details) }
                 }
+                rows.append(contentsOf: expandAll && hidden.contains(i) ? groupRows.map { $0.hiding() } : groupRows)
             }
             if foldRow, !foldInserted { rows.append(foldRowFor(turn!, hidden: 0, expanded: turnExpanded)) }
         }
@@ -316,7 +340,7 @@ public enum ThreadFeedPresentation {
     }
 
     static func toolRows(_ entries: [WorkEntry], turnId: String, activeTail: Bool,
-                         expanded: Set<String>) -> (ThreadFeedRow, ThreadFeedRow?) {
+                         expanded: Set<String>, expandAll: Bool = false) -> (ThreadFeedRow, ThreadFeedRow?) {
         let first = entries[0], last = entries[entries.count - 1]
         let groupId = "work-group:tool:\(turnId):\(first.toolCallId ?? first.id)"
         let live = activeTail && (last.status == .inProgress || last.status == .success)
@@ -324,7 +348,7 @@ public enum ThreadFeedPresentation {
         if live { summary = liveSummary(last) }
         else if entries.count == 1 { summary = first.summary }
         else { summary = summarizeGroup(entries) }
-        let isExpanded = expanded.contains(groupId)
+        let isExpanded = expandAll || expanded.contains(groupId)
         let toggle = ThreadFeedRow(id: live ? ThreadFeedRow.liveRowId : "work-toggle:\(groupId)", turnId: turnId,
                                    createdAt: first.createdAt,
                                    kind: .workToggle(WorkToggle(groupId: groupId, summary: summary, hiddenCount: entries.count,
