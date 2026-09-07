@@ -825,6 +825,8 @@ final class AppModel: ObservableObject {
     private var lastHookRefresh = Date.distantPast
     /// The pass a freshly surfaced AWS-login need starts (rebuildAwsLogins).
     private var awsNeedRefresh: Task<Void, Never>?
+    /// That pass writes the mirror snapshot past the exporter's throttle.
+    private var mirrorExportDue = false
 
     /// The snapshot runs git in the session's repository, off the main
     /// thread; the first checkpoint of a session is logged, the rest are
@@ -1679,6 +1681,7 @@ final class AppModel: ObservableObject {
         if items != awsLogins { awsLogins = items }
         if sessionProgress.scanned { awsLoginsScanned = true }
         if news, seeded, !isPlayground, awsNeedRefresh == nil {
+            mirrorExportDue = true
             awsNeedRefresh = Task { [weak self] in
                 await self?.refreshSnapshot()
                 self?.awsNeedRefresh = nil
@@ -2479,6 +2482,8 @@ final class AppModel: ObservableObject {
                 phoneLatest: appReleaseLatest)
             let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
             let sequenceLog = sequenceLog, leases = mirrorServer.leases
+            let mirrorNow = mirrorExportDue
+            mirrorExportDue = false
             // A living UI keeps its lease; the cap only catches one that died.
             if localUIVisible { reportLocalActivity(visible: true) }
             Task.detached(priority: .utility) { [mirrorExporter] in
@@ -2503,7 +2508,7 @@ final class AppModel: ObservableObject {
                                                 Task { @MainActor [weak self] in self?.sessionProgress.setFacts(facts) }
                                                 return facts
                                             },
-                                            sequence: sequenceLog)
+                                            sequence: sequenceLog, now: mirrorNow)
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be

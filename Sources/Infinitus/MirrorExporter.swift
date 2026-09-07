@@ -38,8 +38,10 @@ actor MirrorExporter {
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
                 profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:],
                 facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
-                sequence: SequenceLog? = nil) {
-        guard Date().timeIntervalSince(lastWrite) > minInterval else { return }
+                sequence: SequenceLog? = nil, now: Bool = false) {
+        // `now`: news the phone is waiting on (an AWS-login need that just
+        // surfaced) skips the 30 s throttle.
+        guard now || Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
         // Same selection as InfinitusTray.swift's panel rows: busy/waiting

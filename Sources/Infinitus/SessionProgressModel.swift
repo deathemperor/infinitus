@@ -50,11 +50,17 @@ final class SessionProgressModel: SessionProgressSource {
 
     /// `sessions`: the engine's current per-session detail (busy-first,
     /// capped) — only those get matched to a transcript and read.
-    func refresh(sessions: [SessionDetail]) {
+    /// `light`: a watcher-driven scan (transcriptMoved) — it refreshes the
+    /// cache but publishes only when a session's AWS-login need moved: a
+    /// streaming session writes every second, and every publish re-lays
+    /// the pop-out (38% CPU at one a second, 2026-09-07).
+    func refresh(sessions: [SessionDetail], light: Bool = false) {
         guard !busy else { return }
         guard !sessions.isEmpty else {
             byPid = [:]
             tokenRate = nil
+            watch([:])
+            lastSessions = []
             return
         }
         busy = true
@@ -91,21 +97,22 @@ final class SessionProgressModel: SessionProgressSource {
                 newCached[record.sessionId] = progress
             }
             await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached, ids: ids, cwds: cwds,
-                               transcripts: urls)
+                               transcripts: urls, light: light)
         }
     }
 
     private func finish(byPid: [Int: SessionProgress], stamps: [String: Stamp],
                         cached: [String: SessionProgress], ids: [Int: String], cwds: [Int: String],
-                        transcripts: [String: URL]) {
+                        transcripts: [String: URL], light: Bool) {
         busy = false
         watch(transcripts)
         if rescanWanted { rescanWanted = false; transcriptMoved() }
+        self.stamps = stamps
+        self.cached = cached
+        if light, Self.awsNeeds(byPid) == Self.awsNeeds(self.byPid) { return }
         sessionIDByPid = ids
         scanned = true
         self.byPid = byPid
-        self.stamps = stamps
-        self.cached = cached
         applyAutoNames()
         if let namer {
             namer.consider(byPid.compactMap { pid, p in ids[pid].map { ($0, cwds[pid] ?? "", p) } })
@@ -115,6 +122,11 @@ final class SessionProgressModel: SessionProgressSource {
         tokenRate = TokenRate(perMinute: perMinute,
                               peakPerMinute: TokenRate.nextPeak(tokenRate?.peakPerMinute ?? 0,
                                                                 seeing: perMinute))
+    }
+
+    private static func awsNeeds(_ byPid: [Int: SessionProgress]) -> Set<String> {
+        Set(byPid.compactMap { pid, p in
+            p.awsLoginProfile.map { "\(pid)|\($0)|\(p.awsLoginFailedAt?.timeIntervalSince1970 ?? 0)" } })
     }
 
     /// Watches follow the matched set: a session that left drops its
@@ -142,7 +154,7 @@ final class SessionProgressModel: SessionProgressSource {
             try? await Task.sleep(for: .seconds(1))
             guard let self else { return }
             rescan = nil
-            if busy { rescanWanted = true } else { refresh(sessions: lastSessions) }
+            if busy { rescanWanted = true } else { refresh(sessions: lastSessions, light: true) }
         }
     }
 
