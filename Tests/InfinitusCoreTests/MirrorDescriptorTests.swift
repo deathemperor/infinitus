@@ -15,7 +15,7 @@ final class MirrorDescriptorTests: XCTestCase {
         XCTAssertTrue(text.contains(#""timeline":true"#))
         XCTAssertTrue(text.contains(#""attention":true"#))
         XCTAssertTrue(text.contains(#""sequence":true"#))
-        XCTAssertFalse(text.contains("leases"))
+        XCTAssertTrue(text.contains(#""leases":true"#))
         #if os(macOS)
         XCTAssertEqual(d.platform, "macos")
         #else

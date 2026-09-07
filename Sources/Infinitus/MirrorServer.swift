@@ -496,6 +496,8 @@ final class MirrorServer: ObservableObject {
     let descriptor = MirrorDescriptorBox()
     /// Command receipts for input / start / attention (#223 phase 4).
     let receipts = Receipts()
+    /// Client-activity leases (#223 phase 5): who is looking at what.
+    let leases = LeaseTable()
     /// Answers `/sessions/<pid>/images/<id>`; set by AppModel once at start.
     let sessionImage = MirrorSessionImageBox()
     let awsLogin = MirrorAwsLoginBox()
@@ -671,6 +673,7 @@ final class MirrorServer: ObservableObject {
         let timeline = self.timeline
         let descriptor = self.descriptor
         let receipts = self.receipts
+        let leases = self.leases
         let sessionImage = self.sessionImage
         let activityTokens = self.activityTokens
         let awsLogin = self.awsLogin
@@ -688,7 +691,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -769,6 +772,7 @@ final class MirrorServer: ObservableObject {
                                           timeline: MirrorTimelineBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
+                                          leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                           team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -778,7 +782,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -793,6 +797,7 @@ final class MirrorServer: ObservableObject {
                                           timeline: MirrorTimelineBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
+                                          leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                             team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -1031,6 +1036,19 @@ final class MirrorServer: ObservableObject {
                                         completion: .contentProcessed { _ in connection.cancel() })
                     }
                     return
+                } else if request.method == "POST", request.path == ClientActivity.path {
+                    guard let decoded = try? JSONDecoder().decode(ClientActivity.Report.self, from: request.body) else {
+                        connection.send(content: MirrorTransport.badRequestResponse(),
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                        return
+                    }
+                    leases.report(decoded)   // no I/O: stays on the queue
+                    let response = MirrorTransport.response(status: 204, reason: "No Content",
+                                                            contentType: "application/json", body: Data())
+                    onServed(request)
+                    connection.send(content: response,
+                                    completion: .contentProcessed { _ in connection.cancel() })
+                    return
                 } else if request.path.hasPrefix(TeamMirror.prefix + "/") {
                     // The phone's Team tab (spec §9): TeamModel work runs
                     // on its own queue behind the main actor, so off this
@@ -1155,7 +1173,7 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }

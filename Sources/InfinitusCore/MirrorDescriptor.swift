@@ -48,7 +48,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         self.appVersion = appVersion; self.capabilities = capabilities
     }
 
-    /// This build's truth; `leases` arrives with phase 5.
+    /// This build's truth.
     public static func current(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         #if os(macOS)
         let platform = "macos"
@@ -58,7 +58,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         let platform = "other"
         #endif
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
-                                capabilities: Capabilities(timeline: true, sequence: true, attention: true,
+                                capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
                                                            ownedSessions: true, checkpoints: true, team: true,
                                                            pastSessions: true, images: true))
     }
