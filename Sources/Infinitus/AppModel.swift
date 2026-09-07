@@ -2549,7 +2549,7 @@ final class AppModel: ObservableObject {
                                                 return facts
                                             },
                                             sequence: sequenceLog, now: mirrorNow,
-                                            roster: { self.ownedRoster(claudeDir: ClaudeSessions.configHome()) })
+                                            overlay: self.overlayingOwnedStatus)
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be
@@ -2729,7 +2729,10 @@ final class AppModel: ObservableObject {
     /// The roster with an owned child's status filled in from its actor
     /// (the CLI leaves an sdk-cli record's status empty).
     nonisolated func ownedRoster(claudeDir: URL) -> [ClaudeSessionRecord] {
-        let records = ClaudeSessions.list(claudeDir: claudeDir)
+        overlayingOwnedStatus(ClaudeSessions.list(claudeDir: claudeDir))
+    }
+
+    nonisolated func overlayingOwnedStatus(_ records: [ClaudeSessionRecord]) -> [ClaudeSessionRecord] {
         guard let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return records }
         return records.map { r in owned.status(pid: r.pid).map { r.with(status: $0) } ?? r }
     }

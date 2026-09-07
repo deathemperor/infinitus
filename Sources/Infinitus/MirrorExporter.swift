@@ -39,15 +39,19 @@ actor MirrorExporter {
                 profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:],
                 facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
                 sequence: SequenceLog? = nil, now: Bool = false,
-                roster: @Sendable () -> [ClaudeSessionRecord] = { ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()) }) {
+                overlay: @Sendable ([ClaudeSessionRecord]) -> [ClaudeSessionRecord] = { $0 }) {
         // `now`: news the phone is waiting on (an AWS-login need that just
         // surfaced) skips the 30 s throttle.
         guard now || Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
+        // `overlay` folds an owned session's live state into the rows; the
+        // facts build below keeps the plain records — a "waiting" status
+        // there turns the open tool_use into a second approval.
+        let plainRecords = ClaudeSessions.list(claudeDir: claudeDir)
         // Same selection as InfinitusTray.swift's panel rows: busy/waiting
         // first, busy before waiting, capped at 6.
-        let allRecords = roster()
+        let allRecords = overlay(plainRecords)
         let sessionRecords = allRecords
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
@@ -102,7 +106,7 @@ actor MirrorExporter {
             profiles: profiles.isEmpty ? nil : profiles,
             births: births.isEmpty ? nil
                 : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })),
-            factsByPid: facts(allRecords),
+            factsByPid: facts(plainRecords),
             epoch: sequence?.epoch, sequence: sequence?.current)
         // Encoded once here rather than inside MirrorWriter so the LAN
         // server hands out the same bytes the file holds.
