@@ -677,7 +677,9 @@ final class AppModel: ObservableObject {
     let mirrorExporter = MirrorExporter()
     /// T3 attention flags and the per-session timeline cache (#223 phase 3).
     let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
-    let timelineCache = TimelineCache()
+    /// Numbers every timeline change for `/timeline` resumes (#223 phase 4).
+    let sequenceLog = SequenceLog()
+    private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
@@ -1483,6 +1485,35 @@ final class AppModel: ObservableObject {
             return SessionAttention.apply(request, sessionId: record.sessionId,
                                           timeline: timeline.appending(pending: pending),
                                           status: record.status, store: attentionStore)
+        }
+        // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
+        let sequenceLog = sequenceLog
+        mirrorServer.timeline.set { pid, after, epoch, wait in
+            let claudeDir = ClaudeSessions.configHome()
+            let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
+            // Long-poll only when the client is current: the stamp is the
+            // record's, same wait rule as /tail (owned pids cap at ownedWait).
+            if let after, after >= sequenceLog.current, wait > 0,
+               let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) {
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
+                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir),
+                                                wait: owned == nil ? wait : min(wait, OwnedFeed.ownedWait))
+            }
+            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+                  let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
+            let full = timeline.appending(pending: owned?.pending(pid: pid) ?? [])
+            let facts = SessionFacts.derive(timeline: full, status: record.status,
+                                            attention: attentionStore.entry(sessionId: record.sessionId))
+            _ = sequenceLog.record(pid: pid, facts: facts)
+            let reply = TimelineSync.reply(log: sequenceLog, pid: pid, afterSequence: after, epoch: epoch,
+                                           timeline: full, facts: facts)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            return try? encoder.encode(reply)
+        }
+        mirrorServer.descriptor.set {
+            MirrorDescriptor.current(machineId: MachineIdentity.current(), label: MachineName.current(),
+                                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
         }
         mirrorServer.sessionInput.set { [weak self] pid, request in
             self?.deliverSessionInput(pid: pid, request, from: "phone")
@@ -2387,6 +2418,7 @@ final class AppModel: ObservableObject {
                 updateChannel: BrewUpdater.channel.rawValue,
                 phoneLatest: appReleaseLatest)
             let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
+            let sequenceLog = sequenceLog
             Task.detached(priority: .utility) { [mirrorExporter] in
                 await mirrorExporter.record(listJSON: raw, prefs: prefs,
                                             serviceStatus: serviceStatus,
@@ -2401,7 +2433,8 @@ final class AppModel: ObservableObject {
                                             facts: { records in
                                                 timelineCache.facts(records: records, claudeDir: ClaudeSessions.configHome(),
                                                                     attention: attentionStore) { ownedBox.existing?.pending(pid: $0) ?? [] }
-                                            })
+                                            },
+                                            sequence: sequenceLog)
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be

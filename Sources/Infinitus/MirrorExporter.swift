@@ -37,7 +37,8 @@ actor MirrorExporter {
                 progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
                 profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:],
-                facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] }) {
+                facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
+                sequence: SequenceLog? = nil) {
         guard Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
@@ -98,7 +99,8 @@ actor MirrorExporter {
             profiles: profiles.isEmpty ? nil : profiles,
             births: births.isEmpty ? nil
                 : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })),
-            factsByPid: facts(allRecords))
+            factsByPid: facts(allRecords),
+            epoch: sequence?.epoch, sequence: sequence?.current)
         // Encoded once here rather than inside MirrorWriter so the LAN
         // server hands out the same bytes the file holds.
         let encoder = JSONEncoder()
