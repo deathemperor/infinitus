@@ -307,4 +307,31 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(p.userInputs.count, 1)
         XCTAssertEqual(p.userInputs[0].questions.first?.objectValue?["options"]?.arrayValue?.count, 1)
     }
+
+    // MARK: Task 8 — SessionFeed carries the timeline
+    func testSessionFeedDecodesWithoutATimelineAndRoundTripsWithOne() throws {
+        let legacy = #"{"pid":1,"sessionId":"s","cwd":"/","status":"idle","waiting":false,"items":[]}"#
+        let feed = try JSONDecoder().decode(SessionFeed.self, from: Data(legacy.utf8))
+        XCTAssertNil(feed.timeline)
+        let tl = build(try entries("plain"))
+        let full = SessionFeed(pid: 1, sessionId: "s", cwd: "/", status: "idle", waiting: false, items: [], timeline: tl)
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        XCTAssertEqual(try dec.decode(SessionFeed.self, from: enc.encode(full)).timeline, tl)
+    }
+
+    func testReadBuildsTheTimelineFromTheSameTail() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tl-read-\(UUID().uuidString)")
+        let claudeDir = dir.appendingPathComponent(".claude")
+        let cwd = "/Users/me/proj"
+        let url = Transcript.locate(cwd: cwd, sessionId: "S1", claudeDir: claudeDir)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let fixture = Bundle.module.url(forResource: "Fixtures/timeline/tools", withExtension: "jsonl")!
+        try FileManager.default.copyItem(at: fixture, to: url)
+        let record = ClaudeSessionRecord(pid: 4242, sessionId: "S1", cwd: cwd, status: "idle")
+        let feed = try XCTUnwrap(SessionFeedReader.read(record: record, claudeDir: claudeDir))
+        XCTAssertEqual(feed.timeline?.turns.map(\.id), ["u1"])
+        XCTAssertEqual(feed.timeline?.activities.count, 6)
+        XCTAssertEqual(feed.items.map(\.kind), [.user, .tool, .result])   // legacy untouched
+    }
 }
