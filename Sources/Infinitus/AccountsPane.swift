@@ -929,10 +929,12 @@ private struct FleetAccountsSection: View {
     /// 20x, Active" after the slot and the name instead of three
     /// unlabelled fragments. The name and the action buttons stay
     /// separate: combining them away would make them unreachable.
-    /// The email shows only when the name is not already the email.
+    /// The email shows unless the name IS the email. Without a name the
+    /// field shows its "Name" placeholder, so a fresh account showed
+    /// neither (user screenshot 2026-09-07: "email cannot be displayed").
     @ViewBuilder private func detail(_ a: Account) -> some View {
         HStack(spacing: 8) {
-            if let alias = a.alias, !alias.isEmpty {
+            if a.alias != a.email {
                 Text(a.email).lineLimit(1)
                     .font(.caption).foregroundStyle(.secondary)
             }
