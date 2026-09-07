@@ -53,6 +53,20 @@ final class StatusItemHolder: ObservableObject {
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
         model.showWall = { [weak controller] in controller?.toggleWall() }
+        model.openSessionChat = { [weak model] session in
+            guard let model else { return }
+            SessionChatWindows.shared.open(session, model: model)
+        }
+        // Dev seam (like the phone's INFINITUS_FEED_PID): a dev instance
+        // opens the chat for one live pid at launch, for a screenshot.
+        if let raw = ProcessInfo.processInfo.environment["INFINITUS_CHAT_PID"], let pid = Int(raw) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                let cwd = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                    .first { Int($0.pid) == pid }?.cwd ?? "?"
+                model.openSessionChat?(SessionDetail(pid: pid, cwd: cwd, status: "idle", kind: "interactive",
+                                                     startedAt: Date().timeIntervalSince1970 * 1000))
+            }
+        }
         model.lock.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         model.team.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         // A cold-launch `infinitus://join/…` can call TeamModel.open(url:)
