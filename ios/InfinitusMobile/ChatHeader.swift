@@ -110,13 +110,33 @@ struct ChatHeaderView: View {
     let data: ChatHeaderData
     var route: SessionDetailRoute? = nil
     var onBack: (() -> Void)? = nil
+    /// Set while the session works: the stop button the Mac's chat
+    /// window and the browser page already have (sends Esc, #223).
+    var onInterrupt: (() -> Void)? = nil
 
     var body: some View {
         let header = ChatHeaderBody(style: style, theme: theme, data: data, route: route, onBack: onBack)
-        if style == "hud" {
-            header.dynamicTypeSize(...DynamicTypeSize.accessibility2)
-        } else {
-            header
+        Group {
+            if style == "hud" {
+                header.dynamicTypeSize(...DynamicTypeSize.accessibility2)
+            } else {
+                header
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let onInterrupt {
+                Button(action: onInterrupt) {
+                    Image(systemName: "stop.fill")
+                        .font(.caption.weight(.bold))
+                        .padding(7)
+                        .background(.red.opacity(0.85), in: Circle())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 8).padding(.trailing, 10)
+                .accessibilityLabel("Interrupt")
+                .accessibilityHint("Stops the current response")
+            }
         }
     }
 }

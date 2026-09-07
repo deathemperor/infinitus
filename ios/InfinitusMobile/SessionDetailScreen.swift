@@ -21,6 +21,26 @@ enum SessionWords {
         theme.sessionWord(raw)
     }
 
+    /// The attention rank's word and color (#223 phase 3): approvals and
+    /// questions wear the theme's "waiting" word, work its "busy" word;
+    /// a failure says so in red; ready keeps the engine's own word.
+    static func status(_ attention: SessionListPresentation.Attention, raw: String, theme: RowTheme) -> String {
+        switch attention {
+        case .approval, .input: return theme.sessionWord("waiting")
+        case .working: return theme.sessionWord("busy")
+        case .failed: return "failed"
+        case .ready: return theme.sessionWord(raw)
+        }
+    }
+    static func color(_ attention: SessionListPresentation.Attention, raw: String) -> Color {
+        switch attention {
+        case .approval, .input: return .yellow
+        case .working: return .orange
+        case .failed: return .red
+        case .ready: return color(raw)
+        }
+    }
+
     /// Same colors the Mac's sessions card uses for each status.
     static func color(_ raw: String) -> Color {
         switch raw {

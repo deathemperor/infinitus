@@ -100,6 +100,13 @@ final class MirrorModel: ObservableObject, FleetModel {
         return other(macId)?.snapshot?.progressByPid?[pid]
     }
 
+    /// The host's facts for a session (#223 phase 3) — present only while
+    /// this phone (or another client) leases it; nil falls back to the
+    /// engine's status word.
+    func facts(macId: String?, pid: Int) -> SessionFacts? {
+        (macId == nil ? snapshot : other(macId!)?.snapshot)?.factsByPid?[pid]
+    }
+
     func accountSummary(macId: String?, pid: Int) -> SessionAccountSummary? {
         guard let macId else { return accountSummary(forSessionPid: pid) }
         guard let snapshot = other(macId)?.snapshot,
