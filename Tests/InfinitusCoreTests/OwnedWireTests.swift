@@ -127,6 +127,60 @@ final class OwnedWireTests: XCTestCase {
         XCTAssertFalse(bogus.contains("--permission-mode"))
     }
 
+    // MARK: #223 §6 leftovers
+
+    func testARejectedRateLimitEventBecomesANoteAndWarningsStayOther() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let line = #"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1800008100,"rateLimitType":"five_hour","utilization":1.0}}"#
+        guard case .rateLimit(let note) = OwnedWire.decode(line: line, now: now) else { return XCTFail("not a limit") }
+        XCTAssertEqual(note.rateLimitType, "five_hour")
+        XCTAssertEqual(note.key, "five_hour:1800008100")
+        XCTAssertEqual(note.text, "Claude usage limit reached. This turn is paused until the 5-hour limit resets in 2h 15m.")
+        guard case .other = OwnedWire.decode(line: #"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1800008100,"rateLimitType":"five_hour"}}"#) else {
+            return XCTFail("a warning is not a line")
+        }
+        // A reset more than 30 days out is not credible: no "in …".
+        let far = LimitNote(status: "rejected", rateLimitType: "seven_day",
+                            resetsAt: now.addingTimeInterval(40 * 86_400), receivedAt: now)
+        XCTAssertEqual(far.text, "Claude usage limit reached. This turn is paused until the weekly limit resets.")
+        XCTAssertEqual(LimitNote(status: "rejected", rateLimitType: nil, resetsAt: nil, receivedAt: now).text,
+                       "Claude usage limit reached. This turn is paused until the usage limit resets.")
+    }
+
+    func testImagesGoBeforeTheOneTextBlock() throws {
+        let line = OwnedWire.userLine("/compact", images: [.init(mediaType: "image/png", base64: "AAAA")])
+        let obj = try JSONSerialization.jsonObject(with: Data(line.utf8)) as! [String: Any]
+        let content = (obj["message"] as! [String: Any])["content"] as! [[String: Any]]
+        XCTAssertEqual(content.map { $0["type"] as? String }, ["image", "text"])
+        let source = content[0]["source"] as! [String: Any]
+        XCTAssertEqual(source["media_type"] as? String, "image/png")
+        XCTAssertEqual(source["data"] as? String, "AAAA")
+        XCTAssertEqual(content[1]["text"] as? String, "/compact")
+        XCTAssertFalse(OwnedWire.imageMediaTypes.contains("image/heic"))
+    }
+
+    func testExitPlanModeExposesItsPlanAsMarkdown() {
+        let line = ##"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"ExitPlanMode","input":{"plan":"# Ship it\n\n1. build\n2. test"},"tool_use_id":"t1"}}"##
+        guard case .canUseTool(let pending) = OwnedWire.decode(line: line) else { return XCTFail("not a can_use_tool") }
+        XCTAssertEqual(pending.planMarkdown, "# Ship it\n\n1. build\n2. test")
+        let write = #"{"type":"control_request","request_id":"r2","request":{"subtype":"can_use_tool","tool_name":"Write","input":{"plan":"not a plan"}}}"#
+        guard case .canUseTool(let other) = OwnedWire.decode(line: write) else { return XCTFail("not a can_use_tool") }
+        XCTAssertNil(other.planMarkdown)
+        let tl = SessionTimeline().appending(pending: [pending])
+        XCTAssertEqual(tl.activities.first?.summary, "Proposed plan: Ship it")
+        XCTAssertEqual(tl.activities.first?.detail, pending.planMarkdown)
+    }
+
+    func testLimitsAppendAsTheTranscriptsOwnWarningShape() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let note = LimitNote(status: "rejected", rateLimitType: "five_hour", resetsAt: now.addingTimeInterval(600), receivedAt: now)
+        let tl = SessionTimeline().appending(limits: [note])
+        XCTAssertEqual(tl.activities.map(\.kind), ["runtime.warning"])
+        XCTAssertEqual(tl.activities[0].payload["code"], .string("limit"))
+        XCTAssertEqual(tl.activities[0].id, "limit:five_hour:1800000600")
+        XCTAssertEqual(tl.activities[0].summary, note.text)
+    }
+
     // MARK: answers
 
     func testAllowEchoesTheInputAndCarriesSuggestionsWhenAsked() throws {

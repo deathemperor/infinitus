@@ -114,6 +114,49 @@ public struct PendingRequest: Sendable, Equatable, Codable {
         SessionFeedItem(kind: .question, text: questions.first?.question ?? "Question", at: receivedAt,
                         options: questions.first?.options, questions: questions)
     }
+
+    /// `ExitPlanMode`'s proposed plan (its `plan` input), so the card
+    /// shows the plan itself rather than its JSON; nil for other tools.
+    public var planMarkdown: String? {
+        guard toolName == "ExitPlanMode",
+              let obj = try? JSONSerialization.jsonObject(with: Data(inputJSON.utf8)) as? [String: Any],
+              let plan = obj["plan"] as? String, !plan.isEmpty else { return nil }
+        return plan
+    }
+}
+
+/// A `rate_limit_event` the session reported mid-turn: the CLI's
+/// `rate_limit_info` reduced to what the feed says (T3's rule: only a
+/// rejected window is worth a line; resets more than 30 days out are
+/// not credible and go unsaid).
+public struct LimitNote: Sendable, Equatable {
+    public let status: String
+    public let rateLimitType: String?
+    public let resetsAt: Date?
+    public let receivedAt: Date
+
+    /// Dedupe key per turn: the same window's same reset is one line.
+    public var key: String { "\(rateLimitType ?? ""):\(resetsAt.map { Int($0.timeIntervalSince1970) } ?? 0)" }
+
+    public var text: String {
+        let window: String
+        switch rateLimitType {
+        case "five_hour": window = "5-hour"
+        case "seven_day": window = "weekly"
+        case let t?: window = t.replacingOccurrences(of: "_", with: " ")
+        case nil: window = "usage"
+        }
+        var line = "Claude usage limit reached. This turn is paused until the \(window) limit resets"
+        // Integer arithmetic like DisplayLogic's countdowns: one shape on
+        // every platform and locale (corelibs' DateComponentsFormatter is not).
+        if let resetsAt, resetsAt.timeIntervalSince(receivedAt) < 30 * 86_400, resetsAt > receivedAt {
+            let total = Int(resetsAt.timeIntervalSince(receivedAt))
+            let days = total / 86400, hours = (total % 86400) / 3600, minutes = (total % 3600) / 60
+            let countdown = days > 0 ? "\(days)d \(hours)h" : hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+            line += " in \(countdown)"
+        }
+        return line + "."
+    }
 }
 
 /// The stream-json protocol between the app and a `claude` it owns:
@@ -125,8 +168,21 @@ public enum OwnedWire {
         case canUseTool(PendingRequest)
         case result
         case controlResponse(requestId: String)
+        /// A `rate_limit_event` whose status is "rejected" — the turn is
+        /// paused on a window; warnings and allowances are `.other`.
+        case rateLimit(LimitNote)
         case other
     }
+
+    /// One image block for a user turn: the API's media type and the
+    /// base64 body. Only what the API takes — heic, pdf and text ride the
+    /// terminal path as files, never a headless turn.
+    public struct Image: Sendable, Equatable {
+        public let mediaType: String
+        public let base64: String
+        public init(mediaType: String, base64: String) { self.mediaType = mediaType; self.base64 = base64 }
+    }
+    public static let imageMediaTypes: Set<String> = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 
     public enum Decision: Sendable, Equatable {
         /// `forSession` also sends the suggested rule so this tool stops asking.
@@ -174,8 +230,15 @@ public enum OwnedWire {
         return String(decoding: data, as: UTF8.self) + "\n"
     }
 
-    public static func userLine(_ text: String) -> String {
-        line(["type": "user", "message": ["role": "user", "content": [["type": "text", "text": text]]]])
+    /// Images go BEFORE the one text block: the CLI expands a slash
+    /// command only from the last text block (T3's trap list), so the
+    /// text stays last and stays alone.
+    public static func userLine(_ text: String, images: [Image] = []) -> String {
+        var content: [[String: Any]] = images.map {
+            ["type": "image", "source": ["type": "base64", "media_type": $0.mediaType, "data": $0.base64]]
+        }
+        content.append(["type": "text", "text": text])
+        return line(["type": "user", "message": ["role": "user", "content": content]])
     }
 
     public static func controlLine(requestId: String, subtype: String, fields: [String: Any] = [:]) -> String {
@@ -252,6 +315,12 @@ public enum OwnedWire {
                                 permissionMode: obj["permissionMode"] as? String)
         case "result":
             return .result
+        case "rate_limit_event":
+            guard let info = obj["rate_limit_info"] as? [String: Any],
+                  (info["status"] as? String) == "rejected" else { return .other }
+            let resets = (info["resetsAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) }
+            return .rateLimit(LimitNote(status: "rejected", rateLimitType: info["rateLimitType"] as? String,
+                                        resetsAt: resets, receivedAt: now))
         case "control_response":
             let rid = (obj["response"] as? [String: Any])?["request_id"] as? String ?? ""
             return .controlResponse(requestId: rid)

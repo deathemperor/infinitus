@@ -21,6 +21,10 @@ publishes the matching section as the GitHub release body.
 - A "needs AWS login" line met by a sign-in outside the app clears on its own: while it shows, the app asks the CLI every five minutes whether the profile works (#313).
 - An `aws login` the app left running when it relaunched is killed at the next launch, and a login past its ten minutes is killed for good — a leftover held the credential broker's lock and failed every caller on that profile (#274).
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.
+- A headless session shows a plan as the plan when Claude asks to leave plan mode, not as JSON (#151).
+- A headless session that hits a usage limit says so in its feed, with the window and when it resets (#151).
+- Photos and screenshots sent to a headless session reach Claude as images (#151).
+- Interrupting a headless session never leaves it stuck on "busy": the turn closes after five seconds if Claude Code doesn't (#151).
 - A headless session's permission prompt reaches the phone, the browser page and the Mac window the moment it parks, instead of up to two seconds later (#151).
 - A headless session's row says busy, idle or waiting like any other, and wears a "headless" chip, instead of reading "unknown" (#151).
 - "Ask every time" is a permission choice on both start forms and in profiles: every tool asks, even the ones Claude Code would allow on its own (#151).

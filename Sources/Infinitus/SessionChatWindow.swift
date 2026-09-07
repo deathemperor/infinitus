@@ -103,7 +103,7 @@ final class SessionChatStore: ObservableObject {
                 // this wait the moment one parks (OwnedFeed).
                 let owned = box?.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
                 SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax,
-                                                decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp },
+                                                decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
                                                 wake: owned?.wake)
                 if Task.isCancelled { return }
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else {
@@ -112,7 +112,7 @@ final class SessionChatStore: ObservableObject {
                     continue
                 }
                 var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 200)
-                if let owned, let f = feed { feed = OwnedFeed.augment(f, pending: owned.pending(pid: pid)) }
+                if let owned, let f = feed { feed = OwnedFeed.augment(f, pending: owned.pending(pid: pid), limits: owned.limits(pid: pid)) }
                 if let feed, feed.stamp != since || since == nil {
                     since = feed.stamp
                     await MainActor.run {

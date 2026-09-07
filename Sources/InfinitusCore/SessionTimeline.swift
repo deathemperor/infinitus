@@ -113,14 +113,34 @@ extension SessionTimeline {
                            })]
             } else {
                 kind = "approval.requested"
-                summary = p.description ?? p.toolName
+                // ExitPlanMode's card is the plan, not its JSON (#223 §6).
+                summary = p.planMarkdown.map { "Proposed plan: " + String($0.split(whereSeparator: \.isNewline).first ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "# ")) }
+                    ?? p.description ?? p.toolName
                 let input = (try? JSONDecoder().decode(JSONValue.self, from: Data(p.inputJSON.utf8))) ?? .object([:])
                 payload = ["requestId": .string(p.requestId), "toolName": .string(p.toolName),
                            "requestType": .string(SessionTimelineBuilder.Slim.requestType(for: p.toolName)),
                            "input": input]
             }
-            out.activities.append(Activity(id: p.requestId, tone: .approval, kind: kind, summary: summary, detail: nil,
-                                           payload: payload, turnId: turnId, sequence: seq, createdAt: p.receivedAt))
+            out.activities.append(Activity(id: p.requestId, tone: .approval, kind: kind, summary: summary,
+                                           detail: p.planMarkdown, payload: payload, turnId: turnId,
+                                           sequence: seq, createdAt: p.receivedAt))
+            seq += 1
+        }
+        return out
+    }
+
+    /// An owned session's rejected rate-limit events (#151), in the shape
+    /// the transcript's own limit stop takes (`runtime.warning`, code
+    /// "limit"), so the rows and facts treat them alike.
+    public func appending(limits: [LimitNote]) -> SessionTimeline {
+        guard !limits.isEmpty else { return self }
+        var out = self
+        let turnId = latestTurn?.id ?? "owned:limit"
+        var seq = (activities.last?.sequence ?? -1) + 1
+        for l in limits {
+            out.activities.append(Activity(id: "limit:" + l.key, tone: .info, kind: "runtime.warning", summary: l.text,
+                                           detail: nil, payload: ["code": .string("limit")], turnId: turnId,
+                                           sequence: seq, createdAt: l.receivedAt))
             seq += 1
         }
         return out

@@ -23,7 +23,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
     /// The fake: `--version` prints a banner; otherwise it answers
     /// `initialize` with init, a user turn with the fixture's permission
     /// request, an allow with a result, and echoes every control request.
-    private func writeFake(version: String = "2.1.263 (Claude Code)") throws {
+    private func writeFake(version: String = "2.1.263 (Claude Code)", swallowInterrupt: Bool = false) throws {
         let ask = Bundle.module.url(forResource: "owned-can-use-tool-write", withExtension: "json", subdirectory: "Fixtures")!.path
         let question = Bundle.module.url(forResource: "owned-can-use-tool-ask", withExtension: "json", subdirectory: "Fixtures")!.path
         try writeScript { dir in
@@ -36,6 +36,10 @@ final class OwnedSessionsProcessTests: XCTestCase {
               case "$line" in
                 *'"initialize"'*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"1","response":{}}}'
                                   echo '{"type":"system","subtype":"init","session_id":"S-FAKE","permissionMode":"default"}';;
+                *'hang'*) echo "$line" >> "\(dir.path)/users";;
+                *'limit please'*) echo "$line" >> "\(dir.path)/users"
+                                  echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1800008100,"rateLimitType":"five_hour"}}'
+                                  echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1800008100,"rateLimitType":"five_hour"}}';;
                 *'"type": "user"'*|*'"type":"user"'*) echo "$line" >> "\(dir.path)/users"
                                   case "$line" in *colour*) cat '\(question)';; *) cat '\(ask)';; esac;;
                 *'"behavior": "allow"'*|*'"behavior":"allow"'*) echo "$line" >> "\(dir.path)/answers"
@@ -44,7 +48,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
                                   echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
                 *'"interrupt"'*) echo "$line" >> "\(dir.path)/controls"
                                   echo '{"type":"control_response","response":{"subtype":"success","request_id":"x","response":{"still_queued":[]}}}'
-                                  echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
+                                  \(swallowInterrupt ? "" : "echo '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"S-FAKE\"}'");;
                 *) echo "$line" >> "\(dir.path)/controls";;
               esac
             done
@@ -97,10 +101,11 @@ final class OwnedSessionsProcessTests: XCTestCase {
         var all: [OwnedSessions.State] { lock.lock(); defer { lock.unlock() }; return list.map(\.1) }
     }
 
-    private func make() async throws -> (OwnedSessions, States) {
-        try writeFake()
+    private func make(swallowInterrupt: Bool = false, interruptGrace: TimeInterval = 5) async throws -> (OwnedSessions, States) {
+        try writeFake(swallowInterrupt: swallowInterrupt)
         let states = States()
-        let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
+        let owned = OwnedSessions(binaryPath: scriptURL.path, interruptGrace: interruptGrace,
+                                  onState: { pid, s in states.add(pid, s) })
         return (owned, states)
     }
 
@@ -235,6 +240,52 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     private func record(_ pid: Int32) -> ClaudeSessionRecord {
         ClaudeSessionRecord(pid: pid, sessionId: "S-FAKE", cwd: cwd.path, kind: "interactive")
+    }
+
+    /// #223 §6: the CLI's interrupt is trusted only for the grace period;
+    /// a child that never answers with a `result` still reads idle after it.
+    func testAnInterruptWithoutAResultClosesTheTurnAfterTheGrace() async throws {
+        let (owned, states) = try await make(swallowInterrupt: true, interruptGrace: 0.5)
+        let pid = Int32(await owned.start(request()).pid!)
+        waitFor("init") { states.all.contains(.idle) }
+        XCTAssertTrue(owned.send(pid: pid, text: "hang"))   // the fake never answers this turn
+        XCTAssertEqual(owned.registry[pid]?.state, .busy)
+        XCTAssertTrue(owned.interrupt(pid: pid))
+        waitFor("interrupt echoed") { self.file("controls").contains("interrupt") }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(owned.registry[pid]?.state, .busy, "trusted within the grace")
+        waitFor("idle after the grace", timeout: 3) { owned.registry[pid]?.state == .idle }
+        await owned.stop(pid: pid)
+    }
+
+    func testARejectedRateLimitIsNotedOncePerTurnAndClearedByTheNext() async throws {
+        let (owned, states) = try await make()
+        let pid = Int32(await owned.start(request()).pid!)
+        waitFor("init") { states.all.contains(.idle) }
+        XCTAssertTrue(owned.send(pid: pid, text: "limit please"))
+        waitFor("noted") { !owned.limits(pid: pid).isEmpty }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(owned.limits(pid: pid).count, 1, "the same window and reset is one note")
+        XCTAssertEqual(owned.limits(pid: pid).first?.rateLimitType, "five_hour")
+        XCTAssertTrue(owned.send(pid: pid, text: "next turn"))
+        XCTAssertTrue(owned.limits(pid: pid).isEmpty)
+        await owned.stop(pid: pid)
+    }
+
+    func testDeliverSendsImagesAsBlocksAndRefusesWhatTheAPIWontTake() async throws {
+        let (owned, states) = try await make()
+        let pid = Int32(await owned.start(request()).pid!)
+        waitFor("init") { states.all.contains(.idle) }
+        let heic = SessionInput.Request(kind: .message, text: "look", attachments: [.init(name: "a.heic", mime: "image/heic", data: Data([1]))])
+        XCTAssertEqual(owned.deliver(heic, record: record(pid))?.outcome, "rejected")
+        let png = SessionInput.Request(kind: .message, text: "look", attachments: [.init(name: "a.png", mime: "image/png", data: Data([1, 2, 3]))])
+        XCTAssertEqual(owned.deliver(png, record: record(pid)), SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("sent") { self.file("users").contains("image\\/png") || self.file("users").contains("image/png") }
+        let users = file("users").replacingOccurrences(of: "\\/", with: "/")
+        XCTAssertLessThan(users.range(of: "\"image\"")!.lowerBound, users.range(of: "\"text\"")!.lowerBound,
+                          "the image block precedes the text block")
+        XCTAssertTrue(users.contains(Data([1, 2, 3]).base64EncodedString()))
+        await owned.stop(pid: pid)
     }
 
     func testDeliverIsNilForAPidItDoesNotOwn() async throws {

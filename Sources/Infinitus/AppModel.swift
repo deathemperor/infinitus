@@ -1492,13 +1492,13 @@ final class AppModel: ObservableObject {
             let claudeDir = ClaudeSessions.configHome()
             let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
             SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait,
-                                            decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp },
+                                            decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
                                             wake: owned?.wake)
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
             else { return nil }
             guard var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
             else { return nil }
-            if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid)) }
+            if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid), limits: owned.limits(pid: pid)) }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             guard rows, let timeline = feed.timeline,
@@ -1560,7 +1560,7 @@ final class AppModel: ObservableObject {
             // Same wait rule as /tail: the record stamp, an owned pid's
             // parked prompts folded in and its actor's wake-up.
             if wait > 0, let after, sequenceLog.events(pid: pid, after: after)?.isEmpty == true {
-                let decorate = { (stamp: String) in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid)) } ?? stamp }
+                let decorate = { (stamp: String) in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp }
                 SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
                                                 since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir).map(decorate),
                                                 wait: wait, decorate: decorate, wake: owned?.wake)
@@ -1569,7 +1569,7 @@ final class AppModel: ObservableObject {
                     record = fresh; timeline = rebuilt
                 }
             }
-            let full = timeline.appending(pending: owned?.pending(pid: pid) ?? [])
+            let full = timeline.appending(limits: owned?.limits(pid: pid) ?? []).appending(pending: owned?.pending(pid: pid) ?? [])
             let facts = SessionFacts.derive(timeline: full, status: record.status,
                                             attention: attentionStore.entry(sessionId: record.sessionId))
             _ = sequenceLog.record(pid: pid, facts: facts)
@@ -1632,7 +1632,9 @@ final class AppModel: ObservableObject {
             }
             let reply = SessionInput.deliver(request: request, record: record,
                                              hosts: PtyHosts.available(), claudeDir: claudeDir,
-                                             owned: self.ownedBox.existing?.deliver)
+                                             owned: self.ownedBox.existing.map { owned in
+                                                 { owned.deliver(Self.imagesForOwned($0), record: $1) }
+                                             })
             let label = URL(fileURLWithPath: record.cwd).lastPathComponent
             Task { @MainActor in
                 if reply.outcome == "delivered" {
@@ -2755,6 +2757,24 @@ final class AppModel: ObservableObject {
     /// Darwin) — swept once at startup, off the main actor (#151 follow-up).
     nonisolated static func sweepOwnedOrphans() -> [Int32] {
         OwnedSessions.sweepOrphans(ledger: OwnedLedger(url: ownedLedgerURL), claudeDir: ClaudeSessions.configHome())
+    }
+
+    /// A headless session takes the API's image types only; a phone file
+    /// pick can be HEIC — ImageIO reads it, so it goes as a JPEG bounded
+    /// to the API's recommended long edge instead of bouncing.
+    nonisolated static func imagesForOwned(_ request: SessionInput.Request) -> SessionInput.Request {
+        guard let attachments = request.attachments, attachments.contains(where: needsJPEG) else { return request }
+        let converted = attachments.map { a -> SessionInput.Attachment in
+            guard needsJPEG(a), let jpeg = ImageThumbnail.jpeg(a.data, maxPixels: 1568) else { return a }
+            return SessionInput.Attachment(name: a.name, mime: "image/jpeg", data: jpeg)
+        }
+        return SessionInput.Request(kind: request.kind, text: request.text, attachments: converted,
+                                    requestId: request.requestId, queuedAt: request.queuedAt,
+                                    sessionId: request.sessionId, commandId: request.commandId)
+    }
+
+    private nonisolated static func needsJPEG(_ a: SessionInput.Attachment) -> Bool {
+        a.mime.hasPrefix("image/") && !OwnedWire.imageMediaTypes.contains(a.mime)
     }
 
     private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {

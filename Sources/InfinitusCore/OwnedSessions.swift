@@ -38,6 +38,12 @@ public actor OwnedSessions {
         }
         var sessionId: String = ""
         private var counter = 100
+        /// Rejected rate-limit events of the current turn, one per
+        /// window+reset; cleared when the next turn goes out.
+        private var limitList: [LimitNote] = []
+        /// The interrupt whose `result` is still awaited, for the soft
+        /// fallback: nil once a result lands or a new turn starts.
+        private var interruptStamp: Date?
 
         init(pid: Int32, cwd: String, stdin: FileHandle) {
             self.pid = pid; self.cwd = cwd; self.stdin = stdin
@@ -86,6 +92,20 @@ public actor OwnedSessions {
             try? stdin.close(); writeLock.unlock()
             return true
         }
+
+        var limits: [LimitNote] { lock.lock(); defer { lock.unlock() }; return limitList }
+        /// True when the note is new for this turn.
+        func note(_ limit: LimitNote) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard !limitList.contains(where: { $0.key == limit.key }) else { return false }
+            limitList.append(limit)
+            return true
+        }
+        func clearLimits() { lock.lock(); limitList.removeAll(); lock.unlock() }
+        var interrupted: Date? {
+            get { lock.lock(); defer { lock.unlock() }; return interruptStamp }
+            set { lock.lock(); interruptStamp = newValue; lock.unlock() }
+        }
     }
 
     final class Registry: @unchecked Sendable {
@@ -108,13 +128,19 @@ public actor OwnedSessions {
     private let onState: @Sendable (Int32, State) -> Void
     /// The orphan ledger (#151 follow-up): nil in tests that don't care.
     private let ledger: OwnedLedger?
+    /// How long an `interrupt` control request gets to produce its
+    /// `result` before the turn is closed as idle anyway (T3 does not
+    /// trust the CLI's interrupt; this trusts it for this long).
+    private nonisolated let interruptGrace: TimeInterval
     private var processes: [Int32: Process] = [:]
     private var version: [Int]?
     private var loginShellPath: String?
 
-    public init(binaryPath: String, ledger: OwnedLedger? = nil, onState: @escaping @Sendable (Int32, State) -> Void) {
+    public init(binaryPath: String, ledger: OwnedLedger? = nil, interruptGrace: TimeInterval = 5,
+                onState: @escaping @Sendable (Int32, State) -> Void) {
         self.binaryPath = binaryPath
         self.ledger = ledger
+        self.interruptGrace = interruptGrace
         self.onState = onState
     }
 
@@ -240,7 +266,10 @@ public actor OwnedSessions {
                     if child.set(.waiting) { self?.publish(child.pid, .waiting) } else { self?.poke() }
                 case .result:
                     child.turnOpen = false
+                    child.interrupted = nil
                     if child.set(child.pending.isEmpty ? .idle : .waiting) { self?.publish(child.pid, child.state) }
+                case .rateLimit(let note):
+                    if child.note(note) { self?.poke() }
                 case .controlResponse, .other:
                     break
                 }
@@ -319,17 +348,34 @@ public actor OwnedSessions {
     // MARK: input — sync, from any thread
 
     /// A user turn. False when the pid is not ours or the child is gone.
-    public nonisolated func send(pid: Int32, text: String) -> Bool {
-        guard let child = registry[pid], child.write(OwnedWire.userLine(text)) else { return false }
+    public nonisolated func send(pid: Int32, text: String, images: [OwnedWire.Image] = []) -> Bool {
+        guard let child = registry[pid], child.write(OwnedWire.userLine(text, images: images)) else { return false }
         child.turnOpen = true
+        child.interrupted = nil
+        child.clearLimits()
         if child.set(.busy) { publish(pid, .busy) }
         return true
     }
 
+    /// The CLI's `interrupt` control request, trusted for `interruptGrace`:
+    /// if the turn's `result` hasn't landed by then, the turn closes as
+    /// idle here so no client sits on "busy" (#151, #223 §6).
     public nonisolated func interrupt(pid: Int32) -> Bool {
         guard let child = registry[pid] else { return false }
-        return child.write(OwnedWire.controlLine(requestId: child.nextRequestId(), subtype: "interrupt"))
+        guard child.write(OwnedWire.controlLine(requestId: child.nextRequestId(), subtype: "interrupt")) else { return false }
+        let stamp = Date()
+        child.interrupted = stamp
+        DispatchQueue.global().asyncAfter(deadline: .now() + interruptGrace) { [weak self] in
+            guard child.interrupted == stamp, child.turnOpen else { return }
+            child.turnOpen = false
+            child.interrupted = nil
+            if child.set(child.pending.isEmpty ? .idle : .waiting) { self?.publish(pid, child.state) }
+        }
+        return true
     }
+
+    /// The current turn's rejected rate-limit notes, for the feed.
+    public nonisolated func limits(pid: Int32) -> [LimitNote] { registry[pid]?.limits ?? [] }
 
     /// `set_permission_mode`, Claude Code's own mode names only.
     public nonisolated func setPermissionMode(pid: Int32, mode: String) -> Bool {
@@ -362,7 +408,16 @@ public actor OwnedSessions {
         case .mode:
             return nil
         case .message, .resume:
-            return send(pid: pid, text: request.text) ? delivered
+            if let rejection = SessionInput.attachmentRejection(request.attachments) {
+                return SessionInput.Reply(outcome: "rejected", detail: rejection)
+            }
+            let attachments = request.attachments ?? []
+            guard attachments.allSatisfy({ OwnedWire.imageMediaTypes.contains($0.mime) }) else {
+                return SessionInput.Reply(outcome: "rejected",
+                                          detail: "a headless session takes png, jpeg, gif and webp images only")
+            }
+            let images = attachments.map { OwnedWire.Image(mediaType: $0.mime, base64: $0.data.base64EncodedString()) }
+            return send(pid: pid, text: request.text, images: images) ? delivered
                 : SessionInput.Reply(outcome: "noChannel", detail: "the session has exited")
         case .approve:
             guard let first = pending(pid: pid).first else {
