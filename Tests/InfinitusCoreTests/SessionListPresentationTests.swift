@@ -55,6 +55,23 @@ final class SessionListPresentationTests: XCTestCase {
         XCTAssertTrue(P.isSnoozed(facts(turnEnded: t0.addingTimeInterval(-60), snoozedUntil: later, snoozedAt: t0), now: t0), "an older turn does not")
     }
 
+    func testShelvesFollowWhatTheStoreWrites() {
+        // The client rules read the fields AttentionStore.apply sets; a
+        // real store round-trip pins them together.
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("attention-\(UUID().uuidString)/attention.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        typealias P = SessionListPresentation
+        let store = AttentionStore(url: url)
+        let tl = SessionTimeline()
+        func facts(_ e: AttentionStore.Entry) -> SessionFacts { SessionFacts.derive(timeline: tl, status: nil, attention: e) }
+        XCTAssertTrue(P.isSettled(facts(store.apply(.settle, sessionId: "s", until: nil, now: t0))))
+        XCTAssertFalse(P.isSettled(facts(store.apply(.unsettle, sessionId: "s", until: nil, now: t0.addingTimeInterval(1)))))
+        let hour = t0.addingTimeInterval(3600)
+        XCTAssertTrue(P.isSnoozed(facts(store.apply(.snooze, sessionId: "s", until: hour, now: t0)), now: t0.addingTimeInterval(2)))
+        XCTAssertFalse(P.isSnoozed(facts(store.apply(.unsnooze, sessionId: "s", until: nil, now: t0)), now: t0.addingTimeInterval(3)))
+    }
+
     func testSettledOverrideWinsThenTimestamps() {
         typealias P = SessionListPresentation
         XCTAssertTrue(P.isSettled(facts(settledOverride: .settled)))

@@ -451,7 +451,8 @@ private struct AttentionActions: ViewModifier {
 
     static func shelfLabel(_ f: SessionFacts) -> (text: String, icon: String)? {
         if SessionListPresentation.isSnoozed(f), let until = f.snoozedUntil {
-            return ("snoozed until " + until.formatted(date: .omitted, time: .shortened), "moon.zzz")
+            let date: Date.FormatStyle.DateStyle = Calendar.current.isDateInToday(until) ? .omitted : .abbreviated
+            return ("snoozed until " + until.formatted(date: date, time: .shortened), "moon.zzz")
         }
         if SessionListPresentation.isSettled(f) { return ("settled", "checkmark.circle") }
         return nil
