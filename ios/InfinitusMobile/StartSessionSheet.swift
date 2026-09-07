@@ -165,7 +165,8 @@ struct StartSessionSheet: View {
         error = nil
         let request = SessionStart.Request(cwd: chosen, engine: engine,
                                            prompt: prompt.isEmpty ? nil : prompt,
-                                           permissionMode: engine == "claude" && !permissionMode.isEmpty ? permissionMode : nil,
+                                           // Supervised headless asks every time through Infinitus ("manual").
+                                           permissionMode: engine == "claude" ? (permissionMode.isEmpty ? (headless ? "manual" : nil) : permissionMode) : nil,
                                            model: engine == "claude" ? profile?.model : nil,
                                            systemPrompt: engine == "claude" ? profile?.systemPrompt : nil,
                                            profile: profile?.name,

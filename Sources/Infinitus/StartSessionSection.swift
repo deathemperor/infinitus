@@ -111,7 +111,9 @@ struct StartSessionSection: View {
         let claude = engine == "claude"
         let request = SessionStart.Request(cwd: chosenFolder, engine: engine,
                                            prompt: prompt.isEmpty ? nil : prompt,
-                                           permissionMode: claude && !permissionMode.isEmpty ? permissionMode : nil,
+                                           // Supervised headless = ask every time through Infinitus
+                                           // ("manual"); a terminal keeps the user's own default.
+                                           permissionMode: claude ? (permissionMode.isEmpty ? (headless ? "manual" : nil) : permissionMode) : nil,
                                            model: claude ? profile?.model : nil,
                                            systemPrompt: claude ? profile?.systemPrompt : nil,
                                            profile: profile?.name,
