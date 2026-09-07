@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
 
 ### Sessions
+- A "needs AWS login" line met by a login that finished before the Mac app relaunched no longer comes back as unmet after the relaunch.
 - The Mac popup's session rows take their dot and word from the same facts as the phone — a raised hand for an approval, a question mark for a prompt, snoozed and settled rows dimmed (#223).
 - The Mac only computes per-session facts for sessions someone is watching: the phone leases the list, the open feed and the stats tab every 25 s, and the Mac's own popup, pop-out and chat windows count too (#223).
 - The browser page draws the timeline rows too — tool groups and folded turns open in place (#223).

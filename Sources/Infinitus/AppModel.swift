@@ -1403,6 +1403,12 @@ final class AppModel: ObservableObject {
         awsLoginNeedsWatch = sessionProgress.$byPid
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.rebuildAwsLogins() }
+        // The ledger's finished logins reach that list only once the
+        // runner exists, and nothing else touches it until a login is
+        // asked for — so after every relaunch a met need came back as
+        // "Log in here" for as long as the failing result stayed in the
+        // transcript's window (Overlord, for hours, 2026-09-07).
+        _ = awsLoginRunner
         // The playground gets a socket only where INFINITUS_CONTROL_SOCKET
         // points — never the real app's path.
         if !isPlayground || ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] != nil {

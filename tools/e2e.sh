@@ -58,6 +58,7 @@ cleanup() {
     pkill -f "$INFINITUS_CSWAP auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
+    [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
@@ -144,6 +145,22 @@ TS="$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone
 cat >"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
 {"type":"assistant","timestamp":"$TS","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_e2e","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-login"}}]}}
 {"type":"user","timestamp":"$TS","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_e2e","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
+EOF
+# A second session with the same lapse, met by a login that finished
+# before this app instance started: the ledger is the only place the
+# app can learn that, and it only did once a login was asked for — so
+# every relaunch showed the met need as "Log in here" (2026-09-07).
+sleep 3600 &
+SEED_PID=$!
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SEED_PID.json" <<EOF
+{"pid":$SEED_PID,"sessionId":"e2e-seed","cwd":"$SESSION_CWD","kind":"interactive","status":"idle","name":"e2e-seed"}
+EOF
+cat >"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-seed.jsonl" <<EOF
+{"type":"assistant","timestamp":"$TS","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_seed","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-seeded"}}]}}
+{"type":"user","timestamp":"$TS","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_seed","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
+EOF
+cat >"$INFINITUS_AWS_LEDGER" <<EOF
+[{"phase":"done","flow":"remote","message":"signed in","startedAt":$(date +%s),"pid":$SEED_PID,"profile":"e2e-seeded"}]
 EOF
 
 "$APP" >"$LOG" 2>&1 &
@@ -281,6 +298,7 @@ until aws_login_item; do
     sleep 1
 done
 echo "aws: need surfaced after ${i}s"
+"$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).
 "$CTL" aws-login e2e-login --status >/dev/null 2>&1 && fail "--status started a login"
