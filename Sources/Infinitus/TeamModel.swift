@@ -868,6 +868,7 @@ final class TeamModel: ObservableObject {
 
     /// The token is checked against the zone before it is kept; ids cached, records of the same zone carried over.
     func saveCloudflare(zone: String, label: String, token: String) async {
+        guard gated() else { return }
         await action("Checking the token…") { paths, secrets in
             guard let team = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
             let dir = paths.teamDir(team)
@@ -884,6 +885,7 @@ final class TeamModel: ObservableObject {
     }
 
     func giveHostname(kid: String) async {
+        guard gated() else { return }
         await action("Minting…") { paths, secrets in
             guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
             guard var ledger = TeamHostnames.Ledger.load(teamDir: client.teamDir), let cf = Self.cloudflare(secrets) else {

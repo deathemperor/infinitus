@@ -47,9 +47,10 @@ func runTeamControl(_ args: [String]) -> Int32? {
         }
         i += 1
     }
-    // Delegating control is at least as sensitive as admitting a member:
-    // the same team gate as `approve` (TeamGate.swift).
-    if ["grant", "revoke"].contains(sub),
+    // Delegating control is at least as sensitive as admitting a member,
+    // and a domain-level Cloudflare token or a tunnel minted for a teammate
+    // at least as sensitive as that: the same team gate as `approve` (TeamGate.swift).
+    if ["grant", "revoke"].contains(sub) || (sub == "hostname" && ["token", "give"].contains(positional.first ?? "")),
        case .needsLock(let why) = TeamGate.check(lockEnabled: LockSetting.enabledOnThisMachine()) {
         return controlFail("\(why) (Infinitus › Settings › Lock)")
     }

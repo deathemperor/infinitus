@@ -455,6 +455,10 @@ struct TeamPane: View {
             }
             Text("A hostname is a Cloudflare named tunnel under your zone (`<name>.<label>.<zone>`), minted per member; their Mac starts it on the next fetch and keeps the same address across restarts.")
                 .font(.caption).foregroundStyle(.secondary)
+            if !gateOpen {
+                Label("Saving a token and giving hostnames need biometric unlock (Settings › Lock).", systemImage: "lock")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
