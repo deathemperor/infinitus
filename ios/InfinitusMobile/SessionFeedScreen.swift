@@ -278,7 +278,8 @@ struct SessionFeedScreen: View {
                 VStack(spacing: 0) {
                     ChatHeaderView(style: headerStyle, theme: theme, data: headerData,
                                    route: SessionDetailRoute(session: session, macId: macId),
-                                   onBack: { dismiss() })
+                                   onBack: { dismiss() },
+                                   onInterrupt: feed?.status == "busy" ? { sendKey("esc") } : nil)
                 }
                 .background(theme.plain ? Color.clear : ThemeColor.flash(theme).opacity(0.16))
                 .background(.bar)

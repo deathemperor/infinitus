@@ -284,9 +284,13 @@ struct SessionsScreen: View {
     }
 
     private func row(_ session: SessionDetail, macId: String? = nil) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        // The host's facts decide the dot and the word when the phone
+        // leases the session (#223 phase 3); the status word until then.
+        let facts = model.facts(macId: macId, pid: session.pid)
+        let attention = SessionListPresentation.attention(facts, fallbackStatus: session.status)
+        return HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(color(for: session.status))
+                .fill(SessionWords.color(attention, raw: session.status))
                 .frame(width: 9, height: 9)
                 .padding(.top, 5)
             VStack(alignment: .leading, spacing: 3) {
@@ -305,9 +309,15 @@ struct SessionsScreen: View {
                         .font(.headline).lineLimit(1)
                         .foregroundStyle(model.rowTheme.plain ? Color.primary : ThemeColor.flash(model.rowTheme))
                     Spacer(minLength: 8)
-                    Text(SessionWords.status(session.status, theme: model.rowTheme))
+                    if attention == .approval || attention == .input {
+                        Image(systemName: attention == .approval ? "hand.raised.fill" : "questionmark.circle.fill")
+                            .font(.caption).foregroundStyle(.yellow)
+                            .accessibilityLabel(attention == .approval ? "waiting for approval" : "asking a question")
+                    }
+                    Text(SessionWords.status(attention, raw: session.status, theme: model.rowTheme))
                         .font(.caption)
-                        .foregroundStyle(model.rowTheme.plain ? Color.secondary : color(for: session.status))
+                        .foregroundStyle(model.rowTheme.plain && attention == .ready ? Color.secondary
+                                         : SessionWords.color(attention, raw: session.status))
                     Text(SessionWords.age(since: session.startedAt))
                         .font(.caption).monospacedDigit()
                         .foregroundStyle(.tertiary)
@@ -321,6 +331,10 @@ struct SessionsScreen: View {
                     .lineLimit(1).truncationMode(.middle)
                 if let p = model.progress(macId: macId, pid: session.pid), p.hasProgressSignal {
                     SessionProgressLine(progress: p)
+                }
+                if let plan = SessionListPresentation.planLine(facts) {
+                    Label(plan, systemImage: "checklist")
+                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
         }
@@ -365,16 +379,6 @@ struct SessionsScreen: View {
     }
 
     /// Same colors the Mac's sessions card uses for each status.
-    private func color(for status: String) -> Color {
-        switch status {
-        case "busy": return .orange
-        case "waiting": return .yellow
-        case "idle": return .green
-        case "shell": return .blue
-        default: return .gray
-        }
-    }
-
     private func title(_ session: SessionDetail, macId: String? = nil) -> String {
         let repo = repoName(session.cwd)
         let p = model.progress(macId: macId, pid: session.pid)
