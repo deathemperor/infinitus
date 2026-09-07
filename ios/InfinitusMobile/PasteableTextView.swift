@@ -41,10 +41,15 @@ struct PasteableTextView: UIViewRepresentable {
         context.coordinator.parent = self
         (view as? ImagePasteTextView)?.onPasteImage = onPasteImage
         if view.text != text { view.text = text }
+        // Never move first responder inside SwiftUI's update pass: the
+        // keyboard's will-hide fires synchronously from resign, and the
+        // safe-area inset it should shrink is mid-update, so the composer
+        // stayed floating at keyboard height until the next state change —
+        // the next poll, seconds later (#294, user 2026-09-07 from the phone).
         if isFocused, !view.isFirstResponder {
-            view.becomeFirstResponder()
+            DispatchQueue.main.async { if !view.isFirstResponder { view.becomeFirstResponder() } }
         } else if !isFocused, view.isFirstResponder {
-            view.resignFirstResponder()
+            DispatchQueue.main.async { if view.isFirstResponder { view.resignFirstResponder() } }
         }
         view.isScrollEnabled = context.coordinator.contentHeight(for: view) > Self.maxHeight
     }

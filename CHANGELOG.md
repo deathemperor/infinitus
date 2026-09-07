@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 - The Mac can own a Claude Code session outright — no terminal — and answer its permission prompts and questions from the phone or the popup (#151).
 
 ### Phone
+- Closing the keyboard on a session chat drops the composer straight back to the bottom instead of leaving it floating mid-screen (#294).
 - Tapping a "Fleet on a Mac" widget opens the sessions list at that Mac's section (#144).
 - A "Fleet on a Mac" widget joins the Fleet widget: pick which paired Mac it shows in the widget's editor (#144).
 - Every paired Mac gets its own Live Activities: a working card and a revival countdown per Mac, each kept moving by the Mac it belongs to (#144).
