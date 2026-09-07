@@ -643,7 +643,8 @@ struct MenuContent: View {
                                 model: model, progress: model.sessionProgress,
                                 status: ServiceStatusSummary(indicator: status.indicator),
                                 onStatusTap: { status.openPage() },
-                                serviceChrome: StatusHoverCard(status: status))
+                                serviceChrome: StatusHoverCard(status: status),
+                                sessionsCard: { live in AnyView(MacSessionsPopover(model: model, live: live)) })
                             if !model.footerActionsHidden {
                                 if model.debugMenu {
                                     // Dev builds only (defaults write

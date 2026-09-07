@@ -19,15 +19,22 @@ public struct FooterChips<M: FleetModel, P: SessionProgressSource,
     let status: ServiceStatusSummary?
     let onStatusTap: () -> Void
     let serviceChrome: Service
+    /// What the agent chip's popover shows. nil ⇒ the plain session list
+    /// (the phone); the mac hands in MacSessionsPopover so a row opens
+    /// its chat window and the past-sessions / driving lines appear —
+    /// without it a tap on a row did nothing (2026-09-07).
+    let sessionsCard: ((LiveSessions) -> AnyView)?
 
     public init(model: M, progress: P, status: ServiceStatusSummary?,
                 onStatusTap: @escaping () -> Void = {},
-                serviceChrome: Service) {
+                serviceChrome: Service,
+                sessionsCard: ((LiveSessions) -> AnyView)? = nil) {
         self.model = model
         self.progress = progress
         self.status = status
         self.onStatusTap = onStatusTap
         self.serviceChrome = serviceChrome
+        self.sessionsCard = sessionsCard
     }
 
     public var body: some View {
@@ -89,7 +96,11 @@ public struct FooterChips<M: FleetModel, P: SessionProgressSource,
             .popover(isPresented: Binding(get: { model.sessionsShown },
                                           set: { model.sessionsShown = $0 }),
                      arrowEdge: .bottom) {
-                SessionListCard(live: live, progress: progress)
+                if let sessionsCard {
+                    sessionsCard(live)
+                } else {
+                    SessionListCard(live: live, progress: progress)
+                }
             }
             .instantTip(SessionSummary.tooltip(live), edge: .above)
         }
