@@ -6,7 +6,7 @@ import Foundation
 /// so list diffing is cheap; the shimmering row keeps ONE id for as long
 /// as anything is live, so the shimmer never restarts.
 public struct ThreadFeedRow: Identifiable, Equatable, Codable, Sendable {
-    public enum Kind: Equatable, Codable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case message(SessionTimeline.Message)
         /// Rows shown as they are: the expanded details of a work group,
         /// or a standalone activity (prompt, warning, error, compaction).
@@ -25,6 +25,43 @@ public struct ThreadFeedRow: Identifiable, Equatable, Codable, Sendable {
 
     /// The id the one shimmering row carries (T3 `LIVE_ACTIVITY_ROW_ID`).
     public static let liveRowId = "live-activity-row"
+
+    public init(id: String, turnId: String, createdAt: Date, kind: Kind) {
+        self.id = id; self.turnId = turnId; self.createdAt = createdAt; self.kind = kind
+    }
+
+    // The wire shape is flat — `{"id","turnId","createdAt","type":"workToggle","toggle":{…}}`
+    // — so the browser page binds to names, not to Swift's `_0` synthesis.
+    enum CodingKeys: String, CodingKey { case id, turnId, createdAt, type, message, activities, toggle, fold, agents }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        turnId = try c.decode(String.self, forKey: .turnId)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        switch try c.decode(String.self, forKey: .type) {
+        case "message": kind = .message(try c.decode(SessionTimeline.Message.self, forKey: .message))
+        case "activityGroup": kind = .activityGroup(try c.decode([WorkEntry].self, forKey: .activities))
+        case "workToggle": kind = .workToggle(try c.decode(WorkToggle.self, forKey: .toggle))
+        case "turnFold": kind = .turnFold(try c.decode(TurnFold.self, forKey: .fold))
+        case "thinking": kind = .thinking
+        case "agentSpawn": kind = .agentSpawn(try c.decode(AgentSpawn.self, forKey: .agents))
+        case let other: throw DecodingError.dataCorruptedError(forKey: .type, in: c, debugDescription: "unknown row type \(other)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id); try c.encode(turnId, forKey: .turnId); try c.encode(createdAt, forKey: .createdAt)
+        switch kind {
+        case .message(let m): try c.encode("message", forKey: .type); try c.encode(m, forKey: .message)
+        case .activityGroup(let e): try c.encode("activityGroup", forKey: .type); try c.encode(e, forKey: .activities)
+        case .workToggle(let t): try c.encode("workToggle", forKey: .type); try c.encode(t, forKey: .toggle)
+        case .turnFold(let f): try c.encode("turnFold", forKey: .type); try c.encode(f, forKey: .fold)
+        case .thinking: try c.encode("thinking", forKey: .type)
+        case .agentSpawn(let a): try c.encode("agentSpawn", forKey: .type); try c.encode(a, forKey: .agents)
+        }
+    }
 }
 
 /// One activity as the feed shows it: a tool's `started`/`completed`
@@ -82,10 +119,10 @@ public struct AgentSpawn: Equatable, Codable, Sendable {
 
 public enum ThreadFeedPresentation {
     /// Derive the rows. `expandedTurnIds` / `expandedWorkGroupIds` are the
-    /// viewer's toggles keyed by `TurnFold` turn id and `WorkToggle.groupId`;
-    /// `now` stamps the thinking row.
+    /// viewer's toggles keyed by `TurnFold` turn id and `WorkToggle.groupId`.
+    /// Pure: the same timeline and toggles give the same rows.
     public static func derive(_ timeline: SessionTimeline, expandedTurnIds: Set<String> = [],
-                              expandedWorkGroupIds: Set<String> = [], now: Date = Date()) -> [ThreadFeedRow] {
+                              expandedWorkGroupIds: Set<String> = []) -> [ThreadFeedRow] {
         let turns = Dictionary(timeline.turns.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let latest = timeline.latestTurn
         let isWorking = latest?.state == .running
@@ -158,8 +195,14 @@ public enum ThreadFeedPresentation {
             if foldRow, !foldInserted { rows.append(foldRowFor(turn!, hidden: 0, expanded: turnExpanded)) }
         }
 
-        if isWorking, !liveRowPresent {
-            rows.append(ThreadFeedRow(id: ThreadFeedRow.liveRowId, turnId: unsettledTurnId ?? "", createdAt: now, kind: .thinking))
+        // Working with nothing live: a thinking row — unless a prompt card
+        // is what Claude is waiting on.
+        if let latest, isWorking, !liveRowPresent {
+            let pending = PendingRequests.derive(timeline.activities)
+            if pending.approvals.isEmpty, pending.userInputs.isEmpty {
+                rows.append(ThreadFeedRow(id: ThreadFeedRow.liveRowId, turnId: latest.id,
+                                          createdAt: latest.startedAt ?? latest.requestedAt, kind: .thinking))
+            }
         }
         return rows
     }
@@ -170,16 +213,17 @@ public enum ThreadFeedPresentation {
     /// each sub-agent's) collapsed onto the start's position.
     static func collapse(_ activities: [SessionTimeline.Activity]) -> [WorkEntry] {
         var out: [WorkEntry] = []
-        var openIndex: [String: Int] = [:]   // "<turnId>\u{0}<toolCallId>" → index in out
+        var openIndex: [String: Int] = [:]   // toolCallId → index in out
         for a in activities {
             let entry = WorkEntry(a)
             if let call = entry.toolCallId {
-                let key = a.turnId + "\u{0}" + call
-                if a.kind == "tool.completed" || a.kind == "task.completed", let i = openIndex[key] {
-                    out[i] = entry.replacing(id: out[i].id, createdAt: out[i].createdAt)
+                if a.kind == "tool.completed" || a.kind == "task.completed", let i = openIndex[call] {
+                    // A result landing after the next prompt opened a turn
+                    // still closes the call where it started.
+                    out[i] = entry.replacing(id: out[i].id, turnId: out[i].turnId, createdAt: out[i].createdAt)
                     continue
                 }
-                openIndex[key] = out.count
+                openIndex[call] = out.count
             }
             out.append(entry)
         }
@@ -418,7 +462,7 @@ extension WorkEntry {
                   changedFiles: changed, payload: a.payload, turnId: a.turnId, createdAt: a.createdAt)
     }
 
-    func replacing(id: String, createdAt: Date) -> WorkEntry {
+    func replacing(id: String, turnId: String, createdAt: Date) -> WorkEntry {
         WorkEntry(id: id, kind: kind, tone: tone, summary: summary, detail: detail, status: status, action: action,
                   toolLike: toolLike, toolCallId: toolCallId, requestId: requestId, changedFiles: changedFiles,
                   payload: payload, turnId: turnId, createdAt: createdAt)

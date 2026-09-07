@@ -152,11 +152,42 @@ final class ThreadFeedPresentationTests: XCTestCase {
         XCTAssertEqual(ThreadFeedPresentation.formatDuration(3720), "1h 2m")
     }
 
-    func testRowsRoundTripAsJSON() throws {
-        let rows = ThreadFeedPresentation.derive(try timeline("tools", status: "busy"), expandedTurnIds: ["u1"],
-                                                 now: Date(timeIntervalSince1970: 1_700_000_000))
+    func testAPendingPromptOwnsTheTailWithoutAThinkingRow() throws {
+        // status "waiting" + an open call → approval.requested; the card is the tail, nothing shimmers.
+        let rows = try rows("tools", status: "waiting", drop: ["a4", "r3"])
+        XCTAssertEqual(rows.suffix(2), [
+            "toggle:work-toggle:work-group:tool:u1:t1 \"Ran 2 commands and changed 1 file\" [3]",
+            "group:activity:perm:t3 approval.requested/neutral",
+        ])
+        XCTAssertFalse(rows.contains { $0.contains("live-activity-row") })
+    }
+
+    func testAResultAfterTheNextPromptStillClosesItsCall() throws {
+        // t3's result lands after u2 opened a turn: one row, in u1, not a lone completed in u2.
+        var e = try entries("tools").filter { !["r3", "a4"].contains($0["uuid"] as? String ?? "") }
+        let r3 = try entries("tools").first { ($0["uuid"] as? String) == "r3" }!
+        e.append(["type": "user", "uuid": "u2", "timestamp": "2026-09-01T10:00:20.000Z", "message": ["content": "and?"]])
+        e.append(r3)
+        let rows = lines(ThreadFeedPresentation.derive(SessionTimelineBuilder.build(entries: e, status: "idle"), expandedTurnIds: ["u1"]))
+        XCTAssertEqual(rows, [
+            "msg:u1 user run the tests and fix",
+            "fold:turn-fold:u1 \"Worked for 11s\" [1]+",
+            "toggle:work-toggle:work-group:tool:u1:t1 \"Ran 2 commands and changed 1 file\" [3]!",
+            "msg:u2 user and?",
+        ])
+    }
+
+    func testRowsAreStableAcrossDerivationsAndRoundTripFlatJSON() throws {
+        let tl = try timeline("tools", status: "busy")
+        let rows = ThreadFeedPresentation.derive(tl, expandedTurnIds: ["u1"])
+        XCTAssertEqual(rows, ThreadFeedPresentation.derive(tl, expandedTurnIds: ["u1"]), "no clock leaks into the rows")
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        XCTAssertEqual(try dec.decode([ThreadFeedRow].self, from: try enc.encode(rows)), rows)
+        let data = try enc.encode(rows)
+        XCTAssertEqual(try dec.decode([ThreadFeedRow].self, from: data), rows)
+        let wire = try JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(wire[1]["type"] as? String, "workToggle")
+        XCTAssertEqual((wire[1]["toggle"] as? [String: Any])?["hiddenCount"] as? Int, 3)
+        XCTAssertEqual(wire.last?["type"] as? String, "thinking")
     }
 }
