@@ -823,6 +823,8 @@ final class AppModel: ObservableObject {
     }
     private var hookRefresh: Task<Void, Never>?
     private var lastHookRefresh = Date.distantPast
+    /// The pass a freshly surfaced AWS-login need starts (rebuildAwsLogins).
+    private var awsNeedRefresh: Task<Void, Never>?
 
     /// The snapshot runs git in the session's repository, off the main
     /// thread; the first checkpoint of a session is logged, the rest are
@@ -1668,8 +1670,20 @@ final class AppModel: ObservableObject {
                                        sessionLabel: nil, state: state,
                                        account: AwsLogin.account(profile: state.profile, configText: configText)))
         }
+        // A need that just appeared goes out now: the mirror snapshot and
+        // the phone's alert ride the fleet poll, up to a minute away. The
+        // first scan after launch only seeds (its needs are old news).
+        func key(_ item: AwsLogin.Item) -> String { "\(item.id)|\(Int(item.failedAt?.timeIntervalSince1970 ?? 0))" }
+        let known = Set(awsLogins.map(key)), seeded = awsLoginsScanned
+        let news = items.contains { $0.pid != nil && !known.contains(key($0)) }
         if items != awsLogins { awsLogins = items }
         if sessionProgress.scanned { awsLoginsScanned = true }
+        if news, seeded, !isPlayground, awsNeedRefresh == nil {
+            awsNeedRefresh = Task { [weak self] in
+                await self?.refreshSnapshot()
+                self?.awsNeedRefresh = nil
+            }
+        }
     }
 
     /// `remote` nil = no flow asked for: this only REPORTS the profile's

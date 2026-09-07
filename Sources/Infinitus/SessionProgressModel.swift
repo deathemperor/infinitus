@@ -32,6 +32,15 @@ final class SessionProgressModel: SessionProgressSource {
     private var stamps: [String: Stamp] = [:]
     private var cached: [String: SessionProgress] = [:]
     private var busy = false
+    /// One vnode watch per matched transcript (#79 without the plugin):
+    /// Claude Code appends every tool result in place, so a write on a
+    /// transcript is the earliest sign a session moved — the AWS-login
+    /// need used to wait for the next fleet poll, up to a minute. Idle
+    /// sessions cost nothing; a burst of writes coalesces into one scan.
+    private var watchers: [String: DispatchSourceFileSystemObject] = [:]
+    private var lastSessions: [SessionDetail] = []
+    private var rescan: Task<Void, Never>?
+    private var rescanWanted = false
     /// Haiku names for unnamed sessions (SessionNamer.swift); nil on
     /// playground/mock instances.
     var namer: SessionNamer? {
@@ -49,6 +58,7 @@ final class SessionProgressModel: SessionProgressSource {
             return
         }
         busy = true
+        lastSessions = sessions
         let claudeDir = claudeDir
         let stampsCopy = stamps
         let cachedCopy = cached
@@ -60,10 +70,12 @@ final class SessionProgressModel: SessionProgressSource {
             var newCached = cachedCopy
             var ids: [Int: String] = [:]
             var cwds: [Int: String] = [:]
+            var urls: [String: URL] = [:]
             for (session, record) in pairs {
                 ids[session.pid] = record.sessionId
                 cwds[session.pid] = record.cwd
                 let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+                urls[record.sessionId] = url
                 let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
                 let size = (attrs?[.size] as? Int) ?? -1
                 let mtime = (attrs?[.modificationDate] as? Date) ?? .distantPast
@@ -78,13 +90,17 @@ final class SessionProgressModel: SessionProgressSource {
                 newStamps[record.sessionId] = stamp
                 newCached[record.sessionId] = progress
             }
-            await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached, ids: ids, cwds: cwds)
+            await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached, ids: ids, cwds: cwds,
+                               transcripts: urls)
         }
     }
 
     private func finish(byPid: [Int: SessionProgress], stamps: [String: Stamp],
-                        cached: [String: SessionProgress], ids: [Int: String], cwds: [Int: String]) {
+                        cached: [String: SessionProgress], ids: [Int: String], cwds: [Int: String],
+                        transcripts: [String: URL]) {
         busy = false
+        watch(transcripts)
+        if rescanWanted { rescanWanted = false; transcriptMoved() }
         sessionIDByPid = ids
         scanned = true
         self.byPid = byPid
@@ -99,6 +115,35 @@ final class SessionProgressModel: SessionProgressSource {
         tokenRate = TokenRate(perMinute: perMinute,
                               peakPerMinute: TokenRate.nextPeak(tokenRate?.peakPerMinute ?? 0,
                                                                 seeing: perMinute))
+    }
+
+    /// Watches follow the matched set: a session that left drops its
+    /// watch (and its descriptor); one that arrived gets one.
+    private func watch(_ transcripts: [String: URL]) {
+        for id in watchers.keys where transcripts[id] == nil { watchers.removeValue(forKey: id)?.cancel() }
+        for (id, url) in transcripts where watchers[id] == nil {
+            let fd = open(url.path, O_EVTONLY)
+            guard fd >= 0 else { continue }
+            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .extend],
+                                                                   queue: .main)
+            source.setEventHandler { [weak self] in self?.transcriptMoved() }
+            source.setCancelHandler { close(fd) }
+            source.resume()
+            watchers[id] = source
+        }
+    }
+
+    /// A beat after the last write, one scan — the stamp cache makes it
+    /// cost one transcript's tail. A scan already running notes the
+    /// wish and reruns once when it finishes.
+    private func transcriptMoved() {
+        guard rescan == nil else { return }
+        rescan = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard let self else { return }
+            rescan = nil
+            if busy { rescanWanted = true } else { refresh(sessions: lastSessions) }
+        }
     }
 
     /// Stamp Haiku's titles onto the unnamed rows (SessionNamer's

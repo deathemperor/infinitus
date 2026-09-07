@@ -36,10 +36,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     /// Foreground too: an alert about the fleet is worth a banner even
-    /// while the fleet screen is open.
+    /// while the fleet screen is open — and the screen catches up with it
+    /// now rather than at its next poll (an AWS-login need's row).
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        Task { @MainActor in await MirrorModel.shared.refresh() }
+        return [.banner, .sound]
     }
 
     /// An AWS sign-in notification's tap lands on its sheet.
