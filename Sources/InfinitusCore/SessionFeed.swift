@@ -628,7 +628,7 @@ public enum SessionFeedReader {
         return (sender, body)
     }
 
-    private static func errorSummary(_ block: [String: Any]) -> String {
+    static func errorSummary(_ block: [String: Any]) -> String {
         if let text = block["content"] as? String { return String(text.prefix(200)) }
         if let parts = block["content"] as? [[String: Any]],
            let text = parts.first(where: { ($0["type"] as? String) == "text" })?["text"] as? String {
@@ -637,7 +637,7 @@ public enum SessionFeedReader {
         return "tool error"
     }
 
-    private static func describeQuestion(_ block: [String: Any]) -> (String, [String]) {
+    static func describeQuestion(_ block: [String: Any]) -> (String, [String]) {
         guard let input = block["input"] as? [String: Any],
               let questions = input["questions"] as? [[String: Any]], !questions.isEmpty
         else { return ("", []) }
@@ -651,7 +651,7 @@ public enum SessionFeedReader {
     /// One-line summary of a tool call's input — the Bash command or the
     /// file path, same signals `SessionProgress.describe` reads, just
     /// without the verb prefix (the tool name carries that on the phone).
-    private static func describeTool(name: String, input: [String: Any]) -> String {
+    static func describeTool(name: String, input: [String: Any]) -> String {
         switch name {
         case "Bash":
             let command = (input["command"] as? String ?? "").replacingOccurrences(of: "\n", with: " ")

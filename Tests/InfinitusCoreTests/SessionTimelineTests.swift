@@ -90,4 +90,50 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(tl.turns.map(\.id), ["u1", "q1"])
         XCTAssertEqual(tl.message(id: "q1")?.text, "and this too")
     }
+
+    // MARK: Task 3 — tools
+    func testToolLifecycleRowsPairByToolUseId() throws {
+        let tl = build(try entries("tools"))
+        XCTAssertEqual(tl.activities.map(\.kind),
+                       ["tool.started", "tool.completed", "tool.started", "tool.completed", "tool.started", "tool.completed"])
+        XCTAssertEqual(tl.activities.map(\.id), ["t1", "t1/completed", "t2", "t2/completed", "t3", "t3/completed"])
+        XCTAssertEqual(tl.activities.map(\.sequence), [0, 1, 2, 3, 4, 5])
+        XCTAssertTrue(tl.activities.allSatisfy { $0.turnId == "u1" })
+        let started = tl.activity(id: "t1")!
+        XCTAssertEqual(started.tone, .tool)
+        XCTAssertEqual(started.summary, "swift test")
+        XCTAssertEqual(started.payload["toolName"], .string("Bash"))
+        XCTAssertEqual(started.payload["itemType"], .string("command_execution"))
+        let done = tl.activity(id: "t1/completed")!
+        XCTAssertEqual(done.payload["status"], .string("completed"))
+        XCTAssertEqual(done.payload["output"], .string("Test Suite 'All tests' passed"))
+        XCTAssertEqual(done.detail, "Test Suite 'All tests' passed")
+    }
+
+    func testAFailedToolIsAnErrorRowAndAnEditListsItsFile() throws {
+        let tl = build(try entries("tools"))
+        let failed = tl.activity(id: "t3/completed")!
+        XCTAssertEqual(failed.tone, .error)
+        XCTAssertEqual(failed.payload["status"], .string("failed"))
+        XCTAssertEqual(failed.detail, "fatal: could not read from remote")
+        let edit = tl.activity(id: "t2/completed")!
+        XCTAssertEqual(tl.activity(id: "t2")?.payload["itemType"], .string("file_change"))
+        XCTAssertEqual(edit.payload["changedFiles"], .array([.string("Deep/Nested/Path/File.swift")]))
+        // the message after the tools closes the turn
+        XCTAssertEqual(tl.turn(id: "u1")?.assistantMessageId, "a4")
+    }
+
+    func testSlimmingRules() {
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("\n\n  first line here \nsecond\n"), "first line here")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output(String(repeating: "x", count: 100) + "\ny\nz"), "3 lines")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output(""), "")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.files(["/a/b/c/d/e/f.swift", "/x.swift"]), ["c/d/e/f.swift", "x.swift"])
+        XCTAssertEqual(SessionTimelineBuilder.Slim.files((0..<20).map { "/f\($0)" }).count, 12)
+        XCTAssertEqual(SessionTimelineBuilder.Slim.detail(String(repeating: "d", count: 300)).count, 180)
+        // a detail that only echoes the command is dropped
+        XCTAssertNil(SessionTimelineBuilder.Slim.outputDetail("git push", command: "git push"))
+        XCTAssertEqual(SessionTimelineBuilder.Slim.itemType(for: "Read"), "file_read")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.itemType(for: "Grep"), "search")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.itemType(for: "mcp__x__y"), "dynamic_tool_call")
+    }
 }
