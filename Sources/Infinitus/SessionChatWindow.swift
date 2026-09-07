@@ -161,9 +161,21 @@ private struct SessionChatRoot: View {
     @ObservedObject var model: AppModel
     @State private var draft = ""
     @State private var expandedPeers: Set<String> = []
+    @State private var expandedTurns: Set<String> = []
+    @State private var expandedGroups: Set<String> = []
     @FocusState private var composerFocused: Bool
 
     private var items: [SessionFeedItem] { store.feed?.items ?? [] }
+    /// The timeline reduced to rows (#223); nil for a feed without one.
+    private var rows: [ThreadFeedRow]? {
+        store.feed?.timeline.map {
+            ThreadFeedPresentation.derive($0, expandedTurnIds: expandedTurns, expandedWorkGroupIds: expandedGroups)
+        }
+    }
+    private var newestAnchor: AnyHashable? {
+        if let rows { return rows.last.map { AnyHashable($0.id) } }
+        return items.indices.last.map { AnyHashable($0) }
+    }
     private var status: String { store.gone ? "ended" : (store.feed?.status ?? store.session.status) }
 
     var body: some View {
@@ -205,11 +217,21 @@ private struct SessionChatRoot: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        SessionFeedRow(item: item, expandedPeers: $expandedPeers) { id in
-                            MacFeedThumbnail(store: store, id: id)
+                    if let rows {
+                        ForEach(rows) { row in
+                            ThreadFeedRowView(row: row, expandedTurns: $expandedTurns, expandedGroups: $expandedGroups,
+                                              expandedPeers: $expandedPeers) { id in
+                                MacFeedThumbnail(store: store, id: id)
+                            }
+                            .id(row.id)
                         }
-                        .id(index)
+                    } else {
+                        ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                            SessionFeedRow(item: item, expandedPeers: $expandedPeers) { id in
+                                MacFeedThumbnail(store: store, id: id)
+                            }
+                            .id(index)
+                        }
                     }
                 }
                 .padding(14)
@@ -223,8 +245,14 @@ private struct SessionChatRoot: View {
                 }
             }
             .onChange(of: items.count) { _, count in
-                guard count > 0 else { return }
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(count - 1, anchor: .bottom) }
+                guard count > 0, let anchor = newestAnchor else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(anchor, anchor: .bottom) }
+            }
+            .onChange(of: rows?.last?.id) { _, id in
+                // The live row keeps one id while its content swaps; a new
+                // tail row is what moves the bottom.
+                guard let id else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(AnyHashable(id), anchor: .bottom) }
             }
         }
     }

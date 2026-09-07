@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Sessions
+- The phone and the Mac chat window draw the new feed: tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works (#223).
 - Session timelines reduce to feed rows: grouped tool runs, folded turns, one live row while Claude works (#223).
 - Sessions ship a T3-shaped timeline — turns, messages and tool activities with stable ids — next to the flat feed, the base for the new phone and Mac feed (#223).
 - Start a session headless — no terminal; Infinitus runs it and the Mac window, phone and browser page are its chat — from the popup, the phone, or as the default in Settings › Display (#151).

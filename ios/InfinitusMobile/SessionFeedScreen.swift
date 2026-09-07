@@ -51,6 +51,9 @@ struct SessionFeedScreen: View {
     @AppStorage("chat_header") private var headerStyle = "compact"
     /// Peer messages opened to their full text (keyed by time + text).
     @State private var expandedPeers: Set<String> = []
+    /// The reducer's toggles (#223): folded turns and tool groups opened.
+    @State private var expandedTurns: Set<String> = []
+    @State private var expandedGroups: Set<String> = []
     @Environment(\.dismiss) private var dismiss
     /// Bumped on foreground return: `.task(id:)` drops the long-poll that
     /// was in flight when the app left — its connection may be dead until
@@ -143,26 +146,51 @@ struct SessionFeedScreen: View {
     var body: some View {
         ScrollViewReader { proxy in
             List {
-                ForEach(Array((feed?.items ?? []).enumerated()), id: \.offset) { index, item in
-                    VStack(alignment: .leading, spacing: 6) {
-                        SessionFeedRow(item: item, expandedPeers: $expandedPeers) {
-                            FeedThumbnail(pid: Int32(session.pid), id: $0)
+                if let rows {
+                    // The T3-shaped feed (#223): the timeline reduced to
+                    // rows — tool groups, turn folds, one live row.
+                    ForEach(rows) { row in
+                        let isLast = row.id == rows.last?.id
+                        VStack(alignment: .leading, spacing: 6) {
+                            ThreadFeedRowView(row: row, expandedTurns: $expandedTurns, expandedGroups: $expandedGroups,
+                                              expandedPeers: $expandedPeers) {
+                                FeedThumbnail(pid: Int32(session.pid), id: $0)
+                            }
+                            if isLast, pendingPrompt == nil, let item = feed?.items.last,
+                               Self.canContinue(after: item, status: feed?.status ?? session.status) {
+                                continueRow
+                            }
                         }
-                        if index == (feed?.items.count ?? 0) - 1, pendingPrompt == nil,
-                           Self.canContinue(after: item, status: feed?.status ?? session.status) {
-                            continueRow
-                        }
+                        .id(row.id)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: ThreadFeedRowView<EmptyView>.isChrome(row) ? 2 : 4, leading: 16,
+                                                  bottom: ThreadFeedRowView<EmptyView>.isChrome(row) ? 2 : 4, trailing: 16))
+                        .onAppear { if isLast { lastRowVisible = true } }
+                        .onDisappear { if isLast { lastRowVisible = false } }
                     }
-                    .id(index)
-                    .listRowSeparator(.hidden)
-                    // Tool chips are the bulk of a transcript; they sit
-                    // tight so the conversation isn't 85% dead space.
-                    .listRowInsets(EdgeInsets(top: item.kind == .tool ? 2 : 4, leading: 16,
-                                              bottom: item.kind == .tool ? 2 : 4, trailing: 16))
-                    // The last row's visibility drives the scroll-to-
-                    // bottom button (user 2026-09-03 from the phone).
-                    .onAppear { if index == (feed?.items.count ?? 0) - 1 { lastRowVisible = true } }
-                    .onDisappear { if index == (feed?.items.count ?? 0) - 1 { lastRowVisible = false } }
+                } else {
+                    // A Mac from before the timeline: the flat item list.
+                    ForEach(Array((feed?.items ?? []).enumerated()), id: \.offset) { index, item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            SessionFeedRow(item: item, expandedPeers: $expandedPeers) {
+                                FeedThumbnail(pid: Int32(session.pid), id: $0)
+                            }
+                            if index == (feed?.items.count ?? 0) - 1, pendingPrompt == nil,
+                               Self.canContinue(after: item, status: feed?.status ?? session.status) {
+                                continueRow
+                            }
+                        }
+                        .id(index)
+                        .listRowSeparator(.hidden)
+                        // Tool chips are the bulk of a transcript; they sit
+                        // tight so the conversation isn't 85% dead space.
+                        .listRowInsets(EdgeInsets(top: item.kind == .tool ? 2 : 4, leading: 16,
+                                                  bottom: item.kind == .tool ? 2 : 4, trailing: 16))
+                        // The last row's visibility drives the scroll-to-
+                        // bottom button (user 2026-09-03 from the phone).
+                        .onAppear { if index == (feed?.items.count ?? 0) - 1 { lastRowVisible = true } }
+                        .onDisappear { if index == (feed?.items.count ?? 0) - 1 { lastRowVisible = false } }
+                    }
                 }
                 ForEach(pendingSent) { pending in
                     pendingRow(pending)
@@ -191,19 +219,26 @@ struct SessionFeedScreen: View {
             .onChange(of: feed?.items.count) { _, _ in
                 reconcilePending()
                 if let pending = pendingSent.last { scrollToNewest(proxy, pending.id); return }
-                guard let last = feed?.items.indices.last else { return }
-                scrollToNewest(proxy, last)
+                guard let anchor = newestAnchor else { return }
+                scrollToNewest(proxy, anchor)
             }
             .onChange(of: pendingSent.count) { _, _ in
                 guard let last = pendingSent.last else { return }
                 scrollToNewest(proxy, last.id)
             }
-            .onChange(of: feed?.stamp) { _, _ in reconcilePending() }
+            .onChange(of: feed?.stamp) { _, _ in
+                reconcilePending()
+                // The live row keeps its id while its content changes, so
+                // the count never moves; a reader at the bottom stays there.
+                if rows != nil, lastRowVisible, pendingSent.isEmpty, let anchor = newestAnchor {
+                    scrollToNewest(proxy, anchor)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if !lastRowVisible, (feed?.items.count ?? 0) > 1 {
                     Button {
-                        guard let last = feed?.items.indices.last else { return }
-                        scrollToNewest(proxy, last)
+                        guard let anchor = newestAnchor else { return }
+                        scrollToNewest(proxy, anchor)
                     } label: {
                         Image(systemName: "arrow.down")
                             .font(.body.weight(.semibold))
@@ -464,6 +499,19 @@ struct SessionFeedScreen: View {
 
     /// The prompt the session is stopped on, while it is stopped on it —
     /// pinned above the composer so it never moves under a thumb.
+    /// The timeline reduced to rows, when the Mac sends one (#223).
+    private var rows: [ThreadFeedRow]? {
+        feed?.timeline.map {
+            ThreadFeedPresentation.derive($0, expandedTurnIds: expandedTurns, expandedWorkGroupIds: expandedGroups)
+        }
+    }
+
+    /// What "newest" scrolls to: the last row's id, or the last item's index.
+    private var newestAnchor: AnyHashable? {
+        if let rows { return rows.last.map { AnyHashable($0.id) } }
+        return feed?.items.indices.last.map { AnyHashable($0) }
+    }
+
     private var pendingPrompt: SessionFeedItem? {
         guard feed?.waiting == true, let last = feed?.items.last,
               last.kind == .permission || last.kind == .question else { return nil }
