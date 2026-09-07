@@ -250,6 +250,52 @@ final class MirrorAttentionBox: @unchecked Sendable {
     }
 }
 
+/// The `GET /sessions/<pid>/timeline` handler (#223 phase 4), boxed like
+/// `sessionFeed`; may block for the long-poll — call it off the queue.
+final class MirrorTimelineBox: @unchecked Sendable {
+    typealias Provider = @Sendable (_ pid: Int32, _ afterSequence: Int?, _ epoch: String?, _ wait: TimeInterval) -> Data?
+    private let lock = NSLock()
+    private var provider: Provider?
+    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
+    func call(_ pid: Int32, _ afterSequence: Int?, _ epoch: String?, _ wait: TimeInterval) -> Data? {
+        lock.lock(); let current = provider; lock.unlock()
+        return current?(pid, afterSequence, epoch, wait)
+    }
+}
+
+/// `GET /.well-known/infinitus` (#223 phase 4): the descriptor, no token.
+final class MirrorDescriptorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var provider: (@Sendable () -> MirrorDescriptor)?
+    func set(_ new: @escaping @Sendable () -> MirrorDescriptor) { lock.lock(); provider = new; lock.unlock() }
+    func call() -> MirrorDescriptor? {
+        lock.lock(); let current = provider; lock.unlock()
+        return current?()
+    }
+}
+
+/// Wraps one POST handler in the receipt protocol (#223 phase 4): a known
+/// `commandId` replays its 200, conflicts (409), reports in-flight (409)
+/// or is gone (410); a fresh one runs `run` and caches a 200 reply. `run`
+/// returning nil is the route's 404.
+private func withReceipt(_ receipts: Receipts, commandId: String?, target: String, pid: Int32?,
+                         run: () -> Data?) -> Data {
+    guard let commandId else { return run() ?? MirrorTransport.notFoundResponse() }
+    switch receipts.begin(commandId: commandId, target: target, pid: pid) {
+    case .hit(let data): return data
+    case .conflict: return MirrorTransport.conflictResponse(Data(#"{"error":"commandId reused for another target"}"#.utf8))
+    case .inFlight: return MirrorTransport.conflictResponse(Data(#"{"error":"in-flight"}"#.utf8))
+    case .tombstoned:
+        return MirrorTransport.response(status: 410, reason: "Gone", contentType: "application/json",
+                                        body: Data(#"{"error":"tombstoned"}"#.utf8))
+    case .miss:
+        guard let data = run() else { receipts.abandon(commandId: commandId); return MirrorTransport.notFoundResponse() }
+        if data.starts(with: Data("HTTP/1.1 200".utf8)) { receipts.finish(commandId: commandId, reply: data) }
+        else { receipts.abandon(commandId: commandId) }
+        return data
+    }
+}
+
 /// Where `POST /sessions/<pid>/input` deliveries run, one at a time.
 private let mirrorInputQueue = DispatchQueue(label: "run.infinitus.mirror-input", qos: .userInitiated)
 
@@ -444,6 +490,12 @@ final class MirrorServer: ObservableObject {
     let sessionInput = MirrorSessionInputBox()
     /// Answers `POST /sessions/<pid>/attention` (#223 phase 3); set by AppModel once at start.
     let attention = MirrorAttentionBox()
+    /// Answers `GET /sessions/<pid>/timeline` (#223 phase 4); set by AppModel once at start.
+    let timeline = MirrorTimelineBox()
+    /// Answers `GET /.well-known/infinitus`; set by AppModel once at start.
+    let descriptor = MirrorDescriptorBox()
+    /// Command receipts for input / start / attention (#223 phase 4).
+    let receipts = Receipts()
     /// Answers `/sessions/<pid>/images/<id>`; set by AppModel once at start.
     let sessionImage = MirrorSessionImageBox()
     let awsLogin = MirrorAwsLoginBox()
@@ -616,6 +668,9 @@ final class MirrorServer: ObservableObject {
         let accountAction = self.accountAction
         let sessionInput = self.sessionInput
         let attention = self.attention
+        let timeline = self.timeline
+        let descriptor = self.descriptor
+        let receipts = self.receipts
         let sessionImage = self.sessionImage
         let activityTokens = self.activityTokens
         let awsLogin = self.awsLogin
@@ -633,7 +688,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -711,6 +766,9 @@ final class MirrorServer: ObservableObject {
                                           sessionFeed: MirrorSessionFeedBox,
                                           sessionInput: MirrorSessionInputBox,
                                           attention: MirrorAttentionBox,
+                                          timeline: MirrorTimelineBox,
+                                          descriptor: MirrorDescriptorBox,
+                                          receipts: Receipts,
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                           team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -720,7 +778,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -732,6 +790,9 @@ final class MirrorServer: ObservableObject {
                                             sessionFeed: MirrorSessionFeedBox,
                                             sessionInput: MirrorSessionInputBox,
                                           attention: MirrorAttentionBox,
+                                          timeline: MirrorTimelineBox,
+                                          descriptor: MirrorDescriptorBox,
+                                          receipts: Receipts,
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
                                             team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
@@ -764,7 +825,8 @@ final class MirrorServer: ObservableObject {
             } ?? false
             let teamRoute = !controlRoute && (head.map { $0.path.hasPrefix(TeamNearby.routePrefix) } ?? false)
                 && Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint)
-            if let head, !teamRoute, !controlRoute, !MirrorTransport.isAuthorized(head, token: token.current) {
+            let wellKnown = head.map { $0.method == "GET" && $0.path == MirrorTransport.wellKnownPath } ?? false
+            if let head, !teamRoute, !controlRoute, !wellKnown, !MirrorTransport.isAuthorized(head, token: token.current) {
                 connection.send(content: MirrorTransport.unauthorizedResponse(),
                                 completion: .contentProcessed { _ in connection.cancel() })
                 return
@@ -798,7 +860,12 @@ final class MirrorServer: ObservableObject {
                     return
                 }
                 let response: Data
-                if !MirrorTransport.isAuthorized(request, token: token.current) {
+                if request.method == "GET", request.path == MirrorTransport.wellKnownPath {
+                    // Unauthenticated by design (#223 phase 4): what this
+                    // Mac supports, read before pairing. No I/O, on the queue.
+                    response = descriptor.call().flatMap { try? JSONEncoder().encode($0) }
+                        .map(MirrorTransport.jsonResponse) ?? MirrorTransport.unavailableResponse()
+                } else if !MirrorTransport.isAuthorized(request, token: token.current) {
                     response = MirrorTransport.unauthorizedResponse()
                 } else if request.method == "GET", request.path == MirrorWebClient.path {
                     // The browser client (#151): Linux/Windows have no app.
@@ -820,6 +887,20 @@ final class MirrorServer: ObservableObject {
                     DispatchQueue.global(qos: .utility).async {
                         let data = sessionFeed.call(pid, limit, since: since, wait: wait)
                         let response = data.map(MirrorTransport.snapshotResponse)
+                            ?? MirrorTransport.notFoundResponse()
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                } else if request.method == "GET",
+                          let pid = MirrorTransport.sessionTimelinePid(request.path) {
+                    let after = request.query(MirrorTransport.timelineAfterQueryName).flatMap(Int.init)
+                    let epoch = request.query(MirrorTransport.timelineEpochQueryName)
+                    let wait = request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0
+                    // A long-poll and a possible transcript parse: off this queue.
+                    DispatchQueue.global(qos: .utility).async {
+                        let response = timeline.call(pid, after, epoch, wait).map(MirrorTransport.jsonResponse)
                             ?? MirrorTransport.notFoundResponse()
                         onServed(request)
                         connection.send(content: response,
@@ -905,10 +986,15 @@ final class MirrorServer: ObservableObject {
                     // not the global pool: two sends in a row must land
                     // one after the other, never interleave keystrokes.
                     mirrorInputQueue.async {
-                        let response = sessionInput.call(pid, decoded)
-                            .flatMap { try? JSONEncoder().encode($0) }
-                            .map(MirrorTransport.jsonResponse)
-                            ?? MirrorTransport.notFoundResponse()
+                        // A stop tombstones this pid's receipts first: the
+                        // interrupted input must not come back on a retry.
+                        if decoded.kind == .key, decoded.text == "escape" { receipts.tombstone(pid: pid) }
+                        let response = withReceipt(receipts, commandId: decoded.commandId,
+                                                   target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
+                            sessionInput.call(pid, decoded)
+                                .flatMap { try? JSONEncoder().encode($0) }
+                                .map(MirrorTransport.jsonResponse)
+                        }
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })
@@ -927,17 +1013,18 @@ final class MirrorServer: ObservableObject {
                     DispatchQueue.global(qos: .utility).async {
                         let encoder = JSONEncoder()
                         encoder.dateEncodingStrategy = .iso8601
-                        let response: Data
-                        switch attention.call(pid, decoded) {
-                        case .applied(let facts)?:
-                            response = (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse)
-                                ?? MirrorTransport.unavailableResponse()
-                        case .refused(let reason)?:
-                            response = MirrorTransport.conflictResponse(Data(#"{"error":"\#(reason)"}"#.utf8))
-                        case .badRequest?:
-                            response = MirrorTransport.badRequestResponse()
-                        case nil:
-                            response = MirrorTransport.notFoundResponse()
+                        let response = withReceipt(receipts, commandId: decoded.commandId, target: request.path, pid: pid) {
+                            switch attention.call(pid, decoded) {
+                            case .applied(let facts)?:
+                                return (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse)
+                                    ?? MirrorTransport.unavailableResponse()
+                            case .refused(let reason)?:
+                                return MirrorTransport.conflictResponse(Data(#"{"error":"\#(reason)"}"#.utf8))
+                            case .badRequest?:
+                                return MirrorTransport.badRequestResponse()
+                            case nil:
+                                return nil
+                            }
                         }
                         onServed(request)
                         connection.send(content: response,
@@ -995,10 +1082,11 @@ final class MirrorServer: ObservableObject {
                     // and not on the input queue either (a send while a
                     // start waits must not queue behind it).
                     DispatchQueue.global(qos: .userInitiated).async {
-                        let response = sessionStart.call(decoded)
-                            .flatMap { try? JSONEncoder().encode($0) }
-                            .map(MirrorTransport.jsonResponse)
-                            ?? MirrorTransport.notFoundResponse()
+                        let response = withReceipt(receipts, commandId: decoded.commandId, target: request.path, pid: nil) {
+                            sessionStart.call(decoded)
+                                .flatMap { try? JSONEncoder().encode($0) }
+                                .map(MirrorTransport.jsonResponse)
+                        }
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })
@@ -1067,7 +1155,7 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
