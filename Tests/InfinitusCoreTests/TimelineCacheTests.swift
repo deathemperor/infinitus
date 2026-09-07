@@ -1,0 +1,73 @@
+import XCTest
+@testable import InfinitusCore
+
+final class TimelineCacheTests: XCTestCase {
+    private var root: URL!
+    override func setUp() {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("tlcache-\(UUID().uuidString)")
+    }
+    override func tearDown() { try? FileManager.default.removeItem(at: root) }
+
+    private func write(_ lines: [String], sessionId: String, cwd: String = "/Users/me/repo") throws -> URL {
+        let url = Transcript.path(cwd: cwd, sessionId: sessionId, claudeDir: root)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+    private let prompt = #"{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"hello"}}"#
+    private let reply = #"{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:02.000Z","message":{"content":[{"type":"text","text":"hi"}]}}"#
+
+    func testUnchangedTranscriptIsParsedOnce() throws {
+        _ = try write([prompt, reply], sessionId: "s1")
+        let record = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle")
+        let cache = TimelineCache()
+        let first = cache.timeline(record: record, claudeDir: root)
+        let second = cache.timeline(record: record, claudeDir: root)
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(first?.turns.map(\.id), ["u1"])
+        XCTAssertEqual(cache.parses, 1)
+    }
+
+    func testChangedTranscriptOrStatusReparses() throws {
+        let url = try write([prompt], sessionId: "s1")
+        let busy = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")
+        let cache = TimelineCache()
+        XCTAssertEqual(cache.timeline(record: busy, claudeDir: root)?.latestTurn?.state, .running)
+        try (prompt + "\n" + reply + "\n").write(to: url, atomically: true, encoding: .utf8)
+        let idle = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle")
+        XCTAssertEqual(cache.timeline(record: idle, claudeDir: root)?.latestTurn?.state, .completed)
+        XCTAssertEqual(cache.parses, 2)
+    }
+
+    func testFactsCoverEveryRecordAndAppendOwnedPending() throws {
+        _ = try write([prompt, reply], sessionId: "s1")
+        _ = try write([prompt], sessionId: "s2", cwd: "/Users/me/other")
+        let records = [ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle"),
+                       ClaudeSessionRecord(pid: 42, sessionId: "s2", cwd: "/Users/me/other", status: "busy")]
+        let store = AttentionStore(url: root.appendingPathComponent("attention.json"))
+        store.apply(.pin, sessionId: "s1", until: nil, now: Date(timeIntervalSince1970: 1_800_000_000))
+        let pending = PendingRequest(requestId: "req-1", toolName: "Bash", toolUseId: nil, description: nil,
+                                     inputJSON: #"{"command":"ls"}"#, suggestionsJSON: nil, questions: [],
+                                     receivedAt: Date())
+        let cache = TimelineCache()
+        let facts = cache.facts(records: records, claudeDir: root, attention: store) { $0 == 42 ? [pending] : [] }
+        XCTAssertEqual(facts[41]?.status, .ready)
+        XCTAssertNotNil(facts[41]?.pinnedAt)
+        XCTAssertEqual(facts[42]?.status, .running)
+        XCTAssertEqual(facts[42]?.hasPendingApprovals, true)
+        // The cached timeline is the transcript's; pending rows are appended per call, never cached.
+        XCTAssertEqual(cache.timeline(record: records[1], claudeDir: root)?.activities.isEmpty, true)
+        XCTAssertEqual(cache.parses, 2)
+    }
+
+    func testFactsEvictSessionsThatLeft() throws {
+        _ = try write([prompt], sessionId: "s1")
+        let r1 = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")
+        let store = AttentionStore(url: root.appendingPathComponent("attention.json"))
+        let cache = TimelineCache()
+        _ = cache.facts(records: [r1], claudeDir: root, attention: store) { _ in [] }
+        _ = cache.facts(records: [], claudeDir: root, attention: store) { _ in [] }
+        _ = cache.timeline(record: r1, claudeDir: root)
+        XCTAssertEqual(cache.parses, 2)
+    }
+}
