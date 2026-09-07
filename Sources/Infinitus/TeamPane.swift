@@ -507,14 +507,16 @@ struct TeamPane: View {
     /// `.disabled` stays on `busy`).
     private var statusLine: String? {
         let phase = team.progress.map { "\($0.phase == "push" ? "pushing" : "reading") \($0.done)/\($0.total)" }
-        let line: String?
+        let base: String?
         switch (team.busy, phase) {
-        case let (busy?, phase?): line = "\(busy) \(phase)"
-        case let (busy?, nil): line = busy
-        case let (nil, phase?): line = "Publishing… \(phase)"
-        case (nil, nil): line = nil
+        case let (busy?, phase?): base = "\(busy) \(phase)"
+        case let (busy?, nil): base = busy
+        case let (nil, phase?): base = "Publishing… \(phase)"
+        // The loop's fetch on a slow store: git's own line, nothing else.
+        case (nil, nil): base = team.storeActivity == nil ? nil : "Syncing…"
         }
-        guard let line else { return nil }
+        guard var line = base else { return nil }
+        if let activity = team.storeActivity { line += " · \(activity)" }
         return catchUp.map { "\(line) · \($0)" } ?? line
     }
 

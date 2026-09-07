@@ -34,6 +34,10 @@ final class TeamModel: ObservableObject {
     /// The running publish's progress (spec §7), or nil when nothing is
     /// publishing. Set once per source and once per batch, never per chunk.
     @Published private(set) var progress: TeamPublisher.Progress?
+    /// git's latest progress line while a store command runs ("Receiving
+    /// objects: 45% (…)", "waiting for the store to answer…"), nil
+    /// between commands. Fed by `TeamGit.activity`, at most every ~2 s.
+    @Published private(set) var storeActivity: String?
     @Published private(set) var shares = TeamShares()
     /// Team session control (#220): who may drive which of my sessions.
     @Published private(set) var grants = TeamGrants()
@@ -118,6 +122,14 @@ final class TeamModel: ObservableObject {
         self.defaults = defaults
         autoApprove = defaults.object(forKey: Self.autoApproveKey) as? Bool ?? true
         discoverable = defaults.bool(forKey: TeamNearby.discoverableDefaultsKey)
+        // Guarded: a hop enqueued as the command ended must not land
+        // after the action's `defer` cleared the label.
+        TeamGit.activity.set { [weak self] line in
+            Task { @MainActor in
+                guard let self, self.busy != nil || self.loopRunning else { return }
+                self.storeActivity = line
+            }
+        }
     }
 
     func setAutoApprove(_ on: Bool) {
@@ -291,7 +303,7 @@ final class TeamModel: ObservableObject {
         let stop = stopRequested, fetchedHook = onFetched
         sources.onProgress = { [weak self] p in Task { @MainActor in self?.progress = p } }
         sources.shouldStop = { stop.withLock { $0 } }
-        defer { progress = nil }
+        defer { progress = nil; storeActivity = nil }
         do {
             let (fetched, published, report, aggregated) = try await run { paths, secrets in
                 guard let client = try Self.openClient(paths, secrets) else { return (nil as Int?, nil as Int?, nil as TeamPublisher.Report?, false) }
@@ -624,7 +636,7 @@ final class TeamModel: ObservableObject {
     private func action(_ label: String, _ work: @escaping @Sendable (TeamPaths, TeamSecrets) throws -> Void) async -> String? {
         guard enabled else { lastError = "team is disabled in this instance"; return lastError }
         busy = label
-        defer { busy = nil }
+        defer { busy = nil; storeActivity = nil }
         var failure: String?
         do {
             try await run(work)
