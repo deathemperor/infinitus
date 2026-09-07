@@ -30,57 +30,61 @@ public struct SessionTimeline: Codable, Sendable, Equatable {
     }
 }
 
-public struct Turn: Codable, Sendable, Equatable {
-    public enum State: String, Codable, Sendable { case running, interrupted, completed, error }
-    public let id: String
-    public let state: State
-    public let requestedAt: Date
-    public let startedAt: Date?
-    public let completedAt: Date?
-    public let userMessageId: String
-    public let assistantMessageId: String?
-    public init(id: String, state: State, requestedAt: Date, startedAt: Date?, completedAt: Date?,
-                userMessageId: String, assistantMessageId: String?) {
-        self.id = id; self.state = state; self.requestedAt = requestedAt
-        self.startedAt = startedAt; self.completedAt = completedAt
-        self.userMessageId = userMessageId; self.assistantMessageId = assistantMessageId
+/// The three timeline entities live under `SessionTimeline`: the phone
+/// app imports ActivityKit, whose `Activity<Attributes>` would collide.
+extension SessionTimeline {
+    public struct Turn: Codable, Sendable, Equatable {
+        public enum State: String, Codable, Sendable { case running, interrupted, completed, error }
+        public let id: String
+        public let state: State
+        public let requestedAt: Date
+        public let startedAt: Date?
+        public let completedAt: Date?
+        public let userMessageId: String
+        public let assistantMessageId: String?
+        public init(id: String, state: State, requestedAt: Date, startedAt: Date?, completedAt: Date?,
+                    userMessageId: String, assistantMessageId: String?) {
+            self.id = id; self.state = state; self.requestedAt = requestedAt
+            self.startedAt = startedAt; self.completedAt = completedAt
+            self.userMessageId = userMessageId; self.assistantMessageId = assistantMessageId
+        }
     }
-}
 
-public struct Message: Codable, Sendable, Equatable {
-    public enum Role: String, Codable, Sendable { case user, assistant }
-    public let id: String
-    public let role: Role
-    public let text: String
-    public let images: [String]?
-    public let sender: String?
-    public let turnId: String
-    public let streaming: Bool
-    public let createdAt: Date
-    public init(id: String, role: Role, text: String, images: [String]?, sender: String?,
-                turnId: String, streaming: Bool, createdAt: Date) {
-        self.id = id; self.role = role; self.text = text; self.images = images; self.sender = sender
-        self.turnId = turnId; self.streaming = streaming; self.createdAt = createdAt
+    public struct Message: Codable, Sendable, Equatable {
+        public enum Role: String, Codable, Sendable { case user, assistant }
+        public let id: String
+        public let role: Role
+        public let text: String
+        public let images: [String]?
+        public let sender: String?
+        public let turnId: String
+        public let streaming: Bool
+        public let createdAt: Date
+        public init(id: String, role: Role, text: String, images: [String]?, sender: String?,
+                    turnId: String, streaming: Bool, createdAt: Date) {
+            self.id = id; self.role = role; self.text = text; self.images = images; self.sender = sender
+            self.turnId = turnId; self.streaming = streaming; self.createdAt = createdAt
+        }
     }
-}
 
-/// `kind` and `payload` are open (strings, JSON) — a new activity ships
-/// without a phone release; unknown kinds render as a plain line.
-public struct Activity: Codable, Sendable, Equatable {
-    public enum Tone: String, Codable, Sendable { case info, tool, approval, error }
-    public let id: String
-    public let tone: Tone
-    public let kind: String
-    public let summary: String
-    public let detail: String?
-    public let payload: [String: JSONValue]
-    public let turnId: String
-    public let sequence: Int
-    public let createdAt: Date
-    public init(id: String, tone: Tone, kind: String, summary: String, detail: String?,
-                payload: [String: JSONValue], turnId: String, sequence: Int, createdAt: Date) {
-        self.id = id; self.tone = tone; self.kind = kind; self.summary = summary; self.detail = detail
-        self.payload = payload; self.turnId = turnId; self.sequence = sequence; self.createdAt = createdAt
+    /// `kind` and `payload` are open (strings, JSON) — a new activity ships
+    /// without a phone release; unknown kinds render as a plain line.
+    public struct Activity: Codable, Sendable, Equatable {
+        public enum Tone: String, Codable, Sendable { case info, tool, approval, error }
+        public let id: String
+        public let tone: Tone
+        public let kind: String
+        public let summary: String
+        public let detail: String?
+        public let payload: [String: JSONValue]
+        public let turnId: String
+        public let sequence: Int
+        public let createdAt: Date
+        public init(id: String, tone: Tone, kind: String, summary: String, detail: String?,
+                    payload: [String: JSONValue], turnId: String, sequence: Int, createdAt: Date) {
+            self.id = id; self.tone = tone; self.kind = kind; self.summary = summary; self.detail = detail
+            self.payload = payload; self.turnId = turnId; self.sequence = sequence; self.createdAt = createdAt
+        }
     }
 }
 

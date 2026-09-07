@@ -43,6 +43,10 @@ and `ActivityPayloadProjection.ts`.
 
 ### 1.1 Types (new file `Sources/InfinitusCore/SessionTimeline.swift`)
 
+`Turn`, `Message` and `Activity` are nested under `SessionTimeline` (the
+phone imports ActivityKit, whose `Activity<Attributes>` collides); the
+shapes below are otherwise verbatim.
+
 ```swift
 public struct SessionTimeline: Codable, Sendable, Equatable {
     public var turns: [Turn]            // oldest → newest

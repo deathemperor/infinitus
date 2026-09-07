@@ -18,10 +18,10 @@ final class SessionTimelineTests: XCTestCase {
     // MARK: Task 1 — types
     func testTimelineRoundTripsAndKeepsAnUnknownKind() throws {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let a = Activity(id: "x:0", tone: .info, kind: "future.kind", summary: "later", detail: nil,
+        let a = SessionTimeline.Activity(id: "x:0", tone: .info, kind: "future.kind", summary: "later", detail: nil,
                          payload: ["n": .number(1)], turnId: "u1", sequence: 0, createdAt: t0)
-        let m = Message(id: "u1", role: .user, text: "hi", images: nil, sender: nil, turnId: "u1", streaming: false, createdAt: t0)
-        let turn = Turn(id: "u1", state: .completed, requestedAt: t0, startedAt: nil, completedAt: t0,
+        let m = SessionTimeline.Message(id: "u1", role: .user, text: "hi", images: nil, sender: nil, turnId: "u1", streaming: false, createdAt: t0)
+        let turn = SessionTimeline.Turn(id: "u1", state: .completed, requestedAt: t0, startedAt: nil, completedAt: t0,
                         userMessageId: "u1", assistantMessageId: nil)
         let tl = SessionTimeline(turns: [turn], messages: [m], activities: [a])
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
@@ -278,9 +278,9 @@ final class SessionTimelineTests: XCTestCase {
     // MARK: Task 7 — PendingRequests
     func testDeriveKeepsOpenRequestsAndNeverReopensAResolvedOne() {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
-        func a(_ id: String, _ kind: String, _ payload: [String: JSONValue] = [:], seq: Int) -> Activity {
+        func a(_ id: String, _ kind: String, _ payload: [String: JSONValue] = [:], seq: Int) -> SessionTimeline.Activity {
             let requestId = id.split(separator: "/").first.map(String.init) ?? id
-            return Activity(id: id, tone: .approval, kind: kind, summary: id, detail: nil,
+            return SessionTimeline.Activity(id: id, tone: .approval, kind: kind, summary: id, detail: nil,
                             payload: payload.merging(["requestId": .string(requestId)]) { a, _ in a },
                             turnId: "u1", sequence: seq, createdAt: t0)
         }
@@ -299,7 +299,7 @@ final class SessionTimelineTests: XCTestCase {
     }
 
     func testDeriveDropsMalformedOptionsButKeepsTheQuestion() {
-        let q = Activity(id: "perm:q", tone: .approval, kind: "user-input.requested", summary: "q", detail: nil,
+        let q = SessionTimeline.Activity(id: "perm:q", tone: .approval, kind: "user-input.requested", summary: "q", detail: nil,
                          payload: ["requestId": .string("perm:q"),
                                    "questions": .array([.object(["id": .string("Q?"), "options": .array([.string("junk"), .object(["label": .string("Fine")])])])])],
                          turnId: "u1", sequence: 0, createdAt: Date())

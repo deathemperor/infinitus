@@ -22,7 +22,7 @@ public struct PendingRequests: Sendable, Equatable {
     public let approvals: [PendingApproval]
     public let userInputs: [PendingUserInput]
 
-    public static func derive(_ activities: [Activity]) -> PendingRequests {
+    public static func derive(_ activities: [SessionTimeline.Activity]) -> PendingRequests {
         var closed: Set<String> = []
         var approvals: [String: PendingApproval] = [:]
         var inputs: [String: PendingUserInput] = [:]

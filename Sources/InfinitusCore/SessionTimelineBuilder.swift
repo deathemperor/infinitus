@@ -25,8 +25,8 @@ public enum SessionTimelineBuilder {
     struct Walk {
         let agents: [String: SessionFeedItem.Agent]
         var turns: [TurnDraft] = []
-        var messages: [Message] = []
-        var activities: [Activity] = []
+        var messages: [SessionTimeline.Message] = []
+        var activities: [SessionTimeline.Activity] = []
         var seq = 0
         /// Index in `messages` of the assistant message still absorbing
         /// streamed blocks, or nil once a non-text entry closed it.
@@ -115,7 +115,7 @@ public enum SessionTimelineBuilder {
 
         mutating func openTurn(id: String, at: Date, text: String, images: [String], sender: String?) {
             turns.append(TurnDraft(id: id, requestedAt: at, lastAt: at))
-            messages.append(Message(id: id, role: .user, text: String(text.prefix(SessionFeedReader.textCap)),
+            messages.append(SessionTimeline.Message(id: id, role: .user, text: String(text.prefix(SessionFeedReader.textCap)),
                                     images: images.isEmpty ? nil : images, sender: sender,
                                     turnId: id, streaming: false, createdAt: at))
             openAssistant = nil
@@ -311,19 +311,19 @@ public enum SessionTimelineBuilder {
             if let i = openAssistant {
                 let m = messages[i]
                 let joined = String((m.text + "\n\n" + text).prefix(SessionFeedReader.textCap))
-                messages[i] = Message(id: m.id, role: .assistant, text: joined, images: nil, sender: nil,
+                messages[i] = SessionTimeline.Message(id: m.id, role: .assistant, text: joined, images: nil, sender: nil,
                                       turnId: m.turnId, streaming: false, createdAt: m.createdAt)
                 return
             }
-            messages.append(Message(id: id, role: .assistant, text: String(text.prefix(SessionFeedReader.textCap)),
+            messages.append(SessionTimeline.Message(id: id, role: .assistant, text: String(text.prefix(SessionFeedReader.textCap)),
                                     images: nil, sender: nil, turnId: currentTurnId, streaming: false, createdAt: at))
             openAssistant = messages.count - 1
             if !turns.isEmpty { turns[turns.count - 1].assistantMessageId = id }
         }
 
-        mutating func append(_ kind: String, id: String, tone: Activity.Tone, summary: String,
+        mutating func append(_ kind: String, id: String, tone: SessionTimeline.Activity.Tone, summary: String,
                              detail: String? = nil, payload: [String: JSONValue] = [:], at: Date) {
-            activities.append(Activity(id: id, tone: tone, kind: kind, summary: summary,
+            activities.append(SessionTimeline.Activity(id: id, tone: tone, kind: kind, summary: summary,
                                        detail: detail.map(Slim.detail), payload: payload,
                                        turnId: currentTurnId, sequence: seq, createdAt: at))
             seq += 1
@@ -333,7 +333,7 @@ public enum SessionTimelineBuilder {
         /// Request ids of prompts nothing has resolved yet.
         var openPrompts: Set<String> = []
 
-        /// Turn state follows the session status, as T3's projector does
+        /// SessionTimeline.Turn state follows the session status, as T3's projector does
         /// (`projector.ts:78-93`): the last turn is running while the
         /// record is busy; every earlier turn is closed by the next prompt.
         func finish(status: String?, statusUpdatedAt: Date?) -> SessionTimeline {
@@ -348,30 +348,30 @@ public enum SessionTimelineBuilder {
             if recordWaiting, let last = activities.last, last.kind == "tool.started", let tool = openTools[last.id] {
                 let id = "perm:" + last.id
                 openPrompts.insert(id)
-                activities.append(Activity(id: id, tone: .approval, kind: "approval.requested", summary: last.summary,
+                activities.append(SessionTimeline.Activity(id: id, tone: .approval, kind: "approval.requested", summary: last.summary,
                                            detail: nil,
                                            payload: ["requestId": .string(id), "toolName": .string(tool.name),
                                                      "requestType": .string(Slim.requestType(for: tool.name)),
                                                      "input": tool.input],
                                            turnId: last.turnId, sequence: seq, createdAt: last.createdAt))
             }
-            var out: [Turn] = []
+            var out: [SessionTimeline.Turn] = []
             var messages = self.messages
             for (i, d) in turns.enumerated() {
                 let isLast = i == turns.count - 1
-                let state: Turn.State
+                let state: SessionTimeline.Turn.State
                 if d.interrupted { state = .interrupted }
                 else if d.errored { state = .error }
                 else if isLast, status == "busy" { state = .running }
                 else if isLast, status == "waiting", !openPrompts.isEmpty { state = .running }
                 else { state = .completed }
-                out.append(Turn(id: d.id, state: state, requestedAt: d.requestedAt, startedAt: d.startedAt,
+                out.append(SessionTimeline.Turn(id: d.id, state: state, requestedAt: d.requestedAt, startedAt: d.startedAt,
                                 completedAt: state == .running ? nil : d.lastAt,
                                 userMessageId: d.id, assistantMessageId: d.assistantMessageId))
                 if state == .running, let aid = d.assistantMessageId,
                    let mi = messages.firstIndex(where: { $0.id == aid }) {
                     let m = messages[mi]
-                    messages[mi] = Message(id: m.id, role: m.role, text: m.text, images: m.images, sender: m.sender,
+                    messages[mi] = SessionTimeline.Message(id: m.id, role: m.role, text: m.text, images: m.images, sender: m.sender,
                                            turnId: m.turnId, streaming: true, createdAt: m.createdAt)
                 }
             }
