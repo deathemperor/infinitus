@@ -92,6 +92,12 @@ defaults write "$DOMAIN" mock_mode -bool true
 # session" question (answered n → failed, never rebound).
 cat >"$SOCKDIR/aws" <<'STUB'
 #!/bin/sh
+# `sts get-caller-identity`: the app's probe (#313) — signed in only
+# once the gate says so with a flag file next to this stub.
+if [ "$1" = "sts" ]; then
+    [ -f "$(dirname "$0")/aws-probe-ok" ] && exit 0
+    echo "aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'."; exit 255
+fi
 profile=""
 while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; shift; done
 echo "Please visit the following URL:"
@@ -109,6 +115,7 @@ STUB
 chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
+export INFINITUS_AWS_PROBE_S=2
 # The fake Claude session: a process with no tty (setsid, so the nudge
 # can't fall back to typing into THIS terminal) listening on the record's
 # messaging socket, writing every frame it receives to an inbox file.
@@ -343,6 +350,26 @@ done
 "$CTL" aws-logins | expect "'bound to account 1 but you signed in to 2' in next(l['state']['message'] for l in d['logins'] if l['profile']=='e2e-rebind')" || fail "rebind message"
 pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
 echo "aws: rebind refused"
+# A second lapse after the login, met outside the app (#313): the ledger
+# can't clear it, the probe does once the CLI says the profile works.
+TS2="$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=1)).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
+cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
+{"type":"assistant","timestamp":"$TS2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_e2e2","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-login"}}]}}
+{"type":"user","timestamp":"$TS2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_e2e2","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
+EOF
+i=0
+until aws_login_item; do
+    i=$((i + 1)); [ "$i" -lt 60 ] || fail "second lapse never surfaced in aws-logins"
+    sleep 1
+done
+touch "$SOCKDIR/aws-probe-ok"
+i=0
+while aws_login_item; do
+    i=$((i + 1)); [ "$i" -lt 30 ] || fail "need did not clear once the CLI said the profile works"
+    sleep 1
+done
+"$CTL" aws-login e2e-login --status | expect "'outside the app' in d['state']['message']" || fail "probe outcome not recorded"
+echo "aws: lapse met outside the app cleared by the probe"
 
 # --- team (spec §11) -------------------------------------------------------
 # The app creates a team on a bare repo; a second identity — the CLI

@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
 
 ### Sessions
+- A "needs AWS login" line met by a sign-in outside the app clears on its own: while it shows, the app asks the CLI every five minutes whether the profile works (#313).
 - A session's AWS-login need reaches the popup and the phone within seconds of the failed command, not at the next fleet poll.
 - Clicking a session row in the popup's footer sessions card opens its chat window again, with past sessions and the driving line, like the rail's card.
 - A "needs AWS login" line met by a login that finished before the Mac app relaunched no longer comes back as unmet after the relaunch.

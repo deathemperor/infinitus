@@ -294,6 +294,11 @@ final class AppModel: ObservableObject {
     private var awsLoginStates: [AwsLogin.State] = []
     private var awsLoginNeedsWatch: AnyCancellable?
     private var awsLoginQuitWatch: AnyCancellable?
+    /// How often an unmet session need is put to the CLI (#313); the
+    /// e2e gate shortens it.
+    static let awsProbeInterval: TimeInterval =
+        Double(ProcessInfo.processInfo.environment["INFINITUS_AWS_PROBE_S"] ?? "") ?? 300
+    private var awsProbeTask: Task<Void, Never>?
     private(set) lazy var awsLoginRunner: AwsLoginRunner = {
         let runner = AwsLoginRunner(
             onChange: { [weak self] states in Task { @MainActor in self?.awsLoginStates = states; self?.rebuildAwsLogins() } },
@@ -1682,6 +1687,33 @@ final class AppModel: ObservableObject {
             awsNeedRefresh = Task { [weak self] in
                 await self?.refreshSnapshot()
                 self?.awsNeedRefresh = nil
+            }
+        }
+        probeAwsNeeds()
+    }
+
+    /// A need met outside the app — `aws login` in a terminal, or the
+    /// ledger's done login past its day (#313) — has no login of the
+    /// app's to clear it, and an idle session never scrolls the failing
+    /// result out of its transcript (Overlord, 2026-09-07). So while a
+    /// session need shows unmet, the CLI is asked whether the profile
+    /// works: on the need's arrival and every `awsProbeInterval` after.
+    /// No nudge on a hit — the session may have moved on hours ago.
+    private var unmetAwsNeeds: Set<String> {
+        Set(awsLogins.filter { $0.pid != nil && ($0.state == nil || $0.state?.phase == .failed) }.map(\.profile))
+    }
+    private func probeAwsNeeds() {
+        if unmetAwsNeeds.isEmpty { awsProbeTask?.cancel(); awsProbeTask = nil; return }
+        guard awsProbeTask == nil else { return }
+        awsProbeTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                for profile in self.unmetAwsNeeds {
+                    guard await AwsLoginRunner.signedIn(profile: profile), !Task.isCancelled else { continue }
+                    await self.awsLoginRunner.markDone(profile: profile, via: "a sign-in outside the app")
+                    self.logMirrorInput("🔐", "aws login for \(profile) done outside the app")
+                }
+                try? await Task.sleep(for: .seconds(Self.awsProbeInterval))
             }
         }
     }
