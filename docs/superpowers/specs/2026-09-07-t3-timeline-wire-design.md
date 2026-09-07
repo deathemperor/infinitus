@@ -112,8 +112,13 @@ file give the same ids and a delta can be computed by diffing two builds.
 
 Legacy parked-prompt rule (`SessionFeedReader.finalize`: trailing tool +
 record `waiting` ⇒ permission) becomes an `approval.requested` activity
-with id `perm:<toolUseId>`; when the transcript later shows the tool's
-result, an `approval.resolved` with the same id follows.
+with id `perm:<toolUseId>`. The transcript never records that a prompt was
+shown, so on the next read the row is simply absent (phase 4 emits a
+tombstone); `approval.resolved` rows exist only for owned sessions, whose
+adapter knows the answer. `AskUserQuestion` differs: its `tool_result`
+carries the answers, so `user-input.resolved` is transcript-derived.
+Entries with `isSidechain: true` are skipped (sub-agents are summarized by
+`task.*`, and the transcript has no `parent_tool_use_id` to filter on).
 
 ### 1.3 Activity kinds and payloads
 
@@ -180,14 +185,13 @@ resolve on one client closes the sheet on the others.
 
 ### 1.7 Tests
 
-Golden transcripts under `Tests/InfinitusCoreTests/Fixtures/timeline/`:
-`plain.jsonl` (user, assistant, Bash, result), `subagents.jsonl` (+
-`subagents/` meta and log), `todo.jsonl` (TodoWrite), `interrupted.jsonl`,
-`limit.jsonl`, `peer.jsonl` (held + cross-session message), each with an
-`.expected.json` timeline; plus unit tests for identity stability (two builds
-of the same lines are `==`), slimming, turn states per record status,
-`appending(pending:)`, `PendingRequests` closed set, and forward decoding of
-an unknown kind.
+Transcript fixtures under `Tests/InfinitusCoreTests/Fixtures/timeline/`
+(`plain.jsonl`, `tools.jsonl`, `interrupted.jsonl`, `limit.jsonl`,
+`peer.jsonl`, `compact.jsonl`, `todo.jsonl`, `agent.jsonl`), each asserted
+field by field in `SessionTimelineTests`; plus identity stability (two builds
+of the same lines are `==`, and a build survives an encode/decode round
+trip), slimming, turn states per record status, `appending(pending:)`,
+`PendingRequests` closed set, and forward decoding of an unknown kind.
 
 ## 2. Phase 3 facts — `SessionFacts` and `AttentionStore`
 
