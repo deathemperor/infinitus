@@ -1241,6 +1241,9 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             let host = NamedTunnel.normalizeHostname(hostname.hostname)
             guard !host.isEmpty else { return }
+            // A re-give mints a fresh token for the same host: the running
+            // cloudflared holds the old one, so it restarts below.
+            if namedTunnel.isRunning, namedTunnel.hostname == host { namedTunnel.stop() }
             NamedTunnel.setToken(hostname.token, for: host)
             mirrorNamedTunnelHost = host
             mirrorNamedTunnelEnabled = true

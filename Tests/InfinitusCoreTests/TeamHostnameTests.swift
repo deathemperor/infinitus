@@ -95,6 +95,12 @@ final class TeamHostnameTests: XCTestCase {
         XCTAssertTrue(got.hostname.token.hasPrefix("tunnel-token-"))
         XCTAssertEqual(got.from, leader.identity.kid)
         XCTAssertNil(try TeamHostnames.inbox(client: bob, handled: &handled))
+        // A scan the caller already ran serves the inbox, the reader and the reap alike (one per load tick).
+        let headers = try bob.readableHeaders()
+        var again = TeamControl.Handled()
+        XCTAssertEqual(try TeamHostnames.inbox(client: bob, handled: &again, headers: headers)?.hostname.hostname, "bob.team.example.com")
+        XCTAssertEqual(try TeamReader.load(client: bob, headers: headers).members.count, try TeamReader.load(client: bob).members.count)
+        XCTAssertEqual(try TeamControl.Store.driverReap(client: bob, acks: [], headers: headers), 0)
 
         // A second give (to self) skips the zones lookup and is read back by the giver.
         fake.calls.removeAll()

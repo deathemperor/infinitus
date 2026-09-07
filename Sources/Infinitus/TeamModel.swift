@@ -183,12 +183,15 @@ final class TeamModel: ObservableObject {
 
     /// Rebuilds the snapshot from the local clone (no network): status +
     /// reader + (leaders) the request list.
-    private nonisolated static func snapshot(_ client: TeamClient, lastFetch: Int?, lastPublish: Int?, lastError: String?) throws -> (TeamSnapshot, TeamReader?) {
+    private nonisolated static func snapshot(_ client: TeamClient, lastFetch: Int?, lastPublish: Int?, lastError: String?) throws -> (TeamSnapshot, TeamReader?, [TeamClient.ReadableHeader]) {
         let status = try client.status()
-        let reader = client.roster == nil ? nil : try? TeamReader.load(client: client)
+        // One store scan per tick: the reader, the driver's reap and the
+        // hostname inbox all read these same headers.
+        let headers = client.roster == nil ? [] : (try? client.readableHeaders()) ?? []
+        let reader = client.roster == nil ? nil : try? TeamReader.load(client: client, headers: headers)
         let requests = client.isLeader ? (try? client.requests()) ?? [] : []
         return (TeamSnapshot.make(status: status, roster: client.roster?.doc, reader: reader, requests: requests,
-                                  today: today(), lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError), reader)
+                                  today: today(), lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError), reader, headers)
     }
 
     /// Every action ends here: reload the snapshot, settings and the kid.
@@ -209,15 +212,15 @@ final class TeamModel: ObservableObject {
                     let exclusions = TeamExclusions.load(paths: paths)
                     guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, [], TranscriptPicker(), TeamGrants(), HostnameState()) }
                     let dir = paths.teamDir(client.config.id)
-                    let (snap, reader) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err)
+                    let (snap, reader, headers) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err)
                     // Driver side of the store lane (#220): my acked or stale
                     // commands go; a push-free scan when there are none.
-                    if let reader { _ = try? TeamControl.Store.driverReap(client: client, acks: reader.ackIDs) }
+                    if let reader { _ = try? TeamControl.Store.driverReap(client: client, acks: reader.ackIDs, headers: headers) }
                     // Member side of §5.4: a hostname a leader sealed to me, applied once per blob.
                     var hostnameState = HostnameState(ledger: TeamHostnames.Ledger.load(teamDir: dir),
                                                       configured: secrets.read(TeamHostnames.secretName) != nil)
                     var applied = TeamControl.Handled.load(teamDir: dir, name: TeamControl.Handled.hostnamesFile)
-                    if let fresh = try? TeamHostnames.inbox(client: client, handled: &applied) {
+                    if let fresh = try? TeamHostnames.inbox(client: client, handled: &applied, headers: headers) {
                         hostnameState.fresh = fresh
                         try? applied.save(teamDir: dir, name: TeamControl.Handled.hostnamesFile)
                     }
@@ -704,17 +707,29 @@ final class TeamModel: ObservableObject {
         }
     }
 
+    /// My identity for the tail poll, read from the secrets store once per
+    /// kid rather than per 3 s tick (a keychain read + roster load each time
+    /// a driver window is open, otherwise).
+    private let tailIdentity = OSAllocatedUnfairLock<TeamIdentity?>(initialState: nil)
+
+    private nonisolated static func identity(_ secrets: TeamSecrets, cache: OSAllocatedUnfairLock<TeamIdentity?>, kid: String?) -> TeamIdentity? {
+        if let cached = cache.withLock({ $0 }), cached.kid == kid { return cached }
+        guard let secret = secrets.read(TeamClient.identitySecretName), let fresh = try? TeamIdentity(secret: secret) else { return nil }
+        cache.withLock { $0 = fresh }
+        return fresh
+    }
+
     /// The session's feed off the grantor's tail route; nil when no
     /// network lane answers (the store never carries a tail).
     func tail(kid: String, session: String, since: String?) async -> (lane: TeamControl.Lane, feed: SessionFeed)? {
-        guard enabled else { return nil }
+        guard enabled, inTeam else { return nil }
         let endpoints = reader?.members[kid]?.now?.endpoints
-        let paths = self.paths, makeSecrets = self.makeSecrets, deliver = self.deliver
+        let makeSecrets = self.makeSecrets, deliver = self.deliver, cache = self.tailIdentity, me = self.kid
         return try? await onDriveQueue { () -> (lane: TeamControl.Lane, feed: SessionFeed)? in
-            guard let client = try Self.openClient(paths, makeSecrets()) else { return nil }
+            guard let identity = Self.identity(makeSecrets(), cache: cache, kid: me) else { return nil }
             guard let (lane, body) = try deliver.withLock({ d in
                 d.interfaces = InterfaceAddresses.ipv4()
-                return try TeamControl.Drive.tail(kid: kid, session: session, since: since, identity: client.identity,
+                return try TeamControl.Drive.tail(kid: kid, session: session, since: since, identity: identity,
                                                   endpoints: endpoints, deliver: &d)
             }) else { return nil }
             let decoder = JSONDecoder()

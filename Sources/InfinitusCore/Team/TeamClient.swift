@@ -521,7 +521,8 @@ public final class TeamClient {
         return scan
     }
 
-    public func readableHeaders() throws -> [(entry: StoreEntry, header: Envelope.Header)] {
+    public typealias ReadableHeader = (entry: StoreEntry, header: Envelope.Header)
+    public func readableHeaders() throws -> [ReadableHeader] {
         try readableScan().headers
     }
 

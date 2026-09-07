@@ -201,10 +201,11 @@ public enum TeamHostnames {
 
     /// The newest `hostname` envelope a current leader sealed to me that
     /// `handled` has not seen; every candidate is marked. nil = nothing new.
-    public static func inbox(client: TeamClient, handled: inout TeamControl.Handled) throws -> (hostname: TeamControl.Hostname, from: String)? {
+    public static func inbox(client: TeamClient, handled: inout TeamControl.Handled,
+                             headers: [TeamClient.ReadableHeader]? = nil) throws -> (hostname: TeamControl.Hostname, from: String)? {
         guard let roster = client.roster?.doc else { return nil }
         let me = client.identity.kid
-        let candidates = try client.readableHeaders().filter { entry, header in
+        let candidates = try (headers ?? client.readableHeaders()).filter { entry, header in
             header.kind == TeamKinds.hostname && roster.isLeader(header.from)
                 && entry.path == TeamControl.hostnamePath(leader: header.from, member: me) && !handled.contains(entry)
         }
