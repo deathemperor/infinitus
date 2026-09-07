@@ -274,4 +274,37 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(tl.activities.suffix(2).map(\.sequence), [base.activities.count, base.activities.count + 1])
         XCTAssertEqual(base.appending(pending: []), base)
     }
+
+    // MARK: Task 7 — PendingRequests
+    func testDeriveKeepsOpenRequestsAndNeverReopensAResolvedOne() {
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        func a(_ id: String, _ kind: String, _ payload: [String: JSONValue] = [:], seq: Int) -> Activity {
+            let requestId = id.split(separator: "/").first.map(String.init) ?? id
+            return Activity(id: id, tone: .approval, kind: kind, summary: id, detail: nil,
+                            payload: payload.merging(["requestId": .string(requestId)]) { a, _ in a },
+                            turnId: "u1", sequence: seq, createdAt: t0)
+        }
+        let acts = [
+            a("perm:t1", "approval.requested", ["toolName": .string("Bash"), "requestType": .string("command_execution_approval"), "input": .object([:])], seq: 0),
+            a("perm:q1", "user-input.requested", ["questions": .array([.object(["id": .string("Q?"), "options": .array([.object(["label": .string("A")])])])])], seq: 1),
+            a("perm:q1/resolved", "user-input.resolved", seq: 2),
+            a("perm:q1", "user-input.requested", ["questions": .array([])], seq: 3),   // a replayed request after its resolve: ignored
+            a("perm:q2", "user-input.requested", ["questions": .array([.object(["id": .string("No options"), "options": .array([])])])], seq: 4),
+            a("x", "tool.started", seq: 5),
+        ]
+        let p = PendingRequests.derive(acts)
+        XCTAssertEqual(p.approvals.map(\.requestId), ["perm:t1"])
+        XCTAssertEqual(p.approvals[0].toolName, "Bash")
+        XCTAssertEqual(p.userInputs.map(\.requestId), [])   // q1 closed, q2 has no valid options
+    }
+
+    func testDeriveDropsMalformedOptionsButKeepsTheQuestion() {
+        let q = Activity(id: "perm:q", tone: .approval, kind: "user-input.requested", summary: "q", detail: nil,
+                         payload: ["requestId": .string("perm:q"),
+                                   "questions": .array([.object(["id": .string("Q?"), "options": .array([.string("junk"), .object(["label": .string("Fine")])])])])],
+                         turnId: "u1", sequence: 0, createdAt: Date())
+        let p = PendingRequests.derive([q])
+        XCTAssertEqual(p.userInputs.count, 1)
+        XCTAssertEqual(p.userInputs[0].questions.first?.objectValue?["options"]?.arrayValue?.count, 1)
+    }
 }
