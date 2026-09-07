@@ -7,6 +7,11 @@ import InfinitusCore
 @MainActor
 public protocol SessionProgressSource: ObservableObject {
     var byPid: [Int: SessionProgress] { get }
+    /// The host's per-session facts (#223 phase 3) — the row's attention
+    /// dot and word, and its shelf. Present only for leased sessions; a
+    /// host without them leaves the map empty and the engine's status
+    /// word decides.
+    var facts: [Int: SessionFacts] { get }
     /// Fleet-wide output tokens per minute — the footer's ⚡ gauge.
     var tokenRate: TokenRate? { get }
     /// `sessions`: the engine's current per-session detail (busy-first,
@@ -15,6 +20,7 @@ public protocol SessionProgressSource: ObservableObject {
 }
 
 public extension SessionProgressSource {
+    var facts: [Int: SessionFacts] { [:] }
     func refresh(sessions: [SessionDetail]) {}
 }
 
@@ -47,11 +53,19 @@ public struct SessionListCard<P: SessionProgressSource>: View {
             if let sessions = live.sessions, !sessions.isEmpty {
                 Divider()
                 ForEach(sessions, id: \.pid) { s in
+                    let facts = progress.facts[s.pid]
+                    let attention = SessionListPresentation.attention(facts, fallbackStatus: s.status)
+                    let shelf = facts.flatMap(shelfWord)
+                    let word = shelf ?? SessionListPresentation.statusWord(attention, raw: s.status)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(color(for: s.status))
+                                .fill(color(for: word))
                                 .frame(width: 7, height: 7)
+                            if attention == .approval || attention == .input {
+                                Image(systemName: attention == .approval ? "hand.raised.fill" : "questionmark.circle.fill")
+                                    .font(PopupFont.caption2).foregroundStyle(.yellow)
+                            }
                             Text(SessionNaming.displayName(name: progress.byPid[s.pid]?.name, autoName: progress.byPid[s.pid]?.autoName, cwd: s.cwd))
                                 .font(PopupFont.caption)
                                 .lineLimit(1)
@@ -63,7 +77,7 @@ public struct SessionListCard<P: SessionProgressSource>: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: 12)
-                            Text(s.status)
+                            Text(word)
                                 .font(PopupFont.caption).foregroundStyle(.secondary)
                             Text(age(s.startedAt))
                                 .font(PopupFont.caption2).foregroundStyle(.tertiary)
@@ -77,6 +91,7 @@ public struct SessionListCard<P: SessionProgressSource>: View {
                             SessionProgressLine(progress: p)
                         }
                     }
+                    .opacity(shelf == nil ? 1 : 0.55)
                     .contentShape(Rectangle())
                     .onTapGesture { onOpen?(s) }
                     .help(onOpen == nil ? tooltip(s, progress.byPid[s.pid])
@@ -103,8 +118,17 @@ public struct SessionListCard<P: SessionProgressSource>: View {
         case "waiting": return .yellow
         case "idle": return .green
         case "shell": return .blue
+        case "failed": return .red
         default: return .gray
         }
+    }
+
+    /// A shelved row's word in the status slot — the card is one line
+    /// per session, so the shelf replaces the word rather than adding one.
+    private func shelfWord(_ f: SessionFacts) -> String? {
+        if SessionListPresentation.isSnoozed(f) { return "snoozed" }
+        if SessionListPresentation.isSettled(f) { return "settled" }
+        return nil
     }
 
     /// pid · kind · branch · model · cwd — the metadata the phone's row

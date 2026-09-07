@@ -29,6 +29,20 @@ public enum SessionListPresentation {
         }
     }
 
+    /// The engine's status vocabulary for an attention rank — approvals
+    /// and questions read "waiting", work "busy", a failure says so, ready
+    /// keeps the engine's own word — so a row's existing word→color map
+    /// keeps working once facts decide the word (Mac card; the phone's
+    /// SessionWords does the same through its theme).
+    public static func statusWord(_ attention: Attention, raw: String) -> String {
+        switch attention {
+        case .approval, .input: return "waiting"
+        case .working: return "busy"
+        case .failed: return "failed"
+        case .ready: return raw
+        }
+    }
+
     /// "2 of 5 · Wire the phone" — the plan line under a row, nil without a plan.
     public static func planLine(_ facts: SessionFacts?) -> String? {
         guard let p = facts?.planProgress, p.total > 0 else { return nil }

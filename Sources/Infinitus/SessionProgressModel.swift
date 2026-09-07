@@ -11,6 +11,14 @@ final class SessionProgressModel: SessionProgressSource {
     /// Fleet-wide output tokens per minute with a slowly decaying peak
     /// (the footer's ⚡ gauge and the phone's Live Activity).
     @Published private(set) var tokenRate: TokenRate?
+    /// The exporter's facts for leased sessions (#223 phase 3) — the
+    /// sessions card reads the attention dot and word off them. Published
+    /// only on change: the exporter ticks every 30 s whether or not a
+    /// session moved.
+    @Published private(set) var facts: [Int: SessionFacts] = [:]
+    func setFacts(_ latest: [Int: SessionFacts]) {
+        if latest != facts { facts = latest }
+    }
     /// True once a scan has completed — the AWS-login push seeds on it.
     @Published private(set) var scanned = false
 

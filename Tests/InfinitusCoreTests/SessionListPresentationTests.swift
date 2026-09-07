@@ -38,6 +38,15 @@ final class SessionListPresentationTests: XCTestCase {
         XCTAssertEqual(P.attention(nil, fallbackStatus: nil), .ready)
     }
 
+    func testStatusWordSpeaksTheEngineVocabulary() {
+        typealias P = SessionListPresentation
+        XCTAssertEqual(P.statusWord(.approval, raw: "busy"), "waiting")
+        XCTAssertEqual(P.statusWord(.input, raw: "idle"), "waiting")
+        XCTAssertEqual(P.statusWord(.working, raw: "idle"), "busy")
+        XCTAssertEqual(P.statusWord(.failed, raw: "idle"), "failed")
+        XCTAssertEqual(P.statusWord(.ready, raw: "shell"), "shell")
+    }
+
     func testPlanLine() {
         XCTAssertNil(SessionListPresentation.planLine(nil))
         XCTAssertNil(SessionListPresentation.planLine(facts(plan: .init(step: nil, completed: 0, total: 0))))
