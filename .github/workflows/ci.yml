@@ -86,7 +86,8 @@ jobs:
       - run: swift test
   # The phone app shares InfinitusCore, so a change green on the Mac can
   # still lean on an API iOS lacks (Foundation.Process in TeamGit, #60).
-  # Simulator build only: no signing, no device, no test run.
+  # Simulator build, then the phone's unit tests (InfinitusMobileTests)
+  # on one simulator; no signing, no device.
   ios:
     runs-on: macos-26
     steps:
@@ -100,6 +101,11 @@ jobs:
           xcodebuild -quiet -project InfinitusMobile.xcodeproj -scheme InfinitusMobile
           -destination 'generic/platform=iOS Simulator' -derivedDataPath ../.build/ios
           CODE_SIGNING_ALLOWED=NO build
+        working-directory: ios
+      - run: >
+          xcodebuild -quiet -project InfinitusMobile.xcodeproj -scheme InfinitusMobile
+          -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath ../.build/ios
+          CODE_SIGNING_ALLOWED=NO test
         working-directory: ios
   # Known red today: CZlib's module map includes <zlib.h>, which no
   # Windows toolchain provides, so InfinitusCore does not build there

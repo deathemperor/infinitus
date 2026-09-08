@@ -55,6 +55,10 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: run.infinitus.mobile.pair
             CFBundleURLSchemes: [infinitus]
+        # DM Sans 400/500/700, the T3 mobile client's face (T3 clone
+        # spec §3.2; OFL text alongside in Fonts/). `T3Font` falls back
+        # to the system face when a name is missing.
+        UIAppFonts: [DMSans-Regular.ttf, DMSans-Medium.ttf, DMSans-Bold.ttf]
     # The share extension (#64) reads the pairing (routes, token, device
     # id) from a keychain item both bundles can open. Keychain sharing
     # only needs the team prefix, which every automatic profile grants;
@@ -94,6 +98,22 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Infinitus
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+  # Unit tests for the phone (T3 clone spec §5.5). CI's ios job runs
+  # them on a simulator; xcodegen folds this target into the app's scheme.
+  InfinitusMobileTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [InfinitusMobileTests]
+    dependencies:
+      - target: InfinitusMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: run.infinitus.mobile.tests
+        DEVELOPMENT_TEAM: Q783W6B4FA
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: "YES"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
   # Live Activity renderer (#1, #2): the widget extension the app embeds.
