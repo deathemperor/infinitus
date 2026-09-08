@@ -4,8 +4,7 @@ import InfinitusCore
 import InfinitusUI
 
 /// The workspace window's root: sidebar | main | right panel (spec §4.1,
-/// `AppSidebarLayout.tsx`). Task 9 replaces the remaining placeholder slot
-/// below with the real thread view.
+/// `AppSidebarLayout.tsx`).
 struct T3Root: View {
     @ObservedObject var model: T3WindowModel
     @ObservedObject var app: AppModel
@@ -95,10 +94,10 @@ struct T3Root: View {
             .frame(height: T3Theme.Metrics.topbarHeight)
             if model.state.projects.isEmpty && model.state.threads.isEmpty {
                 T3NoProjectsHero(action: nil)
-            } else if model.state.selectedThread == nil {
-                T3NoActiveThreadState()
+            } else if let store = model.timelineStore, model.state.selectedThread != nil {
+                T3ThreadView(model: model, app: app, store: store)
             } else {
-                T3ThreadPlaceholder(model: model)                    // Task 9 replaces with T3ThreadView
+                T3NoActiveThreadState()
             }
         }
     }
@@ -126,17 +125,4 @@ struct WindowDragRegion: NSViewRepresentable {
     final class DragView: NSView { override var mouseDownCanMoveWindow: Bool { true } }
     func makeNSView(context: Context) -> DragView { DragView() }
     func updateNSView(_ view: DragView, context: Context) {}
-}
-
-// MARK: - Task 6 placeholder (Task 9 deletes this)
-
-private struct T3ThreadPlaceholder: View {
-    @ObservedObject var model: T3WindowModel
-    @Environment(\.t3) private var t3
-    var body: some View {
-        Text(model.state.selectedThread?.title ?? "")
-            .font(T3Font.web(.sm))
-            .foregroundStyle(t3.web.mutedForeground.color)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 }
