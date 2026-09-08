@@ -83,3 +83,9 @@ public struct T3Thread: Sendable, Equatable {
         self.lastVisitedAt = lastVisitedAt
     }
 }
+
+public extension T3Thread {
+    /// `threadListV2.ts`'s list key: `${environmentId}:${id}`, used for
+    /// order-key/selection/queued-message lookups across the list layer.
+    var key: String { "\(environmentId):\(id)" }
+}
