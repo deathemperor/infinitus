@@ -738,6 +738,7 @@ final class StatusItemController {
     /// The workspace is NOT a mode (unlike the wall): it does not close
     /// the popup or the pop-out. A second `show workspace` just raises it.
     func showWorkspace(screen: String?) { model.lock.surfaceShown(); workspace.show(model: model, screen: screen) }
+    func hideWorkspace() { workspace.close() }
 
     /// The SwiftUI Settings scene's window: macOS 26 shows it by itself
     /// at launch, and SwiftUI keeps it non-resizable — it re-strips the

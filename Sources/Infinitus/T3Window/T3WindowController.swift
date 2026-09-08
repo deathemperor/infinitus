@@ -24,8 +24,10 @@ final class T3WindowController: NSObject, NSWindowDelegate {
     func show(model: AppModel, screen: String?) {
         let wm = windowModel ?? T3WindowModel(model: model)
         windowModel = wm
+        wm.closeRequested = { [weak self] in self?.close() }
         wm.focusedScreen = screen
         if let w = window, w.isVisible {
+            wm.applyPendingScreen()   // no fresh refresh() on the raise path — push it now
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -34,32 +36,69 @@ final class T3WindowController: NSObject, NSWindowDelegate {
         let host = NSHostingController(rootView: root)
         host.sizingOptions = []            // never let the hosting view size the window
         let w = window ?? {
-            let w = NSWindow(contentRect: NSRect(origin: .zero, size: Self.referenceSize),
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: Self.clampedInitialSize()),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
             w.isReleasedWhenClosed = false
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
             w.contentMinSize = Self.minimumSize
+            w.center()                     // before the autosave name so a restored frame wins
             w.setFrameAutosaveName("Workspace")
-            w.center()
+            clampOnScreen(w)
             w.delegate = self
             return w
         }()
         let frame = w.frame
         w.contentViewController = host
-        if frame.width < Self.minimumSize.width { w.setContentSize(Self.referenceSize); w.center() } else { w.setFrame(frame, display: true) }
+        if frame.width < Self.minimumSize.width {
+            w.setContentSize(Self.clampedInitialSize())
+            w.center()
+            clampOnScreen(w)
+        } else {
+            w.setFrame(frame, display: true)
+        }
         w.title = "Infinitus"
         window = w
         placeTrafficLights(w)
         wm.start()
+        wm.applyPendingScreen()   // double-apply with refresh()'s own is harmless — the request is one-shot
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         model.uiSurface("workspace", visible: true)
         visibilityChanged?()
     }
 
-    func close() { window?.performClose(nil) }
+    /// Idempotent: a no-op once the window is already hidden.
+    func close() {
+        guard window?.isVisible == true else { return }
+        window?.performClose(nil)
+    }
+
+    /// The first-open size, never larger than the screen minus a margin, and
+    /// never below `minimumSize` (a 1800×1050 reference size lands the traffic
+    /// lights off-screen on a 1440-pt display, and an accessory app with no
+    /// menu bar then has no way to close the window).
+    private static func clampedInitialSize() -> NSSize {
+        let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame.size ?? referenceSize
+        let margin: CGFloat = 40
+        return NSSize(width: min(referenceSize.width, max(minimumSize.width, visible.width - margin)),
+                      height: min(referenceSize.height, max(minimumSize.height, visible.height - margin)))
+    }
+
+    /// Nudge the window fully back into its screen's visible frame (the
+    /// StatusItemController.clampOnScreen pattern) — a restored autosaved
+    /// frame can land off-screen after a display change.
+    private func clampOnScreen(_ w: NSWindow) {
+        guard let screen = w.screen ?? NSScreen.main else { return }
+        let v = screen.visibleFrame
+        var f = w.frame
+        if f.maxX > v.maxX { f.origin.x = v.maxX - f.width }
+        if f.minX < v.minX { f.origin.x = v.minX }
+        if f.maxY > v.maxY { f.origin.y = v.maxY - f.height }
+        if f.minY < v.minY { f.origin.y = v.minY }
+        if f != w.frame { w.setFrame(f, display: true) }
+    }
 
     /// Electron puts the three buttons at x 12, centred in a 52 pt band.
     private func placeTrafficLights(_ w: NSWindow) {
@@ -83,12 +122,17 @@ final class T3WindowController: NSObject, NSWindowDelegate {
         windowModel?.model?.lock.surfaceShown()
     }
     func windowDidResignKey(_ notification: Notification) { minuteTick?.invalidate(); minuteTick = nil }
-    func windowWillClose(_ notification: Notification) {
+    // No `visibilityChanged?()` here (E1): `window.isVisible` is still true
+    // during this notification, so syncLocalLease's re-check would re-add
+    // "workspace" to the visible surfaces right after tearDown()'s explicit
+    // uiSurface(false) removed it — the lease would never release.
+    func windowWillClose(_ notification: Notification) { tearDown() }
+
+    private func tearDown() {
         minuteTick?.invalidate(); minuteTick = nil
         window?.contentViewController = nil            // detach: nothing ticks while hidden
         windowModel?.stop()
         windowModel?.model?.uiSurface("workspace", visible: false)
         windowModel?.model?.lock.surfaceHidden()
-        visibilityChanged?()
     }
 }

@@ -43,24 +43,36 @@ public struct T3WorkspaceState: Sendable, Equatable {
     public init() {}
 
     public mutating func apply(_ inputs: T3WorkspaceInputs, now: Date) {
+        // ClaudeSessions.list does not dedupe by session id (a resume overlap,
+        // or a missing field on either side, can yield two records for the
+        // same session under different pids) — keep the one with the newer
+        // statusUpdatedAt; nil loses.
+        var recordsBySession: [String: ClaudeSessionRecord] = [:]
+        for r in inputs.records {
+            if let existing = recordsBySession[r.sessionId],
+               (existing.statusUpdatedAt ?? .distantPast) >= (r.statusUpdatedAt ?? .distantPast) { continue }
+            recordsBySession[r.sessionId] = r
+        }
         var next: [T3Thread] = []
         var pids: [String: Int32] = [:]
-        for r in inputs.records {
+        for r in recordsBySession.values {
             guard let f = inputs.facts[r.pid] else { continue }
-            var t = T3Thread(record: r, facts: f, progress: inputs.progress[r.pid], startedAt: inputs.startedAt[r.pid], now: now)
-            let rawCreatedAt = t.createdAt
-            let remembered = firstSeenCreatedAt[t.id] ?? rawCreatedAt
-            firstSeenCreatedAt[t.id] = remembered
             // The bridge's createdAt chain is startedAt ?? latestTurn.requestedAt ??
             // statusUpdatedAt ?? now; only the `now` fallback (none of those three
-            // present) needs freezing here — a real statusUpdatedAt/turn/startedAt is
-            // a genuine signal and must stay free to move (it feeds e.g.
-            // `raisedHandWhileSnoozed`'s error check via `session.updatedAt`).
+            // present) is a non-signal. Passing a frozen clock into the bridge (rather
+            // than post-patching its output) freezes that fallback at the thread's
+            // first sighting AND lets updatedAt (which maxes against createdAt) move
+            // freely on real progress activity, instead of both being pinned to "now"
+            // forever. `createdAt` itself then stays frozen at first-seen for every
+            // thread, birth signal or not — startedAt is always nil (#223, no birth
+            // timestamp yet), so a real `latestTurn.requestedAt`/`statusUpdatedAt` is
+            // the newest TURN/status change, not a creation time, and must not be
+            // allowed to drag createdAt forward on every prompt.
             let hasBirthSignal = inputs.startedAt[r.pid] != nil || f.latestTurn?.requestedAt != nil || r.statusUpdatedAt != nil
-            if !hasBirthSignal {
-                if t.session?.updatedAt == rawCreatedAt { t.session?.updatedAt = remembered }
-                if t.updatedAt == rawCreatedAt { t.updatedAt = remembered }
-            }
+            let effectiveNow = hasBirthSignal ? now : (firstSeenCreatedAt[r.sessionId] ?? now)
+            var t = T3Thread(record: r, facts: f, progress: inputs.progress[r.pid], startedAt: inputs.startedAt[r.pid], now: effectiveNow)
+            let remembered = firstSeenCreatedAt[t.id] ?? t.createdAt
+            firstSeenCreatedAt[t.id] = remembered
             t.createdAt = remembered
             t.lastVisitedAt = lastVisitedAt[t.id]
             next.append(t)
@@ -68,6 +80,12 @@ public struct T3WorkspaceState: Sendable, Equatable {
         }
         threads = next.sorted { $0.updatedAt > $1.updatedAt }
         pidBySession = pids
+        // Drop memory for threads that are gone; a thread that comes back gets
+        // a fresh first-seen date, which is correct — its record then carries
+        // real timestamps or is a genuinely new session.
+        let ids = Set(pids.keys)
+        firstSeenCreatedAt = firstSeenCreatedAt.filter { ids.contains($0.key) }
+        lastVisitedAt = lastVisitedAt.filter { ids.contains($0.key) }
         projects = inputs.projects.map { T3ProjectGrouping.Project(summary: $0) }
         groups = T3ProjectGrouping.groups(projects: projects, settings: .init(),
                                           primaryEnvironmentId: T3Thread.localEnvironmentId, environmentLabel: { _ in nil })
@@ -75,6 +93,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
     }
 
     public mutating func select(_ threadId: String?, now: Date) {
+        guard threadId == nil || threads.contains(where: { $0.id == threadId }) else { return }
         selectedThreadId = threadId
         guard let threadId else { return }
         lastVisitedAt[threadId] = now
@@ -104,6 +123,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
         let pinned = T3ThreadSort.sortPinned(visible.filter { $0.pinnedAt != nil })
         let rest = visible.filter { $0.pinnedAt == nil }
         let snoozed = rest.filter { T3ThreadSettled.effectiveSnoozed($0, now: now) }
+            .sorted { T3ThreadList.stamp($0.snoozedUntil) < T3ThreadList.stamp($1.snoozedUntil) }   // soonest wake first
         let unsnoozed = rest.filter { !T3ThreadSettled.effectiveSnoozed($0, now: now) }
         let settled = unsnoozed.filter { Self.isSettled($0) }
             .sorted { T3ThreadList.stamp(T3ThreadSort.settledTimestamp($0)) > T3ThreadList.stamp(T3ThreadSort.settledTimestamp($1)) }

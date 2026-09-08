@@ -125,7 +125,9 @@ final class T3WorkspaceStateTests: XCTestCase {
     }
 
     // A real statusUpdatedAt (not the bridge's `now` fallback) is a genuine signal;
-    // createdAt still freezes to the first-seen value, but updatedAt stays free to move.
+    // createdAt still freezes to the first-seen value (startedAt is always nil,
+    // #223 — a real latestTurn.requestedAt/statusUpdatedAt is the newest turn/status
+    // change, not a creation time), but updatedAt stays free to move.
     func testApplyFreezesCreatedAtButNotAGenuineStatusUpdatedAt() {
         var s = T3WorkspaceState()
         let r1 = ClaudeSessionRecord(pid: 1, sessionId: "s1", cwd: "/w/a", status: "idle", statusUpdatedAt: now)
@@ -138,5 +140,91 @@ final class T3WorkspaceStateTests: XCTestCase {
         s.apply(T3WorkspaceInputs(records: [r2], facts: [1: f], progress: [:], startedAt: [:], projects: []), now: later)
         XCTAssertEqual(s.threads[0].createdAt, now)      // still the first-seen value
         XCTAssertEqual(s.threads[0].updatedAt, later)     // but the real status change is not frozen
+    }
+
+    // E3: a birthless thread's updatedAt used to be pinned to the (also frozen)
+    // createdAt forever, because the bridge's own `updatedAt = max(lastActivityAt,
+    // createdAt=now)` always picked `now`. Freezing the clock fed into the bridge,
+    // rather than post-patching its output, lets real progress activity win the max.
+    func testApplyLetsRealActivityMoveABirthlessThreadsUpdatedAt() {
+        var s = T3WorkspaceState()
+        let birthless = ClaudeSessionRecord(pid: 1, sessionId: "s1", cwd: "/w/a", status: nil, statusUpdatedAt: nil)
+        let f = facts()
+        let activity = now.addingTimeInterval(0.5)
+        let progress = [Int32(1): SessionProgress(lastActivityAt: activity)]
+        s.apply(T3WorkspaceInputs(records: [birthless], facts: [1: f], progress: progress, startedAt: [:], projects: []), now: now)
+        XCTAssertEqual(s.threads[0].updatedAt, activity)
+        s.apply(T3WorkspaceInputs(records: [birthless], facts: [1: f], progress: progress, startedAt: [:], projects: []),
+                now: now.addingTimeInterval(1))
+        XCTAssertEqual(s.threads[0].updatedAt, activity)
+        XCTAssertEqual(s.threads[0].createdAt, now)
+    }
+
+    // B: memory for a thread that leaves must not leak forward — a resumed
+    // session with the same id gets a fresh first-seen date, not the stale one.
+    func testApplyPrunesMemoryForThreadsThatLeaveAndComeBack() {
+        var s = T3WorkspaceState()
+        let birthless = ClaudeSessionRecord(pid: 1, sessionId: "s1", cwd: "/w/a", status: nil, statusUpdatedAt: nil)
+        let f = facts()
+        s.apply(T3WorkspaceInputs(records: [birthless], facts: [1: f], progress: [:], startedAt: [:], projects: []), now: now)
+        s.select("s1", now: now)
+        XCTAssertEqual(s.lastVisitedAt["s1"], now)
+        s.apply(T3WorkspaceInputs(records: [], facts: [:], progress: [:], startedAt: [:], projects: []), now: now)
+        XCTAssertNil(s.lastVisitedAt["s1"])
+        let later = now.addingTimeInterval(100)
+        s.apply(T3WorkspaceInputs(records: [birthless], facts: [1: f], progress: [:], startedAt: [:], projects: []), now: later)
+        XCTAssertEqual(s.threads[0].createdAt, later)   // fresh first-seen, not the stale `now`
+    }
+
+    // E7: ClaudeSessions.list does not dedupe; a resume overlap or a missing
+    // field can yield two records for one session under different pids.
+    func testApplyDedupesRecordsWithTheSameSessionIdKeepingTheNewer() {
+        var s = T3WorkspaceState()
+        let older = ClaudeSessionRecord(pid: 1, sessionId: "s1", cwd: "/w/a", status: "idle", statusUpdatedAt: now)
+        let newer = ClaudeSessionRecord(pid: 2, sessionId: "s1", cwd: "/w/a", status: "busy", statusUpdatedAt: now.addingTimeInterval(1))
+        s.apply(T3WorkspaceInputs(records: [older, newer], facts: [1: facts(), 2: facts()], progress: [:], startedAt: [:], projects: []), now: now)
+        XCTAssertEqual(s.threads.map(\.id), ["s1"])
+        XCTAssertEqual(s.pid(of: "s1"), 2)
+    }
+
+    // E4: the snoozed section wakes soonest-first, not updatedAt-desc — the
+    // later-updated thread here wakes later, so it must sort second.
+    func testSnoozedSectionOrdersBySoonestWake() {
+        var s = T3WorkspaceState()
+        let soonerWake = ClaudeSessionRecord(pid: 1, sessionId: "sooner-wake", cwd: "/w/a", status: "idle", statusUpdatedAt: now)
+        let laterWake = ClaudeSessionRecord(pid: 2, sessionId: "later-wake", cwd: "/w/a", status: "idle",
+                                            statusUpdatedAt: now.addingTimeInterval(1))
+        s.apply(T3WorkspaceInputs(records: [soonerWake, laterWake],
+                                  facts: [1: facts(snoozedUntil: now.addingTimeInterval(60)),
+                                          2: facts(snoozedUntil: now.addingTimeInterval(3600))],
+                                  progress: [:], startedAt: [:], projects: []), now: now)
+        let snoozed = s.sidebarSections(now: now).first { $0.kind == .snoozed }
+        XCTAssertEqual(snoozed?.threads.map(\.id), ["sooner-wake", "later-wake"])
+    }
+
+    func testSelectIgnoresAnIdNotInThreads() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        s.select("nope", now: now)
+        XCTAssertNil(s.selectedThreadId)
+        XCTAssertNil(s.lastVisitedAt["nope"])
+    }
+
+    // T3SidebarList.swift:131 — no selection walks .previous to the last id.
+    func testAdjacentPreviousWithNoSelectionIsLast() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([
+            (record(pid: 1, id: "pinned"), facts(pinnedAt: now)),
+            (record(pid: 2, id: "active"), facts()),
+        ]), now: now)
+        XCTAssertEqual(s.adjacentThreadId(.previous, now: now), "active")
+    }
+
+    func testSearchWithNoMatchesReturnsNothing() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1", cwd: "/w/a"), facts())]), now: now)
+        s.search = "zzz-does-not-match-anything"
+        XCTAssertEqual(s.visibleThreads(now: now), [])
+        XCTAssertEqual(s.sidebarSections(now: now), [])
     }
 }

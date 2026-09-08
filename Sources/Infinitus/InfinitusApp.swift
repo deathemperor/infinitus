@@ -321,9 +321,10 @@ struct InfinitusApp: App {
 /// split view's hop and restores them.
 struct SettingsRoot: View {
     let tabs: [SettingsTab]
-    /// Opens the workspace window (Task 5); nil in the phantom scene
-    /// InfinitusApp.body declares (StatusItemController hides it — the
-    /// visible Settings window is its own hosting view, which supplies this).
+    /// Opens the workspace window (Task 5); the default nil only covers
+    /// previews/tests — both real call sites (InfinitusApp's phantom scene
+    /// and StatusItemController's hosted Settings window) pass their own
+    /// closure.
     var showWorkspace: (() -> Void)? = nil
     @State private var selection: String?
     /// The pane actually on screen. Usually the selection; a search hit
