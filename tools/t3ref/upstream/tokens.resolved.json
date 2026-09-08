@@ -1,0 +1,1594 @@
+{
+ "mobileDark": {
+  "backdrop": [
+   0,
+   0,
+   0,
+   0.48
+  ],
+  "border": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "borderSubtle": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "card": [
+   23,
+   23,
+   23,
+   1.0
+  ],
+  "cardAlt": [
+   28,
+   28,
+   28,
+   1.0
+  ],
+  "cardTranslucent": [
+   17,
+   17,
+   17,
+   0.8
+  ],
+  "chevron": [
+   255,
+   255,
+   255,
+   0.2
+  ],
+  "danger": [
+   239,
+   68,
+   68,
+   0.14
+  ],
+  "dangerBorder": [
+   248,
+   113,
+   113,
+   0.18
+  ],
+  "dangerForeground": [
+   252,
+   165,
+   165,
+   1.0
+  ],
+  "dotSeparator": [
+   255,
+   255,
+   255,
+   0.2
+  ],
+  "drawer": [
+   14,
+   14,
+   14,
+   0.99
+  ],
+  "drawerShadow": [
+   0,
+   0,
+   0,
+   0.32
+  ],
+  "foreground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "foregroundMuted": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "foregroundSecondary": [
+   163,
+   163,
+   163,
+   1.0
+  ],
+  "foregroundTertiary": [
+   99,
+   99,
+   102,
+   1.0
+  ],
+  "glassSurface": [
+   23,
+   23,
+   23,
+   0.78
+  ],
+  "glassTint": [
+   23,
+   23,
+   23,
+   0.24
+  ],
+  "header": [
+   10,
+   10,
+   10,
+   0.97
+  ],
+  "headerBorder": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "icon": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "iconMuted": [
+   163,
+   163,
+   163,
+   1.0
+  ],
+  "iconSubtle": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "inlineSkillBackground": [
+   217,
+   70,
+   239,
+   0.12
+  ],
+  "inlineSkillBorder": [
+   217,
+   70,
+   239,
+   0.25
+  ],
+  "inlineSkillForeground": [
+   240,
+   171,
+   252,
+   1.0
+  ],
+  "input": [
+   20,
+   20,
+   20,
+   1.0
+  ],
+  "inputBorder": [
+   255,
+   255,
+   255,
+   0.08
+  ],
+  "mdBlockquoteBg": [
+   255,
+   255,
+   255,
+   0.03
+  ],
+  "mdBlockquoteBorder": [
+   255,
+   255,
+   255,
+   0.1
+  ],
+  "mdBody": [
+   229,
+   229,
+   229,
+   1.0
+  ],
+  "mdCodeBg": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "mdCodeText": [
+   229,
+   229,
+   229,
+   1.0
+  ],
+  "mdHr": [
+   255,
+   255,
+   255,
+   0.08
+  ],
+  "mdLink": [
+   96,
+   165,
+   250,
+   1.0
+  ],
+  "mdStrong": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "mdUserCodeBg": [
+   255,
+   255,
+   255,
+   0.18
+  ],
+  "mdUserCodeText": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "mdUserFenceBg": [
+   0,
+   0,
+   0,
+   0.28
+  ],
+  "mdUserFenceText": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "placeholder": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "primary": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "primaryForeground": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "primaryShadow": [
+   0,
+   0,
+   0,
+   1.0
+  ],
+  "screen": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "secondary": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "secondaryBorder": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "secondaryForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "separator": [
+   255,
+   255,
+   255,
+   0.03
+  ],
+  "sheet": [
+   14,
+   14,
+   14,
+   0.98
+  ],
+  "sheetSolid": [
+   14,
+   14,
+   14,
+   1.0
+  ],
+  "sidebarSearch": [
+   118,
+   118,
+   128,
+   0.24
+  ],
+  "statusBar": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "subtle": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "subtleStrong": [
+   255,
+   255,
+   255,
+   0.08
+  ],
+  "switchActiveThumb": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "switchActiveTrack": [
+   48,
+   209,
+   88,
+   1.0
+  ],
+  "switchInactiveThumb": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "switchInactiveTrack": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "userBubble": [
+   10,
+   132,
+   255,
+   1.0
+  ],
+  "userBubbleForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "userBubbleForegroundMuted": [
+   255,
+   255,
+   255,
+   0.78
+  ],
+  "userBubbleSkillForeground": [
+   240,
+   171,
+   252,
+   1.0
+  ],
+  "warning": [
+   69,
+   26,
+   3,
+   0.4
+  ],
+  "warningBorder": [
+   120,
+   53,
+   15,
+   0.6
+  ],
+  "warningForeground": [
+   252,
+   211,
+   77,
+   1.0
+  ],
+  "wordmark": [
+   245,
+   245,
+   245,
+   1.0
+  ]
+ },
+ "mobileLight": {
+  "backdrop": [
+   0,
+   0,
+   0,
+   0.22
+  ],
+  "border": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "borderSubtle": [
+   0,
+   0,
+   0,
+   0.06
+  ],
+  "card": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "cardAlt": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "cardTranslucent": [
+   255,
+   255,
+   255,
+   0.8
+  ],
+  "chevron": [
+   0,
+   0,
+   0,
+   0.2
+  ],
+  "danger": [
+   254,
+   242,
+   242,
+   1.0
+  ],
+  "dangerBorder": [
+   239,
+   68,
+   68,
+   0.12
+  ],
+  "dangerForeground": [
+   220,
+   38,
+   38,
+   1.0
+  ],
+  "dotSeparator": [
+   0,
+   0,
+   0,
+   0.2
+  ],
+  "drawer": [
+   255,
+   255,
+   255,
+   0.99
+  ],
+  "drawerShadow": [
+   0,
+   0,
+   0,
+   0.12
+  ],
+  "foreground": [
+   38,
+   38,
+   38,
+   1.0
+  ],
+  "foregroundMuted": [
+   115,
+   115,
+   115,
+   1.0
+  ],
+  "foregroundSecondary": [
+   82,
+   82,
+   82,
+   1.0
+  ],
+  "foregroundTertiary": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "glassSurface": [
+   255,
+   255,
+   255,
+   0.72
+  ],
+  "glassTint": [
+   255,
+   255,
+   255,
+   0.18
+  ],
+  "header": [
+   255,
+   255,
+   255,
+   0.97
+  ],
+  "headerBorder": [
+   0,
+   0,
+   0,
+   0.06
+  ],
+  "icon": [
+   38,
+   38,
+   38,
+   1.0
+  ],
+  "iconMuted": [
+   82,
+   82,
+   82,
+   1.0
+  ],
+  "iconSubtle": [
+   163,
+   163,
+   163,
+   1.0
+  ],
+  "inlineSkillBackground": [
+   217,
+   70,
+   239,
+   0.12
+  ],
+  "inlineSkillBorder": [
+   217,
+   70,
+   239,
+   0.25
+  ],
+  "inlineSkillForeground": [
+   162,
+   28,
+   175,
+   1.0
+  ],
+  "input": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "inputBorder": [
+   0,
+   0,
+   0,
+   0.1
+  ],
+  "mdBlockquoteBg": [
+   0,
+   0,
+   0,
+   0.02
+  ],
+  "mdBlockquoteBorder": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "mdBody": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "mdCodeBg": [
+   0,
+   0,
+   0,
+   0.04
+  ],
+  "mdCodeText": [
+   38,
+   38,
+   38,
+   1.0
+  ],
+  "mdHr": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "mdLink": [
+   37,
+   99,
+   235,
+   1.0
+  ],
+  "mdStrong": [
+   0,
+   0,
+   0,
+   1.0
+  ],
+  "mdUserCodeBg": [
+   255,
+   255,
+   255,
+   0.22
+  ],
+  "mdUserCodeText": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "mdUserFenceBg": [
+   0,
+   0,
+   0,
+   0.16
+  ],
+  "mdUserFenceText": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "placeholder": [
+   115,
+   115,
+   115,
+   1.0
+  ],
+  "primary": [
+   38,
+   38,
+   38,
+   1.0
+  ],
+  "primaryForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "primaryShadow": [
+   0,
+   0,
+   0,
+   1.0
+  ],
+  "screen": [
+   242,
+   242,
+   247,
+   1.0
+  ],
+  "secondary": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "secondaryBorder": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "secondaryForeground": [
+   38,
+   38,
+   38,
+   1.0
+  ],
+  "separator": [
+   0,
+   0,
+   0,
+   0.04
+  ],
+  "sheet": [
+   242,
+   242,
+   247,
+   0.98
+  ],
+  "sheetSolid": [
+   242,
+   242,
+   247,
+   1.0
+  ],
+  "sidebarSearch": [
+   118,
+   118,
+   128,
+   0.12
+  ],
+  "statusBar": [
+   242,
+   242,
+   247,
+   1.0
+  ],
+  "subtle": [
+   0,
+   0,
+   0,
+   0.04
+  ],
+  "subtleStrong": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "switchActiveThumb": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "switchActiveTrack": [
+   52,
+   199,
+   89,
+   1.0
+  ],
+  "switchInactiveThumb": [
+   142,
+   142,
+   147,
+   1.0
+  ],
+  "switchInactiveTrack": [
+   0,
+   0,
+   0,
+   0.08
+  ],
+  "userBubble": [
+   0,
+   122,
+   255,
+   1.0
+  ],
+  "userBubbleForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "userBubbleForegroundMuted": [
+   255,
+   255,
+   255,
+   0.78
+  ],
+  "userBubbleSkillForeground": [
+   240,
+   171,
+   252,
+   1.0
+  ],
+  "warning": [
+   255,
+   251,
+   235,
+   1.0
+  ],
+  "warningBorder": [
+   253,
+   230,
+   138,
+   1.0
+  ],
+  "warningForeground": [
+   180,
+   83,
+   9,
+   1.0
+  ],
+  "wordmark": [
+   38,
+   38,
+   38,
+   1.0
+  ]
+ },
+ "webDark": {
+  "accent": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "accentForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "appChromeBackground": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "background": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "border": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "card": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "cardForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "codeBackground": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "codeForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "destructive": [
+   251,
+   65,
+   74,
+   1.0
+  ],
+  "destructiveForeground": [
+   255,
+   100,
+   103,
+   1.0
+  ],
+  "error": [
+   251,
+   65,
+   74,
+   1.0
+  ],
+  "errorForeground": [
+   255,
+   100,
+   103,
+   1.0
+  ],
+  "errorSurface": [
+   251,
+   65,
+   74,
+   0.16
+  ],
+  "foreground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "iconMuted": [
+   129,
+   129,
+   129,
+   1.0
+  ],
+  "info": [
+   43,
+   127,
+   255,
+   1.0
+  ],
+  "infoForeground": [
+   81,
+   162,
+   255,
+   1.0
+  ],
+  "input": [
+   255,
+   255,
+   255,
+   0.08
+  ],
+  "messageAction": [
+   52,
+   107,
+   241,
+   1.0
+  ],
+  "messageActionForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "messageActionHover": [
+   48,
+   97,
+   218,
+   1.0
+  ],
+  "messageForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "messageSurface": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "muted": [
+   255,
+   255,
+   255,
+   0.03
+  ],
+  "mutedForeground": [
+   129,
+   129,
+   129,
+   1.0
+  ],
+  "placeholder": [
+   129,
+   129,
+   129,
+   1.0
+  ],
+  "popover": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "popoverForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "primary": [
+   52,
+   107,
+   241,
+   1.0
+  ],
+  "primaryForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "ring": [
+   52,
+   107,
+   241,
+   1.0
+  ],
+  "secondary": [
+   255,
+   255,
+   255,
+   0.03
+  ],
+  "secondaryForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "secondaryLabel": [
+   129,
+   129,
+   129,
+   1.0
+  ],
+  "sidebar": [
+   0,
+   0,
+   0,
+   1.0
+  ],
+  "sidebarBorder": [
+   255,
+   255,
+   255,
+   0.08
+  ],
+  "sidebarControlSurface": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "sidebarForeground": [
+   241,
+   243,
+   247,
+   1.0
+  ],
+  "sidebarMutedForeground": [
+   163,
+   163,
+   163,
+   1.0
+  ],
+  "sidebarRowActive": [
+   241,
+   243,
+   247,
+   0.11
+  ],
+  "sidebarRowHover": [
+   241,
+   243,
+   247,
+   0.08
+  ],
+  "sidebarRowSelected": [
+   241,
+   243,
+   247,
+   0.07
+  ],
+  "sidebarStageFade": [
+   0,
+   0,
+   0,
+   1.0
+  ],
+  "success": [
+   0,
+   188,
+   125,
+   1.0
+  ],
+  "successForeground": [
+   0,
+   212,
+   146,
+   1.0
+  ],
+  "surfaceRaised": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "terminalBackground": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "terminalCursor": [
+   180,
+   203,
+   255,
+   1.0
+  ],
+  "terminalForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "terminalSelectionBackground": [
+   180,
+   203,
+   255,
+   0.25
+  ],
+  "toolErrorIcon": [
+   252,
+   165,
+   165,
+   1.0
+  ],
+  "toolbarBackground": [
+   10,
+   10,
+   10,
+   1.0
+  ],
+  "toolbarBorder": [
+   255,
+   255,
+   255,
+   0.06
+  ],
+  "toolbarControl": [
+   17,
+   17,
+   17,
+   1.0
+  ],
+  "toolbarControlForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "toolbarControlHover": [
+   255,
+   255,
+   255,
+   0.04
+  ],
+  "toolbarForeground": [
+   245,
+   245,
+   245,
+   1.0
+  ],
+  "update": [
+   52,
+   107,
+   241,
+   1.0
+  ],
+  "updateForeground": [
+   81,
+   162,
+   255,
+   1.0
+  ],
+  "updateSurface": [
+   52,
+   107,
+   241,
+   0.18
+  ],
+  "warning": [
+   254,
+   154,
+   0,
+   1.0
+  ],
+  "warningForeground": [
+   255,
+   185,
+   0,
+   1.0
+  ],
+  "warningSurface": [
+   254,
+   154,
+   0,
+   0.16
+  ]
+ },
+ "webLight": {
+  "accent": [
+   244,
+   244,
+   245,
+   1.0
+  ],
+  "accentForeground": [
+   24,
+   24,
+   27,
+   1.0
+  ],
+  "appChromeBackground": [
+   252,
+   252,
+   252,
+   1.0
+  ],
+  "background": [
+   252,
+   252,
+   252,
+   1.0
+  ],
+  "border": [
+   228,
+   228,
+   231,
+   1.0
+  ],
+  "card": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "cardForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "codeBackground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "codeForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "destructive": [
+   251,
+   44,
+   54,
+   1.0
+  ],
+  "destructiveForeground": [
+   193,
+   0,
+   7,
+   1.0
+  ],
+  "error": [
+   251,
+   44,
+   54,
+   1.0
+  ],
+  "errorForeground": [
+   193,
+   0,
+   7,
+   1.0
+  ],
+  "errorSurface": [
+   251,
+   44,
+   54,
+   0.08
+  ],
+  "foreground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "iconMuted": [
+   113,
+   113,
+   123,
+   1.0
+  ],
+  "info": [
+   43,
+   127,
+   255,
+   1.0
+  ],
+  "infoForeground": [
+   20,
+   71,
+   230,
+   1.0
+  ],
+  "input": [
+   212,
+   212,
+   216,
+   1.0
+  ],
+  "messageAction": [
+   27,
+   78,
+   216,
+   1.0
+  ],
+  "messageActionForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "messageActionHover": [
+   49,
+   96,
+   219,
+   1.0
+  ],
+  "messageForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "messageSurface": [
+   244,
+   244,
+   245,
+   1.0
+  ],
+  "muted": [
+   250,
+   250,
+   250,
+   1.0
+  ],
+  "mutedForeground": [
+   113,
+   113,
+   123,
+   1.0
+  ],
+  "placeholder": [
+   113,
+   113,
+   123,
+   1.0
+  ],
+  "popover": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "popoverForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "primary": [
+   27,
+   78,
+   216,
+   1.0
+  ],
+  "primaryForeground": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "ring": [
+   27,
+   78,
+   216,
+   1.0
+  ],
+  "secondary": [
+   250,
+   250,
+   250,
+   1.0
+  ],
+  "secondaryForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "secondaryLabel": [
+   113,
+   113,
+   123,
+   1.0
+  ],
+  "sidebar": [
+   250,
+   250,
+   250,
+   1.0
+  ],
+  "sidebarBorder": [
+   228,
+   228,
+   231,
+   1.0
+  ],
+  "sidebarControlSurface": [
+   244,
+   244,
+   245,
+   1.0
+  ],
+  "sidebarForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "sidebarMutedForeground": [
+   113,
+   113,
+   123,
+   1.0
+  ],
+  "sidebarRowActive": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "sidebarRowHover": [
+   252,
+   252,
+   252,
+   1.0
+  ],
+  "sidebarRowSelected": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "sidebarStageFade": [
+   250,
+   250,
+   250,
+   1.0
+  ],
+  "success": [
+   0,
+   188,
+   125,
+   1.0
+  ],
+  "successForeground": [
+   0,
+   122,
+   85,
+   1.0
+  ],
+  "surfaceRaised": [
+   255,
+   255,
+   255,
+   0.2
+  ],
+  "terminalBackground": [
+   252,
+   252,
+   252,
+   1.0
+  ],
+  "terminalCursor": [
+   38,
+   56,
+   78,
+   1.0
+  ],
+  "terminalForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "terminalSelectionBackground": [
+   37,
+   63,
+   99,
+   0.2
+  ],
+  "toolErrorIcon": [
+   251,
+   44,
+   54,
+   1.0
+  ],
+  "toolbarBackground": [
+   252,
+   252,
+   252,
+   1.0
+  ],
+  "toolbarBorder": [
+   228,
+   228,
+   231,
+   1.0
+  ],
+  "toolbarControl": [
+   255,
+   255,
+   255,
+   1.0
+  ],
+  "toolbarControlForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "toolbarControlHover": [
+   244,
+   244,
+   245,
+   1.0
+  ],
+  "toolbarForeground": [
+   39,
+   39,
+   42,
+   1.0
+  ],
+  "update": [
+   27,
+   78,
+   216,
+   1.0
+  ],
+  "updateForeground": [
+   27,
+   78,
+   216,
+   1.0
+  ],
+  "updateSurface": [
+   27,
+   78,
+   216,
+   0.12
+  ],
+  "warning": [
+   254,
+   154,
+   0,
+   1.0
+  ],
+  "warningForeground": [
+   187,
+   77,
+   0,
+   1.0
+  ],
+  "warningSurface": [
+   254,
+   154,
+   0,
+   0.08
+  ]
+ }
+}
