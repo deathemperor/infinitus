@@ -177,7 +177,7 @@ the parity harness.
 
 Phone: DM Sans 400/500/700 bundled under
 `ios/InfinitusMobile/Fonts/` (OFL text alongside), registered in
-`project.yml` `UIAppFonts`; `T3Font.body(size:weight:)` maps
+`project.yml` `UIAppFonts`; `T3Font.mobile(_:_:)` / `T3Font.mobileLiteral(_:_:)` (web: `T3Font.web` / `webLiteral`) map
 `--font-sans/medium/bold`. Phone sizes are T3's own scale
 (`global.css` `@theme`, mirrored in `src/lib/typography.ts`): 3xs 11/14,
 2xs 12/16, xs 13/17, sm 14/19, base 16/23, lg 18/23, xl 21/28, 2xl 26/32,
