@@ -26,6 +26,7 @@ final class MirrorPayloadBox: @unchecked Sendable {
 final class MirrorTokenBox: @unchecked Sendable {
     private let lock = NSLock()
     private var token = ""
+    private var phone = true
 
     var current: String {
         lock.lock(); defer { lock.unlock() }
@@ -34,6 +35,18 @@ final class MirrorTokenBox: @unchecked Sendable {
 
     func set(_ new: String) {
         lock.lock(); token = new; lock.unlock()
+    }
+
+    /// The Sync pane's phone switch (#356): the listener may be up for
+    /// Team Nearby alone, and then every phone route drops its
+    /// connection exactly as if nothing were listening.
+    var phoneEnabled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return phone
+    }
+
+    func setPhone(_ on: Bool) {
+        lock.lock(); phone = on; lock.unlock()
     }
 }
 
@@ -539,6 +552,14 @@ final class MirrorServer: ObservableObject {
     /// turn each other's request into an unearned 503.
     private static let teamStoreQueue = DispatchQueue(label: "run.infinitus.team-store")
 
+    /// Off: phone routes (snapshot, tails, pairing, the descriptor) drop
+    /// their connection while `/team/*` and session control keep
+    /// answering — the listener serves Team Nearby on its own (#356).
+    var phoneEnabled: Bool {
+        get { token.phoneEnabled }
+        set { token.setPhone(newValue) }
+    }
+
     func start(machineName: String, token: String) {
         self.token.set(token)
         guard listener == nil else { return }
@@ -563,6 +584,8 @@ final class MirrorServer: ObservableObject {
         refreshTeamStanding(force: true)
         refreshTeamControl()
     }
+
+    var isListening: Bool { listener != nil }
 
     func stop() {
         listener?.cancel()
@@ -844,6 +867,14 @@ final class MirrorServer: ObservableObject {
             let teamRoute = !controlRoute && (head.map { $0.path.hasPrefix(TeamNearby.routePrefix) } ?? false)
                 && Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint)
             let wellKnown = head.map { $0.method == "GET" && $0.path == MirrorTransport.wellKnownPath } ?? false
+            // Phone switch off (#356): the listener is up for the team
+            // alone, so a phone route gets what it would with no
+            // listener — a closed connection, never a 401 that reads as
+            // "unpaired" on the phone.
+            if head != nil, !teamRoute, !controlRoute, !token.phoneEnabled {
+                connection.cancel()
+                return
+            }
             if let head, !teamRoute, !controlRoute, !wellKnown, !MirrorTransport.isAuthorized(head, token: token.current) {
                 connection.send(content: MirrorTransport.unauthorizedResponse(),
                                 completion: .contentProcessed { _ in connection.cancel() })
@@ -877,6 +908,7 @@ final class MirrorServer: ObservableObject {
                     }
                     return
                 }
+                guard token.phoneEnabled else { connection.cancel(); return }   // #356, checked off the head above too
                 let response: Data
                 if request.method == "GET", request.path == MirrorTransport.wellKnownPath {
                     // Unauthenticated by design (#223 phase 4): what this

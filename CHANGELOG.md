@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- Team Nearby no longer depends on the phone switch: a discoverable Mac or a team member keeps the LAN listener up by itself, and phone connections are refused while "Serve the fleet to my phone" is off (#356).
 - A click into an account's name field focuses it at once; only the drag handle starts a reorder now, so the row no longer holds every click until the mouse comes up.
 - Stats folds run off the main thread, so a refresh no longer freezes the window for a third of a second.
 - Ignite says what it did: the plan line reports "<account>'s window started — resets 3:20 PM" (or the failure) for ten seconds, the armed "Sure?" state is a solid orange pill, and the account's usage refreshes right away (#338).

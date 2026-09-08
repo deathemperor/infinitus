@@ -70,7 +70,10 @@ final class TeamModel: ObservableObject {
     /// `infinitusctl team-discoverable` and MirrorServer's
     /// `UserDefaults.didChangeNotification` observer see the same flag.
     @Published var discoverable: Bool {
-        didSet { defaults.set(discoverable, forKey: TeamNearby.discoverableDefaultsKey) }
+        didSet {
+            defaults.set(discoverable, forKey: TeamNearby.discoverableDefaultsKey)
+            if discoverable != oldValue { onActed?() }   // the listener follows it (#356)
+        }
     }
     /// Approve requests that prove one of this leader's invite nonces
     /// (spec §6.2) without a tap. On by default; the proof is bound to
@@ -86,8 +89,8 @@ final class TeamModel: ObservableObject {
     /// After every user action (create/join/leave/approve…): the Bonjour
     /// standing re-advertises with the new role.
     var onActed: (() -> Void)?
-    /// False while the LAN mirror is off: no listener, so no Bonjour
-    /// service either way — the pane says so instead of a silent toggle.
+    /// False in a mock or playground instance, which never advertises or
+    /// scans — the pane says so instead of a silent toggle.
     @Published var nearbyAvailable = true
     /// After every fetch, on the team queue: the grantor's store-lane pass (#220 §5.3).
     var onFetched: (@Sendable (TeamClient) -> Void)?

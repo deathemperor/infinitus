@@ -1322,8 +1322,10 @@ final class AppModel: ObservableObject {
         mirrorServer.teamControl.onAudit = { [weak self] audit, name in
             Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
         }
-        team.onLoaded = { [weak self] in self?.mirrorServer.refreshTeamControl() }
-        team.onActed = { [weak self] in self?.mirrorServer.refreshTeamStanding(force: true) }
+        // Both re-apply the listener first: joining, leaving or flipping
+        // Discoverable decides whether the team keeps it up (#356).
+        team.onLoaded = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamControl() }
+        team.onActed = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamStanding(force: true) }
         // #220 §5.4: a leader's hostname for this Mac — token to the keychain,
         // the named tunnel on. The LAN listener is the user's switch, not ours.
         team.onHostname = { [weak self] hostname, from in
@@ -1503,6 +1505,14 @@ final class AppModel: ObservableObject {
     /// Starts or stops the phone companion's LAN listener (#9). Never in
     /// the playground: it seeds from the real defaults and would
     /// advertise a second service with the same machine name.
+    /// The team hooks' cheap form (#356): re-run the full apply only when
+    /// the listener's up/down answer changed — `applyMirrorLAN` rewires
+    /// every handler and drops the thumbnail cache, too much for every load.
+    private func reapplyMirrorLANForTeam() {
+        let wanted = mirrorLANEnabled || team.discoverable || team.inTeam
+        if wanted != mirrorServer.isListening { applyMirrorLAN() }
+    }
+
     private func applyMirrorLAN() {
         // Mock mode only swaps the CLI — sessions/usage in the snapshot
         // are still this machine's real ones, so a dev instance must
@@ -1513,12 +1523,22 @@ final class AppModel: ObservableObject {
             && ProcessInfo.processInfo.processName != "Infinitus"
             && defaults.bool(forKey: "mirror_lan_allow_mock")
         let allowed = !isPlayground && (!mockMode || mockAllowed)
-        team.nearbyAvailable = allowed && mirrorLANEnabled
-        guard allowed, mirrorLANEnabled else {
+        // Team Nearby rides the same listener (#356): a discoverable Mac
+        // or a team member keeps it up with the phone switch off, and the
+        // phone routes then drop their connections. The tunnels stay the
+        // phone's alone.
+        let teamWantsLAN = team.discoverable || team.inTeam
+        team.nearbyAvailable = allowed
+        mirrorServer.phoneEnabled = mirrorLANEnabled
+        guard allowed, mirrorLANEnabled || teamWantsLAN else {
             mirrorServer.stop()
             quickTunnel.stop()
             namedTunnel.stop()
             return
+        }
+        if !mirrorLANEnabled {
+            quickTunnel.stop()
+            namedTunnel.stop()
         }
         let payload = mirrorServer.payload
         Task { [mirrorExporter] in await mirrorExporter.attach(payload: payload) }
