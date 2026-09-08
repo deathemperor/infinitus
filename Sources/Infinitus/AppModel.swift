@@ -2613,7 +2613,8 @@ final class AppModel: ObservableObject {
                                                 // and the phone falls back to today's rows.
                                                 let wanted = leases.leasedPids().map { pids in records.filter { pids.contains($0.pid) } } ?? records
                                                 let facts = timelineCache.facts(records: wanted, claudeDir: ClaudeSessions.configHome(),
-                                                                                attention: attentionStore, roster: records) { ownedBox.existing?.pending(pid: $0) ?? [] }
+                                                                                attention: attentionStore, roster: records,
+                                                                                watched: leases.watchedPids()) { ownedBox.existing?.pending(pid: $0) ?? [] }
                                                 // The Mac's own sessions card reads the same facts (phase 3).
                                                 Task { @MainActor [weak self] in self?.sessionProgress.setFacts(facts) }
                                                 return facts

@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - The team loop stops burning seconds every five minutes: a teammate's stats, live state, sessions and fleet docs are decrypted once per blob version instead of through a git subprocess each pass, and the header cache is rewritten hourly rather than on every pass (#346).
+- A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
 - `infinitusctl team status|fetch|code|approve|decline|create|publish` on a Mac with the app running answer as the app (its identity, its store), and the other team subcommands refuse to mint a second identity beside the app's; `team status` fetches first and says when it is showing a cached roster (#354).
 - The Mac idles near 0% again with the pop-out closed: the project list behind the phone's start sheet reuses its walk of past transcripts for a minute instead of re-reading ten thousand files on every refresh (#346).
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.

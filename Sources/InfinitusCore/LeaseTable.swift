@@ -75,6 +75,14 @@ public final class LeaseTable: @unchecked Sendable {
         return Set(leases.values.flatMap { $0.scopes.compactMap { $0.type == .session ? $0.pid : nil } })
     }
 
+    /// The pids with a `session(pid)` lease of their own — a thread someone
+    /// is looking at — whatever `sessions` leases also exist (#346).
+    public func watchedPids(now: Date = Date()) -> Set<Int32> {
+        lock.lock(); defer { lock.unlock() }
+        sweep(now)
+        return Set(leases.values.flatMap { $0.scopes.compactMap { $0.type == .session ? $0.pid : nil } })
+    }
+
     public func clientCount(now: Date = Date()) -> Int {
         lock.lock(); defer { lock.unlock() }
         sweep(now)
