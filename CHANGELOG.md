@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl` retries for a second while the app re-binds its control socket, and says which error it hit instead of a flat "not running" (#265).
 
 ### Team
+- An invite code from either leader of a two-leader team joins, whichever leader last edited the roster — the join walks the roster's signed history back to the code's leader (#55).
 - Requesting to join fetches only the roster and the requests, not every member's transcript history — a join that pulled 1.3 GB now moves kilobytes (#321).
 - A slow store never looks hung: Team shows git's own progress, a stalled fetch or push times out with a message, and Approve no longer waits behind a running publish.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.

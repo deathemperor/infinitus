@@ -193,6 +193,20 @@ public final class TeamGit: TeamStore {
         } catch GitError.failed { return nil }
     }
 
+    /// Every version of `path` on its branch, newest first and the
+    /// current one included, at most `limit` deep: a first fetch walks
+    /// the roster back to one its trust root signed (`TeamClient.fetch`).
+    public func history(of path: String, limit: Int) throws -> [Data] {
+        guard opened else { throw GitError.notOpen }
+        guard let (branch, rest) = StorePath.branch(of: path) else { throw GitError.badPath(path) }
+        guard let head = try head(of: branch) else { return [] }
+        let shas = String(decoding: try run(["rev-list", "--max-count=\(limit)", head, "--", rest]), as: UTF8.self)
+            .split(separator: "\n")
+        return try shas.compactMap { sha in
+            do { return try run(["cat-file", "blob", "\(sha):\(rest)"]) } catch GitError.failed { return nil }
+        }
+    }
+
     public func list(_ prefix: String) throws -> [StoreEntry] {
         guard opened else { throw GitError.notOpen }
         var out: [StoreEntry] = []

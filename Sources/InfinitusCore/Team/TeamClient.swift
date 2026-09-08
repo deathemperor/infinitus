@@ -222,13 +222,42 @@ public final class TeamClient {
             // named must have SIGNED it — listing them is not enough, since
             // every code holder can write to the store.
             guard candidate.doc.id == config.id else { throw TeamRoster.RosterError.differentTeam }
-            try TeamRoster.Acceptance.check(candidate, previous: nil, trustRoot: config.leaderKid)
+            do {
+                try TeamRoster.Acceptance.check(candidate, previous: nil, trustRoot: config.leaderKid)
+            } catch TeamRoster.RosterError.notALeader where candidate.by != config.leaderKid {
+                try checkChain(to: candidate)
+            }
             self.roster = candidate
         }
         try persist()
         // Non-nil on both branches; the previous roster stands if the
         // candidate was identical.
         return self.roster?.doc ?? candidate.doc
+    }
+
+    /// Every leader action re-signs the roster as the leader who made it,
+    /// so on a team with two leaders the tip is signed by whoever edited
+    /// last — not necessarily the leader whose code we hold (#55). Accept
+    /// it when the roster's own history reaches back to one that leader
+    /// DID sign and every step from there to the tip passes the ordinary
+    /// rule: a store-credential holder can forge neither the root's
+    /// signature nor a step a listed leader didn't sign, so this is the
+    /// promotion chain, not a weaker root.
+    private func checkChain(to tip: Signed<TeamRoster>) throws {
+        var steps: [Signed<TeamRoster>] = []
+        for data in try store.history(of: "roster/team.json", limit: 200).dropFirst() {
+            guard let version = try? CanonicalJSON.decode(Signed<TeamRoster>.self, from: data) else { continue }
+            guard version.by == config.leaderKid else { steps.append(version); continue }
+            guard version.doc.id == config.id else { throw TeamRoster.RosterError.differentTeam }
+            try TeamRoster.Acceptance.check(version, previous: nil, trustRoot: config.leaderKid)
+            var previous = version
+            for next in steps.reversed() + [tip] {
+                try TeamRoster.Acceptance.check(next, previous: previous)
+                previous = next
+            }
+            return
+        }
+        throw TeamRoster.RosterError.notALeader
     }
 
     /// The roster is computed from the roster we read, so a lost push
