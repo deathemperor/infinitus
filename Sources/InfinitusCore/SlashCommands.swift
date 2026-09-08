@@ -79,7 +79,10 @@ public enum SlashCommands {
     /// Frontmatter `description:`; else the first non-empty body line.
     static func describe(_ url: URL) -> String {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
-        var lines = text.components(separatedBy: "\n")
+        // Split on Character.isNewline: "\r\n" is one Character, so neither
+        // split(separator: "\n") nor Linux Foundation's components(separatedBy:)
+        // breaks CRLF text; the stdlib predicate does, identically on both platforms.
+        var lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
         if lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) == "---" {
             var i = 1
             var description: String?
