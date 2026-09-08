@@ -1396,7 +1396,7 @@ sleep 6
 xcrun simctl io booted screenshot "$out" >/dev/null
 echo "→ $out"
 ```
-`capture-ours.sh`: same shape; `mac`: `infinitusctl t3 open <screen>` (B adds the route; until then the script prints "not yet") then `winlist Infinitus` + `screencapture`; `ios`: `xcrun simctl openurl booted "infinitus://t3/<screen>"` (C adds) + screenshot.
+`capture-ours.sh`: same shape; `mac`: `infinitusctl show workspace <screen>` (B adds the route; until then the script prints "not yet") then `winlist Infinitus` + `screencapture`; `ios`: `xcrun simctl openurl booted "infinitus://t3/<screen>"` (C adds) + screenshot.
 
 `fixture.sh` (the `CLAUDE_CONFIG_DIR` recipe from spec §3.6, modelled on `tools/e2e.sh:125-175`):
 ```sh
