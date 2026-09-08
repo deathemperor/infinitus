@@ -307,6 +307,29 @@ actor AwsLoginRunner {
     }
 
     /// Drops a finished entry (after the session has moved on).
+    /// #275: a login the session started itself is still waiting on its
+    /// callback — its Bash sits there until the tool timeout, and the
+    /// continue nudge only drains after that. Any callback ends the wait
+    /// (the CLI checks the OAuth state and exits), so once the sign-in
+    /// landed, poke every such listener under the session and let its
+    /// command return now. Returns how many answered.
+    nonisolated static func releaseSessionLogins(profile: String, sessionPid: Int) async -> Int {
+        guard let ps = try? Subprocess.run("/bin/ps", ["-axo", "pid=,ppid=,command="]) else { return 0 }
+        let pids = AwsLogin.sessionLogins(ps: ps, sessionPid: Int32(sessionPid), profile: profile)
+        // lsof exits 1 when nothing is listed — a throw is "no listener".
+        guard !pids.isEmpty, let lsof = try? Subprocess.run("/usr/sbin/lsof", [
+            "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", pids.map(String.init).joined(separator: ","), "-Fpn",
+        ]) else { return 0 }
+        var released = 0
+        for port in AwsLogin.listeningPorts(lsof: lsof).values.flatMap({ $0 }) {
+            guard let url = URL(string: "http://127.0.0.1:\(port)/oauth/callback?code=infinitus&state=infinitus") else { continue }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 5
+            if (try? await URLSession.shared.data(for: request)) != nil { released += 1 }
+        }
+        return released
+    }
+
     func forget(profile: String) {
         finished[profile] = nil
         publish()

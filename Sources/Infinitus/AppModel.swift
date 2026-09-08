@@ -1905,14 +1905,18 @@ final class AppModel: ObservableObject {
     }
 
     private func nudgeAfterAwsLogin(pid: Int, profile: String, fromPhone: Bool) {
-        let text = AwsLogin.continueMessage(profile: profile, fromPhone: fromPhone)
-        let request = SessionInput.Request(kind: .message, text: text)
         Task.detached(priority: .utility) { [weak self] in
+            // The session's own stuck `aws login` first (#275), so the
+            // nudge drains now instead of after its tool timeout.
+            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
+            let text = AwsLogin.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
+            let request = SessionInput.Request(kind: .message, text: text)
             let claudeDir = ClaudeSessions.configHome()
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else { return }
             let reply = SessionInput.deliver(request: request, record: record,
                                              hosts: PtyHosts.available(), claudeDir: claudeDir)
             await MainActor.run { [weak self] in
+                if released > 0 { self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released") }
                 self?.logMirrorInput(reply.outcome == "delivered" ? "📲" : "⚠️",
                                      "session \(pid) nudged after aws login: \(reply.outcome)")
             }

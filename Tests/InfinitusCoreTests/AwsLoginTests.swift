@@ -253,4 +253,45 @@ final class AwsLoginSubagentTests: XCTestCase {
         XCTAssertEqual(AwsLogin.orphanLogins(ps: ps, aws: "/tmp/e2e/aws"), [9002])
         XCTAssertEqual(AwsLogin.orphanLogins(ps: "", aws: "/opt/homebrew/bin/aws"), [])
     }
+
+    func testSessionLoginsAreTheWaitingLoginsUnderThatSessionForThatProfileWithTheirSubtree() {
+        let ps = """
+              1     0 /sbin/launchd
+            500     1 claude
+            501   500 zsh -c aws login --profile papaya --region ap-southeast-1
+            502   501 /opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/aws login --profile papaya --region ap-southeast-1
+            503   500 /bin/sh /tmp/e2e/aws login --profile papaya
+            504   503 nc -l 127.0.0.1 41726
+            505   500 /opt/homebrew/bin/aws login --profile other
+            506   500 /opt/homebrew/bin/aws login
+            600     1 claude
+            601   600 /opt/homebrew/bin/aws login --profile papaya
+            700   500 /opt/homebrew/bin/aws sts get-caller-identity --profile papaya
+            """
+        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 500, profile: "papaya"), [501, 502, 503, 504])
+        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 500, profile: "default"), [506])
+        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 600, profile: "papaya"), [601])
+        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 700, profile: "papaya"), [])
+    }
+
+    func testListeningPortsComeFromLsofFieldOutput() {
+        let lsof = """
+            p46681
+            f3
+            n127.0.0.1:41726
+            p42654
+            f5
+            n*:55466
+            f6
+            n[::1]:55467
+            """
+        XCTAssertEqual(AwsLogin.listeningPorts(lsof: lsof), [46681: [41726], 42654: [55466, 55467]])
+    }
+
+    func testContinueMessageSaysWhenTheSessionsOwnLoginWasStopped() {
+        XCTAssertFalse(AwsLogin.continueMessage(profile: "p", fromPhone: true).contains("stopped"))
+        let released = AwsLogin.continueMessage(profile: "p", fromPhone: true, released: true)
+        XCTAssertTrue(released.contains("was stopped because the sign-in had already completed"))
+        XCTAssertTrue(released.hasSuffix("do not run `aws login` again."))
+    }
 }

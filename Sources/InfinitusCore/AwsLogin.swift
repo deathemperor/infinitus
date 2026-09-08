@@ -468,9 +468,14 @@ public enum AwsLogin {
 
     /// The message the session gets once the login lands (SessionInput
     /// message path, same as the phone's replies).
-    public static func continueMessage(profile: String, fromPhone: Bool) -> String {
+    /// `released`: the session's own `aws login` was ended by the app
+    /// (#275) — say so, or the session reads its state error, runs
+    /// `aws login` again and blocks another tool timeout.
+    public static func continueMessage(profile: String, fromPhone: Bool, released: Bool = false) -> String {
         "[Infinitus] AWS login for profile \(profile) completed\(fromPhone ? " from the phone" : ""). "
-            + "Retry the command that needed it and continue."
+            + (released ? "Your own `aws login` was stopped because the sign-in had already completed; "
+                          + "the credentials are in place. " : "")
+            + "Retry the command that needed it and continue" + (released ? " — do not run `aws login` again." : ".")
     }
 
     /// Pids of login wrappers an earlier app instance left behind (#274):
@@ -489,5 +494,51 @@ public enum AwsLogin {
                   fields[2].contains(marker) else { return nil }
             return pid
         }
+    }
+
+    /// The `aws login` a session started itself and is still waiting on
+    /// (#275): every `… aws login …` in `ps -axo pid=,ppid=,command=`
+    /// output whose parent chain reaches `sessionPid` and that addresses
+    /// `profile` (none named = the CLI's `default`), plus their
+    /// descendants — a wrapped login holds its callback port on a child.
+    public static func sessionLogins(ps: String, sessionPid: Int32, profile: String) -> [Int32] {
+        var parent: [Int32: Int32] = [:], command: [Int32: String] = [:]
+        for line in ps.split(separator: "\n") {
+            let fields = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+            guard fields.count == 3, let pid = Int32(fields[0]), let ppid = Int32(fields[1]) else { continue }
+            parent[pid] = ppid
+            command[pid] = String(fields[2])
+        }
+        func under(_ pid: Int32, _ root: Int32) -> Bool {
+            var current = pid, hops = 0
+            while let p = parent[current], hops < 32 {
+                if p == root { return true }
+                current = p
+                hops += 1
+            }
+            return false
+        }
+        let logins = command.filter { under($0.key, sessionPid) && isLogin($0.value, profile: profile) }.map(\.key)
+        let subtree = command.keys.filter { pid in logins.contains { under(pid, $0) } }
+        return Array(Set(logins + subtree)).sorted()
+    }
+
+    static func isLogin(_ command: String, profile: String) -> Bool {
+        guard command.range(of: #"(?:^|[ /])aws login(?:\s|$)"#, options: .regularExpression) != nil else { return false }
+        return (self.profile(inCommand: command) ?? "default") == profile
+    }
+
+    /// `lsof -nP -iTCP -sTCP:LISTEN -a -p <pids> -Fpn` output → pid → ports.
+    public static func listeningPorts(lsof: String) -> [Int32: [Int]] {
+        var out: [Int32: [Int]] = [:]
+        var pid: Int32?
+        for line in lsof.split(separator: "\n") {
+            if line.hasPrefix("p") {
+                pid = Int32(line.dropFirst())
+            } else if line.hasPrefix("n"), let pid, let port = Int(line.split(separator: ":").last ?? "") {
+                out[pid, default: []].append(port)
+            }
+        }
+        return out
     }
 }

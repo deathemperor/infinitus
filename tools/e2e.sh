@@ -57,6 +57,7 @@ cleanup() {
     # sleeping from earlier runs, 2026-09-03).
     pkill -f "$INFINITUS_CSWAP auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
+    pkill -f "nc -l 127.0.0.1 4[0-9]{4}$" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
@@ -99,10 +100,19 @@ if [ "$1" = "sts" ]; then
     [ -f "$(dirname "$0")/aws-probe-ok" ] && exit 0
     echo "aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'."; exit 255
 fi
-profile=""
-while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; shift; done
+profile=""; remote=""
+while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; [ "$1" = "--remote" ] && remote=1; shift; done
 # The orphan fixture (#274): a login that never finishes.
 [ "$profile" = "e2e-orphan" ] && exec sleep 3600
+# A session's own login (#275): without --remote the real CLI waits on
+# a callback listener; any callback ends the wait and it fails on the state.
+if [ -z "$remote" ]; then
+    port=$((40000 + $$ % 10000))
+    echo "Attempting to open your default browser. If the browser does not open, open the following URL."
+    echo "https://e2e.invalid/authorize?profile=$profile&redirect_uri=http://127.0.0.1:$port/oauth/callback"
+    printf 'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' | nc -l 127.0.0.1 "$port" >/dev/null
+    echo "aws: [ERROR]: Error loading or redeeming a login authorization code: State parameter infinitus does not match expected value e2e."; exit 255
+fi
 echo "Please visit the following URL:"
 echo "https://e2e.invalid/authorize?profile=$profile"
 printf 'Enter the authorization code: '
@@ -125,8 +135,12 @@ export INFINITUS_AWS_PROBE_S=2
 export CLAUDE_CONFIG_DIR="$SOCKDIR/claude"
 PEER_SOCK="$SOCKDIR/peer.sock"; INBOX="$SOCKDIR/inbox.ndjson"
 python3 - "$PEER_SOCK" "$INBOX" <<'PEER' &
-import os, socket, sys
+import os, socket, subprocess, sys
 os.setsid()
+# The session's own `aws login`, stuck on its callback (#275): a child of
+# this process, so the app finds it under the session's pid.
+subprocess.Popen([os.environ["INFINITUS_AWS_CLI"], "login", "--profile", "e2e-login"],
+                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.bind(sys.argv[1]); s.listen(4)
 while True:
     c, _ = s.accept(); c.settimeout(3); data = b""
@@ -347,6 +361,15 @@ until grep -q "AWS login for profile e2e-login completed from the phone" "$INBOX
     sleep 1
 done
 echo "aws: code flow signed in, need cleared, session nudged"
+# The session's own stuck login (#275) was released before the nudge,
+# and the nudge says so.
+i=0
+while pgrep -f "aws login --profile e2e-login" >/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released"
+    sleep 1
+done
+grep -q "Your own .aws login. was stopped" "$INBOX" || fail "nudge does not say the session's own login was stopped"
+echo "aws: the session's own stuck login released, nudge says so"
 # Rebind refusal: the CLI asks to overwrite the profile's session; the
 # app answers n and reports which account it was bound to.
 "$CTL" aws-login e2e-rebind --remote >/dev/null || fail "aws-login e2e-rebind"
