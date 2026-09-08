@@ -238,6 +238,23 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(reply, .init(outcome: "rejected", detail: "attachment too large"))
     }
 
+    func testAVideoHasItsOwnCapAndTheDeliveredTextSaysHowToLookAtIt() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("owned-video-\(UUID().uuidString)")
+        let video = SessionInput.Attachment(name: "video-1234.mov", mime: "video/quicktime",
+                                            data: Data(count: SessionInput.maxAttachmentBytes + 1))
+        var got = ""
+        let reply = deliver(.init(kind: .message, text: "see", attachments: [video]), hosts: [], attachmentsDir: dir,
+                            owned: { req, _ in got = req.text; return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(reply.channel, "stdin", "over the image cap, under the video cap")
+        XCTAssertTrue(got.contains("-video-1234.mov]"), got)
+        XCTAssertTrue(got.hasSuffix(SessionInput.videoHint), got)
+        let huge = SessionInput.Attachment(name: "long.mp4", mime: "video/mp4",
+                                           data: Data(count: SessionInput.maxVideoAttachmentBytes + 1))
+        XCTAssertEqual(deliver(.init(kind: .message, text: "hi", attachments: [huge]), hosts: []),
+                       .init(outcome: "rejected", detail: "attachment too large"))
+        XCTAssertEqual(SessionInput.sanitizedAttachmentName("clip", mime: "video/mp4"), "clip.mp4")
+    }
+
     func testUnsupportedMimeIsRejected() {
         let exe = SessionInput.Attachment(name: "a.exe", mime: "application/x-msdownload",
                                           data: Data([0]))

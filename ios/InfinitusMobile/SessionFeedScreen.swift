@@ -842,7 +842,7 @@ struct SessionFeedScreen: View {
                               image: attachment.thumbnail)
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems,
-                      maxSelectionCount: SessionInput.maxAttachments, matching: .images)
+                      maxSelectionCount: SessionInput.maxAttachments, matching: .any(of: [.images, .videos]))
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.allowedFileTypes,
                      allowsMultipleSelection: true) { result in
             addPickedFiles(result)
@@ -859,9 +859,15 @@ struct SessionFeedScreen: View {
             Group {
                 if let thumbnail = attachment.thumbnail {
                     Image(uiImage: thumbnail).resizable().scaledToFill()
+                        .overlay {
+                            if attachment.mime.hasPrefix("video/") {
+                                Image(systemName: "play.circle.fill").font(.title3)
+                                    .foregroundStyle(.white, .black.opacity(0.5))
+                            }
+                        }
                 } else {
                     VStack(spacing: 2) {
-                        Image(systemName: "doc.fill").font(.title3)
+                        Image(systemName: attachment.mime.hasPrefix("video/") ? "video.fill" : "doc.fill").font(.title3)
                         Text(attachment.name).font(.caption2).lineLimit(1)
                     }
                 }
@@ -888,6 +894,16 @@ struct SessionFeedScreen: View {
     private func addPickedPhotos(_ items: [PhotosPickerItem]) async {
         for item in items {
             guard attachments.count < SessionInput.maxAttachments else { break }
+            if PickedVideo.isVideo(item) {
+                // A video travels as the movie file (#381), not its poster frame.
+                switch await PickedVideo.load(item) {
+                case .success(let video):
+                    attachments.append(PendingAttachment(name: video.name, mime: video.mime,
+                                                         data: video.data, thumbnail: video.thumbnail))
+                case .failure(let failure): attachmentError = failure.message
+                }
+                continue
+            }
             guard let data = try? await item.loadTransferable(type: Data.self),
                   let image = UIImage(data: data), let jpeg = Self.downscaledJPEG(image) else {
                 attachmentError = "couldn't read that photo"

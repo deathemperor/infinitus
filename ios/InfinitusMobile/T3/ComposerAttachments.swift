@@ -36,6 +36,14 @@ enum ComposerAttachments {
         return image(picked, prefix: "photo")
     }
 
+    /// A picked video, already loaded and checked by `PickedVideo` (#381).
+    static func video(_ loaded: Result<PickedVideo.Loaded, PickedVideo.Failure>) -> Result<ComposerAttachment, Failure> {
+        switch loaded {
+        case .success(let v): return .success(.init(name: v.name, mime: v.mime, data: v.data, thumbnail: v.thumbnail))
+        case .failure(let f): return .failure(.video(f.message))
+        }
+    }
+
     static func file(named name: String, data: Data) -> Result<ComposerAttachment, Failure> {
         guard data.count <= capBytes else { return .failure(.tooLarge(bytes: data.count, compressed: false, name: name)) }
         let mime = UTType(filenameExtension: (name as NSString).pathExtension)?.preferredMIMEType
@@ -49,6 +57,8 @@ enum ComposerAttachments {
         case tooLarge(bytes: Int, compressed: Bool, name: String? = nil)
         case unsupported(String)
         case full
+        /// `PickedVideo`'s own sentence.
+        case video(String)
 
         var message: String {
             let capMB = ComposerAttachments.capBytes / 1_048_576
@@ -59,6 +69,7 @@ enum ComposerAttachments {
             case .tooLarge(_, false, let name): return "\(name ?? "that file") is over \(capMB) MB"
             case .unsupported(let name): return "\(name) isn't a supported file type"
             case .full: return "the message already has \(ComposerAttachments.capCount) attachments"
+            case .video(let message): return message
             }
         }
     }

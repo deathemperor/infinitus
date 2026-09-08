@@ -78,13 +78,24 @@ public enum SessionInput {
         return "[Infinitus] Continue where you left off — this session stopped, and you were asked from the phone to pick the task back up from your last step. (\(f.string(from: now)))"
     }
 
+    /// Follows the attached-paths line when one of them is a video (#381):
+    /// the session can't watch it, but it can pull frames.
+    public static let videoHint = "\n(a .mov/.mp4 is a video: pull frames with ffmpeg to look at it)"
+
     /// At most this many attachments per message.
     public static let maxAttachments = 4
     /// Per-attachment cap, after base64 decoding.
     public static let maxAttachmentBytes = 5 * 1024 * 1024
+    /// A video's own cap (#381): a phone screen recording runs 5-15 MB
+    /// for half a minute, and the session only ever reads it by path.
+    public static let maxVideoAttachmentBytes = 20 * 1024 * 1024
+    public static func maxAttachmentBytes(mime: String) -> Int {
+        mime.hasPrefix("video/") ? maxVideoAttachmentBytes : maxAttachmentBytes
+    }
     public static let allowedAttachmentMimes: Set<String> = [
         "image/png", "image/jpeg", "image/heic", "image/gif", "image/webp",
         "text/plain", "application/pdf",
+        "video/quicktime", "video/mp4",
     ]
 
     public struct Reply: Codable, Sendable, Equatable {
@@ -162,6 +173,8 @@ extension SessionInput {
         case "image/webp": return "webp"
         case "text/plain": return "txt"
         case "application/pdf": return "pdf"
+        case "video/quicktime": return "mov"
+        case "video/mp4": return "mp4"
         default: return nil
         }
     }
@@ -187,7 +200,7 @@ extension SessionInput {
         guard let attachments, !attachments.isEmpty else { return nil }
         guard attachments.count <= maxAttachments else { return "too many attachments" }
         for attachment in attachments {
-            guard attachment.data.count <= maxAttachmentBytes else {
+            guard attachment.data.count <= maxAttachmentBytes(mime: attachment.mime) else {
                 return "attachment too large"
             }
             guard allowedAttachmentMimes.contains(attachment.mime) else {
@@ -302,6 +315,9 @@ extension SessionInput {
                     paths.append(fileURL.path)
                 }
                 deliveredText += "\n\n[attached: \(paths.joined(separator: ", "))]"
+                if attachments.contains(where: { $0.mime.hasPrefix("video/") }) {
+                    deliveredText += videoHint
+                }
             }
             // Claude Code's own inbox first — a message, line breaks kept,
             // rather than keystrokes (user 2026-09-03). The terminal is

@@ -122,10 +122,10 @@ public enum MirrorTransport {
     /// Default body cap for every route except `POST /sessions/*/input`
     /// (`/snapshot` and `/tail` never carry a body worth more than this).
     public static let defaultBodyCap = 16 * 1024
-    /// `POST /sessions/<pid>/input` carries up to 4 attachments at 5 MiB
-    /// each, base64-inflated — room for that plus the JSON envelope
-    /// (2026-09-03 "add features to allow attachments").
-    public static let sessionInputBodyCap = 24 * 1024 * 1024
+    /// `POST /sessions/<pid>/input` carries up to 4 attachments — a
+    /// 20 MiB video and three 5 MiB images at most (#381) — base64-inflated,
+    /// plus the JSON envelope (2026-09-03 "add features to allow attachments").
+    public static let sessionInputBodyCap = 48 * 1024 * 1024
 
     // MARK: - Server side
 

@@ -23,6 +23,7 @@ publishes the matching section as the GitHub release body.
 - Open workspace: a new window over your sessions, from the popup, ⌘⇧T, or infinitusctl show workspace.
 
 ### Phone
+- A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).
 - A long thread scrolls and refreshes without stalling: the feed's rows are derived once per update instead of once per row on every redraw; the Mac's chat window gets the same (#380).
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
