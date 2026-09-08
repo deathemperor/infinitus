@@ -73,6 +73,46 @@ import InfinitusUI
         return .init(timeline: timeline, facts: facts, epoch: "e", sequence: 1, synchronized: true)
     }
 
+    /// Every block MarkdownText draws, for the markdown-* shots.
+    static func richMarkdown() -> TimelineFollower.State {
+        var state = conversation(running: false)
+        let text = """
+        ## What changed
+
+        The row's `id` changed with its status, so SwiftUI **tore the cell down** and rebuilt it — see [the diff](https://example.com/pr/352).
+
+        ```swift
+        ForEach(rows, id: \\.pid) { row in
+            T3HomeRow(entry: row)
+        }
+        ```
+
+        - Keyed on the pid alone
+        - Kept the swipe actions on the row
+        1. Build
+        2. Test on the simulator
+        - [x] `infinitusctl` still builds
+        - [ ] Phone install
+
+        > Keying on identity, not state, is the whole fix.
+
+        | PR | State |
+        |---|---|
+        | #360 | open |
+        | #362 | queued |
+
+        ---
+
+        ### Next
+        Nothing pending.
+        """
+        var messages = state.timeline.messages
+        messages[3] = .init(id: "a2", role: .assistant, text: text, images: nil, sender: nil, turnId: "t2", streaming: false, createdAt: at(90))
+        messages[2] = .init(id: "u2", role: .user, text: "Do it — run `swift build` and **check** the CLI:\n\n```sh\nswift build --product infinitusctl\n```", images: nil, sender: nil, turnId: "t2", streaming: false, createdAt: at(60))
+        state.timeline = SessionTimeline(turns: state.timeline.turns, messages: messages, activities: state.timeline.activities)
+        return state
+    }
+
     static let parityHome: [T3HomeEntry] = [
         T3HomeEntry(session: SessionDetail(pid: 4243, cwd: "/tmp/t3fix/proj/limitless", status: "waiting", kind: "claude", startedAt: 0),
                     macId: nil, title: "Hi", repo: "limitless", branch: nil, macLabel: nil, status: .ready, pinnedAt: nil,
@@ -129,6 +169,8 @@ import InfinitusUI
             ("thread-settled-dark", Self.conversation(running: false), .dark),
             ("thread-approval-light", Self.conversation(prompt: Self.approval, running: true), .light),
             ("thread-question-dark", Self.conversation(prompt: Self.question, running: true), .dark),
+            ("markdown-light", Self.richMarkdown(), .light),
+            ("markdown-dark", Self.richMarkdown(), .dark),
         ]
         for scheme in [ColorScheme.light, .dark] {
             let draft = NavigationStack {
