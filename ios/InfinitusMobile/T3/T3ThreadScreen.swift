@@ -25,6 +25,8 @@ struct T3ThreadScreen: View {
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
     @State private var showCamera = false
+    @State private var showSettings = false
+    @State private var showGit = false
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
         self.model = model
@@ -137,9 +139,15 @@ struct T3ThreadScreen: View {
                         .foregroundStyle(t3.mobile.foregroundMuted.color)
                 }
             }
+            // T3's header pills: files and terminal are E/F's; git opens
+            // the overview sheet.
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Image(systemName: "folder").foregroundStyle(t3.mobile.iconMuted.color)
-                Image(systemName: "terminal").foregroundStyle(t3.mobile.iconMuted.color)
+                Image(systemName: "folder").foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Files (soon)")
+                Image(systemName: "terminal").foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Terminal (soon)")
+                Button { showGit = true } label: {
+                    Image(systemName: "point.topleft.down.curvedto.point.bottomright.up").foregroundStyle(t3.mobile.icon.color)
+                }
+                .accessibilityLabel("Open git controls")
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -167,6 +175,12 @@ struct T3ThreadScreen: View {
         .fullScreenCover(isPresented: $showCamera) {
             CameraCapture { image in stage(ComposerAttachments.image(image, prefix: "camera")) }
                 .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showSettings) {
+            T3ThreadSettingsSheet(model: model, session: session, macId: macId, facts: follower.state.facts).t3(platform: .mobile)
+        }
+        .sheet(isPresented: $showGit) {
+            T3GitSheet(branch: model.progress(macId: macId, pid: session.pid)?.gitBranch).t3(platform: .mobile)
         }
     }
 
@@ -228,6 +242,13 @@ struct T3ThreadScreen: View {
                         editor.padding(.horizontal, 14)
                         HStack(spacing: 4) {
                             attachButton
+                            Button { showSettings = true } label: {
+                                Image(systemName: "gearshape").font(.system(size: 16))
+                                    .foregroundStyle(t3.mobile.icon.color)
+                                    .frame(width: 44, height: 44).contentShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Thread settings")
                             Spacer(minLength: 0)
                             sendButton
                         }
