@@ -11,7 +11,7 @@ enum MCPCommand {
         @Sendable func control(_ command: String, args: [String] = [], options: [String: String] = [:],
                                secret: String? = nil) -> Result<String, MCPServer.ToolError> {
             let request = ControlRequest(command: command, args: args, options: options, secret: secret)
-            guard let reply = roundTrip(request, path: path) else {
+            guard let reply = ControlClient.roundTrip(request, path: path) else {
                 return .failure(.init("Infinitus is not running on this Mac (no control socket)"))
             }
             guard reply.ok else { return .failure(.init(reply.error ?? "\(command) failed")) }

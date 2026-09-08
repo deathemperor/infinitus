@@ -4,7 +4,12 @@ import InfinitusCore
 // `infinitusctl team …` runs in-process — no control socket, so a Linux
 // or Windows member needs only this binary (spec §9). State lives under
 // TeamPaths.standard() (override: INFINITUS_TEAM_DIR); secrets in
-// FileSecrets under it — the Mac app's keychain store arrives in plan 5.
+// FileSecrets under it. On a Mac the app keeps this machine's identity
+// and store tokens in the keychain, which this process cannot read, so
+// with the app running and no INFINITUS_TEAM_DIR the subcommands the
+// app answers go through its control socket, and the rest refuse to
+// mint a second identity beside the app's (#354: a leader Mac ended up
+// with two kids, and a CLI join the app never saw).
 
 func teamUsage() -> String {
     """
@@ -13,7 +18,7 @@ func teamUsage() -> String {
       create <name> --remote <url> [--token -] [--as <your name>]     create a team on an empty git remote (token from stdin)
       code [--days N]                              team code for joiners (default 7 days)
       request - --name <n> [--devices a,b]         ask to join; the code on stdin (argv only if it carries no credential)
-      status [--team <id>]                         this machine's team(s)
+      status [--team <id>]                         this machine's team(s), fetched first (cached, with a warning, when the store is unreachable)
       requests                                     pending join requests (leaders)
       approve <kid> | decline <kid>                answer a request (leaders)
       remove <kid> | promote <kid>                 roster edits (leaders; the founder cannot be removed)
@@ -75,6 +80,36 @@ private func fail(_ message: String, code: Int32 = 1) -> Int32 {
     return code
 }
 
+#if os(macOS)
+/// The subcommands the running app answers itself (ControlServer's
+/// `team-*` verbs), as the app's view — the app's identity, the app's
+/// store. nil when the app is not running (the caller stays in-process)
+/// or the subcommand has no app verb.
+private func routeToApp(_ sub: String, positional: [String], options: [String: String], socket: String) -> Int32? {
+    let request: ControlRequest
+    switch sub {
+    case "status": request = ControlRequest(command: "team-status")
+    case "fetch": request = ControlRequest(command: "team-fetch")
+    case "publish": request = ControlRequest(command: "team-publish")
+    case "code": request = ControlRequest(command: "team-code", options: options.filter { $0.key == "days" })
+    case "approve", "decline":
+        guard let kid = positional.first else { return nil }
+        request = ControlRequest(command: "team-\(sub)", args: [kid])
+    case "create":
+        guard let name = positional.first, let remote = options["remote"] else { return nil }
+        request = ControlRequest(command: "team-create", args: [name, remote],
+                                 options: ["remote": remote].merging(options.filter { $0.key == "as" }) { a, _ in a })
+    default: return nil
+    }
+    guard let reply = ControlClient.roundTripRetrying(request, path: socket) else { return nil }
+    guard reply.ok else { return fail(reply.error ?? "\(request.command) failed") }
+    let enc = JSONEncoder()
+    enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    if let data = try? enc.encode(reply.result ?? .null) { print(String(decoding: data, as: UTF8.self)) }
+    return 0
+}
+#endif
+
 private struct ReadableEntry: Encodable {
     var path: String; var size: Int; var kind: String; var from: String; var at: Int
 }
@@ -119,6 +154,28 @@ func runTeam(_ args: [String]) -> Int32 {
 
     let paths = TeamPaths.standard()
     let secrets = FileSecrets(dir: paths.secretsDir)
+
+    #if os(macOS)
+    let ownDir = !(ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] ?? "").isEmpty
+    if !ownDir {
+        let socket = ControlProtocol.socketURL().path
+        if let routed = routeToApp(sub, positional: positional, options: options, socket: socket) {
+            return routed
+        }
+        // The app answers, this subcommand has no app verb, and no
+        // in-process identity exists yet: minting one here would be
+        // invisible to the app (#354). One that already exists keeps
+        // working, with a note about which identity it is.
+        if sub != "--help", sub != "help",
+           ControlClient.roundTrip(ControlRequest(command: "team-status"), path: socket) != nil {
+            if let kid = secrets.read(TeamClient.identitySecretName).flatMap({ try? TeamIdentity(secret: $0) })?.kid {
+                FileHandle.standardError.write(Data("note: infinitusctl's own identity \(kid), not the app's — set INFINITUS_TEAM_DIR to silence this\n".utf8))
+            } else {
+                return fail("the Infinitus app owns this Mac's team identity (keychain), and `team \(sub)` has no app verb yet: use the app, or INFINITUS_TEAM_DIR=<dir> for a separate identity")
+            }
+        }
+    }
+    #endif
 
     func client() throws -> TeamClient {
         let ids = paths.teamIDs()
@@ -181,10 +238,19 @@ func runTeam(_ args: [String]) -> Int32 {
                                            paths: paths, secrets: secrets)
             emit(try c.status())
         case "status":
+            // Fetched first: a requester kept reading "pending" from the
+            // cached roster after their approval (#354). Unreachable store
+            // → the cached status, and stderr says so.
+            func fresh(_ c: TeamClient) -> TeamStatus? {
+                do { _ = try c.fetch() } catch {
+                    FileHandle.standardError.write(Data("note: store unreachable (\(masked("\(error)"))); showing the cached status\n".utf8))
+                }
+                return try? c.status()
+            }
             if options["team"] == nil, paths.teamIDs().count > 1 {
-                emit(try paths.teamIDs().map { try TeamClient.open(id: $0, paths: paths, secrets: secrets).status() })
+                emit(try paths.teamIDs().compactMap { fresh(try TeamClient.open(id: $0, paths: paths, secrets: secrets)) })
             } else {
-                emit(try client().status())
+                emit(try fresh(client()))
             }
         case "requests":
             let c = try client(); _ = try c.fetch()
