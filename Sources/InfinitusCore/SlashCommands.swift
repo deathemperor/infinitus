@@ -21,11 +21,14 @@ public struct SlashCommand: Sendable, Equatable, Identifiable {
 
 public enum SlashCommands {
     /// Project first so it shadows a same-named user command (Claude Code's
-    /// own precedence); commands before skills; sorted by name.
-    public static func discover(cwd: String, home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    /// own precedence); commands before skills; sorted by name. `claudeDir`
+    /// defaults to `ClaudeSessions.configHome()` (`CLAUDE_CONFIG_DIR` when
+    /// set, else `~/.claude`) so discovery follows the same override the
+    /// rest of Claude Code's own files use.
+    public static func discover(cwd: String, claudeDir: URL = ClaudeSessions.configHome(),
                                 fileManager: FileManager = .default) -> [SlashCommand] {
         let project = URL(fileURLWithPath: cwd).appendingPathComponent(".claude")
-        let user = home.appendingPathComponent(".claude")
+        let user = claudeDir
         var seen = Set<String>()
         var out: [SlashCommand] = []
         func add(_ c: SlashCommand) { if seen.insert(c.name).inserted { out.append(c) } }
@@ -56,8 +59,9 @@ public enum SlashCommands {
         var out: [SlashCommand] = []
         for case let rel as String in e where rel.hasSuffix(".md") {
             guard !rel.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { continue }
-            let name = rel.dropLast(3).replacingOccurrences(of: "/", with: ":")
             let url = dir.appendingPathComponent(rel)
+            guard fm.fileExists(atPath: url.path) else { continue }
+            let name = rel.dropLast(3).replacingOccurrences(of: "/", with: ":")
             out.append(SlashCommand(name: name, description: describe(url), source: source))
         }
         return out
@@ -75,14 +79,14 @@ public enum SlashCommands {
     /// Frontmatter `description:`; else the first non-empty body line.
     static func describe(_ url: URL) -> String {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
-        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        if lines.first?.trimmingCharacters(in: .whitespaces) == "---" {
+        var lines = text.components(separatedBy: "\n")
+        if lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) == "---" {
             var i = 1
             var description: String?
-            while i < lines.count, lines[i].trimmingCharacters(in: .whitespaces) != "---" {
-                let line = lines[i].trimmingCharacters(in: .whitespaces)
+            while i < lines.count, lines[i].trimmingCharacters(in: .whitespacesAndNewlines) != "---" {
+                let line = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
                 if line.hasPrefix("description:") {
-                    description = String(line.dropFirst("description:".count)).trimmingCharacters(in: .whitespaces)
+                    description = String(line.dropFirst("description:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
                         .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 }
                 i += 1
@@ -90,6 +94,6 @@ public enum SlashCommands {
             if let description, !description.isEmpty { return description }
             lines = Array(lines.dropFirst(min(i + 1, lines.count)))
         }
-        return lines.first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }?.trimmingCharacters(in: .whitespaces) ?? ""
+        return lines.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
