@@ -17,36 +17,11 @@ struct T3HomeEntry: Identifiable, Equatable {
     var status: T3ThreadStatus { T3ThreadStatus(thread) }
 }
 
-/// A live session as `threadListV2.ts` sees it (spec §2.2): the facts
-/// the Mac leases become the thread's attention fields, the engine's
-/// status word its session status when no facts have arrived yet.
+/// The phone's environment id for a Mac: the primary has none in the
+/// mirror, other Macs carry their pairing id. The thread itself is the
+/// Core bridge's `T3Thread(session:facts:progress:environmentId:now:)`.
 enum T3HomeThreads {
     static func environmentId(_ macId: String?) -> String { macId ?? "primary" }
-
-    static func thread(session s: SessionDetail, macId: String?, title: String, facts: SessionFacts?,
-                       lastActivity: Date, now: Date = Date()) -> T3Thread {
-        let started = Date(timeIntervalSince1970: s.startedAt / 1000)
-        // Infinitus also settles by timestamp (the Mac's auto-settle stamps
-        // settledAt with no override); T3 only knows the override, so the
-        // effective verdict is written into it.
-        let settled: AttentionStore.SettledOverride? = facts.map { SessionListPresentation.isSettled($0) ? .settled : .active }
-        let status: T3Thread.SessionStatus
-        if let f = facts { status = T3Thread.SessionStatus(rawValue: f.status.rawValue) ?? .idle }
-        else { status = s.status == "busy" ? .running : .idle }
-        var t = T3Thread(id: String(s.pid), environmentId: environmentId(macId), projectId: s.cwd, title: title,
-                         createdAt: started, updatedAt: lastActivity, pinnedAt: facts?.pinnedAt,
-                         settledOverride: settled, settledAt: facts?.settledAt, unsettledAt: facts?.unsettledAt,
-                         snoozedUntil: facts?.snoozedUntil, snoozedAt: facts?.snoozedAt,
-                         hasPendingApprovals: facts?.hasPendingApprovals ?? (s.status == "waiting"),
-                         hasPendingUserInput: facts?.hasPendingUserInput ?? false,
-                         latestUserMessageAt: facts?.latestUserMessageAt,
-                         session: .init(status: status, updatedAt: lastActivity))
-        if let turn = facts?.latestTurn {
-            t.latestTurn = .init(state: .init(rawValue: turn.state.rawValue) ?? .completed, requestedAt: turn.requestedAt,
-                                 startedAt: turn.startedAt, completedAt: turn.completedAt)
-        }
-        return t
-    }
 }
 
 /// T3's `relativeTime` (`lib/time.ts`): "<1m", "5m", "21h", "3d".
@@ -80,9 +55,8 @@ struct T3HomeList: View {
                 let lastActivity = p?.lastActivityAt ?? Date(timeIntervalSince1970: s.startedAt / 1000)
                 out.append(T3HomeEntry(
                     session: s, macId: macId,
-                    thread: T3HomeThreads.thread(session: s, macId: macId,
-                                                 title: SessionNaming.displayName(name: p?.name, autoName: p?.autoName, cwd: s.cwd),
-                                                 facts: facts, lastActivity: lastActivity),
+                    thread: T3Thread(session: s, facts: facts, progress: p,
+                                     environmentId: T3HomeThreads.environmentId(macId), now: Date()),
                     repo: URL(fileURLWithPath: s.cwd).lastPathComponent, branch: p?.gitBranch,
                     macLabel: model.machineName(macId: macId), lastActivity: lastActivity))
             }
