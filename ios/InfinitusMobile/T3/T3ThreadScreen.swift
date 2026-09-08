@@ -47,7 +47,14 @@ struct T3ThreadScreen: View {
     @State private var expandedTurnIds: Set<String> = []
     @State private var expandedWorkGroupIds: Set<String> = []
 
-    private var pending: T3Pending.Live { T3Pending.derive(follower.state.timeline) }
+    /// Rows and cards derived once per timeline and expansion, not per
+    /// body pass (#380).
+    @State private var memo = T3ThreadMemo()
+    private var derived: T3ThreadMemo {
+        memo.update(state: follower.state, expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds)
+    }
+    private var pending: T3Pending.Live { derived.pending }
+    private var rows: [T3TimelineRows.Row] { derived.rows }
 
     /// `T3TimelineRows.Input` over the follower's state: the live prompt's
     /// activities stay out (they show as a card over the composer), the
@@ -67,10 +74,6 @@ struct T3ThreadScreen: View {
             activeTurnStartedAt: running?.startedAt ?? running?.requestedAt)
     }
 
-    private var rows: [T3TimelineRows.Row] {
-        T3TimelineRows.derive(Self.timelineInput(state: follower.state, hiddenActivityIds: pending.activityIds,
-                                                 expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds))
-    }
     private var working: Bool { follower.state.facts?.status == .running }
 
     var body: some View {
