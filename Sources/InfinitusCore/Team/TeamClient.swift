@@ -607,7 +607,7 @@ public final class TeamClient {
         if kept != cache.entries {
             cache.entries = kept
             let writtenAt = (try? FileManager.default.attributesOfItem(atPath: cacheURL.path)[.modificationDate] as? Date) ?? .distantPast
-            if parsed >= 50 || Date().timeIntervalSince(writtenAt) >= 3600 { try? cache.save(cacheURL) }
+            if parsed >= 50 || Date().timeIntervalSince(writtenAt) >= HeaderCache.minWriteInterval { try? cache.save(cacheURL) }
         }
         return scan
     }
@@ -621,6 +621,8 @@ public final class TeamClient {
     struct HeaderCache: Codable, Equatable {
         struct Entry: Codable, Equatable { var version: String; var header: Envelope.Header }
         var entries: [String: Entry] = [:]
+        /// How long a changed cache may stay unwritten (#346); tests set 0.
+        nonisolated(unsafe) static var minWriteInterval: TimeInterval = 3600
         static func load(_ url: URL) -> HeaderCache {
             (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(HeaderCache.self, from: $0) } ?? HeaderCache()
         }
