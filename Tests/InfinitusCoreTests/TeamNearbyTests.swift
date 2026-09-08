@@ -514,4 +514,30 @@ final class TeamNearbyTests: XCTestCase {
         }
         XCTAssertEqual(TeamInvites.load(teamDir: lp.teamDir(leader.config.id)).nonces, [:])
     }
+
+    func testPeerByAddressComesFromTheKeyReply() throws {
+        let keys = TeamIdentity.random().keys
+        let http: TeamNearby.Client.HTTP = { method, host, port, path, _ in
+            XCTAssertEqual(method, "GET"); XCTAssertEqual(host, "10.0.0.5"); XCTAssertEqual(port, 4711)
+            guard path == TeamNearby.keyPath else { return (404, Data()) }
+            return (200, try CanonicalJSON.encode(TeamNearby.KeyReply(name: "Loc", keys: keys, team: "team-1", role: "leader")))
+        }
+        let peer = try TeamNearby.Client.peer(host: "10.0.0.5", port: 4711, http: http)
+        XCTAssertEqual(peer, TeamNearby.Peer(name: "Loc", host: "10.0.0.5", port: 4711, kid: keys.kid, team: "team-1",
+                                             role: "leader", discoverable: true))
+        XCTAssertThrowsError(try TeamNearby.Client.peer(host: "10.0.0.5", port: 4711, http: { _, _, _, _, _ in (404, Data()) })) {
+            guard case TeamNearby.Client.ClientError.keyMismatch(404) = $0 else { return XCTFail("\($0)") }
+        }
+    }
+
+    func testParseAddress() {
+        let p = MirrorTransport.defaultPort
+        XCTAssertEqual(TeamNearby.Client.parseAddress("10.0.0.5")?.port, p)
+        XCTAssertEqual(TeamNearby.Client.parseAddress("elgnas.local:4711").map { "\($0.host) \($0.port)" }, "elgnas.local 4711")
+        XCTAssertEqual(TeamNearby.Client.parseAddress(" http://10.0.0.5/ ").map { "\($0.host) \($0.port)" }, "10.0.0.5 \(p)")
+        XCTAssertEqual(TeamNearby.Client.parseAddress("[fe80::1]:4711").map { "\($0.host) \($0.port)" }, "fe80::1 4711")
+        XCTAssertEqual(TeamNearby.Client.parseAddress("fe80::1")?.host, "fe80::1")
+        XCTAssertNil(TeamNearby.Client.parseAddress(""))
+        XCTAssertNil(TeamNearby.Client.parseAddress("host:notaport"))
+    }
 }

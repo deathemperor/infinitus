@@ -27,6 +27,8 @@ func teamNearbyUsage() -> String {
                delete that invitation
            infinitusctl team request --nearby <kid> --name <n> [--devices a,b] [--seconds N]
                send a join request to that leader over the LAN — no code to paste
+           infinitusctl team request --address <host[:port]> --name <n> [--devices a,b]
+               the same, to a leader you can reach by address when the network hides Bonjour
            infinitusctl team --discoverable [--name <n>] [--port N]
                advertise this machine and answer /team/key + /team/request + /team/invite until Ctrl-C (Linux;
                on the Mac the app advertises: `infinitusctl team-discoverable on`).
@@ -170,11 +172,20 @@ func runTeamNearby(_ args: [String]) -> Int32? {
             try TeamNearby.Store.removeInvite(from: kid, paths: paths)
             emit(["ignored": kid])
         case "request":
-            guard positional.isEmpty, let kid = options["nearby"], let name = options["name"] else {
+            guard positional.isEmpty, let name = options["name"], options["nearby"] != nil || options["address"] != nil else {
                 return fail(teamNearbyUsage(), code: 2)
             }
-            guard let peer = try TeamNearby.Client.browse(seconds: seconds).first(where: { $0.kid == kid && $0.discoverable }) else {
-                return fail("no discoverable machine with kid \(kid) answered within \(Int(seconds))s")
+            let peer: TeamNearby.Peer
+            if let address = options["address"] {
+                guard let (host, port) = TeamNearby.Client.parseAddress(address) else { return fail("--address wants host or host:port", code: 2) }
+                do { peer = try TeamNearby.Client.peer(host: host, port: port, http: { m, h, p, path, body in try http(m, host: h, port: p, path: path, body: body) }) }
+                catch { return fail("nothing at \(host):\(port) answers as an Infinitus leader (\(error))") }
+            } else {
+                let kid = options["nearby"] ?? ""
+                guard let found = try TeamNearby.Client.browse(seconds: seconds).first(where: { $0.kid == kid && $0.discoverable }) else {
+                    return fail("no discoverable machine with kid \(kid) answered within \(Int(seconds))s")
+                }
+                peer = found
             }
             let devices = options["devices"]?.split(separator: ",").map(String.init) ?? []
             do {
