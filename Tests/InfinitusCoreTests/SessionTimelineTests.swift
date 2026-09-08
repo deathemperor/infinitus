@@ -384,6 +384,16 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(m.text, "One\n\nTwo")
     }
 
+    func testAssistantMessageUpdatedAtNeverMovesBackwards() throws {
+        let t = build(lines([
+            user("u1", "Hi", at: 1_000),
+            assistantText("a1", "One", at: 5_000),
+            assistantText("a2", "Two", at: 2_000),
+        ]))
+        let m = try XCTUnwrap(t.messages.first { $0.role == .assistant })
+        XCTAssertEqual(m.updatedAt, Date(timeIntervalSince1970: 5))
+    }
+
     func testUserMessageUpdatedAtEqualsCreatedAt() throws {
         let t = build(lines([user("u1", "Hi", at: 1_000)]))
         let m = try XCTUnwrap(t.messages.first)
@@ -397,6 +407,18 @@ final class SessionTimelineTests: XCTestCase {
         let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
         let m = try d.decode(SessionTimeline.Message.self, from: Data(json.utf8))
         XCTAssertEqual(m.updatedAt, m.createdAt)
+    }
+
+    func testMessageRoundTripsWithUpdatedAtDifferentFromCreatedAt() throws {
+        let m = SessionTimeline.Message(id: "m", role: .assistant, text: "x", images: nil, sender: nil,
+                                        turnId: "t", streaming: false,
+                                        createdAt: Date(timeIntervalSince1970: 1_000),
+                                        updatedAt: Date(timeIntervalSince1970: 2_000))
+        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        let decoded = try d.decode(SessionTimeline.Message.self, from: e.encode(m))
+        XCTAssertEqual(decoded, m)
+        XCTAssertNotEqual(decoded.updatedAt, decoded.createdAt)
     }
 
     func testBashToolStartedCarriesCommandAndToolCallId() throws {

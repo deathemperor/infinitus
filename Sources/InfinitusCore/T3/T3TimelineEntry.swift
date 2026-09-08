@@ -193,19 +193,20 @@ public enum T3TimelineEntry: Sendable, Equatable, Hashable, Identifiable {
     /// derives its own card. The phone's mirror already folded them — it passes
     /// `pending: []`.
     ///
-    /// **Lifecycle pairing (interim, until the builder carries `command` and
-    /// `toolCallId` — sub-project B).** `SessionTimelineBuilder` writes one tool
-    /// call as two activities: `tool.started` with id `<toolUseId>`
-    /// (SessionTimelineBuilder.swift:212) and `tool.completed` with id
-    /// `<toolUseId>/completed` (:274). Their summaries are built from different
-    /// inputs (SessionFeed.swift:697-710), so they differ in exactly the cases
-    /// that matter — a Grep's completed summary is the bare tool name where the
-    /// started one is the pattern; a Bash's completed summary is the raw
-    /// command where the started one was flattened and truncated to 120. Since
-    /// neither marker carries a tool call id, `omitSupersededLifecycleMarkers`
-    /// can only collapse them on `(turnId, itemType, normalizedLabel)`, which
-    /// differing labels defeat: the statusless started marker survives, still
-    /// reads as in-flight, and takes the live activity row — showing the search
+    /// **Lifecycle pairing.** `SessionTimelineBuilder` writes one tool call as
+    /// two activities, both carrying `command` and `toolCallId` in their
+    /// payload now: `tool.started` with id `<toolUseId>`
+    /// (SessionTimelineBuilder.swift:214) and `tool.completed` with id
+    /// `<toolUseId>/completed` (:278). Their summaries are still built from
+    /// different inputs (SessionFeed.swift:697-710), so they differ in exactly
+    /// the cases that matter — a Grep's completed summary is the bare tool
+    /// name where the started one is the pattern; a Bash's completed summary
+    /// is the raw command where the started one was flattened and truncated
+    /// to 120. `omitSupersededLifecycleMarkers` only collapses activities on
+    /// `(turnId, itemType, normalizedLabel)`, which differing labels defeat,
+    /// so the `<id>/completed` suffix pairing below remains the mechanism:
+    /// without it the statusless started marker survives, still reads as
+    /// in-flight, and takes the live activity row — showing the search
     /// pattern as if it were still running long after the call finished.
     ///
     /// So a `tool.started` whose `/completed` twin is present in the same

@@ -323,7 +323,7 @@ public enum SessionTimelineBuilder {
                 let m = messages[i]
                 let joined = String((m.text + "\n\n" + text).prefix(SessionFeedReader.textCap))
                 messages[i] = SessionTimeline.Message(id: m.id, role: .assistant, text: joined, images: nil, sender: nil,
-                                      turnId: m.turnId, streaming: false, createdAt: m.createdAt, updatedAt: at)
+                                      turnId: m.turnId, streaming: false, createdAt: m.createdAt, updatedAt: max(m.updatedAt, at))
                 return
             }
             messages.append(SessionTimeline.Message(id: id, role: .assistant, text: String(text.prefix(SessionFeedReader.textCap)),
