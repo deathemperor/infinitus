@@ -275,7 +275,7 @@ struct SettingsForm: View {
         } header: {
             Text("Appearance")
         } footer: {
-            Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout. New session screens opens sessions in the new thread view and starts them from the new task sheet (in progress).")
+            Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout. New session screens is the thread list, thread view, task sheet and settings sheet the app now opens with; turn it off for the previous grouped list and feed.")
         }
     }
 

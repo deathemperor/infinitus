@@ -264,7 +264,10 @@ final class MirrorModel: ObservableObject, FleetModel {
         localIntroTitle = defaults.string(forKey: "intro_title") ?? "zoom"
         localIntroSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
         macPopupView = defaults.object(forKey: "mac_popup_view") as? Bool ?? false
-        t3Screens = defaults.object(forKey: "t3_screens") as? Bool ?? false
+        // On by default since the new screens replaced the old ones' scope
+        // (spec §5.4: removal follows once the flag defaults on); the
+        // toggle keeps the grouped list and feed reachable until then.
+        t3Screens = defaults.object(forKey: "t3_screens") as? Bool ?? true
         reachableAgain = { Task { await OutboxDelivery.flush() } }
         otherReachable = { id in
             Task {
