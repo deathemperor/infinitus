@@ -367,6 +367,7 @@ final class AppModel: ObservableObject {
     private let launchExecutableDate = AppModel.executableDate()
     private var supervisor: CswapSupervisor?
     private var refreshTask: Task<Void, Never>?
+    private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
     // Display prefs, persisted to UserDefaults under the same names and
@@ -617,6 +618,10 @@ final class AppModel: ObservableObject {
     /// phone's reset alarm fires (#227); mirrored to the phone in FleetPrefs.
     @Published var reviveLeadMinutes: Int { didSet { defaults.set(reviveLeadMinutes, forKey: "revive_lead_minutes") } }
     var reviveLead: TimeInterval { TimeInterval(reviveLeadMinutes * 60) }
+    /// Settings › Sync "Phone lock screen": how often the working Live
+    /// Activity's tok/min is pushed on its own (user 2026-09-08 "update the
+    /// tok/min every 5s, make it configurable"); 0 = only with other changes.
+    @Published var liveActivityRateSeconds: Int { didSet { defaults.set(liveActivityRateSeconds, forKey: "live_activity_rate_seconds") } }
     /// Settings › Sync "This Mac's name" (#99); empty follows the computer name.
     @Published var machineNameOverride: String {
         didSet {
@@ -1019,6 +1024,7 @@ final class AppModel: ObservableObject {
         pushAwsLogin = defaults.object(forKey: "push_aws_login") as? Bool ?? true
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         reviveLeadMinutes = defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10
+        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
@@ -1143,6 +1149,7 @@ final class AppModel: ObservableObject {
         pushAwsLogin = defaults.object(forKey: "push_aws_login") as? Bool ?? true
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         reviveLeadMinutes = defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10
+        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
@@ -1482,6 +1489,21 @@ final class AppModel: ObservableObject {
                 // the next tick without restarting the task.
                 let seconds = await MainActor.run { self?.refreshInterval ?? 60 }
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
+            }
+        }
+        // The tok/min line of the phone's working card, on its own beat: the
+        // token rate is fresh within a second of a transcript write, the
+        // fleet refresh above is a minute apart.
+        rateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let seconds = await MainActor.run { () -> Int in
+                    guard let self else { return 0 }
+                    if self.liveActivityRateSeconds > 0 {
+                        self.liveActivityPusher.pushRate(self.sessionProgress.tokenRate)
+                    }
+                    return self.liveActivityRateSeconds
+                }
+                try? await Task.sleep(for: .seconds(max(seconds, 1)))
             }
         }
     }

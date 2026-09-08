@@ -12,12 +12,14 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - A transcript tail read costs a quarter of what it did: timestamps parse without a formatter and tool output splits on bytes, so a busy Mac spends less on every phone poll and list pass (#380).
+- The team loop stops burning seconds every five minutes: a teammate's stats, live state, sessions and fleet docs are decrypted once per blob version instead of through a git subprocess each pass, and the header cache is rewritten hourly rather than on every pass (#346).
 - Every team git call returns the moment git exits instead of up to 100 ms later, and a store pass lists each branch once: fetch, publish and the reader's tick spend less time waiting (#370).
 - A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
 - `infinitusctl team status|fetch|code|approve|decline|create|publish` on a Mac with the app running answer as the app (its identity, its store), and the other team subcommands refuse to mint a second identity beside the app's; `team status` fetches first and says when it is showing a cached roster (#354).
 - The Mac idles near 0% again with the pop-out closed: the project list behind the phone's start sheet reuses its walk of past transcripts for a minute instead of re-reading ten thousand files on every refresh (#346).
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
 - Workspace groundwork: timeline messages carry updatedAt, tool rows carry their command, slash-command discovery.
+- The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
 
 ### Phone
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).

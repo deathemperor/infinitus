@@ -163,7 +163,8 @@ final class LiveActivities {
             let content = ActivityContent(state: state,
                                           staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale))
             if let working, Self.isLive(working) {
-                if working.activityState == .stale || LiveActivityBuilder.differs(working.content.state, state) {
+                if working.activityState == .stale || LiveActivityBuilder.differs(working.content.state, state)
+                    || working.content.state.tokensPerMinute != state.tokensPerMinute {
                     Task { await working.update(content) }
                 }
             } else {
