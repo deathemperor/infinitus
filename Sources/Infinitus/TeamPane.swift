@@ -68,7 +68,7 @@ struct TeamPane: View {
     /// advertises nor answers, whatever Discoverable says.
     @ViewBuilder private var nearbyHint: some View {
         if !team.nearbyAvailable {
-            Label("Nearby needs the LAN mirror on (Settings › Phone) — this Mac is not advertising and other Macs can't reach it.", systemImage: "wifi.slash")
+            Label("Nearby is off in this instance — a mock or playground copy never advertises or scans.", systemImage: "wifi.slash")
                 .font(.caption).foregroundStyle(.orange)
         }
     }

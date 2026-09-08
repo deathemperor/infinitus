@@ -701,8 +701,10 @@ final class ControlServer {
 
         case "team-discoverable":
             guard let arg = r.args.first, ["on", "off"].contains(arg) else { throw Fail("usage: team-discoverable on|off") }
-            // MirrorServer watches this default and re-advertises (Nearby, spec §6.4).
-            UserDefaults.standard.set(arg == "on", forKey: TeamNearby.discoverableDefaultsKey)
+            // Through the model: its setter writes the default MirrorServer
+            // watches (Nearby, spec §6.4) and brings the listener up or
+            // down with it (#356).
+            model.team.discoverable = arg == "on"
             return ControlReply(ok: true, result: .object(["discoverable": .bool(arg == "on")]))
 
         default:
