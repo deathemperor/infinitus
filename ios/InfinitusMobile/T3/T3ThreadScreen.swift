@@ -33,6 +33,13 @@ struct T3ThreadScreen: View {
         _follower = StateObject(wrappedValue: TimelineFollower(pid: Int32(session.pid), mirror: model.mirror(for: macId)))
     }
 
+    /// The render harness's screen: a fixture follower, no polling.
+    init(model: MirrorModel, session: SessionDetail, fixture: TimelineFollower.State) {
+        self.model = model
+        self.session = session
+        _follower = StateObject(wrappedValue: TimelineFollower(fixture: fixture))
+    }
+
     /// The feed's order without its folds: each turn's user message, its
     /// activities by sequence, then its assistant message; anything a
     /// turn does not claim follows by time.
@@ -109,7 +116,12 @@ struct T3ThreadScreen: View {
                                    allowSession: { send(.init(kind: .approve, text: approval.sessionApproval)) },
                                    decline: { send(.init(kind: .key, text: "3")) })
                 } else if let input = pending.userInput {
-                    T3UserInputCard(input: input, sending: sending) { send(.init(kind: .answers, text: $0)) }
+                    T3UserInputCard(input: input, sending: sending) { submission in
+                        switch submission {
+                        case .answers(let text): send(.init(kind: .answers, text: text))
+                        case .key(let key): send(.init(kind: .key, text: key))
+                        }
+                    }
                 }
                 composer
             }

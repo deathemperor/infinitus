@@ -33,6 +33,9 @@ final class T3PendingTests: XCTestCase {
         let asked = activity("perm:q", kind: "user-input.requested", seq: 0,
                              payload: ["requestId": .string("perm:q"), "questions": questions])
         XCTAssertEqual(T3Pending.derive(SessionTimeline(activities: [asked])).userInput?.questions.first?.options.first?.description, "first")
+        XCTAssertEqual(T3Pending.derive(SessionTimeline(activities: [asked])).userInput?.owned, false)
+        let owned = activity("7", kind: "user-input.requested", seq: 0, payload: ["requestId": .string("7"), "questions": questions])
+        XCTAssertEqual(T3Pending.derive(SessionTimeline(activities: [owned])).userInput?.owned, true)
         let answered = activity("perm:q/resolved", kind: "user-input.resolved", seq: 1,
                                 payload: ["requestId": .string("perm:q"), "answers": .string("A")])
         XCTAssertEqual(T3Pending.derive(SessionTimeline(activities: [asked, answered])), T3Pending.Live())

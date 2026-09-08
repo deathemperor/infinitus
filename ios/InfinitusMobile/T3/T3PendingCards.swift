@@ -25,7 +25,8 @@ struct T3ApprovalCard: View {
             }
             HStack(spacing: 10) {
                 pill("Allow once", fill: t3.mobile.primary, text: t3.mobile.primaryForeground, action: allowOnce)
-                pill("Allow \(approval.rule.label)", fill: t3.mobile.subtleStrong, text: t3.mobile.foreground, action: allowSession)
+                pill("Allow session", fill: t3.mobile.subtleStrong, text: t3.mobile.foreground, action: allowSession)
+                    .accessibilityHint("Allows \(approval.rule.label) for this session")
                 pill("Decline", fill: t3.mobile.danger, text: t3.mobile.dangerForeground, action: decline)
             }
             .disabled(sending)
@@ -53,13 +54,24 @@ struct T3ApprovalCard: View {
 struct T3UserInputCard: View {
     let input: T3Pending.UserInput
     let sending: Bool
-    let submit: (String) -> Void
+    let submit: (T3Pending.Submission) -> Void
     @State private var collapsed = false
     @State private var picks: [String: Set<String>] = [:]
     @State private var custom: [String: String] = [:]
     @Environment(\.t3) private var t3
 
-    private var answers: String? { T3Pending.encodeAnswers(input.questions, picks: picks, custom: custom) }
+    /// A terminal session answers its first question by menu key: one
+    /// pick, no typing (the feed's older path).
+    private var questions: [T3Pending.Question] { input.owned ? input.questions : Array(input.questions.prefix(1)) }
+
+    private var submission: T3Pending.Submission? {
+        if input.owned {
+            return T3Pending.encodeAnswers(questions, picks: picks, custom: custom).map { .answers($0) }
+        }
+        guard let q = questions.first, let label = picks[q.id]?.first,
+              let i = q.options.firstIndex(where: { $0.label == label }) else { return nil }
+        return .key(String(i + 1))
+    }
 
     var body: some View {
         Group {
@@ -73,7 +85,7 @@ struct T3UserInputCard: View {
         Button { collapsed = false } label: {
             HStack(spacing: 8) {
                 T3CardEyebrow(text: "User input needed")
-                Text("\(input.questions.count) question\(input.questions.count == 1 ? "" : "s")")
+                Text("\(questions.count) question\(questions.count == 1 ? "" : "s")")
                     .font(T3Font.mobile(.xs)).foregroundStyle(t3.mobile.foregroundMuted.color)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up").font(.system(size: 12, weight: .semibold))
@@ -106,21 +118,21 @@ struct T3UserInputCard: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(input.questions) { question in questionBlock(question) }
+                    ForEach(questions) { question in questionBlock(question) }
                 }
             }
             .frame(maxHeight: 400)
             Button {
-                if let answers { submit(answers) }
+                if let submission { submit(submission) }
             } label: {
-                Text("Submit answers").font(T3Font.mobile(.sm, .bold))
-                    .foregroundStyle(answers == nil ? t3.mobile.foregroundMuted.color : t3.mobile.primaryForeground.color)
+                Text(input.owned ? "Submit answers" : "Send answer").font(T3Font.mobile(.sm, .bold))
+                    .foregroundStyle(submission == nil ? t3.mobile.foregroundMuted.color : t3.mobile.primaryForeground.color)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(answers == nil ? t3.mobile.subtleStrong.color : t3.mobile.primary.color,
+                    .background(submission == nil ? t3.mobile.subtleStrong.color : t3.mobile.primary.color,
                                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .buttonStyle(.plain)
-            .disabled(answers == nil || sending)
+            .disabled(submission == nil || sending)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,7 +152,7 @@ struct T3UserInputCard: View {
                 Button {
                     var set = picks[question.id] ?? []
                     if on { set.remove(option.label) }
-                    else if question.multiSelect { set.insert(option.label) }
+                    else if question.multiSelect, input.owned { set.insert(option.label) }
                     else { set = [option.label] }
                     picks[question.id] = set
                 } label: {
@@ -162,6 +174,13 @@ struct T3UserInputCard: View {
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
+            if input.owned {
+                customField(question)
+            }
+        }
+    }
+
+    private func customField(_ question: T3Pending.Question) -> some View {
             TextField("Or type a custom answer", text: Binding(
                 get: { custom[question.id] ?? "" }, set: { custom[question.id] = $0 }), axis: .vertical)
                 .font(T3Font.mobile(.base)).foregroundStyle(t3.mobile.foreground.color)
@@ -169,7 +188,6 @@ struct T3UserInputCard: View {
                 .frame(minHeight: 54)
                 .background(t3.mobile.input.color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(t3.mobile.inputBorder.color, lineWidth: 1))
-        }
     }
 }
 

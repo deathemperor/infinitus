@@ -34,6 +34,17 @@ enum T3Pending {
     struct UserInput: Equatable {
         let requestId: String
         let questions: [Question]
+        /// Whole-prompt answers ride the control channel only a session
+        /// the app runs has (`SessionInput` rejects them otherwise); a
+        /// terminal's menu takes one key. Transcript-derived prompts carry
+        /// the `perm:` prefix, an owned session's its control request id.
+        var owned: Bool { !requestId.hasPrefix("perm:") }
+    }
+
+    /// What a card sends: every answer at once, or one menu key.
+    enum Submission: Equatable {
+        case answers(String)
+        case key(String)
     }
 
     struct Live: Equatable {

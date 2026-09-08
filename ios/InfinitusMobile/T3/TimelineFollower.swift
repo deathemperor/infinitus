@@ -21,7 +21,7 @@ import InfinitusCore
     @Published private(set) var unreachable = false
 
     private let pid: Int32
-    private let mirror: NetworkFleetMirror
+    private let mirror: NetworkFleetMirror?
     private var loop: Task<Void, Never>?
 
     init(pid: Int32, mirror: NetworkFleetMirror) {
@@ -29,8 +29,15 @@ import InfinitusCore
         self.mirror = mirror
     }
 
+    /// A follower that never polls — the render harness's fixture.
+    init(fixture: State) {
+        pid = 0
+        mirror = nil
+        state = fixture
+    }
+
     func start() {
-        guard loop == nil else { return }
+        guard loop == nil, let mirror else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled, let self {
                 let cursor = state
