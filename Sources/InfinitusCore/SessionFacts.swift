@@ -6,7 +6,7 @@ import Foundation
 /// `approval > input > working > failed > ready` (`threadListV2.ts:30`)
 /// and settled/snoozed (`threadSettled.ts`) from these inputs.
 public struct SessionFacts: Codable, Sendable, Equatable {
-    public enum Status: String, Codable, Sendable { case idle, starting, running, ready, interrupted, stopped, error }
+    public enum Status: String, Codable, Sendable, CaseIterable { case idle, starting, running, ready, interrupted, stopped, error }
 
     public struct PlanProgress: Codable, Sendable, Equatable {
         public let step: String?

@@ -14,9 +14,7 @@ public enum T3Font {
     public static let dmSansNames = ["DMSans-Regular", "DMSans-Medium", "DMSans-Bold"]
 
     public static func mobile(_ s: T3TypeScale.Mobile, _ w: Weight = .regular) -> Font {
-        let name: String
-        switch w { case .regular: name = dmSansNames[0]; case .medium: name = dmSansNames[1]; case .bold: name = dmSansNames[2] }
-        if dmSansAvailable { return .custom(name, fixedSize: s.step.size) }
+        if dmSansAvailable { return .custom(dmSansName(w), fixedSize: s.step.size) }
         return .system(size: s.step.size, weight: systemWeight(w))
     }
     public static func web(_ s: T3TypeScale.Web, _ w: Weight = .regular) -> Font {
@@ -28,10 +26,11 @@ public enum T3Font {
     /// A DM Sans face at a size T3 sets literally rather than off the scale
     /// (`text-[21px]`, `text-[9px]` in CompactBrandTitle.tsx).
     public static func mobileLiteral(_ size: Double, _ w: Weight = .regular) -> Font {
-        let name: String
-        switch w { case .regular: name = dmSansNames[0]; case .medium: name = dmSansNames[1]; case .bold: name = dmSansNames[2] }
-        if dmSansAvailable { return .custom(name, fixedSize: size) }
+        if dmSansAvailable { return .custom(dmSansName(w), fixedSize: size) }
         return .system(size: size, weight: systemWeight(w))
+    }
+    private static func dmSansName(_ w: Weight) -> String {
+        switch w { case .regular: return dmSansNames[0]; case .medium: return dmSansNames[1]; case .bold: return dmSansNames[2] }
     }
     static func systemWeight(_ w: Weight) -> Font.Weight {
         switch w { case .regular: return .regular; case .medium: return .medium; case .bold: return .bold }

@@ -14,7 +14,7 @@ public enum T3ThreadList {
     }
     public struct Item: Sendable, Equatable, Identifiable {
         public let thread: T3Thread, variant: Variant, snoozed: Bool, pinned: Bool
-        public var isLast: Bool
+        public fileprivate(set) var isLast: Bool
         public var id: String { thread.key }
     }
     public struct Layout: Sendable, Equatable {

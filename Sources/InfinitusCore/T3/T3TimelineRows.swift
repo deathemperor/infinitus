@@ -734,11 +734,11 @@ public enum T3TimelineRows {
                   .workLive(_, yAt, yEntry, yEntries, yGroup, yExpanded, yActive)):
             return xAt == yAt && xGroup == yGroup && xExpanded == yExpanded && xActive == yActive
                 && xEntry == yEntry && xEntries == yEntries
-        case let (.workToggle(_, xAt, xTurn, xGroup, xHidden, xExpanded, xSummary, xKind, xSurface, _, xFailure),
-                  .workToggle(_, yAt, yTurn, yGroup, yHidden, yExpanded, ySummary, yKind, ySurface, _, yFailure)):
+        case let (.workToggle(_, xAt, xTurn, xGroup, xHidden, xExpanded, xSummary, xKind, xSurface, xIcon, xFailure),
+                  .workToggle(_, yAt, yTurn, yGroup, yHidden, yExpanded, ySummary, yKind, ySurface, yIcon, yFailure)):
             return xAt == yAt && xTurn == yTurn && xGroup == yGroup && xHidden == yHidden
                 && xExpanded == yExpanded && xSummary == ySummary && xKind == yKind && xSurface == ySurface
-                && xFailure == yFailure
+                && xIcon == yIcon && xFailure == yFailure
         case let (.message(_, _, xM, xStart, xMeta, xCopy, xStream, xDiff, xRevert),
                   .message(_, _, yM, yStart, yMeta, yCopy, yStream, yDiff, yRevert)):
             return xM == yM && xStart == yStart && xMeta == yMeta && xCopy == yCopy && xStream == yStream
