@@ -1,6 +1,9 @@
 import Foundation
 import InfinitusCore
 
+// Darwin only, like the socket code it came from: a Linux or Windows
+// build of the CLI has no control socket (exit 3 in main.swift).
+#if canImport(Darwin)
 /// One JSON line to the running app's control socket, one back. Shared
 /// by the top-level commands (main.swift), the MCP server and the
 /// `team` subcommands that defer to the app on a Mac (#354).
@@ -69,3 +72,4 @@ enum ControlClient {
         return nil
     }
 }
+#endif
