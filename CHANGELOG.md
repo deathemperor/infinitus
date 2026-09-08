@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- A transcript tail read costs a quarter of what it did: timestamps parse without a formatter and tool output splits on bytes, so a busy Mac spends less on every phone poll and list pass (#380).
 - The team loop stops burning seconds every five minutes: a teammate's stats, live state, sessions and fleet docs are decrypted once per blob version instead of through a git subprocess each pass, and the header cache is rewritten hourly rather than on every pass (#346).
 - Every team git call returns the moment git exits instead of up to 100 ms later, and a store pass lists each branch once: fetch, publish and the reader's tick spend less time waiting (#370).
 - A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
