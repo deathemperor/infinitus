@@ -100,7 +100,6 @@ struct T3ThreadScreen: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    .padding(.bottom, 8)
                 }
                 // The conversation sits at the bottom, as a chat does.
                 .defaultScrollAnchor(.bottom)
@@ -134,7 +133,7 @@ struct T3ThreadScreen: View {
                 composer
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 6)
         }
         // T3's iOS header (`ios-thread.png`) drawn in the content — the
         // system bar squeezes a leading title into a glass pill on iOS 26
@@ -301,7 +300,8 @@ struct T3ThreadScreen: View {
                         editor.padding(.horizontal, 4)
                         sendButton
                     }
-                    .padding(6)
+                    // 44 pt buttons in a 48 pt capsule (`ios-thread.png`).
+                    .padding(2)
                 }
             }
             .background(t3.mobile.input.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -487,6 +487,8 @@ struct T3MessageRow: View {
                 HStack(spacing: 4) { copyButton; stamp }
                     .padding(.top, 4)
             }
+            // T3's assistant row sits 4 pt inside the feed's 16 (`px-1`).
+            .padding(.horizontal, 4)
             .padding(.bottom, 20)
         }
     }

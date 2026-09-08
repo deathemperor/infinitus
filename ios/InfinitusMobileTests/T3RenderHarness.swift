@@ -48,6 +48,37 @@ import InfinitusUI
         return .init(timeline: timeline, facts: facts, epoch: "e", sequence: 9, synchronized: true)
     }
 
+    /// The parity fixture (spec §3.6, tools/t3ref/fixture.sh): one thread
+    /// "Hi" in `limitless`, the "Hi" pair at 3:42 PM, nothing pending —
+    /// what `refs/ios-thread.png` and `refs/ios-home.png` show.
+    static let parityAt: Date = {
+        var c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        c.hour = 15; c.minute = 42
+        return Calendar.current.date(from: c)!
+    }()
+
+    static func parityThread() -> TimelineFollower.State {
+        let timeline = SessionTimeline(
+            turns: [.init(id: "t1", state: .completed, requestedAt: parityAt, startedAt: parityAt, completedAt: parityAt,
+                          userMessageId: "u1", assistantMessageId: "a1")],
+            messages: [
+                .init(id: "u1", role: .user, text: "Hi", images: nil, sender: nil, turnId: "t1", streaming: false, createdAt: parityAt),
+                .init(id: "a1", role: .assistant, text: "Hi. Ready when you are — what's the task?", images: nil,
+                      sender: nil, turnId: "t1", streaming: false, createdAt: parityAt),
+            ],
+            activities: [])
+        let facts = SessionFacts(status: .ready, hasPendingApprovals: false, hasPendingUserInput: false, hasPlan: false,
+                                 latestTurn: timeline.turns.last, planProgress: nil, latestUserMessageAt: parityAt,
+                                 settledOverride: nil, settledAt: nil, unsettledAt: nil, snoozedUntil: nil, snoozedAt: nil, pinnedAt: nil)
+        return .init(timeline: timeline, facts: facts, epoch: "e", sequence: 1, synchronized: true)
+    }
+
+    static let parityHome: [T3HomeEntry] = [
+        T3HomeEntry(session: SessionDetail(pid: 4243, cwd: "/tmp/t3fix/proj/limitless", status: "waiting", kind: "claude", startedAt: 0),
+                    macId: nil, title: "Hi", repo: "limitless", branch: nil, macLabel: nil, status: .ready, pinnedAt: nil,
+                    snoozed: false, settled: false, lastActivity: Date().addingTimeInterval(-21 * 3600 - 60)),
+    ]
+
     static let homeEntries: [T3HomeEntry] = {
         func e(_ pid: Int, _ title: String, _ repo: String, _ branch: String?, _ status: SessionListPresentation.Attention,
                ago: Double, pinned: Bool = false, snoozed: Bool = false, settled: Bool = false) -> T3HomeEntry {
@@ -125,6 +156,20 @@ import InfinitusUI
             let sheet = T3SettingsSheet(model: model).t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
             try Self.attach(name: "settings-\(scheme == .dark ? "dark" : "light")", png: Self.render(sheet), dir: dir, test: self)
         }
+        // Parity captures against tools/t3ref/refs (compare with
+        // tools/t3ref/compare-harness.sh, status bar masked).
+        let paritySession = SessionDetail(pid: 4243, cwd: "/tmp/t3fix/proj/limitless", status: "waiting", kind: "claude", startedAt: 0)
+        model.sessionProgress.apply([4243: SessionProgress(name: "Hi")], tokenRate: nil)
+        let parityThread = NavigationStack {
+            T3ThreadScreen(model: model, session: paritySession, fixture: Self.parityThread())
+        }
+        .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "parity-thread", png: Self.render(parityThread), dir: dir, test: self)
+        let parityHome = NavigationStack {
+            T3HomeBody(entries: Self.parityHome, connection: .reconnecting(""), open: { _ in }, compose: {}, settings: {})
+        }
+        .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "parity-home", png: Self.render(parityHome), dir: dir, test: self)
         let macsPage = T3SettingsSheet(model: model, path: [.macs]).t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "settings-macs-light", png: Self.render(macsPage), dir: dir, test: self)
         let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
@@ -183,7 +228,11 @@ import InfinitusUI
         for _ in 0..<12 {
             let deadline = Date().addingTimeInterval(0.4)
             while Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
-            let image = UIGraphicsImageRenderer(bounds: bounds).image { _ in
+            // 8-bit sRGB: the default extended range writes 16-bit PNGs,
+            // which tools/t3ref/compare.py (stdlib-only) can't decode.
+            let format = UIGraphicsImageRendererFormat.default()
+            format.preferredRange = .standard
+            let image = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
                 window.drawHierarchy(in: bounds, afterScreenUpdates: true)
             }
             png = try XCTUnwrap(image.pngData())

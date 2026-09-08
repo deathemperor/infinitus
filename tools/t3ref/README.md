@@ -24,6 +24,7 @@ Reference versions (spec §0):
 | `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
 | `capture-ios.sh` | `capture-ios.sh <screen> <out.png>` — deep-links the T3 dev client in the booted simulator and screenshots it. |
 | `capture-ours.sh` | `capture-ours.sh <mac\|ios> <screen> <out.png>` — the same screen in Infinitus. |
+| `compare-harness.sh` | `compare-harness.sh <thread\|home> [shots-dir]` — the phone's number from the render harness's `parity-*` shots (InfinitusMobile tests) against `refs/ios-<screen>.png`, the status bar masked. No fixture app or pairing needed. |
 | `refs/` | The committed reference PNGs B and C diff against. |
 
 `compare.py` is pure Python 3 stdlib on purpose (no wheels on a fresh
