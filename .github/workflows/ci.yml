@@ -90,6 +90,8 @@ jobs:
   # on one simulator; no signing, no device.
   ios:
     runs-on: macos-26
+    # A wedged simulator must not hold main's merges (ios is required).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
@@ -102,9 +104,14 @@ jobs:
           -destination 'generic/platform=iOS Simulator' -derivedDataPath ../.build/ios
           CODE_SIGNING_ALLOWED=NO build
         working-directory: ios
+      # Whatever iPhone simulator this Xcode ships, by id — device names
+      # change with every runner image.
+      - run: >
+          echo "SIM_ID=$(xcrun simctl list devices available -j
+          | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid')" >> "$GITHUB_ENV"
       - run: >
           xcodebuild -quiet -project InfinitusMobile.xcodeproj -scheme InfinitusMobile
-          -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath ../.build/ios
+          -destination "id=$SIM_ID" -derivedDataPath ../.build/ios
           CODE_SIGNING_ALLOWED=NO test
         working-directory: ios
   # Known red today: CZlib's module map includes <zlib.h>, which no
