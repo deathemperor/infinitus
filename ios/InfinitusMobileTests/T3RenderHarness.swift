@@ -48,6 +48,24 @@ import InfinitusUI
         return .init(timeline: timeline, facts: facts, epoch: "e", sequence: 9, synchronized: true)
     }
 
+    static let homeEntries: [T3HomeEntry] = {
+        func e(_ pid: Int, _ title: String, _ repo: String, _ branch: String?, _ status: SessionListPresentation.Attention,
+               ago: Double, pinned: Bool = false, snoozed: Bool = false, settled: Bool = false) -> T3HomeEntry {
+            T3HomeEntry(session: SessionDetail(pid: pid, cwd: "/Users/dev/" + repo, status: "busy", kind: "claude", startedAt: 0),
+                        macId: nil, title: title, repo: repo, branch: branch, macLabel: "Studio", status: status,
+                        pinnedAt: pinned ? Date() : nil, snoozed: snoozed, settled: settled,
+                        lastActivity: Date().addingTimeInterval(-ago))
+        }
+        return [
+            e(1, "Why does the sessions list flicker when a row settles?", "limitless", "t3-c6", .working, ago: 120),
+            e(2, "Allow the deploy script to run", "banyan", "main", .approval, ago: 600, pinned: true),
+            e(3, "Which fix do you want?", "limitless", "t3-c5", .input, ago: 3_900),
+            e(4, "Rename the accounts pane fields", "limitless", "accounts-click-latency", .ready, ago: 75_600),
+            e(5, "Hi", "limitless", nil, .ready, ago: 172_800, settled: true),
+            e(6, "Investigate the AWS login banner", "banyan", "main", .ready, ago: 7_200, snoozed: true),
+        ]
+    }()
+
     static let approval = SessionTimeline.Activity(
         id: "perm:x2", tone: .approval, kind: "approval.requested", summary: "swift build", detail: nil,
         payload: ["requestId": .string("perm:x2"), "toolName": .string("Bash"), "requestType": .string("command"),
@@ -94,6 +112,14 @@ import InfinitusUI
             attachment.name = name
             attachment.lifetime = .keepAlways
             add(attachment)
+        }
+        for scheme in [ColorScheme.light, .dark] {
+            let home = NavigationStack {
+                T3HomeBody(entries: Self.homeEntries, connection: .connected("Studio"), open: { _ in }, compose: {}, settings: {},
+                           decorate: { _, row in AnyView(row.swipeActions { Button("Settle") {} }) })
+            }
+            .t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
+            try Self.attach(name: "home-\(scheme == .dark ? "dark" : "light")", png: Self.render(home), dir: dir, test: self)
         }
         let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
                                              facts: Self.conversation(running: true).facts)

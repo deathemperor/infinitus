@@ -33,8 +33,8 @@ struct T3ApprovalCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(t3.mobile.cardAlt.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(t3.mobile.border.color, lineWidth: 1))
+        .background(t3.mobile.warning.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(t3.mobile.warningBorder.color, lineWidth: 1))
     }
 
     private func pill(_ label: String, fill: T3RGBA, text: T3RGBA, action: @escaping () -> Void) -> some View {

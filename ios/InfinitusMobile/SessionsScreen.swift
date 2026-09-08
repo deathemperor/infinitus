@@ -34,6 +34,11 @@ struct SessionsScreen: View {
                 .sheet(isPresented: $startSheet) {
                     if model.t3Screens { T3NewTaskSheet(model: model) } else { StartSessionSheet(model: model) }
                 }
+                .sheet(item: $awsLoginItem) { AwsLoginScreen(item: $0) }
+                // A cold launch from the notification asks before the first
+                // snapshot is in; the request waits for the login to appear.
+                .onChange(of: model.requestedAwsLogin) { _, _ in openRequestedAwsLogin() }
+                .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedAwsLogin() }
                 .navigationDestination(for: PastSessionsRoute.self) { _ in
                     PastSessionsScreen(model: model)
                 }
@@ -117,7 +122,12 @@ struct SessionsScreen: View {
     }
 
     @ViewBuilder private var content: some View {
-        if !fleetsWithSessions.isEmpty || !othersWithSessions.isEmpty {
+        if model.t3Screens {
+            // The new Home (T3 clone C-6): its own header and bottom bar,
+            // the stack's destinations and sheets shared with the list.
+            T3HomeList(model: model, path: $path, startSheet: $startSheet, awsLogin: { awsLoginItem = $0 })
+                .t3(platform: .mobile)
+        } else if !fleetsWithSessions.isEmpty || !othersWithSessions.isEmpty {
             ScrollViewReader { proxy in
                 List {
                     awsLoginSection
@@ -137,11 +147,6 @@ struct SessionsScreen: View {
                 }
                 .onChange(of: model.others.map { $0.snapshot?.capturedAt }) { _, _ in scrollToRequestedMac(proxy) }
             }
-            .sheet(item: $awsLoginItem) { AwsLoginScreen(item: $0) }
-            // A cold launch from the notification asks before the first
-            // snapshot is in; the request waits for the login to appear.
-            .onChange(of: model.requestedAwsLogin) { _, _ in openRequestedAwsLogin() }
-            .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedAwsLogin() }
         } else if !model.fleets.isEmpty {
             ThemedPlaceholder(theme: model.rowTheme, key: "noSessions", plainSymbol: "brain",
                               description: "Nothing is running on the Mac right now.")
@@ -168,7 +173,7 @@ struct SessionsScreen: View {
                             Image(systemName: "key.fill").foregroundStyle(.orange)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.sessionLabel ?? "Profile \(item.profile)").font(.headline)
-                                Text("profile \(item.profile) · \(awsPhase(item))")
+                                Text("profile \(item.profile) · \(Self.awsPhase(item))")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -308,7 +313,7 @@ struct SessionsScreen: View {
         awsLoginItem = item
     }
 
-    private func awsPhase(_ item: AwsLogin.Item) -> String {
+    static func awsPhase(_ item: AwsLogin.Item) -> String {
         switch item.state?.phase {
         case nil: return "tap to sign in"
         case .starting: return "starting"
