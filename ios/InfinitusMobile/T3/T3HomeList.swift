@@ -108,6 +108,10 @@ struct T3HomeList: View {
                    pastSessions: { path.append(PastSessionsRoute()) },
                    awsLogins: model.awsLogins, awsLogin: awsLogin,
                    decorate: { e, item, row in AnyView(row.modifier(T3HomeSwipe(model: model, entry: e, item: item))) })
+            // The Mac computes facts only for leased sessions; the list holds
+            // the fleet lease the grouped screen held.
+            .onAppear { LeaseReporter.shared.acquire(.sessions, on: .everyMac) }
+            .onDisappear { LeaseReporter.shared.release(.sessions, on: .everyMac) }
     }
 }
 
