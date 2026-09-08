@@ -345,4 +345,103 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertTrue(tl.activities.isEmpty)
         XCTAssertEqual(tl.turns.map(\.id), ["u1"])
     }
+
+    // MARK: Task B-1 — Message.updatedAt, tool.started/completed command + toolCallId
+
+    private func iso(_ ms: Int) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
+    }
+    private func jsonLine(_ obj: [String: Any]) -> String {
+        String(data: try! JSONSerialization.data(withJSONObject: obj), encoding: .utf8)!
+    }
+    private func user(_ uuid: String, _ text: String, at ms: Int) -> String {
+        jsonLine(["type": "user", "uuid": uuid, "timestamp": iso(ms), "message": ["content": text]])
+    }
+    private func assistantText(_ uuid: String, _ text: String, at ms: Int) -> String {
+        jsonLine(["type": "assistant", "uuid": uuid, "timestamp": iso(ms),
+                   "message": ["content": [["type": "text", "text": text]]]])
+    }
+    private func toolUse(_ id: String, name: String, input: [String: Any], at ms: Int) -> String {
+        jsonLine(["type": "assistant", "uuid": "a:\(id)", "timestamp": iso(ms),
+                   "message": ["content": [["type": "tool_use", "id": id, "name": name, "input": input]]]])
+    }
+    private func toolResult(_ toolUseId: String, _ content: String, at ms: Int) -> String {
+        jsonLine(["type": "user", "uuid": "r:\(toolUseId)", "timestamp": iso(ms),
+                   "message": ["content": [["type": "tool_result", "tool_use_id": toolUseId, "content": content]]]])
+    }
+
+    func testAssistantMessageUpdatedAtAdvancesWithStreamedBlocks() throws {
+        let t = build(lines([
+            user("u1", "Hi", at: 1_000),
+            assistantText("a1", "One", at: 2_000),
+            assistantText("a2", "Two", at: 5_000),
+        ]))
+        let m = try XCTUnwrap(t.messages.first { $0.role == .assistant })
+        XCTAssertEqual(m.createdAt, Date(timeIntervalSince1970: 2))
+        XCTAssertEqual(m.updatedAt, Date(timeIntervalSince1970: 5))
+        XCTAssertEqual(m.text, "One\n\nTwo")
+    }
+
+    func testAssistantMessageUpdatedAtNeverMovesBackwards() throws {
+        let t = build(lines([
+            user("u1", "Hi", at: 1_000),
+            assistantText("a1", "One", at: 5_000),
+            assistantText("a2", "Two", at: 2_000),
+        ]))
+        let m = try XCTUnwrap(t.messages.first { $0.role == .assistant })
+        XCTAssertEqual(m.updatedAt, Date(timeIntervalSince1970: 5))
+    }
+
+    func testUserMessageUpdatedAtEqualsCreatedAt() throws {
+        let t = build(lines([user("u1", "Hi", at: 1_000)]))
+        let m = try XCTUnwrap(t.messages.first)
+        XCTAssertEqual(m.updatedAt, m.createdAt)
+    }
+
+    func testMessageDecodesWithoutUpdatedAt() throws {
+        let json = """
+        {"id":"m","role":"user","text":"x","turnId":"t","streaming":false,"createdAt":"2026-01-01T00:00:00Z"}
+        """
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        let m = try d.decode(SessionTimeline.Message.self, from: Data(json.utf8))
+        XCTAssertEqual(m.updatedAt, m.createdAt)
+    }
+
+    func testMessageRoundTripsWithUpdatedAtDifferentFromCreatedAt() throws {
+        let m = SessionTimeline.Message(id: "m", role: .assistant, text: "x", images: nil, sender: nil,
+                                        turnId: "t", streaming: false,
+                                        createdAt: Date(timeIntervalSince1970: 1_000),
+                                        updatedAt: Date(timeIntervalSince1970: 2_000))
+        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        let decoded = try d.decode(SessionTimeline.Message.self, from: e.encode(m))
+        XCTAssertEqual(decoded, m)
+        XCTAssertNotEqual(decoded.updatedAt, decoded.createdAt)
+    }
+
+    func testBashToolStartedCarriesCommandAndToolCallId() throws {
+        let t = build(lines([
+            user("u1", "run", at: 1_000),
+            toolUse("tu1", name: "Bash", input: ["command": "ls -la", "description": "list"], at: 2_000),
+            toolResult("tu1", "a\nb", at: 3_000),
+        ]))
+        let started = try XCTUnwrap(t.activities.first { $0.kind == "tool.started" })
+        XCTAssertEqual(started.payload["command"]?.stringValue, "ls -la")
+        XCTAssertEqual(started.payload["toolCallId"]?.stringValue, "tu1")
+        let completed = try XCTUnwrap(t.activities.first { $0.kind == "tool.completed" })
+        XCTAssertEqual(completed.payload["toolCallId"]?.stringValue, "tu1")
+        XCTAssertEqual(completed.payload["command"]?.stringValue, "ls -la")
+    }
+
+    func testNonBashToolStartedHasNoCommandKey() throws {
+        let t = build(lines([
+            user("u1", "read", at: 1_000),
+            toolUse("tu2", name: "Read", input: ["file_path": "/a/b.swift"], at: 2_000),
+        ]))
+        let started = try XCTUnwrap(t.activities.first { $0.kind == "tool.started" })
+        XCTAssertNil(started.payload["command"])
+        XCTAssertEqual(started.payload["toolCallId"]?.stringValue, "tu2")
+    }
 }

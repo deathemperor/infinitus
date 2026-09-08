@@ -98,7 +98,7 @@ final class T3TimelineEntryTests: XCTestCase {
                                            turnId: "u1", streaming: false, createdAt: at)
         let assistant = SessionTimeline.Message(id: "a1", role: .assistant, text: "done", images: nil, sender: nil,
                                                 turnId: "u1", streaming: true, createdAt: at)
-        // Documented divergence: SessionTimeline.Message has no updatedAt.
+        // Neither message here passes updatedAt, so it defaults to createdAt.
         XCTAssertEqual(T3ChatMessage(message: user).updatedAt, at)
         XCTAssertEqual(T3ChatMessage(message: user).role, .user)
         XCTAssertNil(T3ChatMessage(message: user).turnId)      // user messages carry no turn
@@ -256,5 +256,15 @@ final class T3TimelineEntryTests: XCTestCase {
         // Once the session stops working the turn folds and no active live row
         // survives at all (this half already held before the fix).
         XCTAssertFalse(liveRows(isWorking: false).contains { $0.active })
+    }
+
+    func testChatMessageUpdatedAtComesFromMessage() {
+        let m = SessionTimeline.Message(id: "a", role: .assistant, text: "x", images: nil, sender: nil,
+                                        turnId: "t", streaming: false,
+                                        createdAt: Date(timeIntervalSince1970: 10),
+                                        updatedAt: Date(timeIntervalSince1970: 40))
+        let c = T3ChatMessage(message: m)
+        XCTAssertEqual(c.createdAt, Date(timeIntervalSince1970: 10))
+        XCTAssertEqual(c.updatedAt, Date(timeIntervalSince1970: 40))
     }
 }
