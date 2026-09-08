@@ -28,6 +28,20 @@ final class TimelineCacheTests: XCTestCase {
         XCTAssertEqual(cache.parses, 1)
     }
 
+    func testNarrowWindowSlotWidensOnceForAWatchedAsk() throws {
+        _ = try write([prompt, reply], sessionId: "s1")
+        let record = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle")
+        let cache = TimelineCache()
+        let narrow = SessionFeedReader.tailBytes, wide = SessionFeedReader.tailBytesMax
+        XCTAssertNotNil(cache.timeline(record: record, claudeDir: root, maxBytes: narrow))
+        XCTAssertNotNil(cache.timeline(record: record, claudeDir: root, maxBytes: narrow))
+        XCTAssertEqual(cache.parses, 1, "a narrow ask reuses the narrow slot")
+        XCTAssertNotNil(cache.timeline(record: record, claudeDir: root, maxBytes: wide))
+        XCTAssertEqual(cache.parses, 2, "a wider ask rebuilds")
+        XCTAssertNotNil(cache.timeline(record: record, claudeDir: root, maxBytes: narrow))
+        XCTAssertEqual(cache.parses, 2, "the wide slot answers a narrow ask")
+    }
+
     func testChangedTranscriptOrStatusReparses() throws {
         let url = try write([prompt], sessionId: "s1")
         let busy = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")

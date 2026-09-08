@@ -8,7 +8,7 @@ import Foundation
 /// rebuild and facts change is numbered into the `SequenceLog` when one
 /// is attached (#223 phase 4).
 public final class TimelineCache: @unchecked Sendable {
-    private struct Slot { let stamp: String; let pid: Int32; let timeline: SessionTimeline }
+    private struct Slot { let stamp: String; let pid: Int32; let timeline: SessionTimeline; let maxBytes: Int }
     private let lock = NSLock()
     private var slots: [String: Slot] = [:]
     private var sessionByPid: [Int32: String] = [:]
@@ -19,10 +19,14 @@ public final class TimelineCache: @unchecked Sendable {
 
     public init(limit: Int = 30, log: SequenceLog? = nil) { self.limit = limit; self.log = log }
 
-    public func timeline(record: ClaudeSessionRecord, claudeDir: URL) -> SessionTimeline? {
+    /// `maxBytes`: how far the transcript's tail window may grow for this
+    /// build (#346). A slot built with a wider window answers a narrower
+    /// ask unchanged; a narrower slot is rebuilt for a wider one.
+    public func timeline(record: ClaudeSessionRecord, claudeDir: URL,
+                         maxBytes: Int = SessionFeedReader.tailBytesMax) -> SessionTimeline? {
         let stamp = SessionFeedReader.stamp(record: record, claudeDir: claudeDir)
         lock.lock()
-        if let slot = slots[record.sessionId], slot.stamp == stamp {
+        if let slot = slots[record.sessionId], slot.stamp == stamp, slot.maxBytes >= maxBytes {
             lock.unlock()
             return slot.timeline
         }
@@ -33,13 +37,13 @@ public final class TimelineCache: @unchecked Sendable {
         }
         let previous = slots[record.sessionId]?.timeline
         lock.unlock()
-        guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit),
+        guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit, maxBytes: maxBytes),
               let timeline = feed.timeline else { return nil }
         // The feed's own stamp, taken after the read: a write that lands
         // between the stat above and the read is re-parsed next pass.
         lock.lock()
         parses += 1
-        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", pid: record.pid, timeline: timeline)
+        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", pid: record.pid, timeline: timeline, maxBytes: maxBytes)
         sessionByPid[record.pid] = record.sessionId
         lock.unlock()
         _ = log?.record(pid: record.pid, old: previous, new: timeline)
@@ -51,12 +55,20 @@ public final class TimelineCache: @unchecked Sendable {
     /// transcript). Sessions absent from `roster` (default: `records`)
     /// have left and are evicted; a leased subset (#223 phase 5) passes
     /// the full roster so the others keep their slots and rings.
+    /// `watched`: the pids someone has open (a `session` lease); their
+    /// timelines build with the full window, everyone else's with the
+    /// first 256 KB of tail — a row's status, plan step and parked
+    /// prompt live there, and a busy session's transcript moves every
+    /// pass, so the wide re-parse was most of the app's idle CPU (#346).
+    /// nil keeps every record on the full window.
     public func facts(records: [ClaudeSessionRecord], claudeDir: URL, attention: AttentionStore,
-                      roster: [ClaudeSessionRecord]? = nil,
+                      roster: [ClaudeSessionRecord]? = nil, watched: Set<Int32>? = nil,
                       pending: (Int32) -> [PendingRequest]) -> [Int: SessionFacts] {
         var out: [Int: SessionFacts] = [:]
         for record in records where !record.sessionId.isEmpty {
-            guard let timeline = timeline(record: record, claudeDir: claudeDir) else { continue }
+            let wide = watched?.contains(record.pid) ?? true
+            let cap = wide ? SessionFeedReader.tailBytesMax : SessionFeedReader.tailBytes
+            guard let timeline = timeline(record: record, claudeDir: claudeDir, maxBytes: cap) else { continue }
             let facts = SessionFacts.derive(timeline: timeline.appending(pending: pending(record.pid)),
                                             status: record.status,
                                             attention: attention.entry(sessionId: record.sessionId))
