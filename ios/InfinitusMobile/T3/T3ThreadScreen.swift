@@ -128,6 +128,7 @@ struct T3ThreadScreen: View {
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
             follower.start()
+            LeaseReporter.shared.acquire(.session(Int32(session.pid)), on: .mac(macId))
             // `infinitus://t3/git|thread-settings` (the parity capture) lands on
             // the thread with that sheet up.
             switch model.requestedThreadSheet {
@@ -137,7 +138,10 @@ struct T3ThreadScreen: View {
             }
             model.requestedThreadSheet = nil
         }
-        .onDisappear { follower.stop() }
+        .onDisappear {
+            follower.stop()
+            LeaseReporter.shared.release(.session(Int32(session.pid)), on: .mac(macId))
+        }
         // A PhotosPicker inside a Menu never presents (the menu dismisses
         // first) — same modifier pattern as the feed's composer.
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems,
