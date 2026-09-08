@@ -774,6 +774,10 @@ final class TeamModel: ObservableObject {
         do {
             return try await run { paths, secrets in
                 guard let client = try Self.openClient(paths, secrets) else { return [] }
+                // The sender's transcript branch is not part of the routine
+                // sync (#321); pull it now, and read what is local if the
+                // store is unreachable.
+                try? client.fetchTranscripts(from: kid)
                 return try TeamReader.load(client: client).transcript(kid: kid, session: session, client: client, limit: 400)
             }
         } catch {

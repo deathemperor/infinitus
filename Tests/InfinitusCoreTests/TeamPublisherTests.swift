@@ -96,9 +96,10 @@ final class TeamPublisherTests: XCTestCase {
         src.grantsTo = [TeamDocs.GrantHint(audience: .leaders, sessions: nil, capabilities: ["send"])]
         let report = try publisher.publish(sources: src)
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         XCTAssertEqual(Set(report.published), [
             me + "days/2026-09-04.json", me + "sessions/index.json", me + "now.json", me + "crashes.json",
-            me + "transcripts/s1/1.jsonl", me + "transcripts/s1/subagents/agent-a1/1.jsonl",
+            mine + "transcripts/s1/1.jsonl", mine + "transcripts/s1/subagents/agent-a1/1.jsonl",
         ])
         XCTAssertEqual(report.transcriptChunks, 2)
 
@@ -108,7 +109,7 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(Set(dayHeader.to.map(\.kid)), [t.leader.identity.kid, t.alice.identity.kid, t.bob.identity.kid])
         XCTAssertEqual(Set(try t.bob.readable().map(\.path)), [me + "days/2026-09-04.json", me + "sessions/index.json"])
         XCTAssertFalse(try t.leader.readable().map(\.path).contains(me + "sessions/index.json"))
-        let chunkHeader = try header(t.leader, me + "transcripts/s1/1.jsonl")
+        let chunkHeader = try header(t.leader, mine + "transcripts/s1/1.jsonl")
         XCTAssertEqual(Set(chunkHeader.to.map(\.kid)), [t.leader.identity.kid, t.alice.identity.kid])
 
         // Excluded project: no day contribution, no session row, no transcript, no live session.
@@ -130,7 +131,7 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertFalse(try t.leader.readable().map(\.path).contains { $0.contains("/s2/") })
 
         // Redacted before sealing; the local copy is the redacted text too.
-        let chunk = String(decoding: try t.leader.read(me + "transcripts/s1/1.jsonl").1, as: UTF8.self)
+        let chunk = String(decoding: try t.leader.read(mine + "transcripts/s1/1.jsonl").1, as: UTF8.self)
         XCTAssertFalse(chunk.contains("sk-ant"))
         XCTAssertTrue(chunk.contains("[redacted-key]"))
         let copy = try String(contentsOf: publisher.copiesDir.appendingPathComponent("transcripts/s1/1.jsonl"), encoding: .utf8)
@@ -149,7 +150,7 @@ final class TeamPublisherTests: XCTestCase {
         try handle.write(contentsOf: Data(#"{"type":"assistant","timestamp":"2026-09-04T12:00:09.000Z","message":{"id":"a9","model":"claude-opus-5","usage":{"input_tokens":7,"output_tokens":1},"content":[{"type":"text","text":"more"}]}}"#.utf8 + [UInt8(ascii: "\n")]))
         try handle.close()
         let third = try publisher.publish(sources: sources(projects))
-        XCTAssertTrue(third.published.contains(me + "transcripts/s1/2.jsonl"))
+        XCTAssertTrue(third.published.contains(mine + "transcripts/s1/2.jsonl"))
         XCTAssertTrue(third.published.contains(me + "days/2026-09-04.json"))
         XCTAssertEqual(third.transcriptChunks, 1)
         XCTAssertEqual(TeamPublishState.load(teamDir: teamDir).transcripts["s1"]?.seq, 2)
@@ -178,6 +179,7 @@ final class TeamPublisherTests: XCTestCase {
         let later = Date(timeIntervalSince1970: 1_789_000_000)
         let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s, now: later)
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         XCTAssertEqual(report.transcriptChunks, 0)
         XCTAssertTrue(report.published.contains(me + "days/2026-09-04.json"))
         XCTAssertFalse(report.published.contains { $0.contains("/transcripts/") })
@@ -195,8 +197,10 @@ final class TeamPublisherTests: XCTestCase {
         let before = try commits(remote)
         let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s)
         XCTAssertEqual(report.transcriptChunks, 3)   // s1, its sub-agent, s2
-        // Three transcript batches (the whole-object files ride the first) → three commits, not one.
-        XCTAssertEqual(try commits(remote) - before, 3)
+        // Three transcript batches → three commits on t/, plus one on m/ for
+        // the whole-object files riding the first batch (#321: one commit
+        // per branch a batch touches) — not one commit for everything.
+        XCTAssertEqual(try commits(remote) - before, 4)
         XCTAssertEqual(Set(report.published).count, report.published.count)
         XCTAssertEqual(TeamPublishState.load(teamDir: t.alicePaths.teamDir(t.alice.config.id)).transcripts.count, 3)
     }
@@ -204,6 +208,7 @@ final class TeamPublisherTests: XCTestCase {
     func testHeaderScanRemembersHeadersByBlobVersion() throws {
         let t = try team()
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         try t.alice.publish(kind: "now", path: "now.json", plaintext: Data("{}".utf8), audience: .leaders, now: 5_000)
         _ = try t.leader.fetch()
         let first = try XCTUnwrap(try t.leader.readableHeaders().first { $0.entry.path == me + "now.json" })
@@ -230,19 +235,24 @@ final class TeamPublisherTests: XCTestCase {
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
         _ = try publisher.publish(sources: sources(projects))
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         _ = try t.leader.fetch()
-        XCTAssertFalse(try header(t.leader, me + "transcripts/s1/1.jsonl").to.contains { $0.kid == t.bob.identity.kid })
+        XCTAssertFalse(try header(t.leader, mine + "transcripts/s1/1.jsonl").to.contains { $0.kid == t.bob.identity.kid })
 
         try t.leader.promote(kid: t.bob.identity.kid, now: 2_000)
         _ = try t.alice.fetch()
         let report = try publisher.reshare(days: 10_000)
         XCTAssertEqual(Set(report.published), [
             me + "days/2026-09-04.json", me + "sessions/index.json", me + "crashes.json",
-            me + "transcripts/s1/1.jsonl", me + "transcripts/s1/subagents/agent-a1/1.jsonl",
+            mine + "transcripts/s1/1.jsonl", mine + "transcripts/s1/subagents/agent-a1/1.jsonl",
         ])   // never now.json: live state is stale by definition and is gone after quit
         _ = try t.bob.fetch()
-        XCTAssertTrue(try header(t.bob, me + "transcripts/s1/1.jsonl").to.contains { $0.kid == t.bob.identity.kid })
-        XCTAssertFalse(String(decoding: try t.bob.read(me + "transcripts/s1/1.jsonl").1, as: UTF8.self).contains("sk-ant"))
+        // Alice's `now.json` hint was sealed before Bob led, so his routine
+        // fetch skips her transcript branch until her next publish; a
+        // transcript view pulls it on demand meanwhile (#321).
+        try t.bob.fetchTranscripts(from: t.alice.identity.kid)
+        XCTAssertTrue(try header(t.bob, mine + "transcripts/s1/1.jsonl").to.contains { $0.kid == t.bob.identity.kid })
+        XCTAssertFalse(String(decoding: try t.bob.read(mine + "transcripts/s1/1.jsonl").1, as: UTF8.self).contains("sk-ant"))
         // A zero-day window re-shares nothing.
         XCTAssertEqual(try publisher.reshare(days: 0, now: Date(timeIntervalSince1970: 4_000_000_000)).published, [])
     }
@@ -300,6 +310,7 @@ final class TeamPublisherTests: XCTestCase {
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
         _ = try publisher.publish(sources: sources(projects))   // one pass with everything on
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
 
         var shares = TeamShares()
         shares.byKind[TeamKinds.stats] = .team
@@ -344,6 +355,7 @@ final class TeamPublisherTests: XCTestCase {
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
         _ = try publisher.publish(sources: sources(projects))
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         _ = try t.leader.fetch()
         XCTAssertTrue(try t.leader.readable().map(\.path).contains(me + "now.json"))
 
@@ -370,6 +382,7 @@ final class TeamPublisherTests: XCTestCase {
             .init(label: "acct-1", tier: "Max", status: "ok", active: true, windows: [.init(label: "5h", pct: 40)], models: [])])
         s.fleetRows = [row]
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         let first = try publisher.publish(sources: s, now: Date(timeIntervalSince1970: 1_000))
         XCTAssertTrue(first.published.contains(me + "fleet.json"))
         _ = try t.leader.fetch()
@@ -407,8 +420,9 @@ final class TeamPublisherTests: XCTestCase {
         s.cacheURL = cacheURL   // the picker reads what this publish writes
         let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s)
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         XCTAssertEqual(Set(report.published.filter { $0.contains("/transcripts/") }),
-                       [me + "transcripts/s1/1.jsonl", me + "transcripts/s1/subagents/agent-a1/1.jsonl"])
+                       [mine + "transcripts/s1/1.jsonl", mine + "transcripts/s1/subagents/agent-a1/1.jsonl"])
         XCTAssertEqual(report.transcriptChunks, 2, "s2 was not picked; s1's sub-agent rides s1's choice")
         // The unchosen session still contributes its day and its row.
         let index = try CanonicalJSON.decode(TeamDocs.SessionsIndex.self, from: try t.alice.read(me + "sessions/index.json").1)
@@ -443,9 +457,10 @@ final class TeamPublisherTests: XCTestCase {
         s.cacheURL = scratch.appendingPathComponent("never.json")
         let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s)
         let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
         XCTAssertEqual(Set(report.published), [
             me + "days/2026-09-04.json", me + "sessions/index.json", me + "now.json", me + "crashes.json",
-            me + "transcripts/s1/1.jsonl", me + "transcripts/s1/subagents/agent-a1/1.jsonl", me + "transcripts/s2/1.jsonl",
+            mine + "transcripts/s1/1.jsonl", mine + "transcripts/s1/subagents/agent-a1/1.jsonl", mine + "transcripts/s2/1.jsonl",
         ])
         XCTAssertFalse(FileManager.default.fileExists(atPath: s.cacheURL!.path))
         // The picker lists the same sessions off the same entries.
@@ -532,7 +547,8 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertTrue(report.stopped)
         XCTAssertEqual(report.transcriptChunks, 1)
         let me = "m/\(t.alice.identity.kid)/"
-        XCTAssertTrue(report.published.contains(me + "transcripts/s1/1.jsonl"))
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
+        XCTAssertTrue(report.published.contains(mine + "transcripts/s1/1.jsonl"))
         XCTAssertFalse(report.published.contains { $0.contains("/s2/") })
         let state = TeamPublishState.load(teamDir: t.alicePaths.teamDir(t.alice.config.id))
         XCTAssertEqual(state.transcripts.count, 1)
@@ -540,7 +556,7 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertGreaterThan(report.remainingBytes, 0, "the sources the stop never reached count whole")
         _ = try t.leader.fetch()
         XCTAssertEqual(try t.leader.readable().map(\.path).filter { $0.contains("/transcripts/") },
-                       [me + "transcripts/s1/1.jsonl"])
+                       [mine + "transcripts/s1/1.jsonl"])
         // No stop: the rest goes out, nothing is re-chunked.
         var again = sources(projects)
         again.batchBytes = 1
@@ -607,8 +623,9 @@ final class TeamPublisherTests: XCTestCase {
         // The store has exactly what a pass has always had, byte for byte.
         _ = try t.leader.fetch()
         let me = "m/\(t.alice.identity.kid)/"
-        XCTAssertTrue(try t.leader.readable().map(\.path).contains(me + "transcripts/s1/1.jsonl"))
-        let chunk = try t.leader.read(me + "transcripts/s1/1.jsonl").1
+        let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
+        XCTAssertTrue(try t.leader.readable().map(\.path).contains(mine + "transcripts/s1/1.jsonl"))
+        let chunk = try t.leader.read(mine + "transcripts/s1/1.jsonl").1
         XCTAssertTrue(String(decoding: chunk, as: UTF8.self).contains("[redacted-key]"))
         XCTAssertEqual(try t.leader.read(me + "now.json").0.kind, TeamKinds.now)
     }

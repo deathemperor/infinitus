@@ -46,7 +46,10 @@ final class TeamGitTests: XCTestCase {
         XCTAssertEqual(StorePath.branch(of: "requests/abc.json")?.branch, "requests")
         XCTAssertEqual(StorePath.branch(of: "m/abc/days/2026-09-05.json")?.branch, "m/abc")
         XCTAssertEqual(StorePath.branch(of: "m/abc/days/2026-09-05.json")?.rest, "days/2026-09-05.json")
+        XCTAssertEqual(StorePath.branch(of: "t/abc/transcripts/s1/1.jsonl")?.branch, "t/abc")
+        XCTAssertEqual(StorePath.branch(of: "t/abc/transcripts/s1/1.jsonl")?.rest, "transcripts/s1/1.jsonl")
         XCTAssertNil(StorePath.branch(of: "m/abc"))
+        XCTAssertNil(StorePath.branch(of: "t/abc"))
         XCTAssertNil(StorePath.branch(of: "other/x"))
         XCTAssertNil(StorePath.branch(of: "roster/../x"))
     }
@@ -237,13 +240,36 @@ final class TeamGitTests: XCTestCase {
         try g.open()
         try g.put("roster/team.json", Data("{}".utf8))
         try g.put("m/k/now.json", Data("n".utf8))
+        try g.put("t/k/transcripts/s1/1.jsonl", Data("c".utf8))
         // A branch the layout knows nothing about, pointing at the same tree.
         try git(["--git-dir", bare.path, "branch", "main", "roster"])
         try g.sync()
 
-        XCTAssertEqual(try g.list("").map(\.path).sorted(), ["m/k/now.json", "roster/team.json"])
-        XCTAssertEqual(try g.changes(since: nil).0.map(\.path).sorted(), ["m/k/now.json", "roster/team.json"])
+        XCTAssertEqual(try g.list("").map(\.path).sorted(), ["m/k/now.json", "roster/team.json", "t/k/transcripts/s1/1.jsonl"])
+        XCTAssertEqual(try g.changes(since: nil).0.map(\.path).sorted(), ["m/k/now.json", "roster/team.json", "t/k/transcripts/s1/1.jsonl"])
         XCTAssertNil(try g.changes(since: nil).1.heads["main"])
+    }
+
+    /// #321: a store's default branch set bounds what `sync()` pulls, and
+    /// an empty list pulls nothing rather than falling back to the
+    /// remote's own refspec (which is everything).
+    func testSyncKeepsToTheDefaultBranches() throws {
+        let remote = try makeRemote()
+        let writer = TeamGit(dir: scratch.appendingPathComponent("w"), remote: remote, token: nil, author: "w")
+        try writer.open()
+        try writer.put("roster/team.json", Data("{}".utf8))
+        try writer.put("m/a/now.json", Data("n".utf8))
+        try writer.put("t/a/transcripts/s1/1.jsonl", Data("c".utf8))
+        try writer.put("t/b/transcripts/s1/1.jsonl", Data("c".utf8))
+
+        let reader = TeamGit(dir: scratch.appendingPathComponent("r"), remote: remote, token: nil, author: "b")
+        reader.defaultBranches = ["roster", "requests", "m/", "t/b"]
+        try reader.open()
+        XCTAssertEqual(try reader.list("").map(\.path), ["m/a/now.json", "roster/team.json", "t/b/transcripts/s1/1.jsonl"])
+        try reader.sync(branches: [])
+        XCTAssertEqual(try reader.list("t/").count, 1, "an empty list fetches nothing")
+        try reader.sync(branches: ["t/a"])
+        XCTAssertEqual(try reader.list("t/").map(\.path), ["t/a/transcripts/s1/1.jsonl", "t/b/transcripts/s1/1.jsonl"])
     }
 
     /// (e) A cursor's commit can become unreachable (the remote was

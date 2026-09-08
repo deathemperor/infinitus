@@ -286,6 +286,60 @@ final class TeamClientTests: XCTestCase {
         }
     }
 
+    /// #321: transcript chunks publish to `t/<kid>`; a routine fetch pulls
+    /// that branch only for readers the sender's `now.json` hint names,
+    /// anyone else pulls it on demand, chunks from before the split still
+    /// read from `m/<kid>`, and leaving clears both branches.
+    func testTranscriptsRideTheirOwnBranchFetchedByHintOrOnDemand() throws {
+        let remote = try makeRemote()
+        let (lp, ls) = machine("leader"), (ap, asec) = machine("ann"), (bp, bs) = machine("bo")
+        let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
+        let code = try leader.code(expiresIn: 600, now: 1_000)
+        let ann = try TeamClient.request(code: code, name: "Ann", devices: [], platform: "linux", paths: ap, secrets: asec, now: 1_010)
+        let bo = try TeamClient.request(code: code, name: "Bo", devices: [], platform: "linux", paths: bp, secrets: bs, now: 1_011)
+        _ = try leader.fetch()
+        try leader.approve(kid: ann.identity.kid, now: 1_020)
+        try leader.approve(kid: bo.identity.kid, now: 1_021)
+        _ = try ann.fetch(); _ = try bo.fetch()
+        let annT = "origin/t/\(ann.identity.kid)"
+
+        // A chunk from before the split, sealed to the leaders under m/.
+        let old = "m/\(ann.identity.kid)/transcripts/s1/1.jsonl"
+        try ann.store.put(old, try Envelope.seal(Data("old\n".utf8), kind: TeamKinds.transcripts, from: ann.identity,
+                                                 to: leader.roster!.doc.recipients(for: .leaders), at: 1_025))
+        // Today's publish: the hint says transcripts reach the leaders.
+        let now = TeamDocs.Now(at: 1_030, sessions: [], fleets: [], blockers: [], crashesToday: 0,
+                               sharesTo: [TeamKinds.transcripts: .leaders])
+        let paths = try ann.publish([
+            .init(kind: TeamKinds.now, path: "now.json", plaintext: try CanonicalJSON.encode(now), audience: .team),
+            .init(kind: TeamKinds.transcripts, path: "transcripts/s1/2.jsonl", plaintext: Data("new\n".utf8), audience: .leaders),
+        ], now: 1_030)
+        let chunk = "t/\(ann.identity.kid)/transcripts/s1/2.jsonl"
+        XCTAssertEqual(paths, ["m/\(ann.identity.kid)/now.json", chunk])
+
+        // The leader's routine fetch brings Ann's transcript branch by hint…
+        _ = try leader.fetch()
+        XCTAssertTrue(remoteBranches(in: lp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
+        XCTAssertEqual(try leader.read(chunk).1, Data("new\n".utf8))
+        // …and Bo's does not: the hint names the leaders, so the bytes never move to him.
+        _ = try bo.fetch()
+        XCTAssertFalse(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        // On demand the branch arrives; the envelope still isn't his to read.
+        try bo.fetchTranscripts(from: ann.identity.kid)
+        XCTAssertTrue(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        XCTAssertThrowsError(try bo.fetchTranscripts(from: "../x"))
+
+        // Leaving clears m/ and t/ alike.
+        try ann.leave(now: 1_040)
+        try leader.fetchTranscripts(from: ann.identity.kid)
+        _ = try leader.fetch()
+        XCTAssertEqual(try leader.store.list("m/\(ann.identity.kid)/"), [])
+        XCTAssertEqual(try leader.store.list("t/\(ann.identity.kid)/"), [])
+    }
+
     /// C2: a kid names exactly one encryption key, so nobody can plant a
     /// request under someone else's kid, and a leader's kid is never
     /// re-approved as a member.

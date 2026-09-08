@@ -448,7 +448,10 @@ public struct TeamPublisher {
                                    crashesToday: crashesToday,
                                    // An older client's ShareTarget decoder throws on "off";
                                    // the hint carries only kinds that actually travel.
-                                   sharesTo: shares.byKind.filter { $0.value != .off })
+                                   // Every kind's EFFECTIVE audience, so a reader can tell
+                                   // "unset, so leaders" from "off" (#321 fetches by it).
+                                   sharesTo: Dictionary(uniqueKeysWithValues: TeamKinds.memberKinds.map { ($0, shares.target(for: $0)) })
+                                       .filter { $0.value != .off })
             doc.endpoints = sources.endpoints
             doc.grantsTo = sources.grantsTo
             try stage(TeamKinds.now, "now.json", try CanonicalJSON.encode(doc), always: true)

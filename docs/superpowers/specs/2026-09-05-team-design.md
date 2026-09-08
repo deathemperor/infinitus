@@ -147,10 +147,12 @@ Dropbox, OneDrive, iCloud Drive, NAS) and S3-compatible bucket.
   team credential the invite carries. One repo serves any team size.
 - Branches: `roster` (leaders only: `team.json`, `aggregates/…`),
   `requests` (anyone with the credential: `requests/<kid>.json`),
-  `m/<kid>` (that member only). Disjoint writers ⇒ no merge conflicts;
-  a member fetches `roster`, `requests` (leaders only), its own branch,
-  and the `m/*` branches of teammates who share to it (known from the
-  roster's `sharesTo` hints, §5).
+  `m/<kid>` (that member only; everything but transcripts — kilobytes),
+  `t/<kid>` (that member's transcript chunks, #321). Disjoint writers ⇒
+  no merge conflicts; every fetch pulls `roster`, `requests`, every
+  `m/*` and the member's own `t/<kid>`; a teammate's `t/<kid>` is
+  fetched when their `now.json` `sharesTo` hint names this reader, or
+  on demand when one of their transcripts is opened.
 - Local mirror at `App Support/Infinitus/teams/<team-id>/store/store.git`,
   a bare repo (no worktrees: reads are `cat-file`, writes are
   `commit-tree` + push), blobs only.

@@ -94,7 +94,15 @@ public final class TeamClient {
                  paths: TeamPaths, secrets: TeamSecrets, store: TeamGit) {
         self.config = config; self.identity = identity; self.roster = roster
         self.paths = paths; self.secrets = secrets; self.store = store
+        store.defaultBranches = Self.routineBranches(kid: identity.kid)
     }
+
+    /// What every fetch pulls (#321): the roster, the requests, every
+    /// member's `m/` branch (kilobytes each) and this identity's own
+    /// transcript branch — another device of ours pushes there too.
+    /// Teammates' `t/` branches come by hint (`fetch`) or on demand
+    /// (`fetchTranscripts`), never routinely.
+    static func routineBranches(kid: String) -> [String] { ["roster", "requests", "m/", "t/\(kid)"] }
 
     public static func create(name: String, remote: String, token: String?, leaderName: String = "Leader",
                               paths: TeamPaths, secrets: TeamSecrets,
@@ -204,12 +212,19 @@ public final class TeamClient {
     @discardableResult
     public func fetch() throws -> TeamRoster { try fetch(branches: nil) }
 
-    /// `branches` nil syncs every branch; a list syncs just those, which
+    /// `branches` nil syncs the routine set (`routineBranches`) and then,
+    /// for a member, the transcript branches of every teammate whose
+    /// `now.json` hint names this reader; a list syncs just those, which
     /// must include `roster` for the acceptance check below to see a
     /// new roster.
     @discardableResult
     public func fetch(branches: [String]?) throws -> TeamRoster {
         try store.sync(branches: branches)
+        defer {
+            if branches == nil, isMember, let senders = try? transcriptSenders(), !senders.isEmpty {
+                try? store.sync(branches: senders.map { "t/\($0)" })
+            }
+        }
         guard let data = try store.get("roster/team.json") else { throw ClientError.noRoster }
         let candidate = try CanonicalJSON.decode(Signed<TeamRoster>.self, from: data)
         if let roster {
@@ -258,6 +273,32 @@ public final class TeamClient {
             return
         }
         throw TeamRoster.RosterError.notALeader
+    }
+
+    /// Teammates whose `now.json` says their transcripts reach me — the
+    /// `sharesTo` hint, which names every kind's effective audience.
+    /// A hint from before that (no transcripts key) reads as the old
+    /// default, leaders: fetching an empty branch costs nothing. A member
+    /// who shares transcripts more narrowly than `now` is fetched on
+    /// demand instead.
+    func transcriptSenders() throws -> [String] {
+        guard let roster = roster?.doc else { return [] }
+        var kids: [String] = []
+        for (entry, header) in try readableHeaders()
+        where header.kind == TeamKinds.now && header.from != identity.kid {
+            guard let doc = try? CanonicalJSON.decode(TeamDocs.Now.self, from: try read(entry.path).1),
+                  roster.recipients(for: doc.sharesTo[TeamKinds.transcripts] ?? .leaders)
+                      .contains(where: { $0.kid == identity.kid }) else { continue }
+            kids.append(header.from)
+        }
+        return kids.sorted()
+    }
+
+    /// One teammate's transcript branch, now: what a transcript view
+    /// calls before reading, so a sender the hint missed still opens.
+    public func fetchTranscripts(from kid: String) throws {
+        guard Self.isPathSegment(kid) else { throw ClientError.unknownMember }
+        try store.sync(branches: ["t/\(kid)"])
     }
 
     /// The roster is computed from the roster we read, so a lost push
@@ -415,7 +456,7 @@ public final class TeamClient {
         for item in items {
             guard item.audience != .off else { throw ClientError.audienceOff }
             try drainingPool {
-                let storePath = "m/\(identity.kid)/\(item.path)"
+                let storePath = TeamKinds.storePath(item.path, kid: identity.kid)
                 try TeamKinds.check(kind: item.kind, from: identity.kid, at: storePath)
                 writes[storePath] = try Envelope.seal(item.plaintext, kind: item.kind, from: identity,
                                                       to: roster.recipients(for: item.audience), at: now)
@@ -449,7 +490,7 @@ public final class TeamClient {
     public func seal(_ item: PublishItem, to file: URL, now: Int = Int(Date().timeIntervalSince1970)) throws -> SealedItem {
         guard let roster = roster?.doc, isMember else { throw ClientError.notInTeam }
         guard item.audience != .off else { throw ClientError.audienceOff }
-        try TeamKinds.check(kind: item.kind, from: identity.kid, at: "m/\(identity.kid)/\(item.path)")
+        try TeamKinds.check(kind: item.kind, from: identity.kid, at: TeamKinds.storePath(item.path, kid: identity.kid))
         try drainingPool {
             let sealed = try Envelope.seal(item.plaintext, kind: item.kind, from: identity,
                                            to: roster.recipients(for: item.audience), at: now)
@@ -467,7 +508,7 @@ public final class TeamClient {
         var writes: [String: TeamGit.Blob?] = [:]
         var paths: [String] = []
         for item in items {
-            let storePath = "m/\(identity.kid)/\(item.path)"
+            let storePath = TeamKinds.storePath(item.path, kid: identity.kid)
             // The kind was checked when the bytes were sealed; the path's
             // shape and its owner are checked again here, because what is
             // pushed is whatever is on disk now.
@@ -500,7 +541,7 @@ public final class TeamClient {
         if rotateIdentity, paths.teamIDs().contains(where: { $0 != config.id }) { throw ClientError.identityInUse }
         try store.sync()  // list() reads local refs only; a stale tree leaves another device's files behind
         var writes: [String: Data?] = [:]
-        for entry in try store.list("m/") where entry.path.hasPrefix("m/\(identity.kid)/") {
+        for entry in try store.list("m/\(identity.kid)/") + (try store.list("t/\(identity.kid)/")) {
             // A plain `writes[entry.path] = nil` subscript-assign on a
             // `[String: Data?]` collapses the double optional and REMOVES
             // the key instead of staging a delete — `updateValue` is the
@@ -539,7 +580,7 @@ public final class TeamClient {
         let cacheURL = paths.teamDir(config.id).appendingPathComponent("headers.json")
         var cache = HeaderCache.load(cacheURL)
         var kept: [String: HeaderCache.Entry] = [:]
-        for entry in try store.list("m/") + (try store.list("roster/aggregates/")) {
+        for entry in try store.list("m/") + (try store.list("t/")) + (try store.list("roster/aggregates/")) {
             let header: Envelope.Header
             if let cached = cache.entries[entry.path], cached.version == entry.version {
                 header = cached.header

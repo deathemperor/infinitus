@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 
 ### Team
 - An invite code from either leader of a two-leader team joins, whichever leader last edited the roster — the join walks the roster's signed history back to the code's leader (#55).
+- Transcripts publish to their own branch per member, fetched only by the teammates they are shared with: every device's routine sync and a new member's first load stay in the kilobytes (#321).
 - Requesting to join fetches only the roster and the requests, not every member's transcript history — a join that pulled 1.3 GB now moves kilobytes (#321).
 - A slow store never looks hung: Team shows git's own progress, a stalled fetch or push times out with a message, and Approve no longer waits behind a running publish.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.

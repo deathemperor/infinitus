@@ -24,6 +24,22 @@ public enum TeamKinds {
     /// The kinds a member publishes about itself (§7), in table order.
     public static let memberKinds = [stats, now, sessions, transcripts, crashes, fleet]
 
+    /// The branch a member writes `kind` to (#321): transcripts go to
+    /// `t/<kid>`, fetched only by the readers their hint names, so the
+    /// routine sync of every device — and a join's first load — stays in
+    /// the kilobytes. Everything else stays on `m/<kid>`. Chunks published
+    /// before the split still sit under `m/<kid>/transcripts/` and read.
+    public static func branch(for kind: String, kid: String) -> String {
+        kind == transcripts ? "t/\(kid)" : "m/\(kid)"
+    }
+
+    /// Where the member-relative `path` lands for `kid`, by the kind its
+    /// shape names; a shape naming nothing lands under `m/`, where
+    /// `check` then refuses it.
+    public static func storePath(_ path: String, kid: String) -> String {
+        branch(for: expected(at: "m/\(kid)/\(path)")?.kind ?? "", kid: kid) + "/" + path
+    }
+
     public enum KindError: Error, Equatable { case badPath, kindMismatch, senderMismatch }
 
     /// The kind a path's shape names and, under `m/<kid>/`, the kid that
@@ -32,7 +48,7 @@ public enum TeamKinds {
     public static func expected(at path: String) -> (from: String?, kind: String)? {
         guard let (branch, rest) = StorePath.branch(of: path) else { return nil }
         let owner: String?
-        if branch.hasPrefix("m/") {
+        if branch.hasPrefix("m/") || branch.hasPrefix("t/") {
             owner = String(branch.dropFirst(2))
         } else if branch == "roster" {
             owner = nil
@@ -40,6 +56,7 @@ public enum TeamKinds {
             return nil
         }
         let parts = rest.split(separator: "/").map(String.init)
+        if branch.hasPrefix("t/"), parts.first != "transcripts" { return nil }
         switch parts.count {
         case 1 where parts[0] == "now.json":
             return (owner, now)

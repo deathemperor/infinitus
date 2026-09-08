@@ -48,9 +48,9 @@ public enum StorePath {
         case "roster", "requests":
             guard parts.count >= 2 else { return nil }
             return (parts[0], parts.dropFirst().joined(separator: "/"))
-        case "m":
+        case "m", "t":
             guard parts.count >= 3 else { return nil }
-            return ("m/" + parts[1], parts.dropFirst(2).joined(separator: "/"))
+            return (parts[0] + "/" + parts[1], parts.dropFirst(2).joined(separator: "/"))
         default:
             return nil
         }

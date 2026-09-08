@@ -96,6 +96,12 @@ public final class TeamGit: TeamStore {
     /// branch meant the leader's 1.2 GB of transcripts, twenty minutes
     /// at 1 MB/s, before the request was even pushed. Set before `open()`.
     public var firstSyncBranches: [String]?
+    /// What `sync()` fetches when the caller names no branches (nil =
+    /// every branch). `TeamClient` sets it to the roster, the requests,
+    /// every `m/*` and its own `t/<kid>` — never other members'
+    /// transcript branches, which `TeamClient.fetch` adds for the
+    /// senders whose hint names this reader (#321).
+    public var defaultBranches: [String]?
 
     public func open() throws {
         let fresh = !FileManager.default.fileExists(atPath: gitDir.appendingPathComponent("HEAD").path)
@@ -122,6 +128,10 @@ public final class TeamGit: TeamStore {
     /// exact ref: a branch nobody has pushed yet (`requests`, before the
     /// first join) then matches nothing instead of failing the fetch.
     public func sync(branches: [String]?) throws {
+        let branches = branches ?? defaultBranches
+        // No refspec at all would fall back to the remote's configured
+        // one and fetch everything.
+        if let branches, branches.isEmpty { return }
         heads = [:]
         let refspecs = branches?.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
             ?? ["+refs/heads/*:refs/remotes/origin/*"]
@@ -256,7 +266,7 @@ public final class TeamGit: TeamStore {
     private func branches() throws -> [String] {
         let text = String(decoding: try run(["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"]), as: UTF8.self)
         return text.split(separator: "\n").map { String($0.dropFirst("origin/".count)) }
-            .filter { $0 == "roster" || $0 == "requests" || $0.hasPrefix("m/") }
+            .filter { $0 == "roster" || $0 == "requests" || $0.hasPrefix("m/") || $0.hasPrefix("t/") }
     }
 
     private func head(of branch: String) throws -> String? {

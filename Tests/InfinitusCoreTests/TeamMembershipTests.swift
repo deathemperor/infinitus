@@ -98,6 +98,16 @@ final class TeamMembershipTests: XCTestCase {
         XCTAssertNil(kind("m/k/days/x/y.json"))
         XCTAssertNil(kind("requests/k.json"))
         XCTAssertNil(kind("m/k/transcripts/s1/3.json"))
+        // #321: transcripts publish to t/<kid>, which holds nothing else;
+        // chunks from before the split still read from m/<kid>.
+        XCTAssertEqual(kind("t/k/transcripts/s1/3.jsonl"), "transcripts")
+        XCTAssertEqual(kind("t/k/transcripts/s1/subagents/agent-a/1.jsonl"), "transcripts")
+        XCTAssertEqual(TeamKinds.expected(at: "t/k/transcripts/s1/3.jsonl")?.from, "k")
+        XCTAssertNil(kind("t/k/now.json"))
+        XCTAssertNil(kind("t/k/days/2026-09-05.json"))
+        XCTAssertEqual(TeamKinds.storePath("transcripts/s1/3.jsonl", kid: "k"), "t/k/transcripts/s1/3.jsonl")
+        XCTAssertEqual(TeamKinds.storePath("now.json", kid: "k"), "m/k/now.json")
+        XCTAssertEqual(TeamKinds.storePath("other.json", kid: "k"), "m/k/other.json")   // then `check` refuses it
 
         let h = Envelope.Header(v: 1, kind: "now", from: "k", eph: "", to: [], at: 1, nonce: "", sig: nil)
         XCTAssertNoThrow(try TeamKinds.check(h, at: "m/k/now.json"))

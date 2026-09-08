@@ -43,7 +43,7 @@ final class TeamReaderTests: XCTestCase {
             entry("m/\(a.kid)/now.json", kind: "now", from: a.kid, at: 50),
             entry("m/\(a.kid)/crashes.json", kind: "crashes", from: a.kid, at: 30),
             entry("m/\(a.kid)/sessions/index.json", kind: "sessions", from: a.kid, at: 50),
-            entry("m/\(a.kid)/transcripts/s1/10.jsonl", kind: "transcripts", from: a.kid, at: 60),
+            entry("t/\(a.kid)/transcripts/s1/10.jsonl", kind: "transcripts", from: a.kid, at: 60),   // after the split (#321)
             entry("m/\(a.kid)/transcripts/s1/2.jsonl", kind: "transcripts", from: a.kid, at: 55),
             entry("m/\(a.kid)/transcripts/s1/subagents/agent-a/1.jsonl", kind: "transcripts", from: a.kid, at: 56),
             entry("m/\(gone.kid)/days/2026-09-01.json", kind: "stats", from: gone.kid, at: 800),
@@ -68,7 +68,7 @@ final class TeamReaderTests: XCTestCase {
         XCTAssertEqual(reader.members[a.kid]?.crashes, ["Mac · crash · x"])
         XCTAssertEqual(reader.members[a.kid]?.sessions.map(\.id), ["s1"])
         XCTAssertEqual(reader.members[a.kid]?.transcripts["s1"],
-                       ["m/\(a.kid)/transcripts/s1/2.jsonl", "m/\(a.kid)/transcripts/s1/10.jsonl"])   // numeric seq order
+                       ["m/\(a.kid)/transcripts/s1/2.jsonl", "t/\(a.kid)/transcripts/s1/10.jsonl"])   // numeric seq order, across both branches
         XCTAssertEqual(reader.members[a.kid]?.transcripts["s1/subagents/agent-a"]?.count, 1)
         XCTAssertEqual(reader.members[a.kid]?.lastPublished, 60)
         XCTAssertEqual(reader.members[a.kid]?.kinds, ["stats", "now", "crashes", "sessions", "transcripts"])
