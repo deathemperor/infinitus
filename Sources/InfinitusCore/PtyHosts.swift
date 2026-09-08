@@ -81,6 +81,29 @@ public enum ProcessFacts {
         return tty.isEmpty || tty == "??" || tty == "-" ? nil : tty
     }
 
+    /// The session's permission-mode class from how it was launched —
+    /// the fallback when its transcript tail carries no mode
+    /// (`Transcript.peerModeClass`): `"bypass"` for
+    /// `--dangerously-skip-permissions` or `--permission-mode
+    /// bypassPermissions`, `"prompting"` for any other launch, nil when
+    /// `ps` shows nothing. A mode switched at the keyboard after launch
+    /// is missed, which only re-creates today's hold; a missing class
+    /// is held by every bypass receiver (2.1.263+).
+    public static func peerModeClass(pid: Int32) -> String? {
+        peerModeClass(command: run(["-o", "command=", "-p", String(pid)]))
+    }
+
+    static func peerModeClass(command: String) -> String? {
+        let words = command.split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
+        guard !words.isEmpty else { return nil }
+        if words.contains("--dangerously-skip-permissions") { return "bypass" }
+        for (i, word) in words.enumerated() {
+            if word == "--permission-mode", i + 1 < words.count, words[i + 1] == "bypassPermissions" { return "bypass" }
+            if word == "--permission-mode=bypassPermissions" { return "bypass" }
+        }
+        return "prompting"
+    }
+
     /// Parent chain of `pid`, nearest first, stopping before launchd.
     public static func ancestors(of pid: Int32) -> [Int32] {
         var out: [Int32] = []

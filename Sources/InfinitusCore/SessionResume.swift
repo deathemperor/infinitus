@@ -40,7 +40,8 @@ public struct ResumeCoordinator {
         let claudeDir = ClaudeSessions.configHome()
         let transcript = Transcript.locate(cwd: s.cwd, sessionId: s.sessionId, claudeDir: claudeDir)
         return PeerSocket.send(socketPath: s.socketPath, text: text, pid: s.pid, claudeDir: claudeDir,
-                               mode: Transcript.peerModeClass(at: transcript))
+                               mode: Transcript.peerModeClass(at: transcript)
+                                   ?? ProcessFacts.peerModeClass(pid: s.pid))
     }
     public var verdict: (StoppedSession) -> Transcript.Verdict
     public var sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }

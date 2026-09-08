@@ -123,9 +123,11 @@ public enum Transcript {
     /// messages (#213): `"bypass"` for bypassPermissions, or for plan mode
     /// when bypass was available (the tail shows an earlier
     /// bypassPermissions turn); `"prompting"` for every other mode; nil
-    /// when no user entry in the tail records a mode. Every user entry —
-    /// prompts, tool results, peer messages — carries the mode at write
-    /// time, so the newest one is the freshest word.
+    /// when no user entry in the tail records a mode. Typed prompts, peer
+    /// messages and notifications carry the mode at write time; tool
+    /// results do NOT (2.1.263), so a long autonomous run pushes the last
+    /// marker out of the tail — callers fall back to
+    /// `ProcessFacts.peerModeClass(pid:)` (a held AWS nudge, 2026-09-08).
     public static func peerModeClass(at url: URL) -> String? {
         var newest: String?
         for line in tailLines(at: url) {

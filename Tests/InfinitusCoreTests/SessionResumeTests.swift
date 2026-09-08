@@ -196,6 +196,17 @@ final class SessionResumeTests: XCTestCase {
         XCTAssertEqual(Transcript.peerModeClass(at: url), "bypass")
     }
 
+    func testPeerModeClassFromTheLaunchCommandWhenTheTailHasNone() {
+        XCTAssertEqual(ProcessFacts.peerModeClass(
+            command: "claude --enable-auto-mode --dangerously-skip-permissions --remote-control --resume peon\n"), "bypass")
+        XCTAssertEqual(ProcessFacts.peerModeClass(command: "claude --permission-mode bypassPermissions"), "bypass")
+        XCTAssertEqual(ProcessFacts.peerModeClass(command: "claude --permission-mode=bypassPermissions"), "bypass")
+        XCTAssertEqual(ProcessFacts.peerModeClass(command: "claude --permission-mode plan"), "prompting")
+        XCTAssertEqual(ProcessFacts.peerModeClass(command: "claude --resume Overlord"), "prompting")
+        XCTAssertNil(ProcessFacts.peerModeClass(command: ""))
+        XCTAssertNil(ProcessFacts.peerModeClass(command: "\n"))
+    }
+
     func testFramesAndToken() throws {
         try "{\"peerToken\":\"tok\",\"procStart\":1}".write(
             to: dir.appendingPathComponent("sessions/42.abcd.key"), atomically: true, encoding: .utf8)

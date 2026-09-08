@@ -16,6 +16,7 @@ publishes the matching section as the GitHub release body.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
 
 ### Sessions
+- A nudge into a session that has run tools for hours is no longer held by Claude Code as "did not attest its permission mode": the mode comes from how the session was launched when its transcript tail has none.
 - When a sign-in lands, a session still stuck in its own `aws login` is released so its command returns now, and the continue nudge tells it not to log in again (#275).
 - The Mac chat window wears the phone's chat header — Compact, Stat strip or Game HUD, chosen in Settings › Display › Sessions (#151).
 - A question with several parts from a session the app runs shows every part on the Mac window, the phone and the browser page, with one Send that answers them all (#151).

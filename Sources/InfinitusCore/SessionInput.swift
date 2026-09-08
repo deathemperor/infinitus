@@ -219,7 +219,8 @@ extension SessionInput {
             let transcript = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
             return PeerSocket.send(socketPath: record.messagingSocketPath, text: text,
                                    pid: record.pid, claudeDir: claudeDir,
-                                   mode: Transcript.peerModeClass(at: transcript))
+                                   mode: Transcript.peerModeClass(at: transcript)
+                                       ?? ProcessFacts.peerModeClass(pid: record.pid))
         },
         owned: ((Request, ClaudeSessionRecord) -> Reply?)? = nil,
         sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
