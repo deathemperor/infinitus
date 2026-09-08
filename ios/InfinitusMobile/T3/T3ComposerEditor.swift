@@ -36,20 +36,21 @@ struct T3ComposerEditor: UIViewRepresentable {
         return [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
     }
 
-    func makeUIView(context: Context) -> ImagePasteTextView {
-        let view = ImagePasteTextView()
+    func makeUIView(context: Context) -> T3EditorTextView {
+        let view = T3EditorTextView()
         view.backgroundColor = .clear
         view.textContainer.lineFragmentPadding = 0
         view.adjustsFontForContentSizeCategory = false
         view.tintColor = .systemBlue
         view.delegate = context.coordinator
+        view.placeholderLabel = context.coordinator.placeholderLabel
         view.addSubview(context.coordinator.placeholderLabel)
         apply(to: view, context: context)
         view.text = text
         return view
     }
 
-    func updateUIView(_ view: ImagePasteTextView, context: Context) {
+    func updateUIView(_ view: T3EditorTextView, context: Context) {
         context.coordinator.parent = self
         apply(to: view, context: context)
         if view.text != text { view.text = text }
@@ -63,7 +64,7 @@ struct T3ComposerEditor: UIViewRepresentable {
         view.isScrollEnabled = expanded && context.coordinator.contentHeight(for: view) > Self.expandedMax
     }
 
-    private func apply(to view: ImagePasteTextView, context: Context) {
+    private func apply(to view: T3EditorTextView, context: Context) {
         let color = UIColor(textColor)
         view.onPasteImage = onPasteImage
         view.font = Self.font
@@ -75,12 +76,12 @@ struct T3ComposerEditor: UIViewRepresentable {
         label.text = placeholder
         label.font = Self.font
         label.textColor = UIColor(placeholderColor)
-        label.frame = CGRect(x: 0, y: inset, width: max(0, view.bounds.width), height: Self.lineHeight)
+        view.setNeedsLayout()
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: ImagePasteTextView, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: T3EditorTextView, context: Context) -> CGSize? {
         let width = proposal.width ?? uiView.bounds.width
         guard width > 0 else { return nil }
         guard expanded else { return CGSize(width: width, height: Self.collapsedHeight) }
@@ -114,5 +115,18 @@ struct T3ComposerEditor: UIViewRepresentable {
         func textViewDidEndEditing(_ textView: UITextView) {
             DispatchQueue.main.async { self.parent.isFocused = false }
         }
+    }
+}
+
+/// The editor's text view: places the placeholder once it has a width
+/// (T3's `layoutSubviews` does the same), image pastes as the feed's.
+final class T3EditorTextView: ImagePasteTextView {
+    weak var placeholderLabel: UILabel?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        placeholderLabel?.frame = CGRect(x: textContainerInset.left, y: textContainerInset.top,
+                                         width: max(0, bounds.width - textContainerInset.left - textContainerInset.right),
+                                         height: T3ComposerEditor.lineHeight)
     }
 }

@@ -10,6 +10,8 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - A click into an account's name field focuses it at once; only the drag handle starts a reorder now, so the row no longer holds every click until the mouse comes up.
 - Stats folds run off the main thread, so a refresh no longer freezes the window for a third of a second.
+- Ignite says what it did: the plan line reports "<account>'s window started — resets 3:20 PM" (or the failure) for ten seconds, the armed "Sure?" state is a solid orange pill, and the account's usage refreshes right away (#338).
+- The Activity log and `infinitusctl events` survive a relaunch: the last hundred events come back from the durable log at launch (#338).
 - The wall honors the biometric lock: while the app is locked it shows the lock, not the sessions (#55).
 - `infinitusctl` retries for a second while the app re-binds its control socket, and says which error it hit instead of a flat "not running" (#265).
 
@@ -49,9 +51,11 @@ publishes the matching section as the GitHub release body.
 - The Mac can own a Claude Code session outright — no terminal — and answer its permission prompts and questions from the phone or the popup (#151).
 
 ### Phone
-- Settings › Appearance › "T3 screens" (off by default) opens a session as a T3 Code-style thread over the live timeline route (#223).
-- The T3 thread's composer attaches photos, camera shots, files and pasted images, and grows when focused (#223).
-- The T3 thread answers a permission prompt or a question from a card over the composer — allow once, allow for the session, decline, or every question's answers in one Submit (#223).
+- Settings › Appearance › "New session screens" (off by default) opens a session as a chat thread over the live timeline route (#223).
+- The new thread's composer attaches photos, camera shots, files and pasted images, and grows when focused (#223).
+- The new thread answers a permission prompt or a question from a card over the composer — allow once, allow for the session, decline, or every question's answers in one Submit (#223).
+- With the new screens on, + starts a session from a task sheet: pick a project, say what to build, choose the Mac, engine and permissions, send (#223).
+- The new thread's gear opens thread settings — permission mode, settle, snooze, pin, stop the turn — and its git pill shows the branch with the actions to come (#223).
 - A send the phone retries lands once: the Mac answers the retry with the first reply, and a turn you stopped keeps its late input out (#223).
 - Swipe a session to pin it, settle it or snooze it an hour (long-press for "until tomorrow"); pinned rows lead, snoozed and settled ones sit dimmed at the tail (#223).
 - Session rows take their dot and word from the host's facts — a raised hand for an approval, a question mark for a prompt, the plan's "2 of 5" under the row — and the chat header gets a stop button while Claude works (#223).

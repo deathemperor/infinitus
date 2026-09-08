@@ -31,11 +31,15 @@ struct SessionsScreen: View {
                             .disabled(!model.anyMacAnswered)
                     }
                 }
-                .sheet(isPresented: $startSheet) { StartSessionSheet(model: model) }
+                .sheet(isPresented: $startSheet) {
+                    if model.t3Screens { T3NewTaskSheet(model: model) } else { StartSessionSheet(model: model) }
+                }
                 .navigationDestination(for: PastSessionsRoute.self) { _ in
                     PastSessionsScreen(model: model)
                 }
                 .onChange(of: model.requestedPid) { _, _ in openRequestedPid() }
+                .onChange(of: model.requestedT3Screen) { _, _ in openRequestedT3Screen() }
+                .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedT3Screen() }
                 .onChange(of: model.snapshot?.capturedAt) { _, _ in openRequestedPid() }
                 // The pid of a session started on another Mac shows up in
                 // THAT Mac's snapshot, which never moves the primary's.
@@ -247,6 +251,27 @@ struct SessionsScreen: View {
         model.requestedSectionMacId = nil
         path = NavigationPath()
         withAnimation { proxy.scrollTo(Self.sectionID(macId: macId), anchor: .top) }
+    }
+
+    /// `infinitus://t3/<screen>`: the task sheet, or the first live
+    /// session's thread — with its git or settings sheet up when asked.
+    private func openRequestedT3Screen() {
+        guard let screen = model.requestedT3Screen else { return }
+        switch screen {
+        case "home":
+            model.requestedT3Screen = nil
+        case "newtask":
+            model.requestedT3Screen = nil
+            startSheet = true
+        case "thread", "git", "settings":
+            guard let session = fleetsWithSessions.flatMap({ $0.liveSessions?.sessions ?? [] }).first else { return }
+            model.requestedT3Screen = nil
+            model.requestedThreadSheet = screen == "thread" ? nil : screen
+            path = NavigationPath()
+            path.append(session)
+        default:
+            model.requestedT3Screen = nil
+        }
     }
 
     /// A session started from the + sheet or Past sessions: its chat

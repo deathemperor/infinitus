@@ -81,6 +81,26 @@ import InfinitusUI
             ("thread-approval-light", Self.conversation(prompt: Self.approval, running: true), .light),
             ("thread-question-dark", Self.conversation(prompt: Self.question, running: true), .dark),
         ]
+        for scheme in [ColorScheme.light, .dark] {
+            let draft = NavigationStack {
+                T3NewTaskDraft(model: model, cwd: "/Users/dev/death/limitless", macId: .constant(nil), changeProject: {})
+            }
+            .t3(platform: .mobile, scheme: scheme)
+            .preferredColorScheme(scheme)
+            let png = try Self.render(draft)
+            let name = "new-task-\(scheme == .dark ? "dark" : "light")"
+            try png.write(to: dir.appendingPathComponent(name + ".png"))
+            let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
+                                             facts: Self.conversation(running: true).facts)
+            .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "thread-settings-light", png: Self.render(settings), dir: dir, test: self)
+        let git = T3GitSheet(branch: "t3-c5").t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         for (name, state, scheme) in shots {
             let root = NavigationStack {
                 T3ThreadScreen(model: model, session: session, fixture: state)
@@ -99,6 +119,14 @@ import InfinitusUI
     /// Hosts the view in a key window the size of the simulator's screen,
     /// lets two run-loop turns lay it out, and snapshots the hierarchy —
     /// UIKit-backed views (the editor) included.
+    static func attach(name: String, png: Data, dir: URL, test: XCTestCase) throws {
+        try png.write(to: dir.appendingPathComponent(name + ".png"))
+        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        test.add(attachment)
+    }
+
     private static var sharedWindow: UIWindow?
 
     static func render<V: View>(_ view: V) throws -> Data {

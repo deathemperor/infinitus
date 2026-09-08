@@ -248,11 +248,11 @@ struct SettingsForm: View {
         Section {
             Toggle("Follow Mac", isOn: $model.followMac)
             Toggle("Show as Mac popup", isOn: $model.macPopupView)
-            Toggle("T3 screens", isOn: $model.t3Screens)
+            Toggle("New session screens", isOn: $model.t3Screens)
         } header: {
             Text("Appearance")
         } footer: {
-            Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout. T3 screens opens sessions in the T3 Code-style thread (in progress).")
+            Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout. New session screens opens sessions in the new thread view and starts them from the new task sheet (in progress).")
         }
     }
 

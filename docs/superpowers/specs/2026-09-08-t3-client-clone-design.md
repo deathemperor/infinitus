@@ -45,6 +45,8 @@ so the parity harness never taps.
 Gotcha for scripts: zsh ties `$path` to `PATH`, and `$T:thread` is a
 history modifier — the harness uses `route`/`${T}` names.
 
+**Naming (user decision #345, 2026-09-08):** "T3" is an internal codename. No user-visible string — window title, menu or popup item, CLI subcommand, CHANGELOG line, notification — may say T3; the product surface is the "workspace" (`Open workspace`, `infinitusctl show workspace`). Code paths, type prefixes, file names and branch names keep the codename.
+
 ## 1. What T3's clients are, concretely
 
 **Mac (`apps/web`, React 19 + Tailwind v4 + TanStack Router, in Electron).**
@@ -257,7 +259,7 @@ caller (the browser page) moves, tracked in §9.
 - `capture-ios.sh <screen>`: boots the simulator, opens the deep link,
   `simctl io screenshot`.
 - `capture-ours.sh <platform> <screen>`: Mac via the control socket
-  (`infinitusctl t3 open <screen>` — a debug-only route) and
+  (`infinitusctl show workspace <screen>` — a debug-only route) and
   `screencapture`; phone via `xcodebuild test` UI-test that navigates and
   attaches a screenshot.
 - `compare.py a.png b.png --out diff.png`: same-size check, per-pixel
@@ -301,8 +303,8 @@ size 1800×1050 (the reference); min 960×600. Content is a single
 (PinnedRoot rule). `NSGlassEffectView` is not used (T3 has no glass on
 desktop; its `.glass` class is a CSS backdrop, ≈ `--glass-blur 12px` —
 rendered with `NSVisualEffectView.hudWindow`-free plain colours since the
-reference is opaque). Opened from the menu bar popup ("Open T3 window"),
-`infinitusctl t3 open`, and ⌘⇧T; one window, reused (closed windows keep
+reference is opaque). Opened from the menu bar popup ("Open workspace"),
+`infinitusctl show workspace` (next to `show wall`), and ⌘⇧T; one window, reused (closed windows keep
 their NSWindow, content detached — the wall's lesson).
 
 ### 4.2 Layout (T3Root)
@@ -392,7 +394,7 @@ window open must stay under 1 %.
 Reducer tests (A). View tests: `T3WindowModel` unit tests with a fake
 `AppModel` seam (projects derivation, selection survives a pid change on
 resume, drafts persist). e2e (`tools/e2e.sh`): open the window through
-`infinitusctl t3 open`, assert the perf gate, capture the fixture screens
+`infinitusctl show workspace`, assert the perf gate, capture the fixture screens
 and run `compare.py` against the refs, printing the numbers into the PR.
 
 ## 5. Sub-project C — the phone (`ios/InfinitusMobile/T3/`)
