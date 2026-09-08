@@ -1,0 +1,21 @@
+import XCTest
+@testable import InfinitusUI
+
+/// MarkdownText's block split — the additions for T3's rendering (fence
+/// language, task items, rules) beside the existing shapes.
+final class MarkdownBlocksTests: XCTestCase {
+    func testFenceKeepsItsLanguage() {
+        let blocks = MarkdownText.blocks("```swift\nlet a = 1\n```\n```\nplain\n```")
+        XCTAssertEqual(blocks, [.code(language: "swift", "let a = 1"), .code(language: nil, "plain")])
+    }
+
+    func testTaskItemsAndRules() {
+        let blocks = MarkdownText.blocks("- [x] done\n- [ ] open\n- plain\n---\n***\ntext")
+        XCTAssertEqual(blocks, [.task(done: true, "done"), .task(done: false, "open"), .bullet("plain"),
+                                .rule, .rule, .paragraph("text")])
+    }
+
+    func testDashesInsideAParagraphAreNotARule() {
+        XCTAssertEqual(MarkdownText.blocks("a -- b\n--"), [.paragraph("a -- b --")])
+    }
+}
