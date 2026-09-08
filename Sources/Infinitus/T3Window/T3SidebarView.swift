@@ -30,7 +30,12 @@ struct T3SidebarView: View {
             T3ScrollArea { sectionsList }
             footer
         }
-        .background { keyboard }
+        // `Sidebar.tsx`'s settled tail is paged per list, not per session:
+        // changing scope or search rebuilds the list, so the "show 25 more"
+        // count starts over instead of leaving an unrelated page size behind.
+        .onChange(of: model.state.scope) { settledShown = T3ThreadList.settledInitialCount }
+        .onChange(of: model.state.search) { settledShown = T3ThreadList.settledInitialCount }
+        .overlay { keyboard }
     }
 
     // MARK: - Brand
@@ -118,8 +123,11 @@ struct T3SidebarView: View {
 
     private var sectionsList: some View {
         let sections = model.state.sidebarSections(now: model.now)
-        return VStack(alignment: .leading, spacing: 4) {
-            ForEach(sections.indices, id: \.self) { i in sectionView(sections[i]) }
+        // Lazy inside `T3ScrollArea`'s own `ScrollView`, so an off-screen
+        // section's rows are never built (`sidebarSections` returns at most
+        // four sections, each already ordered).
+        return LazyVStack(alignment: .leading, spacing: 4) {
+            ForEach(sections, id: \.kind) { sectionView($0) }
         }
     }
 
@@ -129,18 +137,18 @@ struct T3SidebarView: View {
     @ViewBuilder private func sectionView(_ section: T3WorkspaceState.SidebarSection) -> some View {
         switch section.kind {
         case .pinned:
-            T3SidebarGroup(label: "Pinned") { rows(section.threads) }
+            T3SidebarGroup(label: "Pinned") { rows(section.threads, .pinned) }
         case .active:
-            VStack(alignment: .leading, spacing: 4) { rows(section.threads) }
+            VStack(alignment: .leading, spacing: 4) { rows(section.threads, .active) }
                 .padding(T3Theme.Metrics.sidebarContentInset)
         case .snoozed:
             shelf(title: "Snoozed", count: section.threads.count, expanded: $snoozedExpanded) {
-                rows(section.threads)
+                rows(section.threads, .snoozed)
             }
         case .settled:
             shelf(title: "Settled", count: section.threads.count, expanded: $settledExpanded) {
                 let shown = Array(section.threads.prefix(settledShown))
-                rows(shown)
+                rows(shown, .settled)
                 if section.threads.count > shown.count {
                     // Sidebar.tsx's settled tail: 10 initial, 25 a page
                     // (`T3ThreadList.settledInitialCount`/`settledPageCount`).
@@ -164,9 +172,15 @@ struct T3SidebarView: View {
         }
     }
 
-    @ViewBuilder private func rows(_ threads: [T3Thread]) -> some View {
+    // `Sidebar.tsx:4627-4643`'s `renderThreadRowInner`: `isCard = section ===
+    // "active" || section === "pinned"`, and `variantAction` is "unsnooze" in
+    // the snoozed shelf, "unsettle" in the settled tail, "settle" elsewhere.
+    @ViewBuilder private func rows(_ threads: [T3Thread], _ kind: T3SidebarList.Section) -> some View {
+        let variant: T3ThreadRowView.Variant = (kind == .active || kind == .pinned) ? .card : .slim
+        let variantAction: T3ThreadRowView.VariantAction = kind == .snoozed ? .unsnooze : (kind == .settled ? .unsettle : .settle)
         ForEach(threads) { thread in
-            T3ThreadRowView(thread: thread, selected: thread.id == model.state.selectedThreadId, now: model.now,
+            T3ThreadRowView(thread: thread, variant: variant, variantAction: variantAction,
+                            selected: thread.id == model.state.selectedThreadId, now: model.now,
                             onSelect: { model.select(thread.id) },
                             onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
                             projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
@@ -221,23 +235,5 @@ struct T3SidebarView: View {
         Button("") { searchFocused = true }
             .keyboardShortcut("f", modifiers: .command)
             .buttonStyle(.plain).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
-    }
-}
-
-/// The collapsed sidebar's 48 pt icon column (`ui/sidebar.tsx` icon
-/// variant): just the brand glyph, centered — not `T3SidebarRail` (A's
-/// kit primitive is the separate 16 pt hover-to-resize strip).
-struct T3SidebarIconRail: View {
-    var body: some View {
-        VStack {
-            // The 48 pt column is narrower than the traffic-light cluster,
-            // so — unlike the expanded brand row — there is no clearing
-            // them horizontally; the glyph sits below the whole reserved
-            // band instead (Task 8's top bar picks up the leftover 90 pt
-            // inset on its own side while collapsed).
-            T3ProviderIcon(size: 20).padding(.top, T3Theme.Metrics.topbarHeight + 8)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

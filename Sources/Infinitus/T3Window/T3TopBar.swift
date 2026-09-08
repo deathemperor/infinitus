@@ -26,7 +26,19 @@ import InfinitusUI
 struct T3TopBar: View {
     @ObservedObject var model: T3WindowModel
     @ObservedObject var app: AppModel
+    /// The main column's width, proposed by `T3Root` (window − sidebar −
+    /// right panel). `ChatHeader.tsx:318-320` marks the header content div
+    /// `@container/header-actions`, and that div fills the column, so this is
+    /// what its container queries measure. Measuring it here with a
+    /// `GeometryReader` instead would feed this view's own children's widths
+    /// back into their own proposal.
+    let columnWidth: Double
     @Environment(\.t3) private var t3
+
+    /// Tailwind v4's `--container-3xl: 48rem` (`theme.css:341`): the one
+    /// breakpoint `ChatHeader.tsx:418` and `OpenInPicker.tsx:283-291` query.
+    private static let containerBreakpoint3xl: Double = 768
+    private var wide: Bool { columnWidth >= Self.containerBreakpoint3xl }
     // Fix round 1 (task-8-fix1-brief.md R1): each menu-fronted control's
     // trigger button reports its own NSView here via `MenuAnchor`, so its
     // action closure can call `NSMenu.popUp(positioning:at:in:)` on it.
@@ -46,16 +58,30 @@ struct T3TopBar: View {
                 breadcrumb(thread: thread)
             } else {
                 // NoActiveThreadState.tsx's isElectron branch: "text-xs text-muted-foreground/50".
+                // `WorkspacePageHeader.tsx:19` is a plain `flex items-center`
+                // row with padding — the label starts at the leading inset
+                // and the controls stay at the trailing edge. Without this
+                // the whole row is fixed-width and the outer
+                // `.frame(maxWidth: .infinity)` centres it (B-3 review).
                 Text("No active thread")
                     .font(T3Font.web(.xs))
                     .foregroundStyle(t3.web.mutedForeground.color.opacity(0.5))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             // R2 (fix1 brief): the breadcrumb above is the row's ONLY
             // flexible member (its own `.frame(maxWidth: .infinity)`) — this
             // gap is fixed, not an expanding `Spacer`, so nothing else in
-            // the row competes for leftover width.
-            Color.clear.frame(width: 12)   // ChatHeader.tsx "gap-2 sm:gap-3"
-            HStack(spacing: 12) { actions }   // ChatHeader.tsx's actions div: same "gap-2 sm:gap-3"
+            // the row competes for leftover width. It is
+            // `ChatHeader.tsx:319`'s `gap-2 sm:gap-3` on the header content
+            // div — a VIEWPORT breakpoint the window's 840 pt minimum always
+            // clears, so always 12, unlike the actions gap below.
+            Color.clear.frame(width: 12)
+            // `ChatHeader.tsx:418`: the actions div is `gap-2
+            // @3xl/header-actions:gap-3` — a CONTAINER query, so the gap is 8
+            // until the header itself reaches 768 pt and 12 above it. With
+            // the right panel open at 840 the column is ~380 pt wide and the
+            // 12 pt gaps overflowed it (B-3 review).
+            HStack(spacing: wide ? 12 : 8) { actions }
             // R4 (fix1 brief): `ChatHeader.tsx:415-418`'s actions div is
             // `pr-16` (64pt) while the toggle shows (`pr-0` once the right
             // panel is open and the panel itself separates it — B has no
@@ -124,26 +150,33 @@ struct T3TopBar: View {
     // menu, neither of which B wires yet (no `onNewThreadInProject` /
     // thread-rename plumbing in this task's scope).
     //
-    // R2 (fix1 brief): `ChatHeader.tsx`'s project button is `max-w-40
+    // R2 (fix1 brief): `ChatHeader.tsx:332`'s project button is `max-w-40
     // truncate` (10rem = 160pt) with `className="shrink"` overriding the
     // breadcrumb item's default `shrink-0` — it's meant to cap AND shrink,
     // not hug its content. The Task 8 first pass's `.fixedSize` on the
     // icon+name pair defeated both (SwiftUI adopts the unconstrained ideal
     // width under `.fixedSize`, so a sibling `.frame(maxWidth:)` has no
-    // proposal left to clamp) — removed. The name Text now carries the cap
-    // directly; the priority differential that decides who gives up width
-    // first lives one level up, between this HStack's own children — the
-    // thread title below carries the explicit `.layoutPriority(1)`
-    // (`min-w-10 flex-1 truncate`, upstream's actual flex-grow member) and
-    // the project cluster is the implicit-0 sibling that loses the tie.
+    // proposal left to clamp) — removed; `CapToContent` below does the job.
+    //
+    // B-3 review: the priority was inverted. CSS gives the title item
+    // `min-w-10 flex-1` (`:352`) — flex-basis 0, so it takes the leftover and
+    // is the member that TRUNCATES — while the project item is `shrink` with
+    // a content basis capped at 160 (`:332`,`:360`), so it keeps
+    // min(content, 160) and only gives way under real squeeze. The title's
+    // `.layoutPriority(1)` said the opposite (it made the title hold its
+    // ideal width and the project cluster collapse), so it is gone: the two
+    // siblings are equal-priority and SwiftUI serves the less flexible one —
+    // `CapToContent`, whose range is [0, min(ideal, 160)] — first.
     @ViewBuilder private func breadcrumb(thread: T3Thread) -> some View {
         HStack(spacing: 12) {
             if let project {
                 HStack(spacing: 6) {
-                    // `ChatHeader.tsx`'s `<ProjectFavicon>` — B has no
-                    // favicon pipeline, so this falls back to a folder glyph.
-                    // `.fixedSize()`: the icon itself never shrinks/truncates.
-                    LucideIcon(.folderClosed, size: 14).fixedSize()
+                    // `ChatHeader.tsx:345-352`'s `<ProjectFavicon …
+                    // className="size-3.5">` — the same automatic project
+                    // glyph the sidebar rows draw (Task 7's `T3ProjectGlyph`),
+                    // at 14 pt. `.fixedSize()`: the icon never
+                    // shrinks/truncates.
+                    T3ProjectGlyph(projectName: project.name, projectCwd: project.cwd, size: 14).fixedSize()
                     // Measured (fix1 brief's own literal R2 prescription,
                     // `/tmp/ours-fix1.png`): `.frame(maxWidth: 160)` alone,
                     // without `.fixedSize`, is flexible — it accepts
@@ -174,7 +207,7 @@ struct T3TopBar: View {
                 .foregroundStyle(t3.web.foreground.color)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .layoutPriority(1)   // "min-w-10 flex-1 truncate" — the row's actual flex-grow member
+                .frame(minWidth: 40, alignment: .leading)   // `:352` "min-w-10 flex-1 truncate"
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -216,7 +249,9 @@ struct T3TopBar: View {
             // (`button.tsx:36`) — `ProjectScriptsControl.tsx:250`'s
             // "Add action" trigger and `GitActionsControl.tsx:1678`'s
             // "Commit & push" trigger both carry it.
-            outline { HStack(spacing: 6) { LucideIcon(icon, size: 14); Text(title).font(T3Font.web(.xs, .medium)) } }
+            // `button.tsx:36`'s xs row is `h-7 gap-1 …` — gap-1 = 4 pt
+            // between the leading glyph and the label, not 6.
+            outline { HStack(spacing: 4) { LucideIcon(icon, size: 14); Text(title).font(T3Font.web(.xs, .medium)) } }
         }
         .buttonStyle(.plain)
         .background(MenuAnchor(view: anchor))
@@ -227,29 +262,48 @@ struct T3TopBar: View {
     // segment rounded only on its own outer corner, a 1pt `GroupSeparator`
     // (`bg-input`) between them, one continuous 1pt outline around the
     // union. Chevron is `size-4` = 16pt (`OpenInPicker.tsx:299`), not 14.
-    // B carries no `usePreferredEditor` state, so the primary "Open" click
-    // always opens Finder (always installed, per the brief) rather than a
-    // remembered preference; the chevron opens a real `NSMenu`
-    // (`showOpenInMenu`) listing every entry from the brief whose app is
-    // actually installed.
+    //
+    // B-3 review: the primary segment is `disabled={!preferredEditor || …}`
+    // (`OpenInPicker.tsx:275`), and `usePreferredEditor`
+    // (`editorPreferences.ts:41-50`) resolves to the first AVAILABLE editor,
+    // falling to `null` only when none is installed — so with no editor on
+    // the machine the button is dead, not a shortcut to Finder. It opens
+    // `preferredEditor` (`:276`), never Finder; Finder lives in the chevron
+    // menu (`showOpenInMenu`) alongside every editor actually installed.
     private func openInControl(project: T3ProjectGrouping.Project) -> some View {
         let radius = T3Theme.Metrics.controlRadius
         // `OpenInPicker.tsx:273`: `size="xs"` on the "Open" segment;
         // `:293`: `size="icon-xs"` on the chevron — both 24 pt at the
         // `sm:` breakpoint (`button.tsx:36`).
         let h = T3ButtonMetrics.height(.xs)
+        let preferred = preferredEditor
         return HStack(spacing: 0) {
-            Button { openIn(bundleId: nil, cwd: project.cwd) } label: {
-                HStack(spacing: 6) { LucideIcon(.folderClosed, size: 14); Text("Open").font(T3Font.web(.xs, .medium)) }
-                    .padding(.horizontal, T3ButtonMetrics.horizontalPadding(.xs))
+            Button { if let preferred { openIn(bundleId: preferred.bundleId, cwd: project.cwd) } } label: {
+                // `button.tsx:36`'s `gap-1` = 4 pt. `OpenInPicker.tsx:283-290`
+                // wraps the label in `sr-only @3xl/header-actions:not-sr-only`:
+                // below a 768 pt header the primary is icon-only.
+                // `:277-282` renders the icon only when there IS a primary
+                // option (`{primaryOption?.Icon && …}`) — with no editor
+                // installed the disabled button is genuinely empty upstream.
+                HStack(spacing: 4) {
+                    if let preferred { LucideIcon(preferred.icon, size: 14) }
+                    if wide { Text("Open").font(T3Font.web(.xs, .medium)) }
+                }
+                .padding(.horizontal, T3ButtonMetrics.horizontalPadding(.xs))
             }
             .buttonStyle(.plain)
+            .disabled(preferred == nil)
+            // `button.tsx:11` `disabled:opacity-64`.
+            .opacity(preferred == nil ? 0.64 : 1)
             .frame(height: h)
             .foregroundStyle(t3.web.foreground.color)
             .background(t3.web.popover.color, in: UnevenRoundedRectangle(
                 topLeadingRadius: radius, bottomLeadingRadius: radius, bottomTrailingRadius: 0, topTrailingRadius: 0))
 
-            Rectangle().fill(t3.web.input.color).frame(width: 1, height: h)   // `GroupSeparator`'s `bg-input`
+            // `GroupSeparator`'s `bg-input`, itself `hidden
+            // @3xl/header-actions:block` (`OpenInPicker.tsx:291`) — the two
+            // segments merge into one pill below 768.
+            if wide { Rectangle().fill(t3.web.input.color).frame(width: 1, height: h) }
 
             Button { showOpenInMenu(project: project, from: openInAnchor) } label: {
                 LucideIcon(.chevronDown, size: 16)   // `OpenInPicker.tsx:299` "size-4"
@@ -315,20 +369,27 @@ struct T3TopBar: View {
     }
 
     // `OpenInPicker.tsx`'s `resolveOptions` filtered to what the brief scopes
-    // B to: Finder always, the rest gated on `NSWorkspace` actually finding
-    // the app (never a static "is this installed" guess).
-    private var openInEntries: [(title: String, icon: Lucide, bundleId: String?)] {
-        var entries: [(title: String, icon: Lucide, bundleId: String?)] = [("Finder", .folderClosed, nil)]
+    // B to, in `EDITORS` order — gated on `NSWorkspace` actually finding the
+    // app, never a static "is this installed" guess.
+    private var installedEditors: [(title: String, icon: Lucide, bundleId: String)] {
         let candidates: [(title: String, icon: Lucide, bundleId: String)] = [
             ("VS Code", .code2, "com.microsoft.VSCode"),
             ("Cursor", .code2, "com.todesktop.230313mzl4w4u92"),
             ("Terminal", .terminal, "com.apple.Terminal"),
             ("iTerm", .terminal, "com.googlecode.iterm2"),
         ]
-        for c in candidates where NSWorkspace.shared.urlForApplication(withBundleIdentifier: c.bundleId) != nil {
-            entries.append(c)
-        }
-        return entries
+        return candidates.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.bundleId) != nil }
+    }
+
+    /// `usePreferredEditor` (`editorPreferences.ts:41-50`): the remembered
+    /// pick when it is still available, else the first available editor, else
+    /// `null`. B persists no pick yet, so this is the fallback arm only.
+    private var preferredEditor: (title: String, icon: Lucide, bundleId: String)? { installedEditors.first }
+
+    /// The chevron menu (`OpenInPicker.tsx:295-320`), plus Finder — always
+    /// present, and the only entry when no editor is installed.
+    private var openInEntries: [(title: String, icon: Lucide, bundleId: String?)] {
+        [("Finder", .folderClosed, nil)] + installedEditors.map { ($0.title, $0.icon, Optional($0.bundleId)) }
     }
 
     private func openIn(bundleId: String?, cwd: String) {
@@ -341,20 +402,22 @@ struct T3TopBar: View {
     }
 }
 
-/// Task 8 fix brief's own ask: a 60-char project name and a 120-char thread
-/// title at a 900 pt width, so the breadcrumb's 160 pt cap (`CapToContent`)
-/// and the thread title's `.layoutPriority(1)` truncation are both visible —
-/// standing up a real `T3TopBar` here would need a live `AppModel` (engine
-/// registration, a demo-script subprocess even under `playground:`), wildly
-/// disproportionate for a layout check, so this reproduces the breadcrumb's
-/// exact structure/spacing/priorities directly rather than going through
-/// `T3WindowModel`/`AppModel`.
+/// Task 8 fix brief's own ask, re-pointed by the B-3 review: a 60-char
+/// project name and a 120-char thread title at a 900 pt width, so BOTH sides
+/// of the breadcrumb's sizing show — the project cluster holding at its
+/// 160 pt cap (`CapToContent`, `ChatHeader.tsx:360`'s `max-w-40`) while the
+/// TITLE is the member that truncates (`:352`'s `min-w-10 flex-1`, no
+/// `.layoutPriority` anywhere). Standing up a real `T3TopBar` here would need
+/// a live `AppModel` (engine registration, a demo-script subprocess even
+/// under `playground:`), wildly disproportionate for a layout check, so this
+/// reproduces the breadcrumb's exact structure and spacing directly rather
+/// than going through `T3WindowModel`/`AppModel`.
 #Preview("Breadcrumb truncation") {
     let projectName = "a-project-name-so-long-it-must-truncate-under-the-cap-xxxxxx"   // 60 chars
     let threadTitle = "A thread title long enough to demonstrate truncation under the layout priority differential in the breadcrumb row xxxxxx"   // 120 chars
     HStack(spacing: 12) {
         HStack(spacing: 6) {
-            LucideIcon(.folderClosed, size: 14).fixedSize()
+            T3ProjectGlyph(projectName: projectName, projectCwd: "/workspace/\(projectName)", size: 14).fixedSize()
             CapToContent(maxWidth: 160) {
                 Text(projectName).lineLimit(1).truncationMode(.tail)
             }
@@ -365,8 +428,9 @@ struct T3TopBar: View {
             .font(T3Font.web(.sm, .medium))
             .lineLimit(1)
             .truncationMode(.tail)
-            .layoutPriority(1)
+            .frame(minWidth: 40, alignment: .leading)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(20)
     .frame(width: 900)
 }
@@ -385,7 +449,10 @@ struct T3TopBar: View {
 /// `bounds.width` (not a recomputed ideal) so the child is laid out at the
 /// same width `sizeThatFits` reported, and truncates rather than overflows
 /// its slot when squeezed.
-private struct CapToContent: Layout {
+///
+/// Not `private`: `T3RightPanel`'s tabs are `max-w-36` with the same CSS
+/// semantics and hit the same SwiftUI trap.
+struct CapToContent: Layout {
     let maxWidth: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -432,6 +499,10 @@ private final class MenuActionTarget: NSObject {
 /// no `[data-pressed]`). Tooltip text carries the shortcut inline —
 /// `T3Tooltip` only wraps AppKit's plain-text `.help()` (no room for a
 /// `T3Kbd` chip), matching `T3SidebarView`'s "New thread ⌘N" precedent.
+/// The 28 pt box is not `size="icon"` (32): `ui/sidebar.tsx:328-331` forces
+/// `size-[var(--workspace-titlebar-control-size)]!` over it, and
+/// `index.css:112` sets that variable to 1.75rem — hence `.sm`, whose 28 is
+/// the same number.
 /// Not `private`: `T3Root` also renders one, for the sidebar toggle
 /// (`AppSidebarLayout.tsx`'s window-level `SidebarControl`).
 struct T3TopBarToggle: View {

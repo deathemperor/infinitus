@@ -14,16 +14,22 @@ struct T3Root: View {
     var body: some View {
         let t3 = T3Environment(platform: .web, scheme: scheme)
         GeometryReader { geo in
+            let sidebarW = model.state.sidebarCollapsed ? 0 : Self.sidebarWidth(windowWidth: geo.size.width)
+            let panelW = model.state.rightPanelOpen ? Self.rightPanelWidth(windowWidth: geo.size.width) : 0
             HStack(spacing: 0) {
-                sidebar(t3)
-                    .frame(width: model.state.sidebarCollapsed ? T3Theme.Metrics.sidebarWidthIcon : Self.sidebarWidth(windowWidth: geo.size.width))
+                T3SidebarView(model: model, app: app)
+                    .frame(width: sidebarW)
                     .background(t3.web.sidebar.color)
                     .overlay(alignment: .trailing) { Rectangle().fill(t3.web.sidebarBorder.color).frame(width: 1) }
-                main(t3)
+                    // `ui/sidebar.tsx:288,299` slide the whole container off
+                    // the left edge at width 0 — nothing of it, border
+                    // included, may bleed into the main column.
+                    .clipped()
+                main(t3, columnWidth: max(0, geo.size.width - sidebarW - panelW))
                     .frame(maxWidth: .infinity)
                 if model.state.rightPanelOpen {
-                    T3RightPanel(model: model)
-                        .frame(width: Self.rightPanelWidth(windowWidth: geo.size.width))
+                    T3RightPanel()
+                        .frame(width: panelW)
                         .overlay(alignment: .leading) { Rectangle().fill(t3.web.border.color).frame(width: 1) }
                 }
             }
@@ -53,6 +59,13 @@ struct T3Root: View {
         min(max(0.42 * windowWidth, 360), 560)
     }
 
+    // `AppSidebarLayout.tsx:227` makes the sidebar `collapsible="offcanvas"`:
+    // collapsed is width 0 (`ui/sidebar.tsx:285`'s
+    // `group-data-[collapsible=offcanvas]:w-0`) with the container translated
+    // off-screen (`:298`), never an icon rail — B-3 review. The top bar's own
+    // 130 pt collapsed inset then leaves 12 pt of air after this toggle, which
+    // ends at 118.
+    //
     // `AppSidebarLayout.tsx:72-137`'s `SidebarControl`: fixed at
     // `left: var(--workspace-controls-left)` (90 pt) regardless of sidebar
     // state — a sibling of `{children}` (`:258`), not part of either
@@ -68,16 +81,16 @@ struct T3Root: View {
         .frame(height: T3Theme.Metrics.topbarHeight)
     }
 
-    @ViewBuilder private func sidebar(_ t3: T3Environment) -> some View {
-        if model.state.sidebarCollapsed { T3SidebarIconRail() }
-        else { T3SidebarView(model: model, app: app) }
-    }
-
-    @ViewBuilder private func main(_ t3: T3Environment) -> some View {
+    // `columnWidth` is the main column's own width — what
+    // `ChatHeader.tsx:318-320`'s `@container/header-actions` measures, since
+    // the header content div fills the column. `T3TopBar` can't read it with
+    // its own `GeometryReader` (its children's widths depend on the answer),
+    // so it is proposed from here.
+    @ViewBuilder private func main(_ t3: T3Environment, columnWidth: Double) -> some View {
         VStack(spacing: 0) {
             ZStack {
                 WindowDragRegion()
-                T3TopBar(model: model, app: app)
+                T3TopBar(model: model, app: app, columnWidth: columnWidth)
             }
             .frame(height: T3Theme.Metrics.topbarHeight)
             if model.state.projects.isEmpty && model.state.threads.isEmpty {
