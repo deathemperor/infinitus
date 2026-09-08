@@ -48,6 +48,9 @@ targets:
         # Live Activities (#1 revival countdown, #2 working sessions), and
         # the background refresh that keeps them moving with the app closed.
         NSSupportsLiveActivities: true
+        # The tok/min line is pushed every few seconds (Settings › Sync on
+        # the Mac); without this iOS budgets updates to a handful an hour.
+        NSSupportsLiveActivitiesFrequentUpdates: true
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [run.infinitus.mobile.refresh]
         # `infinitus://pair?url=…&token=…` — the same pair link, opened
