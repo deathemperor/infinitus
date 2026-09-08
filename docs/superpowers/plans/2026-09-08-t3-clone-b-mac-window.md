@@ -1118,9 +1118,6 @@ final class T3WindowModel: ObservableObject {
     private(set) weak var model: AppModel?
     private var sink: AnyCancellable?
     private var refreshing = false
-    private var projectsCache: [ProjectSummary] = []
-    private var projectsCachedAt = Date.distantPast
-    private var projectsCwds: Set<String> = []
     /// Task 13's composer focuses its field when this flips true, then clears it.
     @Published var composerFocusRequested = false
 
@@ -1154,15 +1151,12 @@ final class T3WindowModel: ObservableObject {
         let facts = model.sessionProgress.facts, progress = model.sessionProgress.byPid
         let births = model.sessionBirths
         let profiles = model.sessionProfiles.profiles   // adapt to the real accessor
-        // `projectSummaries` scans past transcripts (PastSessions.list(limit: 200)):
-        // never per fleet tick. Recompute when the set of live cwds changes or
-        // every 30 s (the exporter's cadence), else reuse the last result.
-        let cachedProjects = projectsCache, cachedAt = projectsCachedAt, cachedCwds = projectsCwds
+        // `projectSummaries(profiles:)` memoizes its PastSessions walk itself
+        // (#369: 60 s, keyed on the live session set) — call it, never wrap
+        // it in a second cache (that doubles the cost the memo removed).
         Task.detached(priority: .utility) { [weak self] in
             let records = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-            let cwds = Set(records.map(\.cwd))
-            let stale = cwds != cachedCwds || Date().timeIntervalSince(cachedAt) > 30
-            let projects = stale ? model.projectSummaries(profiles: profiles) : cachedProjects
+            let projects = model.projectSummaries(profiles: profiles)
             let inputs = T3WorkspaceInputs(
                 records: records,
                 facts: Dictionary(uniqueKeysWithValues: facts.map { (Int32($0.key), $0.value) }),
@@ -1171,7 +1165,6 @@ final class T3WindowModel: ObservableObject {
                 projects: projects)
             await MainActor.run {
                 guard let self else { return }
-                if stale { self.projectsCache = projects; self.projectsCachedAt = Date(); self.projectsCwds = cwds }
                 let now = Date()
                 self.now = now
                 self.state.apply(inputs, now: now)
