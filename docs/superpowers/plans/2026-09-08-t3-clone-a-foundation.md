@@ -925,7 +925,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/t3ref/upstream/lucide"
 OUT = ROOT / "Sources/InfinitusUI/T3/Lucide.generated.swift"
 
-NODE = re.compile(r'\["(\w+)",\s*\{([^}]*)\}\]')
+NODE = re.compile(r'\[\s*"(\w+)"\s*,\s*\{([^}]*)\}\s*\]')   # whitespace-tolerant: lucide pretty-prints long nodes across lines
 ATTR = re.compile(r'(\w+):\s*"([^"]*)"')
 
 def path_for(tag, a):
