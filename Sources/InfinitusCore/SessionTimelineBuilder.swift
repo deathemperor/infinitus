@@ -17,8 +17,11 @@ public enum SessionTimelineBuilder {
         return walk.finish(status: status, statusUpdatedAt: statusUpdatedAt)
     }
 
+    /// `TokenRateScanner.parseStamp`: the transcript's `…T15:11:48.377Z` shape
+    /// parses without a formatter (#380 — the formatter was a quarter of
+    /// a tail read); anything else still goes through the formatters.
     static func timestamp(_ entry: [String: Any]) -> Date? {
-        (entry["timestamp"] as? String).flatMap(UsageHistory.parseISO)
+        (entry["timestamp"] as? String).flatMap(TokenRateScanner.parseStamp).map(Date.init(timeIntervalSince1970:))
     }
 
     /// The mutable state of one walk.
@@ -397,13 +400,48 @@ public enum SessionTimelineBuilder {
 
         /// First meaningful line when it fits, else "N lines" — T3's
         /// `summarizeToolTextOutput`.
+        /// Walks the UTF-8 bytes rather than splitting Characters: a
+        /// tool result is a bridged NSString hundreds of KB long, and
+        /// the Character split was a quarter of a tail read (#380). A
+        /// line is meaningful when trimming `.whitespaces` leaves
+        /// something — decided on bytes for ASCII, by the trim itself
+        /// when a line carries anything non-ASCII (NBSP trims too).
         static func output(_ text: String) -> String {
-            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-            let meaningful = lines.filter { !$0.isEmpty }
-            guard let first = meaningful.first else { return "" }
+            var text = text
+            text.makeContiguousUTF8()
+            var first: String?
+            var meaningful = 0
+            text.utf8.withContiguousStorageIfAvailable { bytes in
+                var start = 0
+                let n = bytes.count
+                while start <= n {
+                    var end = start
+                    while end < n, bytes[end] != 10 { end += 1 }
+                    let next = end + 1
+                    if end > start, bytes[end - 1] == 13 { end -= 1 }   // CRLF is a line break too
+                    var blank = true, ascii = true
+                    for b in bytes[start..<end] {
+                        if b >= 0x80 { ascii = false; break }
+                        if b != 0x20, b != 0x09 { blank = false }
+                    }
+                    var line: String?
+                    if !ascii {
+                        let s = String(decoding: bytes[start..<end], as: UTF8.self).trimmingCharacters(in: .whitespaces)
+                        blank = s.isEmpty
+                        line = s
+                    }
+                    if !blank {
+                        meaningful += 1
+                        if first == nil {
+                            first = line ?? String(decoding: bytes[start..<end], as: UTF8.self).trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                    start = next
+                }
+            }
+            guard let first else { return "" }
             if first.count <= 84 { return first }
-            return "\(meaningful.count) line\(meaningful.count == 1 ? "" : "s")"
+            return "\(meaningful) line\(meaningful == 1 ? "" : "s")"
         }
 
         /// The detail line for a completed tool, or nil when it merely

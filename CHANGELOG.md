@@ -11,6 +11,8 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- A transcript tail read costs a quarter of what it did: timestamps parse without a formatter and tool output splits on bytes, so a busy Mac spends less on every phone poll and list pass (#380).
+- The team loop stops burning seconds every five minutes: a teammate's stats, live state, sessions and fleet docs are decrypted once per blob version instead of through a git subprocess each pass, and the header cache is rewritten hourly rather than on every pass (#346).
 - Every team git call returns the moment git exits instead of up to 100 ms later, and a store pass lists each branch once: fetch, publish and the reader's tick spend less time waiting (#370).
 - A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
 - `infinitusctl team status|fetch|code|approve|decline|create|publish` on a Mac with the app running answer as the app (its identity, its store), and the other team subcommands refuse to mint a second identity beside the app's; `team status` fetches first and says when it is showing a cached roster (#354).
@@ -21,6 +23,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).
+- A long thread scrolls and refreshes without stalling: the feed's rows are derived once per update instead of once per row on every redraw; the Mac's chat window gets the same (#380).
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
 - Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).

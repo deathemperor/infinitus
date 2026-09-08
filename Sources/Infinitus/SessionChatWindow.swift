@@ -168,12 +168,14 @@ private struct SessionChatRoot: View {
     @State private var expandedTurns: Set<String> = []
     @State private var expandedGroups: Set<String> = []
     @FocusState private var composerFocused: Bool
+    /// Rows derived once per feed and expansion, not per body pass (#380).
+    @State private var rowsMemo = ThreadRowsMemo()
 
     private var items: [SessionFeedItem] { store.feed?.items ?? [] }
     /// The timeline reduced to rows (#223); nil for a feed without one.
     private var rows: [ThreadFeedRow]? {
         store.feed?.timeline.map {
-            ThreadFeedPresentation.derive($0, expandedTurnIds: expandedTurns, expandedWorkGroupIds: expandedGroups)
+            rowsMemo.rows($0, expandedTurnIds: expandedTurns, expandedWorkGroupIds: expandedGroups)
         }
     }
     private var newestAnchor: AnyHashable? {

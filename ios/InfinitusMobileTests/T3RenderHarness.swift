@@ -131,7 +131,8 @@ import InfinitusUI
         let session = SessionDetail(pid: pid, cwd: "/Users/dev/" + repo, status: "busy", kind: "claude",
                                     startedAt: (Date().timeIntervalSince1970 - ago - 600) * 1000)
         return T3HomeEntry(session: session, macId: nil,
-                           thread: T3HomeThreads.thread(session: session, macId: nil, title: title, facts: facts, lastActivity: last),
+                           thread: T3Thread(session: session, facts: facts, progress: SessionProgress(lastActivityAt: last, name: title),
+                                            environmentId: T3HomeThreads.environmentId(nil), now: Date()),
                            repo: repo, branch: branch, macLabel: macLabel, lastActivity: last)
     }
 

@@ -109,10 +109,45 @@ public struct TeamReader {
         Int(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent) ?? 0
     }
 
+    /// Decrypted member docs by store path, remembered with the blob
+    /// version they came from (#346): every loop pass re-read each
+    /// member's stats, now, sessions, fleet and crash docs through one
+    /// git subprocess per blob — some forty spawns, seconds of CPU, for
+    /// bytes that only change when the blob's version does. Bounded to
+    /// the paths of the current scan by `keep(only:)`.
+    public final class DocCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var docs: [String: (version: String, data: Data)] = [:]
+        public init() {}
+
+        public func read(_ path: String, version: String, miss: () throws -> Data) rethrows -> Data {
+            lock.lock()
+            if let hit = docs[path], hit.version == version { lock.unlock(); return hit.data }
+            lock.unlock()
+            let data = try miss()
+            lock.lock(); docs[path] = (version, data); lock.unlock()
+            return data
+        }
+
+        public func keep(only paths: Set<String>) {
+            lock.lock(); docs = docs.filter { paths.contains($0.key) }; lock.unlock()
+        }
+
+        public var count: Int { lock.lock(); defer { lock.unlock() }; return docs.count }
+    }
+
     /// `headers`: a scan the caller already ran this tick (one per `load()`), else a fresh one.
-    public static func load(client: TeamClient, headers: [TeamClient.ReadableHeader]? = nil) throws -> TeamReader {
+    /// `cache`: decrypted docs reused while their blob version holds.
+    public static func load(client: TeamClient, headers: [TeamClient.ReadableHeader]? = nil,
+                            cache: DocCache? = nil) throws -> TeamReader {
         guard let roster = client.roster?.doc else { throw TeamClient.ClientError.noRoster }
-        return fold(headers: try headers ?? client.readableHeaders(), roster: roster) { try client.read($0).1 }
+        let scanned = try headers ?? client.readableHeaders()
+        guard let cache else { return fold(headers: scanned, roster: roster) { try client.read($0).1 } }
+        let versions = Dictionary(scanned.map { ($0.entry.path, $0.entry.version) }, uniquingKeysWith: { a, _ in a })
+        cache.keep(only: Set(versions.keys))
+        return fold(headers: scanned, roster: roster) { path in
+            try cache.read(path, version: versions[path] ?? "") { try client.read(path).1 }
+        }
     }
 
     /// One member's period summary in the app's own shape (`Stats.fold`).

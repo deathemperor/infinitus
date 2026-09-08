@@ -127,6 +127,13 @@ final class SessionTimelineTests: XCTestCase {
         XCTAssertEqual(SessionTimelineBuilder.Slim.output("\n\n  first line here \nsecond\n"), "first line here")
         XCTAssertEqual(SessionTimelineBuilder.Slim.output(String(repeating: "x", count: 100) + "\ny\nz"), "3 lines")
         XCTAssertEqual(SessionTimelineBuilder.Slim.output(""), "")
+        // byte walk (#380) keeps the trim's rules (an NBSP-only line is blank) and reads CRLF as a line break
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("\r\nx"), "x")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("a\r\nb\r\n"), "a")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("\u{00A0}\n  héllo wörld  \n"), "héllo wörld")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output(String(repeating: "x", count: 100) + "\n\t\n\u{00A0}\nz"), "2 lines")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("only"), "only")
+        XCTAssertEqual(SessionTimelineBuilder.Slim.output("a\n\n"), "a")
         XCTAssertEqual(SessionTimelineBuilder.Slim.files(["/a/b/c/d/e/f.swift", "/x.swift"]), ["c/d/e/f.swift", "x.swift"])
         XCTAssertEqual(SessionTimelineBuilder.Slim.files((0..<20).map { "/f\($0)" }).count, 12)
         XCTAssertEqual(SessionTimelineBuilder.Slim.detail(String(repeating: "d", count: 300)).count, 180)

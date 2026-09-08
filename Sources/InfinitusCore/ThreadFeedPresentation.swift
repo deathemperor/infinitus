@@ -492,3 +492,33 @@ extension WorkEntry {
                   payload: payload, turnId: turnId, createdAt: createdAt)
     }
 }
+
+/// Rows derived once per (timeline, expansion) and handed back until
+/// one of them changes. `derive` walks the whole timeline; a view's
+/// computed `rows` ran it on every body pass — and once more per row
+/// for `rows.last` — so a long thread re-derived itself dozens of times
+/// per frame (#380). Compare-by-value on the timeline (`Equatable`) is
+/// a fraction of a derivation.
+public final class ThreadRowsMemo {
+    private var timeline: SessionTimeline?
+    private var turns: Set<String> = []
+    private var groups: Set<String> = []
+    private var rows: [ThreadFeedRow] = []
+    /// Perf probe: derivations so far.
+    public private(set) var derivations = 0
+
+    public init() {}
+
+    public func rows(_ timeline: SessionTimeline, expandedTurnIds: Set<String>,
+                     expandedWorkGroupIds: Set<String>) -> [ThreadFeedRow] {
+        if let cached = self.timeline, cached == timeline, turns == expandedTurnIds, groups == expandedWorkGroupIds {
+            return rows
+        }
+        rows = ThreadFeedPresentation.derive(timeline, expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds)
+        self.timeline = timeline
+        turns = expandedTurnIds
+        groups = expandedWorkGroupIds
+        derivations += 1
+        return rows
+    }
+}

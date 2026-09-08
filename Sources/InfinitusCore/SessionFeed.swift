@@ -313,7 +313,29 @@ public enum SessionFeedReader {
         let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
         guard (try? handle.seek(toOffset: start)) != nil,
               let blob = try? handle.readToEnd() else { return [] }
-        return blob.split(separator: UInt8(ascii: "\n")).map { String(decoding: $0, as: UTF8.self) }
+        return lines(of: blob)
+    }
+
+    /// The blob's lines, split on the raw bytes (`Data.split` walked
+    /// them one Collection index at a time, a tenth of a 4 MB read, #380).
+    static func lines(of blob: Data) -> [String] {
+        var out: [String] = []
+        blob.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            guard let base = raw.baseAddress else { return }
+            let bytes = base.assumingMemoryBound(to: UInt8.self)
+            var start = 0
+            let n = raw.count
+            while start < n {
+                let rest = n - start
+                let hit = memchr(bytes + start, 10, rest)
+                let end = hit.map { UnsafeRawPointer($0) - UnsafeRawPointer(bytes) } ?? n
+                if end > start {
+                    out.append(String(decoding: UnsafeBufferPointer(start: bytes + start, count: end - start), as: UTF8.self))
+                }
+                start = end + 1
+            }
+        }
+        return out
     }
 
     /// The record-level finishing touch `read` applies after `parse`,
@@ -346,9 +368,8 @@ public enum SessionFeedReader {
     /// `SessionProgress.parse`. Returns at most `limit` items, newest
     /// last.
     static func decodeLine(_ line: String) -> [String: Any]? {
-        guard line.first == "{",
-              let data = line.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard line.utf8.first == UInt8(ascii: "{"),
+              let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
         else { return nil }
         return obj
     }
@@ -376,9 +397,7 @@ public enum SessionFeedReader {
         var runs: [Run] = []
         var toolNames: [String: String] = [:]   // tool_use id -> name
 
-        func timestamp(_ entry: [String: Any]) -> Date? {
-            (entry["timestamp"] as? String).flatMap(UsageHistory.parseISO)
-        }
+        func timestamp(_ entry: [String: Any]) -> Date? { SessionTimelineBuilder.timestamp(entry) }
 
         func append(_ item: SessionFeedItem, isError: Bool = false) {
             // Streamed text arrives one block per entry; adjacent assistant
