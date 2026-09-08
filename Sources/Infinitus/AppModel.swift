@@ -1687,9 +1687,9 @@ final class AppModel: ObservableObject {
                                            timelineCache: TimelineCache, attentionStore: AttentionStore,
                                            ownedBox: OwnedSessionsBox) -> SessionAttention.Outcome? {
         let claudeDir = ClaudeSessions.configHome()
-        guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+        guard let record = ClaudeSessions.record(pid: pid, sessionId: request.sessionId, in: ClaudeSessions.list(claudeDir: claudeDir)),
               let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
-        let pending = ownedBox.existing?.pending(pid: pid) ?? []
+        let pending = ownedBox.existing?.pending(pid: record.pid) ?? []
         return SessionAttention.apply(request, sessionId: record.sessionId,
                                       timeline: timeline.appending(pending: pending),
                                       status: record.status, store: attentionStore)

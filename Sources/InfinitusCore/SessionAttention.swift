@@ -12,8 +12,11 @@ public enum SessionAttention {
         public let until: Date?
         /// Client-minted id for retry-safe delivery (#223 phase 4); absent = today's behaviour.
         public let commandId: String?
-        public init(action: AttentionStore.Action, until: Date?, commandId: String? = nil) {
-            self.action = action; self.until = until; self.commandId = commandId
+        /// #391: names the session outright, so a pid reused after a resume
+        /// cannot land the action on the wrong one; absent = pid only.
+        public let sessionId: String?
+        public init(action: AttentionStore.Action, until: Date?, commandId: String? = nil, sessionId: String? = nil) {
+            self.action = action; self.until = until; self.commandId = commandId; self.sessionId = sessionId
         }
     }
 
