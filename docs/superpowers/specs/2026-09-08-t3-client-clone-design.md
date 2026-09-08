@@ -176,11 +176,12 @@ the parity harness.
 Phone: DM Sans 400/500/700 bundled under
 `ios/InfinitusMobile/Fonts/` (OFL text alongside), registered in
 `project.yml` `UIAppFonts`; `T3Font.body(size:weight:)` maps
-`--font-sans/medium/bold`. Sizes follow T3's Tailwind classes
-(`text-[15px]`, `text-xs` = 12, `text-sm` = 14, `text-base` = 16,
-`text-lg` = 18, `text-2xl` = 24 for empty-state titles). Mac: `.system`
-(SF), same size table. Line heights follow Tailwind's defaults for each
-size (`leading-5` = 20 pt for 14, `leading-6` = 24 for 16).
+`--font-sans/medium/bold`. Phone sizes are T3's own scale
+(`global.css` `@theme`, mirrored in `src/lib/typography.ts`): 3xs 11/14,
+2xs 12/16, xs 13/17, sm 14/19, base 16/23, lg 18/23, xl 21/28, 2xl 26/32,
+3xl 30/36 (pt / line height). Mac: `.system` (SF) with Tailwind v4's
+web scale (xs 12/16, sm 14/20, base 16/24, lg 18/28, xl 20/28, 2xl 24/32)
+plus the literal sizes T3 uses in classes (`text-[13px]`, `text-[15px]`).
 
 ### 3.3 Icons
 
@@ -217,10 +218,12 @@ One Swift view per T3 primitive, same name, same props where sensible:
 Each component has a SwiftUI preview and a snapshot test against a
 cropped reference PNG (§3.7).
 
-### 3.5 Presentation reducers (`Sources/InfinitusUI/T3/Logic/`)
+### 3.5 Presentation reducers (`Sources/InfinitusCore/T3/`)
 
-Pure Swift ports, one file per upstream module, with the upstream test
-cases transcribed as XCTest data tables:
+Pure Swift ports in InfinitusCore (no SwiftUI, so `swift test` covers
+them on Linux too, next to `ThreadFeedPresentation`), one file per
+upstream module, with the upstream test cases transcribed as XCTest data
+tables:
 
 - `T3ThreadList.swift` ← `threadListV2.ts` + `client-runtime/state/thread-sort.ts`
   + `thread-settled.ts`: `status(facts:)`, `orderedSection`, `buildItems`
@@ -266,9 +269,16 @@ caller (the browser page) moves, tracked in §9.
   text, timestamps, the DEV badge) is driven by a **fixture**: one
   Infinitus session and one T3 thread with the same title, the same two
   messages ("Hi" / "Hi. Ready when you are — what's the task?"), the same
-  project name `limitless`. The harness reports; CI does not gate on it
-  yet (the reference app is not on CI machines) — it runs in the PR
-  description.
+  project name `limitless`. The Infinitus side is `tools/t3ref/fixture.sh`:
+  it writes a `CLAUDE_CONFIG_DIR` the way `tools/e2e.sh` does (a
+  `sessions/<pid>.json` with status `waiting`, a `projects/<slug>/<id>.jsonl`
+  with the "Hi" pair, an open `Write` tool_use for the pending approval
+  and an `AskUserQuestion` tool_use with two questions), then launches
+  the real app (`INFINITUS_CONTROL_SOCKET=/tmp/t3fix.sock`) with the
+  mirror on, so the Mac window, the phone and the browser page all read
+  the same fixture through the unchanged pipeline. The harness reports;
+  CI does not gate on it yet (the reference app is not on CI machines) —
+  the numbers go in the PR description.
 
 ### 3.7 Testing (A)
 
@@ -464,14 +474,16 @@ paths are internal names, not a public scheme.
 
 `SessionsScreen`, `SessionFeedScreen`, `SessionDetailScreen`,
 `StartSessionSheet`, `PastSessionsScreen`, `FleetScreen` / `NativeFleetScreen`
-(fleet stats fold into Usage in F), `OutlookScreen` (Usage in F),
-`ThemeChooserScreen` + `MotionChooser` (T3 has Appearance: light/dark/system
-+ accent; RPG effects stay reachable from the Mac popup only). Kept as
-is: pairing (`PairScanner`, `MacPairing`), Live Activities, share sheet,
+(fleet stats fold into Usage in F), `OutlookScreen` (Usage in F). Kept:
+pairing (`PairScanner`, `MacPairing`), Live Activities, share sheet,
 widgets, Team screens (no T3 equivalent; they move under Settings ›
-Team), AWS login (a banner + sheet, restyled with the kit). Removal is
-the last PR of C, after every replacement screen is on main behind a
-`t3Screens` flag that defaults on.
+Team), AWS login (a banner + sheet, restyled with the kit), and — the
+user asked for these earlier and has not agreed to lose them — the RPG
+row themes (`ThemeChooserScreen`, `MotionChooser`) under Appearance ›
+"Infinitus theme", and the #329 chat-header HUD behind its `chat_header`
+pref (off by default in the T3 look). Removal is the last PR of C, after
+every replacement screen is on main behind a `t3Screens` flag that
+defaults on.
 
 ### 5.5 Testing (C)
 
