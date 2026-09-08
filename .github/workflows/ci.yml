@@ -31,6 +31,8 @@ jobs:
             spm-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('Package.resolved', 'Package.swift') }}-
             spm-${{ github.repository }}-${{ runner.os }}-
       - run: swift build
+      - name: generated files are current
+        run: tools/t3ref/check-generated.sh
       - run: swift test --parallel --skip Team
   test-team:
     runs-on: macos-26
