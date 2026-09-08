@@ -169,24 +169,10 @@ public struct MarkdownText: View {
     /// face, inline code in mono two points smaller (no background —
     /// `runStyle` only paints fences), links in the link color.
     private func inline(_ text: String, font: Font, color: Color) -> Text {
-        guard let style, var attributed = try? AttributedString(
-            markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
-            return Text(text).font(font).foregroundStyle(color)
-        }
-        for run in attributed.runs {
-            let intent = run.inlinePresentationIntent ?? []
-            if run.link != nil {
-                attributed[run.range].foregroundColor = style.link
-                attributed[run.range].underlineStyle = .single
-            } else if intent.contains(.code) {
-                attributed[run.range].font = style.inlineCodeFont
-                attributed[run.range].foregroundColor = style.inlineCode
-            } else if intent.contains(.stronglyEmphasized) {
-                attributed[run.range].font = style.boldFont
-                attributed[run.range].foregroundColor = style.strong
-            }
-        }
-        return Text(attributed).font(font).foregroundStyle(color)
+        guard let style else { return Text(text).font(font).foregroundStyle(color) }
+        return MarkdownInline.text(text, font: font, color: color, runs: .init(
+            link: style.link, codeFont: style.inlineCodeFont, code: style.inlineCode,
+            strongFont: style.boldFont, strong: style.strong))
     }
 
     /// T3's table (`NativeTable`): 160 pt cells in a 8 pt bordered box,

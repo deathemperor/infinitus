@@ -74,11 +74,12 @@ public struct T3ChatMarkdown: View {
     }
 
     /// `.chat-markdown h1..h6` (index.css:1651-1673): weight 600 throughout;
-    /// h1 1.25rem (`T3TypeScale.Web.xl`), h2 1.125rem (`.lg`), h3-h6 1rem
-    /// (`.base`). `T3Font.Weight` has no semibold step, so this sets the
-    /// system font directly at the CSS weight.
+    /// h1 1.25rem (`T3TypeScale.Web.xl`), h2 1.125rem (`.lg`), h3 1rem
+    /// (`.base`), h4-h6 0.875rem (`.sm`, index.css:1670-1677).
+    /// `T3Font.Weight` has no semibold step, so this sets the system font
+    /// directly at the CSS weight.
     private func headingFont(_ level: Int) -> Font {
-        let scale: T3TypeScale.Web = level == 1 ? .xl : level == 2 ? .lg : .base
+        let scale: T3TypeScale.Web = level == 1 ? .xl : level == 2 ? .lg : level == 3 ? .base : .sm
         return .system(size: scale.step.size, weight: .semibold)
     }
 
@@ -89,27 +90,14 @@ public struct T3ChatMarkdown: View {
         }
     }
 
-    /// Inline bold/code/link runs, the same technique `MarkdownText` uses,
+    /// Inline bold/code/link runs, the same helper `MarkdownText` uses,
     /// against the web palette's tokens (it has no dedicated `md*` set —
-    /// that's mobile-only).
+    /// that's mobile-only). `strong: nil` — `<strong>` only bumps the
+    /// weight here, it doesn't repaint the color.
     private func inline(_ text: String, font: Font, color: Color) -> some View {
-        guard var attributed = try? AttributedString(
-            markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
-            return Text(text).font(font).foregroundStyle(color)
-        }
-        for run in attributed.runs {
-            let intent = run.inlinePresentationIntent ?? []
-            if run.link != nil {
-                attributed[run.range].foregroundColor = p.primary.color
-                attributed[run.range].underlineStyle = .single
-            } else if intent.contains(.code) {
-                attributed[run.range].font = .system(size: 13, design: .monospaced)
-                attributed[run.range].foregroundColor = p.mutedForeground.color
-            } else if intent.contains(.stronglyEmphasized) {
-                attributed[run.range].font = font.weight(.semibold)
-            }
-        }
-        return Text(attributed).font(font).foregroundStyle(color)
+        MarkdownInline.text(text, font: font, color: color, runs: .init(
+            link: p.primary.color, codeFont: .system(size: 13, design: .monospaced), code: p.mutedForeground.color,
+            strongFont: font.weight(.semibold), strong: nil))
     }
 
     private struct Table: View {

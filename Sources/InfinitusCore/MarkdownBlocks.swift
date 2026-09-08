@@ -1,3 +1,5 @@
+import Foundation
+
 /// The line-based markdown block split `MarkdownText` (InfinitusUI) and
 /// `T3ChatMarkdown` both render — moved here so `InfinitusCoreTests` can
 /// exercise the parser without linking SwiftUI (T3 clone B-10).
