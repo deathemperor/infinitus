@@ -1520,7 +1520,8 @@ git commit -m "workspace: three-column layout, icon rail, right-panel frame, emp
 ### Task 7: The sidebar — brand row, search, scope, project groups, thread rows, context menu
 
 **Files:**
-- Create: `Sources/Infinitus/T3Window/T3SidebarView.swift`, `Sources/Infinitus/T3Window/T3ThreadRowView.swift`, `Sources/InfinitusCore/T3/T3RelativeTime.swift`
+- Create: `Sources/Infinitus/T3Window/T3SidebarView.swift`, `Sources/Infinitus/T3Window/T3ThreadRowView.swift`, `Sources/InfinitusCore/T3/T3RelativeTime.swift`, `Sources/InfinitusCore/T3/T3ProjectIcon.swift` (port of `ProjectFavicon.tsx` `selectProjectIcon` + `PROJECT_ICONS`)
+  (CORRECTION, B-3 review — upstream wins over this task's prose below: the desktop row's LEADING glyph is always the project icon (`ProjectFavicon.tsx:44-123`: favicon → emoji → a Lucide icon from the 22-entry `PROJECT_ICONS` table chosen by `selectProjectIcon`, coloured per name/cwd — never an initial letter); status is a TRAILING text label per `SidebarThreadRow`'s `topStatus` (`Sidebar.tsx` ≈:1155-1177), never a leading `hand`/`message-circle-question`/`circle-x` glyph. Brand row inset when expanded = 90 + 28 + 12 = 130 pt (`AppSidebarLayout.tsx:49`, `ui/sidebar.tsx:169-170`, `SidebarChrome.tsx:89`).)
   (Width, from upstream `threadSidebarWidth.ts`: expanded width = `min(Metrics.sidebarWidth, max(208, windowWidth - 640))` — 208 = `THREAD_SIDEBAR_MIN_WIDTH`, 640 = `THREAD_MAIN_CONTENT_MIN_WIDTH`; read the window width with a `GeometryReader` at the root and pass it down. The collapsed rail is the 48 pt icon column with the brand glyph, not `T3SidebarRail` (that is the 16 pt resize strip). B-3 review.)
 - Modify: `Sources/Infinitus/T3Window/T3Root.swift` (drop `T3SidebarPlaceholder`)
 - Test: `Tests/InfinitusCoreTests/T3/T3RelativeTimeTests.swift`
