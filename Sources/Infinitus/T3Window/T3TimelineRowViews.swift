@@ -29,8 +29,13 @@ struct T3TimelineRowView: View, Equatable {
     let columnWidth: Double
     /// The minute tick (`T3WindowModel.now`); only the working row reads it.
     let now: Date
+    /// The plan card's Implement button exists only while the parked
+    /// `ExitPlanMode` is the prompt a key would answer (Task 12).
+    var planIsActionable = false
     let onToggleTurn: (String) -> Void
     let onToggleWorkGroup: (String) -> Void
+    var onImplementPlan: () -> Void = {}
+    var onEditPlan: (String) -> Void = { _ in }
 
     /// `memo(TimelineRowContent)` (`:1175`). Rows are values here, so the port
     /// of React's memo is `.equatable()` over the row payload: without it every
@@ -43,6 +48,10 @@ struct T3TimelineRowView: View, Equatable {
     static func == (l: T3TimelineRowView, r: T3TimelineRowView) -> Bool {
         l.row == r.row && l.columnWidth == r.columnWidth
             && (l.row.kind == "working" ? l.now == r.now : true)
+            // Same rule as `now`: only the row that reads it compares it, so a
+            // resolved approval hides the plan card's button without touching
+            // any other row.
+            && (l.row.kind == "proposed-plan" ? l.planIsActionable == r.planIsActionable : true)
     }
 
     var body: some View {
@@ -107,7 +116,8 @@ struct T3TimelineRowView: View, Equatable {
                 .padding(.top, 2)
                 .padding(.horizontal, 4)
         case let .proposedPlan(_, _, plan):
-            T3ProposedPlanCard(plan: plan)
+            T3ProposedPlanCard(plan: plan, isActionable: planIsActionable,
+                               onImplement: onImplementPlan, onEdit: onEditPlan)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
         case let .working(_, createdAt):
@@ -756,6 +766,10 @@ enum T3ToolCallBody {
 /// does.
 private struct T3ProposedPlanCard: View {
     let plan: T3ProposedPlan
+    /// The parked `ExitPlanMode` is the prompt on top, so a verdict reaches it.
+    let isActionable: Bool
+    let onImplement: () -> Void
+    let onEdit: (String) -> Void
     @Environment(\.t3) private var t3
     @State private var expanded = false
 
@@ -804,12 +818,28 @@ private struct T3ProposedPlanCard: View {
                         expanded.toggle()
                     }
                 }
+                if isActionable { actions }
             }
         }
         .padding(20)
         .background(t3.web.card.color.opacity(0.7), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
             .stroke(t3.web.border.color.opacity(0.8), lineWidth: 1))
+    }
+
+    /// Upstream answers a plan from the composer, not from the card: "Implement"
+    /// is the composer's primary action while the plan is the follow-up prompt
+    /// (`ComposerPrimaryActions.tsx:165-218`) and refining it means typing over
+    /// the plan there ("Refine", `:179`). B has no such composer yet (Task 13),
+    /// so the two live on the card: Implement allows the parked `ExitPlanMode`,
+    /// and Edit puts the plan's markdown in the composer's draft
+    /// (`T3WindowModel.pendingComposerInsert`) for the user to change first.
+    private var actions: some View {
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
+            T3Button("Edit", variant: .outline, size: .sm) { onEdit(plan.planMarkdown) }
+            T3Button("Implement", size: .sm, action: onImplement)
+        }
     }
 
     @ViewBuilder private var body_: some View {

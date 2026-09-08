@@ -50,6 +50,11 @@ struct T3ThreadView: View {
     /// held in `@State` so the per-scroll writes never republish the view.
     @State private var anchors = T3Anchors()
     @State private var composerHeight: CGFloat = 0
+    /// Task 12's delivery. `@State`, not `@StateObject`: `sending`/`note` flip on
+    /// every verdict, and observing them here would re-run this body — and
+    /// `Row ==` for every row — for something only the bottom slot draws. The
+    /// slot observes it instead (`T3ThreadPendingSlot`).
+    @State private var actions = T3ThreadActions()
 
     /// `max-w-3xl` (48 rem) inside the list's own `sm:px-5`.
     private static let columnMax: Double = 768
@@ -67,8 +72,11 @@ struct T3ThreadView: View {
                             T3TimelineRowView(row: row,
                                               columnWidth: min(Self.columnMax, geo.size.width - 2 * Self.listInset),
                                               now: now,
+                                              planIsActionable: planIsActionable,
                                               onToggleTurn: { turnId in toggle(rowId: row.id) { model.toggleTurn(turnId) } },
-                                              onToggleWorkGroup: { groupId in toggle(rowId: row.id) { model.toggleWorkGroup(groupId) } })
+                                              onToggleWorkGroup: { groupId in toggle(rowId: row.id) { model.toggleWorkGroup(groupId) } },
+                                              onImplementPlan: implementPlan,
+                                              onEditPlan: { markdown in model.pendingComposerInsert = markdown })
                                 .equatable()
                                 .frame(maxWidth: Self.columnMax)
                                 .frame(maxWidth: .infinity)   // `mx-auto`
@@ -112,7 +120,8 @@ struct T3ThreadView: View {
     /// `T3ComposerHeightKey` so the children need no plumbing of their own.
     private var bottomSlot: some View {
         VStack(spacing: 0) {
-            // Task 12: banners/panels; Task 13: composer.
+            T3ThreadPendingSlot(app: app, store: store, actions: actions)
+            // Task 13: the composer.
         }
         // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
@@ -136,6 +145,24 @@ struct T3ThreadView: View {
             .font(T3Font.web(.sm))
             .foregroundStyle(t3.web.placeholder.color)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - The proposed plan's actions
+
+    /// A plan can be implemented only while its `ExitPlanMode` is the prompt the
+    /// session is parked on: `.key "1"` answers `pending(pid:).first`
+    /// (OwnedSessions.swift:445), so a plan behind another approval must not
+    /// offer the button — it would approve the wrong tool.
+    private var planIsActionable: Bool {
+        store.pending.approvals.first?.toolName == "ExitPlanMode"
+    }
+
+    /// `ProposedPlanCard`'s Approve, upstream's "Implement"
+    /// (`ComposerPrimaryActions.tsx:192`): allow the parked `ExitPlanMode` the
+    /// way every other approval is allowed (SessionChatWindow.swift:303).
+    private func implementPlan() {
+        guard planIsActionable else { return }
+        actions.send(.init(kind: .key, text: "1"), app: app, pid: store.pid)
     }
 
     // MARK: - Anchoring

@@ -24,6 +24,11 @@ final class T3WindowModel: ObservableObject {
     private var refreshing = false
     /// Task 13's composer focuses its field when this flips true, then clears it.
     @Published var composerFocusRequested = false
+    /// Text a panel wants in the composer's draft — the proposed plan's markdown
+    /// when the plan card's Edit is pressed (Task 12). Task 13's composer takes
+    /// it and clears it; upstream does the same thing by writing the composer's
+    /// own draft (`ComposerPrimaryActions.tsx:166-181`, the "Refine" branch).
+    @Published var pendingComposerInsert: String?
     /// The hidden ⌘W button in `T3Root` (E6c); the controller sets this to `close()`.
     var closeRequested: (() -> Void)?
 
