@@ -74,6 +74,9 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// The Mac's saved session profiles (#165) — the phone's Start a
     /// session chips. Additive optional.
     public let profiles: [SessionProfile]?
+    /// T3's project list (spec §2.1) — one row per cwd the Mac has seen,
+    /// for both clients' sidebar/Home grouping. Additive optional.
+    public let projects: [ProjectSummary]?
     /// How Infinitus started each live session, by pid (#163/#165):
     /// profile, permission mode, resumed-from. Additive optional.
     public let births: [Int: SessionBirth]?
@@ -92,6 +95,7 @@ public struct MirrorSnapshot: Codable, Sendable {
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
                 app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil,
+                projects: [ProjectSummary]? = nil,
                 births: [Int: SessionBirth]? = nil,
                 factsByPid: [Int: SessionFacts]? = nil,
                 epoch: String? = nil, sequence: Int? = nil) {
@@ -115,6 +119,7 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.app = app
         self.team = team
         self.profiles = profiles
+        self.projects = projects
         self.births = births
         self.factsByPid = factsByPid
         self.epoch = epoch

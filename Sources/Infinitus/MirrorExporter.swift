@@ -36,7 +36,13 @@ actor MirrorExporter {
                 plan: WindowPlanner.Plan? = nil, awsLogins: [AwsLogin.Item] = [],
                 progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
-                profiles: [SessionProfile] = [], births: [Int: SessionBirth] = [:],
+                profiles: [SessionProfile] = [],
+                // A closure, not a value: T3's project list scans past
+                // sessions and shells out to git per cwd (#T3 clone A) —
+                // real work the throttle below must skip, the same
+                // reason `facts` below is a closure too.
+                projects: @Sendable () -> [ProjectSummary] = { [] },
+                births: [Int: SessionBirth] = [:],
                 facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
                 sequence: SequenceLog? = nil, now: Bool = false,
                 overlay: @Sendable ([ClaudeSessionRecord]) -> [ClaudeSessionRecord] = { $0 }) {
@@ -104,6 +110,7 @@ actor MirrorExporter {
             recentCwds: recentCwds.isEmpty ? nil : recentCwds,
             pushesAlerts: pushesAlerts, app: app, team: team,
             profiles: profiles.isEmpty ? nil : profiles,
+            projects: { let p = projects(); return p.isEmpty ? nil : p }(),
             births: births.isEmpty ? nil
                 : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })),
             factsByPid: facts(plainRecords),

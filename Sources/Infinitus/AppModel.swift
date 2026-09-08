@@ -2533,6 +2533,7 @@ final class AppModel: ObservableObject {
                 phoneLatest: appReleaseLatest)
             let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
             let sequenceLog = sequenceLog, leases = mirrorServer.leases
+            let sessionProfilesList = sessionProfiles.profiles
             let mirrorNow = mirrorExportDue
             mirrorExportDue = false
             // A living UI keeps its lease; the cap only catches one that died.
@@ -2546,7 +2547,8 @@ final class AppModel: ObservableObject {
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo, team: teamSnapshot,
-                                            profiles: self.sessionProfiles.profiles,
+                                            profiles: sessionProfilesList,
+                                            projects: { self.projectSummaries(profiles: sessionProfilesList) },
                                             births: self.sessionBirths,
                                             facts: { records in
                                                 // Only leased sessions get a timeline rebuild (#223
@@ -2661,6 +2663,32 @@ final class AppModel: ObservableObject {
         }
         for msg in pushes where !isPlayground { push(msg) }
         if !isPlayground { await sync.tick() }
+    }
+
+    /// T3's project list for the window and the mirror (spec §2.1). Off
+    /// the main actor (called from the exporter's detached tick) — takes
+    /// `profiles` from the caller since a `nonisolated` func can't read
+    /// the main-actor-isolated `sessionProfiles` itself.
+    nonisolated func projectSummaries(profiles: [SessionProfile]) -> [ProjectSummary] {
+        let claudeDir = ClaudeSessions.configHome()
+        let live = ClaudeSessions.list(claudeDir: claudeDir)
+        let past = PastSessions.list(claudeDir: claudeDir, limit: 200)
+        let recentCwds = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
+        // Only shell out for cwds worth the ~5ms git call: live ones and
+        // the five most recent, so an idle tick stays under 50ms. `derive`
+        // calls `branch` with its own standardized key, so match on a
+        // trailing-slash-stripped form here too.
+        func trimSlash(_ s: String) -> String { var s = s; while s.count > 1, s.hasSuffix("/") { s.removeLast() }; return s }
+        let branchable = Set((live.map(\.cwd) + recentCwds.prefix(5)).map(trimSlash))
+        return ProjectSummary.derive(live: live, past: past, profiles: profiles,
+                                     recentCwds: recentCwds,
+                                     branch: { branchable.contains(trimSlash($0)) ? Self.gitBranch(cwd: $0) : nil })
+    }
+
+    nonisolated static func gitBranch(cwd: String) -> String? {
+        let out = try? GitRunner(timeout: 2).run(["symbolic-ref", "--short", "-q", "HEAD"], cwd: cwd)
+        let b = out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return b.isEmpty ? nil : b
     }
 
     /// The badge click: running -> stop, stopped -> start ("auto switch
