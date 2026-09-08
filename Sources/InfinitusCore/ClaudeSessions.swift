@@ -85,6 +85,13 @@ public enum ClaudeSessions {
 #endif
     }
 
+    /// The session a request names: by id when it carries one (#391 — a
+    /// pid reused after a resume belongs to a different session), else
+    /// by pid.
+    public static func record(pid: Int32, sessionId: String?, in records: [ClaudeSessionRecord]) -> ClaudeSessionRecord? {
+        sessionId.flatMap { id in records.first { $0.sessionId == id } } ?? records.first { $0.pid == pid }
+    }
+
     /// Live sessions. A record that cannot be read is skipped — one bad
     /// file must not take out the listing.
     public static func list(claudeDir: URL, alive: (Int32) -> Bool = isAlive) -> [ClaudeSessionRecord] {
