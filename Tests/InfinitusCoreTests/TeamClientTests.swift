@@ -214,6 +214,78 @@ final class TeamClientTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: jp.rosterFile(leader.config.id).path))
     }
 
+    /// #55: every leader action re-signs the roster as the leader who made
+    /// it, while a code names its minter as the trust root. On a team with
+    /// two leaders the roster's signer is whoever edited last, so a code
+    /// from the other leader must be accepted through the roster's own
+    /// history: back to a roster the code's leader signed, then forward
+    /// one accepted step at a time. A forged step still fails.
+    func testACodeFromEitherLeaderJoinsWhenTheOtherLeaderSignedTheRosterLast() throws {
+        let remote = try makeRemote()
+        let (fp, fs) = machine("founder")
+        let (cp, cs) = machine("coleader")
+        let founder = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: fp, secrets: fs, now: 1_000)
+        let coleader = try TeamClient.request(code: try founder.code(expiresIn: 600, now: 1_000), name: "Cy",
+                                              devices: [], platform: "linux", paths: cp, secrets: cs, now: 1_010)
+        _ = try founder.fetch()
+        try founder.approve(kid: coleader.identity.kid, now: 1_020)
+        try founder.promote(kid: coleader.identity.kid, now: 1_030)
+        _ = try coleader.fetch()
+        XCTAssertTrue(coleader.isLeader)
+
+        // The co-leader approves someone: the roster's tip is now theirs.
+        let (dp, ds) = machine("dee")
+        let dee = try TeamClient.request(code: try founder.code(expiresIn: 600, now: 1_030), name: "Dee",
+                                         devices: [], platform: "linux", paths: dp, secrets: ds, now: 1_040)
+        _ = try coleader.fetch()
+        try coleader.approve(kid: dee.identity.kid, now: 1_050)
+        XCTAssertEqual(coleader.roster?.by, coleader.identity.kid)
+        XCTAssertEqual(coleader.roster?.doc.rev, 4)
+
+        // A founder code still works: the chain runs founder → founder → founder → co-leader.
+        let (ep, es) = machine("eve")
+        let eve = try TeamClient.request(code: try founder.code(expiresIn: 600, now: 1_050), name: "Eve",
+                                         devices: [], platform: "linux", paths: ep, secrets: es, now: 1_060)
+        XCTAssertEqual(try eve.status().role, "pending")
+        XCTAssertEqual(eve.roster?.doc.rev, 4)
+        XCTAssertEqual(eve.config.leaderKid, founder.identity.kid)
+
+        // And the mirror: the founder edits last, a co-leader code joins.
+        _ = try founder.fetch()
+        try founder.approve(kid: eve.identity.kid, now: 1_070)
+        XCTAssertEqual(founder.roster?.by, founder.identity.kid)
+        let (gp, gs) = machine("gil")
+        let gil = try TeamClient.request(code: try coleader.code(expiresIn: 600, now: 1_070), name: "Gil",
+                                         devices: [], platform: "linux", paths: gp, secrets: gs, now: 1_080)
+        XCTAssertEqual(gil.roster?.doc.rev, 5)
+        XCTAssertEqual(gil.config.leaderKid, coleader.identity.kid)
+        // Later fetches step from the roster the join accepted.
+        _ = try coleader.fetch()
+        try coleader.approve(kid: gil.identity.kid, now: 1_090)
+        XCTAssertEqual(try gil.fetch().rev, 6)
+        XCTAssertTrue(gil.isMember)
+
+        // A forged step on top (a member with the store credential names
+        // themselves leader) breaks the chain for a newcomer, whichever
+        // leader's code they hold.
+        let mal = TeamIdentity.random()
+        var forged = try XCTUnwrap(coleader.roster).doc
+        forged.rev += 1
+        forged.leaders.append(TeamRoster.Member(keys: mal.keys, name: "Mal", since: 1_095))
+        let raw = TeamGit(dir: scratch.appendingPathComponent("mal-store"), remote: remote, token: nil, author: mal.kid)
+        try raw.open(); try raw.sync()
+        try raw.put("roster/team.json", try CanonicalJSON.encode(try Signed.make(forged, by: mal)))
+        for (code, name) in [(try founder.code(expiresIn: 600, now: 1_095), "hal-f"),
+                             (try coleader.code(expiresIn: 600, now: 1_095), "hal-c")] {
+            let (hp, hs) = machine(name)
+            XCTAssertThrowsError(try TeamClient.request(code: code, name: "Hal", devices: [], platform: "linux",
+                                                        paths: hp, secrets: hs, now: 1_100), name) {
+                XCTAssertEqual($0 as? TeamClient.ClientError, .badCode)
+            }
+            XCTAssertEqual(hp.teamIDs(), [])
+        }
+    }
+
     /// C2: a kid names exactly one encryption key, so nobody can plant a
     /// request under someone else's kid, and a leader's kid is never
     /// re-approved as a member.
