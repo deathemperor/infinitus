@@ -469,9 +469,11 @@ struct T3MessageRow: View {
             HStack {
                 Spacer(minLength: 48)
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(message.text)
-                        .font(T3Font.mobile(.base))
-                        .foregroundStyle(t3.mobile.userBubbleForeground.color)
+                    // The user's text is markdown too (skill bodies, pasted
+                    // notes): T3's `user` run styles, everything in the
+                    // bubble's foreground.
+                    MarkdownText(text: message.text)
+                        .markdownStyle(.t3(t3.mobile, user: true))
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(t3.mobile.userBubble.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     HStack(spacing: 4) { stamp; copyButton }
@@ -482,8 +484,7 @@ struct T3MessageRow: View {
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 MarkdownText(text: message.text)
-                    .font(T3Font.mobile(.base))
-                    .foregroundStyle(t3.mobile.foreground.color)
+                    .markdownStyle(.t3(t3.mobile))
                 HStack(spacing: 4) { copyButton; stamp }
                     .padding(.top, 4)
             }
