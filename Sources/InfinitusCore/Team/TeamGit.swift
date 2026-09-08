@@ -81,6 +81,14 @@ public final class TeamGit: TeamStore {
     /// asked git for the branch tip again (1708 files → 1708 extra
     /// subprocesses on the 2026-09-06 first publish).
     private var heads: [String: String?] = [:]
+    /// A commit's tree never changes, so its listing is kept for the
+    /// life of this store object: `list` is called three times per
+    /// reader pass and every branch was `ls-tree`d each time (#370).
+    /// Bounded; the store's own pushes and every sync add heads.
+    private var trees: [String: [StoreEntry]] = [:]
+    /// Remote branch names, memoised until the next `sync`/push like
+    /// `heads` — one `for-each-ref` per pass, not one per `list`.
+    private var branchNames: [String]?
     /// What the last `open()` cleared, for the log line and the tests.
     public private(set) var sweptLocks: [String] = []
 
@@ -132,7 +140,7 @@ public final class TeamGit: TeamStore {
         // No refspec at all would fall back to the remote's configured
         // one and fetch everything.
         if let branches, branches.isEmpty { return }
-        heads = [:]
+        heads = [:]; branchNames = nil
         let refspecs = branches?.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
             ?? ["+refs/heads/*:refs/remotes/origin/*"]
         _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
@@ -173,8 +181,8 @@ public final class TeamGit: TeamStore {
             guard let (branch, rest) = StorePath.branch(of: path) else { throw GitError.badPath(path) }
             byBranch[branch, default: []].append((rest, blob))
         }
-        heads = [:]
-        defer { heads = [:] }
+        heads = [:]; branchNames = nil
+        defer { heads = [:]; branchNames = nil }
         for (branch, items) in byBranch {
             do {
                 try commitAndPush(branch: branch, items: items)
@@ -221,6 +229,9 @@ public final class TeamGit: TeamStore {
         guard opened else { throw GitError.notOpen }
         var out: [StoreEntry] = []
         for branch in try branches() {
+            // A branch the prefix cannot reach is never listed: `m/<kid>/`
+            // names one branch, `m/` all member branches, `roster/x` one.
+            guard prefix.hasPrefix(branch + "/") || (branch + "/").hasPrefix(prefix) else { continue }
             guard let head = try head(of: branch) else { continue }
             for entry in try tree(commit: head, branch: branch) where entry.path.hasPrefix(prefix) {
                 out.append(entry)
@@ -264,9 +275,12 @@ public final class TeamGit: TeamStore {
     /// blobs the store never promised. `requireEmptyRemote` deliberately
     /// does NOT go through here: for "is this repo empty?" every ref counts.
     private func branches() throws -> [String] {
+        if let branchNames { return branchNames }
         let text = String(decoding: try run(["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"]), as: UTF8.self)
-        return text.split(separator: "\n").map { String($0.dropFirst("origin/".count)) }
+        let names = text.split(separator: "\n").map { String($0.dropFirst("origin/".count)) }
             .filter { $0 == "roster" || $0 == "requests" || $0.hasPrefix("m/") || $0.hasPrefix("t/") }
+        branchNames = names
+        return names
     }
 
     private func head(of branch: String) throws -> String? {
@@ -282,13 +296,17 @@ public final class TeamGit: TeamStore {
 
     /// `ls-tree -r -l` lines: `<mode> blob <sha> <size>\t<path>`.
     private func tree(commit: String, branch: String) throws -> [StoreEntry] {
+        if let known = trees[branch + "@" + commit] { return known }
         let text = String(decoding: try run(["ls-tree", "-r", "-l", commit]), as: UTF8.self)
-        return text.split(separator: "\n").compactMap { line in
+        let entries: [StoreEntry] = text.split(separator: "\n").compactMap { line in
             guard let tab = line.firstIndex(of: "\t") else { return nil }
             let meta = line[line.startIndex..<tab].split(separator: " ", omittingEmptySubsequences: true)
             guard meta.count == 4, meta[1] == "blob", let size = Int(meta[3]) else { return nil }
             return StoreEntry(path: branch + "/" + line[line.index(after: tab)...], size: size, version: String(meta[2]))
         }
+        if trees.count >= 64 { trees.removeAll() }
+        trees[branch + "@" + commit] = entries
+        return entries
     }
 
     private func commitAndPush(branch: String, items: [(String, Blob?)]) throws {
@@ -584,6 +602,12 @@ public final class TeamGit: TeamStore {
         let out = Pipe(), err = Pipe()
         p.standardOutput = out; p.standardError = err
         let feeding = DispatchGroup()
+        // `waitUntilExit` polls: ~100 ms per call on the main thread (where
+        // XCTest runs every Team suite) and ~35 ms off it, on top of git's
+        // own ~20 ms — a termination handler returns the moment the child
+        // is gone (#370: 254 git calls made one 33 s test).
+        let exited = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in exited.signal() }
         if let stdin {
             let input = Pipe()
             p.standardInput = input
@@ -598,7 +622,7 @@ public final class TeamGit: TeamStore {
         let watch = network ? Watch(activity: { Self.activity.fire($0) }, kill: { Self.terminate(p) }) : nil
         let (data, errData, stalled) = Self.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
         feeding.wait()
-        p.waitUntilExit()
+        exited.wait()
         let command = args.joined(separator: " ")
         if stalled { throw GitError.stalled(command: command, idle: watch?.idle ?? Self.stallTimeout) }
         guard p.terminationStatus == 0 else {
