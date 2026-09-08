@@ -214,4 +214,19 @@ final class ThreadFeedPresentationTests: XCTestCase {
         XCTAssertEqual((wire[1]["toggle"] as? [String: Any])?["hiddenCount"] as? Int, 3)
         XCTAssertEqual(wire.last?["type"] as? String, "thinking")
     }
+
+    func testRowsMemoDerivesOncePerTimelineAndExpansion() throws {
+        let tl = try timeline("tools", status: "busy")
+        let memo = ThreadRowsMemo()
+        let rows = memo.rows(tl, expandedTurnIds: [], expandedWorkGroupIds: [])
+        XCTAssertEqual(rows, ThreadFeedPresentation.derive(tl))
+        _ = memo.rows(tl, expandedTurnIds: [], expandedWorkGroupIds: [])
+        _ = memo.rows(try timeline("tools", status: "busy"), expandedTurnIds: [], expandedWorkGroupIds: [])
+        XCTAssertEqual(memo.derivations, 1, "an equal timeline and the same expansion answer from the memo")
+        XCTAssertEqual(memo.rows(tl, expandedTurnIds: ["u1"], expandedWorkGroupIds: []),
+                       ThreadFeedPresentation.derive(tl, expandedTurnIds: ["u1"]))
+        XCTAssertEqual(memo.derivations, 2)
+        _ = memo.rows(try timeline("tools", status: "idle"), expandedTurnIds: ["u1"], expandedWorkGroupIds: [])
+        XCTAssertEqual(memo.derivations, 3, "a changed timeline derives again")
+    }
 }

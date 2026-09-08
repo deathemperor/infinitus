@@ -20,6 +20,7 @@ publishes the matching section as the GitHub release body.
 - The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
 
 ### Phone
+- A long thread scrolls and refreshes without stalling: the feed's rows are derived once per update instead of once per row on every redraw; the Mac's chat window gets the same (#380).
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
 - Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).
