@@ -397,6 +397,46 @@ actor NetworkFleetMirror: FleetMirror {
         return try decoder.decode(R.self, from: data)
     }
 
+    /// The session timeline (#223 phase 4): a snapshot on the first ask,
+    /// then the events past `after` while `epoch` still matches, else a
+    /// fresh snapshot — the Mac holds a `wait` long-poll until something
+    /// changes. Same route discipline as `sessionTail`: a long-poll goes
+    /// to the route that last answered only, with a timeout past `wait`.
+    func timeline(pid: Int32, after: Int?, epoch: String?, wait: TimeInterval) async throws -> TimelineSync {
+        let token = pairToken()
+        var path = MirrorTransport.sessionTimelinePath(pid: pid)
+        let data: Data
+        if let after, let epoch, wait > 0 {
+            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+            path += "?\(MirrorTransport.timelineAfterQueryName)=\(after)"
+                + "&\(MirrorTransport.timelineEpochQueryName)="
+                + (epoch.addingPercentEncoding(withAllowedCharacters: allowed) ?? epoch)
+                + "&\(MirrorTransport.tailWaitQueryName)=\(Int(wait))"
+            guard let text = candidateEndpoints().first,
+                  let manual = MirrorTransport.parseEndpoint(text) else {
+                throw MirrorTransportError.timedOut
+            }
+            let endpoint = NWEndpoint.hostPort(
+                host: NWEndpoint.Host(manual.host),
+                port: NWEndpoint.Port(rawValue: manual.port) ?? .any)
+            (data, _) = try await fetch(endpoint, path: path, hostHeader: manual.host,
+                                        useTLS: manual.useTLS, token: token, timeout: wait + 10)
+        } else {
+            guard let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) else {
+                throw MirrorTransportError.timedOut
+            }
+            data = stored
+        }
+        return try Self.decodeTimeline(data)
+    }
+
+    /// The timeline route's reply; the one decoder that knows its ISO 8601 dates.
+    static func decodeTimeline(_ data: Data) throws -> TimelineSync {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(TimelineSync.self, from: data)
+    }
+
     /// The session feed (#17 layer 1): same candidate/token/Host picking
     /// logic as `latest()`, factored into `fetchFromStored` so both share
     /// it — no snapshot-style caching here, a failed fetch just throws.

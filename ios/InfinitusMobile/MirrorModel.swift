@@ -217,6 +217,8 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// "Show as Mac popup" (#9 native shell): the 1:1 rendering is kept,
     /// one toggle away — the native tab shell is the default.
     @Published var macPopupView: Bool { didSet { defaults.set(macPopupView, forKey: "mac_popup_view") } }
+    /// The T3 client clone's screens (#223 §5) in place of the phone's own; off until they are whole.
+    @Published var t3Screens: Bool { didSet { defaults.set(t3Screens, forKey: "t3_screens") } }
 
     // MARK: LAN transport (#9)
 
@@ -262,6 +264,7 @@ final class MirrorModel: ObservableObject, FleetModel {
         localIntroTitle = defaults.string(forKey: "intro_title") ?? "zoom"
         localIntroSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
         macPopupView = defaults.object(forKey: "mac_popup_view") as? Bool ?? false
+        t3Screens = defaults.object(forKey: "t3_screens") as? Bool ?? false
         reachableAgain = { Task { await OutboxDelivery.flush() } }
         otherReachable = { id in
             Task {

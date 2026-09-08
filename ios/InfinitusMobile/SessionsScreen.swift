@@ -41,7 +41,7 @@ struct SessionsScreen: View {
                 // THAT Mac's snapshot, which never moves the primary's.
                 .onChange(of: model.others.map { $0.snapshot?.capturedAt }) { _, _ in openRequestedPid() }
                 .navigationDestination(for: SessionDetail.self) { session in
-                    SessionFeedScreen(model: model, session: session)
+                    threadScreen(session, macId: nil)
                         .onAppear { openPid = session.pid }
                         .onDisappear { if openPid == session.pid { openPid = nil } }
                 }
@@ -59,7 +59,7 @@ struct SessionsScreen: View {
                 // own Mac. Sits beside the primary's destination so both
                 // can stack.
                 .navigationDestination(for: OtherSessionRoute.self) { route in
-                    SessionFeedScreen(model: model, session: route.session, macId: route.macId)
+                    threadScreen(route.session, macId: route.macId)
                 }
         }
         // A shake staged a capture for a session: open its feed (which
@@ -385,6 +385,17 @@ struct SessionsScreen: View {
                 .background(ThemeColor.flash(theme).opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
                 .textCase(nil)
             }
+        }
+    }
+
+    /// A session opens in the phone's feed, or in the T3 clone's thread
+    /// (#223 §5) while the `T3 screens` setting is on.
+    @ViewBuilder
+    private func threadScreen(_ session: SessionDetail, macId: String?) -> some View {
+        if model.t3Screens {
+            T3ThreadScreen(model: model, session: session, macId: macId)
+        } else {
+            SessionFeedScreen(model: model, session: session, macId: macId)
         }
     }
 
