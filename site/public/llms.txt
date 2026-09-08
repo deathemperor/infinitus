@@ -6,7 +6,7 @@
 - Source (MIT): https://github.com/deathemperor/infinitus
 - Releases: https://github.com/deathemperor/infinitus/releases
 - Issues / roadmap: https://github.com/deathemperor/infinitus/issues
-- Version: 0.4.4-alpha.1 (2026-09, alpha)
+- Version: 0.4.4-alpha.2 (2026-09, alpha)
 
 ## What it does
 
@@ -25,6 +25,9 @@
 - Team (preview), session control: a member grants leaders, the whole team or named members the right to view, send, approve, mode, resume or key on all or chosen sessions (Settings › Team or `infinitusctl team grant`); commands are sealed envelopes verified against the roster and the grant on the member's own Mac, every one is audited, and the driven session shows who is driving.
 - Team (preview), hostnames: a leader pastes a Cloudflare API token (Tunnel Edit + DNS Edit on one zone) once, then mints `<name>.<label>.<zone>` per member from Settings › Team › Hostnames or `infinitusctl team hostname give`; the tunnel token travels sealed to that member in the team store, their Mac keeps it in the keychain and runs the named tunnel, and removing the member deletes the tunnel and DNS record.
 - Team (preview), driving: from a teammate's detail on the Mac (a chat window over their session's live tail, controls gated on the grant) or `infinitusctl team send|approve|mode|tail|acks`; a command tries their LAN address on the same subnet, then their tunnel, then waits in the team store for their next fetch, and reports the lane it took and the grantor's outcome.
+- Headless sessions: a session with no terminal, run by the Mac; the Mac window, the phone and the browser page are its chat, and its prompts, questions, plans and images reach all three.
+- Browser page: machines without the app get the sessions list, a chat with a session and Start a session at the "Copy Browser Link" address in Settings › Devices.
+- New phone screens (preview, Settings › Appearance › "New session screens"): a flat thread list with shelves and search, a session as a chat thread, a task sheet, thread settings and a git pill.
 
 ## Platforms
 

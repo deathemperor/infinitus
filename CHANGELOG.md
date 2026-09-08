@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+## 0.4.4-alpha.2
+
 ### Mac
 - Team Nearby no longer depends on the phone switch: a discoverable Mac or a team member keeps the LAN listener up by itself, and phone connections are refused while "Serve the fleet to my phone" is off (#356).
 - A click into an account's name field focuses it at once; only the drag handle starts a reorder now, so the row no longer holds every click until the mouse comes up.
@@ -15,13 +17,64 @@ publishes the matching section as the GitHub release body.
 - The Activity log and `infinitusctl events` survive a relaunch: the last hundred events come back from the durable log at launch (#338).
 - The wall honors the biometric lock: while the app is locked it shows the lock, not the sessions (#55).
 - `infinitusctl` retries for a second while the app re-binds its control socket, and says which error it hit instead of a flat "not running" (#265).
+- A freshly added account shows its email in Settings › Accounts before you name it.
+- "Waiting for the token" shows what the sign-in CLI is saying, and a rejected code comes back to the field with the reason.
+- The "Almost there" setup card no longer clips the popup's toolbar, names your account once, and explains the AI-agent brief under its button.
+- A sign-in code Claude rejects (half-copied, or a failed exchange) comes straight back to the paste field with the reason, instead of waiting forever.
+- The setup steps (install the engine, add the first account) show on a solid background instead of glass.
+- The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
+- The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
+- Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
+- Settings › Machine shows on dev builds and stays hidden on releases.
+- Fewer stray notifications: "all sessions finished" needs ten minutes of work first, its stretch and the last-alive warning survive a relaunch, and engine housekeeping events no longer post banners (#231).
+- Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
+- Settings polish: every engine error reads as a sentence, the search highlight fades in and out, Machine labels share one casing, and a `-mock_mode YES` dev instance shows mock accounts (#249).
+- Team publishing reuses the Stats scan instead of scanning every transcript a second time, which had taken the app to 5.5 GB (#251).
+- Settings › Accounts leads with Add Account, shows Sign In Again only on the account that needs it, and renames an account in its own field, Tab moving to the next.
+- Randomize Names can be undone for 30 seconds.
+- Regenerating the pairing token, stopping rotation, signing in again, forgetting a stored key or token, and removing a push channel, a profile or a crash report all ask first.
+- Settings › Devices puts one QR code and one address up front, with the rest behind Other addresses.
+- Every icon button in Settings says what it does and to which account, and an engine error now reads as a sentence with a next step.
+- Settings' sidebar is a real list: arrow keys, type-select, a focus ring and VoiceOver names, grouped into General, Accounts, Dashboards and Engines.
+- Settings search finds a setting by its own label, opens its pane and flashes the group it lives in; ⌘F jumps to the field.
+- The Settings window is called Settings and says which pane you're in.
+- Display is five named groups — Menu bar, Popup, Fleet wall, Sessions, Refresh and startup — each with a footer that says what the setting costs.
+- The popup's headroom sorting moved to Settings › Display, where the rest of the popup's appearance lives.
+- Theme cards show the whole theme instead of hiding half of it in a sideways scroller, and name two accounts the way that theme would.
+- Utilization says what its gauge glyphs mean, and its run-rate methodology moved under "How this is measured".
+- The Stats tiles fill their last row instead of stranding one tile beside three empty cells.
+- About has its own Software Update group, and says "Scripted (Notification Center unavailable)" instead of naming the tool it fell back to.
+- The tokens/minute chip speaks the theme — mana/min, baud, knots — with its own icon, on the Mac, the phone, the widgets and both theme previews (#218).
+- Settings › Accounts backs up every cswap account to one file and restores from it, asking before it replaces anything (#229).
+- All accounts limited: the one that revives first floats to the top with a themed pulse and its own hh:mm:ss countdown inside the revive lead, on the popup, pop-out and the phone's rows.
+- Settings › Notifications sets the revive lead (default 10 min): how far ahead of an exhausted account's reset its row counts down live and the phone's reset alarm fires.
+- Phone messages and resume nudges reach sessions in every permission mode again: Claude Code 2.1.263 holds a peer message that claims a different permission class than the receiver's, so the app now asserts the session's own (#213).
+- "All accounts are exhausted" notifies once per outage and honors its toggle — the engine's ten-minute re-probes no longer repeat it.
 
-### Team
+### Team (preview)
 - An invite code from either leader of a two-leader team joins, whichever leader last edited the roster — the join walks the roster's signed history back to the code's leader (#55).
 - Transcripts publish to their own branch per member, fetched only by the teammates they are shared with: every device's routine sync and a new member's first load stay in the kilobytes (#321).
 - Requesting to join fetches only the roster and the requests, not every member's transcript history — a join that pulled 1.3 GB now moves kilobytes (#321).
 - A slow store never looks hung: Team shows git's own progress, a stalled fetch or push times out with a message, and Approve no longer waits behind a running publish.
 - Team actions no longer wait for biometric unlock: create, join, approve, invite, grants and hostnames work with the lock off.
+- Nearby no longer lists this Mac as a stranger, re-advertises your role right after you create or join a team, and says when the LAN mirror is off.
+- Saving the Cloudflare token and giving a hostname sit behind biometric unlock, like grants (#220).
+- Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
+- A leader can give each member a stable hostname — a Cloudflare named tunnel under the team's zone, minted from Settings › Team or `infinitusctl team hostname give`, started by their Mac on its next fetch (#220).
+- Team session control, driver side: drive a teammate's granted session from their detail on the Mac or with `infinitusctl team send|approve|mode|tail` — over LAN, a tunnel, or the store on their next fetch, each command answered with its lane and outcome (#220).
+- Team session control on the Mac, grantor side: grant teammates view, send, approve, mode, resume or key on chosen sessions from Settings › Team or `infinitusctl team grant`; commands arrive at the mirror server, every one is audited, and the sessions popover says who is driving (#220).
+- Team session control, core: grants, sealed command and ack envelopes, the verification pipeline and the control routes land in InfinitusCore with tests; nothing is mounted yet (#220).
+- Team store hardening: `--team` ids are one path segment, git's stdin is fed without a pipe deadlock or SIGPIPE, the CLI reports encoding failures instead of exiting 0, garbled signer keys read as a bad signature (#55).
+- A teammate's fleet — every account with tier, state and headroom — shows in their detail on the Mac and the phone, with a Fleet share row (default: leaders) and a headroom board for leaders (#221).
+- A removed teammate's files stay readable up to the moment they were removed, and only later ones are ignored.
+- Creating a team refuses a remote that already has content.
+- A join the store refuses leaves no credential on this Mac.
+- A publish that lost a push race is told apart from one that lost the network.
+- The team store ignores an inherited git environment, and clears stale git locks a killed publish left behind.
+- The team store reads only its own branches, and a rebuilt mirror re-lists instead of failing.
+- `infinitusctl team` masks credentials in its errors, lists envelopes without decrypting them, and checks `--team`.
+- A publish seals its batch to disk instead of holding it in memory, and Settings › Team says how much of a big catch-up is left.
+- `infinitusctl team leave [--rotate-identity]` leaves a team and can mint a fresh identity on the way out.
 
 ### Sessions
 - A nudge into a session that has run tools for hours is no longer held by Claude Code as "did not attest its permission mode": the mode comes from how the session was launched when its transcript tail has none.
@@ -84,64 +137,7 @@ publishes the matching section as the GitHub release body.
 - The all-limited Live Activity counts down to the real revival instead of 31 years out, and every surface picks the reviver by parsed reset date, ignoring implausible ones (#226).
 - Review changes says why there is nothing to review — checkpoints off on the Mac, a folder outside git, or no prompt checkpointed yet — instead of a caption nobody saw (#214).
 - A message Claude Code held instead of delivering shows in the chat as a marker, with where to review it (#213).
-
-### Mac
-- A freshly added account shows its email in Settings › Accounts before you name it.
-- "Waiting for the token" shows what the sign-in CLI is saying, and a rejected code comes back to the field with the reason.
-- The "Almost there" setup card no longer clips the popup's toolbar, names your account once, and explains the AI-agent brief under its button.
-- A sign-in code Claude rejects (half-copied, or a failed exchange) comes straight back to the paste field with the reason, instead of waiting forever.
-- The setup steps (install the engine, add the first account) show on a solid background instead of glass.
-- The private sign-in window keeps your Google login across accounts, so adding or re-logging an account skips the email field.
-- The Mac serves a browser page for machines without the app — sessions list, chat with a session, Start a session — at the "Copy Browser Link" address in Settings › Devices (#151).
-- Click a session in the sessions card to chat with it in its own window: the live transcript, a composer, and its permission and question prompts answered from the Mac (#151).
-- Settings › Machine shows on dev builds and stays hidden on releases.
-- Fewer stray notifications: "all sessions finished" needs ten minutes of work first, its stretch and the last-alive warning survive a relaunch, and engine housekeeping events no longer post banners (#231).
-- Team members say when they joined, on their row and in their detail; a removed member still readable says when they were removed; `team members` gains `joined` (#219).
-- Settings polish: every engine error reads as a sentence, the search highlight fades in and out, Machine labels share one casing, and a `-mock_mode YES` dev instance shows mock accounts (#249).
-- Team publishing reuses the Stats scan instead of scanning every transcript a second time, which had taken the app to 5.5 GB (#251).
-- Settings › Accounts leads with Add Account, shows Sign In Again only on the account that needs it, and renames an account in its own field, Tab moving to the next.
-- Randomize Names can be undone for 30 seconds.
-- Regenerating the pairing token, stopping rotation, signing in again, forgetting a stored key or token, and removing a push channel, a profile or a crash report all ask first.
-- Settings › Devices puts one QR code and one address up front, with the rest behind Other addresses.
-- Every icon button in Settings says what it does and to which account, and an engine error now reads as a sentence with a next step.
-- Settings' sidebar is a real list: arrow keys, type-select, a focus ring and VoiceOver names, grouped into General, Accounts, Dashboards and Engines.
-- Settings search finds a setting by its own label, opens its pane and flashes the group it lives in; ⌘F jumps to the field.
-- The Settings window is called Settings and says which pane you're in.
-- Display is five named groups — Menu bar, Popup, Fleet wall, Sessions, Refresh and startup — each with a footer that says what the setting costs.
-- The popup's headroom sorting moved to Settings › Display, where the rest of the popup's appearance lives.
-- Theme cards show the whole theme instead of hiding half of it in a sideways scroller, and name two accounts the way that theme would.
-- Utilization says what its gauge glyphs mean, and its run-rate methodology moved under "How this is measured".
-- The Stats tiles fill their last row instead of stranding one tile beside three empty cells.
-- About has its own Software Update group, and says "Scripted (Notification Center unavailable)" instead of naming the tool it fell back to.
-- The tokens/minute chip speaks the theme — mana/min, baud, knots — with its own icon, on the Mac, the phone, the widgets and both theme previews (#218).
-- Settings › Accounts backs up every cswap account to one file and restores from it, asking before it replaces anything (#229).
-- All accounts limited: the one that revives first floats to the top with a themed pulse and its own hh:mm:ss countdown inside the revive lead, on the popup, pop-out and the phone's rows.
-- Settings › Notifications sets the revive lead (default 10 min): how far ahead of an exhausted account's reset its row counts down live and the phone's reset alarm fires.
-- Phone messages and resume nudges reach sessions in every permission mode again: Claude Code 2.1.263 holds a peer message that claims a different permission class than the receiver's, so the app now asserts the session's own (#213).
-- "All accounts are exhausted" notifies once per outage and honors its toggle — the engine's ten-minute re-probes no longer repeat it.
-
-### Phone
 - A phone showing the revival countdown skips the duplicate all-dead alert, and a working activity starts silently.
-
-### Team (preview)
-- Nearby no longer lists this Mac as a stranger, re-advertises your role right after you create or join a team, and says when the LAN mirror is off.
-- Saving the Cloudflare token and giving a hostname sit behind biometric unlock, like grants (#220).
-- Team publishing and fetching run git directly instead of through the macOS xcrun shim, about a quarter faster per call.
-- A leader can give each member a stable hostname — a Cloudflare named tunnel under the team's zone, minted from Settings › Team or `infinitusctl team hostname give`, started by their Mac on its next fetch (#220).
-- Team session control, driver side: drive a teammate's granted session from their detail on the Mac or with `infinitusctl team send|approve|mode|tail` — over LAN, a tunnel, or the store on their next fetch, each command answered with its lane and outcome (#220).
-- Team session control on the Mac, grantor side: grant teammates view, send, approve, mode, resume or key on chosen sessions from Settings › Team or `infinitusctl team grant`; commands arrive at the mirror server, every one is audited, and the sessions popover says who is driving (#220).
-- Team session control, core: grants, sealed command and ack envelopes, the verification pipeline and the control routes land in InfinitusCore with tests; nothing is mounted yet (#220).
-- Team store hardening: `--team` ids are one path segment, git's stdin is fed without a pipe deadlock or SIGPIPE, the CLI reports encoding failures instead of exiting 0, garbled signer keys read as a bad signature (#55).
-- A teammate's fleet — every account with tier, state and headroom — shows in their detail on the Mac and the phone, with a Fleet share row (default: leaders) and a headroom board for leaders (#221).
-- A removed teammate's files stay readable up to the moment they were removed, and only later ones are ignored.
-- Creating a team refuses a remote that already has content.
-- A join the store refuses leaves no credential on this Mac.
-- A publish that lost a push race is told apart from one that lost the network.
-- The team store ignores an inherited git environment, and clears stale git locks a killed publish left behind.
-- The team store reads only its own branches, and a rebuilt mirror re-lists instead of failing.
-- `infinitusctl team` masks credentials in its errors, lists envelopes without decrypting them, and checks `--team`.
-- A publish seals its batch to disk instead of holding it in memory, and Settings › Team says how much of a big catch-up is left.
-- `infinitusctl team leave [--rotate-identity]` leaves a team and can mint a fresh identity on the way out.
 
 ## 0.4.4-alpha.1
 
