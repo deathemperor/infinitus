@@ -37,17 +37,23 @@ struct T3SidebarView: View {
 
     // AppSidebarLayout's brand slot; height matches Metrics.topbarHeight so
     // the row lines up with the top bar to its right (Task 8). The native
-    // traffic lights "sit over the sidebar" while it is expanded (task-8
-    // brief), so the row's own content — not just the window chrome —
-    // must clear them; 90 pt is the same clearance Task 8's top bar uses
-    // for its own left inset when the sidebar is collapsed.
+    // traffic lights "sit over the sidebar" while it is expanded, so the
+    // row's own content — not just the window chrome — must clear them.
+    // `--workspace-titlebar-content-left` (`ui/sidebar.tsx:169-170`) =
+    // `--workspace-controls-left` + `--workspace-titlebar-control-size` +
+    // `--workspace-titlebar-control-gap`: 90 pt (macOS traffic-light inset,
+    // `AppSidebarLayout.tsx:49`'s `MACOS_TRAFFIC_LIGHTS_LEFT_INSET`,
+    // applied at `:180`) + 28 pt (1.75rem control size) + 12 pt (0.75rem
+    // gap, both `src/index.css:112-113`) = 130 pt — the brand slot's own
+    // `ml-[var(--workspace-titlebar-content-left)]`
+    // (`components/sidebar/SidebarChrome.tsx:89`).
     private var brandRow: some View {
         HStack(spacing: 8) {
             T3ProviderIcon(size: 20)
             T3Wordmark()
             Spacer(minLength: 0)
         }
-        .padding(.leading, 90)
+        .padding(.leading, 130)
         .padding(.trailing, T3Theme.Metrics.sidebarContentInset)
         .frame(height: T3Theme.Metrics.topbarHeight)
     }
@@ -89,6 +95,7 @@ struct T3SidebarView: View {
             }
         }
         .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
+        // `Sidebar.tsx:4451`'s project-select trigger: "h-8 min-h-8" = 32 pt.
         .frame(height: 32)
         .padding(.bottom, 4)
     }
@@ -137,14 +144,17 @@ struct T3SidebarView: View {
                 if section.threads.count > shown.count {
                     // Sidebar.tsx's settled tail: 10 initial, 25 a page
                     // (`T3ThreadList.settledInitialCount`/`settledPageCount`).
+                    // `Sidebar.tsx:4877`'s button: "flex h-9 w-full … px-2.5
+                    // text-left text-sm text-sidebar-muted-foreground/55" —
+                    // h-9 = 36 pt (fix round 1 R4; was 28), text-sm not -xs.
                     Button("Show \(min(T3ThreadList.settledPageCount, section.threads.count - shown.count)) more") {
                         settledShown += T3ThreadList.settledPageCount
                     }
                     .buttonStyle(.plain)
-                    .font(T3Font.web(.xs))
+                    .font(T3Font.web(.sm))
                     .foregroundStyle(t3.web.sidebarMutedForeground.color)
                     .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
-                    .frame(height: 28, alignment: .leading)
+                    .frame(height: 36, alignment: .leading)
                 }
             }
         }
@@ -173,6 +183,11 @@ struct T3SidebarView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
+            // Shelf toggle row: no upstream 1:1 found (this compact port's
+            // own shelf header markup, not traced to a `Sidebar.tsx`
+            // element) — 32 pt matches the scope row's own h-8
+            // (`Sidebar.tsx:4451`), kept as this sidebar's own rhythm for
+            // its non-thread control rows.
             .frame(height: 32)
             if expanded.wrappedValue { content() }
         }
@@ -182,7 +197,10 @@ struct T3SidebarView: View {
     // MARK: - Footer
 
     // `SidebarChrome.tsx`'s footer: settings gear only — the update pill
-    // has no host surface on B yet.
+    // has no host surface on B yet. `<SidebarFooter className="p-[var(
+    // --sidebar-content-inset)]">` (`:226`) has no fixed height class —
+    // content-driven padding on all sides, not the `.frame(height: 40)`
+    // literal this held before fix round 1's R4.
     private var footer: some View {
         HStack {
             Button(action: { app.showSettings?() }) { LucideIcon(.settings, size: 16) }
@@ -190,8 +208,7 @@ struct T3SidebarView: View {
                 .foregroundStyle(t3.web.sidebarMutedForeground.color)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, T3Theme.Metrics.sidebarContentInset)
-        .frame(height: 40)
+        .padding(T3Theme.Metrics.sidebarContentInset)
     }
 
     // ⌘F focuses the search field while the window is key (the ⌘B/⌘J/⌘W

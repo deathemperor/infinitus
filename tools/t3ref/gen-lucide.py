@@ -12,16 +12,17 @@ below) and must not get their own case.
 
 Kebab-case mapping exceptions (a trailing digit gets its own dash, which
 the generic camelCase→kebab-case regex misses): Code2 → code-2,
-FolderGit2 → folder-git-2, Globe2 → globe-2, Link2 → link-2,
-Maximize2 → maximize-2, Minimize2 → minimize-2, MousePointer2 → mouse-pointer-2,
+FolderGit2 → folder-git-2, Gamepad2 → gamepad-2, Globe2 → globe-2,
+Layers3 → layers-3, Link2 → link-2, Maximize2 → maximize-2,
+Minimize2 → minimize-2, MousePointer2 → mouse-pointer-2,
 PictureInPicture2 → picture-in-picture-2, Trash2 → trash-2, Undo2 → undo-2,
 Unlink2 → unlink-2.
 
 Five vendored names are deprecated lucide aliases whose upstream .js is a
 byte-identical `export { default } from './<target>.js'` re-export with
 no __iconNode of its own: code-2 → code-xml, globe-2 → earth,
-more-vertical → ellipsis-vertical, x-circle → circle-x,
-message-circle-question → message-circle-question-mark. Both the alias
+more-vertical → ellipsis-vertical, x-circle → circle-x, layers-3 →
+layers. Both the alias
 file and its target module are vendored as true upstream copies (so a
 future `cp` re-vendor never has to special-case them); this generator
 follows the re-export at parse time and draws the target's paths under
@@ -44,9 +45,10 @@ ATTR = re.compile(r'(\w+):\s*"([^"]*)"')
 REEXPORT = re.compile(r"export \{ default \} from '\./(\S+)\.js'")
 
 KEBAB_OVERRIDES = {
-    "Code2": "code-2", "FolderGit2": "folder-git-2", "Globe2": "globe-2", "Link2": "link-2",
-    "Maximize2": "maximize-2", "Minimize2": "minimize-2", "MousePointer2": "mouse-pointer-2",
-    "PictureInPicture2": "picture-in-picture-2", "Trash2": "trash-2", "Undo2": "undo-2", "Unlink2": "unlink-2",
+    "Code2": "code-2", "FolderGit2": "folder-git-2", "Gamepad2": "gamepad-2", "Globe2": "globe-2",
+    "Layers3": "layers-3", "Link2": "link-2", "Maximize2": "maximize-2", "Minimize2": "minimize-2",
+    "MousePointer2": "mouse-pointer-2", "PictureInPicture2": "picture-in-picture-2", "Trash2": "trash-2",
+    "Undo2": "undo-2", "Unlink2": "unlink-2",
 }
 
 def kebab(name):

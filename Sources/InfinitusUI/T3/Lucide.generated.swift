@@ -6,6 +6,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case arrowLeft = "arrow-left"
     case arrowRight = "arrow-right"
     case arrowUp = "arrow-up"
+    case bookOpen = "book-open"
     case bookmark = "bookmark"
     case bot = "bot"
     case braces = "braces"
@@ -20,31 +21,38 @@ public enum Lucide: String, CaseIterable, Sendable {
     case circle = "circle"
     case circleAlert = "circle-alert"
     case circleCheck = "circle-check"
+    case circuitBoard = "circuit-board"
     case cloud = "cloud"
+    case cloudCog = "cloud-cog"
     case code2 = "code-2"
     case copy = "copy"
+    case database = "database"
     case download = "download"
     case ellipsis = "ellipsis"
     case externalLink = "external-link"
     case eye = "eye"
     case file = "file"
     case fileText = "file-text"
+    case flaskConical = "flask-conical"
     case folder = "folder"
     case folderClosed = "folder-closed"
+    case folderCode = "folder-code"
     case folderGit = "folder-git"
     case folderGit2 = "folder-git-2"
     case folderPlus = "folder-plus"
     case folderTree = "folder-tree"
     case frame = "frame"
+    case gamepad2 = "gamepad-2"
     case gauge = "gauge"
     case gitBranch = "git-branch"
     case gitPullRequest = "git-pull-request"
     case globe = "globe"
     case globe2 = "globe-2"
-    case hand = "hand"
     case history = "history"
+    case image = "image"
     case info = "info"
     case laptop = "laptop"
+    case layers3 = "layers-3"
     case link = "link"
     case link2 = "link-2"
     case listTodo = "list-todo"
@@ -52,7 +60,6 @@ public enum Lucide: String, CaseIterable, Sendable {
     case logIn = "log-in"
     case maximize2 = "maximize-2"
     case messageCircle = "message-circle"
-    case messageCircleQuestion = "message-circle-question"
     case messageSquare = "message-square"
     case minimize2 = "minimize-2"
     case minus = "minus"
@@ -61,6 +68,8 @@ public enum Lucide: String, CaseIterable, Sendable {
     case moreVertical = "more-vertical"
     case mousePointer2 = "mouse-pointer-2"
     case mousePointerClick = "mouse-pointer-click"
+    case music = "music"
+    case package = "package"
     case packagePlus = "package-plus"
     case paintbrush = "paintbrush"
     case palette = "palette"
@@ -85,6 +94,8 @@ public enum Lucide: String, CaseIterable, Sendable {
     case search = "search"
     case server = "server"
     case settings = "settings"
+    case shieldCheck = "shield-check"
+    case shoppingBag = "shopping-bag"
     case smartphone = "smartphone"
     case smilePlus = "smile-plus"
     case sparkles = "sparkles"
@@ -100,6 +111,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case undo2 = "undo-2"
     case unlink2 = "unlink-2"
     case userPlus = "user-plus"
+    case video = "video"
     case x = "x"
     case xCircle = "x-circle"
     case zap = "zap"
@@ -113,6 +125,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .arrowLeft: return ["m12 19-7-7 7-7", "M19 12H5"]
         case .arrowRight: return ["M5 12h14", "m12 5 7 7-7 7"]
         case .arrowUp: return ["m5 12 7-7 7 7", "M12 19V5"]
+        case .bookOpen: return ["M12 7v14", "M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"]
         case .bookmark: return ["M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"]
         case .bot: return ["M12 8V4H8", "M6.0 8.0h12.0a2.0 2.0 0 0 1 2.0 2.0v8.0a2.0 2.0 0 0 1 -2.0 2.0h-12.0a2.0 2.0 0 0 1 -2.0 -2.0v-8.0a2.0 2.0 0 0 1 2.0 -2.0z", "M2 14h2", "M20 14h2", "M15 13v2", "M9 13v2"]
         case .braces: return ["M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"]
@@ -127,31 +140,38 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .circle: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
         case .circleAlert: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12.0 8.0L12.0 12.0", "M12.0 16.0L12.01 16.0"]
         case .circleCheck: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "m9 12 2 2 4-4"]
+        case .circuitBoard: return ["M5.0 3.0h14.0a2.0 2.0 0 0 1 2.0 2.0v14.0a2.0 2.0 0 0 1 -2.0 2.0h-14.0a2.0 2.0 0 0 1 -2.0 -2.0v-14.0a2.0 2.0 0 0 1 2.0 -2.0z", "M11 9h4a2 2 0 0 0 2-2V3", "M7.0 9.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0", "M7 21v-4a2 2 0 0 1 2-2h4", "M13.0 15.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0"]
         case .cloud: return ["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"]
+        case .cloudCog: return ["m10.852 19.772-.383.924", "m13.148 14.228.383-.923", "M13.148 19.772a3 3 0 1 0-2.296-5.544l-.383-.923", "m13.53 20.696-.382-.924a3 3 0 1 1-2.296-5.544", "m14.772 15.852.923-.383", "m14.772 18.148.923.383", "M4.2 15.1a7 7 0 1 1 9.93-9.858A7 7 0 0 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.2", "m9.228 15.852-.923-.383", "m9.228 18.148-.923.383"]
         case .code2: return ["m18 16 4-4-4-4", "m6 8-4 4 4 4", "m14.5 4-5 16"]
         case .copy: return ["M10.0 8.0h10.0a2.0 2.0 0 0 1 2.0 2.0v10.0a2.0 2.0 0 0 1 -2.0 2.0h-10.0a2.0 2.0 0 0 1 -2.0 -2.0v-10.0a2.0 2.0 0 0 1 2.0 -2.0z", "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"]
+        case .database: return ["M3.0 5.0a9.0 3.0 0 1 0 18.0 0a9.0 3.0 0 1 0 -18.0 0", "M3 5V19A9 3 0 0 0 21 19V5", "M3 12A9 3 0 0 0 21 12"]
         case .download: return ["M12 15V3", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "m7 10 5 5 5-5"]
         case .ellipsis: return ["M11.0 12.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0", "M18.0 12.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0", "M4.0 12.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0"]
         case .externalLink: return ["M15 3h6v6", "M10 14 21 3", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"]
         case .eye: return ["M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0", "M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
         case .file: return ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5"]
         case .fileText: return ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"]
+        case .flaskConical: return ["M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2", "M6.453 15h11.094", "M8.5 2h7"]
         case .folder: return ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"]
         case .folderClosed: return ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z", "M2 10h20"]
+        case .folderCode: return ["M10 10.5 8 13l2 2.5", "m14 10.5 2 2.5-2 2.5", "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"]
         case .folderGit: return ["M10.0 13.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0", "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z", "M14 13h3", "M7 13h3"]
         case .folderGit2: return ["M18 19a5 5 0 0 1-5-5v8", "M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5", "M11.0 12.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0", "M18.0 19.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0"]
         case .folderPlus: return ["M12 10v6", "M9 13h6", "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"]
         case .folderTree: return ["M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z", "M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z", "M3 5a2 2 0 0 0 2 2h3", "M3 3v13a2 2 0 0 0 2 2h3"]
         case .frame: return ["M22.0 6.0L2.0 6.0", "M22.0 18.0L2.0 18.0", "M6.0 2.0L6.0 22.0", "M18.0 2.0L18.0 22.0"]
+        case .gamepad2: return ["M6.0 11.0L10.0 11.0", "M8.0 9.0L8.0 13.0", "M15.0 12.0L15.01 12.0", "M18.0 10.0L18.01 10.0", "M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"]
         case .gauge: return ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"]
         case .gitBranch: return ["M15 6a9 9 0 0 0-9 9V3", "M15.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
         case .gitPullRequest: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M13 6h3a2 2 0 0 1 2 2v7", "M6.0 9.0L6.0 21.0"]
         case .globe: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"]
         case .globe2: return ["M21.54 15H17a2 2 0 0 0-2 2v4.54", "M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17", "M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05", "M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
-        case .hand: return ["M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2", "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2", "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8", "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"]
         case .history: return ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5", "M12 7v5l4 2"]
+        case .image: return ["M5.0 3.0h14.0a2.0 2.0 0 0 1 2.0 2.0v14.0a2.0 2.0 0 0 1 -2.0 2.0h-14.0a2.0 2.0 0 0 1 -2.0 -2.0v-14.0a2.0 2.0 0 0 1 2.0 -2.0z", "M7.0 9.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0", "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"]
         case .info: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 16v-4", "M12 8h.01"]
         case .laptop: return ["M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z", "M20.054 15.987H3.946"]
+        case .layers3: return ["M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z", "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12", "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"]
         case .link: return ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"]
         case .link2: return ["M9 17H7A5 5 0 0 1 7 7h2", "M15 7h2a5 5 0 1 1 0 10h-2", "M8.0 12.0L16.0 12.0"]
         case .listTodo: return ["M13 5h8", "M13 12h8", "M13 19h8", "m3 17 2 2 4-4", "M4.0 4.0h4.0a1.0 1.0 0 0 1 1.0 1.0v4.0a1.0 1.0 0 0 1 -1.0 1.0h-4.0a1.0 1.0 0 0 1 -1.0 -1.0v-4.0a1.0 1.0 0 0 1 1.0 -1.0z"]
@@ -159,7 +179,6 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .logIn: return ["m10 17 5-5-5-5", "M15 12H3", "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"]
         case .maximize2: return ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"]
         case .messageCircle: return ["M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"]
-        case .messageCircleQuestion: return ["M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719", "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", "M12 17h.01"]
         case .messageSquare: return ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"]
         case .minimize2: return ["m14 10 7-7", "M20 10h-6V4", "m3 21 7-7", "M4 14h6v6"]
         case .minus: return ["M5 12h14"]
@@ -168,6 +187,8 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .moreVertical: return ["M11.0 12.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0", "M11.0 5.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0", "M11.0 19.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0"]
         case .mousePointer2: return ["M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"]
         case .mousePointerClick: return ["M14 4.1 12 6", "m5.1 8-2.9-.8", "m6 12-1.9 2", "M7.2 2.2 8 5.1", "M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"]
+        case .music: return ["M9 18V5l12-2v13", "M3.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M15.0 16.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
+        case .package: return ["M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z", "M12 22V12", "M3.29 7L12 12L20.71 7", "m7.5 4.27 9 5.15"]
         case .packagePlus: return ["M16 16h6", "M19 13v6", "M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14", "m7.5 4.27 9 5.15", "M3.29 7L12 12L20.71 7", "M12.0 22.0L12.0 12.0"]
         case .paintbrush: return ["m14.622 17.897-10.68-2.913", "M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z", "M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"]
         case .palette: return ["M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z", "M13.0 6.5a0.5 0.5 0 1 0 1.0 0a0.5 0.5 0 1 0 -1.0 0", "M17.0 10.5a0.5 0.5 0 1 0 1.0 0a0.5 0.5 0 1 0 -1.0 0", "M6.0 12.5a0.5 0.5 0 1 0 1.0 0a0.5 0.5 0 1 0 -1.0 0", "M8.0 7.5a0.5 0.5 0 1 0 1.0 0a0.5 0.5 0 1 0 -1.0 0"]
@@ -192,6 +213,8 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .search: return ["m21 21-4.34-4.34", "M3.0 11.0a8.0 8.0 0 1 0 16.0 0a8.0 8.0 0 1 0 -16.0 0"]
         case .server: return ["M4.0 2.0h16.0a2.0 2.0 0 0 1 2.0 2.0v4.0a2.0 2.0 0 0 1 -2.0 2.0h-16.0a2.0 2.0 0 0 1 -2.0 -2.0v-4.0a2.0 2.0 0 0 1 2.0 -2.0z", "M4.0 14.0h16.0a2.0 2.0 0 0 1 2.0 2.0v4.0a2.0 2.0 0 0 1 -2.0 2.0h-16.0a2.0 2.0 0 0 1 -2.0 -2.0v-4.0a2.0 2.0 0 0 1 2.0 -2.0z", "M6.0 6.0L6.01 6.0", "M6.0 18.0L6.01 18.0"]
         case .settings: return ["M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915", "M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
+        case .shieldCheck: return ["M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "m9 12 2 2 4-4"]
+        case .shoppingBag: return ["M16 10a4 4 0 0 1-8 0", "M3.103 6.034h17.794", "M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z"]
         case .smartphone: return ["M7.0 2.0h10.0a2.0 2.0 0 0 1 2.0 2.0v16.0a2.0 2.0 0 0 1 -2.0 2.0h-10.0a2.0 2.0 0 0 1 -2.0 -2.0v-16.0a2.0 2.0 0 0 1 2.0 -2.0z", "M12 18h.01"]
         case .smilePlus: return ["M22 11v1a10 10 0 1 1-9-10", "M8 14s1.5 2 4 2 4-2 4-2", "M9.0 9.0L9.01 9.0", "M15.0 9.0L15.01 9.0", "M16 5h6", "M19 2v6"]
         case .sparkles: return ["M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z", "M20 2v4", "M22 4h-4", "M2.0 20.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0"]
@@ -207,6 +230,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .undo2: return ["M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"]
         case .unlink2: return ["M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"]
         case .userPlus: return ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M5.0 7.0a4.0 4.0 0 1 0 8.0 0a4.0 4.0 0 1 0 -8.0 0", "M19.0 8.0L19.0 14.0", "M22.0 11.0L16.0 11.0"]
+        case .video: return ["m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5", "M4.0 6.0h10.0a2.0 2.0 0 0 1 2.0 2.0v8.0a2.0 2.0 0 0 1 -2.0 2.0h-10.0a2.0 2.0 0 0 1 -2.0 -2.0v-8.0a2.0 2.0 0 0 1 2.0 -2.0z"]
         case .x: return ["M18 6 6 18", "m6 6 12 12"]
         case .xCircle: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "m15 9-6 6", "m9 9 6 6"]
         case .zap: return ["M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"]
