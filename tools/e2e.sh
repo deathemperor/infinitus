@@ -430,6 +430,11 @@ KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
 "$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
 "$CTL" team-approve "$KID" | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "team-approve"
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
+# #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
+# the app's own view, and a subcommand the app has no verb for either refuses
+# to mint a second identity or says whose identity it is using.
+env -u INFINITUS_TEAM_DIR "$CTL" team status | expect "d['role']=='leader' and d['name']=='Papaya'" || fail "cli team status did not route to the app"
+env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Mac's team identity\|infinitusctl's own identity" || fail "cli team identity neither refused nor named its own identity beside the app's"
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish --projects "$SOCKDIR/fixture/projects" \
     | expect "d['transcriptChunks']>=1" || fail "cli team publish"
 # "Nobody" (spec §7): the appended line WOULD chunk — the point of the
