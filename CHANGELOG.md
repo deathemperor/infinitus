@@ -47,9 +47,10 @@ publishes the matching section as the GitHub release body.
 - The Mac can own a Claude Code session outright — no terminal — and answer its permission prompts and questions from the phone or the popup (#151).
 
 ### Phone
-- Settings › Appearance › "T3 screens" (off by default) opens a session as a T3 Code-style thread over the live timeline route (#223).
-- The T3 thread's composer attaches photos, camera shots, files and pasted images, and grows when focused (#223).
-- The T3 thread answers a permission prompt or a question from a card over the composer — allow once, allow for the session, decline, or every question's answers in one Submit (#223).
+- Settings › Appearance › "New session screens" (off by default) opens a session as a chat thread over the live timeline route (#223).
+- The new thread's composer attaches photos, camera shots, files and pasted images, and grows when focused (#223).
+- The new thread answers a permission prompt or a question from a card over the composer — allow once, allow for the session, decline, or every question's answers in one Submit (#223).
+- With the new screens on, + starts a session from a task sheet: pick a project, say what to build, choose the Mac, engine and permissions, send (#223).
 - A send the phone retries lands once: the Mac answers the retry with the first reply, and a turn you stopped keeps its late input out (#223).
 - Swipe a session to pin it, settle it or snooze it an hour (long-press for "until tomorrow"); pinned rows lead, snoozed and settled ones sit dimmed at the tail (#223).
 - Session rows take their dot and word from the host's facts — a raised hand for an approval, a question mark for a prompt, the plan's "2 of 5" under the row — and the chat header gets a stop button while Claude works (#223).

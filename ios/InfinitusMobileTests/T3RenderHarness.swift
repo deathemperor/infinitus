@@ -81,6 +81,20 @@ import InfinitusUI
             ("thread-approval-light", Self.conversation(prompt: Self.approval, running: true), .light),
             ("thread-question-dark", Self.conversation(prompt: Self.question, running: true), .dark),
         ]
+        for scheme in [ColorScheme.light, .dark] {
+            let draft = NavigationStack {
+                T3NewTaskDraft(model: model, cwd: "/Users/dev/death/limitless", macId: .constant(nil), changeProject: {})
+            }
+            .t3(platform: .mobile, scheme: scheme)
+            .preferredColorScheme(scheme)
+            let png = try Self.render(draft)
+            let name = "new-task-\(scheme == .dark ? "dark" : "light")"
+            try png.write(to: dir.appendingPathComponent(name + ".png"))
+            let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
         for (name, state, scheme) in shots {
             let root = NavigationStack {
                 T3ThreadScreen(model: model, session: session, fixture: state)

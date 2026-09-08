@@ -90,7 +90,7 @@ struct PasteableTextView: UIViewRepresentable {
 /// A UITextView that takes an image paste itself. The image is read the
 /// way the composer's "Paste Image" menu item reads it; a pasteboard
 /// with no image pastes as text, as before.
-final class ImagePasteTextView: UITextView {
+class ImagePasteTextView: UITextView {
     var onPasteImage: ((UIImage) -> Void)?
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {

@@ -31,7 +31,9 @@ struct SessionsScreen: View {
                             .disabled(!model.anyMacAnswered)
                     }
                 }
-                .sheet(isPresented: $startSheet) { StartSessionSheet(model: model) }
+                .sheet(isPresented: $startSheet) {
+                    if model.t3Screens { T3NewTaskSheet(model: model) } else { StartSessionSheet(model: model) }
+                }
                 .navigationDestination(for: PastSessionsRoute.self) { _ in
                     PastSessionsScreen(model: model)
                 }
