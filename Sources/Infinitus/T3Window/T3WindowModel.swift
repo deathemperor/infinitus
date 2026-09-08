@@ -68,12 +68,13 @@ final class T3WindowModel: ObservableObject {
         refreshing = true
         let facts = model.sessionProgress.facts, progress = model.sessionProgress.byPid
         let profiles = model.sessionProfiles.profiles
-        // `projectSummaries(profiles:)` memoizes its PastSessions walk itself
-        // (#369: 60 s, keyed on the live session set) — call it, never wrap
-        // it in a second cache (that doubles the cost the memo removed).
+        // `projectSummaries(profiles:live:)` memoizes its PastSessions walk
+        // and its git branch lookups itself (#369, #384: 60 s each) — call
+        // it with the list already taken, never wrap it in a second cache
+        // (that doubles the cost the memo removed).
         Task.detached(priority: .utility) { [weak self, model, profiles] in
             let records = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-            let projects = model.projectSummaries(profiles: profiles)
+            let projects = model.projectSummaries(profiles: profiles, live: records)
             let inputs = T3WorkspaceInputs(
                 records: records,
                 facts: Dictionary(uniqueKeysWithValues: facts.map { (Int32($0.key), $0.value) }),
