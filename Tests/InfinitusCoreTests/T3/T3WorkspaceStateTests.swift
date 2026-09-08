@@ -84,6 +84,24 @@ final class T3WorkspaceStateTests: XCTestCase {
         XCTAssertEqual(s.sidebarSections(now: now).flatMap { $0.threads.map(\.id) }, ["s2"])
     }
 
+    // B-3 review: `.group` scope filters by every member id, not just one
+    // physical project — two same-named checkouts must both show up.
+    func testGroupScopeFiltersByMembership() {
+        var s = T3WorkspaceState()
+        let a = ProjectSummary(id: ProjectSummary.projectId(cwd: "/w/app"), name: "app", cwd: "/w/app", branch: nil, liveCount: 1, lastActivityAt: nil)
+        let b = ProjectSummary(id: ProjectSummary.projectId(cwd: "/other/app"), name: "app", cwd: "/other/app", branch: nil, liveCount: 1, lastActivityAt: nil)
+        let c = ProjectSummary(id: ProjectSummary.projectId(cwd: "/w/c"), name: "c", cwd: "/w/c", branch: nil, liveCount: 1, lastActivityAt: nil)
+        s.apply(inputs([
+            (record(pid: 1, id: "s1", cwd: "/w/app"), facts()),
+            (record(pid: 2, id: "s2", cwd: "/other/app"), facts()),
+            (record(pid: 3, id: "s3", cwd: "/w/c"), facts()),
+        ], projects: [a, b, c]), now: now)
+        XCTAssertEqual(s.groups.count, 2)   // "app" merges by folder name; "c" stands alone
+        let appGroup = s.groups.first { $0.members.count == 2 }!
+        s.scope = .group(ids: appGroup.members.map(\.id))
+        XCTAssertEqual(Set(s.visibleThreads(now: now).map(\.id)), ["s1", "s2"])
+    }
+
     func testAdjacentThreadWalksTheVisibleOrder() {
         var s = T3WorkspaceState()
         s.apply(inputs([

@@ -13,20 +13,22 @@ struct T3Root: View {
 
     var body: some View {
         let t3 = T3Environment(platform: .web, scheme: scheme)
-        HStack(spacing: 0) {
-            sidebar(t3)
-                .frame(width: model.state.sidebarCollapsed ? T3Theme.Metrics.sidebarWidthIcon : T3Theme.Metrics.sidebarWidth)
-                .background(t3.web.sidebar.color)
-                .overlay(alignment: .trailing) { Rectangle().fill(t3.web.sidebarBorder.color).frame(width: 1) }
-            main(t3)
-                .frame(minWidth: 640, maxWidth: .infinity)
-            if model.state.rightPanelOpen {
-                T3RightPanel(model: model)
-                    .frame(minWidth: 360, idealWidth: 360)
-                    .overlay(alignment: .leading) { Rectangle().fill(t3.web.border.color).frame(width: 1) }
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                sidebar(t3)
+                    .frame(width: model.state.sidebarCollapsed ? T3Theme.Metrics.sidebarWidthIcon : Self.sidebarWidth(windowWidth: geo.size.width))
+                    .background(t3.web.sidebar.color)
+                    .overlay(alignment: .trailing) { Rectangle().fill(t3.web.sidebarBorder.color).frame(width: 1) }
+                main(t3)
+                    .frame(minWidth: 640, maxWidth: .infinity)
+                if model.state.rightPanelOpen {
+                    T3RightPanel(model: model)
+                        .frame(minWidth: 360, idealWidth: 360)
+                        .overlay(alignment: .leading) { Rectangle().fill(t3.web.border.color).frame(width: 1) }
+                }
             }
+            .background(t3.web.background.color)
         }
-        .background(t3.web.background.color)
         .frame(minWidth: T3WindowController.minimumSize.width, minHeight: T3WindowController.minimumSize.height)
         // `.fullSizeContentView` insets SwiftUI content by the titlebar's
         // safe area by default; T3's own custom titlebar starts at y = 0
@@ -36,9 +38,17 @@ struct T3Root: View {
         .background { keyboard }   // hidden buttons: the ⌘F pattern
     }
 
+    // `threadSidebarWidth.ts`: expanded width clamps between
+    // THREAD_SIDEBAR_MIN_WIDTH (208) and Metrics.sidebarWidth (256),
+    // yielding to the main content's own THREAD_MAIN_CONTENT_MIN_WIDTH
+    // (640) floor as the window narrows (B-3 review).
+    private static func sidebarWidth(windowWidth: Double) -> Double {
+        min(T3Theme.Metrics.sidebarWidth, max(208, windowWidth - 640))
+    }
+
     @ViewBuilder private func sidebar(_ t3: T3Environment) -> some View {
-        if model.state.sidebarCollapsed { T3SidebarRail() }          // A's rail primitive; Task 7 fills it
-        else { T3SidebarPlaceholder(model: model) }                   // Task 7 replaces with T3SidebarView
+        if model.state.sidebarCollapsed { T3SidebarIconRail() }
+        else { T3SidebarView(model: model, app: app) }
     }
 
     @ViewBuilder private func main(_ t3: T3Environment) -> some View {
@@ -83,19 +93,7 @@ struct WindowDragRegion: NSViewRepresentable {
     func updateNSView(_ view: DragView, context: Context) {}
 }
 
-// MARK: - Task 6 placeholders (Tasks 7–9 delete these)
-
-private struct T3SidebarPlaceholder: View {
-    @ObservedObject var model: T3WindowModel
-    @Environment(\.t3) private var t3
-    var body: some View {
-        Text("\(model.state.threads.count) threads")
-            .font(T3Font.web(.sm))
-            .foregroundStyle(t3.web.mutedForeground.color)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(8)
-    }
-}
+// MARK: - Task 6 placeholders (Task 8/9 delete these)
 
 private struct T3TopBarPlaceholder: View {
     @ObservedObject var model: T3WindowModel

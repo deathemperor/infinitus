@@ -41,6 +41,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case gitPullRequest = "git-pull-request"
     case globe = "globe"
     case globe2 = "globe-2"
+    case hand = "hand"
     case history = "history"
     case info = "info"
     case laptop = "laptop"
@@ -51,6 +52,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case logIn = "log-in"
     case maximize2 = "maximize-2"
     case messageCircle = "message-circle"
+    case messageCircleQuestion = "message-circle-question"
     case messageSquare = "message-square"
     case minimize2 = "minimize-2"
     case minus = "minus"
@@ -146,6 +148,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .gitPullRequest: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M13 6h3a2 2 0 0 1 2 2v7", "M6.0 9.0L6.0 21.0"]
         case .globe: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"]
         case .globe2: return ["M21.54 15H17a2 2 0 0 0-2 2v4.54", "M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17", "M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05", "M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
+        case .hand: return ["M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2", "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2", "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8", "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"]
         case .history: return ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5", "M12 7v5l4 2"]
         case .info: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 16v-4", "M12 8h.01"]
         case .laptop: return ["M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z", "M20.054 15.987H3.946"]
@@ -156,6 +159,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .logIn: return ["m10 17 5-5-5-5", "M15 12H3", "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"]
         case .maximize2: return ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"]
         case .messageCircle: return ["M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"]
+        case .messageCircleQuestion: return ["M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719", "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", "M12 17h.01"]
         case .messageSquare: return ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"]
         case .minimize2: return ["m14 10 7-7", "M20 10h-6V4", "m3 21 7-7", "M4 14h6v6"]
         case .minus: return ["M5 12h14"]
