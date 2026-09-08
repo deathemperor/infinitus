@@ -228,11 +228,11 @@ struct T3ThreadScreen: View {
     }
 
     private var editor: some View {
-        PasteableTextView(text: $draft, isFocused: $composerFocused,
-                          placeholder: "Ask the repo agent, or run a command…") { image in
+        T3ComposerEditor(text: $draft, isFocused: $composerFocused,
+                         placeholder: "Ask the repo agent, or run a command…", expanded: expanded,
+                         textColor: t3.mobile.foreground.color, placeholderColor: t3.mobile.placeholder.color) { image in
             stage(ComposerAttachments.image(image, prefix: "pasted"))
         }
-        .frame(minHeight: expanded ? 72 : 36, maxHeight: expanded ? 160 : 36)
         .fixedSize(horizontal: false, vertical: true)
     }
 
