@@ -125,6 +125,8 @@ import InfinitusUI
             let sheet = T3SettingsSheet(model: model).t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
             try Self.attach(name: "settings-\(scheme == .dark ? "dark" : "light")", png: Self.render(sheet), dir: dir, test: self)
         }
+        let macsPage = T3SettingsSheet(model: model, path: [.macs]).t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "settings-macs-light", png: Self.render(macsPage), dir: dir, test: self)
         let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
                                              facts: Self.conversation(running: true).facts)
             .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)

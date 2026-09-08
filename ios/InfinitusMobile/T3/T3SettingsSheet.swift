@@ -9,13 +9,15 @@ import InfinitusUI
 /// until D restyles the pages.
 struct T3SettingsSheet: View {
     @ObservedObject var model: MirrorModel
+    /// The pushed group; the harness seeds it to render a page.
+    @State var path: [SettingsForm.Part] = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.t3) private var t3
 
     private var macCount: Int { (model.pairToken.isEmpty ? 0 : 1) + model.others.count }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     group("Configuration") {
