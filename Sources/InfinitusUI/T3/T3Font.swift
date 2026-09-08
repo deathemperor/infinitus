@@ -25,6 +25,14 @@ public enum T3Font {
     public static func webLiteral(_ size: Double, _ w: Weight = .regular) -> Font {
         .system(size: size, weight: systemWeight(w))
     }
+    /// A DM Sans face at a size T3 sets literally rather than off the scale
+    /// (`text-[21px]`, `text-[9px]` in CompactBrandTitle.tsx).
+    public static func mobileLiteral(_ size: Double, _ w: Weight = .regular) -> Font {
+        let name: String
+        switch w { case .regular: name = dmSansNames[0]; case .medium: name = dmSansNames[1]; case .bold: name = dmSansNames[2] }
+        if dmSansAvailable { return .custom(name, fixedSize: size) }
+        return .system(size: size, weight: systemWeight(w))
+    }
     static func systemWeight(_ w: Weight) -> Font.Weight {
         switch w { case .regular: return .regular; case .medium: return .medium; case .bold: return .bold }
     }
