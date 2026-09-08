@@ -53,9 +53,10 @@ Grab `Infinitus-<version>.zip` from
 drop `Infinitus.app` into `/Applications`.
 
 The `infinitusctl` CLI ships inside the bundle at
-`Infinitus.app/Contents/MacOS/infinitusctl` — Homebrew links it onto
-your PATH; from a release, symlink it yourself
-(`ln -sf /Applications/Infinitus.app/Contents/MacOS/infinitusctl /usr/local/bin/infinitusctl`).
+`Infinitus.app/Contents/MacOS/infinitusctl`, with `ictl` beside it as the
+short name for the same binary — Homebrew links them onto your PATH; from
+a release, symlink them yourself
+(`ln -sf /Applications/Infinitus.app/Contents/MacOS/{infinitusctl,ictl} /usr/local/bin/`).
 
 ### Linux — engine CLI + Waybar module (Omarchy-ready)
 
