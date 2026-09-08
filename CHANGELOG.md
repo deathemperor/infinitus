@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
+
 ## 0.4.4-alpha.2
 
 ### Mac

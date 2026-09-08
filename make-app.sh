@@ -16,6 +16,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Infinitus"
 cp "$(dirname "$BIN")/infinitusctl" "$APP/Contents/MacOS/infinitusctl"
+# `ictl`: the same binary under a name that is quick to type (usage text
+# follows whichever name ran it).
+ln -s infinitusctl "$APP/Contents/MacOS/ictl"
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp tools/demo-cswap "$APP/Contents/Resources/demo-cswap"
