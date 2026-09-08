@@ -362,7 +362,8 @@ struct T3HomeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: "folder.fill").font(.system(size: 13)).foregroundStyle(t3.mobile.iconMuted.color)
+                // `ProjectFavicon` size 15: the folder fallback is 0.78 of it, icon-subtle.
+                Image(systemName: "folder.fill").font(.system(size: 15 * 0.78)).foregroundStyle(t3.mobile.iconSubtle.color)
                 Text(entry.repo).font(T3Font.mobile(.sm, .medium)).lineLimit(1)
                     .foregroundStyle(t3.mobile.foregroundMuted.color)
                 Spacer(minLength: 8)
