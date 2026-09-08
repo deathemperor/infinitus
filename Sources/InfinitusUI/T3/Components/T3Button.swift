@@ -16,7 +16,8 @@ public struct T3Button: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let icon { LucideIcon(icon, size: 16) }
-                if size != .icon { Text(title).font(T3Font.web(.sm, .medium)) }
+                // `button.tsx:36` `xs`'s `sm:text-xs` (the rest render `sm:text-sm`).
+                if size != .icon { Text(title).font(T3Font.web(size == .xs ? .xs : .sm, .medium)) }
             }
             .padding(.horizontal, T3ButtonMetrics.horizontalPadding(size))
             .frame(height: T3ButtonMetrics.height(size))

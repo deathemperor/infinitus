@@ -20,10 +20,10 @@ struct T3Root: View {
                     .background(t3.web.sidebar.color)
                     .overlay(alignment: .trailing) { Rectangle().fill(t3.web.sidebarBorder.color).frame(width: 1) }
                 main(t3)
-                    .frame(minWidth: 640, maxWidth: .infinity)
+                    .frame(maxWidth: .infinity)
                 if model.state.rightPanelOpen {
                     T3RightPanel(model: model)
-                        .frame(minWidth: 360, idealWidth: 360)
+                        .frame(width: Self.rightPanelWidth(windowWidth: geo.size.width))
                         .overlay(alignment: .leading) { Rectangle().fill(t3.web.border.color).frame(width: 1) }
                 }
             }
@@ -36,7 +36,7 @@ struct T3Root: View {
         // (the topbar band reserves the traffic-light inset itself, Task 8).
         .ignoresSafeArea()
         .environment(\.t3, t3)
-        .background { keyboard }   // hidden buttons: the ⌘F pattern
+        .overlay { keyboard }   // hidden buttons: the ⌘F pattern
     }
 
     // `threadSidebarWidth.ts`: expanded width clamps between
@@ -45,6 +45,12 @@ struct T3Root: View {
     // (640) floor as the window narrows (B-3 review).
     private static func sidebarWidth(windowWidth: Double) -> Double {
         min(T3Theme.Metrics.sidebarWidth, max(208, windowWidth - 640))
+    }
+
+    // `DiffPanelShell.tsx:33`: `w-[42vw] min-w-[360px] max-w-[560px]
+    // shrink-0` — 42% of the window width, clamped.
+    private static func rightPanelWidth(windowWidth: Double) -> Double {
+        min(max(0.42 * windowWidth, 360), 560)
     }
 
     // `AppSidebarLayout.tsx:72-137`'s `SidebarControl`: fixed at
@@ -56,7 +62,7 @@ struct T3Root: View {
     private var sidebarToggle: some View {
         T3TopBarToggle(icon: model.state.sidebarCollapsed ? .panelLeft : .panelLeftClose, pressed: false,
                         tooltip: "Toggle main sidebar (\u{2318}B)") {
-            withAnimation(.linear(duration: 0.2)) { model.toggleSidebar() }
+            withAnimation(.easeOut(duration: 0.2)) { model.toggleSidebar() }
         }
         .padding(.leading, 90)
         .frame(height: T3Theme.Metrics.topbarHeight)
@@ -84,14 +90,14 @@ struct T3Root: View {
         }
     }
 
-    // `ui/sidebar.tsx:285` collapses the width column over
-    // `--panel-animation-duration` (Tailwind's own `duration-200` elsewhere
-    // in the file, `:734`) — one `withAnimation`, never a repeating one.
+    // `ui/sidebar.tsx:285,297,607` collapse the width column over
+    // `--panel-animation-duration` with `ease-out` — one `withAnimation`,
+    // never a repeating one.
     private var keyboard: some View {
         Group {
-            Button("") { withAnimation(.linear(duration: 0.2)) { model.toggleSidebar() } }
+            Button("") { withAnimation(.easeOut(duration: 0.2)) { model.toggleSidebar() } }
                 .keyboardShortcut("b", modifiers: .command)
-            Button("") { withAnimation(.linear(duration: 0.2)) { model.toggleRightPanel() } }
+            Button("") { withAnimation(.easeOut(duration: 0.2)) { model.toggleRightPanel() } }
                 .keyboardShortcut("j", modifiers: .command)
             // ⌘W closes the workspace window — an accessory app has no menu
             // bar to route the standard close item, so this is the only way

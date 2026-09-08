@@ -42,7 +42,7 @@ struct T3ThreadRowView: View {
     private var p: T3Theme.WebPalette { t3.web }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {   // `Sidebar.tsx:1557` "gap-2.5"
             T3ProjectGlyph(projectName: projectName ?? "", projectCwd: projectCwd ?? "")
             Text(thread.title)
                 .font(T3Font.web(.sm, style.medium ? .medium : .regular))

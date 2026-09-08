@@ -4,12 +4,12 @@ import InfinitusUI
 
 /// T3's right panel (`RightPanelTabs.tsx:990-1035`): a tab strip over Diff,
 /// Files, Pull request, Terminal and Agents — each a "coming later" empty
-/// state until the matching surface ships (a later release). The 360 pt
-/// minimum width comes from the shell that wraps this component
-/// (`DiffPanelShell.tsx:33` `min-w-[360px] border-l border-border`,
-/// applied by `T3Root`).
+/// state until the matching surface ships (a later release). The width
+/// (42% of the window, clamped to [360, 560]) comes from the shell that
+/// wraps this component (`DiffPanelShell.tsx:33` `w-[42vw] min-w-[360px]
+/// max-w-[560px] border-l border-border`, applied by `T3Root`).
 struct T3RightPanel: View {
-    @ObservedObject var model: T3WindowModel
+    let model: T3WindowModel
     @Environment(\.t3) private var t3
     @State private var tab = "diff"
 

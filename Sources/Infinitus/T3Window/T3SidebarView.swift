@@ -144,15 +144,19 @@ struct T3SidebarView: View {
                 if section.threads.count > shown.count {
                     // Sidebar.tsx's settled tail: 10 initial, 25 a page
                     // (`T3ThreadList.settledInitialCount`/`settledPageCount`).
-                    // `Sidebar.tsx:4877`'s button: "flex h-9 w-full … px-2.5
-                    // text-left text-sm text-sidebar-muted-foreground/55" —
-                    // h-9 = 36 pt (fix round 1 R4; was 28), text-sm not -xs.
-                    Button("Show \(min(T3ThreadList.settledPageCount, section.threads.count - shown.count)) more") {
-                        settledShown += T3ThreadList.settledPageCount
+                    // `Sidebar.tsx:4877`'s button: "flex h-9 w-full … gap-2.5
+                    // px-2.5 text-left text-sm text-sidebar-muted-foreground/55"
+                    // — h-9 = 36 pt (fix round 1 R4; was 28), text-sm not -xs,
+                    // leading `PlusIcon` "size-4 shrink-0" (16 pt).
+                    Button(action: { settledShown += T3ThreadList.settledPageCount }) {
+                        HStack(spacing: 10) {
+                            LucideIcon(.plus, size: 16)
+                            Text("Show \(min(T3ThreadList.settledPageCount, section.threads.count - shown.count)) more")
+                        }
                     }
                     .buttonStyle(.plain)
                     .font(T3Font.web(.sm))
-                    .foregroundStyle(t3.web.sidebarMutedForeground.color)
+                    .foregroundStyle(t3.web.sidebarMutedForeground.color.opacity(0.55))
                     .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
                     .frame(height: 36, alignment: .leading)
                 }

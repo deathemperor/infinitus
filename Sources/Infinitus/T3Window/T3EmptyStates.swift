@@ -12,6 +12,8 @@ struct T3WebEmpty: View {
     let message: String
 
     var body: some View {
+        // `mt-2` between title and description (`NoProjectsHero.tsx:21`,
+        // `NoActiveThreadState.tsx:26`).
         VStack(spacing: 8) {
             Text(title)
                 .font(T3Font.web(.xl, .bold))
@@ -23,6 +25,8 @@ struct T3WebEmpty: View {
             }
         }
         .multilineTextAlignment(.center)
+        // `px-8` on the wrapper div (`NoProjectsHero.tsx:16`,
+        // `NoActiveThreadState.tsx:23`).
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -36,6 +40,7 @@ struct T3NoProjectsHero: View {
     let action: (() -> Void)?
 
     var body: some View {
+        // `mt-2` between title and description (`NoProjectsHero.tsx:21`).
         VStack(spacing: 8) {
             // `NoProjectsHero.tsx` "text-2xl sm:text-3xl" — the kit renders
             // the `sm:` breakpoint (T3ButtonMetrics' own rule); `xxl` in
@@ -53,6 +58,7 @@ struct T3NoProjectsHero: View {
                 .padding(.top, 16)
         }
         .multilineTextAlignment(.center)
+        // `px-8` on the wrapper div (`NoProjectsHero.tsx:16`).
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

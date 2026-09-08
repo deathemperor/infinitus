@@ -15,7 +15,9 @@ final class T3WindowController: NSObject, NSWindowDelegate {
     var isVisible: Bool { window?.isVisible == true }
 
     static let referenceSize = NSSize(width: 1800, height: 1050)
-    static let minimumSize = NSSize(width: 960, height: 600)
+    /// Upstream's window minimum (`DesktopWindow.ts:366-367`), not the plan's
+    /// superseded 960×600.
+    static let minimumSize = NSSize(width: 840, height: 620)
     /// T3's Electron traffic-light inset (`--workspace-controls-left` 12,
     /// `titlebar-area-height` 52).
     static let controlsLeft: CGFloat = 12

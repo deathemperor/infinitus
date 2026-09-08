@@ -19,9 +19,10 @@ import InfinitusUI
 /// With no thread selected this band IS `NoActiveThreadState.tsx`'s own
 /// `WorkspacePageHeader` (`className="border-b border-border"`) — the "No
 /// active thread" text used to render as `T3NoActiveThreadState`'s own
-/// stacked label row (Task 6); that row moves here, and B unifies the
-/// `border-b` onto both states (upstream's with-thread `WorkspacePageHeader`
-/// instance in `ChatView.tsx` carries none) for one consistent band.
+/// stacked label row (Task 6); that row moves here. The `border-b` renders
+/// only in that no-thread state — the with-thread `WorkspacePageHeader`
+/// instance in `ChatView.tsx:7847` carries none (B-3 review; Task 8's first
+/// pass had unified the border onto both states).
 struct T3TopBar: View {
     @ObservedObject var model: T3WindowModel
     @ObservedObject var app: AppModel
@@ -69,7 +70,7 @@ struct T3TopBar: View {
             // it upstream has no B counterpart to render.
             T3TopBarToggle(icon: .panelRight, pressed: model.state.rightPanelOpen,
                             tooltip: "Toggle right panel (\u{2318}J)") {
-                withAnimation(.linear(duration: 0.2)) { model.toggleRightPanel() }
+                withAnimation(.easeOut(duration: 0.2)) { model.toggleRightPanel() }
             }
             Color.clear.frame(width: 12)   // `index.css:110` --workspace-controls-right
         }
@@ -80,7 +81,15 @@ struct T3TopBar: View {
         // background class of its own; ChatView's instance is "bg-background",
         // so the alias renders identically here.
         .background(t3.web.toolbarBackground.color)
-        .overlay(alignment: .bottom) { Rectangle().fill(t3.web.border.color).frame(height: 1) }
+        // Upstream borders only the no-thread header (`NoActiveThreadState.tsx:10`
+        // `className="border-b border-border"`), not the with-thread bar
+        // (`ChatView.tsx:7847` `className="relative bg-background"`, no
+        // `border-b`) — B-3 review corrects Task 8's "unify onto both" call.
+        .overlay(alignment: .bottom) {
+            if model.state.selectedThread == nil {
+                Rectangle().fill(t3.web.border.color).frame(height: 1)
+            }
+        }
     }
 
     // `ui/sidebar.tsx:169-170`'s `--workspace-titlebar-content-left` =
@@ -122,9 +131,11 @@ struct T3TopBar: View {
     // icon+name pair defeated both (SwiftUI adopts the unconstrained ideal
     // width under `.fixedSize`, so a sibling `.frame(maxWidth:)` has no
     // proposal left to clamp) — removed. The name Text now carries the cap
-    // directly and a low `.layoutPriority` so it's the item that gives up
-    // width first; the thread title (`min-w-10 flex-1 truncate`) gets the
-    // higher priority, matching upstream's actual flex-grow member.
+    // directly; the priority differential that decides who gives up width
+    // first lives one level up, between this HStack's own children — the
+    // thread title below carries the explicit `.layoutPriority(1)`
+    // (`min-w-10 flex-1 truncate`, upstream's actual flex-grow member) and
+    // the project cluster is the implicit-0 sibling that loses the tie.
     @ViewBuilder private func breadcrumb(thread: T3Thread) -> some View {
         HStack(spacing: 12) {
             if let project {
@@ -151,7 +162,6 @@ struct T3TopBar: View {
                     CapToContent(maxWidth: 160) {
                         Text(project.name).lineLimit(1).truncationMode(.tail)
                     }
-                    .layoutPriority(0)
                 }
                 .font(T3Font.web(.sm, .medium))
                 .foregroundStyle(t3.web.mutedForeground.color)
@@ -203,10 +213,9 @@ struct T3TopBar: View {
             showDisabledMenu(disabledMessage, from: anchor.wrappedValue)
         } label: {
             // `size="xs"` at the `sm:` breakpoint is `h-6` (24 pt) `text-xs`
-            // (`button.tsx:36`) — no `.xs` case in `T3ButtonMetrics`
-            // (InfinitusCore, out of this task's scope to add), so the
-            // height substitutes `.sm` (28 pt, Task 6's "Add project"
-            // precedent); the label text still renders at the real `.xs` scale.
+            // (`button.tsx:36`) — `ProjectScriptsControl.tsx:250`'s
+            // "Add action" trigger and `GitActionsControl.tsx:1678`'s
+            // "Commit & push" trigger both carry it.
             outline { HStack(spacing: 6) { LucideIcon(icon, size: 14); Text(title).font(T3Font.web(.xs, .medium)) } }
         }
         .buttonStyle(.plain)
@@ -225,11 +234,14 @@ struct T3TopBar: View {
     // actually installed.
     private func openInControl(project: T3ProjectGrouping.Project) -> some View {
         let radius = T3Theme.Metrics.controlRadius
-        let h = T3ButtonMetrics.height(.sm)
+        // `OpenInPicker.tsx:273`: `size="xs"` on the "Open" segment;
+        // `:293`: `size="icon-xs"` on the chevron — both 24 pt at the
+        // `sm:` breakpoint (`button.tsx:36`).
+        let h = T3ButtonMetrics.height(.xs)
         return HStack(spacing: 0) {
             Button { openIn(bundleId: nil, cwd: project.cwd) } label: {
                 HStack(spacing: 6) { LucideIcon(.folderClosed, size: 14); Text("Open").font(T3Font.web(.xs, .medium)) }
-                    .padding(.horizontal, T3ButtonMetrics.horizontalPadding(.sm))
+                    .padding(.horizontal, T3ButtonMetrics.horizontalPadding(.xs))
             }
             .buttonStyle(.plain)
             .frame(height: h)
@@ -252,19 +264,19 @@ struct T3TopBar: View {
         .overlay(RoundedRectangle(cornerRadius: radius).stroke(t3.web.input.color, lineWidth: 1))
     }
 
-    /// `button.tsx`'s `variant="outline"` chrome (`border-input bg-popover`,
-    /// `text-foreground`) as a `Button` label — `T3Button` itself has no
-    /// `size="xs"` case (see `menuButton` above), so the two single-pill
-    /// menu-fronted controls rebuild its outline look here directly (no
-    /// hover state: a menu trigger's affordance is the click, not a hover
-    /// fill). `openInControl` above builds its own joined-pill chrome
-    /// instead of using this helper (R3, fix1 brief).
+    /// `button.tsx`'s `variant="outline" size="xs"` chrome (`border-input
+    /// bg-popover`, `text-foreground`) as a `Button` label — the two
+    /// single-pill menu-fronted controls rebuild its look here directly
+    /// (no hover state: a menu trigger's affordance is the click, not a
+    /// hover fill; `T3Button` itself carries hover, which these
+    /// deliberately don't need). `openInControl` above builds its own
+    /// joined-pill chrome instead of using this helper (R3, fix1 brief).
     @ViewBuilder
     private func outline<Content: View>(square: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
         content()
-            .padding(.horizontal, square ? 0 : T3ButtonMetrics.horizontalPadding(.sm))
-            .frame(minWidth: square ? T3ButtonMetrics.height(.sm) : nil)
-            .frame(height: T3ButtonMetrics.height(.sm))
+            .padding(.horizontal, square ? 0 : T3ButtonMetrics.horizontalPadding(.xs))
+            .frame(minWidth: square ? T3ButtonMetrics.height(.xs) : nil)
+            .frame(height: T3ButtonMetrics.height(.xs))
             .foregroundStyle(t3.web.foreground.color)
             .background(t3.web.popover.color, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
             .overlay(RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius).stroke(t3.web.input.color, lineWidth: 1))
@@ -327,6 +339,36 @@ struct T3TopBar: View {
         }
         NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
     }
+}
+
+/// Task 8 fix brief's own ask: a 60-char project name and a 120-char thread
+/// title at a 900 pt width, so the breadcrumb's 160 pt cap (`CapToContent`)
+/// and the thread title's `.layoutPriority(1)` truncation are both visible —
+/// standing up a real `T3TopBar` here would need a live `AppModel` (engine
+/// registration, a demo-script subprocess even under `playground:`), wildly
+/// disproportionate for a layout check, so this reproduces the breadcrumb's
+/// exact structure/spacing/priorities directly rather than going through
+/// `T3WindowModel`/`AppModel`.
+#Preview("Breadcrumb truncation") {
+    let projectName = "a-project-name-so-long-it-must-truncate-under-the-cap-xxxxxx"   // 60 chars
+    let threadTitle = "A thread title long enough to demonstrate truncation under the layout priority differential in the breadcrumb row xxxxxx"   // 120 chars
+    HStack(spacing: 12) {
+        HStack(spacing: 6) {
+            LucideIcon(.folderClosed, size: 14).fixedSize()
+            CapToContent(maxWidth: 160) {
+                Text(projectName).lineLimit(1).truncationMode(.tail)
+            }
+        }
+        .font(T3Font.web(.sm, .medium))
+        Text("/").font(T3Font.web(.sm, .medium))
+        Text(threadTitle)
+            .font(T3Font.web(.sm, .medium))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .layoutPriority(1)
+    }
+    .padding(20)
+    .frame(width: 900)
 }
 
 /// The SwiftUI idiom for CSS's default flex-item sizing (`flex-shrink: 1,
