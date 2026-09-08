@@ -60,32 +60,34 @@ public enum T3ProjectIcon {
     private static let genericIcons: [Name] = [.code, .braces, .circuit, .folderCode, .layers]
 
     // `PROJECT_ICON_COLOR_BY_NAME` × `PROJECT_ICON_COLORS`'
-    // text-{color}-600/text-{color}-400 pair, resolved to sRGB hex via the
-    // pinned tailwindcss@4.3.3 palette (`theme.css`'s oklch stops render to
-    // the same sRGB as v3's colors.js at these shades).
+    // text-{color}-600/dark:text-{color}-400 pair. The stops come from
+    // `T3TailwindPalette.generated.swift` — the pinned tailwindcss@4.3.3
+    // `theme.css` resolved by the generator, NOT v3's `colors.js` hex (v4
+    // restated the whole palette in oklch and the sRGB values moved: sky-400
+    // is (0, 188, 255) here, #38bdf8 = (56, 189, 248) in v3).
     private static let colorByName: [Name: ColorPair] = [
-        .ai: ColorPair(RGB(124, 58, 237), RGB(167, 139, 250)),            // violet-600/400
-        .book: ColorPair(RGB(217, 119, 6), RGB(251, 191, 36)),            // amber-600/400
-        .braces: ColorPair(RGB(147, 51, 234), RGB(192, 132, 252)),        // purple-600/400
-        .circuit: ColorPair(RGB(13, 148, 136), RGB(45, 212, 191)),        // teal-600/400
-        .cloud: ColorPair(RGB(2, 132, 199), RGB(56, 189, 248)),           // sky-600/400
-        .code: ColorPair(RGB(37, 99, 235), RGB(96, 165, 250)),            // blue-600/400
-        .database: ColorPair(RGB(8, 145, 178), RGB(34, 211, 238)),        // cyan-600/400
-        .desktop: ColorPair(RGB(79, 70, 229), RGB(129, 140, 248)),        // indigo-600/400
-        .folderCode: ColorPair(RGB(234, 88, 12), RGB(251, 146, 60)),      // orange-600/400
-        .game: ColorPair(RGB(5, 150, 105), RGB(52, 211, 153)),            // emerald-600/400
-        .image: ColorPair(RGB(219, 39, 119), RGB(244, 114, 182)),         // pink-600/400
-        .layers: ColorPair(RGB(192, 38, 211), RGB(232, 121, 249)),        // fuchsia-600/400
-        .mobile: ColorPair(RGB(101, 163, 13), RGB(163, 230, 53)),         // lime-600/400
-        .music: ColorPair(RGB(192, 38, 211), RGB(232, 121, 249)),         // fuchsia-600/400
-        .package: ColorPair(RGB(234, 88, 12), RGB(251, 146, 60)),         // orange-600/400
-        .security: ColorPair(RGB(13, 148, 136), RGB(45, 212, 191)),       // teal-600/400
-        .server: ColorPair(RGB(37, 99, 235), RGB(96, 165, 250)),          // blue-600/400
-        .shopping: ColorPair(RGB(225, 29, 72), RGB(251, 113, 133)),       // rose-600/400
-        .terminal: ColorPair(RGB(22, 163, 74), RGB(74, 222, 128)),        // green-600/400
-        .test: ColorPair(RGB(202, 138, 4), RGB(250, 204, 21)),            // yellow-600/400
-        .video: ColorPair(RGB(220, 38, 38), RGB(248, 113, 113)),          // red-600/400
-        .web: ColorPair(RGB(2, 132, 199), RGB(56, 189, 248)),             // sky-600/400
+        .ai: ColorPair(T3Tailwind.violet600, T3Tailwind.violet400),
+        .book: ColorPair(T3Tailwind.amber600, T3Tailwind.amber400),
+        .braces: ColorPair(T3Tailwind.purple600, T3Tailwind.purple400),
+        .circuit: ColorPair(T3Tailwind.teal600, T3Tailwind.teal400),
+        .cloud: ColorPair(T3Tailwind.sky600, T3Tailwind.sky400),
+        .code: ColorPair(T3Tailwind.blue600, T3Tailwind.blue400),
+        .database: ColorPair(T3Tailwind.cyan600, T3Tailwind.cyan400),
+        .desktop: ColorPair(T3Tailwind.indigo600, T3Tailwind.indigo400),
+        .folderCode: ColorPair(T3Tailwind.orange600, T3Tailwind.orange400),
+        .game: ColorPair(T3Tailwind.emerald600, T3Tailwind.emerald400),
+        .image: ColorPair(T3Tailwind.pink600, T3Tailwind.pink400),
+        .layers: ColorPair(T3Tailwind.fuchsia600, T3Tailwind.fuchsia400),
+        .mobile: ColorPair(T3Tailwind.lime600, T3Tailwind.lime400),
+        .music: ColorPair(T3Tailwind.fuchsia600, T3Tailwind.fuchsia400),
+        .package: ColorPair(T3Tailwind.orange600, T3Tailwind.orange400),
+        .security: ColorPair(T3Tailwind.teal600, T3Tailwind.teal400),
+        .server: ColorPair(T3Tailwind.blue600, T3Tailwind.blue400),
+        .shopping: ColorPair(T3Tailwind.rose600, T3Tailwind.rose400),
+        .terminal: ColorPair(T3Tailwind.green600, T3Tailwind.green400),
+        .test: ColorPair(T3Tailwind.yellow600, T3Tailwind.yellow400),
+        .video: ColorPair(T3Tailwind.red600, T3Tailwind.red400),
+        .web: ColorPair(T3Tailwind.sky600, T3Tailwind.sky400),
     ]
 
     /// `projectNameTokens`: split camelCase, lowercase, then split on

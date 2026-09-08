@@ -1,16 +1,29 @@
 import XCTest
 @testable import InfinitusCore
 
-/// `selectProjectIcon`'s classification port. The three classified cases
-/// and the generic-fallback case are copied verbatim from upstream's own
+/// `selectProjectIcon`'s classification port. The classified cases and the
+/// generic-fallback case are copied verbatim from upstream's own
 /// `projectIconModel.test.ts` (`it.each` table + "gives unknown names a
 /// stable generic icon") — ground truth from the source's own test suite,
 /// not hand-computed.
 final class T3ProjectIconTests: XCTestCase {
+    /// The whole `it.each` table at `projectIconModel.test.ts:5-14`, in its
+    /// order — including the camelCase row, which is the only case that
+    /// exercises `projectNameTokens`' camel split.
     func testClassifiesByKeyword() {
-        XCTAssertEqual(T3ProjectIcon.select(name: "customer-api", cwd: "/workspace/customer-api"), .server)
-        XCTAssertEqual(T3ProjectIcon.select(name: "ios-client", cwd: "/workspace/ios-client"), .mobile)
-        XCTAssertEqual(T3ProjectIcon.select(name: "agent-runtime", cwd: "/workspace/agent-runtime"), .ai)
+        let table: [(String, T3ProjectIcon.Name)] = [
+            ("customer-api", .server),
+            ("AnalyticsDatabase", .database),
+            ("ios-client", .mobile),
+            ("terraform-infra", .cloud),
+            ("developer-docs", .book),
+            ("shop-frontend", .shopping),
+            ("agent-runtime", .ai),
+            ("video-studio", .video),
+        ]
+        for (name, expected) in table {
+            XCTAssertEqual(T3ProjectIcon.select(name: name, cwd: "/workspace/\(name)"), expected, name)
+        }
     }
 
     func testUnknownNameGetsAStableGenericIcon() {

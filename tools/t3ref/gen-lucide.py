@@ -18,11 +18,11 @@ Minimize2 → minimize-2, MousePointer2 → mouse-pointer-2,
 PictureInPicture2 → picture-in-picture-2, Trash2 → trash-2, Undo2 → undo-2,
 Unlink2 → unlink-2.
 
-Five vendored names are deprecated lucide aliases whose upstream .js is a
+Six vendored names are deprecated lucide aliases whose upstream .js is a
 byte-identical `export { default } from './<target>.js'` re-export with
-no __iconNode of its own: code-2 → code-xml, globe-2 → earth,
-more-vertical → ellipsis-vertical, x-circle → circle-x, layers-3 →
-layers. Both the alias
+no __iconNode of its own: code-2 → code-xml, git-commit →
+git-commit-horizontal, globe-2 → earth, layers-3 → layers,
+more-vertical → ellipsis-vertical, x-circle → circle-x. Both the alias
 file and its target module are vendored as true upstream copies (so a
 future `cp` re-vendor never has to special-case them); this generator
 follows the re-export at parse time and draws the target's paths under
