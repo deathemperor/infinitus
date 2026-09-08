@@ -1,0 +1,414 @@
+import SwiftUI
+import AppKit
+import InfinitusCore
+import InfinitusUI
+
+/// The workspace window's real top bar (Task 8): `WorkspacePageHeader.tsx`'s
+/// band + `WorkspaceBreadcrumb.tsx` inside `ChatHeader.tsx`'s action cluster
+/// (`OpenInPicker.tsx`, `ProjectScriptsControl.tsx`, `GitActionsControl.tsx`),
+/// plus the right-panel toggle upstream floats as `PanelLayoutControls.tsx`'s
+/// `Toggle` (B renders it inline in the topbar's own flow instead of a
+/// window-level fixed overlay — B has no `terminalOpen`/right-panel-sheet
+/// mode to reconcile a fixed overlay against). The sidebar toggle
+/// (`AppSidebarLayout.tsx`'s `SidebarControl`) is genuinely
+/// window-level — a fixed sibling of the sidebar/main/panel row, not part
+/// of any one column — so `T3Root` renders it, not this view; see
+/// `leadingInset` below for the space this view still reserves for it.
+/// Replaces Task 6's `T3TopBarPlaceholder`.
+///
+/// With no thread selected this band IS `NoActiveThreadState.tsx`'s own
+/// `WorkspacePageHeader` (`className="border-b border-border"`) — the "No
+/// active thread" text used to render as `T3NoActiveThreadState`'s own
+/// stacked label row (Task 6); that row moves here, and B unifies the
+/// `border-b` onto both states (upstream's with-thread `WorkspacePageHeader`
+/// instance in `ChatView.tsx` carries none) for one consistent band.
+struct T3TopBar: View {
+    @ObservedObject var model: T3WindowModel
+    @ObservedObject var app: AppModel
+    @Environment(\.t3) private var t3
+    // Fix round 1 (task-8-fix1-brief.md R1): each menu-fronted control's
+    // trigger button reports its own NSView here via `MenuAnchor`, so its
+    // action closure can call `NSMenu.popUp(positioning:at:in:)` on it.
+    @State private var addActionAnchor: NSView?
+    @State private var commitPushAnchor: NSView?
+    @State private var openInAnchor: NSView?
+
+    private var project: T3ProjectGrouping.Project? {
+        guard let thread = model.state.selectedThread else { return nil }
+        return model.state.projects.first { $0.id == thread.projectId }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leadingInset
+            if let thread = model.state.selectedThread {
+                breadcrumb(thread: thread)
+            } else {
+                // NoActiveThreadState.tsx's isElectron branch: "text-xs text-muted-foreground/50".
+                Text("No active thread")
+                    .font(T3Font.web(.xs))
+                    .foregroundStyle(t3.web.mutedForeground.color.opacity(0.5))
+            }
+            // R2 (fix1 brief): the breadcrumb above is the row's ONLY
+            // flexible member (its own `.frame(maxWidth: .infinity)`) — this
+            // gap is fixed, not an expanding `Spacer`, so nothing else in
+            // the row competes for leftover width.
+            Color.clear.frame(width: 12)   // ChatHeader.tsx "gap-2 sm:gap-3"
+            HStack(spacing: 12) { actions }   // ChatHeader.tsx's actions div: same "gap-2 sm:gap-3"
+            // R4 (fix1 brief): `ChatHeader.tsx:415-418`'s actions div is
+            // `pr-16` (64pt) while the toggle shows (`pr-0` once the right
+            // panel is open and the panel itself separates it — B has no
+            // such conditional, this task's scope is the toggle-visible
+            // case only); `index.css:110`'s `--workspace-controls-right`
+            // (12pt) is the toggle's own trailing inset. 24 + 28 (toggle
+            // width) + 12 = 64, so the actions cluster's trailing edge
+            // still lands 64pt from the window's right edge.
+            Color.clear.frame(width: 24)
+            // `PanelLayoutControls.tsx`'s right-panel `Toggle` — B has no
+            // `terminalOpen` state yet, so the terminal-drawer toggle beside
+            // it upstream has no B counterpart to render.
+            T3TopBarToggle(icon: .panelRight, pressed: model.state.rightPanelOpen,
+                            tooltip: "Toggle right panel (\u{2318}J)") {
+                withAnimation(.linear(duration: 0.2)) { model.toggleRightPanel() }
+            }
+            Color.clear.frame(width: 12)   // `index.css:110` --workspace-controls-right
+        }
+        .frame(height: T3Theme.Metrics.topbarHeight)
+        .frame(maxWidth: .infinity)
+        // `toolbarBackground` == `background`/`appChromeBackground` by value
+        // (T3Theme.generated.swift) — WorkspacePageHeader itself carries no
+        // background class of its own; ChatView's instance is "bg-background",
+        // so the alias renders identically here.
+        .background(t3.web.toolbarBackground.color)
+        .overlay(alignment: .bottom) { Rectangle().fill(t3.web.border.color).frame(height: 1) }
+    }
+
+    // `ui/sidebar.tsx:169-170`'s `--workspace-titlebar-content-left` =
+    // `--workspace-controls-left` (90 pt, `AppSidebarLayout.tsx:49`'s
+    // `MACOS_TRAFFIC_LIGHTS_LEFT_INSET`) + `--workspace-titlebar-control-size`
+    // (28 pt) + `--workspace-titlebar-control-gap` (12 pt, both
+    // `index.css:112-113`) = 130 pt, applied only while the sidebar is
+    // collapsed and its own lights sit over the main column instead of the
+    // sidebar's brand row (`T3SidebarView.brandRow`, B-3 review). The 90 pt
+    // slot itself is `T3Root`'s job (`AppSidebarLayout.tsx:258`'s
+    // `<SidebarControl />`, a fixed sibling of `{children}`, not part of
+    // either column) — this is just the topbar's own content clearing it.
+    @ViewBuilder private var leadingInset: some View {
+        if model.state.sidebarCollapsed {
+            Spacer().frame(width: 130)
+        } else {
+            // `WorkspacePageHeader.tsx`'s own base inset, `sm:` breakpoint
+            // (always active — the window's minimum width clears 640 px):
+            // "sm:pl-[calc(env(safe-area-inset-left)+1.25rem)]" = 20 pt.
+            Spacer().frame(width: 20)
+        }
+    }
+
+    // MARK: - Breadcrumb
+
+    // `WorkspaceBreadcrumb.tsx`: items `sm` medium; current thread title in
+    // `foreground`, the project item in `mutedForeground`; separator "/" in
+    // `iconMuted`; gap "gap-2 sm:gap-3" = 12 pt (the `sm:` breakpoint,
+    // always active here too — Tailwind's `gap-3` is 0.75 rem, not the
+    // literal digit 3). Both items are plain text — upstream's project item
+    // opens "new thread in project" and the thread item opens a rename/action
+    // menu, neither of which B wires yet (no `onNewThreadInProject` /
+    // thread-rename plumbing in this task's scope).
+    //
+    // R2 (fix1 brief): `ChatHeader.tsx`'s project button is `max-w-40
+    // truncate` (10rem = 160pt) with `className="shrink"` overriding the
+    // breadcrumb item's default `shrink-0` — it's meant to cap AND shrink,
+    // not hug its content. The Task 8 first pass's `.fixedSize` on the
+    // icon+name pair defeated both (SwiftUI adopts the unconstrained ideal
+    // width under `.fixedSize`, so a sibling `.frame(maxWidth:)` has no
+    // proposal left to clamp) — removed. The name Text now carries the cap
+    // directly and a low `.layoutPriority` so it's the item that gives up
+    // width first; the thread title (`min-w-10 flex-1 truncate`) gets the
+    // higher priority, matching upstream's actual flex-grow member.
+    @ViewBuilder private func breadcrumb(thread: T3Thread) -> some View {
+        HStack(spacing: 12) {
+            if let project {
+                HStack(spacing: 6) {
+                    // `ChatHeader.tsx`'s `<ProjectFavicon>` — B has no
+                    // favicon pipeline, so this falls back to a folder glyph.
+                    // `.fixedSize()`: the icon itself never shrinks/truncates.
+                    LucideIcon(.folderClosed, size: 14).fixedSize()
+                    // Measured (fix1 brief's own literal R2 prescription,
+                    // `/tmp/ours-fix1.png`): `.frame(maxWidth: 160)` alone,
+                    // without `.fixedSize`, is flexible — it accepts
+                    // whatever width the row offers (up to 160), so on this
+                    // wide window it greedily filled to 160pt even for the
+                    // short name "limitless" (name-end to "/" measured
+                    // ~120pt apart, reproducing the exact round-1 bug this
+                    // task already fixed once). `.fixedSize` alone hugs but
+                    // never truncates (no cap). Neither modifier alone gets
+                    // CSS's actual behavior here (`flex-shrink` hug, capped,
+                    // truncate past the cap) — `CapToContent` below does:
+                    // reports `min(ideal, 160)` upward (hug + cap) and
+                    // proposes that same width down to the Text (so it
+                    // truncates past 160). Untested past the fixture's short
+                    // "limitless" name (no 160pt+ name available to capture).
+                    CapToContent(maxWidth: 160) {
+                        Text(project.name).lineLimit(1).truncationMode(.tail)
+                    }
+                    .layoutPriority(0)
+                }
+                .font(T3Font.web(.sm, .medium))
+                .foregroundStyle(t3.web.mutedForeground.color)
+                Text("/")
+                    .font(T3Font.web(.sm, .medium))
+                    .foregroundStyle(t3.web.iconMuted.color)
+            }
+            Text(thread.title)
+                .font(T3Font.web(.sm, .medium))
+                .foregroundStyle(t3.web.foreground.color)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)   // "min-w-10 flex-1 truncate" — the row's actual flex-grow member
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Actions
+
+    @ViewBuilder private var actions: some View {
+        if let project {
+            menuButton(icon: .plus, title: "Add action",
+                       disabledMessage: "Project actions arrive with a later release", anchor: $addActionAnchor)
+            openInControl(project: project)
+            menuButton(icon: .gitCommit, title: "Commit & push",
+                       disabledMessage: "Git actions arrive with a later release", anchor: $commitPushAnchor)
+        }
+    }
+
+    // `ProjectScriptsControl.tsx`'s zero-scripts branch / `GitActionsControl.tsx`'s
+    // split control, both collapsed to one `size="xs" variant="outline"`
+    // button + a one-row disabled menu (B ships no project-scripts backend
+    // and no git actions — Task 16/F may add the latter). The disabled row's
+    // copy ("Project actions arrive with a later release" /
+    // "Git actions arrive with a later release") is B's OWN wording, not
+    // transcribed from upstream's disabled-state copy — there is no
+    // upstream "not implemented yet" string to transcribe here.
+    //
+    // R1 (fix1 brief): a real `NSMenu` (`showDisabledMenu`, below) replaces
+    // the first pass's `.popover` — a `.popover` renders whatever content
+    // view it's given, so it kept the button's outline chrome, but it has
+    // none of a real menu's dismiss-on-outside-click, Esc, or arrow-key
+    // semantics. `NSMenu.popUp(positioning:at:in:)` gets both real chrome
+    // and real keyboard semantics; T3's own `dropdown-glass` blur/shadow
+    // look (`menu.tsx:53-95`) is NOT reproduced by a plain `NSMenu` — a
+    // documented parity gap, not attempted here.
+    private func menuButton(icon: Lucide, title: String, disabledMessage: String, anchor: Binding<NSView?>) -> some View {
+        Button {
+            showDisabledMenu(disabledMessage, from: anchor.wrappedValue)
+        } label: {
+            // `size="xs"` at the `sm:` breakpoint is `h-6` (24 pt) `text-xs`
+            // (`button.tsx:36`) — no `.xs` case in `T3ButtonMetrics`
+            // (InfinitusCore, out of this task's scope to add), so the
+            // height substitutes `.sm` (28 pt, Task 6's "Add project"
+            // precedent); the label text still renders at the real `.xs` scale.
+            outline { HStack(spacing: 6) { LucideIcon(icon, size: 14); Text(title).font(T3Font.web(.xs, .medium)) } }
+        }
+        .buttonStyle(.plain)
+        .background(MenuAnchor(view: anchor))
+    }
+
+    // R3 (fix1 brief): `OpenInPicker.tsx`'s split control is one joined
+    // `<Group>` (`ui/group.tsx:10-11`) — zero gap between segments, each
+    // segment rounded only on its own outer corner, a 1pt `GroupSeparator`
+    // (`bg-input`) between them, one continuous 1pt outline around the
+    // union. Chevron is `size-4` = 16pt (`OpenInPicker.tsx:299`), not 14.
+    // B carries no `usePreferredEditor` state, so the primary "Open" click
+    // always opens Finder (always installed, per the brief) rather than a
+    // remembered preference; the chevron opens a real `NSMenu`
+    // (`showOpenInMenu`) listing every entry from the brief whose app is
+    // actually installed.
+    private func openInControl(project: T3ProjectGrouping.Project) -> some View {
+        let radius = T3Theme.Metrics.controlRadius
+        let h = T3ButtonMetrics.height(.sm)
+        return HStack(spacing: 0) {
+            Button { openIn(bundleId: nil, cwd: project.cwd) } label: {
+                HStack(spacing: 6) { LucideIcon(.folderClosed, size: 14); Text("Open").font(T3Font.web(.xs, .medium)) }
+                    .padding(.horizontal, T3ButtonMetrics.horizontalPadding(.sm))
+            }
+            .buttonStyle(.plain)
+            .frame(height: h)
+            .foregroundStyle(t3.web.foreground.color)
+            .background(t3.web.popover.color, in: UnevenRoundedRectangle(
+                topLeadingRadius: radius, bottomLeadingRadius: radius, bottomTrailingRadius: 0, topTrailingRadius: 0))
+
+            Rectangle().fill(t3.web.input.color).frame(width: 1, height: h)   // `GroupSeparator`'s `bg-input`
+
+            Button { showOpenInMenu(project: project, from: openInAnchor) } label: {
+                LucideIcon(.chevronDown, size: 16)   // `OpenInPicker.tsx:299` "size-4"
+                    .frame(width: h, height: h)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(t3.web.foreground.color)
+            .background(t3.web.popover.color, in: UnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: radius, topTrailingRadius: radius))
+            .background(MenuAnchor(view: $openInAnchor))
+        }
+        .overlay(RoundedRectangle(cornerRadius: radius).stroke(t3.web.input.color, lineWidth: 1))
+    }
+
+    /// `button.tsx`'s `variant="outline"` chrome (`border-input bg-popover`,
+    /// `text-foreground`) as a `Button` label — `T3Button` itself has no
+    /// `size="xs"` case (see `menuButton` above), so the two single-pill
+    /// menu-fronted controls rebuild its outline look here directly (no
+    /// hover state: a menu trigger's affordance is the click, not a hover
+    /// fill). `openInControl` above builds its own joined-pill chrome
+    /// instead of using this helper (R3, fix1 brief).
+    @ViewBuilder
+    private func outline<Content: View>(square: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, square ? 0 : T3ButtonMetrics.horizontalPadding(.sm))
+            .frame(minWidth: square ? T3ButtonMetrics.height(.sm) : nil)
+            .frame(height: T3ButtonMetrics.height(.sm))
+            .foregroundStyle(t3.web.foreground.color)
+            .background(t3.web.popover.color, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+            .overlay(RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius).stroke(t3.web.input.color, lineWidth: 1))
+    }
+
+    // MARK: - Native menus (R1, fix1 brief)
+
+    private func showDisabledMenu(_ message: String, from anchor: NSView?) {
+        guard let anchor else { return }
+        let menu = NSMenu()
+        let item = NSMenuItem(title: message, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        menu.addItem(item)
+        // 4 pt below the trigger, per the fix brief; `nil` item places the
+        // menu's top-left corner at `at:` (Apple's own documented behavior).
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: anchor)
+    }
+
+    private func showOpenInMenu(project: T3ProjectGrouping.Project, from anchor: NSView?) {
+        guard let anchor else { return }
+        let menu = NSMenu()
+        for entry in openInEntries {
+            let target = MenuActionTarget { [self] in openIn(bundleId: entry.bundleId, cwd: project.cwd) }
+            let item = NSMenuItem(title: entry.title, action: #selector(MenuActionTarget.invoke), keyEquivalent: "")
+            item.target = target
+            // `NSMenuItem.target` is `weak` — a local array surviving only
+            // for this call's stack frame would rely on `popUp` completing
+            // its action dispatch before returning, which AppKit doesn't
+            // document. `representedObject` holds a strong reference for
+            // exactly as long as the item (and therefore the menu) is
+            // alive, removing the timing dependency entirely.
+            item.representedObject = target
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: anchor)
+    }
+
+    // `OpenInPicker.tsx`'s `resolveOptions` filtered to what the brief scopes
+    // B to: Finder always, the rest gated on `NSWorkspace` actually finding
+    // the app (never a static "is this installed" guess).
+    private var openInEntries: [(title: String, icon: Lucide, bundleId: String?)] {
+        var entries: [(title: String, icon: Lucide, bundleId: String?)] = [("Finder", .folderClosed, nil)]
+        let candidates: [(title: String, icon: Lucide, bundleId: String)] = [
+            ("VS Code", .code2, "com.microsoft.VSCode"),
+            ("Cursor", .code2, "com.todesktop.230313mzl4w4u92"),
+            ("Terminal", .terminal, "com.apple.Terminal"),
+            ("iTerm", .terminal, "com.googlecode.iterm2"),
+        ]
+        for c in candidates where NSWorkspace.shared.urlForApplication(withBundleIdentifier: c.bundleId) != nil {
+            entries.append(c)
+        }
+        return entries
+    }
+
+    private func openIn(bundleId: String?, cwd: String) {
+        let url = URL(fileURLWithPath: cwd)
+        guard let bundleId, let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            NSWorkspace.shared.open(url)   // Finder
+            return
+        }
+        NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
+    }
+}
+
+/// The SwiftUI idiom for CSS's default flex-item sizing (`flex-shrink: 1,
+/// flex-grow: 0`) with a `max-width` cap (`ChatHeader.tsx`'s project button,
+/// `max-w-40 truncate`): report `min(ideal, maxWidth, offered)` as this
+/// view's own size — hugs short content when offered more than it needs
+/// (never grows to fill), caps at `maxWidth`, AND shrinks below that under
+/// squeeze (a narrow `proposal`, e.g. `.layoutPriority` losing out to a
+/// sibling) so a genuinely tight row still truncates instead of clipping.
+/// `.fixedSize` alone hugs but never shrinks or truncates; `.frame(maxWidth:)`
+/// alone is flexible and fills any offered width up to the cap regardless of
+/// content — see the breadcrumb's own comment above for the measured proof
+/// neither works alone. `placeSubviews` proposes the actual allotted
+/// `bounds.width` (not a recomputed ideal) so the child is laid out at the
+/// same width `sizeThatFits` reported, and truncates rather than overflows
+/// its slot when squeezed.
+private struct CapToContent: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let ideal = subviews[0].sizeThatFits(.unspecified)
+        let width = min(ideal.width, maxWidth, proposal.width ?? .infinity)
+        let height = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: ideal.height)).height
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews[0].place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
+/// R1 (fix1 brief): reports its own backing `NSView` out through `view` so a
+/// sibling SwiftUI `Button`'s action closure can hand it to
+/// `NSMenu.popUp(positioning:at:in:)`. Sized by `.background(MenuAnchor(...))`
+/// on the trigger button, so it always matches that button's own frame.
+private struct MenuAnchor: NSViewRepresentable {
+    @Binding var view: NSView?
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { view = v }
+        return v
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+/// `NSMenuItem.target`/`.action` needs an `NSObject`; this is the smallest
+/// closure-holding adapter (R1, fix1 brief — SwiftUI's `T3TopBar` is a
+/// value type and can't itself be a menu-item target).
+private final class MenuActionTarget: NSObject {
+    private let action: () -> Void
+    init(_ action: @escaping () -> Void) { self.action = action }
+    @objc func invoke() { action() }
+}
+
+/// `PanelLayoutControls.tsx`/`ui/sidebar.tsx`'s toggle chrome —
+/// `ui/toggle.tsx`'s `ghost` variant: transparent, `hover:bg-accent`,
+/// `data-pressed:bg-accent data-pressed:text-accent-foreground` (pressed
+/// reads the same as hover, so one boolean stands in for AppKit, which has
+/// no `[data-pressed]`). Tooltip text carries the shortcut inline —
+/// `T3Tooltip` only wraps AppKit's plain-text `.help()` (no room for a
+/// `T3Kbd` chip), matching `T3SidebarView`'s "New thread ⌘N" precedent.
+/// Not `private`: `T3Root` also renders one, for the sidebar toggle
+/// (`AppSidebarLayout.tsx`'s window-level `SidebarControl`).
+struct T3TopBarToggle: View {
+    @Environment(\.t3) private var t3
+    @State private var hover = false
+    let icon: Lucide, pressed: Bool, tooltip: String, action: () -> Void
+
+    var body: some View {
+        T3Tooltip(tooltip) {
+            Button(action: action) {
+                LucideIcon(icon, size: 16)
+                    .foregroundStyle(active ? t3.web.accentForeground.color : t3.web.foreground.color)
+            }
+            .buttonStyle(.plain)
+            .frame(width: T3ButtonMetrics.height(.sm), height: T3ButtonMetrics.height(.sm))
+            .background(active ? t3.web.accent.color : .clear, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+            .onHover { hover = $0 }
+        }
+    }
+
+    private var active: Bool { pressed || hover }
+}

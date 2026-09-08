@@ -43,6 +43,7 @@ Frame
 Gamepad2
 Gauge
 GitBranch
+GitCommit
 GitPullRequest
 Globe
 Globe2

@@ -61,23 +61,13 @@ struct T3NoProjectsHero: View {
 /// T3's `<NoActiveThreadState>` (`NoActiveThreadState.tsx`): shown once a
 /// project exists but no thread is selected. Upstream's "No active thread"
 /// text sits inside its own `WorkspacePageHeader` (a full `topbarHeight`
-/// band with `border-b`), replacing the layout's generic top bar for this
-/// page; `T3Root`'s skeleton renders one top bar unconditionally instead, so
-/// this is a plain label row rather than a second stacked band — Task 8
-/// (`T3TopBar`) is the one place this can move to its intended spot.
+/// band with `border-b`) — `T3Root`'s top bar (`T3TopBar`, Task 8) renders
+/// that band unconditionally now, so this view is only the `<Empty>` body
+/// below it.
 struct T3NoActiveThreadState: View {
-    @Environment(\.t3) private var t3
-
     var body: some View {
-        VStack(spacing: 0) {
-            Text("No active thread")
-                .font(T3Font.web(.xs))
-                .foregroundStyle(t3.web.mutedForeground.color.opacity(0.5))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-            T3WebEmpty(
-                title: "Pick a thread to continue",
-                message: "Select an existing thread or create a new one to get started.")
-        }
+        T3WebEmpty(
+            title: "Pick a thread to continue",
+            message: "Select an existing thread or create a new one to get started.")
     }
 }

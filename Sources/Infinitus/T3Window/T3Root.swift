@@ -4,8 +4,8 @@ import InfinitusCore
 import InfinitusUI
 
 /// The workspace window's root: sidebar | main | right panel (spec §4.1,
-/// `AppSidebarLayout.tsx`). Tasks 7–9 replace the placeholder slots below
-/// with the real sidebar, top bar and thread view.
+/// `AppSidebarLayout.tsx`). Task 9 replaces the remaining placeholder slot
+/// below with the real thread view.
 struct T3Root: View {
     @ObservedObject var model: T3WindowModel
     @ObservedObject var app: AppModel
@@ -28,6 +28,7 @@ struct T3Root: View {
                 }
             }
             .background(t3.web.background.color)
+            .overlay(alignment: .topLeading) { sidebarToggle }
         }
         .frame(minWidth: T3WindowController.minimumSize.width, minHeight: T3WindowController.minimumSize.height)
         // `.fullSizeContentView` insets SwiftUI content by the titlebar's
@@ -46,6 +47,21 @@ struct T3Root: View {
         min(T3Theme.Metrics.sidebarWidth, max(208, windowWidth - 640))
     }
 
+    // `AppSidebarLayout.tsx:72-137`'s `SidebarControl`: fixed at
+    // `left: var(--workspace-controls-left)` (90 pt) regardless of sidebar
+    // state — a sibling of `{children}` (`:258`), not part of either
+    // column, so it renders here rather than inside `T3TopBar`. Icon swaps
+    // `ui/sidebar.tsx:344`: `PanelLeftIcon` collapsed, `PanelLeftCloseIcon`
+    // expanded (`isSidebarVisible`).
+    private var sidebarToggle: some View {
+        T3TopBarToggle(icon: model.state.sidebarCollapsed ? .panelLeft : .panelLeftClose, pressed: false,
+                        tooltip: "Toggle main sidebar (\u{2318}B)") {
+            withAnimation(.linear(duration: 0.2)) { model.toggleSidebar() }
+        }
+        .padding(.leading, 90)
+        .frame(height: T3Theme.Metrics.topbarHeight)
+    }
+
     @ViewBuilder private func sidebar(_ t3: T3Environment) -> some View {
         if model.state.sidebarCollapsed { T3SidebarIconRail() }
         else { T3SidebarView(model: model, app: app) }
@@ -55,7 +71,7 @@ struct T3Root: View {
         VStack(spacing: 0) {
             ZStack {
                 WindowDragRegion()
-                T3TopBarPlaceholder(model: model)                    // Task 8 replaces with T3TopBar
+                T3TopBar(model: model, app: app)
             }
             .frame(height: T3Theme.Metrics.topbarHeight)
             if model.state.projects.isEmpty && model.state.threads.isEmpty {
@@ -93,19 +109,7 @@ struct WindowDragRegion: NSViewRepresentable {
     func updateNSView(_ view: DragView, context: Context) {}
 }
 
-// MARK: - Task 6 placeholders (Task 8/9 delete these)
-
-private struct T3TopBarPlaceholder: View {
-    @ObservedObject var model: T3WindowModel
-    @Environment(\.t3) private var t3
-    var body: some View {
-        Text(model.state.selectedThread?.title ?? "Workspace")
-            .font(T3Font.web(.sm))
-            .foregroundStyle(t3.web.mutedForeground.color)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-    }
-}
+// MARK: - Task 6 placeholder (Task 9 deletes this)
 
 private struct T3ThreadPlaceholder: View {
     @ObservedObject var model: T3WindowModel

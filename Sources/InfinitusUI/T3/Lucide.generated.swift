@@ -45,6 +45,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case gamepad2 = "gamepad-2"
     case gauge = "gauge"
     case gitBranch = "git-branch"
+    case gitCommit = "git-commit"
     case gitPullRequest = "git-pull-request"
     case globe = "globe"
     case globe2 = "globe-2"
@@ -164,6 +165,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .gamepad2: return ["M6.0 11.0L10.0 11.0", "M8.0 9.0L8.0 13.0", "M15.0 12.0L15.01 12.0", "M18.0 10.0L18.01 10.0", "M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"]
         case .gauge: return ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"]
         case .gitBranch: return ["M15 6a9 9 0 0 0-9 9V3", "M15.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
+        case .gitCommit: return ["M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 12.0L9.0 12.0", "M15.0 12.0L21.0 12.0"]
         case .gitPullRequest: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M13 6h3a2 2 0 0 1 2 2v7", "M6.0 9.0L6.0 21.0"]
         case .globe: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"]
         case .globe2: return ["M21.54 15H17a2 2 0 0 0-2 2v4.54", "M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17", "M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05", "M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
