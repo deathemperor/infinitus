@@ -1,4 +1,5 @@
 import XCTest
+import InfinitusCore
 @testable import InfinitusMobile
 
 /// The `/timeline` fold (T3 clone C-1): snapshots replace, upserts merge
@@ -41,7 +42,14 @@ final class TimelineFollowerTests: XCTestCase {
         XCTAssertEqual(state.timeline.messages.last?.streaming, false)
         XCTAssertEqual(state.timeline.activities.map(\.id), ["x1"])
         XCTAssertEqual(state.sequence, 6)
-        XCTAssertEqual(T3ThreadScreen.rows(of: state.timeline).map(\.id), ["m:u1", "a:x1", "m:a1"])
+        // The reducer's rows over the same state: the user message, the
+        // activity, the assistant message with its meta.
+        let input = T3ThreadScreen.timelineInput(state: state, hiddenActivityIds: [], expandedTurnIds: [], expandedWorkGroupIds: [])
+        XCTAssertEqual(input.entries.map(\.id), ["message:u1", "activity:x1", "message:a1"])
+        XCTAssertEqual(input.isWorking, state.facts?.status == .running)
+        let kinds = T3TimelineRows.derive(input).map(\.kind)
+        XCTAssertEqual(kinds.first, "message")
+        XCTAssertTrue(kinds.contains("message") && kinds.count >= 2, "\(kinds)")
     }
 
     func testATombstoneDropsTheEntityAndAFactsEventReplacesFacts() throws {

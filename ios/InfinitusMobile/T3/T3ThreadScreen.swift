@@ -6,9 +6,9 @@ import InfinitusUI
 
 /// A session as T3 Code's mobile thread (T3 clone C-1, #223 §5): native
 /// title + subtitle header, the conversation over `/timeline`, and the
-/// capsule composer. Deliberately thin — one flat row per message and
-/// per activity, no work groups or turn folds; those arrive with
-/// `T3TimelineRows` (A's PR 4) and replace `rows(of:)` here.
+/// capsule composer. The feed is `T3TimelineRows.derive` over the
+/// follower's timeline: messages, work rows and live activity, tool
+/// groups behind a summary toggle, settled turns behind "Worked for …".
 struct T3ThreadScreen: View {
     @ObservedObject var model: MirrorModel
     let session: SessionDetail
@@ -42,45 +42,34 @@ struct T3ThreadScreen: View {
         _follower = StateObject(wrappedValue: TimelineFollower(fixture: fixture))
     }
 
-    /// The feed's order without its folds: each turn's user message, its
-    /// activities by sequence, then its assistant message; anything a
-    /// turn does not claim follows by time.
-    enum Row: Identifiable, Equatable {
-        case message(SessionTimeline.Message)
-        case work(SessionTimeline.Activity)
-        var id: String {
-            switch self {
-            case .message(let m): return "m:" + m.id
-            case .work(let a): return "a:" + a.id
-            }
-        }
-    }
-
-    static func rows(of timeline: SessionTimeline) -> [Row] {
-        var rows: [Row] = []
-        var claimed = Set<String>()
-        for turn in timeline.turns {
-            let messages = timeline.messages.filter { $0.turnId == turn.id }
-            for m in messages where m.role == .user { rows.append(.message(m)); claimed.insert(m.id) }
-            for a in timeline.activities.filter({ $0.turnId == turn.id }).sorted(by: { $0.sequence < $1.sequence }) {
-                rows.append(.work(a)); claimed.insert(a.id)
-            }
-            for m in messages where m.role == .assistant { rows.append(.message(m)); claimed.insert(m.id) }
-        }
-        let loose: [(Date, Row)] = timeline.messages.filter { !claimed.contains($0.id) }.map { ($0.createdAt, .message($0)) }
-            + timeline.activities.filter { !claimed.contains($0.id) }.map { ($0.createdAt, .work($0)) }
-        rows += loose.sorted { $0.0 < $1.0 }.map(\.1)
-        return rows
-    }
+    /// Which turn folds and work groups the user opened (`expandedTurnIds`,
+    /// `expandedWorkGroupIds` in T3's timeline state).
+    @State private var expandedTurnIds: Set<String> = []
+    @State private var expandedWorkGroupIds: Set<String> = []
 
     private var pending: T3Pending.Live { T3Pending.derive(follower.state.timeline) }
-    /// The live prompt shows as a card over the composer, not a feed line.
-    private var rows: [Row] {
-        let hidden = pending.activityIds
-        return Self.rows(of: follower.state.timeline).filter {
-            if case .work(let a) = $0 { return !hidden.contains(a.id) }
-            return true
-        }
+
+    /// `T3TimelineRows.Input` over the follower's state: the live prompt's
+    /// activities stay out (they show as a card over the composer), the
+    /// facts' latest turn and the running turn steer the folds.
+    static func timelineInput(state: TimelineFollower.State, hiddenActivityIds: Set<String>,
+                              expandedTurnIds: Set<String>, expandedWorkGroupIds: Set<String>) -> T3TimelineRows.Input {
+        var timeline = state.timeline
+        timeline.activities.removeAll { hiddenActivityIds.contains($0.id) }
+        let running = timeline.turns.first { $0.state == .running }
+        let latest = state.facts?.latestTurn
+        return T3TimelineRows.Input(
+            entries: T3TimelineEntry.entries(from: timeline),
+            latestTurn: latest.map { .init(turnId: $0.id, state: $0.state, startedAt: $0.startedAt, completedAt: $0.completedAt) },
+            runningTurnId: running?.id,
+            expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds,
+            isWorking: state.facts?.status == .running,
+            activeTurnStartedAt: running?.startedAt ?? running?.requestedAt)
+    }
+
+    private var rows: [T3TimelineRows.Row] {
+        T3TimelineRows.derive(Self.timelineInput(state: follower.state, hiddenActivityIds: pending.activityIds,
+                                                 expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds))
     }
     private var working: Bool { follower.state.facts?.status == .running }
 
@@ -90,12 +79,7 @@ struct T3ThreadScreen: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(rows) { row in
-                            switch row {
-                            case .message(let m): T3MessageRow(message: m)
-                            case .work(let a): T3WorkRow(activity: a)
-                            }
-                        }
+                        ForEach(rows) { row in feedRow(row) }
                         Color.clear.frame(height: 1).id("end")
                     }
                     .padding(.horizontal, 16)
@@ -236,6 +220,51 @@ struct T3ThreadScreen: View {
         let mac = model.macName(macId) ?? model.snapshot?.machineName
         if follower.unreachable { return "Reconnecting…" }
         return mac.map { "\(repo) · \($0)" } ?? repo
+    }
+
+    // MARK: feed rows (`MessagesTimeline.tsx` variants)
+
+    @ViewBuilder private func feedRow(_ row: T3TimelineRows.Row) -> some View {
+        switch row {
+        case let .message(_, _, message, _, showAssistantMeta, _, _, _, _):
+            T3MessageRow(message: message, showMeta: message.role == .user || showAssistantMeta)
+        case let .assistantMeta(_, _, message, _, _):
+            T3MessageMeta(message: message).padding(.horizontal, 4).padding(.bottom, 20)
+        case let .work(_, _, groupedEntries, _, displayLabel):
+            if let entry = groupedEntries.first {
+                T3WorkRow(entry: entry, label: displayLabel ?? T3WorkLog.displayLabel(entry, workspaceRoot: session.cwd))
+            }
+        case let .workLive(_, _, entry, _, _, _, active):
+            T3WorkRow(entry: entry, label: T3WorkLog.liveLabel(entry, workspaceRoot: session.cwd, active: active), live: active)
+        case let .workToggle(_, _, _, groupId, hiddenCount, expanded, summary, _, _, _, hasFailure):
+            T3FoldRow(label: hiddenCount > 0 && !expanded ? "\(summary) · \(hiddenCount) more" : summary,
+                      expanded: expanded, failure: hasFailure) {
+                if expanded { expandedWorkGroupIds.remove(groupId) } else { expandedWorkGroupIds.insert(groupId) }
+            }
+        case let .turnFold(_, _, turnId, label, expanded):
+            T3FoldRow(label: label, expanded: expanded, failure: false) {
+                if expanded { expandedTurnIds.remove(turnId) } else { expandedTurnIds.insert(turnId) }
+            }
+        case let .contextCompaction(_, _, label):
+            Text(label).font(T3Font.mobile(.xs)).foregroundStyle(t3.mobile.foregroundTertiary.color)
+                .frame(maxWidth: .infinity).padding(.vertical, 8)
+        case let .proposedPlan(_, _, plan):
+            VStack(alignment: .leading, spacing: 8) {
+                T3CardEyebrow(text: "Proposed plan")
+                MarkdownText(text: plan.planMarkdown).markdownStyle(.t3(t3.mobile))
+            }
+            .padding(16)
+            .background(t3.mobile.cardAlt.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(t3.mobile.border.color, lineWidth: 1))
+            .padding(.bottom, 20)
+        case .working, .thinking:
+            HStack(spacing: 8) {
+                T3Spinner(size: 12)
+                Text(row.kind == "thinking" ? "Thinking" : "Working").font(T3Font.mobile(.sm))
+                    .foregroundStyle(t3.mobile.foregroundMuted.color)
+            }
+            .padding(.vertical, 6)
+        }
     }
 
     // MARK: floating working control (T3 `floating-working-control.tsx`)
@@ -461,7 +490,10 @@ struct T3ThreadScreen: View {
 /// bubble, trailing; the assistant's as plain markdown; a timestamp under
 /// each.
 struct T3MessageRow: View {
-    let message: SessionTimeline.Message
+    let message: T3ChatMessage
+    /// The assistant's copy + time row; the reducer folds it into a
+    /// following `assistantMeta` row when tool calls trail the text.
+    var showMeta = true
     @Environment(\.t3) private var t3
 
     var body: some View {
@@ -476,7 +508,7 @@ struct T3MessageRow: View {
                         .markdownStyle(.t3(t3.mobile, user: true))
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(t3.mobile.userBubble.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    HStack(spacing: 4) { stamp; copyButton }
+                    HStack(spacing: 4) { meta.stamp; meta.copyButton }
                         .padding(.top, 4).padding(.trailing, 2)
                 }
             }
@@ -485,24 +517,33 @@ struct T3MessageRow: View {
             VStack(alignment: .leading, spacing: 0) {
                 MarkdownText(text: message.text)
                     .markdownStyle(.t3(t3.mobile))
-                HStack(spacing: 4) { copyButton; stamp }
-                    .padding(.top, 4)
+                if showMeta { meta.padding(.top, 4) }
             }
             // T3's assistant row sits 4 pt inside the feed's 16 (`px-1`).
             .padding(.horizontal, 4)
-            .padding(.bottom, 20)
+            .padding(.bottom, showMeta ? 20 : 8)
         }
     }
 
+    private var meta: T3MessageMeta { T3MessageMeta(message: message) }
+}
+
+/// The assistant meta row (`assistant-meta`): copy, then the time.
+struct T3MessageMeta: View {
+    let message: T3ChatMessage
+    @Environment(\.t3) private var t3
+
+    var body: some View { HStack(spacing: 4) { copyButton; stamp } }
+
     /// T3's `mt-1 gap-1` row: `text-xs font-t3-medium tabular-nums`.
-    private var stamp: some View {
+    var stamp: some View {
         Text(message.createdAt.formatted(date: .omitted, time: .shortened))
             .font(T3Font.mobile(.xs, .medium)).monospacedDigit()
             .foregroundStyle(t3.mobile.foregroundMuted.color)
     }
 
     /// `CopyTextButton`: a 28 pt target around a 14 pt glyph.
-    private var copyButton: some View {
+    var copyButton: some View {
         Button { UIPasteboard.general.string = message.text } label: {
             Image(systemName: "doc.on.doc").font(.system(size: 14))
                 .foregroundStyle(t3.mobile.iconSubtle.color)
@@ -513,41 +554,75 @@ struct T3MessageRow: View {
     }
 }
 
-/// One activity as a single line — tool, note, or a pending approval /
-/// question card's summary. Actions on those cards come with the rows
-/// reducer (#330's answers included).
+/// One work entry as a single line (`work` / `work-live`): the tool glyph,
+/// the reducer's display label, a spinner while live.
 struct T3WorkRow: View {
-    let activity: SessionTimeline.Activity
+    let entry: T3WorkLogEntry
+    let label: String
+    var live = false
     @Environment(\.t3) private var t3
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: symbol).font(.system(size: 12, weight: .medium))
-                .foregroundStyle(tint)
-                .frame(width: 16)
-            Text(activity.summary)
+            if live {
+                // A non-text view's baseline is its bottom; lift the spinner
+                // so it sits on the label's first line.
+                T3Spinner(size: 12).frame(width: 16)
+                    .alignmentGuide(.firstTextBaseline) { d in d[.bottom] - 2 }
+            } else {
+                Image(systemName: symbol).font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 16)
+            }
+            Text(label)
                 .font(T3Font.mobile(.sm))
-                .foregroundStyle(activity.tone == .approval ? t3.mobile.foreground.color : t3.mobile.foregroundMuted.color)
+                .foregroundStyle(t3.mobile.foregroundMuted.color)
                 .lineLimit(3)
         }
         .padding(.vertical, 4)
-        .padding(.bottom, activity.tone == .approval ? 8 : 0)
     }
 
     private var symbol: String {
-        switch activity.tone {
-        case .tool: return "wrench"
-        case .approval: return activity.kind == "user-input.requested" ? "questionmark.bubble" : "hand.raised"
+        if T3WorkLog.indicatesFailure(entry) { return "exclamationmark.triangle" }
+        switch entry.tone {
+        case .tool: return T3WorkLog.indicatesSuccess(entry) ? "checkmark" : "wrench"
+        case .thinking: return "brain"
         case .error: return "exclamationmark.triangle"
         case .info: return "info.circle"
         }
     }
 
     private var tint: Color {
-        switch activity.tone {
-        case .error: return t3.mobile.dangerForeground.color
-        case .approval: return t3.mobile.primary.color
-        default: return t3.mobile.iconMuted.color
+        if entry.tone == .error || T3WorkLog.indicatesFailure(entry) { return t3.mobile.dangerForeground.color }
+        return t3.mobile.iconMuted.color
+    }
+}
+
+/// `turn-fold` and `work-toggle`: "Worked for 2m 14s" / the group summary
+/// with a chevron, opening the folded rows in place.
+struct T3FoldRow: View {
+    let label: String
+    let expanded: Bool
+    let failure: Bool
+    let toggle: () -> Void
+    @Environment(\.t3) private var t3
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
+                    .foregroundStyle(t3.mobile.iconMuted.color)
+                    .frame(width: 16)
+                Text(label).font(T3Font.mobile(.sm))
+                    .foregroundStyle(failure ? t3.mobile.dangerForeground.color : t3.mobile.foregroundMuted.color)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(expanded ? "Collapse \(label)" : "Expand \(label)")
     }
 }
