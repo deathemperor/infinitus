@@ -15,7 +15,11 @@ public struct T3WorkspaceInputs: Sendable, Equatable {
     }
 }
 
-public enum T3SidebarScope: Sendable, Equatable { case all, project(id: String) }
+/// `.group` scopes by a `T3ProjectGrouping.Group`'s member ids (B-3 review):
+/// grouping is logical (folder-name based) while `.project` is one physical
+/// id, so a group with more than one physical checkout of the same name
+/// needs every member's threads, not just the representative's.
+public enum T3SidebarScope: Sendable, Equatable { case all, project(id: String), group(ids: [String]) }
 
 /// The workspace window's state as a value (spec §4.3): threads, projects,
 /// selection, sidebar scope/search, disclosure. `T3WindowModel` owns one
@@ -108,7 +112,11 @@ public struct T3WorkspaceState: Sendable, Equatable {
     /// is only consulted once there is something to search for).
     public func visibleThreads(now: Date) -> [T3Thread] {
         var out = threads
-        if case let .project(id) = scope { out = out.filter { $0.projectId == id } }
+        switch scope {
+        case .all: break
+        case let .project(id): out = out.filter { $0.projectId == id }
+        case let .group(ids): let set = Set(ids); out = out.filter { set.contains($0.projectId) }
+        }
         let q = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return q.isEmpty ? out : T3SidebarList.searchByTitle(out, query: search)
     }

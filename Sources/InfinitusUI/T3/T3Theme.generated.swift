@@ -414,6 +414,9 @@ public enum T3Theme {
         public static let radius: Double = 10
         public static let controlRadius: Double = 8
         public static let sidebarWidth: Double = 256
+        // `--sidebar-width-icon`. Unused by the Mac window: its sidebar is
+        // `collapsible="offcanvas"` (AppSidebarLayout.tsx:227), which collapses
+        // to width 0 (ui/sidebar.tsx:285), never to an icon rail.
         public static let sidebarWidthIcon: Double = 48
         public static let topbarHeight: Double = 52
         public static let sidebarContentInset: Double = 8
