@@ -107,12 +107,17 @@ final class AppModel: ObservableObject {
     @Published var cswapState: CswapSupervisor.State = .stopped
     struct EventEntry: Identifiable {
         let id = UUID()
-        let at = Date()
+        var at = Date()
         let icon: String
         let text: String
     }
+    /// The Activity tail, `infinitusctl events` and the wall's last
+    /// lines: the last 100 events — seeded from the durable log at
+    /// launch (`seedEventLog`), so a relaunch or rebuild no longer wipes
+    /// what the user just did (#338).
     @Published var eventLog: [EventEntry] = []
     let eventStore = EventStore()
+    private let launchedAt = Date()
     /// Team session control (#220): the audit feed and who is driving
     /// which session (by session id) until when — read at render time,
     /// no timer.
@@ -275,6 +280,9 @@ final class AppModel: ObservableObject {
     /// by itself.
     @Published var battlePlan: WindowPlanner.Plan?
     @Published var igniting: Int?
+    /// #338: what the last ignition did, for the plan line to say out
+    /// loud for a few seconds — the chip otherwise vanishes silently.
+    @Published var igniteResult: IgniteResult?
     /// Run-rate projection: when the active account's windows hit their
     /// limits and when the fleet is out, at the measured pace (nil until
     /// there is an active account). The planner reads the same rates.
@@ -1218,6 +1226,22 @@ final class AppModel: ObservableObject {
         return .init(pct: w.pct, resetsAt: w.resetsAt.flatMap(UsageHistory.parseISO)?.timeIntervalSince1970)
     }
 
+    /// The last 100 durable events back into the Activity tail (#338),
+    /// under whatever this launch has logged meanwhile — those are on
+    /// disk too by now, so only events from before launch are taken.
+    private func seedEventLog() {
+        guard !isPlayground, !mockMode else { return }
+        let launchedAt = launchedAt
+        Task.detached(priority: .utility) { [weak self, eventStore] in
+            let past = await eventStore.load().filter { $0.at < launchedAt }.suffix(100)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.eventLog = past.map { EventEntry(at: $0.at, icon: $0.icon, text: $0.text) } + self.eventLog
+                if self.eventLog.count > 100 { self.eventLog.removeFirst(self.eventLog.count - 100) }
+            }
+        }
+    }
+
     /// Seed the burn-rate buffer from this machine's own history file.
     private func seedRecentSamples() {
         guard !isPlayground, !mockMode else { return }
@@ -1246,14 +1270,26 @@ final class AppModel: ObservableObject {
             .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(number)"
         logEvent("ignite", icon: "flag.checkered", "igniting \(name)'s 5h window")
         Task { [weak self] in
+            var result: IgniteResult?
             do {
                 try await engine.ignite(fleet: provider, number: number)
-                self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started")
+                // The row's reset only moves with the next poll; say when
+                // the window ends from the poll below, or now + 5 h until
+                // then (#338: "nothing happens" after a successful ignite).
+                await self?.refreshSnapshot()
+                let resets = self?.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
+                    .flatMap(UsageHistory.parseISO) ?? Date().addingTimeInterval(5 * 3_600)
+                let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short
+                result = IgniteResult(text: "\(name)'s window started — resets \(f.string(from: resets))", ok: true)
+                self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(f.string(from: resets))")
             } catch {
-                self?.logEvent("other", icon: "exclamationmark.triangle", "ignite \(name) failed: \(error.localizedDescription)")
+                result = IgniteResult(text: "ignite \(name) failed: \(error.localizedDescription)", ok: false)
+                self?.logEvent("other", icon: "exclamationmark.triangle", result!.text)
             }
             self?.igniting = nil
-            await self?.refreshSnapshot()
+            self?.igniteResult = result
+            try? await Task.sleep(for: .seconds(10))
+            if self?.igniteResult == result { self?.igniteResult = nil }
         }
     }
 
@@ -1262,6 +1298,7 @@ final class AppModel: ObservableObject {
     /// until the first click, and rumps started its engine immediately.
     func startFeeds() {
         detectOnboarding()
+        seedEventLog()
         seedRecentSamples()
         // Same gate as logEvent: a mock instance must not rewrite the
         // real events log either.

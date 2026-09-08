@@ -9,6 +9,13 @@ import InfinitusCore
 /// Exactly the members the moved views touch, nothing speculative: add
 /// one only when a view actually reads it.
 @MainActor
+/// #338: the outcome the plan line shows after an ignition.
+public struct IgniteResult: Equatable, Sendable {
+    public let text: String
+    public let ok: Bool
+    public init(text: String, ok: Bool) { self.text = text; self.ok = ok }
+}
+
 public protocol FleetModel: ObservableObject {
     var accounts: [Account] { get }
     /// What the rows iterate — engine order or the headroom sort.
@@ -57,6 +64,10 @@ public protocol FleetModel: ObservableObject {
     var battlePlan: WindowPlanner.Plan? { get }
     /// The account an ignition is in flight for (button shows a spinner).
     var igniting: Int? { get }
+    /// What the last ignition did ("bloody's window started — resets
+    /// 3:20 PM", or the failure), shown in the chip's place for a few
+    /// seconds; nil otherwise (#338).
+    var igniteResult: IgniteResult? { get }
     /// Whether this host's engine can ignite (capability `.ignite`); the
     /// button is hidden otherwise — the plan line still shows.
     var canIgnite: Bool { get }
@@ -135,6 +146,7 @@ public extension FleetModel {
     var appUpdateVersion: String? { nil }
     var battlePlan: WindowPlanner.Plan? { nil }
     var igniting: Int? { nil }
+    var igniteResult: IgniteResult? { nil }
     var canIgnite: Bool { false }
     var forecast: UsageForecast? { nil }
     var awsLogins: [AwsLogin.Item] { [] }

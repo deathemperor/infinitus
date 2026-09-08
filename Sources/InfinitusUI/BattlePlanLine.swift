@@ -5,7 +5,9 @@ import InfinitusCore
 /// naming the steps the planner proposes, and — when a step is an
 /// ignition — a confirm-gated button that runs it. Two taps: the first
 /// arms ("Sure?"), the second fires; the arm times out on its own so a
-/// stray click never ignites. Nothing runs by itself.
+/// stray click never ignites. Nothing runs by itself. After it fires the
+/// chip's place says what happened for a few seconds (#338: a silent
+/// success read as "nothing happens").
 public struct BattlePlanLine<M: FleetModel>: View {
     @ObservedObject var model: M
     @State private var armed = false
@@ -23,7 +25,14 @@ public struct BattlePlanLine<M: FleetModel>: View {
                     .font(PopupFont.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if model.canIgnite, let n = plan.igniteNumber {
+                if let result = model.igniteResult {
+                    (Text(Image(systemName: result.ok ? "checkmark.circle.fill" : "exclamationmark.triangle"))
+                     + Text(" " + result.text))
+                        .font(PopupFont.caption)
+                        .foregroundStyle(result.ok ? Color.green : Color.red)
+                        .lineLimit(1)
+                        .transition(.opacity)
+                } else if model.canIgnite, let n = plan.igniteNumber {
                     igniteButton(n)
                 }
             }
@@ -48,14 +57,18 @@ public struct BattlePlanLine<M: FleetModel>: View {
                     }
                 }
             } label: {
-                Text(armed ? "Sure? Ignite \(name(n))" : "Ignite \(name(n))")
-                    .font(PopupFont.caption)
+                // Armed: a solid orange pill, not a tint under the caption
+                // font — the 6 s window has to be seen to be used (#338).
+                (Text(Image(systemName: armed ? "flame.fill" : "flame"))
+                 + Text(armed ? " Sure? Ignite \(name(n))" : " Ignite \(name(n))"))
+                    .font(PopupFont.caption.weight(armed ? .semibold : .regular))
                     .padding(.horizontal, 6).padding(.vertical, 1)
-                    .background((armed ? Color.orange : Color.secondary).opacity(0.2),
-                                in: Capsule())
-                    .foregroundStyle(armed ? .orange : .secondary)
+                    .background(armed ? Color.orange : Color.secondary.opacity(0.2), in: Capsule())
+                    .foregroundStyle(armed ? .white : .secondary)
             }
             .buttonStyle(.plain)
+            .help(armed ? "Click again within 6 s to start \(name(n))'s window now"
+                        : "Starts \(name(n))'s 5h window now with one tiny request (asks again before it fires)")
         }
     }
 
