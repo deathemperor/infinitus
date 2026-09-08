@@ -151,6 +151,24 @@ final class LiveActivityPusher: ObservableObject {
         }
     }
 
+    /// The tok/min line alone, on the app's rate beat: the last state each
+    /// working card received with the fresh rate laid over it, sent only
+    /// when the number moved. Push-to-start slots never get an update.
+    func pushRate(_ tokenRate: TokenRate?) {
+        guard configured else { return }
+        for registration in registrations.values where registration.kind == .working {
+            guard var state = lastWorking[registration.slot] else { continue }
+            let perMinute = tokenRate.flatMap { $0.perMinute > 0 ? $0.perMinute : nil }
+            guard state.tokensPerMinute != perMinute else { continue }
+            state.tokensPerMinute = perMinute
+            state.tokenFraction = tokenRate?.fraction ?? 0
+            lastWorking[registration.slot] = state
+            send(LiveActivityPush.updatePayload(state: state,
+                                                staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale)),
+                 to: registration, what: "update rate")
+        }
+    }
+
     /// An update token registered in the last 8 h (an activity's max run).
     private func hasLive(_ kind: ActivityPushRegistration.Kind, device: String) -> Bool {
         guard let live = registrations["\(device)/\(kind.rawValue)"] else { return false }

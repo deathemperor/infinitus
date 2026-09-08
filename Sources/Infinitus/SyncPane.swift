@@ -301,6 +301,11 @@ struct SyncPane: View {
         if let result = pusher.lastResult {
             Text(result).font(.caption).foregroundStyle(.secondary)
         }
+        Stepper(value: $app.liveActivityRateSeconds, in: 0...60, step: 5) {
+            Text(app.liveActivityRateSeconds == 0
+                 ? "tok/min: pushed with other changes only"
+                 : "tok/min: pushed every \(app.liveActivityRateSeconds) s")
+        }
     }
 
     /// Who is talking to the mirror (user 2026-09-03: "show active/
