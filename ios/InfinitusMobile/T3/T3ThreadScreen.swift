@@ -145,11 +145,11 @@ struct T3ThreadScreen: View {
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
             follower.start()
-            // `infinitus://t3/git|settings` (the parity capture) lands on
+            // `infinitus://t3/git|thread-settings` (the parity capture) lands on
             // the thread with that sheet up.
             switch model.requestedThreadSheet {
             case "git": showGit = true
-            case "settings": showSettings = true
+            case "thread-settings": showSettings = true
             default: break
             }
             model.requestedThreadSheet = nil

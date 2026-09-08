@@ -26,7 +26,6 @@ struct T3NewTaskSheet: View {
                     T3NewTaskDraft(model: model, cwd: cwd, macId: $macId, changeProject: { path = [] })
                 }
         }
-        .t3(platform: .mobile)
         .presentationDetents([.fraction(0.6), .fraction(0.95)])
         .presentationDragIndicator(.visible)
         .onAppear { if macId == nil { macId = model.defaultTargetMacId } }

@@ -55,6 +55,7 @@ publishes the matching section as the GitHub release body.
 - With the new screens on, + starts a session from a task sheet: pick a project, say what to build, choose the Mac, engine and permissions, send (#223).
 - The new thread's gear opens thread settings — permission mode, settle, snooze, pin, stop the turn — and its git pill shows the branch with the actions to come (#223).
 - With the new screens on, the sessions list is a flat thread list — project, title, branch · Mac, a status word or age — with snoozed and settled shelves and a search pill (#223).
+- With the new screens on, Home's ⋯ opens Settings as a sheet — Macs, Appearance, Dictation, Screenshots, Notifications, Team, About as card rows (#223).
 - A send the phone retries lands once: the Mac answers the retry with the first reply, and a turn you stopped keeps its late input out (#223).
 - Swipe a session to pin it, settle it or snooze it an hour (long-press for "until tomorrow"); pinned rows lead, snoozed and settled ones sit dimmed at the tail (#223).
 - Session rows take their dot and word from the host's facts — a raised hand for an approval, a question mark for a prompt, the plan's "2 of 5" under the row — and the chat header gets a stop button while Claude works (#223).

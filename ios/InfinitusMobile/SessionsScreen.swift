@@ -32,9 +32,10 @@ struct SessionsScreen: View {
                     }
                 }
                 .sheet(isPresented: $startSheet) {
-                    if model.t3Screens { T3NewTaskSheet(model: model) } else { StartSessionSheet(model: model) }
+                    if model.t3Screens { T3NewTaskSheet(model: model).t3(platform: .mobile) } else { StartSessionSheet(model: model) }
                 }
                 .sheet(item: $awsLoginItem) { AwsLoginScreen(item: $0) }
+                .sheet(isPresented: $settingsSheet) { T3SettingsSheet(model: model).t3(platform: .mobile) }
                 // A cold launch from the notification asks before the first
                 // snapshot is in; the request waits for the login to appear.
                 .onChange(of: model.requestedAwsLogin) { _, _ in openRequestedAwsLogin() }
@@ -71,6 +72,11 @@ struct SessionsScreen: View {
                     threadScreen(route.session, macId: route.macId)
                 }
         }
+        // A view reads the environment above it, not one it installs on its
+        // own body — so the new screens' palette goes on the stack, where
+        // the pushed thread and every sheet inherit it (dark mode read the
+        // default light palette before this, 2026-09-08).
+        .t3(platform: .mobile)
         // A shake staged a capture for a session: open its feed (which
         // takes the capture into its composer). A feed already open for
         // that pid takes it itself — re-pushing a fresh SessionDetail
@@ -125,8 +131,8 @@ struct SessionsScreen: View {
         if model.t3Screens {
             // The new Home (T3 clone C-6): its own header and bottom bar,
             // the stack's destinations and sheets shared with the list.
-            T3HomeList(model: model, path: $path, startSheet: $startSheet, awsLogin: { awsLoginItem = $0 })
-                .t3(platform: .mobile)
+            T3HomeList(model: model, path: $path, startSheet: $startSheet, settingsSheet: $settingsSheet,
+                       awsLogin: { awsLoginItem = $0 })
         } else if !fleetsWithSessions.isEmpty || !othersWithSessions.isEmpty {
             ScrollViewReader { proxy in
                 List {
@@ -157,6 +163,8 @@ struct SessionsScreen: View {
     }
 
     @State private var awsLoginItem: AwsLogin.Item?
+    /// The new Home's ellipsis opens Settings as a sheet, as T3 does.
+    @State private var settingsSheet = false
 
     /// The List body is split into three builders — one expression with
     /// all three sections is more than CI's compiler type-checks in time.
@@ -268,7 +276,10 @@ struct SessionsScreen: View {
         case "newtask":
             model.requestedT3Screen = nil
             startSheet = true
-        case "thread", "git", "settings":
+        case "settings":
+            model.requestedT3Screen = nil
+            settingsSheet = true
+        case "thread", "git", "thread-settings":
             guard let session = fleetsWithSessions.flatMap({ $0.liveSessions?.sessions ?? [] }).first else { return }
             model.requestedT3Screen = nil
             model.requestedThreadSheet = screen == "thread" ? nil : screen

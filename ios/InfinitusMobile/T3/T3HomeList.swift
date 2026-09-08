@@ -82,6 +82,7 @@ struct T3HomeList: View {
     @ObservedObject var model: MirrorModel
     @Binding var path: NavigationPath
     @Binding var startSheet: Bool
+    @Binding var settingsSheet: Bool
     let awsLogin: (AwsLogin.Item) -> Void
 
     private var entries: [T3HomeEntry] {
@@ -119,7 +120,7 @@ struct T3HomeList: View {
                        else { path.append(e.session) }
                    },
                    compose: { startSheet = true },
-                   settings: { model.requestedTab = "settings" },
+                   settings: { settingsSheet = true },
                    pastSessions: { path.append(PastSessionsRoute()) },
                    awsLogins: model.awsLogins, awsLogin: awsLogin,
                    decorate: { e, row in AnyView(row.modifier(T3HomeSwipe(model: model, entry: e))) })

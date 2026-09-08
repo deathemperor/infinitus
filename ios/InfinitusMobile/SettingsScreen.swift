@@ -11,6 +11,25 @@ import InfinitusUI
 /// with it off these are the mac's own Display / Themes / Animations
 /// choices, same values and same labels.
 struct SettingsForm: View {
+    /// One group of the Form, when the T3 settings sheet pushes it on
+    /// its own page; nil is the whole Form (the Settings tab).
+    enum Part: Hashable {
+        case macs, appearance, dictation, screenshots, notifications, team, about
+        var title: String {
+            switch self {
+            case .macs: return "Macs"
+            case .appearance: return "Appearance"
+            case .dictation: return "Dictation"
+            case .screenshots: return "Screenshots"
+            case .notifications: return "Notifications"
+            case .team: return "Team"
+            case .about: return "About"
+            }
+        }
+    }
+    var part: Part? = nil
+    private func shows(_ p: Part) -> Bool { part == nil || part == p }
+
     @AppStorage("chat_header") private var chatHeader = "compact"
     @AppStorage(FleetAlarmCenter.enabledKey) private var fleetAlarms = true
 
@@ -49,23 +68,27 @@ struct SettingsForm: View {
             // and the cosmetics wait below it (critique, iOS
             // hierarchy: "on a phone with nothing paired, the first
             // screen is a theme picker").
-            connectionSection
-            addressesSection
-            // A token cleared out of the field below must not hide the
-            // Macs it can't forget: the other Macs are stored on their
-            // own, so the group stays as long as one of them is there.
-            if isPaired || !model.others.isEmpty { otherMacsSection }
-            appearanceSection
-            if !model.followMac {
-                themeSection
-                motionSection
+            if shows(.macs) {
+                connectionSection
+                addressesSection
+                // A token cleared out of the field below must not hide the
+                // Macs it can't forget: the other Macs are stored on their
+                // own, so the group stays as long as one of them is there.
+                if isPaired || !model.others.isEmpty { otherMacsSection }
             }
-            chatHeaderSection
-            DictationSettings()
-            ScreenshotSettings()
-            notificationsSection
-            teamSection
-            AboutSettings(model: model)
+            if shows(.appearance) {
+                appearanceSection
+                if !model.followMac {
+                    themeSection
+                    motionSection
+                }
+                chatHeaderSection
+            }
+            if shows(.dictation) { DictationSettings() }
+            if shows(.screenshots) { ScreenshotSettings() }
+            if shows(.notifications) { notificationsSection }
+            if shows(.team) { teamSection }
+            if shows(.about) { AboutSettings(model: model) }
         }
         .onChange(of: fleetAlarms) { _, on in
             if !on { FleetAlarmCenter.shared.clearPending() }
