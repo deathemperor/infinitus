@@ -209,6 +209,8 @@ public enum SessionTimelineBuilder {
             openTools[id] = OpenTool(name: name, command: command, files: files, input: Walk.json(input))
             var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name))]
             if !title.isEmpty { payload["title"] = .string(title) }
+            payload["toolCallId"] = .string(id)
+            if let command { payload["command"] = .string(command) }
             append("tool.started", id: id, tone: .tool, summary: title.isEmpty ? name : title, payload: payload, at: at)
         }
 
@@ -260,6 +262,8 @@ public enum SessionTimelineBuilder {
             }
             var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name)),
                                                 "status": .string(isError ? "failed" : "completed")]
+            payload["toolCallId"] = .string(toolUseId)
+            if let c = open.command { payload["command"] = .string(c) }
             let line = Slim.output(text)
             if !line.isEmpty { payload["output"] = .string(line) }
             var files = open.files
@@ -319,7 +323,7 @@ public enum SessionTimelineBuilder {
                 let m = messages[i]
                 let joined = String((m.text + "\n\n" + text).prefix(SessionFeedReader.textCap))
                 messages[i] = SessionTimeline.Message(id: m.id, role: .assistant, text: joined, images: nil, sender: nil,
-                                      turnId: m.turnId, streaming: false, createdAt: m.createdAt)
+                                      turnId: m.turnId, streaming: false, createdAt: m.createdAt, updatedAt: max(m.updatedAt, at))
                 return
             }
             messages.append(SessionTimeline.Message(id: id, role: .assistant, text: String(text.prefix(SessionFeedReader.textCap)),
@@ -379,7 +383,7 @@ public enum SessionTimelineBuilder {
                    let mi = messages.firstIndex(where: { $0.id == aid }) {
                     let m = messages[mi]
                     messages[mi] = SessionTimeline.Message(id: m.id, role: m.role, text: m.text, images: m.images, sender: m.sender,
-                                           turnId: m.turnId, streaming: true, createdAt: m.createdAt)
+                                           turnId: m.turnId, streaming: true, createdAt: m.createdAt, updatedAt: m.updatedAt)
                 }
             }
             return SessionTimeline(turns: out, messages: messages, activities: activities)

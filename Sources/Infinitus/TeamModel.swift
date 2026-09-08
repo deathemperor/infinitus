@@ -477,6 +477,21 @@ final class TeamModel: ObservableObject {
         catch { lastError = Self.mask(error) }
     }
 
+    /// A join request to a leader typed as `host[:port]` (#355): the
+    /// key route resolves who is there, then the request goes exactly
+    /// as it would to a discovered peer.
+    func requestNearby(address: String, name: String) async {
+        guard let (host, port) = TeamNearby.Client.parseAddress(address) else {
+            lastError = "that is not an address — use host or host:port"; return
+        }
+        let device = Host.current().localizedName ?? "Mac"
+        await action("Asking \(host) to join…") { paths, secrets in
+            let peer = try TeamNearby.Client.peer(host: host, port: port, http: Self.blockingHTTP)
+            _ = try TeamNearby.Client.request(to: peer, name: name, devices: [device], platform: "macos",
+                                              paths: paths, secrets: secrets, http: Self.blockingHTTP)
+        }
+    }
+
     func requestNearby(_ peer: TeamNearby.Peer, name: String) async {
         let device = Host.current().localizedName ?? "Mac"
         await action("Asking \(peer.name) to join…") { paths, secrets in

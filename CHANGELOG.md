@@ -7,18 +7,25 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Team (preview)
+- Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
+
 ### Mac
 - The team loop stops burning seconds every five minutes: a teammate's stats, live state, sessions and fleet docs are decrypted once per blob version instead of through a git subprocess each pass, and the header cache is rewritten hourly rather than on every pass (#346).
+- Every team git call returns the moment git exits instead of up to 100 ms later, and a store pass lists each branch once: fetch, publish and the reader's tick spend less time waiting (#370).
 - A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
 - `infinitusctl team status|fetch|code|approve|decline|create|publish` on a Mac with the app running answer as the app (its identity, its store), and the other team subcommands refuse to mint a second identity beside the app's; `team status` fetches first and says when it is showing a cached roster (#354).
 - The Mac idles near 0% again with the pop-out closed: the project list behind the phone's start sheet reuses its walk of past transcripts for a minute instead of re-reading ten thousand files on every refresh (#346).
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
+- Workspace groundwork: timeline messages carry updatedAt, tool rows carry their command, slash-command discovery.
+- The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
 
 ### Phone
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
 - Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).
 - The new thread renders markdown the way the reference does — DM Sans body, bold in the strong color, mono inline code, fenced code in a bordered block with its language and a copy button, task lists, tables, rules (#223).
+- The new thread list and thread screen hold the same session leases the previous screens held, so the Mac keeps computing facts and full timelines for what the phone shows (#223).
 
 ## 0.4.4-alpha.2
 

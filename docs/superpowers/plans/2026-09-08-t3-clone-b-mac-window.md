@@ -747,6 +747,11 @@ git commit -m "core: slash command and skill discovery for the workspace compose
 
       public init()
       public mutating func apply(_ inputs: T3WorkspaceInputs, now: Date)
+      // apply() remembers the first `createdAt` it saw per thread id (`firstSeenCreatedAt: [String: Date]`)
+      // and rewrites each incoming thread's createdAt (and an updatedAt equal to it) with the remembered
+      // value: the bridge falls back to `now` for a session with no birth record/turn/statusUpdatedAt, and
+      // without this memory such a thread re-sorts and re-diffs the sidebar on every tick (B-1 review #4).
+      // Test: apply twice, 1 s apart, the same record-less thread → equal T3Thread values, one createdAt.
       public mutating func select(_ threadId: String?, now: Date)   // stamps lastVisitedAt
       public func pid(of threadId: String) -> Int32?
       public var selectedThread: T3Thread?
@@ -1118,9 +1123,6 @@ final class T3WindowModel: ObservableObject {
     private(set) weak var model: AppModel?
     private var sink: AnyCancellable?
     private var refreshing = false
-    private var projectsCache: [ProjectSummary] = []
-    private var projectsCachedAt = Date.distantPast
-    private var projectsCwds: Set<String> = []
     /// Task 13's composer focuses its field when this flips true, then clears it.
     @Published var composerFocusRequested = false
 
@@ -1154,15 +1156,12 @@ final class T3WindowModel: ObservableObject {
         let facts = model.sessionProgress.facts, progress = model.sessionProgress.byPid
         let births = model.sessionBirths
         let profiles = model.sessionProfiles.profiles   // adapt to the real accessor
-        // `projectSummaries` scans past transcripts (PastSessions.list(limit: 200)):
-        // never per fleet tick. Recompute when the set of live cwds changes or
-        // every 30 s (the exporter's cadence), else reuse the last result.
-        let cachedProjects = projectsCache, cachedAt = projectsCachedAt, cachedCwds = projectsCwds
+        // `projectSummaries(profiles:)` memoizes its PastSessions walk itself
+        // (#369: 60 s, keyed on the live session set) — call it, never wrap
+        // it in a second cache (that doubles the cost the memo removed).
         Task.detached(priority: .utility) { [weak self] in
             let records = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-            let cwds = Set(records.map(\.cwd))
-            let stale = cwds != cachedCwds || Date().timeIntervalSince(cachedAt) > 30
-            let projects = stale ? model.projectSummaries(profiles: profiles) : cachedProjects
+            let projects = model.projectSummaries(profiles: profiles)
             let inputs = T3WorkspaceInputs(
                 records: records,
                 facts: Dictionary(uniqueKeysWithValues: facts.map { (Int32($0.key), $0.value) }),
@@ -1171,7 +1170,6 @@ final class T3WindowModel: ObservableObject {
                 projects: projects)
             await MainActor.run {
                 guard let self else { return }
-                if stale { self.projectsCache = projects; self.projectsCachedAt = Date(); self.projectsCwds = cwds }
                 let now = Date()
                 self.now = now
                 self.state.apply(inputs, now: now)
@@ -1703,7 +1701,7 @@ git commit -m "workspace: approval and user-input panels, banners, plan card act
   // Core
   public struct T3ComposerDraft: Codable, Sendable, Equatable {
       public var text: String; public var attachments: [T3ComposerAttachmentRef]   // file URLs as paths; data read at send
-      public static let historyLimit = <upstream constant>
+      public static let historyLimit = 50   // ours: T3 recalls prompts from the thread's own user messages (composerPromptHistory.ts has no cap); we persist a flat list, capped
   }
   public enum T3ComposerDrafts {
       public static func load(from data: Data?) -> [String: T3ComposerDraft]       // by threadId (or "draft:<uuid>")
@@ -1714,6 +1712,7 @@ git commit -m "workspace: approval and user-input panels, banners, plan card act
   ```
   `T3WindowModel` gains `@Published var drafts: [String: T3ComposerDraft]` persisted to `UserDefaults.standard` key `workspace.drafts` on change (debounced 500 ms, through `T3ComposerDrafts.save`), `promptHistory: [String]` key `workspace.promptHistory`, and — same mechanism, key `workspace.lastVisitedAt` — `state.lastVisitedAt` (`[String: Date]`, capped to the 200 most recent), loaded before the first `apply` so ready threads do not all read as unseen after a relaunch. `T3ComposerView(model:store:actions:)`: `TextEditor`-backed multiline field (or an `NSTextView` representable if `TextEditor` cannot intercept ⏎ — try `.onKeyPress(.return)` first; document which), placeholder "Ask anything…" (take the exact string from `ChatComposer.tsx`), ⏎ sends / ⇧⏎ newline, `T3ComposerDrafts.canSend` gates the button; `.queue` sends with `queuedAt: Date()` and shows the queued badge count (the count = requests this store sent while running that have not yet appeared as a user message in `timeline.messages` — match by `commandId` in `payload`? No: match by text equality against new user messages, oldest first; say so), Stop sends `esc`; attachments via drop (`.onDrop(of: [.fileURL, .image])`), paste (`NSPasteboard` images), and an `NSOpenPanel`; images to owned sessions ride `SessionInput.Attachment` (data + mime), everything else and every terminal session gets the file path appended as text (`SessionInput.deliver` does this — just pass attachments; check `SessionInput.swift:290-297`); permission pill shows the current mode (`hookModes` label), menu lists modes ≥ the floor, picking one calls `setPermissionMode` (owned only; hidden otherwise); model pill shows the session's model when known (`grep -rn 'model' Sources/InfinitusCore/SessionProgress.swift SessionFacts.swift` — if no field carries it, the pill is hidden and the report says so). Length cap: at > 4000 chars the send button disables and a `xs` `destructive` line "Message is too long (N / 4000)" appears (upstream wording from `ComposerPromptLengthValidation.tsx`).
   The composer publishes its height via `PreferenceKey` so `T3ThreadView`'s bottom inset tracks it.
+  Focus: the prompt field is `@FocusState`-bound; `onAppear` and `onChange(of: model.composerFocusRequested)` set focus when `model.composerFocusRequested` is true and then set it back to false (Task 5's `show workspace composer` consumer). ⌘N/⌘⇧N (Task 15) reuse the same flag.
 
 - [ ] **Step 1: Failing tests** for `T3ComposerDrafts` (round-trip save/load; `pushHistory` dedups and caps; `canSend` table: `"  "` → `.empty`, running → `.queue`, 4001 chars → `.tooLong(4001)`, else `.send`). Run → fails; implement; run → pass.
 - [ ] **Step 2: The view** transcribed from the upstream files with tokens; mount in `T3ThreadView`; drafts bound per `state.selectedThreadId`.
@@ -1731,6 +1730,7 @@ git commit -m "workspace: the composer — send, stop, queue, permission mode, a
 
 **Files:**
 - Create: `Sources/Infinitus/T3Window/T3ComposerMenus.swift`
+  (`SlashCommands.discover` reads every command/skill file — call it once per cwd when the `/` menu opens and cache the result on the model keyed by cwd; never per keystroke. B-1 review #11.)
 - Create: `Sources/InfinitusCore/T3/T3FileMention.swift`, Test: `Tests/InfinitusCoreTests/T3/T3FileMentionTests.swift`
 - Modify: `Sources/Infinitus/T3Window/T3ComposerView.swift` (trigger detection, insertion)
 - Upstream: `components/chat/ComposerCommandMenu.tsx` (menu look: rows with name + description, keyboard ↑↓⏎⎋, highlight `composerMenuHighlight.ts`), `composerSlashCommandSearch.ts` (ported as `SlashCommands.filter`, Task 3), `ComposerPromptEditor.tsx` (trigger rules: `/` at the start of the prompt or after whitespace opens the command menu; `@` opens the file menu; the query is the run of non-space characters after the trigger; picking inserts `insertion` and closes), `lib/composerPathSearchState.ts` + the fuzzy path search (`grep -rn "fuzzy\|fzf\|pathSearch" ~/death/t3code/apps/web/src/lib ~/death/t3code/packages/shared/src | head`) — port the ranking to `T3FileMention.rank(paths:query:limit:)` with its tests transcribed.

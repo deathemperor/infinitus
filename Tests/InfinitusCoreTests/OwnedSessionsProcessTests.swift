@@ -109,6 +109,14 @@ final class OwnedSessionsProcessTests: XCTestCase {
         return (owned, states)
     }
 
+    /// A start that did not spawn (the fake's `--version` probe past its
+    /// deadline on a loaded machine, #365) is a failure with the reply's
+    /// own words, not a crash on `pid!` that takes the xctest worker down.
+    private func startedPid(_ owned: OwnedSessions, _ req: SessionStart.Request) async throws -> Int32 {
+        let reply = await owned.start(req)
+        return Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
+    }
+
     private func request(_ prompt: String? = nil) -> SessionStart.Request {
         SessionStart.Request(cwd: cwd.path, prompt: prompt, permissionMode: "acceptEdits", headless: true)
     }
@@ -130,7 +138,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
     func testAFirstPromptGoesOverStdinAndAPermissionParksAsPending() async throws {
         let (owned, states) = try await make()
         let reply = await owned.start(request("write hello"))
-        let pid = Int32(reply.pid!)
+        let pid = Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
         waitFor("pending") { !owned.pending(pid: pid).isEmpty }
         // The card must not read "idle" while the first prompt is running:
         // init keeps the child busy, only the result frees it.
@@ -153,7 +161,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
     func testATransitionBroadcastsTheWakeCondition() async throws {
         let (owned, _) = try await make()
         let reply = await owned.start(request())
-        let pid = Int32(reply.pid!)
+        let pid = Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
         waitFor("idle") { owned.registry[pid]?.state == .idle }
         let woke = expectation(description: "woken")
         let started = DispatchSemaphore(value: 0)
@@ -173,7 +181,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testSendMarksBusyAndInterruptGoesAsAControlRequest() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertTrue(owned.send(pid: pid, text: "count to 30"))
         waitFor("busy then waiting") { states.all.contains(.busy) && states.all.last == .waiting }
@@ -185,7 +193,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testStopClosesStdinAndTheChildExits() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         await owned.stop(pid: pid)
         waitFor("exited") { states.all.last == .exited }
@@ -198,7 +206,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
         let ledgerURL = cwd.appendingPathComponent("ledger.json")
         let ledger = OwnedLedger(url: ledgerURL)
         let owned = OwnedSessions(binaryPath: scriptURL.path, ledger: ledger, onState: { _, _ in })
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("ledger sees the session id") { ledger.entries().first(where: { $0.pid == pid })?.sessionId == "S-FAKE" }
         await owned.stop(pid: pid)
         // `forget` runs in the termination handler, off `stop`'s own thread.
@@ -246,7 +254,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
     /// a child that never answers with a `result` still reads idle after it.
     func testAnInterruptWithoutAResultClosesTheTurnAfterTheGrace() async throws {
         let (owned, states) = try await make(swallowInterrupt: true, interruptGrace: 0.5)
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertTrue(owned.send(pid: pid, text: "hang"))   // the fake never answers this turn
         XCTAssertEqual(owned.registry[pid]?.state, .busy)
@@ -260,7 +268,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testARejectedRateLimitIsNotedOncePerTurnAndClearedByTheNext() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertTrue(owned.send(pid: pid, text: "limit please"))
         waitFor("noted") { !owned.limits(pid: pid).isEmpty }
@@ -274,7 +282,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testDeliverSendsImagesAsBlocksAndRefusesWhatTheAPIWontTake() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         let heic = SessionInput.Request(kind: .message, text: "look", attachments: [.init(name: "a.heic", mime: "image/heic", data: Data([1]))])
         XCTAssertEqual(owned.deliver(heic, record: record(pid))?.outcome, "rejected")
@@ -295,7 +303,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testDeliverRoutesMessageKeyApproveAndEscape() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
 
         let msg = owned.deliver(SessionInput.Request(kind: .message, text: "[Infinitus] hello"), record: record(pid))
@@ -327,7 +335,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testDeliverAnswersEveryQuestionOfTheParkedPrompt() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .answers, text: "{}"), record: record(pid))?.detail,
                        "no pending question")
@@ -348,7 +356,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testDeliverRejectsAnUnsupportedKeyAndModeIsNotItsBusiness() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .key, text: "q"), record: record(pid))?.outcome, "rejected")
         XCTAssertNil(owned.deliver(SessionInput.Request(kind: .mode, text: "plan"), record: record(pid)))
@@ -357,7 +365,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
 
     func testSetPermissionModeWritesTheControlRequest() async throws {
         let (owned, states) = try await make()
-        let pid = Int32(await owned.start(request()).pid!)
+        let pid = try await startedPid(owned, request())
         waitFor("init") { states.all.contains(.idle) }
         XCTAssertTrue(owned.setPermissionMode(pid: pid, mode: "plan"))
         waitFor("mode echoed") { self.file("controls").contains("set_permission_mode") && self.file("controls").contains("plan") }
@@ -382,7 +390,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
         let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
         let reply = await owned.start(request())
         XCTAssertEqual(reply.outcome, "started", reply.detail ?? "")
-        let pid = Int32(reply.pid!)
+        let pid = Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
         let big = String(repeating: "x", count: 200_000) // > the 64 KiB pipe buffer
         let sent = ResultBox()
         DispatchQueue.global().async { sent.set(owned.send(pid: pid, text: big)) }
@@ -407,7 +415,7 @@ final class OwnedSessionsProcessTests: XCTestCase {
         let states = States()
         let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
         let reply = await owned.start(request())
-        let pid = Int32(reply.pid!)
+        let pid = Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
         waitFor("exited") { states.all.contains(.exited) }
         waitFor("forgotten") { !owned.ownedPids.contains(pid) }
     }
@@ -431,7 +439,7 @@ final class OwnedSessionsRealClaudeTests: XCTestCase {
             cwd: dir.path, prompt: "Use the Write tool to create hello.txt containing hello. Then stop.",
             permissionMode: "manual", headless: true))
         XCTAssertEqual(reply.outcome, "started", reply.detail ?? "")
-        let pid = Int32(reply.pid!)
+        let pid = Int32(try XCTUnwrap(reply.pid, "start: \(reply.outcome) \(reply.detail ?? "")"))
         // manual forces the ask whatever this Mac's settings default to, so
         // the Write must park as a prompt before the allow lets it through.
         var prompted: [String] = []
