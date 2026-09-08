@@ -2722,6 +2722,8 @@ final class AppModel: ObservableObject {
         if !isPlayground { await sync.tick() }
     }
 
+    private let pastSessionsMemo = PastSessionsMemo()
+
     /// T3's project list for the window and the mirror (spec §2.1). Off
     /// the main actor (called from the exporter's detached tick) — takes
     /// `profiles` from the caller since a `nonisolated` func can't read
@@ -2729,7 +2731,17 @@ final class AppModel: ObservableObject {
     nonisolated func projectSummaries(profiles: [SessionProfile]) -> [ProjectSummary] {
         let claudeDir = ClaudeSessions.configHome()
         let live = ClaudeSessions.list(claudeDir: claudeDir)
-        let past = PastSessions.list(claudeDir: claudeDir, limit: 200)
+        // `PastSessions.list` stats every transcript under the projects
+        // dir (10k files, ~1 s of CPU here) and the export asked for it
+        // on every refresh — 7% idle CPU on its own (#346). The walk is
+        // reused for a minute while the live set holds; a session ending
+        // is what turns a transcript into a past one, so that key catches
+        // the change that matters and the project picker never lags by
+        // more than the minute otherwise.
+        let liveKey = live.map(\.sessionId).sorted().joined(separator: ",")
+        let past = pastSessionsMemo.value(key: liveKey, maxAge: 60) {
+            PastSessions.list(claudeDir: claudeDir, limit: 200)
+        }
         let recentCwds = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
         // Only shell out for cwds worth the ~5ms git call: live ones and
         // the five most recent, so an idle tick stays under 50ms. `derive`
@@ -2949,4 +2961,24 @@ extension AppModel: FleetModel {
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }
+}
+
+/// One remembered `PastSessions.list` for `projectSummaries` (#346):
+/// a value, the key it was computed under and when. Called off the main
+/// actor from the exporter's detached tick, so it locks.
+final class PastSessionsMemo: @unchecked Sendable {
+    private let lock = NSLock()
+    private var key = "", at = Date.distantPast, stored: [PastSession] = []
+
+    func value(key: String, maxAge: TimeInterval, now: Date = Date(),
+               compute: () -> [PastSession]) -> [PastSession] {
+        lock.lock()
+        if self.key == key, now.timeIntervalSince(at) < maxAge {
+            let hit = stored; lock.unlock(); return hit
+        }
+        lock.unlock()
+        let fresh = compute()
+        lock.lock(); self.key = key; at = now; stored = fresh; lock.unlock()
+        return fresh
+    }
 }
