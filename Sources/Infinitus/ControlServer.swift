@@ -633,7 +633,13 @@ final class ControlServer {
             case "popout": controller.showPinnedWindow()
             case "settings": controller.showSettingsWindow()
             case "wall": controller.toggleWall()
-            default: throw Fail("usage: show popout|settings|wall")
+            case "workspace":
+                let screen = r.args.dropFirst().first
+                if let screen, !["sidebar", "thread", "composer"].contains(screen) {
+                    throw Fail("usage: show workspace [sidebar|thread|composer]")
+                }
+                controller.showWorkspace(screen: screen)
+            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer]")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
@@ -643,7 +649,8 @@ final class ControlServer {
             }
             switch r.args.first {
             case "popout": controller.hidePinnedWindow()
-            default: throw Fail("usage: hide popout")
+            case "workspace": controller.hideWorkspace()
+            default: throw Fail("usage: hide popout|workspace")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 

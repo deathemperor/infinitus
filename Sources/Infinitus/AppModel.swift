@@ -349,6 +349,9 @@ final class AppModel: ObservableObject {
     /// Set by StatusItemHolder — toggles the full-screen fleet wall
     /// (issue #11).
     var showWall: (() -> Void)?
+    /// Opens the workspace window (T3 clone B), optionally on a screen
+    /// ("sidebar" | "thread" | "composer" — the parity harness's names).
+    var showWorkspace: ((String?) -> Void)?
     /// Opens a live session's chat window (#151); set by the status item
     /// controller, called from the sessions card's rows.
     var openSessionChat: ((SessionDetail) -> Void)?
@@ -1615,16 +1618,14 @@ final class AppModel: ObservableObject {
             thumbnails[key] = thumb
             return (thumb, "image/jpeg")
         }
-        // T3 attention (#223 phase 3): settle / snooze / pin one session.
+        // T3 attention (#223 phase 3): settle / snooze / pin one session —
+        // the mirror's attention route and the workspace window share
+        // `Self.applyAttention` (a static func: `timelineCache` is a
+        // `lazy var`, main-actor-isolated, so it must be captured here
+        // on the actor rather than touched from the nonisolated closure).
         let timelineCache = timelineCache, attentionStore = attentionStore
         mirrorServer.attention.set { pid, request in
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                  let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
-            let pending = ownedBox.existing?.pending(pid: pid) ?? []
-            return SessionAttention.apply(request, sessionId: record.sessionId,
-                                          timeline: timeline.appending(pending: pending),
-                                          status: record.status, store: attentionStore)
+            Self.applyAttention(pid: pid, request, timelineCache: timelineCache, attentionStore: attentionStore, ownedBox: ownedBox)
         }
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
@@ -1676,6 +1677,24 @@ final class AppModel: ObservableObject {
     /// session" records the rule then answers Yes, everything else goes
     /// through `SessionInput.deliver`. Off the main actor; hops in for
     /// the log and the births.
+    /// Settle / snooze / pin one session (#223 phase 3) — the mirror's
+    /// attention route and the workspace window (`T3WindowModel.attention`)
+    /// share it. A static func, not an instance method: `timelineCache` is
+    /// a `lazy var` (main-actor-isolated), so callers capture the three
+    /// pieces on the actor and pass them in, rather than this touching
+    /// `self` from whatever thread the caller runs on.
+    nonisolated static func applyAttention(pid: Int32, _ request: SessionAttention.Request,
+                                           timelineCache: TimelineCache, attentionStore: AttentionStore,
+                                           ownedBox: OwnedSessionsBox) -> SessionAttention.Outcome? {
+        let claudeDir = ClaudeSessions.configHome()
+        guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+              let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
+        let pending = ownedBox.existing?.pending(pid: pid) ?? []
+        return SessionAttention.apply(request, sessionId: record.sessionId,
+                                      timeline: timeline.appending(pending: pending),
+                                      status: record.status, store: attentionStore)
+    }
+
     nonisolated func deliverSessionInput(pid: Int32, _ request: SessionInput.Request,
                                          from source: String) -> SessionInput.Reply {
             let claudeDir = ClaudeSessions.configHome()

@@ -53,6 +53,7 @@ final class StatusItemHolder: ObservableObject {
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
         model.showWall = { [weak controller] in controller?.toggleWall() }
+        model.showWorkspace = { [weak controller] screen in controller?.showWorkspace(screen: screen) }
         model.openSessionChat = { [weak model] session in
             guard let model else { return }
             SessionChatWindows.shared.open(session, model: model)
@@ -102,6 +103,11 @@ final class StatusItemController {
     private let usage: UsageModel
     private lazy var wall: WallWindowController = {
         let w = WallWindowController()
+        w.visibilityChanged = { [weak self] in self?.syncLocalLease() }
+        return w
+    }()
+    private lazy var workspace: T3WindowController = {
+        let w = T3WindowController()
         w.visibilityChanged = { [weak self] in self?.syncLocalLease() }
         return w
     }()
@@ -454,6 +460,7 @@ final class StatusItemController {
         model.uiSurface("popup", visible: anchored?.isVisible == true)
         model.uiSurface("popout", visible: pinned?.isVisible == true)
         model.uiSurface("wall", visible: wall.isVisible)
+        model.uiSurface("workspace", visible: workspace.isVisible)
     }
 
     func showPinnedWindow(activate: Bool = true) {
@@ -654,7 +661,9 @@ final class StatusItemController {
             // Tabs built once per window, as before; the gate re-evaluates
             // only which of the two it shows.
             let tabs = settingsTabs()
-            let host = NSHostingView(rootView: LockGate(lock: model.lock) { SettingsRoot(tabs: tabs) })
+            let host = NSHostingView(rootView: LockGate(lock: model.lock) {
+                SettingsRoot(tabs: tabs, showWorkspace: { [weak self] in self?.showWorkspace(screen: nil) })
+            })
             // No sizing input from the content: hosting-view constraints
             // pin the window to SwiftUI's ideal size and beat the
             // .resizable style bit — the window refused to grow even via
@@ -726,6 +735,11 @@ final class StatusItemController {
         wall.show(model: model, usage: usage)
     }
 
+    /// The workspace is NOT a mode (unlike the wall): it does not close
+    /// the popup or the pop-out. A second `show workspace` just raises it.
+    func showWorkspace(screen: String?) { model.lock.surfaceShown(); workspace.show(model: model, screen: screen) }
+    func hideWorkspace() { workspace.close() }
+
     /// The SwiftUI Settings scene's window: macOS 26 shows it by itself
     /// at launch, and SwiftUI keeps it non-resizable — it re-strips the
     /// .resizable bit and resets contentMinSize on every update (probed
@@ -785,6 +799,16 @@ private struct PinnedRoot: View {
         // window then follows THAT (fitPinned) instead of the other way
         // round, so wide rows never compress into wrapped lines.
         .fixedSize()
+        // ⌘⇧T opens the workspace window (the ⌘F pattern in
+        // InfinitusApp.SettingsRoot) — only fires while the pop-out is key.
+        .overlay {
+            Button("") { model.showWorkspace?(nil) }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .buttonStyle(.plain)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // fullSizeContentView hands the hosting view a titlebar-high top

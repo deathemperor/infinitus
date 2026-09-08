@@ -20,6 +20,7 @@ publishes the matching section as the GitHub release body.
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
 - Workspace groundwork: timeline messages carry updatedAt, tool rows carry their command, slash-command discovery.
 - The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
+- Open workspace: a new window over your sessions, from the popup, ⌘⇧T, or infinitusctl show workspace.
 
 ### Phone
 - A long thread scrolls and refreshes without stalling: the feed's rows are derived once per update instead of once per row on every redraw; the Mac's chat window gets the same (#380).

@@ -28,6 +28,14 @@ struct MacSessionsPopover: View {
                                 model.sessionsShown = false
                                 model.openSessionChat?(session)
                             })
+            Button {
+                model.sessionsShown = false
+                model.showWorkspace?(nil)
+            } label: {
+                Label("Open workspace", systemImage: "rectangle.3.group")
+                    .font(PopupFont.caption)
+            }
+            .buttonStyle(.plain)
             // Team session control (#220 §6): who drove a session in the last minute.
             let driving = model.drivenBy.filter { $0.value.until > Date() }
             ForEach(driving.keys.sorted(), id: \.self) { id in

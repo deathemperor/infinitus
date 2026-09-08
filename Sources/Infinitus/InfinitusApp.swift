@@ -175,7 +175,8 @@ struct InfinitusApp: App {
                 notifyModel: notifyModel, usageModel: usageModel,
                 utilizationModel: utilizationModel,
                 statsModel: model.statsModel,
-                updateModel: updateModel, appRelease: appRelease, brew: brew))
+                updateModel: updateModel, appRelease: appRelease, brew: brew),
+                showWorkspace: { [weak model] in model?.showWorkspace?(nil) })
         }
         // ⌘, would raise that hidden scene window (and the controller
         // would hide it again — "opened and closed immediately", user
@@ -320,6 +321,11 @@ struct InfinitusApp: App {
 /// split view's hop and restores them.
 struct SettingsRoot: View {
     let tabs: [SettingsTab]
+    /// Opens the workspace window (Task 5); the default nil only covers
+    /// previews/tests — both real call sites (InfinitusApp's phantom scene
+    /// and StatusItemController's hosted Settings window) pass their own
+    /// closure.
+    var showWorkspace: (() -> Void)? = nil
     @State private var selection: String?
     /// The pane actually on screen. Usually the selection; a search hit
     /// selects a ROW and opens the pane that row lives on.
@@ -365,12 +371,16 @@ struct SettingsRoot: View {
         // bar to hang the standard Find item off (critique: Alex "has
         // no ⌘F").
         .overlay {
-            Button("") { searchFocused = true }
-                .keyboardShortcut("f", modifiers: .command)
-                .buttonStyle(.plain)
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
+            Group {
+                Button("") { searchFocused = true }
+                    .keyboardShortcut("f", modifiers: .command)
+                Button("") { showWorkspace?() }
+                    .keyboardShortcut("t", modifiers: [.command, .shift])
+            }
+            .buttonStyle(.plain)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
         }
         .onAppear {
             if selection == nil {
