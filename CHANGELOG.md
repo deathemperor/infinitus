@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
 
 ### Phone
+- The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
 - Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).
 - The new thread renders markdown the way the reference does — DM Sans body, bold in the strong color, mono inline code, fenced code in a bordered block with its language and a copy button, task lists, tables, rules (#223).
