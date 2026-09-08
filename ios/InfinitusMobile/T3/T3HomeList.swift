@@ -2,22 +2,51 @@ import SwiftUI
 import InfinitusCore
 import InfinitusUI
 
-/// One Home row's facts (T3 clone C-6): a session as T3's thread-list
-/// v2 row shows it — project, title, branch · Mac, status — with the
-/// attention shelf it sits on.
+/// One Home row (T3 clone C-6): the session as a `T3Thread` for the list
+/// reducers, plus what the row draws — project, title, branch · Mac.
 struct T3HomeEntry: Identifiable, Equatable {
     let session: SessionDetail
     let macId: String?
-    let title: String
+    let thread: T3Thread
     let repo: String
     let branch: String?
     let macLabel: String?
-    let status: SessionListPresentation.Attention
-    let pinnedAt: Date?
-    let snoozed: Bool
-    let settled: Bool
     let lastActivity: Date
-    var id: String { "\(macId ?? "primary"):\(session.pid)" }
+    var id: String { thread.key }
+    var title: String { thread.title }
+    var status: T3ThreadStatus { T3ThreadStatus(thread) }
+}
+
+/// A live session as `threadListV2.ts` sees it (spec §2.2): the facts
+/// the Mac leases become the thread's attention fields, the engine's
+/// status word its session status when no facts have arrived yet.
+enum T3HomeThreads {
+    static func environmentId(_ macId: String?) -> String { macId ?? "primary" }
+
+    static func thread(session s: SessionDetail, macId: String?, title: String, facts: SessionFacts?,
+                       lastActivity: Date, now: Date = Date()) -> T3Thread {
+        let started = Date(timeIntervalSince1970: s.startedAt / 1000)
+        // Infinitus also settles by timestamp (the Mac's auto-settle stamps
+        // settledAt with no override); T3 only knows the override, so the
+        // effective verdict is written into it.
+        let settled: AttentionStore.SettledOverride? = facts.map { SessionListPresentation.isSettled($0) ? .settled : .active }
+        let status: T3Thread.SessionStatus
+        if let f = facts { status = T3Thread.SessionStatus(rawValue: f.status.rawValue) ?? .idle }
+        else { status = s.status == "busy" ? .running : .idle }
+        var t = T3Thread(id: String(s.pid), environmentId: environmentId(macId), projectId: s.cwd, title: title,
+                         createdAt: started, updatedAt: lastActivity, pinnedAt: facts?.pinnedAt,
+                         settledOverride: settled, settledAt: facts?.settledAt, unsettledAt: facts?.unsettledAt,
+                         snoozedUntil: facts?.snoozedUntil, snoozedAt: facts?.snoozedAt,
+                         hasPendingApprovals: facts?.hasPendingApprovals ?? (s.status == "waiting"),
+                         hasPendingUserInput: facts?.hasPendingUserInput ?? false,
+                         latestUserMessageAt: facts?.latestUserMessageAt,
+                         session: .init(status: status, updatedAt: lastActivity))
+        if let turn = facts?.latestTurn {
+            t.latestTurn = .init(state: .init(rawValue: turn.state.rawValue) ?? .completed, requestedAt: turn.requestedAt,
+                                 startedAt: turn.startedAt, completedAt: turn.completedAt)
+        }
+        return t
+    }
 }
 
 /// T3's `relativeTime` (`lib/time.ts`): "<1m", "5m", "21h", "3d".
@@ -30,49 +59,6 @@ enum T3Time {
         let hours = minutes / 60
         if hours < 24 { return "\(hours)h" }
         return "\(hours / 24)d"
-    }
-}
-
-/// The list's shelves (`threadListV2.ts` until A's reducer lands): the
-/// live shelf — pinned first (newest pin on top), then what waits on the
-/// user, then by last activity — and the snoozed and settled shelves,
-/// each by last activity.
-enum T3HomeShelves {
-    struct Split: Equatable {
-        var live: [T3HomeEntry] = []
-        var snoozed: [T3HomeEntry] = []
-        var settled: [T3HomeEntry] = []
-    }
-
-    static func split(_ entries: [T3HomeEntry]) -> Split {
-        var out = Split()
-        for e in entries {
-            if e.snoozed { out.snoozed.append(e) }
-            else if e.settled, e.pinnedAt == nil { out.settled.append(e) }
-            else { out.live.append(e) }
-        }
-        out.live.sort { a, b in
-            switch (a.pinnedAt, b.pinnedAt) {
-            case let (x?, y?): return x > y
-            case (_?, nil): return true
-            case (nil, _?): return false
-            default: break
-            }
-            let ra = a.status == .approval || a.status == .input ? 0 : 1
-            let rb = b.status == .approval || b.status == .input ? 0 : 1
-            if ra != rb { return ra < rb }
-            return a.lastActivity > b.lastActivity
-        }
-        out.snoozed.sort { $0.lastActivity > $1.lastActivity }
-        out.settled.sort { $0.lastActivity > $1.lastActivity }
-        return out
-    }
-
-    static func matches(_ e: T3HomeEntry, search: String) -> Bool {
-        let q = search.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return true }
-        return e.title.localizedCaseInsensitiveContains(q) || e.repo.localizedCaseInsensitiveContains(q)
-            || (e.branch?.localizedCaseInsensitiveContains(q) ?? false)
     }
 }
 
@@ -91,16 +77,14 @@ struct T3HomeList: View {
             for s in fleets.flatMap({ $0.liveSessions?.sessions ?? [] }) {
                 let facts = model.facts(macId: macId, pid: s.pid)
                 let p = model.progress(macId: macId, pid: s.pid)
+                let lastActivity = p?.lastActivityAt ?? Date(timeIntervalSince1970: s.startedAt / 1000)
                 out.append(T3HomeEntry(
                     session: s, macId: macId,
-                    title: SessionNaming.displayName(name: p?.name, autoName: p?.autoName, cwd: s.cwd),
+                    thread: T3HomeThreads.thread(session: s, macId: macId,
+                                                 title: SessionNaming.displayName(name: p?.name, autoName: p?.autoName, cwd: s.cwd),
+                                                 facts: facts, lastActivity: lastActivity),
                     repo: URL(fileURLWithPath: s.cwd).lastPathComponent, branch: p?.gitBranch,
-                    macLabel: model.machineName(macId: macId),
-                    status: SessionListPresentation.attention(facts, fallbackStatus: s.status),
-                    pinnedAt: facts?.pinnedAt,
-                    snoozed: facts.map { SessionListPresentation.isSnoozed($0) } ?? false,
-                    settled: facts.map { SessionListPresentation.isSettled($0) } ?? false,
-                    lastActivity: p?.lastActivityAt ?? Date(timeIntervalSince1970: s.startedAt / 1000)))
+                    macLabel: model.machineName(macId: macId), lastActivity: lastActivity))
             }
         }
         return out
@@ -123,34 +107,52 @@ struct T3HomeList: View {
                    settings: { settingsSheet = true },
                    pastSessions: { path.append(PastSessionsRoute()) },
                    awsLogins: model.awsLogins, awsLogin: awsLogin,
-                   decorate: { e, row in AnyView(row.modifier(T3HomeSwipe(model: model, entry: e))) })
+                   decorate: { e, item, row in AnyView(row.modifier(T3HomeSwipe(model: model, entry: e, item: item))) })
     }
 }
 
-/// The swipe actions T3's rows carry (settle / snooze / pin), the phone's
-/// existing ones (#223): the attention route with a client id.
+/// The swipe actions `T3ThreadList.swipeActions` hands a row — settle or
+/// unsettle (slim rows), snooze while snoozable, unsnooze while snoozed —
+/// on the attention route with a client id; pin stays on the leading
+/// edge as the phone had it.
 private struct T3HomeSwipe: ViewModifier {
     @ObservedObject var model: MirrorModel
     let entry: T3HomeEntry
+    let item: T3ThreadList.Item
     func body(content: Content) -> some View {
+        let actions = T3ThreadList.swipeActions(variant: item.variant, settlementSupported: true, snoozeSupported: true,
+                                                snoozable: T3ThreadSettled.canSnooze(entry.thread, now: Date()), snoozed: item.snoozed)
         content
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button {
-                    Task { await model.attention(entry.settled ? .unsettle : .settle, macId: entry.macId, pid: entry.session.pid) }
-                } label: { Label(entry.settled ? "Unsettle" : "Settle", systemImage: "checkmark.circle") }
-                    .tint(.green)
-                Button {
-                    Task { await model.attention(entry.snoozed ? .unsnooze : .snooze, macId: entry.macId, pid: entry.session.pid,
-                                                 until: entry.snoozed ? nil : Date().addingTimeInterval(3600)) }
-                } label: { Label(entry.snoozed ? "Unsnooze" : "Snooze", systemImage: "moon.zzz") }
-                    .tint(.indigo)
+                swipe(actions.primary)
+                if let secondary = actions.secondary { swipe(secondary) }
             }
             .swipeActions(edge: .leading) {
                 Button {
-                    Task { await model.attention(entry.pinnedAt == nil ? .pin : .unpin, macId: entry.macId, pid: entry.session.pid) }
-                } label: { Label(entry.pinnedAt == nil ? "Pin" : "Unpin", systemImage: "pin") }
+                    Task { await model.attention(entry.thread.pinnedAt == nil ? .pin : .unpin, macId: entry.macId, pid: entry.session.pid) }
+                } label: { Label(entry.thread.pinnedAt == nil ? "Pin" : "Unpin", systemImage: "pin") }
                     .tint(.orange)
             }
+    }
+
+    @ViewBuilder private func swipe(_ action: T3ThreadList.SwipeAction) -> some View {
+        let pid = entry.session.pid, macId = entry.macId
+        switch action {
+        case .settle:
+            Button { Task { await model.attention(.settle, macId: macId, pid: pid) } } label: { Label("Settle", systemImage: "checkmark.circle") }
+                .tint(.green)
+        case .unsettle:
+            Button { Task { await model.attention(.unsettle, macId: macId, pid: pid) } } label: { Label("Unsettle", systemImage: "arrow.uturn.backward.circle") }
+                .tint(.green)
+        case .snooze:
+            Button { Task { await model.attention(.snooze, macId: macId, pid: pid, until: Date().addingTimeInterval(3600)) } } label: { Label("Snooze", systemImage: "moon.zzz") }
+                .tint(.indigo)
+        case .unsnooze:
+            Button { Task { await model.attention(.unsnooze, macId: macId, pid: pid) } } label: { Label("Unsnooze", systemImage: "sun.max") }
+                .tint(.indigo)
+        case .archive:
+            EmptyView()   // no archive on the phone (settlement is always supported)
+        }
     }
 }
 
@@ -173,13 +175,27 @@ struct T3HomeBody: View {
     var awsLogin: (AwsLogin.Item) -> Void = { _ in }
     /// Wraps each row with what needs the model (swipe actions); the
     /// harness passes none. Row-level, so `.swipeActions` lands on the row.
-    var decorate: ((T3HomeEntry, AnyView) -> AnyView)? = nil
+    var decorate: ((T3HomeEntry, T3ThreadList.Item, AnyView) -> AnyView)? = nil
     @Environment(\.t3) private var t3
     @State private var search = ""
     @State private var showSnoozed = false
     @State private var showSettled = true
 
-    private var shelves: T3HomeShelves.Split { T3HomeShelves.split(entries.filter { T3HomeShelves.matches($0, search: search) }) }
+    /// `threadListV2.ts` over the entries: pinned and active cards, the
+    /// snoozed shelf, the settled tail — search by title, as upstream.
+    private var listItems: [T3ThreadList.ListItem] {
+        let now = Date()
+        var input = T3ThreadList.Input(threads: entries.map(\.thread), now: now)
+        input.searchQuery = search
+        input.snoozedShelfExpanded = showSnoozed
+        input.settledShelfExpanded = showSettled
+        let layout = T3ThreadList.buildItems(input)
+        return T3ThreadList.buildListItems(items: layout.items, pendingTasks: [], snoozedCount: layout.snoozedCount,
+                                           snoozedShelfExpanded: showSnoozed, snoozedShelfHeaderIndex: layout.snoozedShelfHeaderIndex,
+                                           settledCount: layout.settledCount, settledShelfExpanded: showSettled,
+                                           settledShelfHeaderIndex: layout.settledShelfHeaderIndex, snoozeLabelNow: now)
+    }
+    private var entriesByKey: [String: T3HomeEntry] { Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
 
     var body: some View {
         ZStack {
@@ -232,23 +248,26 @@ struct T3HomeBody: View {
     // MARK: list
 
     private var list: some View {
-        let s = shelves
+        let byKey = entriesByKey
         return List {
             ForEach(awsLogins) { awsRow($0) }
-            ForEach(s.live) { rowItem($0) }
-            if !s.snoozed.isEmpty {
-                shelfHeader(showSnoozed ? "Snoozed" : "Snoozed (\(s.snoozed.count))", expanded: showSnoozed,
-                            line: t3.mobile.primary.color.opacity(0.2), text: t3.mobile.foregroundSecondary.color) {
-                    showSnoozed.toggle()
+            ForEach(listItems) { listItem in
+                switch listItem {
+                case let .thread(item, snoozeWakeLabel):
+                    if let e = byKey[item.thread.key] { rowItem(e, item: item, snoozeLabel: snoozeWakeLabel) }
+                case let .snoozedShelf(count, expanded):
+                    shelfHeader(expanded ? "Snoozed" : "Snoozed (\(count))", expanded: expanded,
+                                line: t3.mobile.primary.color.opacity(0.2), text: t3.mobile.foregroundSecondary.color) {
+                        showSnoozed.toggle()
+                    }
+                case let .settledShelf(count, expanded):
+                    shelfHeader(expanded ? "Settled" : "Settled (\(count))", expanded: expanded,
+                                line: t3.mobile.border.color, text: t3.mobile.foregroundTertiary.color) {
+                        showSettled.toggle()
+                    }
+                case .pending:
+                    EmptyView()   // queued drafts arrive with the new-task flow's pending tasks
                 }
-                if showSnoozed { ForEach(s.snoozed) { rowItem($0) } }
-            }
-            if !s.settled.isEmpty {
-                shelfHeader(showSettled ? "Settled" : "Settled (\(s.settled.count))", expanded: showSettled,
-                            line: t3.mobile.border.color, text: t3.mobile.foregroundTertiary.color) {
-                    showSettled.toggle()
-                }
-                if showSettled { ForEach(s.settled) { rowItem($0) } }
             }
         }
         .listStyle(.plain)
@@ -256,9 +275,9 @@ struct T3HomeBody: View {
         .environment(\.defaultMinListRowHeight, 1)
     }
 
-    private func rowItem(_ e: T3HomeEntry) -> some View {
-        let base = AnyView(Button { open(e) } label: { T3HomeRow(entry: e) }.buttonStyle(.plain))
-        return (decorate?(e, base) ?? base)
+    private func rowItem(_ e: T3HomeEntry, item: T3ThreadList.Item, snoozeLabel: String?) -> some View {
+        let base = AnyView(Button { open(e) } label: { T3HomeRow(entry: e, snoozeLabel: snoozeLabel) }.buttonStyle(.plain))
+        return (decorate?(e, item, base) ?? base)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .listRowBackground(t3.mobile.screen.color)
@@ -357,6 +376,8 @@ struct T3HomeBody: View {
 /// at the trailing edge.
 struct T3HomeRow: View {
     let entry: T3HomeEntry
+    /// "Wakes 5:00 PM" on a snoozed (slim) row, where the age would be.
+    var snoozeLabel: String? = nil
     var now: Date = Date()
     @Environment(\.t3) private var t3
 
@@ -367,10 +388,12 @@ struct T3HomeRow: View {
                 Text(entry.repo).font(T3Font.mobile(.sm, .medium)).lineLimit(1)
                     .foregroundStyle(t3.mobile.foregroundMuted.color)
                 Spacer(minLength: 8)
-                if entry.pinnedAt != nil {
+                if entry.thread.pinnedAt != nil {
                     Image(systemName: "pin").font(.system(size: 11)).foregroundStyle(t3.mobile.foregroundMuted.color)
                 }
-                if let label = statusLabel {
+                if let snoozeLabel {
+                    Text(snoozeLabel).font(T3Font.mobile(.xs)).monospacedDigit().foregroundStyle(t3.mobile.foregroundTertiary.color)
+                } else if let label = statusLabel {
                     Text(label.text).font(T3Font.mobile(.xs)).monospacedDigit().foregroundStyle(label.color)
                 } else {
                     Text(T3Time.relative(entry.lastActivity, now: now)).font(T3Font.mobile(.xs)).monospacedDigit()

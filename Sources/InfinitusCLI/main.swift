@@ -8,6 +8,12 @@ import InfinitusCore
 // mismatch.
 
 let args = Array(CommandLine.arguments.dropFirst())
+/// `infinitusctl`, or `ictl` — the shorthand symlink the bundle ships
+/// beside it; usage text names whichever ran.
+let programName: String = {
+    let name = URL(fileURLWithPath: CommandLine.arguments.first ?? "infinitusctl").lastPathComponent
+    return name.isEmpty ? "infinitusctl" : name
+}()
 
 // `team` runs in-process (TeamCommand.swift) and needs no app.
 if args.first == "team" {
@@ -23,7 +29,7 @@ if args.first == "mcp" {
 }
 
 func usage() -> String {
-    var out = "usage: infinitusctl <command> [args] [--option value]\n\n"
+    var out = "usage: \(programName) <command> [args] [--option value]\n\n"
     let width = ControlCommand.all.map { ($0.name + " " + $0.args.joined(separator: " ")).count }.max() ?? 20
     for c in ControlCommand.all {
         let head = (c.name + " " + c.args.joined(separator: " ")).padding(toLength: width + 2, withPad: " ", startingAt: 0)
@@ -31,7 +37,7 @@ func usage() -> String {
         if !c.options.isEmpty { out += "  [\(c.options.joined(separator: ", "))]" }
         out += "\n"
     }
-    out += "  team <subcommand>      teams: create, code, request, approve, publish… (`infinitusctl team --help`)\n"
+    out += "  team <subcommand>      teams: create, code, request, approve, publish… (`\(programName) team --help`)\n"
     out += "  plugin install|uninstall|status   the Claude Code plugin: hooks that push prompts to the phone the moment they appear\n"
     out += "  mcp                    the plugin's MCP server over stdio (fleet_status, list_sessions, session_message)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. cswap/claude, cliproxy/claude).\n"

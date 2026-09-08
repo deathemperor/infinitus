@@ -26,7 +26,7 @@ a glance and swaps before you stall.
 
 ## Install
 
-Infinitus is alpha software (0.4.4-alpha.1): it runs its author's fleet
+Infinitus is alpha software (0.4.4-alpha.2): it runs its author's fleet
 all day, but expect rough edges — please file issues.
 
 ### Homebrew
@@ -53,9 +53,10 @@ Grab `Infinitus-<version>.zip` from
 drop `Infinitus.app` into `/Applications`.
 
 The `infinitusctl` CLI ships inside the bundle at
-`Infinitus.app/Contents/MacOS/infinitusctl` — Homebrew links it onto
-your PATH; from a release, symlink it yourself
-(`ln -sf /Applications/Infinitus.app/Contents/MacOS/infinitusctl /usr/local/bin/infinitusctl`).
+`Infinitus.app/Contents/MacOS/infinitusctl`, with `ictl` beside it as the
+short name for the same binary — Homebrew links them onto your PATH; from
+a release, symlink them yourself
+(`ln -sf /Applications/Infinitus.app/Contents/MacOS/{infinitusctl,ictl} /usr/local/bin/`).
 
 ### Linux — engine CLI + Waybar module (Omarchy-ready)
 
@@ -153,6 +154,13 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
 - **Fork a session** — Past sessions on the Mac and the phone, or `infinitusctl resume-session --fork`, continue a transcript under a new session id.
 - **Start a session from the Mac** — the sessions popover takes a profile chip, folder, engine, permissions and a first prompt.
+- **Headless sessions** — start a session with no terminal, from the popup, the phone, or as the default; the Mac window, the phone and the browser page are its chat, and its prompts, questions, plans and images reach all three.
+- **A browser page for machines without the app** — sessions list, chat with a session, Start a session, at the "Copy Browser Link" address in Settings › Devices.
+- **Chat with a session on the Mac** — click a session in the sessions card for its own window: the live transcript, a composer, its prompts answered from the Mac, headers in the phone's three styles.
+- **A feed that folds** — tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works; the same rows on the Mac, the phone and the browser page.
+- **New phone screens (preview)** — Settings › Appearance › "New session screens": a flat thread list with shelves and search, a session as a chat thread with a task sheet under +, thread settings and a git pill.
+- **Ignite says what it did** — the plan line reports the window it started or why it failed, and the Activity log survives a relaunch.
+- **Nearby on its own** — a discoverable Mac or a team member keeps the LAN listener up without the phone switch.
 - **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS logins, stats, perf; plus an agent-setup guide.
 
 ## Privacy
