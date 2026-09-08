@@ -747,6 +747,11 @@ git commit -m "core: slash command and skill discovery for the workspace compose
 
       public init()
       public mutating func apply(_ inputs: T3WorkspaceInputs, now: Date)
+      // apply() remembers the first `createdAt` it saw per thread id (`firstSeenCreatedAt: [String: Date]`)
+      // and rewrites each incoming thread's createdAt (and an updatedAt equal to it) with the remembered
+      // value: the bridge falls back to `now` for a session with no birth record/turn/statusUpdatedAt, and
+      // without this memory such a thread re-sorts and re-diffs the sidebar on every tick (B-1 review #4).
+      // Test: apply twice, 1 s apart, the same record-less thread → equal T3Thread values, one createdAt.
       public mutating func select(_ threadId: String?, now: Date)   // stamps lastVisitedAt
       public func pid(of threadId: String) -> Int32?
       public var selectedThread: T3Thread?
@@ -1725,6 +1730,7 @@ git commit -m "workspace: the composer — send, stop, queue, permission mode, a
 
 **Files:**
 - Create: `Sources/Infinitus/T3Window/T3ComposerMenus.swift`
+  (`SlashCommands.discover` reads every command/skill file — call it once per cwd when the `/` menu opens and cache the result on the model keyed by cwd; never per keystroke. B-1 review #11.)
 - Create: `Sources/InfinitusCore/T3/T3FileMention.swift`, Test: `Tests/InfinitusCoreTests/T3/T3FileMentionTests.swift`
 - Modify: `Sources/Infinitus/T3Window/T3ComposerView.swift` (trigger detection, insertion)
 - Upstream: `components/chat/ComposerCommandMenu.tsx` (menu look: rows with name + description, keyboard ↑↓⏎⎋, highlight `composerMenuHighlight.ts`), `composerSlashCommandSearch.ts` (ported as `SlashCommands.filter`, Task 3), `ComposerPromptEditor.tsx` (trigger rules: `/` at the start of the prompt or after whitespace opens the command menu; `@` opens the file menu; the query is the run of non-space characters after the trigger; picking inserts `insertion` and closes), `lib/composerPathSearchState.ts` + the fuzzy path search (`grep -rn "fuzzy\|fzf\|pathSearch" ~/death/t3code/apps/web/src/lib ~/death/t3code/packages/shared/src | head`) — port the ranking to `T3FileMention.rank(paths:query:limit:)` with its tests transcribed.
