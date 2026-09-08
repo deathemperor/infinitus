@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The Mac idles near 0% again with the pop-out closed: the project list behind the phone's start sheet reuses its walk of past transcripts for a minute instead of re-reading ten thousand files on every refresh (#346).
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
 
 ### Phone
