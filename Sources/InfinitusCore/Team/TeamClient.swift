@@ -580,16 +580,18 @@ public final class TeamClient {
         let cacheURL = paths.teamDir(config.id).appendingPathComponent("headers.json")
         var cache = HeaderCache.load(cacheURL)
         var kept: [String: HeaderCache.Entry] = [:]
+        var parsed = 0
         for entry in try store.list("m/") + (try store.list("t/")) + (try store.list("roster/aggregates/")) {
             let header: Envelope.Header
             if let cached = cache.entries[entry.path], cached.version == entry.version {
                 header = cached.header
             } else {
-                guard let parsed = try drainingPool({ try store.get(entry.path).flatMap { try? Envelope.header(of: $0) } }) else {
+                guard let fresh = try drainingPool({ try store.get(entry.path).flatMap { try? Envelope.header(of: $0) } }) else {
                     scan.skipped += 1
                     continue
                 }
-                header = parsed
+                header = fresh
+                parsed += 1
             }
             kept[entry.path] = HeaderCache.Entry(version: entry.version, header: header)
             guard (try? TeamKinds.check(header, at: entry.path)) != nil,
@@ -597,7 +599,16 @@ public final class TeamClient {
                   header.to.contains(where: { $0.kid == identity.kid }) else { continue }
             scan.headers.append((entry, header))
         }
-        if kept != cache.entries { cache.entries = kept; try? cache.save(cacheURL) }
+        // A member's `now` moves every pass, so the cache nearly always
+        // differs — and encoding ten thousand headers took seconds each
+        // time (#346). Write it hourly, or after a batch of new parses
+        // (a catch-up); the few blobs parsed since the last write are
+        // re-read once after a relaunch, which is cheap.
+        if kept != cache.entries {
+            cache.entries = kept
+            let writtenAt = (try? FileManager.default.attributesOfItem(atPath: cacheURL.path)[.modificationDate] as? Date) ?? .distantPast
+            if parsed >= 50 || Date().timeIntervalSince(writtenAt) >= HeaderCache.minWriteInterval { try? cache.save(cacheURL) }
+        }
         return scan
     }
 
@@ -610,6 +621,8 @@ public final class TeamClient {
     struct HeaderCache: Codable, Equatable {
         struct Entry: Codable, Equatable { var version: String; var header: Envelope.Header }
         var entries: [String: Entry] = [:]
+        /// How long a changed cache may stay unwritten (#346); tests set 0.
+        nonisolated(unsafe) static var minWriteInterval: TimeInterval = 3600
         static func load(_ url: URL) -> HeaderCache {
             (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(HeaderCache.self, from: $0) } ?? HeaderCache()
         }

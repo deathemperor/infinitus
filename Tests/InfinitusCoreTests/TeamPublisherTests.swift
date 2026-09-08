@@ -206,6 +206,9 @@ final class TeamPublisherTests: XCTestCase {
     }
 
     func testHeaderScanRemembersHeadersByBlobVersion() throws {
+        // The disk copy is normally written at most hourly (#346); this test reads it back at once.
+        TeamClient.HeaderCache.minWriteInterval = 0
+        defer { TeamClient.HeaderCache.minWriteInterval = 3600 }
         let t = try team()
         let me = "m/\(t.alice.identity.kid)/"
         let mine = "t/\(t.alice.identity.kid)/"   // transcripts live on their own branch (#321)
