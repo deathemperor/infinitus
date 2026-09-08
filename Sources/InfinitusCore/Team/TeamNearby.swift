@@ -486,6 +486,42 @@ extension TeamNearby {
             #endif
         }
 
+        /// `host[:port]` as typed (an IPv6 literal in brackets); the port
+        /// defaults to the app's (#355).
+        public static func parseAddress(_ text: String, defaultPort: UInt16 = MirrorTransport.defaultPort) -> (host: String, port: UInt16)? {
+            var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if s.hasPrefix("http://") { s = String(s.dropFirst(7)) }
+            if s.hasSuffix("/") { s.removeLast() }
+            guard !s.isEmpty else { return nil }
+            if s.hasPrefix("[") {
+                guard let close = s.firstIndex(of: "]") else { return nil }
+                let host = String(s[s.index(after: s.startIndex)..<close])
+                let rest = s[s.index(after: close)...]
+                if rest.isEmpty { return (host, defaultPort) }
+                guard rest.hasPrefix(":"), let port = UInt16(rest.dropFirst()) else { return nil }
+                return (host, port)
+            }
+            let parts = s.split(separator: ":", omittingEmptySubsequences: false)
+            if parts.count == 1 { return (s, defaultPort) }
+            if parts.count > 2 { return (s, defaultPort) }   // a bare IPv6 literal
+            guard let port = UInt16(parts[1]), !parts[0].isEmpty else { return nil }
+            return (String(parts[0]), port)
+        }
+
+        /// The peer behind an address, for a network that doesn't pass
+        /// Bonjour between machines (#355): `GET /team/key` says who is
+        /// there and what they lead, the same record a browse would have
+        /// carried. `keyMismatch` carries the status when nothing answers
+        /// or the reply isn't a key.
+        public static func peer(host: String, port: UInt16, http: HTTP) throws -> Peer {
+            let (status, body) = try http("GET", host, port, keyPath, nil)
+            guard status == 200, let reply = try? CanonicalJSON.decode(KeyReply.self, from: body) else {
+                throw ClientError.keyMismatch(status)
+            }
+            return Peer(name: reply.name, host: host, port: port, kid: reply.keys.kid, team: reply.team,
+                        role: reply.role, discoverable: true)
+        }
+
         public static func request(to peer: Peer, name: String, devices: [String], platform: String,
                                    paths: TeamPaths, secrets: TeamSecrets, http: HTTP,
                                    now: Int = Int(Date().timeIntervalSince1970)) throws -> Outcome {

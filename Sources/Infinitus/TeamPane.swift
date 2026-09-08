@@ -56,6 +56,7 @@ struct TeamPane: View {
     @State private var token = ""
     @State private var joinCode = ""
     @State private var joinName = NSFullUserName()
+    @State private var joinAddress = ""
     @State private var showRecovery = false
     @State private var showExport = false
     @State private var showImport = false
@@ -113,6 +114,13 @@ struct TeamPane: View {
                     Button(team.scanning ? "Scanning…" : "Scan") { Task { await team.scanNearby() } }.disabled(team.scanning)
                     Toggle("Discoverable", isOn: $team.discoverable).toggleStyle(.switch)
                 }
+                HStack {
+                    TextField("Leader's address (host or host:port)", text: $joinAddress)
+                    Button("Request by address") { Task { await team.requestNearby(address: joinAddress, name: joinName) } }
+                        .disabled(joinAddress.isEmpty || joinName.isEmpty)
+                }
+                Text("When Nearby stays empty on a network that keeps machines from seeing each other's Bonjour, the leader's IP or hostname works instead — port 47824 unless they changed it.")
+                    .font(.caption).foregroundStyle(.secondary)
                 nearbyHint
                 Text("Discoverable Macs show their name, kid and team on this network (nothing secret). Leaders see your request in Requests.")
                     .font(.caption).foregroundStyle(.secondary)

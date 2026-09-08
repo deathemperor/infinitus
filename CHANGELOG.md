@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Team (preview)
+- Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
+
 ### Mac
 - A session nobody has open builds its row's facts from the last 256 KB of its transcript instead of up to 4 MB, so a busy fleet no longer re-parses megabytes twice a minute; the thread you're looking at keeps the full window (#346).
 - `infinitusctl team status|fetch|code|approve|decline|create|publish` on a Mac with the app running answer as the app (its identity, its store), and the other team subcommands refuse to mint a second identity beside the app's; `team status` fetches first and says when it is showing a cached roster (#354).
