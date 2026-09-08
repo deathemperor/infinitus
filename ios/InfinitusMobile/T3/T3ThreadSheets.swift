@@ -181,46 +181,40 @@ struct T3GitSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("BRANCH").font(T3Font.mobile(.xs, .bold)).tracking(1)
-                            .foregroundStyle(t3.mobile.foregroundMuted.color)
-                        Text(branch ?? "No branch").font(T3Font.mobile(.xl, .bold)).foregroundStyle(t3.mobile.foreground.color)
-                        Text(branch == nil ? "This session's folder is not on a git branch the Mac has reported."
-                                           : "Git actions from the phone arrive with a later release; the Mac's terminal has them today.")
-                            .font(T3Font.mobile(.sm, .medium)).foregroundStyle(t3.mobile.foregroundSecondary.color)
-                    }
-                    .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .bottom) { Divider().overlay(t3.mobile.border.color) }
-                    VStack(spacing: 0) {
-                        ForEach(Array(Self.rows.enumerated()), id: \.offset) { i, row in
-                            if i > 0 { Divider().overlay(t3.mobile.border.color).padding(.leading, 48) }
-                            HStack(spacing: 12) {
-                                Image(systemName: row.glyph).font(.system(size: 18)).foregroundStyle(t3.mobile.iconSubtle.color)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(row.title).font(T3Font.mobile(.base, .medium)).foregroundStyle(t3.mobile.foregroundMuted.color)
-                                    Text(row.subtitle).font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundTertiary.color)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(t3.mobile.chevron.color)
-                            }
-                            .padding(.horizontal, 16).padding(.vertical, 12)
-                        }
-                    }
-                    .background(t3.mobile.card.color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(.horizontal, 16)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(branch ?? "No branch").font(T3Font.mobile(.xxl, .bold)).foregroundStyle(t3.mobile.foreground.color)
+                    Text(branch == nil ? "This session's folder is not on a git branch the Mac has reported."
+                                       : "Git actions from the phone arrive with a later release; the Mac's terminal has them today.")
+                        .font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundMuted.color)
                 }
+                .padding(.horizontal, 24).padding(.top, 28)
+                VStack(spacing: 0) {
+                    ForEach(Array(Self.rows.enumerated()), id: \.offset) { i, row in
+                        if i > 0 { Divider().overlay(t3.mobile.border.color).padding(.leading, 72) }
+                        HStack(spacing: 14) {
+                            Image(systemName: row.glyph).font(.system(size: 16))
+                                .foregroundStyle(t3.mobile.iconMuted.color)
+                                .frame(width: 36, height: 36)
+                                .background(t3.mobile.subtle.color, in: Circle())
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.title).font(T3Font.mobile(.lg, .bold)).foregroundStyle(t3.mobile.foregroundMuted.color)
+                                Text(row.subtitle).font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundTertiary.color)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(t3.mobile.chevron.color)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                    }
+                }
+                .background(t3.mobile.card.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(.horizontal, 20)
             }
-            .background(t3.mobile.sheet.color.ignoresSafeArea())
-            .navigationTitle("Git")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .padding(.bottom, 24)
         }
+        .background(t3.mobile.sheet.color.ignoresSafeArea())
         .presentationDetents([.fraction(0.55), .fraction(0.92)])
         .presentationDragIndicator(.visible)
     }

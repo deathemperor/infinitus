@@ -80,7 +80,13 @@ struct InfinitusMobileApp: App {
                     // `infinitus://sessions` — a Live Activity tap lands on
                     // whatever is waiting, not the fleet; `?mac=<id>` — a
                     // per-Mac widget's tap (#144) — on that Mac's section.
-                    if url.host == "sessions" {
+                    if url.host == "t3" {
+                        // The parity capture's route (tools/t3ref/capture-ours.sh):
+                        // the new screens on, then the named one.
+                        model.t3Screens = true
+                        model.requestedTab = "sessions"
+                        model.requestedT3Screen = url.lastPathComponent
+                    } else if url.host == "sessions" {
                         model.requestedTab = "sessions"
                         model.requestedSectionMacId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                             .queryItems?.first { $0.name == "mac" }?.value

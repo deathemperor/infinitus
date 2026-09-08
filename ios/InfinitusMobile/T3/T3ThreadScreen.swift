@@ -85,7 +85,7 @@ struct T3ThreadScreen: View {
     private var working: Bool { follower.state.facts?.status == .running }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             t3.mobile.screen.color.ignoresSafeArea()
             ScrollViewReader { proxy in
                 ScrollView {
@@ -100,8 +100,10 @@ struct T3ThreadScreen: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    .padding(.bottom, 96)
+                    .padding(.bottom, 8)
                 }
+                // The conversation sits at the bottom, as a chat does.
+                .defaultScrollAnchor(.bottom)
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: rows.last?.id) { _, _ in
                     withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("end", anchor: .bottom) }
@@ -110,6 +112,10 @@ struct T3ThreadScreen: View {
                     if now { proxy.scrollTo("end", anchor: .bottom) }
                 }
             }
+        }
+        // The bottom stack is a safe-area inset, so the feed always clears
+        // it — a card and the Working pill can be most of the screen.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 12) {
                 if working { workingControl }
                 if let approval = pending.approval {
@@ -130,29 +136,24 @@ struct T3ThreadScreen: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(title).font(T3Font.mobile(.base, .medium)).lineLimit(1)
-                        .foregroundStyle(t3.mobile.foreground.color)
-                    Text(subtitle).font(T3Font.mobile(.xxs)).lineLimit(1)
-                        .foregroundStyle(t3.mobile.foregroundMuted.color)
-                }
-            }
-            // T3's header pills: files and terminal are E/F's; git opens
-            // the overview sheet.
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Image(systemName: "folder").foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Files (soon)")
-                Image(systemName: "terminal").foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Terminal (soon)")
-                Button { showGit = true } label: {
-                    Image(systemName: "point.topleft.down.curvedto.point.bottomright.up").foregroundStyle(t3.mobile.icon.color)
-                }
-                .accessibilityLabel("Open git controls")
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
+        // T3's iOS header (`ios-thread.png`) drawn in the content — the
+        // system bar squeezes a leading title into a glass pill on iOS 26
+        // — with swipe-back kept, as the feed does.
+        .toolbar(.hidden, for: .navigationBar)
+        .background(InteractivePopGesture())
+        .safeAreaInset(edge: .top, spacing: 0) { header }
         .toolbar(.hidden, for: .tabBar)
-        .onAppear { follower.start() }
+        .onAppear {
+            follower.start()
+            // `infinitus://t3/git|settings` (the parity capture) lands on
+            // the thread with that sheet up.
+            switch model.requestedThreadSheet {
+            case "git": showGit = true
+            case "settings": showSettings = true
+            default: break
+            }
+            model.requestedThreadSheet = nil
+        }
         .onDisappear { follower.stop() }
         // A PhotosPicker inside a Menu never presents (the menu dismisses
         // first) — same modifier pattern as the feed's composer.
@@ -187,6 +188,44 @@ struct T3ThreadScreen: View {
     private static let allowedFileTypes: [UTType] = [
         .png, .jpeg, .heic, .gif, .pdf, .plainText, UTType(mimeType: "image/webp"),
     ].compactMap { $0 }
+
+    /// Title and `project · Mac` subtitle lead; the terminal and files
+    /// pills (E/F's, inert here) share a glass capsule; the git gear is
+    /// its own.
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(T3Font.mobile(.xl, .bold)).lineLimit(1)
+                    .foregroundStyle(t3.mobile.foreground.color)
+                Text(subtitle).font(T3Font.mobile(.sm)).lineLimit(1)
+                    .foregroundStyle(t3.mobile.foregroundMuted.color)
+            }
+            Spacer(minLength: 8)
+            T3GlassSurface {
+                HStack(spacing: 0) {
+                    Image(systemName: "terminal").frame(width: 60, height: 44).accessibilityLabel("Terminal (soon)")
+                    Image(systemName: "folder").frame(width: 60, height: 44).accessibilityLabel("Files (soon)")
+                }
+                .font(.system(size: 18))
+                .foregroundStyle(t3.mobile.iconSubtle.color)
+            }
+            .clipShape(Capsule())
+            Button { showGit = true } label: {
+                Image(systemName: "gearshape.fill").font(.system(size: 20))
+                    .foregroundStyle(t3.mobile.icon.color)
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "arrow.triangle.branch").font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(t3.mobile.icon.color).offset(x: 4, y: 3)
+                    }
+                    .frame(width: 48, height: 48)
+                    .background(t3.mobile.subtleStrong.color, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open git controls")
+        }
+        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 10)
+        .background(t3.mobile.screen.color)
+    }
 
     private var title: String {
         let p = model.progress(macId: macId, pid: session.pid)
@@ -243,7 +282,7 @@ struct T3ThreadScreen: View {
                         HStack(spacing: 4) {
                             attachButton
                             Button { showSettings = true } label: {
-                                Image(systemName: "gearshape").font(.system(size: 16))
+                                Image(systemName: "slider.horizontal.3").font(.system(size: 16))
                                     .foregroundStyle(t3.mobile.icon.color)
                                     .frame(width: 44, height: 44).contentShape(Circle())
                             }
@@ -426,31 +465,48 @@ struct T3MessageRow: View {
     @Environment(\.t3) private var t3
 
     var body: some View {
-        let stamp = Text(message.createdAt.formatted(date: .omitted, time: .shortened))
-            .font(T3Font.mobile(.xs, .medium)).monospacedDigit()
-            .foregroundStyle(t3.mobile.foregroundTertiary.color)
         if message.role == .user {
             HStack {
                 Spacer(minLength: 48)
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 0) {
                     Text(message.text)
                         .font(T3Font.mobile(.base))
                         .foregroundStyle(t3.mobile.userBubbleForeground.color)
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .background(t3.mobile.userBubble.color, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    stamp
+                    HStack(spacing: 4) { stamp; copyButton }
+                        .padding(.top, 4).padding(.trailing, 2)
                 }
             }
             .padding(.bottom, 20)
         } else {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 MarkdownText(text: message.text)
                     .font(T3Font.mobile(.base))
                     .foregroundStyle(t3.mobile.foreground.color)
-                stamp
+                HStack(spacing: 4) { copyButton; stamp }
+                    .padding(.top, 4)
             }
             .padding(.bottom, 20)
         }
+    }
+
+    /// T3's `mt-1 gap-1` row: `text-xs font-t3-medium tabular-nums`.
+    private var stamp: some View {
+        Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+            .font(T3Font.mobile(.xs, .medium)).monospacedDigit()
+            .foregroundStyle(t3.mobile.foregroundMuted.color)
+    }
+
+    /// `CopyTextButton`: a 28 pt target around a 14 pt glyph.
+    private var copyButton: some View {
+        Button { UIPasteboard.general.string = message.text } label: {
+            Image(systemName: "doc.on.doc").font(.system(size: 14))
+                .foregroundStyle(t3.mobile.iconSubtle.color)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Copy message")
     }
 }
 

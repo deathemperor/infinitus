@@ -712,6 +712,12 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// A screen asking the shell to switch tabs (the Fleet hero's
     /// sessions line, a Live Activity tap); RootView consumes it.
     @Published var requestedTab: String?
+    /// `infinitus://t3/<screen>` (tools/t3ref parity captures): the new
+    /// screen to land on — "newtask" opens the task sheet, "thread" the
+    /// first live session, "git" / "settings" that session with the
+    /// sheet up (`requestedThreadSheet`). Consumed by SessionsScreen.
+    @Published var requestedT3Screen: String?
+    @Published var requestedThreadSheet: String?
     /// A per-Mac widget's tap (#144) asking the sessions list to scroll
     /// to that Mac's section; SessionsScreen consumes it.
     @Published var requestedSectionMacId: String?
