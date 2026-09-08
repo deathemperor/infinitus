@@ -16,8 +16,10 @@ enum PickedVideo {
         let thumbnail: UIImage?
     }
 
+    /// A Live Photo advertises its paired movie too; it stays a photo.
     static func isVideo(_ item: PhotosPickerItem) -> Bool {
-        item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+        let types = item.supportedContentTypes
+        return types.contains { $0.conforms(to: .movie) } && !types.contains { $0.conforms(to: .image) }
     }
 
     struct Failure: Error { let message: String }
