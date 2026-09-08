@@ -276,14 +276,21 @@ final class T3ColorParseTests: XCTestCase {
     }
     func testWebOklchAndColorMixResolve() throws {
         let t = try tokens()
-        // --background: var(--color-zinc-25) = oklch(99.2% 0 0) → #fdfdfd
-        XCTAssertEqual(t["webLight"]?["background"], [253, 253, 253, 1])
-        // --primary: oklch(0.488 0.217 264) → #3b3bd6-ish; assert channels within ±2
+        // --background: var(--color-zinc-25) = oklch(99.2% 0 0) → 252.31 per channel (CSS Color 4 matrices) → #fcfcfc
+        XCTAssertEqual(t["webLight"]?["background"], [252, 252, 252, 1])
+        // --primary: oklch(0.488 0.217 264) → (26.59, 78.32, 215.81) → #1b4ed8; ±1 for rounding
         let p = try XCTUnwrap(t["webLight"]?["primary"])
-        XCTAssertEqual(p[0], 49, accuracy: 2); XCTAssertEqual(p[1], 63, accuracy: 2); XCTAssertEqual(p[2], 232, accuracy: 2)
+        XCTAssertEqual(p[0], 27, accuracy: 1); XCTAssertEqual(p[1], 78, accuracy: 1); XCTAssertEqual(p[2], 216, accuracy: 1)
+        // dark --primary: oklch(0.571 0.21 264) → (52.12, 107.04, 240.96)
+        let pd = try XCTUnwrap(t["webDark"]?["primary"])
+        XCTAssertEqual(pd[0], 52, accuracy: 1); XCTAssertEqual(pd[1], 107, accuracy: 1); XCTAssertEqual(pd[2], 241, accuracy: 1)
+        // light --accent: var(--color-zinc-100) = oklch(0.967 0.001 286.375) → #f4f4f5 (Tailwind's documented hex)
+        XCTAssertEqual(t["webLight"]?["accent"], [244, 244, 245, 1])
         // dark --accent: --alpha(var(--color-white) / 4%)
         XCTAssertEqual(t["webDark"]?["accent"], [255, 255, 255, 0.04])
-        // dark --card: color-mix(in srgb, var(--background) 97%, var(--color-white)) with background neutral-950 (#0a0a0a)
+        // dark --background: var(--color-neutral-950) = oklch(14.5% 0 none) → #0a0a0a (Tailwind's documented hex)
+        XCTAssertEqual(t["webDark"]?["background"], [10, 10, 10, 1])
+        // dark --card: color-mix(in srgb, var(--background) 97%, var(--color-white)) = 0.97·10.04 + 0.03·255 = 17.39
         let c = try XCTUnwrap(t["webDark"]?["card"])
         XCTAssertEqual(c[0], 17, accuracy: 1); XCTAssertEqual(c[3], 1)
     }
@@ -296,7 +303,7 @@ final class T3ColorParseTests: XCTestCase {
     }
 }
 ```
-Add `Fixtures/t3/` to the test target: the generator writes the JSON to `tools/t3ref/upstream/tokens.resolved.json` and `check-generated.sh` copies it to `Tests/InfinitusCoreTests/Fixtures/t3/tokens.resolved.json` (both committed). The numbers above are hand estimates to make the test compile and fail first. Before pinning them: run the generator, then spot-check three tokens against T3 itself — open the T3 Code (Alpha) devtools (`View › Toggle Developer Tools`), read `getComputedStyle(document.documentElement).getPropertyValue("--background")` and the resolved `background-color` of `body` and of a `[data-app-sidebar]` element, or sample the reference PNGs (`tools/t3ref/refs/mac-thread.png`) with `compare.py`'s `read_png` — and pin the test to what T3 renders (±1 per channel; oklch achromatic greys round differently across implementations). A generator that disagrees with T3's rendering by more than 2 per channel has a wrong oklch → sRGB matrix.
+Add `Fixtures/t3/` to the test target: the generator writes the JSON to `tools/t3ref/upstream/tokens.resolved.json` and `check-generated.sh` copies it to `Tests/InfinitusCoreTests/Fixtures/t3/tokens.resolved.json` (both committed). The expected numbers above were computed with the CSS Color 4 reference matrices (OKLab → LMS → linear sRGB → gamma) at full precision and cross-checked against Tailwind's documented hex for `neutral-950` (#0a0a0a) and `zinc-100` (#f4f4f5), which the same conversion reproduces exactly. Round half away from zero on each channel after the gamma step. If the generator disagrees by more than the stated accuracy, the generator is wrong (recheck the matrices, not the test).
 
 - [ ] **Step 2: Run to verify it fails**
 
