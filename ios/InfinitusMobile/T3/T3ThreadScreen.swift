@@ -64,7 +64,15 @@ struct T3ThreadScreen: View {
         return rows
     }
 
-    private var rows: [Row] { Self.rows(of: follower.state.timeline) }
+    private var pending: T3Pending.Live { T3Pending.derive(follower.state.timeline) }
+    /// The live prompt shows as a card over the composer, not a feed line.
+    private var rows: [Row] {
+        let hidden = pending.activityIds
+        return Self.rows(of: follower.state.timeline).filter {
+            if case .work(let a) = $0 { return !hidden.contains(a.id) }
+            return true
+        }
+    }
     private var working: Bool { follower.state.facts?.status == .running }
 
     var body: some View {
@@ -93,8 +101,16 @@ struct T3ThreadScreen: View {
                     if now { proxy.scrollTo("end", anchor: .bottom) }
                 }
             }
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 if working { workingControl }
+                if let approval = pending.approval {
+                    T3ApprovalCard(approval: approval, sending: sending,
+                                   allowOnce: { send(.init(kind: .key, text: "1")) },
+                                   allowSession: { send(.init(kind: .approve, text: approval.sessionApproval)) },
+                                   decline: { send(.init(kind: .key, text: "3")) })
+                } else if let input = pending.userInput {
+                    T3UserInputCard(input: input, sending: sending) { send(.init(kind: .answers, text: $0)) }
+                }
                 composer
             }
             .padding(.horizontal, 12)
