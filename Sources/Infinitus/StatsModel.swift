@@ -72,22 +72,26 @@ final class StatsModel: ObservableObject {
         var merged = transcriptDays
         for (k, d) in repoDays { merged[k] = (merged[k] ?? Stats.Day()) + d }
         days = merged
-        summaries = Dictionary(uniqueKeysWithValues: Stats.Period.allCases.map {
-            ($0, Stats.fold(days: merged, period: $0, calendar: calendar))
-        })
         rebuildBundle(days: merged, calendar: calendar)
     }
 
-    /// The mirrored bundle, rebuilt off the main actor. `generation`
-    /// drops a build that finishes after a newer one started (the
-    /// transcript chunk loop and the repo scan both land here).
+    /// The period summaries and the mirrored bundle, rebuilt off the main
+    /// actor. `generation` drops a build that finishes after a newer one
+    /// started (the transcript chunk loop and the repo scan both land
+    /// here). The summaries used to fold on the MainActor — ~330 ms per
+    /// pass, a visible hitch in whatever the user was clicking (sample,
+    /// 2026-09-08).
     private func rebuildBundle(days: [String: Stats.Day], calendar: Calendar) {
         bundleGeneration += 1
         let generation = bundleGeneration
         Task.detached(priority: .utility) {
+            let folded = Dictionary(uniqueKeysWithValues: Stats.Period.allCases.map {
+                ($0, Stats.fold(days: days, period: $0, calendar: calendar))
+            })
             let built = Stats.Bundle(days: days, calendar: calendar)
             await MainActor.run {
                 guard self.bundleGeneration == generation else { return }
+                self.summaries = folded
                 self.bundle = built
             }
         }

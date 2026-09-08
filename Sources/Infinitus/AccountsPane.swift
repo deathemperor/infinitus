@@ -783,6 +783,15 @@ private struct FleetAccountsSection: View {
     /// first-responder to the next row's field directly (user 2026-09-06:
     /// "press tab -> go to rename next account").
     @StateObject private var renameFields = RenameFields()
+    /// The slot whose drag handle the pointer is over. A row is movable
+    /// only then: a List with `.onMove` lets the table arbitrate EVERY
+    /// mouse-down (drag or click?) in a nested event loop until mouse-up,
+    /// so a click into a name field only reached the field on release —
+    /// `sample` showed the wait in `-[NSTableView _dragShouldBeginFromMouseDown:]`
+    /// (user 2026-09-08: "selecting name field for renaming still has very
+    /// high latency"). Movable-while-hovering-the-handle keeps reordering
+    /// and gives clicks elsewhere in the row straight to their control.
+    @State private var handleHovered: Int?
 
     var body: some View {
         Section {
@@ -799,10 +808,10 @@ private struct FleetAccountsSection: View {
                 List {
                     ForEach(fleet.accounts, id: \.number) { a in
                         if canRelogin {
-                            row(a).moveDisabled(!caps.contains(.reorder))
+                            row(a).moveDisabled(!caps.contains(.reorder) || handleHovered != a.number)
                                 .contextMenu { rowMenu(a) }
                         } else {
-                            row(a).moveDisabled(!caps.contains(.reorder))
+                            row(a).moveDisabled(!caps.contains(.reorder) || handleHovered != a.number)
                         }
                     }
                     .onMove { from, to in
@@ -936,6 +945,7 @@ private struct FleetAccountsSection: View {
                 Image(systemName: "line.3.horizontal")
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
+                    .onHover { handleHovered = $0 ? a.number : (handleHovered == a.number ? nil : handleHovered) }
             }
             Text("\(a.number)").monospacedDigit()
                 .foregroundStyle(.secondary)

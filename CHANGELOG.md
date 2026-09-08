@@ -8,6 +8,8 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- A click into an account's name field focuses it at once; only the drag handle starts a reorder now, so the row no longer holds every click until the mouse comes up.
+- Stats folds run off the main thread, so a refresh no longer freezes the window for a third of a second.
 - The wall honors the biometric lock: while the app is locked it shows the lock, not the sessions (#55).
 - `infinitusctl` retries for a second while the app re-binds its control socket, and says which error it hit instead of a flat "not running" (#265).
 
