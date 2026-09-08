@@ -45,8 +45,12 @@ final class WallWindowController {
 
     func show(model: AppModel, usage: UsageModel) {
         guard !isVisible, let screen = Self.targetScreen() else { return }
-        let root = WallRoot(model: model, usage: usage, stats: model.statsModel,
-                            close: { [weak self] in self?.close() })
+        // Same gate as the pop-out and Settings (#55): a locked app's wall
+        // shows the lock, not the sessions.
+        let root = LockGate(lock: model.lock) {
+            WallRoot(model: model, usage: usage, stats: model.statsModel,
+                     close: { [weak self] in self?.close() })
+        }
         let host = NSHostingController(rootView: root)
         host.sizingOptions = []
         let w = window ?? NSWindow(contentRect: screen.frame, styleMask: [.borderless],

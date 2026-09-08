@@ -64,8 +64,9 @@ every member's leader-shared data plus the same.
   Activities push for the same reason); the local path below is the
   default until then, which is why it builds first (§12).
 - **Local path** (no passkey, or declined): 32 random bytes in the OS
-  credential store (macOS keychain `com.huuloc.infinitus.team`, Windows
-  Credential Manager, Linux `~/.config/infinitus/identity` 0600) plus a
+  credential store (macOS keychain `run.infinitus.team`, Windows
+  Credential Manager, Linux `$XDG_DATA_HOME/infinitus/teams/secrets/`
+  0700 with 0600 files) plus a
   **recovery key** (the same bytes, base32 in 8 groups) shown once with
   "keep this offline" and re-showable after unlock.
 - Derivation: `HKDF-SHA256(secret, salt: "infinitus-team-v1", info:
@@ -150,8 +151,9 @@ Dropbox, OneDrive, iCloud Drive, NAS) and S3-compatible bucket.
   a member fetches `roster`, `requests` (leaders only), its own branch,
   and the `m/*` branches of teammates who share to it (known from the
   roster's `sharesTo` hints, §5).
-- Local clone at `App Support/Infinitus/teams/<team-id>/repo`, one
-  worktree per fetched branch under `…/branches/`, blobs only.
+- Local mirror at `App Support/Infinitus/teams/<team-id>/store/store.git`,
+  a bare repo (no worktrees: reads are `cat-file`, writes are
+  `commit-tree` + push), blobs only.
 - Commits are made by `git` as a subprocess (present on every dev box;
   the app already shells out to git for Stats). Author `Infinitus
   <kid@infinitus.run>`; message = path list. Force-push never.

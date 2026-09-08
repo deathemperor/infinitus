@@ -70,7 +70,7 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: products,
     dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.10.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
     ],
     targets: targets
 )

@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The wall honors the biometric lock: while the app is locked it shows the lock, not the sessions (#55).
 - `infinitusctl` retries for a second while the app re-binds its control socket, and says which error it hit instead of a flat "not running" (#265).
 
 ### Team
