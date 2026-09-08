@@ -95,7 +95,13 @@ struct T3Root: View {
             if model.state.projects.isEmpty && model.state.threads.isEmpty {
                 T3NoProjectsHero(action: nil)
             } else if let store = model.timelineStore, model.state.selectedThread != nil {
-                T3ThreadView(model: model, app: app, store: store)
+                // `.id` per upstream's `key={activeThread.id}` on
+                // `<MessagesTimeline>` (`ChatView.tsx:7939`): a thread switch
+                // remounts the list, which is also what drops the outgoing
+                // thread's row geometry. A rebind (same thread, new pid) keeps
+                // the same store id and so keeps the scroll position.
+                T3ThreadView(model: model, app: app, store: store, now: model.now)
+                    .id(store.threadId)
             } else {
                 T3NoActiveThreadState()
             }

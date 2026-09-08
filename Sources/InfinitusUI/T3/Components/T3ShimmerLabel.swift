@@ -24,7 +24,11 @@ import AppKit
 /// of the same string and size (glyph antialiasing therefore differs a hair
 /// from the neighbouring SwiftUI labels — the only way to have SwiftUI drive
 /// the layout and Core Animation drive the pixels).
-public struct T3ShimmerLabel: View {
+///
+/// `Equatable` on the inputs, so a caller can wrap it in `.equatable()`:
+/// `LayerEffect.updateNSView` reinstalls its layers and the sweep restarts from
+/// phase 0, so an update that changed nothing must not reach it.
+public struct T3ShimmerLabel: View, Equatable {
     let text: String
     let fontSize: Double
     let base: T3RGBA
@@ -32,6 +36,10 @@ public struct T3ShimmerLabel: View {
 
     public init(text: String, fontSize: Double, base: T3RGBA, highlight: T3RGBA) {
         self.text = text; self.fontSize = fontSize; self.base = base; self.highlight = highlight
+    }
+
+    public static func == (l: T3ShimmerLabel, r: T3ShimmerLabel) -> Bool {
+        l.text == r.text && l.fontSize == r.fontSize && l.base == r.base && l.highlight == r.highlight
     }
 
     /// `--live-activity-focus-width: 4.5rem`.

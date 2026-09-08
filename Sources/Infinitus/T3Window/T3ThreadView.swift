@@ -3,10 +3,15 @@ import AppKit
 import InfinitusCore
 import InfinitusUI
 
-/// Task 13's composer publishes its measured height through this key; the
-/// timeline's footer inset is that height plus 16 (`TimelineListFooter`'s
-/// `composerInset`, `MessagesTimeline.tsx:609-612`). Until the composer lands
-/// the default 0 leaves the plain 16.
+/// The bottom slot (Task 12's banners, Task 13's composer) publishes its
+/// measured height through this key; the timeline's footer inset is that height
+/// plus 16 (`TimelineListFooter`'s `composerInset`,
+/// `MessagesTimeline.tsx:609-612`). Until the slot has content its 0 leaves the
+/// plain 16.
+///
+/// Preferences only flow UP, so the publisher has to live INSIDE `T3ThreadView`
+/// — the slot is its `.overlay`, not a sibling in `T3Root`, and the reader is
+/// attached to that overlay.
 struct T3ComposerHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -29,11 +34,16 @@ struct T3ComposerHeightKey: PreferenceKey {
 /// upstream gets from `maintainVisibleContentPosition`: a fold that opens or
 /// closes leaves the toggled row exactly where it was.
 struct T3ThreadView: View {
-    @ObservedObject var model: T3WindowModel
-    /// Held as a plain reference on purpose: `AppModel` republishes on every
-    /// fleet tick, and observing it here would re-render every row.
+    /// Both models are plain references on purpose: `AppModel` republishes on
+    /// every fleet tick and `T3WindowModel` on every state change, and observing
+    /// either here would re-run this body — and `Row ==` for every row — for
+    /// changes the timeline does not read. The one value it needs, `now`, comes
+    /// in as a value; the two toggles are calls, not reads.
+    let model: T3WindowModel
     let app: AppModel
     @ObservedObject var store: T3TimelineStore
+    /// `T3WindowModel.now`, passed down by `T3Root` (never `Date()`).
+    let now: Date
     @Environment(\.t3) private var t3
 
     /// Row geometry, `atEnd` and the pending disclosure pin. A reference type
@@ -56,7 +66,7 @@ struct T3ThreadView: View {
                         ForEach(store.rows) { row in
                             T3TimelineRowView(row: row,
                                               columnWidth: min(Self.columnMax, geo.size.width - 2 * Self.listInset),
-                                              now: model.now,
+                                              now: now,
                                               onToggleTurn: { turnId in toggle(rowId: row.id) { model.toggleTurn(turnId) } },
                                               onToggleWorkGroup: { groupId in toggle(rowId: row.id) { model.toggleWorkGroup(groupId) } })
                                 .equatable()
@@ -86,9 +96,36 @@ struct T3ThreadView: View {
                     DispatchQueue.main.async { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
                 .overlay { if store.rows.isEmpty { empty } }
+                // `ChatView.tsx:8006-8012`: the composer wrapper is
+                // `absolute inset-x-0 bottom-0 z-20` over the messages wrapper
+                // (`:7931`, `relative flex min-h-0 flex-1`) — the timeline runs
+                // full height and scrolls UNDER it, which is what the footer
+                // inset reserves room for. So: an overlay, not a stacked row.
+                .overlay(alignment: .bottom) { bottomSlot }
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { anchors.viewport = $0 }
+    }
+
+    /// The composer overlay's slot. Empty until Tasks 12/13 fill it; its height
+    /// is what the timeline's footer reserves, published as
+    /// `T3ComposerHeightKey` so the children need no plumbing of their own.
+    private var bottomSlot: some View {
+        VStack(spacing: 0) {
+            // Task 12: banners/panels; Task 13: composer.
+        }
+        // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
+        // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
+        // whatever lands in it lines up with them. `pointer-events-auto`
+        // there too, so no `allowsHitTesting(false)` here.
+        .frame(maxWidth: Self.columnMax)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Self.listInset)
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: T3ComposerHeightKey.self, value: geo.size.height)
+            }
+        }
         .onPreferenceChange(T3ComposerHeightKey.self) { composerHeight = $0 }
     }
 
@@ -112,6 +149,12 @@ struct T3ThreadView: View {
     }
 
     private func anchor(old: [T3TimelineRows.Row], new: [T3TimelineRows.Row], proxy: ScrollViewProxy) {
+        // Row frames are written per scrolled frame and never removed on their
+        // own: drop the ids this re-derive folded away, or a long thread's
+        // dictionary only grows. (`previous` below is the *old* id set — a
+        // different question: which rows are new.)
+        let ids = Set(new.map(\.id))
+        anchors.rows = anchors.rows.filter { ids.contains($0.key) }
         guard !new.isEmpty else { return }
         if let pinned = anchors.pinned {
             anchors.pinned = nil
@@ -158,3 +201,4 @@ struct T3ThreadView: View {
     /// `(rowId, its viewport-relative top)` recorded before a disclosure toggle.
     var pinned: (String, Double)?
 }
+

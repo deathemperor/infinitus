@@ -176,7 +176,7 @@ private struct T3UserTimelineRow: View {
             // `max-h-44 overflow-hidden` (176) under the
             // `COLLAPSED_USER_MESSAGE_FADE_MASK` — black to transparent over
             // the last 1.75 rem (28) (`:2345-2346`).
-            T3MemoisedMarkdown(messageId: message.id, text: text, streaming: message.streaming)
+            T3ChatMarkdown(text: text)
                 .frame(maxHeight: 176, alignment: .top)
                 .clipped()
                 .mask(LinearGradient(stops: [.init(color: .black, location: 0),
@@ -184,7 +184,7 @@ private struct T3UserTimelineRow: View {
                                              .init(color: .clear, location: 1)],
                                      startPoint: .top, endPoint: .bottom))
         } else {
-            T3MemoisedMarkdown(messageId: message.id, text: text, streaming: message.streaming)
+            T3ChatMarkdown(text: text)
         }
     }
 
@@ -233,10 +233,9 @@ private struct T3AssistantTimelineRow: View {
     var body: some View {
         // `relative min-w-0 px-1 py-0.5` (`:1564`).
         VStack(alignment: .leading, spacing: 0) {
-            T3MemoisedMarkdown(messageId: message.id,
-                               text: message.text.isEmpty && !message.streaming
-                                   ? "(empty response)" : message.text,
-                               streaming: message.streaming)
+            // `:1571-1577`: an empty settled reply still shows something.
+            T3ChatMarkdown(text: message.text.isEmpty && !message.streaming
+                ? "(empty response)" : message.text)
             if showMeta {
                 // `className="mt-1.5"` (`:1590`).
                 T3AssistantMessageMeta(message: message, showCopyButton: showCopyButton,
@@ -314,23 +313,6 @@ private struct T3MessageCopyButton: View {
         .onHover { hover = $0 }
         .accessibilityLabel("Copy message")
     }
-}
-
-/// `ChatMarkdown` under React's `memo`: `T3ChatMarkdown` re-parses its text on
-/// every body run, so the row's markdown is gated on the identity the brief
-/// asks for — `(messageId, text.count, streaming)`. A streaming tail changes
-/// its own length every chunk and so re-renders; every settled message above it
-/// compares equal and is skipped.
-private struct T3MemoisedMarkdown: View, Equatable {
-    let messageId: String
-    let text: String
-    let streaming: Bool
-
-    static func == (l: T3MemoisedMarkdown, r: T3MemoisedMarkdown) -> Bool {
-        l.messageId == r.messageId && l.text.count == r.text.count && l.streaming == r.streaming
-    }
-
-    var body: some View { T3ChatMarkdown(text: text) }
 }
 
 // MARK: - Folds and separators
@@ -498,8 +480,14 @@ private struct T3LiveActivityRow: View {
             // `ActivityShimmerOverlay` (`:1979`) / `live-tool-shine` (`:2098`):
             // the SwiftUI text lays the row out, `T3ShimmerLabel` draws it.
             base.hidden()
+                // `.equatable()`: `LayerEffect.updateNSView` reinstalls its
+                // layers, which restarts the sweep from phase 0, so an update
+                // with unchanged inputs must not reach it. SwiftUI happens to
+                // elide it here already (measured), but only through its own
+                // structural comparison of the view value — this states it.
                 .overlay(T3ShimmerLabel(text: label, fontSize: T3TypeScale.Web.sm.step.size,
-                                        base: t3.web.secondaryLabel, highlight: t3.web.foreground))
+                                        base: t3.web.secondaryLabel,
+                                        highlight: t3.web.foreground).equatable())
         } else {
             base.foregroundStyle(t3.web.secondaryLabel.color)
         }
