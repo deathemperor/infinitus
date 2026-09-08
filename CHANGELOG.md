@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Phone
+- Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).
 - The new thread renders markdown the way the reference does — DM Sans body, bold in the strong color, mono inline code, fenced code in a bordered block with its language and a copy button, task lists, tables, rules (#223).
 
 ## 0.4.4-alpha.2

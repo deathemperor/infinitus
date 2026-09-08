@@ -114,18 +114,31 @@ import InfinitusUI
     }
 
     static let parityHome: [T3HomeEntry] = [
-        T3HomeEntry(session: SessionDetail(pid: 4243, cwd: "/tmp/t3fix/proj/limitless", status: "waiting", kind: "claude", startedAt: 0),
-                    macId: nil, title: "Hi", repo: "limitless", branch: nil, macLabel: nil, status: .ready, pinnedAt: nil,
-                    snoozed: false, settled: false, lastActivity: Date().addingTimeInterval(-21 * 3600 - 60)),
+        homeEntry(4243, "Hi", "limitless", nil, .ready, ago: 21 * 3600 + 60, macLabel: nil),
     ]
 
+    /// A Home entry from the facts a leased session would carry.
+    nonisolated static func homeEntry(_ pid: Int, _ title: String, _ repo: String, _ branch: String?, _ status: T3ThreadStatus,
+                          ago: Double, pinned: Bool = false, snoozed: Bool = false, settled: Bool = false,
+                          macLabel: String? = "Studio") -> T3HomeEntry {
+        let last = Date().addingTimeInterval(-ago)
+        let facts = SessionFacts(status: status == .working ? .running : status == .failed ? .error : .ready,
+                                 hasPendingApprovals: status == .approval, hasPendingUserInput: status == .input, hasPlan: false,
+                                 latestTurn: nil, planProgress: nil, latestUserMessageAt: last,
+                                 settledOverride: settled ? .settled : nil, settledAt: nil, unsettledAt: nil,
+                                 snoozedUntil: snoozed ? Date().addingTimeInterval(3600) : nil, snoozedAt: snoozed ? last : nil,
+                                 pinnedAt: pinned ? Date().addingTimeInterval(-ago) : nil)
+        let session = SessionDetail(pid: pid, cwd: "/Users/dev/" + repo, status: "busy", kind: "claude",
+                                    startedAt: (Date().timeIntervalSince1970 - ago - 600) * 1000)
+        return T3HomeEntry(session: session, macId: nil,
+                           thread: T3HomeThreads.thread(session: session, macId: nil, title: title, facts: facts, lastActivity: last),
+                           repo: repo, branch: branch, macLabel: macLabel, lastActivity: last)
+    }
+
     static let homeEntries: [T3HomeEntry] = {
-        func e(_ pid: Int, _ title: String, _ repo: String, _ branch: String?, _ status: SessionListPresentation.Attention,
+        func e(_ pid: Int, _ title: String, _ repo: String, _ branch: String?, _ status: T3ThreadStatus,
                ago: Double, pinned: Bool = false, snoozed: Bool = false, settled: Bool = false) -> T3HomeEntry {
-            T3HomeEntry(session: SessionDetail(pid: pid, cwd: "/Users/dev/" + repo, status: "busy", kind: "claude", startedAt: 0),
-                        macId: nil, title: title, repo: repo, branch: branch, macLabel: "Studio", status: status,
-                        pinnedAt: pinned ? Date() : nil, snoozed: snoozed, settled: settled,
-                        lastActivity: Date().addingTimeInterval(-ago))
+            homeEntry(pid, title, repo, branch, status, ago: ago, pinned: pinned, snoozed: snoozed, settled: settled)
         }
         return [
             e(1, "Why does the sessions list flicker when a row settles?", "limitless", "t3-c6", .working, ago: 120),
@@ -189,7 +202,7 @@ import InfinitusUI
         for scheme in [ColorScheme.light, .dark] {
             let home = NavigationStack {
                 T3HomeBody(entries: Self.homeEntries, connection: .connected("Studio"), open: { _ in }, compose: {}, settings: {},
-                           decorate: { _, row in AnyView(row.swipeActions { Button("Settle") {} }) })
+                           decorate: { _, _, row in AnyView(row.swipeActions { Button("Settle") {} }) })
             }
             .t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
             try Self.attach(name: "home-\(scheme == .dark ? "dark" : "light")", png: Self.render(home), dir: dir, test: self)

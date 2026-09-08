@@ -2,17 +2,25 @@ import XCTest
 import InfinitusCore
 @testable import InfinitusMobile
 
-/// Home's shelves and ages (C-6), until A's list reducer replaces them.
+/// Home's session → `T3Thread` mapping (C-6/C-10) and its ages; the list
+/// order itself is `T3ThreadList`'s, tested in InfinitusCore.
 final class T3HomeTests: XCTestCase {
-    private func row(_ pid: Int, status: SessionListPresentation.Attention = .ready, ago: Double = 0,
-                       pinnedAt: Date? = nil, snoozed: Bool = false, settled: Bool = false, title: String = "t") -> T3HomeEntry {
-        T3HomeEntry(session: SessionDetail(pid: pid, cwd: "/r", status: "idle", kind: "claude", startedAt: 0), macId: nil,
-                    title: title, repo: "r", branch: nil, macLabel: nil, status: status, pinnedAt: pinnedAt,
-                    snoozed: snoozed, settled: settled, lastActivity: Date(timeIntervalSince1970: 10_000 - ago))
+    private let now = Date(timeIntervalSince1970: 1_000_000)
+
+    private func facts(status: SessionFacts.Status = .ready, approvals: Bool = false, input: Bool = false,
+                       settledOverride: AttentionStore.SettledOverride? = nil, settledAt: Date? = nil, unsettledAt: Date? = nil,
+                       snoozedUntil: Date? = nil, pinnedAt: Date? = nil) -> SessionFacts {
+        SessionFacts(status: status, hasPendingApprovals: approvals, hasPendingUserInput: input, hasPlan: false, latestTurn: nil,
+                     planProgress: nil, latestUserMessageAt: nil, settledOverride: settledOverride, settledAt: settledAt,
+                     unsettledAt: unsettledAt, snoozedUntil: snoozedUntil, snoozedAt: nil, pinnedAt: pinnedAt)
+    }
+
+    private func thread(_ status: String = "idle", facts: SessionFacts?) -> T3Thread {
+        let s = SessionDetail(pid: 7, cwd: "/r/limitless", status: status, kind: "claude", startedAt: 900_000_000)
+        return T3HomeThreads.thread(session: s, macId: "mac-2", title: "Hi", facts: facts, lastActivity: now, now: now)
     }
 
     func testRelativeTimeMatchesT3() {
-        let now = Date(timeIntervalSince1970: 1_000_000)
         XCTAssertEqual(T3Time.relative(now.addingTimeInterval(-30), now: now), "<1m")
         XCTAssertEqual(T3Time.relative(now.addingTimeInterval(-5 * 60), now: now), "5m")
         XCTAssertEqual(T3Time.relative(now.addingTimeInterval(-21 * 3600 - 59), now: now), "21h")
@@ -20,27 +28,35 @@ final class T3HomeTests: XCTestCase {
         XCTAssertEqual(T3Time.relative(now.addingTimeInterval(60), now: now), "<1m")
     }
 
-    func testShelvesPinnedThenWaitingThenRecentAndTheRestByShelf() {
-        let split = T3HomeShelves.split([
-            row(1, ago: 10),
-            row(2, status: .approval, ago: 500),
-            row(3, ago: 900, pinnedAt: Date(timeIntervalSince1970: 1)),
-            row(4, ago: 900, pinnedAt: Date(timeIntervalSince1970: 2), settled: true),
-            row(5, ago: 5, snoozed: true),
-            row(6, ago: 1, settled: true),
-        ])
-        XCTAssertEqual(split.live.map(\.session.pid), [4, 3, 2, 1])
-        XCTAssertEqual(split.snoozed.map(\.session.pid), [5])
-        XCTAssertEqual(split.settled.map(\.session.pid), [6])
+    func testIdentityAndStatusFromFacts() {
+        let t = thread(facts: facts(status: .running, approvals: true, pinnedAt: now))
+        XCTAssertEqual(t.key, "mac-2:7")
+        XCTAssertEqual(t.projectId, "/r/limitless")
+        XCTAssertEqual(t.createdAt, Date(timeIntervalSince1970: 900_000))
+        XCTAssertEqual(t.pinnedAt, now)
+        XCTAssertEqual(T3ThreadStatus(t), .approval)
+        XCTAssertEqual(T3ThreadStatus(thread(facts: facts(status: .running))), .working)
+        XCTAssertEqual(T3ThreadStatus(thread(facts: facts(status: .error))), .failed)
     }
 
-    func testSearchMatchesTitleRepoOrBranch() {
-        let e = T3HomeEntry(session: SessionDetail(pid: 1, cwd: "/x/limitless", status: "idle", kind: "claude", startedAt: 0),
-                            macId: nil, title: "Fix the flicker", repo: "limitless", branch: "t3-c6", macLabel: nil,
-                            status: .ready, pinnedAt: nil, snoozed: false, settled: false, lastActivity: Date())
-        XCTAssertTrue(T3HomeShelves.matches(e, search: "FLICK"))
-        XCTAssertTrue(T3HomeShelves.matches(e, search: "c6"))
-        XCTAssertTrue(T3HomeShelves.matches(e, search: "  "))
-        XCTAssertFalse(T3HomeShelves.matches(e, search: "banyan"))
+    func testEngineWordDecidesWithoutFacts() {
+        XCTAssertEqual(T3ThreadStatus(thread("busy", facts: nil)), .working)
+        XCTAssertEqual(T3ThreadStatus(thread("waiting", facts: nil)), .approval)
+        XCTAssertEqual(T3ThreadStatus(thread("idle", facts: nil)), .ready)
+        XCTAssertNil(thread(facts: nil).settledOverride)
+    }
+
+    func testTimestampSettlementBecomesTheOverride() {
+        XCTAssertEqual(thread(facts: facts(settledAt: now)).settledOverride, .settled)
+        XCTAssertEqual(thread(facts: facts(settledAt: now.addingTimeInterval(-10), unsettledAt: now)).settledOverride, .active)
+        XCTAssertEqual(thread(facts: facts(settledOverride: .active, settledAt: now)).settledOverride, .active)
+        XCTAssertEqual(thread(facts: facts()).settledOverride, .active)
+    }
+
+    func testSnoozeCarriesOverForTheReducer() {
+        let t = thread(facts: facts(snoozedUntil: now.addingTimeInterval(3600)))
+        XCTAssertTrue(T3ThreadSettled.effectiveSnoozed(t, now: now))
+        let raised = thread(facts: facts(approvals: true, snoozedUntil: now.addingTimeInterval(3600)))
+        XCTAssertFalse(T3ThreadSettled.effectiveSnoozed(raised, now: now))
     }
 }
