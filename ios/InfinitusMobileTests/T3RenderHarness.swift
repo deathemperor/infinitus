@@ -96,6 +96,11 @@ import InfinitusUI
 
         > Keying on identity, not state, is the whole fix.
 
+        | PR | State |
+        |---|---|
+        | #360 | open |
+        | #362 | queued |
+
         ---
 
         ### Next

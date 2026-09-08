@@ -15,6 +15,12 @@ final class MarkdownBlocksTests: XCTestCase {
                                 .rule, .rule, .paragraph("text")])
     }
 
+    func testPipeTables() {
+        let blocks = MarkdownText.blocks("| PR | State |\n|---|:---:|\n| #360 | open |\n| #362 | queued |\n\nafter")
+        XCTAssertEqual(blocks, [.table(header: ["PR", "State"], rows: [["#360", "open"], ["#362", "queued"]]), .paragraph("after")])
+        XCTAssertEqual(MarkdownText.blocks("| only |"), [.table(header: ["only"], rows: [])])
+    }
+
     func testDashesInsideAParagraphAreNotARule() {
         XCTAssertEqual(MarkdownText.blocks("a -- b\n--"), [.paragraph("a -- b --")])
     }

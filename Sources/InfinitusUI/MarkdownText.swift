@@ -83,6 +83,7 @@ public struct MarkdownText: View {
         case numbered(String, String)
         case quote(String)
         case rule
+        case table(header: [String], rows: [[String]])
         case paragraph(String)
     }
 
@@ -127,6 +128,11 @@ public struct MarkdownText: View {
             }
         case .rule:
             Rectangle().fill(style?.divider ?? Color.secondary.opacity(0.4)).frame(height: 1)
+        case .table(let header, let rows):
+            Table(header: header, rows: rows, style: style, inline: { text, font, color in
+                if let style { return inline(text, font: font, color: color) }
+                return inline(text).font(font).foregroundStyle(color)
+            })
         case .paragraph(let text):
             if let style {
                 inline(text, font: style.bodyFont, color: style.body)
@@ -187,6 +193,47 @@ public struct MarkdownText: View {
         return Text(attributed).font(font).foregroundStyle(color)
     }
 
+    /// T3's table (`NativeTable`): 160 pt cells in a 8 pt bordered box,
+    /// the header row bold on the code background, hairlines between
+    /// rows and columns, scrolling sideways when wide.
+    private struct Table: View {
+        let header: [String]
+        let rows: [[String]]
+        let style: Style?
+        let inline: (String, Font, Color) -> Text
+        var body: some View {
+            let divider = style?.divider ?? Color.secondary.opacity(0.4)
+            let bodyFont = style?.bodyFont ?? .body
+            let bodyColor = style?.body ?? .primary
+            let columns = max(header.count, rows.map(\.count).max() ?? 0)
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    row(header, columns: columns, divider: divider, font: style?.boldFont ?? .body.bold(),
+                        color: style?.strong ?? .primary)
+                        .background(style?.codeBackground ?? Color.primary.opacity(0.06))
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
+                        Rectangle().fill(divider).frame(height: 1)
+                        row(cells, columns: columns, divider: divider, font: bodyFont, color: bodyColor)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(divider, lineWidth: 1))
+            }
+        }
+
+        private func row(_ cells: [String], columns: Int, divider: Color, font: Font, color: Color) -> some View {
+            HStack(spacing: 0) {
+                ForEach(0..<columns, id: \.self) { i in
+                    if i > 0 { Rectangle().fill(divider).frame(width: 1) }
+                    inline(i < cells.count ? cells[i] : "", font, color)
+                        .frame(width: 160, alignment: .leading)
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     /// T3's fenced block (`NativeCodeBlock`): 10 pt continuous corners, a
     /// hairline border, a 42 pt header with the language in upper-case
     /// mono and a copy button, the code scrolling sideways under 14/12 pt
@@ -237,12 +284,26 @@ public struct MarkdownText: View {
         }
     }
 
+    static func tableCells(_ line: String) -> [String] {
+        var inner = Substring(line)
+        inner = inner.dropFirst()
+        if inner.hasSuffix("|") { inner = inner.dropLast() }
+        return inner.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    static func isSeparatorRow(_ cells: [String]) -> Bool {
+        !cells.isEmpty && cells.allSatisfy { c in
+            c.count >= 3 && c.allSatisfy { $0 == "-" || $0 == ":" } && c.contains("-")
+        }
+    }
+
     /// Line-based block split. Consecutive plain lines join into one
     /// paragraph (soft wraps); a blank line ends it.
     static func blocks(_ text: String) -> [Block] {
         var out: [Block] = []
         var paragraph: [String] = []
         var code: (language: String?, lines: [String])?
+        var tableOpen = false
         func flush() {
             if !paragraph.isEmpty { out.append(.paragraph(paragraph.joined(separator: " "))); paragraph = [] }
         }
@@ -264,7 +325,7 @@ public struct MarkdownText: View {
                 code = (language.isEmpty ? nil : language, [])
                 continue
             }
-            if trimmed.isEmpty { flush(); continue }
+            if trimmed.isEmpty { flush(); tableOpen = false; continue }
             if trimmed.count >= 3, trimmed.allSatisfy({ $0 == "-" }) || trimmed.allSatisfy({ $0 == "*" }) || trimmed.allSatisfy({ $0 == "_" }) {
                 flush(); out.append(.rule); continue
             }
@@ -289,6 +350,15 @@ public struct MarkdownText: View {
                 continue
             }
             if trimmed.hasPrefix("> ") { flush(); out.append(.quote(String(trimmed.dropFirst(2)))); continue }
+            if trimmed.hasPrefix("|"), trimmed.hasSuffix("|") {
+                let cells = tableCells(trimmed)
+                if case .table(let header, var rows)? = out.last, tableOpen, cells.count >= 1 {
+                    if isSeparatorRow(cells), rows.isEmpty { continue }   // the |---|---| line under the header
+                    rows.append(cells); out[out.count - 1] = .table(header: header, rows: rows); continue
+                }
+                flush(); out.append(.table(header: cells, rows: [])); tableOpen = true; continue
+            }
+            tableOpen = false
             paragraph.append(trimmed)
         }
         if let open = code { out.append(.code(language: open.language, open.lines.joined(separator: "\n"))) }
