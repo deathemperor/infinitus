@@ -780,12 +780,7 @@ final class T3TimelineRowsTests: XCTestCase {
     // MARK: - describe("computeStableMessagesTimelineRows")
 
     /// `it("replaces a cached work toggle when its icon presentation changes")`
-    /// Adapted: upstream compares the rich `toolIcon`, which the ported row does
-    /// not carry — and per the brief `isRowUnchanged` deliberately skips
-    /// `summaryToolIcon`, so an icon-only change reuses the previous row. The
-    /// nearest expressible assertion is that rule, plus a real field change
-    /// (the summary) still replacing the cached row.
-    func testStableReplacesACachedWorkToggleWhenARealFieldChanges() {
+    func testStableReplacesACachedWorkToggleWhenItsIconPresentationChanges() {
         let base = T3TimelineRows.Row.workToggle(id: "work-toggle:1", createdAt: at(0), turnId: nil,
                                                  groupId: "work-group:1", hiddenCount: 1, expanded: false,
                                                  summary: "Used Browser", summaryKind: .other,
@@ -796,7 +791,7 @@ final class T3TimelineRowsTests: XCTestCase {
                                    hiddenCount: hidden, expanded: expanded, summary: summary, summaryKind: kind,
                                    toolSurface: surface, summaryToolIcon: .browser, hasFailure: failure)
         }
-        XCTAssertEqual(T3TimelineRows.stable(previous: [base], next: [iconOnly]), [base])
+        XCTAssertEqual(T3TimelineRows.stable(previous: [base], next: [iconOnly]), [iconOnly])
 
         var changed = base
         if case let .workToggle(id, createdAt, turnId, groupId, hidden, expanded, _, kind, surface, icon, failure) = base {

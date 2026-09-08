@@ -38,7 +38,7 @@ actor MirrorExporter {
                 pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
                 profiles: [SessionProfile] = [],
                 // A closure, not a value: T3's project list scans past
-                // sessions and shells out to git per cwd (#T3 clone A) —
+                // sessions and shells out to git per cwd (T3 clone A, #337) —
                 // real work the throttle below must skip, the same
                 // reason `facts` below is a closure too.
                 projects: @Sendable () -> [ProjectSummary] = { [] },

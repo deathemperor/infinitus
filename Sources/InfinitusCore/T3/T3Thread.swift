@@ -3,7 +3,7 @@ import Foundation
 /// T3 Code's thread shell as the settle/snooze rules see it
 /// (`OrchestrationThreadShell` upstream) — the session/turn/snooze fields
 /// `T3ThreadStatus` and `T3ThreadSettled` derive over, nothing more.
-public struct T3Thread: Sendable, Equatable {
+public struct T3Thread: Sendable, Equatable, Identifiable {
     public enum SessionStatus: String, Sendable, CaseIterable { case idle, starting, running, ready, interrupted, stopped, error }
 
     public struct Session: Sendable, Equatable {
@@ -88,4 +88,12 @@ public extension T3Thread {
     /// `threadListV2.ts`'s list key: `${environmentId}:${id}`, used for
     /// order-key/selection/queued-message lookups across the list layer.
     var key: String { "\(environmentId):\(id)" }
+}
+
+extension T3Thread.SessionStatus {
+    public init(_ s: SessionFacts.Status) { self = Self(rawValue: s.rawValue) ?? .idle }
+}
+
+extension T3Thread.Turn.State {
+    public init(_ s: SessionTimeline.Turn.State) { self = Self(rawValue: s.rawValue) ?? .completed }
 }

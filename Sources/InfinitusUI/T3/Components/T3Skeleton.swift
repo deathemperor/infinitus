@@ -2,7 +2,7 @@ import SwiftUI
 import QuartzCore
 
 /// T3's `<Skeleton>` (ui/skeleton.tsx): "rounded-sm bg-muted-foreground/15"
-/// under `animate-skeleton` — the stepped 1 → 0.55 → 1 breath of index.css's
+/// under `animate-skeleton` — the 1 → 0.55 → 1 breath of index.css's
 /// `@keyframes skeleton`, as a CAAnimation so nothing ticks in-process (#18).
 public struct T3Skeleton: View {
     @Environment(\.t3) private var t3

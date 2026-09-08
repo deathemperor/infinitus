@@ -24,6 +24,16 @@ final class T3ThreadSortTests: XCTestCase {
         XCTAssertNil(T3ThreadSort.pinOrderKeyBetween("da", "ff"))      // trailing "a" is corrupt
         XCTAssertNil(T3ThreadSort.pinOrderKeyBetween("d1", nil))       // non-alphabet digit
         XCTAssertEqual(T3ThreadSort.pinOrderKeyBetween("d", "db"), "dan")   // consecutive digits after the shared "d": midpoint("", "b") = "a" + midpoint("", "") = "an"
+        // A stray character never reaches midpoint through the public entry — isValidKey
+        // rejects it first, same as upstream's isValidPinOrderKey — but must not crash either way.
+        XCTAssertNil(T3ThreadSort.pinOrderKeyBetween("a-", "z"))
+        XCTAssertNil(T3ThreadSort.pinOrderKeyBetween("A", "z"))
+        // Direct call to the internal `midpoint`, bypassing isValidKey, exercises the
+        // -1-tolerant arithmetic itself: da = -1 for "-" (not in the digit alphabet).
+        // Upstream: `PIN_ORDER_DIGITS.charAt(-1)` is "" (JS `charAt` on an out-of-range
+        // index), so `pinOrderMidpoint("-", "a")` = "" + `pinOrderMidpoint("", "")` = "n".
+        // The old force-unwrapping code (`digits.firstIndex(of: a.first!)!`) crashed here.
+        XCTAssertEqual(T3ThreadSort.midpoint("-", "a"), "n")
     }
     func testPlanPinnedMoveMaterialisesKeylessSections() {
         let ids = ["e:a", "e:b", "e:c"]
@@ -106,7 +116,7 @@ final class T3ThreadSortTests: XCTestCase {
         ], by: .updatedAt)
         XCTAssertEqual(sorted.map(\.id), ["thread-3", "thread-1", "thread-2"])
     }
-    func testSortThreadsFallsBackToTheLatestValidUserMessageWhenLatestUserMessageAtIsInvalid() {
+    func testSortThreadsPrefersLatestUserMessageAtOverUpdatedAtWhenBothArePresent() {
         let sorted = T3ThreadSort.sortThreads([
             t("thread-1", created: "2026-03-09T10:00:00Z") {
                 $0.updatedAt = self.d("2026-03-09T10:00:00Z")

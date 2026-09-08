@@ -35,7 +35,8 @@ stop() {
         kill "$app" 2>/dev/null || true
     fi
     [ -f "$state/pid" ] && kill "$(cat "$state/pid")" 2>/dev/null || true
-    for k in mirror_lan_enabled popout_shown mock_mode; do
+    for k in mirror_lan_enabled popout_shown mock_mode \
+             migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2 mirror_pair_token; do
         defaults delete "$domain" "$k" >/dev/null 2>&1 || true
     done
     rm -rf "$state"
@@ -76,6 +77,16 @@ identity=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Ap
 defaults write "$domain" mirror_lan_enabled -bool true
 defaults write "$domain" popout_shown -bool true
 defaults write "$domain" mock_mode -bool false   # the fixture IS the session data; mock mode would hide it
+
+# Identity isolation (final review of A): a fresh debug domain would copy
+# the real app's prefs — the LAN pairing token included — via
+# AppModel.migrateLegacyDefaults. Mark every hop done, then give the
+# fixture a throwaway token so it never answers as the real Mac.
+for marker in migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2; do
+    defaults write "$domain" "$marker" -bool true
+done
+defaults write "$domain" mirror_pair_token -string "t3fix-$(uuidgen | tr -d - | cut -c1-16)"
+defaults delete "$domain" team_discoverable >/dev/null 2>&1 || true
 
 INFINITUS_CONTROL_SOCKET=$sock \
 CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR \

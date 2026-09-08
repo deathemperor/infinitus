@@ -24,11 +24,19 @@ public enum T3ThreadSort {
             while n < bc.count, (n < ac.count ? ac[n] : digits[0]) == bc[n] { n += 1 }
             if n > 0 { return String(bc[0..<n]) + midpoint(String(ac.dropFirst(n)), String(bc.dropFirst(n))) }
         }
-        let da = a.isEmpty ? 0 : digits.firstIndex(of: a.first!)!
-        let db = b.isEmpty ? digits.count : digits.firstIndex(of: b.first!)!
-        if db - da > 1 { return String(digits[Int((Double(da + db) / 2).rounded())]) }
+        let da = a.isEmpty ? 0 : (a.first.flatMap { digits.firstIndex(of: $0) } ?? -1)
+        let db = b.isEmpty ? digits.count : (b.first.flatMap { digits.firstIndex(of: $0) } ?? -1)
+        if db - da > 1 { return digitChar(Int((Double(da + db) / 2).rounded())) }
         if b.count > 1 { return String(b.first!) }
-        return String(digits[da]) + midpoint(String(a.dropFirst()), "")
+        return digitChar(da) + midpoint(String(a.dropFirst()), "")
+    }
+
+    /// `PIN_ORDER_DIGITS.charAt(i)` upstream: out-of-range (including the
+    /// `-1` a foreign character's `indexOf` yields) returns "" rather than
+    /// throwing.
+    private static func digitChar(_ i: Int) -> String {
+        guard i >= 0, i < digits.count else { return "" }
+        return String(digits[i])
     }
 
     public static func pinOrderKeyBetween(_ before: String?, _ after: String?) -> String? {

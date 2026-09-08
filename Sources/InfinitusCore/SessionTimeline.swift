@@ -34,7 +34,7 @@ public struct SessionTimeline: Codable, Sendable, Equatable {
 /// app imports ActivityKit, whose `Activity<Attributes>` would collide.
 extension SessionTimeline {
     public struct Turn: Codable, Sendable, Equatable {
-        public enum State: String, Codable, Sendable { case running, interrupted, completed, error }
+        public enum State: String, Codable, Sendable, CaseIterable { case running, interrupted, completed, error }
         public let id: String
         public let state: State
         public let requestedAt: Date

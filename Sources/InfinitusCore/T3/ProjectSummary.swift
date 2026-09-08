@@ -19,7 +19,7 @@ public struct ProjectSummary: Codable, Sendable, Equatable, Identifiable {
 
     /// Stable across restarts and Macs that share a checkout path: FNV-1a
     /// 64 over the standardized path, hex (Swift's `Hasher` is seeded per
-    /// process, and the package does not depend on swift-crypto).
+    /// process; no crypto in the id path).
     public static func projectId(cwd: String) -> String {
         var h: UInt64 = 0xcbf29ce484222325
         for b in standardize(cwd).utf8 { h ^= UInt64(b); h &*= 0x100000001b3 }
