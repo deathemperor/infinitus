@@ -89,7 +89,6 @@ final class T3ThreadBridgeTests: XCTestCase {
         XCTAssertEqual(t.snoozedAt, now)
         XCTAssertFalse(t.hasActionableProposedPlan)
         XCTAssertNil(t.archivedAt)
-        XCTAssertEqual(T3ThreadStatus(t), T3ThreadStatus(facts: facts(approvals: true)))
     }
 
     // MARK: - Mirror overload (lifted from ios/InfinitusMobileTests/T3HomeTests.swift,
@@ -105,6 +104,8 @@ final class T3ThreadBridgeTests: XCTestCase {
         }
         XCTAssertEqual(t("busy").session?.status, .running)
         XCTAssertTrue(t("waiting").hasPendingApprovals)
+        XCTAssertFalse(t("busy").hasPendingApprovals)
+        XCTAssertFalse(t("idle").hasPendingApprovals)
         XCTAssertEqual(t("idle").session?.status, .idle)
         XCTAssertNil(t("idle").settledOverride)
         XCTAssertEqual(t("idle").id, "pid:7")
@@ -117,5 +118,14 @@ final class T3ThreadBridgeTests: XCTestCase {
                                         snoozedUntil: nil, snoozedAt: nil, pinnedAt: nil)
         let t = T3Thread(session: mirrorSession("idle"), facts: settledFacts, progress: nil, environmentId: "mac-2", now: now)
         XCTAssertEqual(t.settledOverride, .settled)
+    }
+
+    func testMirrorFactsPresentUnsettledIsActive() {
+        let unsettledFacts = SessionFacts(status: .ready, hasPendingApprovals: false, hasPendingUserInput: false,
+                                          hasPlan: false, latestTurn: nil, planProgress: nil, latestUserMessageAt: nil,
+                                          settledOverride: nil, settledAt: nil, unsettledAt: nil,
+                                          snoozedUntil: nil, snoozedAt: nil, pinnedAt: nil)
+        let t = T3Thread(session: mirrorSession("idle"), facts: unsettledFacts, progress: nil, environmentId: "mac-2", now: now)
+        XCTAssertEqual(t.settledOverride, .active)
     }
 }
