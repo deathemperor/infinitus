@@ -145,7 +145,7 @@ struct T3ThreadScreen: View {
         // A PhotosPicker inside a Menu never presents (the menu dismisses
         // first) — same modifier pattern as the feed's composer.
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems,
-                      maxSelectionCount: ComposerAttachments.capCount, matching: .images)
+                      maxSelectionCount: ComposerAttachments.capCount, matching: .any(of: [.images, .videos]))
         .onChange(of: photoPickerItems) { _, items in
             guard !items.isEmpty else { return }
             Task { await addPickedPhotos(items) }
@@ -402,9 +402,15 @@ struct T3ThreadScreen: View {
                         Group {
                             if let thumbnail = attachment.thumbnail {
                                 Image(uiImage: thumbnail).resizable().scaledToFill()
+                                    .overlay {
+                                        if attachment.mime.hasPrefix("video/") {
+                                            Image(systemName: "play.circle.fill").font(.system(size: 18))
+                                                .foregroundStyle(.white, .black.opacity(0.5))
+                                        }
+                                    }
                             } else {
                                 VStack(spacing: 2) {
-                                    Image(systemName: "doc.fill").font(.system(size: 18))
+                                    Image(systemName: attachment.mime.hasPrefix("video/") ? "video.fill" : "doc.fill").font(.system(size: 18))
                                         .foregroundStyle(t3.mobile.iconMuted.color)
                                     Text(attachment.name).font(T3Font.mobile(.xxxs)).lineLimit(1)
                                         .foregroundStyle(t3.mobile.foreground.color)
@@ -464,7 +470,11 @@ struct T3ThreadScreen: View {
 
     private func addPickedPhotos(_ items: [PhotosPickerItem]) async {
         for item in items {
-            stage(ComposerAttachments.photo(try? await item.loadTransferable(type: Data.self)))
+            if PickedVideo.isVideo(item) {
+                stage(ComposerAttachments.video(await PickedVideo.load(item)))
+            } else {
+                stage(ComposerAttachments.photo(try? await item.loadTransferable(type: Data.self)))
+            }
         }
         photoPickerItems = []
     }

@@ -20,6 +20,7 @@ publishes the matching section as the GitHub release body.
 - The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
 
 ### Phone
+- A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).
 - The new thread folds a finished turn's work behind "Worked for …", groups tool calls with a summary that opens in place, and labels each call the way the reference does (#223).
 - The new session screens are on by default — Home list, thread, task sheet and settings sheet; the Appearance toggle brings the previous list and feed back (#223).
 - Home orders threads as the reference does — pinned in saved order, then newest first, snoozed and settled shelves — and each row's swipes come from its state (#223).
