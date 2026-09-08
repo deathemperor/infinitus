@@ -1,4 +1,6 @@
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 import InfinitusCore
 import InfinitusUI
 
@@ -18,6 +20,11 @@ struct T3ThreadScreen: View {
     @State private var composerFocused = false
     @State private var sending = false
     @State private var note: String?
+    @State private var attachments: [ComposerAttachment] = []
+    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showPhotoPicker = false
+    @State private var showFileImporter = false
+    @State private var showCamera = false
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
         self.model = model
@@ -111,7 +118,33 @@ struct T3ThreadScreen: View {
         .toolbar(.hidden, for: .tabBar)
         .onAppear { follower.start() }
         .onDisappear { follower.stop() }
+        // A PhotosPicker inside a Menu never presents (the menu dismisses
+        // first) — same modifier pattern as the feed's composer.
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems,
+                      maxSelectionCount: ComposerAttachments.capCount, matching: .images)
+        .onChange(of: photoPickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await addPickedPhotos(items) }
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: Self.allowedFileTypes,
+                      allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            for url in urls {
+                guard url.startAccessingSecurityScopedResource() else { continue }
+                defer { url.stopAccessingSecurityScopedResource() }
+                guard let data = try? Data(contentsOf: url) else { note = "couldn't read \(url.lastPathComponent)"; continue }
+                stage(ComposerAttachments.file(named: url.lastPathComponent, data: data))
+            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraCapture { image in stage(ComposerAttachments.image(image, prefix: "camera")) }
+                .ignoresSafeArea()
+        }
     }
+
+    private static let allowedFileTypes: [UTType] = [
+        .png, .jpeg, .heic, .gif, .pdf, .plainText, UTType(mimeType: "image/webp"),
+    ].compactMap { $0 }
 
     private var title: String {
         let p = model.progress(macId: macId, pid: session.pid)
@@ -151,23 +184,38 @@ struct T3ThreadScreen: View {
         .overlay(Capsule().stroke(t3.mobile.border.color, lineWidth: 1))
     }
 
-    // MARK: composer (T3 `ThreadComposer.tsx`, collapsed capsule)
+    // MARK: composer (T3 `ThreadComposer.tsx`)
+
+    /// Collapsed: one capsule row — attach, the single-line editor, send.
+    /// Expanded (focused): the strip above a taller editor, the buttons
+    /// on a row beneath, T3's 14 pt inset.
+    private var expanded: Bool { composerFocused }
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .bottom, spacing: 6) {
-                // Attachments come with the composer port; the button
-                // holds T3's slot.
-                Image(systemName: "plus").font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(t3.mobile.iconMuted.color)
-                    .frame(width: 36, height: 36)
-                PasteableTextView(text: $draft, isFocused: $composerFocused,
-                                  placeholder: "Ask the repo agent, or run a command…") { _ in }
-                    .frame(minHeight: 36, maxHeight: 160)
-                    .fixedSize(horizontal: false, vertical: true)
-                sendButton
+            Group {
+                if expanded {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !attachments.isEmpty { attachmentStrip.padding(.horizontal, 14).padding(.bottom, 10) }
+                        editor.padding(.horizontal, 14)
+                        HStack(spacing: 4) {
+                            attachButton
+                            Spacer(minLength: 0)
+                            sendButton
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.vertical, 6)
+                } else {
+                    HStack(spacing: 4) {
+                        attachButton
+                        if !attachments.isEmpty { attachmentCount }
+                        editor.padding(.horizontal, 4)
+                        sendButton
+                    }
+                    .padding(6)
+                }
             }
-            .padding(6)
             .background(t3.mobile.input.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(t3.mobile.inputBorder.color, lineWidth: 1))
             .shadow(color: t3.mobile.drawerShadow.color, radius: 14, y: 6)
@@ -176,14 +224,105 @@ struct T3ThreadScreen: View {
                     .padding(.leading, 14)
             }
         }
+        .animation(.easeOut(duration: 0.18), value: expanded)
     }
 
-    private var canSend: Bool { !sending && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var editor: some View {
+        PasteableTextView(text: $draft, isFocused: $composerFocused,
+                          placeholder: "Ask the repo agent, or run a command…") { image in
+            stage(ComposerAttachments.image(image, prefix: "pasted"))
+        }
+        .frame(minHeight: expanded ? 72 : 36, maxHeight: expanded ? 160 : 36)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// T3's `ComposerAttachmentButton`: `plus` in a 44 pt round hit
+    /// target, a menu of sources. Camera and paste are the phone's own
+    /// (user 2026-09-03), kept alongside T3's two.
+    private var attachButton: some View {
+        Menu {
+            Button { showPhotoPicker = true } label: { Label("Photo Library", systemImage: "photo") }
+            if CameraCapture.isAvailable {
+                Button { showCamera = true } label: { Label("Take Photo", systemImage: "camera") }
+            }
+            Button { showFileImporter = true } label: { Label("Choose Files", systemImage: "folder") }
+            if UIPasteboard.general.hasImages {
+                Button {
+                    guard let image = UIPasteboard.general.image else { note = "nothing to paste"; return }
+                    stage(ComposerAttachments.image(image, prefix: "pasted"))
+                } label: { Label("Paste Image", systemImage: "doc.on.clipboard") }
+            }
+        } label: {
+            Image(systemName: "plus").font(.system(size: 20, weight: .medium))
+                .foregroundStyle(t3.mobile.icon.color)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
+        .disabled(sending || attachments.count >= ComposerAttachments.capCount)
+        .accessibilityLabel("Attach")
+    }
+
+    /// Collapsed rows show the count in a 30 pt square, not the strip.
+    private var attachmentCount: some View {
+        Text("\(attachments.count)")
+            .font(T3Font.mobile(.xxxs, .bold))
+            .foregroundStyle(t3.mobile.foregroundMuted.color)
+            .frame(width: 30, height: 30)
+            .background(t3.mobile.subtleStrong.color, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    /// T3's `ComposerAttachmentStrip`: 64 pt tiles, r12, a 22 pt remove
+    /// button over the top-right corner.
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(attachments) { attachment in
+                    ZStack(alignment: .topTrailing) {
+                        Group {
+                            if let thumbnail = attachment.thumbnail {
+                                Image(uiImage: thumbnail).resizable().scaledToFill()
+                            } else {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "doc.fill").font(.system(size: 18))
+                                        .foregroundStyle(t3.mobile.iconMuted.color)
+                                    Text(attachment.name).font(T3Font.mobile(.xxxs)).lineLimit(1)
+                                        .foregroundStyle(t3.mobile.foreground.color)
+                                }
+                                .padding(.horizontal, 4)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .background(t3.mobile.subtle.color)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        Button { attachments.removeAll { $0.id == attachment.id } } label: {
+                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 22, height: 22)
+                                .background(Color.black.opacity(0.55), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 4, y: -4)
+                        .accessibilityLabel("Remove \(attachment.name)")
+                    }
+                }
+            }
+            .padding(.top, 4).padding(.trailing, 4)
+        }
+    }
+
+    private var canSend: Bool {
+        !sending && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty)
+    }
 
     private var sendButton: some View {
         Button {
             let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            send(.init(kind: .message, text: text)) { draft = "" }
+            let picked = attachments.map(\.wire)
+            send(.init(kind: .message, text: text, attachments: picked.isEmpty ? nil : picked,
+                       requestId: UUID().uuidString)) {
+                draft = ""
+                attachments = []
+            }
         } label: {
             Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
                 .foregroundStyle(t3.mobile.primaryForeground.color)
@@ -194,6 +333,21 @@ struct T3ThreadScreen: View {
         .disabled(!canSend)
     }
 
+    private func stage(_ staged: Result<ComposerAttachment, ComposerAttachments.Failure>) {
+        guard attachments.count < ComposerAttachments.capCount else { note = ComposerAttachments.Failure.full.message; return }
+        switch staged {
+        case .success(let attachment): attachments.append(attachment); note = nil
+        case .failure(let failure): note = failure.message
+        }
+    }
+
+    private func addPickedPhotos(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            stage(ComposerAttachments.photo(try? await item.loadTransferable(type: Data.self)))
+        }
+        photoPickerItems = []
+    }
+
     private func send(_ request: SessionInput.Request, delivered: @escaping () -> Void = {}) {
         sending = true
         note = nil
@@ -201,7 +355,13 @@ struct T3ThreadScreen: View {
             defer { sending = false }
             do {
                 let reply = try await model.mirror(for: macId).sessionInput(pid: Int32(session.pid), request: request)
-                if reply.outcome == "delivered" { delivered() } else { note = reply.detail ?? reply.outcome }
+                if reply.outcome == "delivered" {
+                    delivered()
+                } else if reply.outcome == "rejected", reply.detail == "session ended" {
+                    note = "that session has ended"
+                } else {
+                    note = SessionFeedScreen.describe(reply.outcome)
+                }
             } catch {
                 note = "couldn't reach the Mac"
             }

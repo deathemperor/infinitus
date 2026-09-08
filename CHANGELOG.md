@@ -48,6 +48,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - Settings › Appearance › "T3 screens" (off by default) opens a session as a T3 Code-style thread over the live timeline route (#223).
+- The T3 thread's composer attaches photos, camera shots, files and pasted images, and grows when focused (#223).
 - A send the phone retries lands once: the Mac answers the retry with the first reply, and a turn you stopped keeps its late input out (#223).
 - Swipe a session to pin it, settle it or snooze it an hour (long-press for "until tomorrow"); pinned rows lead, snoozed and settled ones sit dimmed at the tail (#223).
 - Session rows take their dot and word from the host's facts — a raised hand for an approval, a question mark for a prompt, the plan's "2 of 5" under the row — and the chat header gets a stop button while Claude works (#223).

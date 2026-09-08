@@ -1300,7 +1300,7 @@ struct SessionFeedScreen: View {
         await load()
     }
 
-    private static func describe(_ outcome: String) -> String {
+    static func describe(_ outcome: String) -> String {
         switch outcome {
         case "running": return "session is mid-turn — try again when it's waiting"
         case "noSurface": return "this session has nowhere to receive input right now"
