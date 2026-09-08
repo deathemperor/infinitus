@@ -134,15 +134,13 @@ public struct T3ChatMessage: Sendable, Equatable, Hashable, Identifiable {
         self.streaming = streaming; self.createdAt = createdAt; self.updatedAt = updatedAt
     }
 
-    /// Documented divergence: `SessionTimeline.Message` carries no `updatedAt`,
-    /// so `updatedAt` is the message's own `createdAt`. A turn fold measured
-    /// from timestamps therefore ends at the terminal assistant message's start
-    /// rather than its last token.
+    /// `updatedAt` is the message's last streamed block (Task B-1); a turn
+    /// fold measured from timestamps ends at the reply's last token.
     public init(message m: SessionTimeline.Message) {
         let turn = m.turnId.isEmpty ? nil : m.turnId
         self.init(id: m.id, role: m.role == .user ? .user : .assistant, text: m.text,
                   turnId: m.role == .user ? nil : turn, streaming: m.streaming,
-                  createdAt: m.createdAt, updatedAt: m.createdAt)
+                  createdAt: m.createdAt, updatedAt: m.updatedAt)
     }
 }
 

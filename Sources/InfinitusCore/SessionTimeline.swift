@@ -60,10 +60,28 @@ extension SessionTimeline {
         public let turnId: String
         public let streaming: Bool
         public let createdAt: Date
+        /// Last streamed block's time (T3 `updatedAt`); equals `createdAt`
+        /// for user messages and single-block replies.
+        public let updatedAt: Date
         public init(id: String, role: Role, text: String, images: [String]?, sender: String?,
-                    turnId: String, streaming: Bool, createdAt: Date) {
+                    turnId: String, streaming: Bool, createdAt: Date, updatedAt: Date? = nil) {
             self.id = id; self.role = role; self.text = text; self.images = images; self.sender = sender
             self.turnId = turnId; self.streaming = streaming; self.createdAt = createdAt
+            self.updatedAt = updatedAt ?? createdAt
+        }
+
+        enum CodingKeys: String, CodingKey { case id, role, text, images, sender, turnId, streaming, createdAt, updatedAt }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            role = try c.decode(Role.self, forKey: .role)
+            text = try c.decode(String.self, forKey: .text)
+            images = try c.decodeIfPresent([String].self, forKey: .images)
+            sender = try c.decodeIfPresent(String.self, forKey: .sender)
+            turnId = try c.decode(String.self, forKey: .turnId)
+            streaming = try c.decode(Bool.self, forKey: .streaming)
+            createdAt = try c.decode(Date.self, forKey: .createdAt)
+            updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         }
     }
 
