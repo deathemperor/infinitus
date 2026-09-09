@@ -45,15 +45,21 @@ public enum T3ComposerTrigger: Sendable {
         unit == 0x20 || unit == 0x0A || unit == 0x09 || unit == 0x0D
     }
 
-    /// `\S` in `^\/(\S*)$` (`:60`) — the regex class, which also excludes the
-    /// vertical tab, the form feed and a non-breaking space.
+    /// `\S` in `^\/(\S*)$` (`:60`) — JavaScript's `\s`, which is wider than the
+    /// token scan's four: the vertical tab and form feed, plus every Unicode
+    /// space separator and the BOM. A pasted ideographic space (U+3000, what a
+    /// CJK keyboard's space bar sends) closes the command menu just as a plain
+    /// one does.
     private static func isRegexWhitespace(_ unit: UInt16) -> Bool {
-        isTokenBoundary(unit) || unit == 0x0B || unit == 0x0C || unit == 0xA0
+        switch unit {
+        case 0x0B, 0x0C, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF: return true
+        case 0x2000...0x200A: return true
+        default: return isTokenBoundary(unit)
+        }
     }
 
     private static let slash: UInt16 = 0x2F
     private static let at: UInt16 = 0x40
-    private static let dollar: UInt16 = 0x24
     private static let newline: UInt16 = 0x0A
 
     public static func detect(text: String, caret: Int) -> Detected? {
@@ -86,7 +92,7 @@ public enum T3ComposerTrigger: Sendable {
         guard tokenStart < cursor else { return nil }
         // Anything but `@` is literal text — including `$`, upstream's skill
         // trigger (`:98-105`), which this port does not offer.
-        guard units[tokenStart] != dollar, units[tokenStart] == at else { return nil }
+        guard units[tokenStart] == at else { return nil }
         return detected(.mention, query: units[(tokenStart + 1)..<cursor],
                         start: tokenStart, end: cursor, in: text)
     }

@@ -48,7 +48,7 @@ struct T3ComposerMenu: View {
     let onPick: (T3ComposerMenuItem) -> Void
     @Environment(\.t3) private var t3
 
-    /// `CommandItem` `px-3 py-2` on a `text-xs` line over a 16 pt icon
+    /// `CommandItem` `px-3 py-2` on a `text-xs` line over a 14 pt icon
     /// (`:152`, `:172`): every row is one line, so the height is fixed and the
     /// list needs no measurement pass.
     private static let rowHeight: Double = 32
@@ -87,6 +87,10 @@ struct T3ComposerMenu: View {
                 VStack(spacing: 0) {
                     ForEach(items) { row($0) }
                 }
+                // `not-empty:p-2` is on the scrolling element itself
+                // (`ui/command.tsx:131`), so it insets the rows INSIDE the box
+                // `max-h-72` caps — it is not a margin around it.
+                .padding(Self.listPadding)
             }
             .frame(height: min(Self.maxListHeight,
                                Double(items.count) * Self.rowHeight + Self.listPadding * 2))
@@ -98,7 +102,6 @@ struct T3ComposerMenu: View {
                 proxy.scrollTo(id, anchor: nil)
             }
         }
-        .padding(Self.listPadding)
     }
 
     private func row(_ item: T3ComposerMenuItem) -> some View {

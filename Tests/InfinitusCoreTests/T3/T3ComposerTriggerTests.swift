@@ -47,6 +47,13 @@ final class T3ComposerTriggerTests: XCTestCase {
         XCTAssertNil(T3ComposerTrigger.detect(text: "/review this", caret: 12))
     }
 
+    /// `\S` is JavaScript's class, not four ASCII characters: an ideographic
+    /// space is whitespace, so the line is no longer a lone command.
+    func testAWideUnicodeSpaceAfterTheCommandClosesTheMenu() {
+        let text = "/review\u{3000}more"
+        XCTAssertNil(T3ComposerTrigger.detect(text: text, caret: text.utf16.count))
+    }
+
     // MARK: - The `@` mention trigger (token-anchored, `:90-115`)
 
     func testAtAfterWhitespaceOpensTheMentionMenu() {

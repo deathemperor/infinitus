@@ -89,8 +89,18 @@ struct T3ComposerView: View {
     @State private var dismissed: String?
     /// The open menu's measured height (`T3ComposerMenuHeightKey`).
     @State private var menuHeight: Double = 0
+    /// True while `SlashCommands.discover` is reading the command files and no
+    /// cached rows stand in — upstream's `isLoading` (`:114`).
+    @State private var commandLoading = false
+    /// The rank in flight, so the next keystroke can abandon it.
+    @State private var rankTask: Task<Void, Never>?
 
     var body: some View {
+        // One detection per body pass: `detect` copies the text's UTF-16, and
+        // the menu, both `onChange`s and the dismissal's lapse all want the
+        // same answer for this (text, caret).
+        let raw = rawTrigger
+        let trigger = raw.flatMap { Self.dismissKey($0) == dismissed ? nil : $0 }
         // `ComposerSurface.Main` (`ComposerSurface.tsx:67`): `rounded-[22px]
         // p-px` over the inner surface's `rounded-[20px]` (`:4959`).
         VStack(spacing: 0) {
@@ -125,14 +135,19 @@ struct T3ComposerView: View {
         // `ComposerBanner.Surface` sits in. Anchoring to the caret's own line
         // is out of scope (the field would have to report its layout).
         .overlay(alignment: .topLeading) {
-            if trigger != nil {
-                T3ComposerMenu(items: menuItems, activeID: activeItemID, emptyText: menuEmptyText,
+            if let trigger {
+                let items = menuItems(trigger)
+                T3ComposerMenu(items: items, activeID: activeItemID(items, trigger),
+                               emptyText: menuEmptyText(trigger),
                                onHighlight: highlight, onPick: pick)
                     // Lifted by its own measured height: an alignment guide
                     // cannot push an overlay outside its container (it lands on
                     // the field instead — seen on the fixture).
                     .offset(y: -menuHeight)
                     .opacity(menuHeight > 0 ? 1 : 0)
+                    // Until it is measured it sits ON the card, where it would
+                    // eat the field's own clicks.
+                    .allowsHitTesting(menuHeight > 0)
                     .onPreferenceChange(T3ComposerMenuHeightKey.self) { menuHeight = $0 }
             }
         }
@@ -187,7 +202,7 @@ struct T3ComposerView: View {
         // is on another one (or on none — a send empties the field) it lapses.
         // Keyed on the raw detection, or clearing it would reopen the menu ⎋
         // just closed.
-        .onChange(of: rawTrigger.map(Self.dismissKey)) { _, key in
+        .onChange(of: raw.map(Self.dismissKey)) { _, key in
             if key != dismissed { dismissed = nil }
         }
         .onChange(of: store.threadId) { _, _ in
@@ -626,8 +641,7 @@ struct T3ComposerView: View {
     /// `/name` over its description (`:1972-1973`). Ours are Claude Code's own
     /// commands and skills, both invoked as `/name` — upstream's `/skill:`
     /// prefix (`:1983`) would misstate what the row inserts.
-    private var menuItems: [T3ComposerMenuItem] {
-        guard let trigger else { return [] }
+    private func menuItems(_ trigger: T3ComposerTrigger.Detected) -> [T3ComposerMenuItem] {
         switch trigger.kind {
         case .command:
             return SlashCommands.filter(commands, query: trigger.query)
@@ -645,17 +659,22 @@ struct T3ComposerView: View {
     }
 
     /// `resolveComposerMenuActiveItemId` (`composerMenuHighlight.ts`).
-    private var activeItemID: String? {
-        T3ComposerMenuHighlight.resolve(itemIDs: menuItems.map(\.id), highlighted: highlighted,
-                                        currentKey: trigger?.searchKey, highlightedKey: highlightedKey)
+    private func activeItemID(_ items: [T3ComposerMenuItem],
+                             _ trigger: T3ComposerTrigger.Detected) -> String? {
+        T3ComposerMenuHighlight.resolve(itemIDs: items.map(\.id), highlighted: highlighted,
+                                        currentKey: trigger.searchKey, highlightedKey: highlightedKey)
     }
 
-    /// `ComposerCommandMenu.tsx:117-125`.
-    private var menuEmptyText: String {
-        switch trigger?.kind {
-        case .command: return "No matching command."
-        case .mention: return mentionLoading ? "Searching workspace files..." : "No matching files or folders."
-        case nil: return ""
+    /// `ComposerCommandMenu.tsx:113-127`: `isLoading` wins over the empty
+    /// copy. Upstream's loading line names files because only its path and
+    /// skill triggers search; ours reads command files off disk too, so that
+    /// menu says so instead of claiming to search files.
+    private func menuEmptyText(_ trigger: T3ComposerTrigger.Detected) -> String {
+        switch trigger.kind {
+        case .command:
+            return commandLoading ? "Searching workspace commands..." : "No matching command."
+        case .mention:
+            return mentionLoading ? "Searching workspace files..." : "No matching files or folders."
         }
     }
 
@@ -666,14 +685,20 @@ struct T3ComposerView: View {
     private func openMenu(_ kind: T3ComposerTrigger.Kind?) {
         highlighted = nil
         highlightedKey = nil
+        // The overlay leaves the tree with its trigger, and a removed view
+        // reports no preference — without this a later open would render one
+        // frame lifted by the last menu's height.
+        if kind == nil { menuHeight = 0 }
         guard let kind, let cwd else { return }
         switch kind {
         case .command:
             commands = model.cachedSlashCommands(cwd: cwd)
+            commandLoading = commands.isEmpty
             Task {
                 let discovered = await model.slashCommands(cwd: cwd)
                 guard self.cwd == cwd, trigger?.kind == .command else { return }
                 commands = discovered
+                commandLoading = false
             }
         case .mention:
             if mentionCwd != cwd { mentionRows = [] }
@@ -695,9 +720,15 @@ struct T3ComposerView: View {
     private func rankMentions() {
         guard let cwd, let trigger, trigger.kind == .mention else { return }
         let query = trigger.query
-        Task {
+        // One rank in flight: the next keystroke abandons the previous query's
+        // before asking for its own, so on a 20 000-path checkout a stale rank
+        // can no longer land after the newest one. (The detached scan itself
+        // runs to its end — `rank` is a pure function — but a cancelled task
+        // never publishes its rows.)
+        rankTask?.cancel()
+        rankTask = Task {
             let rows = await model.mentionRows(cwd: cwd, query: query)
-            guard self.cwd == cwd, let current = self.trigger,
+            guard !Task.isCancelled, self.cwd == cwd, let current = self.trigger,
                   current.kind == .mention, current.query == query else { return }
             mentionRows = rows
             mentionCwd = cwd
@@ -720,16 +751,19 @@ struct T3ComposerView: View {
             // Upstream nudges from the STORED highlight, which its sync effect
             // (`:2298-2320`) has already set to the resolved active row; this
             // port resolves on read instead, so the nudge starts there.
-            guard !menuItems.isEmpty else { return false }
-            highlighted = T3ComposerMenuHighlight.nudge(itemIDs: menuItems.map(\.id),
-                                                        highlighted: activeItemID,
+            let items = menuItems(trigger)
+            guard !items.isEmpty else { return false }
+            highlighted = T3ComposerMenuHighlight.nudge(itemIDs: items.map(\.id),
+                                                        highlighted: activeItemID(items, trigger),
                                                         direction: key == .down ? 1 : -1)
             highlightedKey = trigger.searchKey
             return true
         case .pick:
             // `(key === "Enter" || key === "Tab") && selectedItem` (`:3104`):
             // with nothing to pick, ⏎ sends the prompt as upstream does.
-            guard let item = menuItems.first(where: { $0.id == activeItemID }) else { return false }
+            let items = menuItems(trigger)
+            guard let active = activeItemID(items, trigger),
+                  let item = items.first(where: { $0.id == active }) else { return false }
             pick(item)
             return true
         case .dismiss:
