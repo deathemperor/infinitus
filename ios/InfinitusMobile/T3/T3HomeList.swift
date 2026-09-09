@@ -331,7 +331,7 @@ struct T3HomeBody: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.sessionLabel ?? "Profile \(item.profile)").font(T3Font.mobile(.base, .medium))
                         .foregroundStyle(t3.mobile.foreground.color).lineLimit(1)
-                    Text("Needs AWS login · profile \(item.profile) · \(SessionsScreen.awsPhase(item))")
+                    Text("\(item.needLabel) · \(item.subjectLabel) · \(SessionsScreen.awsPhase(item))")
                         .font(T3Font.mobile(.xs)).foregroundStyle(t3.mobile.foregroundMuted.color).lineLimit(1)
                 }
                 Spacer(minLength: 8)

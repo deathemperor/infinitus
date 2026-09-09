@@ -174,14 +174,14 @@ struct SessionsScreen: View {
             // (user 2026-09-03 "not seeing session with aws
             // login button"): one row per login the Mac reports,
             // pid-less ones included.
-            Section("Needs AWS login") {
+            Section(Set(model.awsLogins.map(\.providerOrAws)).count == 1 ? model.awsLogins[0].needLabel : "Needs login") {
                 ForEach(model.awsLogins) { item in
                     Button { awsLoginItem = item } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "key.fill").foregroundStyle(.orange)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.sessionLabel ?? "Profile \(item.profile)").font(.headline)
-                                Text("profile \(item.profile) · \(Self.awsPhase(item))")
+                                Text("\(item.subjectLabel) · \(Self.awsPhase(item))")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -350,9 +350,9 @@ struct SessionsScreen: View {
                 HStack {
                     // "Infinitus · limitless": the session's name and its
                     // repo (user 2026-09-03 "show repo too").
-                    if model.awsLogin(macId: macId, pid: session.pid) != nil {
+                    if let need = model.awsLogin(macId: macId, pid: session.pid) {
                         Image(systemName: "key.fill").foregroundStyle(.orange)
-                            .accessibilityLabel("needs AWS login")
+                            .accessibilityLabel(need.needLabel.lowercased())
                     }
                     // The row wears the theme like the chat header does
                     // (user 2026-09-05: "sessions list to honor colors

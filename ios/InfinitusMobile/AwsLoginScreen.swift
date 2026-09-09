@@ -60,7 +60,7 @@ final class AwsLoginFlow: ObservableObject {
         Task {
             // Explicit true/false: the Mac replaces a run of the other
             // kind on it; the flag-less poll below only reports.
-            await post(AwsLogin.StartRequest(profile: profile, pid: item.pid, remote: remote))
+            await post(AwsLogin.StartRequest(profile: profile, pid: item.pid, remote: remote, provider: item.provider))
             busy = false
             startPolling()
         }
@@ -80,7 +80,7 @@ final class AwsLoginFlow: ObservableObject {
         }
         busy = true
         Task {
-            await post(AwsLogin.CodeRequest(profile: profile, code: code))
+            await post(AwsLogin.CodeRequest(profile: profile, code: code, provider: item.provider))
             busy = false
         }
     }
@@ -113,7 +113,7 @@ final class AwsLoginFlow: ObservableObject {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard let self, !self.finished else { return }
                 if let reply = try? await mirror.awsLoginStart(
-                    AwsLogin.StartRequest(profile: self.profile, pid: self.item.pid)) {
+                    AwsLogin.StartRequest(profile: self.profile, pid: self.item.pid, provider: self.item.provider)) {
                     self.apply(reply)
                 }
             }
@@ -136,7 +136,7 @@ struct AwsLoginScreen: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("AWS login · \(flow.profile)")
+                .navigationTitle("\(provider.loginLabel) · \(flow.profile)")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -164,14 +164,14 @@ struct AwsLoginScreen: View {
             // Not started, or the CLI hasn't printed its URL yet.
             VStack(spacing: 16) {
                 if let label = flow.item.sessionLabel {
-                    Text("Session **\(label)** is stuck on an expired AWS session for profile **\(flow.profile)**.")
+                    Text("Session **\(label)** is stuck on expired \(provider == .aws ? "AWS" : "gcloud") credentials for **\(flow.item.subjectLabel)**.")
                         .multilineTextAlignment(.center)
                 } else {
-                    Text("Profile **\(flow.profile)** needs a fresh AWS login.")
+                    Text("**\(flow.item.subjectLabel.prefix(1).uppercased() + flow.item.subjectLabel.dropFirst())** needs a fresh \(provider.loginLabel).")
                 }
-                accountRows
+                if provider == .aws { accountRows }
                 if state != nil || flow.busy {
-                    ProgressView("Starting `aws login` on the Mac…")
+                    ProgressView("Starting `\(provider == .aws ? "aws login" : "gcloud auth login")` on the Mac…")
                 } else {
                     Button("Sign in from this phone") { flow.start() }
                         .buttonStyle(.borderedProminent)
@@ -200,11 +200,15 @@ struct AwsLoginScreen: View {
         }
     }
 
+    private var provider: AwsLogin.Provider { flow.item.providerOrAws }
+
     private var flowBlurb: String {
         switch flow.item.flow {
         case .deviceCode: return "You'll get a short code to enter on the AWS page."
         case .relay, .local, .remote:
-            return "The AWS page opens in Safari (passkeys work there); it ends with a code to paste back here."
+            return provider == .aws
+                ? "The AWS page opens in Safari (passkeys work there); it ends with a code to paste back here."
+                : "Google's sign-in page opens in Safari; it ends with a code to paste back here."
         }
     }
 
@@ -314,7 +318,7 @@ struct AwsLoginScreen: View {
     private func deviceCodeView(state: AwsLogin.State, url: URL) -> some View {
         VStack(spacing: 18) {
             accountRows
-            Text("Enter this code on the AWS page:")
+            Text("Enter this code on the sign-in page:")
             Text(state.userCode ?? "…")
                 .font(.system(.largeTitle, design: .monospaced).bold())
                 .textSelection(.enabled)
