@@ -53,6 +53,12 @@ final class MachineModel: ObservableObject {
     private var lastTempCount: Int?
     private var lastTempByOwner: [String: Int]?
     private var lastTempListSeconds: Double = 0
+    /// Persisted with their time: the tree sizes are display-only and
+    /// hourly by design, and the walk (240k files) was most of every
+    /// relaunch's launch tail (#346) — a relaunch inside the hour
+    /// reuses the last figures instead.
+    private static let sizesKey = "machine_tree_sizes"
+    private static let sizesAtKey = "machine_tree_sizes_at"
     private var lastSizesAt: Date?
     private var lastSizes: (transcripts: Int, pluginCache: Int, mem: Int) = (0, 0, 0)
     private var pushedWarnings = Set<String>()
@@ -72,6 +78,11 @@ final class MachineModel: ObservableObject {
         enabled = UserDefaults.standard.object(forKey: "machine_guardian") as? Bool ?? true
         notifyHooks = UserDefaults.standard.object(forKey: "machine_notify_hooks") as? Bool ?? true
         notifyTemp = UserDefaults.standard.object(forKey: "machine_notify_temp") as? Bool ?? true
+        if let at = UserDefaults.standard.object(forKey: Self.sizesAtKey) as? Double,
+           let sizes = UserDefaults.standard.array(forKey: Self.sizesKey) as? [Int], sizes.count == 3 {
+            lastSizesAt = Date(timeIntervalSince1970: at)
+            lastSizes = (sizes[0], sizes[1], sizes[2])
+        }
     }
 
     /// Called once per `AppModel.refreshSnapshot()` pass; samples at
@@ -175,7 +186,11 @@ final class MachineModel: ObservableObject {
             lastTempCountAt = Date()
             lastTempListSeconds = report.sample.tempListSeconds
         }
-        if doSizes { lastSizesAt = Date(); lastSizes = sizes }
+        if doSizes {
+            lastSizesAt = Date(); lastSizes = sizes
+            UserDefaults.standard.set(lastSizesAt!.timeIntervalSince1970, forKey: Self.sizesAtKey)
+            UserDefaults.standard.set([sizes.0, sizes.1, sizes.2], forKey: Self.sizesKey)
+        }
         parkedOwners = parked
 
         // Newcomers since the last stored fingerprint. No stored
