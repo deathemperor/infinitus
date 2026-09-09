@@ -33,6 +33,9 @@ struct T3ThreadRowView: View {
     enum VariantAction { case settle, unsettle, unsnooze }
 
     let thread: T3Thread
+    /// Only for `cachedBranch`/`gitBranch` — the row reads no published
+    /// state off it, so it is a plain reference, not an `@ObservedObject`.
+    let model: T3WindowModel
     let variant: Variant
     let variantAction: VariantAction
     let selected: Bool
@@ -51,6 +54,10 @@ struct T3ThreadRowView: View {
 
     @Environment(\.t3) private var t3
     @State private var hover = false
+    /// The card's branch line. Filled from `T3WindowModel`'s cache — one git
+    /// call per distinct project cwd, on the thread's own `.task`, never a
+    /// timer (`T3GitFacts`, B-6).
+    @State private var branch: String?
 
     private var status: T3ThreadStatus { T3ThreadStatus(thread) }
     private var style: T3SidebarList.RowStyle { T3SidebarList.rowStyle(isActive: selected, isSelected: false) }
@@ -103,17 +110,47 @@ struct T3ThreadRowView: View {
             titleText
                 .frame(maxWidth: .infinity, minHeight: T3TypeScale.Web.sm.step.lineHeight, alignment: .leading)
                 .padding(.top, 4)
-            // `:1883-1897`: the branch line, `mt-0.5 … text-xs`. `T3Thread`
-            // carries no branch/worktree, so this row is always upstream's
-            // own no-branch case — the bare `<span className="flex-1" />` at
-            // `:1896` — which still occupies its line's height.
-            Color.clear
+            // `:1883-1897`: the branch line, `mt-0.5 flex min-w-0
+            // items-center gap-1.5 text-secondary-label text-xs`. With no
+            // branch it is upstream's bare `<span className="flex-1" />`
+            // (`:1896`), which still occupies its line's height.
+            branchLine
                 .frame(maxWidth: .infinity, minHeight: T3TypeScale.Web.xs.step.lineHeight)
                 .padding(.top, 2)
         }
         .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
         .padding(.vertical, T3Theme.Metrics.sidebarContentInset)
         .frame(height: 78)
+    }
+
+    // `:1885-1896`'s branch span — `min-w-0 flex-1 truncate whitespace-nowrap
+    // text-muted-foreground/40`, with no leading glyph (the `size-3`
+    // `FolderGit2Icon` before it is `ThreadWorktreeIndicator`
+    // (`ThreadStatusIndicators.tsx:188-196`), which renders null without a
+    // worktree — B has none) — and `:1906-1934`'s `ml-auto` trailing span,
+    // whose `ProviderInstanceIcon` is `size-3.5 opacity-60`. `showBadge` and
+    // the remote-machine glyph beside it have no B counterpart; the driver
+    // kind always resolves (every thread here runs Claude Code), which is
+    // data, not an ungated glyph.
+    private var branchLine: some View {
+        HStack(spacing: 6) {
+            if let branch {
+                Text(branch)
+                    .font(T3Font.web(.xs))
+                    .foregroundStyle(p.mutedForeground.color.opacity(0.4))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 0)
+            T3ProviderIcon(size: 14).opacity(0.6)
+        }
+        .task(id: thread.id) {
+            guard let cwd = projectCwd, !cwd.isEmpty else { return }
+            branch = model.cachedBranch(cwd: cwd)
+            // Cache-first and de-duplicated per cwd inside the model, so N
+            // rows on one project are still ONE `git rev-parse`.
+            branch = await model.gitBranch(cwd: cwd)
+        }
     }
 
     // `:1725` `flex h-5 min-w-0 items-center gap-1.5`.

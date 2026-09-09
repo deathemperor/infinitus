@@ -239,10 +239,7 @@ struct T3ComposerView: View {
 
     private var promptField: some View {
         T3PromptField(text: $draft.text,
-                      // `:5449`'s placeholder promises `@tag`, `$skills` and
-                      // `/` commands, none of which exist here; `:4998`'s
-                      // shorter form of the same string is the honest one.
-                      placeholder: "Ask anything...",
+                      placeholder: placeholder,
                       caret: $caret,
                       caretRequest: $caretRequest,
                       focus: focusRequest,
@@ -252,6 +249,39 @@ struct T3ComposerView: View {
                       onMenuKey: menuKey,
                       onRecall: step(recall:),
                       onPaste: paste)
+    }
+
+    /// `ChatComposer.tsx:5432-5450`'s ladder, ported in
+    /// `T3ComposerPlaceholder`. `phase` is `derivePhase`
+    /// (`session-logic.ts:1673-1685`) over what B can see: `T3TimelineStore.gone`
+    /// — no record for this pid under this session id — is upstream's
+    /// "no session / stopped / errored", a draft has no session at all, and a
+    /// running turn is `running`. That last branch is why the Mac reference
+    /// reads "Ask for changes…": its thread was recreated by hand in T3 Code
+    /// and never ran.
+    private var placeholder: String {
+        let approval = store.pending.approvals.first
+        let question = store.pending.userInputs.first
+            .map { T3PendingAnswers.parse($0.questions) }?.first
+        return T3ComposerPlaceholder.text(
+            phase: phase,
+            approval: (pending: approval != nil,
+                       detail: approval.map { T3PendingApprovalItem($0).detail }),
+            question: (pending: approval == nil && question != nil,
+                       // `isChoiceOnlyPendingQuestion` (`:2052-2053`).
+                       choiceOnly: question?.allowCustomAnswer == false),
+            // Neither has a B counterpart: no proposed-plan follow-up prompt,
+            // and a draft always carries the project it will start in
+            // (`T3ComposerDraftTarget.projectId`).
+            planFollowUp: false,
+            projectSelectionRequired: false,
+            noProviderAvailable: false)
+    }
+
+    private var phase: T3ComposerPlaceholder.Phase {
+        if draftTarget != nil { return starting ? .connecting : .disconnected }
+        if store.gone { return .disconnected }
+        return running ? .running : .ready
     }
 
     /// `ComposerPromptLengthValidation.tsx:5-11`: `px-3 pb-2 text-xs

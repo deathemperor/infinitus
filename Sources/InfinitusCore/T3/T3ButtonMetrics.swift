@@ -15,14 +15,19 @@ public enum T3ButtonMetrics {
         }
     }
 
-    /// The Tailwind spacing step behind `px-[calc(--spacing(n)-1px)]`: the
-    /// class subtracts the 1 px border, which SwiftUI draws on the edge, so
-    /// the padding here is the whole step. `icon` is a square, no padding.
+    /// `px-[calc(--spacing(n)-1px)]` verbatim — the class's own arithmetic is
+    /// the number, not the step it subtracts from. The 1 px it takes off is
+    /// the outline, which `button.tsx` paints as a `before:` overlay
+    /// (`before:rounded-[calc(var(--radius-md)-1px)]`) and SwiftUI as a
+    /// `.stroke` on the frame's edge: neither consumes layout width, so the
+    /// remainder is the whole content inset. Measured on the 2x Mac
+    /// reference: the "Add action" pill is 94 pt around 80 pt of content, i.e.
+    /// 7 a side. `icon` is a square, no padding.
     public static func horizontalPadding(_ size: Size) -> Double {
         switch size {
-        case .default: return 12  // px-3
-        case .sm: return 10       // px-2.5
-        case .xs: return 8        // px-2 (`button.tsx:36`)
+        case .default: return 11  // px-[calc(--spacing(3)-1px)]
+        case .sm: return 9        // px-[calc(--spacing(2.5)-1px)]
+        case .xs: return 7        // px-[calc(--spacing(2)-1px)] (`button.tsx:36`)
         case .icon: return 0
         }
     }

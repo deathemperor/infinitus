@@ -208,47 +208,55 @@ red channel raised where ΔE went over.
 
 ### B parity — 2026-09-09
 
-`refs/mac-thread.png` and `refs/mac-composer.png` (2755×1646, the desktop
-app's window as the user had it sized; the two differ by focus only) against
+`refs/mac-thread.png` and `refs/mac-composer.png` (2756×1646 — the workspace
+window shot on the 2× display with T3's zoom reset, the sidebar at its 16 rem
+default and the pointer off the content; the two differ by focus only) against
 `capture-ours.sh mac …` on `T3FIX_MAC_REF=1 fixture.sh`, whose transcript is
-the reference thread's own "Hi" and reply, with the workspace window preset
-to the same frame (`defaults write Infinitus "NSWindow Frame Workspace"
-"1433 910 1377.5 823 0 0 7680 2130"`) and the capture cropped to the
-reference's width (the window lands 1 px wider):
+the reference thread's own "Hi" and reply, with the workspace window preset to
+the same frame:
 
-| screen | over ΔE 6 | max ΔE |
+```
+$ defaults write Infinitus "NSWindow Frame Workspace" "96 55 1378 823 0 0 1800 1169"
+$ T3FIX_MAC_REF=1 tools/t3ref/fixture.sh && sleep 12
+$ INFINITUS_CONTROL_SOCKET=/tmp/t3fix.sock tools/t3ref/capture-ours.sh mac composer /tmp/ours.png
+$ python3 tools/t3ref/compare.py tools/t3ref/refs/mac-thread.png /tmp/ours.png --out /tmp/diff.png
+$ tools/t3ref/fixture.sh --stop; rm -f /tmp/t3fix.sock
+```
+
+| screen | over ΔE 6 (≤ 1.5 % passes) | max ΔE |
 |---|---|---|
-| thread | 2.08 % | 110.9 |
-| composer | 2.08 % | 110.9 |
+| thread | 1.17 % ✅ | 107.4 |
+| composer | 1.17 % ✅ | 107.4 |
 
-(2.72 % before the six fixes in #435; the two screens are one window, so
-both columns read the same capture.)
+No crop: the sizes match. The two screens are one window, so both rows read
+the same capture. 2.12 % before the six fixes in #435 (2.72 % before the first
+round). The first Mac pair was a 1× capture of a window zoomed 1.893× — every
+content measurement was off by that factor however exact the port — and was
+replaced by this one rather than normalized around.
 
-**The reference is not at 1:1 scale, and that caps the number.** Its
-window chrome is 1× — the traffic lights are 11 px tall in
-`mac-thread.png` against 23 px in ours — while its web content is zoomed
-1.893×. Every content measurement agrees: the composer card is 1454 px for `max-w-3xl` (1454/768 = 1.893),
-the sidebar is 484 px for the `16rem` default (484/1.893 = 255.7, i.e.
-**not** a resized sidebar), and one identical line of the reply is 1434 px
-against our 1515 (1434 × 2 / 1515 = 1.893). Ours renders at 2× on a
-Retina display, so the whole frame is 5.3 % larger and every column lands
-a few points off however exact the port is. Normalized out, the port now
-matches: that line of the reply is **757.5 design px wide in both**, its
-glyph peak is 198 in both (`text-foreground/80`), the user bubble's top
-is 76.5 against 76.6, the line pitch 23.0 against 22.7
-(`leading-relaxed`). Getting under the bar needs a **new
-`mac-thread.png`, shot on the 2× display with T3's zoom reset (⌘0)** —
-not more porting.
+**What closed the gap**, in order of area: the chat markdown and the composer's
+editor were each one full leading short (SwiftUI's `.lineSpacing` goes only
+BETWEEN lines, where CSS splits the extra leading half above the first line and
+half below the last), which put the reply 18 px high and grew to 47 by the last
+paragraph; the sidebar's scope row was missing its flex-1 trigger and its
+`New project` button and carried a bottom padding that sat every card 8 px low;
+the sidebar card's third line was blank where the reference names the branch
+and the provider; the top bar was missing the terminal-drawer toggle and the
+git control's chevron segment; and `px-[calc(--spacing(n)-1px)]` had been read
+as the step rather than as the class's own arithmetic, widening every button by
+2 pt.
 
-What is left in the heatmap, in order of area: the 5.3 % scale
-(everything doubled a few px sideways), the composer's model / effort /
-access controls (capability-gated here, the reference session has them),
-the sidebar row's relative timestamp and project glyph, the header
-wordmark (the app's own), and the `5:38 PM` stamp — which is hover state
-baked into the reference: upstream's message footer is
-`opacity-0 group-hover/assistant:opacity-100` (`MessagesTimeline.tsx:1625`),
-so the cursor was over the reply when the shot was taken. Future Mac
-references should be captured with the pointer off the content.
+What is left in the heatmap: the app's own wordmark and project glyph, the
+composer's model / effort / access controls (capability-gated here, the
+reference session has them), the sidebar row's relative timestamp, and two
+pieces of reference STATE — the `5:38 PM` stamp (upstream's message footer is
+`opacity-0 group-hover/assistant:opacity-100`, so the cursor was over the reply
+when the first pair was shot) and the composer's "Ask for changes, send
+follow-ups, or attach images", which `ChatComposer.tsx:5432-5450` reaches only
+through `phase === "disconnected"`: the reference's thread was recreated by
+hand and never ran, while the fixture's session is `idle`, i.e. `ready`
+(`T3ComposerPlaceholder` ports the whole ladder). Future Mac references should
+be captured with the pointer off the content.
 
 ### C parity — 2026-09-09
 

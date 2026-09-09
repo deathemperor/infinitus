@@ -45,6 +45,7 @@ struct T3TopBar: View {
     @State private var addActionAnchor: NSView?
     @State private var commitPushAnchor: NSView?
     @State private var openInAnchor: NSView?
+    @State private var commitPushMenuAnchor: NSView?
 
     private var project: T3ProjectGrouping.Project? {
         guard let thread = model.state.selectedThread else { return nil }
@@ -90,10 +91,23 @@ struct T3TopBar: View {
             // (12pt) is the toggle's own trailing inset. 24 + 28 (toggle
             // width) + 12 = 64, so the actions cluster's trailing edge
             // still lands 64pt from the window's right edge.
-            Color.clear.frame(width: 24)
-            // `PanelLayoutControls.tsx`'s right-panel `Toggle` — B has no
-            // `terminalOpen` state yet, so the terminal-drawer toggle beside
-            // it upstream has no B counterpart to render.
+            // Measured against the 2x reference with both toggles present:
+            // the actions cluster's trailing edge sits 12 pt from the panel
+            // controls (`ChatHeader.tsx:319`'s own `gap-3`), and the group's
+            // 28 + 4 + 28 plus `index.css:110`'s 12 pt inset fill the rest.
+            // The 24 here came from reading `pr-16` as the whole trailing
+            // run while only ONE toggle stood in it.
+            Color.clear.frame(width: 12)
+            // `PanelLayoutControls.tsx:47-60`'s terminal-drawer `Toggle`,
+            // `PanelBottomIcon size-4`, first in the group's own `gap-1`
+            // (`:36`). B has no terminal drawer to open, and the reference's
+            // header keeps the control's width whether or not it can be
+            // pressed, so it renders in upstream's own `disabled` shape —
+            // never pressed — and says where the drawer is.
+            T3TopBarToggle(icon: .panelBottom, pressed: false,
+                            tooltip: "The bottom panel arrives with the terminal") {}
+            Color.clear.frame(width: 4)   // `PanelLayoutControls.tsx:36` gap-1
+            // `PanelLayoutControls.tsx:61-80`'s right-panel `Toggle`.
             T3TopBarToggle(icon: .panelRight, pressed: model.state.rightPanelOpen,
                             tooltip: "Toggle right panel (\u{2318}J)") {
                 withAnimation(.easeOut(duration: 0.2)) { model.toggleRightPanel() }
@@ -219,14 +233,59 @@ struct T3TopBar: View {
             menuButton(icon: .plus, title: "Add action",
                        disabledMessage: "Project actions arrive with a later release", anchor: $addActionAnchor)
             openInControl(project: project)
-            menuButton(icon: .gitCommit, title: "Commit & push",
-                       disabledMessage: "Git actions arrive with a later release", anchor: $commitPushAnchor)
+            gitActionsControl
         }
     }
 
-    // `ProjectScriptsControl.tsx`'s zero-scripts branch / `GitActionsControl.tsx`'s
-    // split control, both collapsed to one `size="xs" variant="outline"`
-    // button + a one-row disabled menu (B ships no project-scripts backend
+    // `GitActionsControl.tsx:1704-1755`'s `<Group aria-label="Git actions">`:
+    // the quick action as an `xs` outline button, a `GroupSeparator`, and an
+    // `icon-xs` outline `MenuTrigger` carrying `ChevronDownIcon size-4` — the
+    // same joined pill `openInControl` builds, and unconditional once the
+    // project is a repo. The first pass collapsed it to one pill, which left
+    // the whole actions cluster 44 px narrower than the reference's and
+    // therefore that much further right.
+    //
+    // B ships no git actions, so both segments open the same one-row disabled
+    // menu (`showDisabledMenu`) rather than doing nothing quietly.
+    private var gitActionsControl: some View {
+        let radius = T3Theme.Metrics.controlRadius
+        let h = T3ButtonMetrics.height(.xs)
+        return HStack(spacing: 0) {
+            Button { showDisabledMenu(Self.gitPending, from: commitPushAnchor) } label: {
+                // `:1731`'s `ps-[8.5px]` and the label's own `ml-0.5` on top
+                // of the button's `gap-1`.
+                HStack(spacing: 6) { LucideIcon(.gitCommit, size: 14); Text("Commit & push").font(T3Font.web(.xs, .medium)) }
+                    .padding(.leading, 8.5)
+                    .padding(.trailing, T3ButtonMetrics.horizontalPadding(.xs))
+            }
+            .buttonStyle(.plain)
+            .frame(height: h)
+            .foregroundStyle(t3.web.foreground.color)
+            .background(t3.web.popover.color, in: UnevenRoundedRectangle(
+                topLeadingRadius: radius, bottomLeadingRadius: radius, bottomTrailingRadius: 0, topTrailingRadius: 0))
+            .background(MenuAnchor(view: $commitPushAnchor))
+
+            // `GroupSeparator`, `hidden @3xl/header-actions:block` (`:1746`).
+            if wide { Rectangle().fill(t3.web.input.color).frame(width: 1, height: h) }
+
+            Button { showDisabledMenu(Self.gitPending, from: commitPushMenuAnchor) } label: {
+                LucideIcon(.chevronDown, size: 16)   // `:1753` "size-4"
+                    .frame(width: h, height: h)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(t3.web.foreground.color)
+            .background(t3.web.popover.color, in: UnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: radius, topTrailingRadius: radius))
+            .accessibilityLabel("Git action options")
+            .background(MenuAnchor(view: $commitPushMenuAnchor))
+        }
+        .overlay(RoundedRectangle(cornerRadius: radius).stroke(t3.web.input.color, lineWidth: 1))
+    }
+
+    private static let gitPending = "Git actions arrive with a later release"
+
+    // `ProjectScriptsControl.tsx`'s zero-scripts branch, collapsed to one
+    // `size="xs" variant="outline"` button + a one-row disabled menu (B ships no project-scripts backend
     // and no git actions — Task 16/F may add the latter). The disabled row's
     // copy ("Project actions arrive with a later release" /
     // "Git actions arrive with a later release") is B's OWN wording, not
