@@ -76,14 +76,19 @@ public struct SessionDetail: Codable, Sendable, Hashable {
     public let status: String
     public let kind: String
     public let startedAt: Double   // epoch milliseconds
+    /// Claude Code's session id (#391): the engine's rows carry none, the
+    /// Mac fills it from the session record before publishing, so a phone
+    /// can name the session by id as well as pid; nil from an older Mac.
+    public let sessionId: String?
 
     public init(pid: Int, cwd: String, status: String, kind: String,
-                startedAt: Double) {
+                startedAt: Double, sessionId: String? = nil) {
         self.pid = pid
         self.cwd = cwd
         self.status = status
         self.kind = kind
         self.startedAt = startedAt
+        self.sessionId = sessionId
     }
 }
 
@@ -106,12 +111,25 @@ extension LiveSessions {
                 default: break
                 }
             }
-            return SessionDetail(pid: s.pid, cwd: s.cwd, status: fresh, kind: s.kind, startedAt: s.startedAt)
+            return SessionDetail(pid: s.pid, cwd: s.cwd, status: fresh, kind: s.kind, startedAt: s.startedAt,
+                                 sessionId: s.sessionId)
         }
         guard rows != sessions else { return self }
         return LiveSessions(busy: max(0, busy), total: total, idle: self.idle == nil ? nil : max(0, idle),
                             waiting: self.waiting == nil ? nil : max(0, waiting), shell: shell,
                             unknown: self.unknown == nil ? nil : max(0, unknown), sessions: rows)
+    }
+
+    /// The same rows carrying Claude Code's session id where `ids` knows
+    /// the pid (#391); a row with no match keeps what it had.
+    public func tagging(sessionIds ids: [Int: String]) -> LiveSessions {
+        guard let sessions, !ids.isEmpty else { return self }
+        let rows = sessions.map { s -> SessionDetail in
+            guard let id = ids[s.pid], id != s.sessionId else { return s }
+            return SessionDetail(pid: s.pid, cwd: s.cwd, status: s.status, kind: s.kind, startedAt: s.startedAt, sessionId: id)
+        }
+        guard rows != sessions else { return self }
+        return LiveSessions(busy: busy, total: total, idle: idle, waiting: waiting, shell: shell, unknown: unknown, sessions: rows)
     }
 }
 

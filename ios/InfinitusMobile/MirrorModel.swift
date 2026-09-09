@@ -117,8 +117,9 @@ final class MirrorModel: ObservableObject, FleetModel {
 
     /// Settle / snooze / pin a session on its Mac (#223 phase 3). Best
     /// effort: a Mac that doesn't answer leaves the row as it was.
-    func attention(_ action: AttentionStore.Action, macId: String?, pid: Int, until: Date? = nil) async {
-        let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString.lowercased())
+    func attention(_ action: AttentionStore.Action, macId: String?, pid: Int, sessionId: String? = nil, until: Date? = nil) async {
+        let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString.lowercased(),
+                                               sessionId: sessionId)
         guard let facts = try? await mirror(for: macId).sessionAttention(pid: Int32(pid), request: request) else { return }
         factsOverride[Self.factsKey(macId, pid)] = (Date(), facts)
     }
