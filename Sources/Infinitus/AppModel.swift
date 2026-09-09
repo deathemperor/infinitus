@@ -2805,7 +2805,6 @@ final class AppModel: ObservableObject {
     }
 
     private let pastSessionsMemo = PastSessionsMemo()
-    private let gitBranchMemo = GitBranchMemo()
 
     /// T3's project list for the window and the mirror (spec §2.1). Off
     /// the main actor (called from the exporter's detached tick) — takes
@@ -2828,26 +2827,11 @@ final class AppModel: ObservableObject {
             PastSessions.list(claudeDir: claudeDir, limit: 200)
         }
         let recentCwds = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
-        // Only shell out for cwds worth the ~5ms git call: live ones and
-        // the five most recent, so an idle tick stays under 50ms. `derive`
-        // calls `branch` with its own standardized key, so match on a
-        // trailing-slash-stripped form here too. The answer is kept a
-        // minute per cwd (#384): the workspace window asks on every
-        // fleet pump, and a dozen git spawns per pump is the whole cost.
-        func trimSlash(_ s: String) -> String { var s = s; while s.count > 1, s.hasSuffix("/") { s.removeLast() }; return s }
-        let branchable = Set((live.map(\.cwd) + recentCwds.prefix(5)).map(trimSlash))
+        // The branch is one HEAD-file read per cwd (#346) — no spawn, no
+        // memo, so a checkout shows on the next pump.
         return ProjectSummary.derive(live: live, past: past, profiles: profiles,
                                      recentCwds: recentCwds,
-                                     branch: { cwd in
-                                         guard branchable.contains(trimSlash(cwd)) else { return nil }
-                                         return gitBranchMemo.value(cwd: cwd, maxAge: 60) { Self.gitBranch(cwd: cwd) }
-                                     })
-    }
-
-    nonisolated static func gitBranch(cwd: String) -> String? {
-        let out = try? GitRunner(timeout: 2).run(["symbolic-ref", "--short", "-q", "HEAD"], cwd: cwd)
-        let b = out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return b.isEmpty ? nil : b
+                                     branch: { cwd in T3GitFacts.branch(cwd: cwd) })
     }
 
     /// The badge click: running -> stop, stopped -> start ("auto switch
@@ -3053,25 +3037,7 @@ extension AppModel: FleetModel {
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }
 }
 
-/// `projectSummaries`' remembered branch per cwd (#384), a minute each;
-/// the same lock-and-stamp shape as `PastSessionsMemo` below, keyed.
-final class GitBranchMemo: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: [String: (branch: String?, at: Date)] = [:]
-
-    func value(cwd: String, maxAge: TimeInterval, now: Date = Date(),
-               compute: () -> String?) -> String? {
-        lock.lock()
-        if let hit = stored[cwd], now.timeIntervalSince(hit.at) < maxAge {
-            lock.unlock(); return hit.branch
-        }
-        lock.unlock()
-        let fresh = compute()
-        lock.lock(); stored[cwd] = (fresh, now); lock.unlock()
-        return fresh
-    }
-}
-
+    private let pastSessionsMemo = PastSessionsMemo()
 /// One remembered `PastSessions.list` for `projectSummaries` (#346):
 /// a value, the key it was computed under and when. Called off the main
 /// actor from the exporter's detached tick, so it locks.

@@ -9,14 +9,44 @@ import Foundation
 /// a five-second killer, locks and prompts off, and nil on every platform
 /// that has no child processes.
 public enum T3GitFacts {
-    /// The checked-out branch name, or nil when `cwd` is not a work tree, git
-    /// is missing, or HEAD is detached (`rev-parse --abbrev-ref` answers
-    /// `HEAD` there, which is not a branch to show). Blocking.
+    /// The checked-out branch name, or nil when `cwd` is not a work tree or
+    /// HEAD is detached. Read straight from the repo's HEAD file — a git
+    /// spawn per cwd per minute was the project list's largest idle cost
+    /// (#346), and this works where there are no child processes at all.
+    /// `cwd` may be anywhere inside the work tree; a linked worktree's
+    /// `.git` is a file naming its git dir.
     public static func branch(cwd: String) -> String? {
-        guard let out = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd: cwd) else { return nil }
-        let name = out.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name != "HEAD" else { return nil }
-        return name
+        guard let head = headFile(cwd: cwd),
+              let text = try? String(contentsOf: head, encoding: .utf8) else { return nil }
+        let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard line.hasPrefix("ref: ") else { return nil }
+        let ref = String(line.dropFirst("ref: ".count))
+        return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
+    }
+
+    /// `<git dir>/HEAD` for the work tree containing `cwd`: the first
+    /// ancestor with a `.git` entry — a directory, or a file whose one
+    /// line is `gitdir: <path>` (linked worktrees, submodules).
+    static func headFile(cwd: String) -> URL? {
+        let fm = FileManager.default
+        var dir = URL(fileURLWithPath: cwd).standardizedFileURL
+        while true {
+            let dotGit = dir.appendingPathComponent(".git")
+            var isDirectory: ObjCBool = false
+            if fm.fileExists(atPath: dotGit.path, isDirectory: &isDirectory) {
+                if isDirectory.boolValue { return dotGit.appendingPathComponent("HEAD") }
+                guard let text = try? String(contentsOf: dotGit, encoding: .utf8),
+                      let line = text.split(whereSeparator: \.isNewline).first,
+                      line.hasPrefix("gitdir: ") else { return nil }
+                let path = String(line.dropFirst("gitdir: ".count))
+                let gitDir = path.hasPrefix("/") ? URL(fileURLWithPath: path)
+                    : dir.appendingPathComponent(path).standardizedFileURL
+                return gitDir.appendingPathComponent("HEAD")
+            }
+            let parent = dir.deletingLastPathComponent()
+            guard parent.path != dir.path else { return nil }
+            dir = parent
+        }
     }
 
     static func run(_ arguments: [String], cwd: String) -> String? {

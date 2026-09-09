@@ -261,7 +261,7 @@ final class T3WindowModel: ObservableObject {
         return candidates
     }
 
-    /// The composer strip's branch (`T3GitFacts.branch` → one `git rev-parse`)
+    /// The composer strip's branch (`T3GitFacts.branch` → one HEAD-file read)
     /// per project cwd, on a detached task and cached — the strip asks when it
     /// mounts on a thread, never on a timer. `reload` is the thread switch:
     /// the checkout may have moved since this cwd was last looked at.
