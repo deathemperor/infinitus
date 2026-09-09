@@ -29,6 +29,9 @@ enum T3Pending {
         let header: String
         let multiSelect: Bool
         let options: [Option]
+        /// Upstream `allowCustomAnswer: Schema.optional(Schema.Boolean)`:
+        /// the custom field shows unless the question withdrew it.
+        var allowCustomAnswer = true
     }
 
     struct UserInput: Equatable {
@@ -75,7 +78,8 @@ enum T3Pending {
                                     options: (o["options"]?.arrayValue ?? []).compactMap { opt in
                                         guard let d = opt.objectValue, let label = d["label"]?.stringValue else { return nil }
                                         return Option(label: label, description: d["description"]?.stringValue ?? "")
-                                    })
+                                    },
+                                    allowCustomAnswer: o["allowCustomAnswer"] != .bool(false))
                 }
                 guard !questions.isEmpty else { continue }
                 live.userInput = UserInput(requestId: requestId, questions: questions)
@@ -100,16 +104,38 @@ enum T3Pending {
     /// The `answers` request's text: every question answered by label(s)
     /// or a typed answer — the typed one stands in for the picks, as
     /// upstream's `resolvePendingUserInputAnswer` does (a mix is not an
-    /// answer the Mac accepts); nil until each has one.
+    /// answer the Mac accepts); nil until each has one. A typed answer
+    /// counts only where the question allows one, and never on a
+    /// multi-select when it carries the separator: the Mac splits that
+    /// answer on it and needs every part to be an option
+    /// (`OwnedWire.decision`), so it could only be rejected.
     static func encodeAnswers(_ questions: [Question], picks: [String: Set<String>], custom: [String: String]) -> String? {
         var out: [String: String] = [:]
         for q in questions {
-            let typed = custom[q.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let typed = typedAnswer(q, custom: custom) ?? ""
             let chosen = q.options.map(\.label).filter { picks[q.id]?.contains($0) == true }
             let parts = typed.isEmpty ? chosen : [typed]
             guard !parts.isEmpty else { return nil }
             out[q.question] = parts.joined(separator: SessionInput.Answers.separator)
         }
         return SessionInput.Answers.encode(out)
+    }
+
+    /// The question's deliverable typed answer, trimmed; nil when the
+    /// question takes none, the field is blank, or the text is a
+    /// multi-select's undeliverable one (`separatorInMultiSelectText`).
+    static func typedAnswer(_ q: Question, custom: [String: String]) -> String? {
+        guard q.allowCustomAnswer else { return nil }
+        let trimmed = (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return q.multiSelect && trimmed.contains(SessionInput.Answers.separator) ? nil : trimmed
+    }
+
+    /// Text in a multi-select's field that `typedAnswer` has to drop —
+    /// the card says why rather than leave Submit dead.
+    static func separatorInMultiSelectText(_ q: Question, custom: [String: String]) -> Bool {
+        guard q.allowCustomAnswer, q.multiSelect else { return false }
+        return (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            .contains(SessionInput.Answers.separator)
     }
 }

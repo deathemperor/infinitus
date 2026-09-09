@@ -155,6 +155,10 @@ struct T3UserInputCard: View {
                     else if question.multiSelect, input.owned { set.insert(option.label) }
                     else { set = [option.label] }
                     picks[question.id] = set
+                    // `togglePendingUserInputOptionSelection` writes
+                    // `customAnswer: ""` on every branch: picking an option
+                    // withdraws the typed answer, or the typed one would win.
+                    custom[question.id] = ""
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(option.label).font(T3Font.mobile(.sm, .bold))
@@ -174,8 +178,16 @@ struct T3UserInputCard: View {
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
-            if input.owned {
+            if input.owned, question.allowCustomAnswer {
                 customField(question)
+                // Upstream never shows this: its wire carries an array, so a
+                // comma is just a comma. Ours joins on ", ", so on a
+                // multi-select that text reads as two labels and is dropped.
+                if T3Pending.separatorInMultiSelectText(question, custom: custom) {
+                    Text("A custom answer here can't contain a comma followed by a space — on a multiple-choice question that reads as two options.")
+                        .font(T3Font.mobile(.xs)).foregroundStyle(t3.mobile.warningForeground.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
