@@ -12,6 +12,8 @@ struct T3HomeEntry: Identifiable, Equatable {
     let branch: String?
     let macLabel: String?
     let lastActivity: Date
+    /// `T3AccountBadge.label`: nil when the Mac has one account.
+    var accountBadge: String? = nil
     var id: String { thread.key }
     var title: String { thread.title }
     var status: T3ThreadStatus { T3ThreadStatus(thread) }
@@ -58,7 +60,9 @@ struct T3HomeList: View {
                     thread: T3Thread(session: s, facts: facts, progress: p,
                                      environmentId: T3HomeThreads.environmentId(macId), now: Date()),
                     repo: URL(fileURLWithPath: s.cwd).lastPathComponent, branch: p?.gitBranch,
-                    macLabel: model.machineName(macId: macId), lastActivity: lastActivity))
+                    macLabel: model.machineName(macId: macId), lastActivity: lastActivity,
+                    accountBadge: T3AccountBadge.label(accountCount: fleets.reduce(0) { $0 + $1.accounts.count },
+                                                       summary: model.accountSummary(macId: macId, pid: s.pid))))
             }
         }
         return out
@@ -459,7 +463,21 @@ struct T3HomeRow: View {
                     }
                 }
                 Spacer(minLength: 0)
+                // `ProviderInstanceIcon`: the glyph at 60 %, the account
+                // bubble full strength in its bottom-right corner (12 pt,
+                // card fill, a hairline in the screen colour to cut it out).
                 T3ProviderIcon(size: 14).opacity(0.6)
+                    .overlay(alignment: .bottomTrailing) {
+                        if let badge = entry.accountBadge {
+                            Text(badge).font(.system(size: 7, weight: .semibold))
+                                .foregroundStyle(t3.mobile.foregroundMuted.color)
+                                .padding(.horizontal, 2)
+                                .frame(minWidth: 12).frame(height: 12)
+                                .background(t3.mobile.card.color, in: Capsule())
+                                .overlay(Capsule().stroke(t3.mobile.screen.color, lineWidth: 1))
+                                .offset(x: 3, y: 3)
+                        }
+                    }
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 10)
@@ -476,7 +494,10 @@ struct T3HomeRow: View {
         switch entry.status {
         case .approval: return ("Approval", t3.mobile.warningForeground.color)
         case .input: return ("Input", t3.mobile.foregroundSecondary.color)
-        case .working: return ("Working", t3.mobile.foregroundSecondary.color)
+        // `text-adaptive-sky-600-400` (upstream 357b8d521): the Mac's sky.
+        case .working:
+            let sky = t3.scheme == .dark ? T3Tailwind.sky400 : T3Tailwind.sky600
+            return ("Working", Color(.sRGB, red: Double(sky.r) / 255, green: Double(sky.g) / 255, blue: Double(sky.b) / 255))
         case .failed: return ("Failed", t3.mobile.dangerForeground.color)
         case .ready: return nil
         }

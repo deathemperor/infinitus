@@ -131,7 +131,11 @@ final class MirrorModel: ObservableObject, FleetModel {
         let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString.lowercased(),
                                                sessionId: sessionId)
         guard let facts = try? await mirror(for: macId).sessionAttention(pid: Int32(pid), request: request) else { return }
-        factsOverride[Self.factsKey(macId, pid)] = (Date(), facts)
+        // The row moves shelf (settle, snooze, pin) as one transition
+        // (upstream e32dd42f8) instead of jumping on the next redraw.
+        withAnimation(.easeInOut(duration: 0.25)) {
+            factsOverride[Self.factsKey(macId, pid)] = (Date(), facts)
+        }
     }
 
     func accountSummary(macId: String?, pid: Int) -> SessionAccountSummary? {
