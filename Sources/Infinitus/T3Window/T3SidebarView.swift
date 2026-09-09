@@ -72,7 +72,7 @@ struct T3SidebarView: View {
 
     // MARK: - Search
 
-    // `Sidebar.tsx:4252-4275`: not an `<Input>` — a borderless sidebar row
+    // `Sidebar.tsx:4293-4316`: not an `<Input>` — a borderless sidebar row
     // (`flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5
     // text-sm font-medium text-sidebar-muted-foreground
     // hover:bg-sidebar-row-hover`) holding an `unstyled` field, with the
@@ -119,7 +119,7 @@ struct T3SidebarView: View {
         .padding(.bottom, 4)
     }
 
-    // `Sidebar.tsx:4276-4318`: a `SidebarMenuButton size="icon"` (`size-8`,
+    // `Sidebar.tsx:4317-4359`: a `SidebarMenuButton size="icon"` (`size-8`,
     // `--control-radius`) carrying `SquarePenIcon` at `size-4`. Upstream's
     // multi-project setup routes ⌘N through the palette's "New thread in…"
     // picker (`:4210-4229`); B resolves the project directly
@@ -142,7 +142,7 @@ struct T3SidebarView: View {
 
     // MARK: - Scope
 
-    // `Sidebar.tsx:4343-4396`: a `flex items-center gap-1` line holding the
+    // `Sidebar.tsx:4384-4430`: a `flex items-center gap-1` line holding the
     // scope trigger (`SidebarMenuButton`, `min-w-0 flex-1
     // ps-[calc(var(--sidebar-row-content-inset)-1px)]`) and the "New project"
     // icon button beside it — the same two-control shape as the search row
@@ -189,7 +189,7 @@ struct T3SidebarView: View {
         // first card 8 px below the reference's.
     }
 
-    // `Sidebar.tsx:4492-4510`: the group's second `SidebarMenuButton
+    // `Sidebar.tsx:4505-4523`: the group's second `SidebarMenuButton
     // size="icon"` (`size-8`), `FolderPlusIcon`, tooltip "New project". B has
     // no project picker to open — the row exists in the reference and the
     // button says so rather than silently doing nothing (`T3BranchLine`'s
@@ -252,7 +252,7 @@ struct T3SidebarView: View {
                 if section.threads.count > shown.count {
                     // Sidebar.tsx's settled tail: 10 initial, 25 a page
                     // (`T3ThreadList.settledInitialCount`/`settledPageCount`).
-                    // `Sidebar.tsx:4877`'s button: "flex h-9 w-full … gap-2.5
+                    // `Sidebar.tsx:4862`'s button: "flex h-9 w-full … gap-2.5
                     // px-2.5 text-left text-sm text-sidebar-muted-foreground/55"
                     // — h-9 = 36 pt (fix round 1 R4; was 28), text-sm not -xs,
                     // leading `PlusIcon` "size-4 shrink-0" (16 pt).
@@ -272,7 +272,7 @@ struct T3SidebarView: View {
         }
     }
 
-    // `Sidebar.tsx:4627-4643`'s `renderThreadRowInner`: `isCard = section ===
+    // `Sidebar.tsx:4628-4644`'s `renderThreadRowInner`: `isCard = section ===
     // "active" || section === "pinned"`, and `variantAction` is "unsnooze" in
     // the snoozed shelf, "unsettle" in the settled tail, "settle" elsewhere.
     @ViewBuilder private func rows(_ threads: [T3Thread], _ kind: T3SidebarList.Section) -> some View {
@@ -314,7 +314,7 @@ struct T3SidebarView: View {
             // Shelf toggle row: no upstream 1:1 found (this compact port's
             // own shelf header markup, not traced to a `Sidebar.tsx`
             // element) — 32 pt matches the scope row's own h-8
-            // (`Sidebar.tsx:4451`), kept as this sidebar's own rhythm for
+            // (`Sidebar.tsx:4471`), kept as this sidebar's own rhythm for
             // its non-thread control rows.
             .frame(height: 32)
             if expanded.wrappedValue { content() }
@@ -348,7 +348,7 @@ struct T3SidebarView: View {
     }
 }
 
-/// `SidebarDraftRow` (`Sidebar.tsx:689-786`): one unsent draft, two lines —
+/// `SidebarDraftRow` (`Sidebar.tsx:681-770`): one unsent draft, two lines —
 /// the pen, the project name, a hover-only discard, then the typed prompt.
 ///
 /// Two deliberate differences from upstream, both in the dispatch's scope:

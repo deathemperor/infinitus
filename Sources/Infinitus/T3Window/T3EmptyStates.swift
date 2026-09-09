@@ -80,7 +80,7 @@ struct T3NoActiveThreadState: View {
     }
 }
 
-/// T3's `<DraftHeroHeadline>` (`DraftHeroHeadline.tsx:197-207`): the one `h1`
+/// T3's `<DraftHeroHeadline>` (`DraftHeroHeadline.tsx:204-214`): the one `h1`
 /// over an empty draft, whose project name is itself the project picker
 /// (`:110-186`). Upstream's three forms, verbatim from that ternary:
 /// "What should we build in {project}?" once a project is resolved,

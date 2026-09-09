@@ -13,7 +13,7 @@ import InfinitusUI
 /// (`ComposerPromptEditor.tsx:1971-1990`) with ⏎ to send and ⇧⏎ for a newline
 /// (`composerSubmissionIntentForEnter`, `composer-logic.ts:27-37`), the length
 /// validation line (`ComposerPromptLengthValidation.tsx`), the footer's mode
-/// control (`ChatComposer.tsx:931-1043`) and model label
+/// control (`ChatComposer.tsx:1000-1112`) and model label
 /// (`ProviderModelPicker`, `:3979-4013`), the attach action (`:5528-5556`),
 /// the primary actions (`ComposerPrimaryActions.tsx:222-283`), terminal-style
 /// prompt recall (`composerPromptHistory.ts:183-211`) and the `/` command and
@@ -32,7 +32,7 @@ import InfinitusUI
 /// cannot be changed from here.
 /// What a composer with no session yet sends into (Task 15): upstream's
 /// `composerDraftTarget` / `draftId` props on `<ChatComposer>`
-/// (`ChatView.tsx:8052-8060`). `nil` is a live thread, and the whole live path
+/// (`ChatView.tsx:8342-8351`). `nil` is a live thread, and the whole live path
 /// below is unchanged by draft mode.
 struct T3ComposerDraftTarget: Equatable {
     let draftId: String
@@ -97,7 +97,7 @@ struct T3ComposerView: View {
     /// The menu's own state (`T3ComposerMenuState`, Core): the highlighted
     /// row and the query it was highlighted under
     /// (`composerHighlightedItemId` / `composerHighlightedSearchKey`,
-    /// `ChatComposer.tsx:2027-2041`), and which trigger ⎋ shut. Upstream's
+    /// `ChatComposer.tsx:2156-2170`), and which trigger ⎋ shut. Upstream's
     /// menu is open exactly while a trigger is under the caret (`:2023`) and
     /// ⎋ does nothing; a dismissal here stays until the caret is on a
     /// different trigger — never longer, or ⎋ would make `/` a dead key.
@@ -258,9 +258,9 @@ struct T3ComposerView: View {
                       onPaste: paste)
     }
 
-    /// `ChatComposer.tsx:5432-5450`'s ladder, ported in
+    /// `ChatComposer.tsx:5718-5736`'s ladder, ported in
     /// `T3ComposerPlaceholder`. `phase` is `derivePhase`
-    /// (`session-logic.ts:1673-1685`) over what B can see: `T3TimelineStore.gone`
+    /// (`session-logic.ts:1682-1694`) over what B can see: `T3TimelineStore.gone`
     /// — no record for this pid under this session id — is upstream's
     /// "no session / stopped / errored", a draft has no session at all, and a
     /// running turn is `running`. That last branch is why the Mac reference
@@ -754,7 +754,7 @@ struct T3ComposerView: View {
         return model.state.projects.first { $0.id == thread.projectId }?.cwd
     }
 
-    /// `composerMenuItems` (`ChatComposer.tsx:1921-1996`): a path row is its
+    /// `composerMenuItems` (`ChatComposer.tsx:2050-2125`): a path row is its
     /// basename over the directory it sits in (`:1929-1930`), a command row is
     /// `/name` over its description (`:1972-1973`). Ours are Claude Code's own
     /// commands and skills, both invoked as `/name` — upstream's `/skill:`
@@ -857,7 +857,7 @@ struct T3ComposerView: View {
         menu.highlight(id, trigger: trigger)
     }
 
-    /// `onComposerCommandKey` (`ChatComposer.tsx:3080-3125`): while a menu is
+    /// `onComposerCommandKey` (`ChatComposer.tsx:3241-3286`): while a menu is
     /// open it takes ↑/↓ and ⏎/⇥ first, and only then does the key fall
     /// through to prompt recall and to sending. False = the field keeps the key.
     private func menuKey(_ key: T3ComposerMenuKey) -> Bool {
@@ -956,7 +956,7 @@ struct T3ComposerView: View {
         }
     }
 
-    /// `runtimeModeConfig`'s glyphs (`ChatComposer.tsx:832-856`): `LockIcon`,
+    /// `runtimeModeConfig`'s glyphs (`ChatComposer.tsx:901-925`): `LockIcon`,
     /// `PenLineIcon`, `LockOpenIcon`. The vendored set has no `lock` or
     /// `lock-open` — `shield-check` and `zap` are its nearest for "asks first"
     /// and "nothing is asked".
@@ -1028,7 +1028,7 @@ private struct T3ComposerControlSeparator: View {
 }
 
 /// `Button size="icon-sm" variant="ghost"` (`ui/button.tsx:36`), the composer's
-/// attach action (`ChatComposer.tsx:5544-5556`): a 28 pt square, the glyph in
+/// attach action (`ChatComposer.tsx:5831-5843`): a 28 pt square, the glyph in
 /// `secondary-label` over an `accent` fill on hover.
 private struct T3ComposerIconButton: View {
     let icon: Lucide
@@ -1054,7 +1054,7 @@ private struct T3ComposerIconButton: View {
     }
 }
 
-/// One staged file (`ChatComposer.tsx:5324-5330`): `flex items-center gap-2
+/// One staged file (`ChatComposer.tsx:5609-5615`): `flex items-center gap-2
 /// py-1 text-sm`, the name truncating, its size in `text-xs
 /// text-secondary-label` (`:5334`) and an `icon-xs` remove button (`:5390`).
 private struct T3ComposerAttachmentRow: View {

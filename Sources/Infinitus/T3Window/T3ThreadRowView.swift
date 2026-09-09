@@ -4,7 +4,7 @@ import InfinitusCore
 import InfinitusUI
 
 /// One sidebar row (`Sidebar.tsx`'s `SidebarThreadRow`), in both of the
-/// variants upstream renders. `Sidebar.tsx:4627`:
+/// variants upstream renders. `Sidebar.tsx:4628`:
 /// `const isCard = section === "active" || section === "pinned"` — settling
 /// and snoozing are the ONLY things that collapse a row, so pinned/active
 /// rows are 78 pt two-line CARDS (`:1723-1815`) and snoozed/settled rows are
@@ -25,9 +25,9 @@ import InfinitusUI
 /// `delete` and `new-thread-on-branch` have no host action on B yet (task
 /// brief's own deviation table) and are omitted rather than stubbed.
 struct T3ThreadRowView: View {
-    /// `Sidebar.tsx:4626-4628`'s `rowVariant`.
+    /// `Sidebar.tsx:4627-4629`'s `rowVariant`.
     enum Variant { case card, slim }
-    /// `Sidebar.tsx:4637-4643`'s `variantAction`: a snoozed row wakes, a
+    /// `Sidebar.tsx:4638-4644`'s `variantAction`: a snoozed row wakes, a
     /// settled row un-settles, a card settles. The slim row reads it to pick
     /// its trailing label (`:1606`, `:1633-1635`).
     enum VariantAction { case settle, unsettle, unsnooze }
@@ -123,7 +123,7 @@ struct T3ThreadRowView: View {
             .allowsHitTesting(false)
     }
 
-    // MARK: - Card (`Sidebar.tsx:1723-1897`)
+    // MARK: - Card (`Sidebar.tsx:1721-1890`)
 
     // `:1723` `h-[4.875rem] px-[var(--sidebar-row-content-inset)]
     // py-[var(--sidebar-content-inset)]` — 78 pt tall, 10 pt sides, 8 pt
@@ -233,7 +233,7 @@ struct T3ThreadRowView: View {
         }
     }
 
-    // MARK: - Slim (`Sidebar.tsx:1538-1636`)
+    // MARK: - Slim (`Sidebar.tsx:1539-1632`)
 
     // `:1561` `flex h-9 items-center gap-2.5 px-2.5` on top of the shared
     // row surface.
@@ -395,8 +395,8 @@ struct T3ThreadRowView: View {
 /// background box, no radius, no letter fallback (upstream has none of those
 /// for the automatic path; the favicon-image and emoji-override branches have
 /// no B equivalent, see `T3ProjectIcon`'s header comment). `size` is the
-/// caller's own class: 16 in the sidebar rows (`Sidebar.tsx:1735`/`:1580`'s
-/// `size-4`), 14 in the breadcrumb (`ChatHeader.tsx:351`'s `size-3.5`).
+/// caller's own class: 16 in the sidebar rows (`Sidebar.tsx:1728`/`:1580`'s
+/// `size-4`), 14 in the breadcrumb (`ChatHeader.tsx:341`'s `size-3.5`).
 struct T3ProjectGlyph: View {
     let projectName: String
     let projectCwd: String
@@ -413,7 +413,7 @@ struct T3ProjectGlyph: View {
             .foregroundStyle((t3.scheme == .dark ? pair.dark : pair.light).color)
     }
 
-    // `PROJECT_ICONS` (`ProjectFavicon.tsx:44-65`): each `ProjectIconName` →
+    // `PROJECT_ICONS` (`ProjectFavicon.tsx:45-66`): each `ProjectIconName` →
     // its Lucide component, transcribed to this kit's vendored names.
     private static func lucide(_ icon: T3ProjectIcon.Name) -> Lucide {
         switch icon {

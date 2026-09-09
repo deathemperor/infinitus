@@ -4,7 +4,7 @@ import Foundation
 /// paths, ranked against what was typed after the `@`.
 ///
 /// Upstream asks its server for `projects.searchEntries`
-/// (`apps/server/src/ws.ts:2255`), which is a native `FileFinder` index
+/// (`apps/server/src/ws.ts:2256`), which is a native `FileFinder` index
 /// (`WorkspaceSearchIndex.ts:300-327`) — a binary this port has no equivalent
 /// of. So the list comes from `git ls-files` (a bounded `FileManager` walk
 /// behind it) and the ranking is the repo's own TypeScript one: `scoreQueryMatch`
@@ -34,7 +34,7 @@ public enum T3FileMention: Sendable {
 
     /// `--cached --others --exclude-standard`: what the repo tracks plus what
     /// it does not ignore — upstream's index excludes gitignored files and
-    /// nothing else (`server.test.ts:6773`). `-z` because git quotes odd
+    /// nothing else (`server.test.ts:6810`). `-z` because git quotes odd
     /// filenames otherwise. nil = no repo here (or no git), so the walk answers.
     static func gitListed(cwd: String) -> [String]? {
         #if os(Windows) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)

@@ -42,7 +42,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
     public var sidebarCollapsed = false
     public var rightPanelOpen = false
     /// Threads that have no session yet (Task 15): upstream's draft sessions
-    /// (`routes/_chat.draft.$draftId.tsx`, `Sidebar.tsx:797-800`'s draft
+    /// (`routes/_chat.draft.$draftId.tsx`, `Sidebar.tsx:781-784`'s draft
     /// block), each a pseudo-thread carrying the project its first prompt
     /// will start in. Merged into `threads` so every selector — `select`,
     /// `selectedThread`, `visibleThreads`, the window's own emptiness checks —
@@ -140,7 +140,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
             lastVisitedAt[next[i].id] = now
             next[i].lastVisitedAt = now
         }
-        // Drafts first: `Sidebar.tsx:797-800` keeps the draft block above the
+        // Drafts first: `Sidebar.tsx:781-784` keeps the draft block above the
         // list so an interrupted "new thread" stays one click away.
         let previousThreads = threads
         threads = drafts + next.sorted { $0.updatedAt > $1.updatedAt }
@@ -198,7 +198,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
     public static let draftIdPrefix = "draft:"
     public static func isDraft(_ threadId: String) -> Bool { threadId.hasPrefix(draftIdPrefix) }
     /// Upstream's draft row shows the project name over the typed prompt and
-    /// has no title of its own (`Sidebar.tsx:689-786`); this is ours, for the
+    /// has no title of its own (`Sidebar.tsx:681-770`); this is ours, for the
     /// places a thread must have a title (the top bar, the ⌘K switcher).
     public static let draftTitle = "New thread"
     /// A draft row's title: the first line of its text, trimmed, or
@@ -230,14 +230,14 @@ public struct T3WorkspaceState: Sendable, Equatable {
 
     /// A draft with nothing in it yet, in this project: ⌘N reuses it rather
     /// than stacking a second "New thread" row (upstream's draft rows only
-    /// exist for drafts that HAVE content, `Sidebar.tsx:797-800`, so it never
+    /// exist for drafts that HAVE content, `Sidebar.tsx:781-784`, so it never
     /// stacks empty ones either). `isUntouched` answers for the composer draft
     /// the model holds — the reducer knows nothing about typed text.
     public func reusableDraftId(projectId: String, isUntouched: (String) -> Bool) -> String? {
         drafts.first { $0.projectId == projectId && startedDraftPids[$0.id] == nil && isUntouched($0.id) }?.id
     }
 
-    /// Discarded (upstream's "Discard draft", `Sidebar.tsx:772`), or replaced
+    /// Discarded (upstream's "Discard draft", `Sidebar.tsx:756`), or replaced
     /// by the session it started. A discarded draft that WAS selected hands the
     /// selection to its neighbour rather than leaving the window with nothing
     /// selected — `Sidebar.tsx`'s discard leaves the route on a thread.
@@ -256,7 +256,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
     }
 
     /// The hero's project picker moves the open draft to another project in
-    /// place (`DraftHeroHeadline.tsx:141-149`).
+    /// place (`DraftHeroHeadline.tsx:142-150`).
     public mutating func retargetDraft(_ draftId: String, projectId: String) {
         guard let i = drafts.firstIndex(where: { $0.id == draftId }) else { return }
         drafts[i].projectId = projectId
