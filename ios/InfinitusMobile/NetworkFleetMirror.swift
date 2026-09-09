@@ -402,6 +402,16 @@ actor NetworkFleetMirror: FleetMirror {
     /// fresh snapshot — the Mac holds a `wait` long-poll until something
     /// changes. Same route discipline as `sessionTail`: a long-poll goes
     /// to the route that last answered only, with a timeout past `wait`.
+    /// `GET /sessions/<pid>/commands` (#223): the slash commands and skills
+    /// the Mac finds for that session's cwd; filtered locally as typed.
+    func commands(pid: Int32) async throws -> [SlashCommand] {
+        guard let data = try await fetchFromStored(path: MirrorTransport.sessionCommandsPath(pid: pid),
+                                                   token: pairToken(), timeout: Self.candidateTimeout) else {
+            throw MirrorTransportError.timedOut
+        }
+        return try JSONDecoder().decode([SlashCommand].self, from: data)
+    }
+
     func timeline(pid: Int32, after: Int?, epoch: String?, wait: TimeInterval) async throws -> TimelineSync {
         let token = pairToken()
         var path = MirrorTransport.sessionTimelinePath(pid: pid)

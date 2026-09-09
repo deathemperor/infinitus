@@ -271,15 +271,21 @@ public enum OwnedWire {
     }
 
     /// A client's whole-prompt answers (`SessionInput.Request.Kind.answers`)
-    /// against a parked question: every question answered, every label a
-    /// real option (a multi-select's labels joined by `Answers.separator`,
-    /// in any order). nil = not an answer to this prompt.
+    /// against a parked question: every question answered, and each answer
+    /// either real options (a multi-select's labels joined by
+    /// `Answers.separator`, in any order) or one free-text string — Claude
+    /// Code's "Other", which `resolvePendingUserInputAnswer` upstream sends
+    /// in place of the selection. A mix of options and other text is not an
+    /// answer (nor is a free text carrying the separator on a multi-select).
+    /// nil = not an answer to this prompt.
     public static func decision(answers text: String, pending: PendingRequest) -> Decision? {
         guard !pending.questions.isEmpty, let answers = SessionInput.Answers.decode(text) else { return nil }
         for q in pending.questions {
-            guard let answer = answers[q.question] else { return nil }
+            guard let answer = answers[q.question],
+                  !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             let labels = q.multiSelect ? answer.components(separatedBy: SessionInput.Answers.separator) : [answer]
-            guard !labels.isEmpty, labels.allSatisfy({ q.options.contains($0) }) else { return nil }
+            let matched = labels.filter { q.options.contains($0) }.count
+            guard matched == labels.count || (matched == 0 && labels.count == 1) else { return nil }
         }
         return .answers(answers)
     }

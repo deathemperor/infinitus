@@ -278,6 +278,36 @@ final class MirrorTimelineBox: @unchecked Sendable {
     }
 }
 
+/// The `GET /sessions/<pid>/commands` handler (#223, the phone's `/`
+/// popover), boxed like `timeline`; reads `.claude/` trees, so call it
+/// off the queue. `nil` = no such pid (404).
+final class MirrorCommandsBox: @unchecked Sendable {
+    typealias Provider = @Sendable (_ pid: Int32) -> Data?
+    private let lock = NSLock()
+    private var provider: Provider?
+    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
+    func call(_ pid: Int32) -> Data? {
+        lock.lock(); let current = provider; lock.unlock()
+        return current?(pid)
+    }
+}
+
+/// A few seconds of `/commands` replies per cwd: a popover reopening (or
+/// two phones) doesn't rescan the trees. Core's `SlashCommands` keeps no
+/// cache of its own here by design (B-5 adds one for the Mac composer).
+final class MirrorCommandsCache: @unchecked Sendable {
+    static let ttl: TimeInterval = 5
+    private let lock = NSLock()
+    private var entries: [String: (at: Date, data: Data)] = [:]
+    func data(cwd: String, now: Date = Date(), make: () -> Data?) -> Data? {
+        lock.lock(); let hit = entries[cwd]; lock.unlock()
+        if let hit, now.timeIntervalSince(hit.at) < Self.ttl { return hit.data }
+        guard let fresh = make() else { return nil }
+        lock.lock(); entries[cwd] = (now, fresh); lock.unlock()
+        return fresh
+    }
+}
+
 /// `GET /.well-known/infinitus` (#223 phase 4): the descriptor, no token.
 final class MirrorDescriptorBox: @unchecked Sendable {
     private let lock = NSLock()
@@ -510,6 +540,8 @@ final class MirrorServer: ObservableObject {
     let attention = MirrorAttentionBox()
     /// Answers `GET /sessions/<pid>/timeline` (#223 phase 4); set by AppModel once at start.
     let timeline = MirrorTimelineBox()
+    /// Answers `GET /sessions/<pid>/commands` (#223); set by AppModel once at start.
+    let commands = MirrorCommandsBox()
     /// Answers `GET /.well-known/infinitus`; set by AppModel once at start.
     let descriptor = MirrorDescriptorBox()
     /// Command receipts for input / start / attention (#223 phase 4).
@@ -707,6 +739,7 @@ final class MirrorServer: ObservableObject {
         let sessionInput = self.sessionInput
         let attention = self.attention
         let timeline = self.timeline
+        let commands = self.commands
         let descriptor = self.descriptor
         let receipts = self.receipts
         let leases = self.leases
@@ -727,7 +760,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -806,6 +839,7 @@ final class MirrorServer: ObservableObject {
                                           sessionInput: MirrorSessionInputBox,
                                           attention: MirrorAttentionBox,
                                           timeline: MirrorTimelineBox,
+                                          commands: MirrorCommandsBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -818,7 +852,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -831,6 +865,7 @@ final class MirrorServer: ObservableObject {
                                             sessionInput: MirrorSessionInputBox,
                                           attention: MirrorAttentionBox,
                                           timeline: MirrorTimelineBox,
+                                          commands: MirrorCommandsBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -952,6 +987,17 @@ final class MirrorServer: ObservableObject {
                     // A long-poll and a possible transcript parse: off this queue.
                     DispatchQueue.global(qos: .utility).async {
                         let response = timeline.call(pid, after, epoch, wait).map(MirrorTransport.jsonResponse)
+                            ?? MirrorTransport.notFoundResponse()
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                } else if request.method == "GET",
+                          let pid = MirrorTransport.sessionCommandsPid(request.path) {
+                    // Discovery walks .claude/ trees on disk: off this queue.
+                    DispatchQueue.global(qos: .utility).async {
+                        let response = commands.call(pid).map(MirrorTransport.jsonResponse)
                             ?? MirrorTransport.notFoundResponse()
                         onServed(request)
                         connection.send(content: response,
@@ -1219,7 +1265,7 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
