@@ -7,12 +7,20 @@ import InfinitusUI
 /// the per-account rows the refs predate). One group per Mac and engine
 /// fleet; inside it one card per window pooled across the fleet's accounts:
 /// quota left, pace, the next refill, a numbered segment per account and a
-/// row per account. Countdowns anchor to `now` and move only on refresh.
-/// The Usage (cost) tab lands separately.
+/// row per account. Countdowns anchor to `now`, re-set on refresh and on
+/// each new snapshot.
+/// The Usage tab (`T3UsageCostTab`) sits beside it behind T3's segmented
+/// control whenever a shown fleet carries an engine report; without one
+/// the screen is Limits alone.
 struct T3UsageScreen: View {
     @ObservedObject var model: MirrorModel
     @Environment(\.t3) private var t3
     @State private var now = Date()
+    enum Tab: Hashable { case usage, limits }
+    @State private var tab: Tab = .usage
+    /// Another Mac's report, decoded once per snapshot; keyed by Mac id →
+    /// capture time (the primary's sits on its fleet, see `decodeReports`).
+    @State private var otherReports: [String: (Date, UsageReport?)] = [:]
     /// nil = every Mac; otherwise the Macs kept (nil member = this phone's primary).
     @State private var selectedMacs: Set<String?>? = nil
 
@@ -31,10 +39,44 @@ struct T3UsageScreen: View {
         return out.filter { selectedMacs?.contains($0.macId) ?? true }
     }
 
+    /// The engine reports behind the shown groups, in group order.
+    private var costSources: [T3UsageCost.Source] {
+        groups.compactMap { g in
+            let report: UsageReport?
+            if let macId = g.macId {
+                report = g.fleet.engineID == MirrorFleetModel.cswapEngineID ? otherReports[macId]?.1 : nil
+            } else {
+                report = g.fleet.report
+            }
+            return report.map { T3UsageCost.Source(macId: g.macId, macName: g.macName, provider: g.fleet.provider, report: $0) }
+        }
+    }
+
+    /// The primary's report lives on its fleet and decodes on demand
+    /// (`loadIfNeeded`, the old Fleet screen's onAppear) — this screen is
+    /// the only T3 reader, so it asks itself; another Mac's decodes here.
+    private func decodeReports() {
+        for fleet in model.fleets { fleet.loadIfNeeded() }
+        for mac in model.others {
+            guard let snapshot = mac.snapshot, otherReports[mac.id]?.0 != snapshot.capturedAt else { continue }
+            otherReports[mac.id] = (snapshot.capturedAt, snapshot.usageJSON.flatMap { try? JSONDecoder().decode(UsageReport.self, from: $0) })
+        }
+        // A fresh snapshot re-anchors the countdowns, and the redraw picks
+        // up the primary's report (its fleet isn't observed here).
+        now = Date()
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
                 let shown = groups
+                let sources = costSources
+                if !sources.isEmpty {
+                    T3SegmentedControl(options: [(Tab.usage, "Usage"), (Tab.limits, "Limits")], selected: $tab)
+                }
+                if !sources.isEmpty, tab == .usage, let merged = T3UsageCost.merge(sources, today: now) {
+                    T3UsageCostTab(merged: merged, seriesColors: sources.map { T3UsageColors.bar($0.provider, dark: t3.scheme == .dark) })
+                } else {
                 if shown.isEmpty {
                     Text(selectedMacs?.isEmpty == true ? "Select a Mac to see limits."
                                                         : "No account on the selected Macs reports subscription limits.")
@@ -44,6 +86,7 @@ struct T3UsageScreen: View {
                 ForEach(shown) { group in
                     T3UsageLimitsGroup(macId: group.macId, fleet: group.fleet,
                                        macName: model.others.isEmpty ? nil : group.macName, now: now)
+                }
                 }
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 36)
@@ -61,7 +104,8 @@ struct T3UsageScreen: View {
             await model.refresh(macId: model.others.first?.id)
             now = Date()
         }
-        .onAppear { now = Date() }
+        .onAppear { decodeReports() }
+        .onChange(of: [model.snapshot?.capturedAt] + model.others.map { $0.snapshot?.capturedAt }) { _, _ in decodeReports() }
         .navigationDestination(for: T3UsageAccountRoute.self) { route in
             T3UsageAccountScreen(model: model, route: route)
         }
@@ -251,8 +295,8 @@ private struct T3AccountSegment: View {
             ZStack(alignment: .leading) {
                 if pending {
                     Hatch().stroke(color.opacity(0.22), lineWidth: 1)
-                        .frame(width: geo.size.width - split).offset(x: split)
-                        .clipped()
+                        .frame(width: geo.size.width - split).clipped()
+                        .offset(x: split)
                 }
                 color.opacity(0.35).frame(width: split)
             }
