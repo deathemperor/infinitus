@@ -201,7 +201,7 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         let gcloudNeed = gcloudLoginNeed(entries: entries)
 
         return SessionProgress(lastActivityAt: lastActivityAt, nowDoing: nowDoing, todos: todos,
-                                title: title, goal: goal(lines: lines), phase: phase(entries: entries),
+                                title: title, goal: goal(entries: entries), phase: phase(entries: entries),
                                 gitBranch: gitBranch, model: model,
                                 outputTokens: outputTokens, recentOutputTokens: recentOutputTokens,
                                 retrying: retrying, awsLoginProfile: awsNeed?.profile,
@@ -411,14 +411,13 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// with `<`). First line only, leading whitespace stripped, truncated
     /// to 100 chars.
     public static func goal(lines: [String]) -> String? {
-        let entries: [[String: Any]] = lines.compactMap { line in
-            guard line.first == "{",
-                  let data = line.data(using: .utf8),
-                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return nil }
-            return obj
-        }
+        goal(entries: jsonEntries(lines))
+    }
 
+    /// `goal` over lines already parsed — `parse` and the past-session
+    /// scan have the entries in hand, and parsing the tail twice was
+    /// half of every progress read (#346).
+    static func goal(entries: [[String: Any]]) -> String? {
         for entry in entries where (entry["type"] as? String) == "user" {
             guard let message = entry["message"] as? [String: Any] else { continue }
             let text: String?
