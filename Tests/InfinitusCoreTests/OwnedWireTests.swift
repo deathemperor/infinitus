@@ -243,13 +243,25 @@ final class OwnedWireTests: XCTestCase {
         XCTAssertEqual(OwnedWire.decision(answers: SessionInput.Answers.encode(good), pending: ask), .answers(good))
         XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Blue"]), pending: ask),
                      "the second question went unanswered")
-        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Green", "Which sizes?": "S"]), pending: ask),
-                     "not one of the options")
-        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Red, Blue", "Which sizes?": "S"]), pending: ask),
-                     "a single-select takes one label")
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "Red", "Which sizes?": "S, XL"]), pending: ask),
+                     "options and other text mixed on a multi-select")
+        XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(["Which colour?": "  ", "Which sizes?": "S"]), pending: ask),
+                     "an empty free text answers nothing")
         XCTAssertNil(OwnedWire.decision(answers: "not json", pending: ask))
         guard case .canUseTool(let write) = OwnedWire.decode(line: try fixture("owned-can-use-tool-write")) else { return XCTFail() }
         XCTAssertNil(OwnedWire.decision(answers: SessionInput.Answers.encode(good), pending: write), "a permission takes no answers")
+    }
+
+    /// Claude Code's "Other": a typed answer stands in for the options, on a
+    /// single- or a multi-select (upstream `resolvePendingUserInputAnswer`).
+    func testAFreeTextAnswerStandsInForTheOptions() {
+        let ask = twoQuestions()
+        let typed = ["Which colour?": "Teal, please", "Which sizes?": "S"]
+        XCTAssertEqual(OwnedWire.decision(answers: SessionInput.Answers.encode(typed), pending: ask), .answers(typed))
+        let multi = ["Which colour?": "Red", "Which sizes?": "huge"]
+        XCTAssertEqual(OwnedWire.decision(answers: SessionInput.Answers.encode(multi), pending: ask), .answers(multi))
+        let line = OwnedWire.answerLine(ask, .answers(typed))
+        XCTAssertTrue(line.contains(#""Which colour?":"Teal, please""#), "the text reaches updatedInput.answers as typed")
     }
 
     func testAParkedPromptBecomesOneFeedItemCarryingEveryQuestion() throws {

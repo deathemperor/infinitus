@@ -91,6 +91,15 @@ public enum MirrorTransport {
         guard parts.count == 3, parts[0] == "sessions", parts[2] == "timeline" else { return nil }
         return Int32(parts[1])
     }
+    /// `GET /sessions/<pid>/commands` (#223, the phone's `/` popover): the
+    /// slash commands and skills `SlashCommands.discover` finds for that
+    /// session's cwd, as `[SlashCommand]` JSON.
+    public static func sessionCommandsPath(pid: Int32) -> String { "/sessions/\(pid)/commands" }
+    public static func sessionCommandsPid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "commands" else { return nil }
+        return Int32(parts[1])
+    }
     public static let timelineAfterQueryName = "afterSequence"
     public static let timelineEpochQueryName = "epoch"
     /// Query parameter carrying the item limit for the tail route.

@@ -98,13 +98,15 @@ enum T3Pending {
     }
 
     /// The `answers` request's text: every question answered by label(s)
-    /// or a typed answer; nil until each has one.
+    /// or a typed answer — the typed one stands in for the picks, as
+    /// upstream's `resolvePendingUserInputAnswer` does (a mix is not an
+    /// answer the Mac accepts); nil until each has one.
     static func encodeAnswers(_ questions: [Question], picks: [String: Set<String>], custom: [String: String]) -> String? {
         var out: [String: String] = [:]
         for q in questions {
             let typed = custom[q.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let chosen = q.options.map(\.label).filter { picks[q.id]?.contains($0) == true }
-            let parts = chosen + (typed.isEmpty ? [] : [typed])
+            let parts = typed.isEmpty ? chosen : [typed]
             guard !parts.isEmpty else { return nil }
             out[q.question] = parts.joined(separator: SessionInput.Answers.separator)
         }

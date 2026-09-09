@@ -48,5 +48,8 @@ final class T3PendingTests: XCTestCase {
         XCTAssertNil(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red", "Blue"]], custom: [:]))
         XCTAssertEqual(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red", "Blue"]], custom: ["Size?": " large "]),
                        #"{"Color?":"Red, Blue","Size?":"large"}"#)
+        // A typed answer stands in for the picks; it is never appended to them.
+        XCTAssertEqual(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red"]], custom: ["Color?": "teal", "Size?": "large"]),
+                       #"{"Color?":"teal","Size?":"large"}"#)
     }
 }

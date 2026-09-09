@@ -165,6 +165,16 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertNil(MirrorTransport.sessionAttentionPid("/sessions/x/attention"))
     }
 
+    func testSessionCommandsPathRoundTrips() {
+        XCTAssertEqual(MirrorTransport.sessionCommandsPath(pid: 5), "/sessions/5/commands")
+        XCTAssertEqual(MirrorTransport.sessionCommandsPid("/sessions/5/commands"), 5)
+        XCTAssertNil(MirrorTransport.sessionCommandsPid("/sessions/5/timeline"))
+        XCTAssertNil(MirrorTransport.sessionCommandsPid("/sessions/x/commands"))
+        let wire = try? JSONEncoder().encode([SlashCommand(name: "review", description: "Review a PR", source: .projectCommand)])
+        let back = wire.flatMap { try? JSONDecoder().decode([SlashCommand].self, from: $0) }
+        XCTAssertEqual(back, [SlashCommand(name: "review", description: "Review a PR", source: .projectCommand)])
+    }
+
     func testSessionTimelinePathRoundTrips() {
         XCTAssertEqual(MirrorTransport.sessionTimelinePath(pid: 5), "/sessions/5/timeline")
         XCTAssertEqual(MirrorTransport.sessionTimelinePid("/sessions/5/timeline"), 5)

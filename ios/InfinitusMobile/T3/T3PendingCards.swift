@@ -181,8 +181,12 @@ struct T3UserInputCard: View {
     }
 
     private func customField(_ question: T3Pending.Question) -> some View {
+            // Typing clears the picks (upstream `setPendingUserInputCustomAnswer`):
+            // the text is the answer, not an addition to them.
             TextField("Or type a custom answer", text: Binding(
-                get: { custom[question.id] ?? "" }, set: { custom[question.id] = $0 }), axis: .vertical)
+                get: { custom[question.id] ?? "" },
+                set: { custom[question.id] = $0; if !$0.trimmingCharacters(in: .whitespaces).isEmpty { picks[question.id] = [] } }),
+                axis: .vertical)
                 .font(T3Font.mobile(.base)).foregroundStyle(t3.mobile.foreground.color)
                 .padding(.horizontal, 14).padding(.vertical, 12)
                 .frame(minHeight: 54)

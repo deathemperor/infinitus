@@ -1627,6 +1627,17 @@ final class AppModel: ObservableObject {
         mirrorServer.attention.set { pid, request in
             Self.applyAttention(pid: pid, request, timelineCache: timelineCache, attentionStore: attentionStore, ownedBox: ownedBox)
         }
+        // `GET /sessions/<pid>/commands` (#223, the phone's `/` popover): the
+        // session's cwd decides the list; the reply is cached per cwd for a
+        // few seconds in the handler.
+        let commandsCache = MirrorCommandsCache()
+        mirrorServer.commands.set { pid in
+            let claudeDir = ClaudeSessions.configHome()
+            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else { return nil }
+            return commandsCache.data(cwd: record.cwd) {
+                try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
+            }
+        }
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in

@@ -342,14 +342,17 @@ final class OwnedSessionsProcessTests: XCTestCase {
         XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .message, text: "[Infinitus] pick a colour"), record: record(pid))?.outcome,
                        "delivered")
         waitFor("question parked") { owned.pending(pid: pid).first?.questions.isEmpty == false }
-        let wrong = owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "Green"])),
+        // Blank text answers nothing; a typed non-option is Claude Code's
+        // "Other" and goes through as the answer (OwnedWireTests has the
+        // option / free-text / mixed matrix).
+        let blank = owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "  "])),
                                   record: record(pid))
-        XCTAssertEqual(wrong?.outcome, "rejected")
-        XCTAssertEqual(wrong?.detail, "no such option")
-        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "Blue"])),
+        XCTAssertEqual(blank?.outcome, "rejected")
+        XCTAssertEqual(blank?.detail, "no such option")
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .answers, text: SessionInput.Answers.encode(["Which colour?": "Green"])),
                                      record: record(pid)),
                        SessionInput.Reply(outcome: "delivered", channel: "stdin"))
-        waitFor("answered") { self.file("answers").contains("\"Blue\"") }
+        waitFor("answered") { self.file("answers").contains("\"Green\"") }
         XCTAssertTrue(owned.pending(pid: pid).isEmpty)
         await owned.stopAll()
     }
