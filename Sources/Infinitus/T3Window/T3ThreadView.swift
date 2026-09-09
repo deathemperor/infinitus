@@ -107,7 +107,9 @@ struct T3ThreadView: View {
                 // without touching `store.rows` — re-follow the end so the
                 // scroll doesn't settle against the drawer's PREVIOUS height.
                 .onChange(of: composerHeight) { _, _ in
-                    if anchors.atEnd { proxy.scrollTo(Self.endId, anchor: .bottom) }
+                    // Never over a pending disclosure pin — `anchor(old:new:)`
+                    // owns that restore on the next rows publish.
+                    if anchors.atEnd, anchors.pinned == nil { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
                 .onAppear {
                     guard !store.rows.isEmpty else { return }

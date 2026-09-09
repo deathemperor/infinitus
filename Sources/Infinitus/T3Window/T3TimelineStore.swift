@@ -79,7 +79,9 @@ final class T3TimelineStore: ObservableObject {
                 }
                 await MainActor.run { [pid] in
                     guard let self, self.pid == pid else { return }
-                    self.gone = false
+                    // Only publish on the flip: an unconditional write fires
+                    // objectWillChange every poll for nothing.
+                    if self.gone { self.gone = false }
                 }
                 guard let raw = timelineCache.timeline(record: record, claudeDir: claudeDir) else {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)

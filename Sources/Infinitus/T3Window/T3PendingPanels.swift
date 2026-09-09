@@ -865,7 +865,7 @@ struct T3ThreadPendingSlot: View {
     /// The capability gate: only a session the app runs itself has the control
     /// channel that whole-prompt answers, permission suggestions and a deny
     /// message ride (`OwnedSessions`). Same predicate the store polls with
-    /// (T3TimelineStore.swift:54) — never the engine's identity.
+    /// (`owned` in `T3TimelineStore.start()`) — never the engine's identity.
     private var owned: Bool { app.ownedBox.existing?.ownedPids.contains(store.pid) == true }
 
     private var approval: T3PendingApprovalItem? {
