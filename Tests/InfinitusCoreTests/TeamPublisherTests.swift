@@ -170,6 +170,36 @@ final class TeamPublisherTests: XCTestCase {
         return Int(String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)) ?? -1
     }
 
+    /// A store from before the transcript split (#321) keeps the old chunks
+    /// in `m/<kid>`'s tree; the next publish deletes them there and only
+    /// there (#414).
+    func testPublishSweepsPreSplitChunksOutOfTheMemberBranch() throws {
+        let t = try team()
+        let projects = try writeProjects(scratch)
+        let me = "m/\(t.alice.identity.kid)/"
+        var legacy: [String: Data?] = [:]
+        for path in [me + "transcripts/old/1.jsonl", me + "transcripts/old/2.jsonl",
+                     me + "transcripts/old/subagents/agent-z/1.jsonl"] {
+            legacy[path] = Data("pre-split chunk".utf8)
+        }
+        try t.alice.store.putAll(legacy)
+        XCTAssertEqual(try t.alice.store.list(me + "transcripts/").count, 3)
+
+        let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
+        let report = try publisher.publish(sources: sources(projects))
+        XCTAssertEqual(report.legacyChunksRemoved, 3)
+        XCTAssertEqual(try t.alice.store.list(me + "transcripts/"), [])
+        // Everything else on the branch survives, and the live chunks on t/ are untouched.
+        XCTAssertTrue(try t.alice.store.list(me).map(\.path).contains(me + "now.json"))
+        XCTAssertEqual(report.transcriptChunks, 3)   // s1, its subagent, s2 (nothing excluded here)
+        XCTAssertEqual(try t.alice.store.list("t/\(t.alice.identity.kid)/transcripts/").count, 3)
+
+        // A clean branch: the next pass has nothing to sweep.
+        XCTAssertEqual(try publisher.publish(sources: sources(projects)).legacyChunksRemoved, 0)
+        _ = try t.leader.fetch()
+        XCTAssertEqual(try t.leader.store.list(me + "transcripts/"), [])
+    }
+
     func testTranscriptWindowIsNarrowerThanTheStatsWindow() throws {
         let t = try team()
         let projects = try writeProjects(scratch)
