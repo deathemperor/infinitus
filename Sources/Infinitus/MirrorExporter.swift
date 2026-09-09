@@ -17,10 +17,13 @@ actor MirrorExporter {
         self.payload = payload
     }
 
+    // INFINITUS_MIRROR_SNAPSHOT: a debug/fixture instance's own file, so
+    // it never overwrites the real app's mirror snapshot (#474).
     static let url: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory,
-                                 in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/mirror-snapshot.json")
+        ProcessInfo.processInfo.environment["INFINITUS_MIRROR_SNAPSHOT"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.urls(for: .applicationSupportDirectory,
+                                        in: .userDomainMask)[0]
+                .appendingPathComponent("Infinitus/mirror-snapshot.json")
     }()
 
     /// The ⚡ gauge's scale: the highest tokens/minute seen lately.

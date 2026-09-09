@@ -157,7 +157,9 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   — without it, ControlServer.start() unlinks the real app's control
   socket and `infinitusctl`/the phone get "connection refused" until
   the bundle relaunches (bit us 2026-09-03 08:21). Short path: unix
-  sockets cap at ~104 bytes, so never the scratchpad dir.
+  sockets cap at ~104 bytes, so never the scratchpad dir. It also needs
+  `INFINITUS_MIRROR_SNAPSHOT=<state-dir>/mirror-snapshot.json`, or
+  MirrorExporter overwrites the real app's mirror snapshot (#474).
 
 ## Build / run / test
 `./make-app.sh && open Infinitus.app` · `swift test` · `./dev.sh` (entr)
