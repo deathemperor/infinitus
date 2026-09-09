@@ -6,7 +6,7 @@ import InfinitusUI
 /// The bottom slot (Task 12's banners, Task 13's composer) publishes its
 /// measured height through this key; the timeline's footer inset is that height
 /// plus 16 (`TimelineListFooter`'s `composerInset`,
-/// `MessagesTimeline.tsx:609-612`). Until the slot has content its 0 leaves the
+/// `MessagesTimeline.tsx:616-619`). Until the slot has content its 0 leaves the
 /// plain 16.
 ///
 /// Preferences only flow UP, so the publisher has to live INSIDE `T3ThreadView`
@@ -24,9 +24,9 @@ struct T3ComposerHeightKey: PreferenceKey {
 /// in. File scope because the pill lives outside `T3ThreadView`.
 private let t3TimelineSpace = "t3-timeline"
 
-/// The scrolling thread (`MessagesTimeline.tsx:803-865`): the row list in a
+/// The scrolling thread (`MessagesTimeline.tsx:822-884`): the row list in a
 /// centred `max-w-3xl` column inside a `px-5` scroll area, with the header
-/// spacer (`TIMELINE_LIST_HEADER`, `:240`) above and the composer inset below.
+/// spacer (`TIMELINE_LIST_HEADER`, `:246`) above and the composer inset below.
 ///
 /// Not ported: `LegendList`'s virtualization knobs (a `LazyVStack` is the
 /// platform equivalent), the minimap, the titlebar scroll fade, the citation
@@ -83,7 +83,7 @@ struct T3ThreadView: View {
 
     // MARK: - The draft hero (Task 15)
 
-    /// `ChatView.tsx:8005-8039`'s draft-hero state: the composer overlay
+    /// `ChatView.tsx:8295-8329`'s draft-hero state: the composer overlay
     /// becomes `absolute inset-0 … flex items-center` — the card CENTRED in the
     /// column rather than docked at its bottom — with the headline pinned
     /// directly above it (`absolute inset-x-0 bottom-full` + `pb-8` = 32) and no
@@ -92,7 +92,7 @@ struct T3ThreadView: View {
         VStack(spacing: 32) {
             T3DraftHeroHeadline(projectName: projectName(target), groups: model.state.groups) { group in
                 // The picker retargets the OPEN draft in place
-                // (`DraftHeroHeadline.tsx:141-149`); a group's representative
+                // (`DraftHeroHeadline.tsx:142-150`); a group's representative
                 // member is the physical project it starts in.
                 guard let id = group.members.first?.id else { return }
                 model.retargetDraft(target.draftId, projectId: id)
@@ -104,7 +104,7 @@ struct T3ThreadView: View {
                 branchLine
             }
         }
-        // The same column the rows and the docked composer share (`:8019`).
+        // The same column the rows and the docked composer share (`:8309`).
         .frame(maxWidth: Self.columnMax)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Self.listInset)
@@ -116,7 +116,7 @@ struct T3ThreadView: View {
     }
 
     /// `activeProjectGroup?.displayName ?? activeProjectTitle`
-    /// (`DraftHeroHeadline.tsx:105`): the logical group's name when the project
+    /// (`DraftHeroHeadline.tsx:106`): the logical group's name when the project
     /// belongs to one, else the project's own.
     private func projectName(_ target: T3ComposerDraftTarget) -> String? {
         if let group = model.state.groups.first(where: { $0.members.contains { $0.id == target.projectId } }) {
@@ -132,9 +132,9 @@ struct T3ThreadView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        // `TIMELINE_LIST_FADE_HEADER` (`:241`):
+                        // `TIMELINE_LIST_FADE_HEADER` (`:247`):
                         // `--workspace-titlebar-scroll-fade-height` (1.5 rem,
-                        // index.css:114). `ChatView.tsx:7977` passes
+                        // index.css:114). `ChatView.tsx:8267` passes
                         // `topFadeEnabled={!hasTimelineTopBanner}`, so this is
                         // the ordinary header — `TIMELINE_LIST_HEADER`'s
                         // `h-3 sm:h-4` (16) belongs to the banner state, which
@@ -162,7 +162,7 @@ struct T3ThreadView: View {
                                     anchors.rows[row.id] = rect
                                 }
                         }
-                        // `ListFooterComponent` (`:864`): the composer inset.
+                        // `ListFooterComponent` (`:883`): the composer inset.
                         Color.clear
                             .frame(height: composerHeight + 16)
                             .id(Self.endId)
@@ -195,15 +195,15 @@ struct T3ThreadView: View {
                     DispatchQueue.main.async { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
                 .overlay { if store.rows.isEmpty { empty } }
-                // `ChatView.tsx:8006-8012`: the composer wrapper is
+                // `ChatView.tsx:8296-8302`: the composer wrapper is
                 // `absolute inset-x-0 bottom-0 z-20` over the messages wrapper
-                // (`:7931`, `relative flex min-h-0 flex-1`) — the timeline runs
+                // (`:8221`, `relative flex min-h-0 flex-1`) — the timeline runs
                 // full height and scrolls UNDER it, which is what the footer
                 // inset reserves room for. So: an overlay, not a stacked row.
                 .overlay(alignment: .bottom) { bottomSlot }
                 // `:8271-8291`, `z-30` over the composer overlay's `z-20`, so
                 // the second overlay. An empty timeline has no end to scroll
-                // to (`:7982`'s own `hideEmptyPlaceholder` state).
+                // to (`:8272`'s own `hideEmptyPlaceholder` state).
                 .overlay(alignment: .bottom) {
                     if !store.rows.isEmpty {
                         T3ScrollToEndPill(anchors: anchors) {
@@ -227,7 +227,7 @@ struct T3ThreadView: View {
     private var bottomSlot: some View {
         VStack(spacing: 0) {
             T3ThreadPendingSlot(app: app, store: store, actions: actions)
-                // `[data-composer-banner-surface="attached"]` (`:5316`): the
+                // `[data-composer-banner-surface="attached"]` (`:5327`): the
                 // drawers the pill has to clear. This port stacks them in one
                 // full-width column, so the group is one box.
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(t3TimelineSpace)) } action: {
@@ -244,12 +244,12 @@ struct T3ThreadView: View {
                     anchors.composerTop = $0
                     anchors.updateScrollToEndClearance()
                 }
-            // `ChatView.tsx:8167-8180`: the context strip sits in the same
+            // `ChatView.tsx:8460-8473`: the context strip sits in the same
             // floating column, directly under the card — so it is inside the
             // slot whose height the timeline's footer reserves.
             branchLine
         }
-        // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
+        // `:8307` `sm:ps/pe 1.25rem` (the list's own inset) and `:8309`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
         // whatever lands in it lines up with them. `pointer-events-auto`
         // there too, so no `allowsHitTesting(false)` here.
@@ -285,7 +285,7 @@ struct T3ThreadView: View {
         }
     }
 
-    /// `:795-799`: `rows.length === 0 && !isWorking` — a working turn always
+    /// `:814-818`: `rows.length === 0 && !isWorking` — a working turn always
     /// contributes its own row, so an empty row list is the whole condition.
     private var empty: some View {
         Text("Send a message to start the conversation.")
@@ -308,8 +308,8 @@ struct T3ThreadView: View {
     /// …and only on ONE card: the parked prompt belongs to the newest plan, so
     /// an older card's Implement would approve someone else's `ExitPlanMode`.
     /// Upstream picks the same single plan — `activeProposedPlan`
-    /// (`ChatView.tsx:2625-2633`) is `findLatestProposedPlan`
-    /// (`session-logic.ts:349-372`), the latest turn's newest plan — and only
+    /// (`ChatView.tsx:2782-2790`) is `findLatestProposedPlan`
+    /// (`session-logic.ts:352-375`), the latest turn's newest plan — and only
     /// that one drives the composer's Implement. (Which row that is: hoisted
     /// into `body` as `latestPlanRowId`, above the `ForEach`.)
 
@@ -416,12 +416,12 @@ private struct T3DraftNoteSlot: View {
     /// `(rowId, its viewport-relative top)` recorded before a disclosure toggle.
     var pinned: (String, Double)?
 
-    /// `showScrollToBottom` (`ChatView.tsx:1576`). Upstream debounces the SHOW
-    /// by 150 ms to ride out a thread switch (`:4543-4545`); here the flip is
+    /// `showScrollToBottom` (`ChatView.tsx:1593`). Upstream debounces the SHOW
+    /// by 150 ms to ride out a thread switch (`:4714-4716`); here the flip is
     /// driven by the footer sentinel's own geometry, which never reports a
     /// settling list, so there is no timer.
     @Published private(set) var scrolledAway = false
-    /// `scrollToEndClearance` (`:1664`).
+    /// `scrollToEndClearance` (`:1682`).
     @Published private(set) var scrollToEndClearance: Double = 0
 
     /// The clearance's inputs, in the timeline's own coordinate space.
