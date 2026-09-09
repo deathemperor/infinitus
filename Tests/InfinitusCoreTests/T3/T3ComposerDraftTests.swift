@@ -69,7 +69,9 @@ final class T3ComposerDraftTests: XCTestCase {
             "draft:onscreen": T3ComposerDraft(text: "a", projectId: "p1"),
             "draft:discarded": T3ComposerDraft(text: "b", projectId: "p1"),
             "live-thread": T3ComposerDraft(text: ""),
-            "dead-thread": T3ComposerDraft(text: "", attachments: [
+            "dead-thread": T3ComposerDraft(text: ""),
+            // Facts can lag a live record for a tick: staged files are content.
+            "lagging-thread-with-files": T3ComposerDraft(text: "", attachments: [
                 T3ComposerAttachmentRef(path: "/tmp/shot.png", mime: "image/png"),
             ]),
             "dead-thread-with-text": T3ComposerDraft(text: "worth keeping"),

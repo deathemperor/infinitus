@@ -99,8 +99,9 @@ public enum T3ComposerDrafts {
     /// Keys `workspace.drafts` should stop carrying, decided after an apply:
     /// a draft key with no row left (discarded, started, or never restorable)
     /// and a thread key whose session is not in the fleet and whose entry is
-    /// only staged files — the text is what a returning session would want
-    /// back, and an attachment path may not even exist by then. Without this
+    /// empty (no text, no staged files). Anything with content stays: a
+    /// live thread's facts can lag its record for a tick, and that tick must
+    /// not throw away what a returning session would want back. Without this
     /// the defaults key grows with every thread this Mac ever ran.
     public static func prunable(_ drafts: [String: T3ComposerDraft],
                                 liveDraftIds: Set<String>,
@@ -109,8 +110,7 @@ public enum T3ComposerDrafts {
         for (id, draft) in drafts {
             if T3WorkspaceState.isDraft(id) {
                 if !liveDraftIds.contains(id) { out.insert(id) }
-            } else if !liveThreadIds.contains(id),
-                      draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            } else if !liveThreadIds.contains(id), draft.isEmpty {
                 out.insert(id)
             }
         }
