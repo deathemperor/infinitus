@@ -26,6 +26,14 @@ public struct SessionTail: @unchecked Sendable {
     /// re-read 2.3 MB of their tails on every move of its own (#346).
     private var agents: [String: SessionTail] = [:]
     private let scansAgents: Bool
+    /// The sub-agent folder is listed (and every recent agent file
+    /// stat'd and read) only when the folder's mtime moved — a new or
+    /// removed file — or `agentWalkInterval` has passed: a session with
+    /// 1,900 agent files listed them on every refresh of every tail once
+    /// the walk stopped riding the parent's own size+mtime stamp (#346).
+    private var agentsDirMtime: Date?
+    private var agentWalkAt: Date?
+    static let agentWalkInterval: TimeInterval = 30
     /// An agent tail's own lapsed-sign-in reading, computed when it moves —
     /// the detector runs `contains` over every recent tool result, and 18
     /// agents re-detected on every move of the parent were most of what
@@ -50,6 +58,12 @@ public struct SessionTail: @unchecked Sendable {
         var moved = advanceOwn()
         guard scansAgents else { return moved }
         let dir = url.deletingPathExtension().appendingPathComponent("subagents")
+        let dirMtime = (try? dir.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        let due = dirMtime != agentsDirMtime
+            || agentWalkAt.map { now.timeIntervalSince($0) >= Self.agentWalkInterval } ?? true
+        guard due else { return moved }
+        agentsDirMtime = dirMtime
+        agentWalkAt = now
         var kept: [String: SessionTail] = [:]
         for file in Transcript.agentFiles(under: dir) {
             guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
