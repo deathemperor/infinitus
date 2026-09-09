@@ -146,13 +146,16 @@ public struct T3ChatMarkdown: View {
     /// run can and cannot paint (no radius, no border).
     private func inline(_ text: String, font: Font, color: Color) -> some View {
         MarkdownInline.text(text, font: font, color: color, runs: .init(
-            link: p.primary.color,
+            // `.chat-markdown a { color: var(--info-foreground); text-decoration: none }`
+            // (index.css:1745-1747): blue-700 light / blue-400 dark, no underline.
+            link: p.infoForeground.color,
             codeFont: .system(size: Self.inlineCodeSize, design: .monospaced),
             code: p.foreground.color,
             strongFont: font.weight(.semibold), strong: nil,
             codeChip: .init(background: p.muted.color, fontSize: Self.inlineCodeSize,
                             padding: Self.inlineCodePadding),
-            linkGlyph: Self.linkSlot(p.primary)))
+            linkGlyph: Self.linkSlot(p.infoForeground),
+            linkUnderline: false))
     }
 
     /// `font-size: 0.75rem` and `padding: 0.1rem 0.35rem` + `border: 1px`

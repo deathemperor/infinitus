@@ -23,6 +23,10 @@ enum MarkdownInline {
         /// `T3ChatMarkdown` passes one so every external link keeps the
         /// reference's favicon slot.
         var linkGlyph: LinkGlyph? = nil
+        /// The phone underlines a link; T3's `.chat-markdown a` is
+        /// `text-decoration: none` (index.css:1745-1747), so `T3ChatMarkdown`
+        /// turns this off.
+        var linkUnderline = true
     }
 
     /// The inline-code chip, `.chat-markdown :not(pre) > code`
@@ -92,7 +96,7 @@ enum MarkdownInline {
             let intent = run.inlinePresentationIntent ?? []
             if run.link != nil {
                 attributed[run.range].foregroundColor = runs.link
-                attributed[run.range].underlineStyle = .single
+                if runs.linkUnderline { attributed[run.range].underlineStyle = .single }
             } else if intent.contains(.code) {
                 attributed[run.range].font = runs.codeFont
                 attributed[run.range].foregroundColor = runs.code
