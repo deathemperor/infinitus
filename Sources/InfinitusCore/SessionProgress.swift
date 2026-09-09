@@ -292,15 +292,26 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     static func subagentLoginNeeds(transcript: URL, now: Date = Date(), window: TimeInterval = subagentAwsLoginWindow)
         -> (aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?) {
         let subagentsDir = transcript.deletingPathExtension().appendingPathComponent("subagents")
+        var tails: [[[String: Any]]] = []
+        for file in Transcript.agentFiles(under: subagentsDir) {
+            guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
+                .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
+            guard let lines = tailLines(of: file, maxBytes: subagentTailBytes) else { continue }
+            tails.append(jsonEntries(lines))
+        }
+        return loginNeeds(agentEntries: tails)
+    }
+
+    static let subagentTailBytes = 128 * 1024
+
+    /// The newest failure per provider across the agent tails given.
+    static func loginNeeds(agentEntries: [[[String: Any]]])
+        -> (aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?) {
         var aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?
         func newer(_ need: (profile: String, failedAt: Date?), than current: (profile: String, failedAt: Date?)?) -> Bool {
             current == nil || (need.failedAt ?? .distantPast) > (current?.failedAt ?? .distantPast)
         }
-        for file in Transcript.agentFiles(under: subagentsDir) {
-            guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
-                .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
-            guard let lines = tailLines(of: file, maxBytes: 128 * 1024) else { continue }
-            let entries = jsonEntries(lines)
+        for entries in agentEntries {
             if let need = awsLoginNeed(entries: entries), newer(need, than: aws) { aws = need }
             if let need = gcloudLoginNeed(entries: entries), newer(need, than: gcloud) { gcloud = need }
         }
@@ -457,8 +468,10 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// The progress off a tail's entries plus the head's goal — `read`
     /// for a one-off, `SessionTail.progress` for a session read
     /// incrementally.
+    /// `agents`: the recent sub-agent tails' entries when the caller holds
+    /// them (a `SessionTail`); nil walks the agent files afresh.
     static func assemble(entries: [[String: Any]], headGoal: String?, transcript url: URL,
-                         name: String?, now: Date = Date()) -> SessionProgress {
+                         name: String?, now: Date = Date(), agents: [[[String: Any]]]? = nil) -> SessionProgress {
         let progress = parse(entries: entries, now: now)
         // The session's own tail wins; a sub-agent's lapsed sign-in (#149)
         // fills in only when the parent shows none.
@@ -467,7 +480,7 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         var aws: (profile: String, failedAt: Date?)? = progress.awsLoginProfile.map { ($0, progress.awsLoginFailedAt) }
         var gcloud: (profile: String, failedAt: Date?)? = progress.gcloudLoginProfile.map { ($0, progress.gcloudLoginFailedAt) }
         if aws == nil || gcloud == nil {
-            let sub = subagentLoginNeeds(transcript: url)
+            let sub = agents.map(loginNeeds(agentEntries:)) ?? subagentLoginNeeds(transcript: url, now: now)
             if aws == nil { aws = sub.aws }
             if gcloud == nil { gcloud = sub.gcloud }
         }

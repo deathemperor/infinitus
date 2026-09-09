@@ -99,6 +99,34 @@ final class SessionTailTests: XCTestCase {
         XCTAssertEqual(tail.progress().goal, "New goal")
     }
 
+    /// A sub-agent's lapsed sign-in reaches the parent (#149) off agent
+    /// tails read incrementally too: a new failure line is one advance,
+    /// and an agent aged out of the window drops its need.
+    func testSubagentTailsFeedTheLoginNeedIncrementally() throws {
+        let failed = #"{"type":"user","timestamp":"2026-09-03T08:00:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile papaya-login"}]}}"#
+        let fine = #"{"type":"user","timestamp":"2026-09-03T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"ok"}]}]}}"#
+        try (user("Go") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        let subagents = url.deletingPathExtension().appendingPathComponent("subagents")
+        try FileManager.default.createDirectory(at: subagents, withIntermediateDirectories: true)
+        let agent = subagents.appendingPathComponent("agent-a.jsonl")
+        try (fine + "\n").write(to: agent, atomically: true, encoding: .utf8)
+
+        var tail = SessionTail(url: url)
+        XCTAssertTrue(tail.advance())
+        XCTAssertNil(tail.progress().awsLoginProfile)
+        XCTAssertFalse(tail.advance())
+
+        let handle = try FileHandle(forWritingTo: agent)
+        try handle.seekToEnd(); try handle.write(contentsOf: Data((failed + "\n").utf8)); try handle.close()
+        XCTAssertTrue(tail.advance(), "the agent moved, the parent did not")
+        XCTAssertEqual(tail.progress().awsLoginProfile, "papaya-login")
+        XCTAssertEqual(tail.progress(), SessionProgress.read(sessionId: "s", cwd: "/p", claudeDir: dir))
+
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-2 * 60 * 60)], ofItemAtPath: agent.path)
+        XCTAssertTrue(tail.advance(), "the agent aged out of the window")
+        XCTAssertNil(tail.progress().awsLoginProfile)
+    }
+
     func testAMissingFileIsNoProgressUntilItAppears() throws {
         var tail = SessionTail(url: url)
         XCTAssertFalse(tail.advance())
