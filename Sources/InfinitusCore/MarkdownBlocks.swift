@@ -83,6 +83,9 @@ public enum MarkdownBlocks {
             if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("• ") {
                 let item = String(trimmed.dropFirst(2))
                 flush()
+                // `.task` carries no `indent` (unlike `.bullet`/`.numbered`
+                // below) — nested task items are not modelled and render
+                // flush; deliberate, not an oversight.
                 if item.hasPrefix("[ ] ") { out.append(.task(done: false, String(item.dropFirst(4)))) }
                 else if item.lowercased().hasPrefix("[x] ") { out.append(.task(done: true, String(item.dropFirst(4)))) }
                 else { out.append(.bullet(indent: indent, item)) }

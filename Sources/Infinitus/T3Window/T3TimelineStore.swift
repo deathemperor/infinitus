@@ -16,12 +16,18 @@ final class T3TimelineStore: ObservableObject {
     /// Owned usage limits (Task 12).
     @Published private(set) var limits: [LimitNote] = []
     /// No record for the pid (under this thread's session id) any more.
+    /// Reset on every successful record lookup, not just a stamp
+    /// change — otherwise the banner is reachable only briefly today
+    /// because the state drops a vanished pid
+    /// (https://github.com/deathemperor/infinitus/issues/400).
     @Published private(set) var gone = false
 
     let threadId: String
-    /// Read off the polling loop's `Task.detached` and `image(id:)` —
-    /// both `nonisolated` — so this can't stay actor-isolated; only
-    /// `start()`/`stop()`/`rebind(pid:)`, all main-actor methods, mutate it.
+    /// Read off `image(id:)`, `nonisolated`, so this can't stay
+    /// actor-isolated; only `start()`/`stop()`/`rebind(pid:)`, all
+    /// main-actor methods, mutate it. (The polling loop's
+    /// `Task.detached` captures `pid` by value instead — it never reads
+    /// this property off-actor.)
     nonisolated(unsafe) private(set) var pid: Int32
     private weak var model: AppModel?
     private weak var window: T3WindowModel?
@@ -52,7 +58,12 @@ final class T3TimelineStore: ObservableObject {
                 // transcript: they ride the stamp, and its actor wakes
                 // this wait the moment one parks (OwnedFeed).
                 let owned = box.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
-                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax, poll: 1.0,
+                // 5 s: a stopped store's loop cannot see cancellation
+                // inside waitForChange
+                // (https://github.com/deathemperor/infinitus/issues/399);
+                // a per-thread store churns on every sidebar click, so
+                // the orphan window stays short.
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: 5, poll: 1.0,
                                                 decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
                                                 wake: owned?.wake)
                 if Task.isCancelled { return }
@@ -65,6 +76,10 @@ final class T3TimelineStore: ObservableObject {
                     }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     continue
+                }
+                await MainActor.run { [pid] in
+                    guard let self, self.pid == pid else { return }
+                    self.gone = false
                 }
                 guard let raw = timelineCache.timeline(record: record, claudeDir: claudeDir) else {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -93,7 +108,6 @@ final class T3TimelineStore: ObservableObject {
                         self.lastOwnedPending = ownedPending
                         self.lastFacts = facts
                         self.applyRows(timeline: withLimits, ownedPending: ownedPending, facts: facts)
-                        self.gone = false
                     }
                 }
                 // No stamp to wait on (transcript not there yet): pace

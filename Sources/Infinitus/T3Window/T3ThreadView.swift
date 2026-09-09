@@ -68,6 +68,10 @@ struct T3ThreadView: View {
                     LazyVStack(spacing: 0) {
                         // `TIMELINE_LIST_HEADER` (`:240`): `h-3 sm:h-4`.
                         Color.clear.frame(height: 16)
+                        // Hoisted out of the row closure: `rows.last(where:)`
+                        // is O(n) and was running once PER row (O(n^2) over
+                        // the timeline) to answer the same question every time.
+                        let latestPlanRowId = store.rows.last(where: { $0.kind == "proposed-plan" })?.id
                         ForEach(store.rows) { row in
                             T3TimelineRowView(row: row,
                                               columnWidth: min(Self.columnMax, geo.size.width - 2 * Self.listInset),
@@ -99,6 +103,12 @@ struct T3ThreadView: View {
                     .padding(.horizontal, Self.listInset)
                 }
                 .onChange(of: store.rows) { old, new in anchor(old: old, new: new, proxy: proxy) }
+                // The drawer mounting/growing moves the footer sentinel
+                // without touching `store.rows` — re-follow the end so the
+                // scroll doesn't settle against the drawer's PREVIOUS height.
+                .onChange(of: composerHeight) { _, _ in
+                    if anchors.atEnd { proxy.scrollTo(Self.endId, anchor: .bottom) }
+                }
                 .onAppear {
                     guard !store.rows.isEmpty else { return }
                     DispatchQueue.main.async { proxy.scrollTo(Self.endId, anchor: .bottom) }
@@ -162,10 +172,8 @@ struct T3ThreadView: View {
     /// Upstream picks the same single plan — `activeProposedPlan`
     /// (`ChatView.tsx:2625-2633`) is `findLatestProposedPlan`
     /// (`session-logic.ts:349-372`), the latest turn's newest plan — and only
-    /// that one drives the composer's Implement.
-    private var latestPlanRowId: String? {
-        store.rows.last(where: { $0.kind == "proposed-plan" })?.id
-    }
+    /// that one drives the composer's Implement. (Which row that is: hoisted
+    /// into `body` as `latestPlanRowId`, above the `ForEach`.)
 
     /// `ProposedPlanCard`'s Approve, upstream's "Implement"
     /// (`ComposerPrimaryActions.tsx:192`): allow the parked `ExitPlanMode` the
@@ -181,8 +189,14 @@ struct T3ThreadView: View {
     /// re-derive (`onToggleTurnFold`/`onToggleWorkGroup` + `store.rederive()`).
     private func toggle(rowId: String, _ mutate: () -> Void) {
         anchors.pinned = (rowId, Double(anchors.rows[rowId]?.minY ?? 0))
+        let idsBefore = store.rows.map(\.id)
         mutate()
         store.rederive()
+        // `anchors.pinned` is set above, before the toggle mutates — if
+        // `rederive()` yields identical rows there is no `store.rows`
+        // change to consume the pin, and the stale pin hijacks the next
+        // unrelated rows change instead.
+        if store.rows.map(\.id) == idsBefore { anchors.pinned = nil }
     }
 
     private func anchor(old: [T3TimelineRows.Row], new: [T3TimelineRows.Row], proxy: ScrollViewProxy) {

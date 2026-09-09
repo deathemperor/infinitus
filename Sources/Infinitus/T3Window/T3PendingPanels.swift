@@ -592,8 +592,14 @@ struct T3PendingApprovalPanel: View {
             // plugin's PreToolUse hook, which asks the app per session id
             // (ControlServer.swift:341) — the terminal path this feature was
             // built for (#79, ToolApproval.swift:3-6).
-            T3BannerActionButton(title: "Always allow this session", action: onAllowSession)
-                .accessibilityHint("Allows \(approval.rule.label) for the rest of this session")
+            // `ExitPlanMode` has no upstream "always allow" slot either —
+            // it shows the plan follow-up banner there instead (`:26-30`
+            // above), which B doesn't port; suppressing the button rather
+            // than wiring it to a plan it can't reason about.
+            if approval.toolName != "ExitPlanMode" {
+                T3BannerActionButton(title: "Always allow this session", action: onAllowSession)
+                    .accessibilityHint("Allows \(approval.rule.label) for the rest of this session")
+            }
             T3BannerActionButton(title: "Approve", tint: t3.web.foreground.color, action: onApprove)
             if sending { T3Spinner(size: 12) }
         }
@@ -859,7 +865,7 @@ struct T3ThreadPendingSlot: View {
     /// The capability gate: only a session the app runs itself has the control
     /// channel that whole-prompt answers, permission suggestions and a deny
     /// message ride (`OwnedSessions`). Same predicate the store polls with
-    /// (T3TimelineStore.swift:49) — never the engine's identity.
+    /// (T3TimelineStore.swift:54) — never the engine's identity.
     private var owned: Bool { app.ownedBox.existing?.ownedPids.contains(store.pid) == true }
 
     private var approval: T3PendingApprovalItem? {

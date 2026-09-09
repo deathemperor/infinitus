@@ -599,6 +599,9 @@ private struct T3WorkGroupSection: View {
     }
 
     var body: some View {
+        // Bound once: `entries` filters `groupedEntries` on every access,
+        // and the check below plus the `ForEach` were each re-running it.
+        let entries = entries
         if entries.isEmpty {
             EmptyView()
         } else if isExpandedToolGroup {

@@ -79,7 +79,7 @@ public struct MarkdownText: View {
     /// The block split lives in InfinitusCore (`MarkdownBlocksTests` needs it
     /// without linking SwiftUI); this keeps the phone's `MarkdownText.Block`
     /// / `.blocks(_:)` call sites compiling unchanged.
-    typealias Block = MarkdownBlock
+    public typealias Block = MarkdownBlock
 
     @ViewBuilder private func render(_ block: Block) -> some View {
         switch block {
