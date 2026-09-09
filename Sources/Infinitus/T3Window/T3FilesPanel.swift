@@ -404,8 +404,10 @@ private struct T3FileRow: View {
 
 /// A ghost `icon-xs` button: `size-6` on the Mac's `sm:` breakpoint with a
 /// `size-3.5` glyph (`button.tsx:29-30`), `hover:bg-accent` from the ghost
-/// variant, the tooltip as the native help tag.
-private struct T3FilesIconButton<Content: View>: View {
+/// variant, the tooltip as the native help tag. The Diff tab's subheader
+/// (`T3DiffPanel`) is the same row of the same buttons, so this one is shared
+/// rather than transcribed twice.
+struct T3FilesIconButton<Content: View>: View {
     @Environment(\.t3) private var t3
     @State private var hover = false
     let help: String

@@ -323,6 +323,41 @@ final class T3WindowModel: ObservableObject {
         return listing
     }
 
+    /// The right panel's Diff tab reads one scope's patch here: the session's
+    /// checkpoint ladder (`Checkpoints.list`) and the `Checkpoints.diff` the
+    /// scope resolves to, parsed into files off the main actor. Cached per
+    /// (cwd, session, scope) like the listing above; `reload` is the refresh
+    /// button and the thread switch, and nothing else ever asks — no timer and
+    /// no watcher.
+    private var diffCache: [T3DiffLoad.Key: T3DiffLoad] = [:]
+    private var diffLoads: [T3DiffLoad.Key: Task<T3DiffLoad, Never>] = [:]
+
+    /// The last patch for this scope, to paint before a fresh one lands.
+    func cachedCheckpointDiff(cwd: String, sessionId: String, scope: T3DiffScope) -> T3DiffLoad? {
+        diffCache[T3DiffLoad.Key(cwd: cwd, sessionId: sessionId, scope: scope)]
+    }
+
+    func checkpointDiff(cwd: String, sessionId: String, scope: T3DiffScope,
+                        reload: Bool = false) async -> T3DiffLoad {
+        let key = T3DiffLoad.Key(cwd: cwd, sessionId: sessionId, scope: scope)
+        if reload { diffCache[key] = nil }
+        if !reload, let cached = diffCache[key] { return cached }
+        if let existing = diffLoads[key] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) { T3DiffLoad.load(key) }
+        diffLoads[key] = task
+        let load = await task.value
+        diffLoads[key] = nil
+        diffCache[key] = load
+        // A refresh of one scope invalidates the others: they read the same
+        // working tree, and the ladder they list from has just been re-read.
+        if reload {
+            for other in diffCache.keys where other.cwd == cwd && other.sessionId == sessionId && other != key {
+                diffCache[other] = nil
+            }
+        }
+        return load
+    }
+
     /// The `@` menu's rows for one query. Ranking a monorepo's 20 000 paths is
     /// tens of milliseconds of scanning, so it happens off the main actor
     /// too — the caller drops a result whose query has moved on.

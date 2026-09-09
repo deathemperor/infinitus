@@ -18,7 +18,9 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
+- Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
 - Workspace: the right panel's Files tab browses the thread's project.
+- Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
@@ -69,6 +71,7 @@ publishes the matching section as the GitHub release body.
 - The lapsed-sign-in scan over tool results folds bytes instead of Unicode-lowercasing and Foundation-searching each one — 49× faster per result (#346).
 - The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
+- A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
@@ -96,6 +99,7 @@ publishes the matching section as the GitHub release body.
 - Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
 - Settings → Appearance gains Text size: a slider from 11 to 22 pt that scales every session-screen font, 16 pt being the reference.
 - A thread's Files pill opens the session's workspace: a searchable folder tree, a file's source with line numbers or its markdown rendered, and Add to message drops @path into the composer (#223).
+- The Files tree is built off the main thread and a search re-derives its rows once per keystroke instead of once per redraw.
 
 ## 0.4.4-alpha.2
 

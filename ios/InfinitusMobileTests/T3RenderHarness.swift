@@ -74,10 +74,10 @@ import InfinitusUI
     }
 
     /// The tree in `refs/ios-files.png` (child counts included).
-    static let parityListing: T3FileTree.Listing = {
-        func dir(_ p: String) -> T3FileTree.Entry { .init(path: p, kind: .directory, size: nil) }
-        func file(_ p: String) -> T3FileTree.Entry { .init(path: p, kind: .file, size: 100) }
-        var e: [T3FileTree.Entry] = [
+    static let parityListing: T3ProjectFiles.Listing = {
+        func dir(_ p: String) -> T3ProjectFiles.Entry { .init(path: p, kind: .directory, size: nil) }
+        func file(_ p: String) -> T3ProjectFiles.Entry { .init(path: p, kind: .file, size: 100) }
+        var e: [T3ProjectFiles.Entry] = [
             dir(".claude"), dir(".claude/agents"), file(".claude/agents/coder.md"), dir(".claude/session-logs"),
             file(".claude/settings.json"),
             dir(".claude-plugin"), file(".claude-plugin/marketplace.json"),
@@ -304,7 +304,7 @@ import InfinitusUI
         .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "thread-text-20-dark", png: Self.render(large), dir: dir, test: self)
         T3Font.mobileScale = 1
-        let filesListing = T3FileTree.Listing(cwd: "/tmp/t3fix/proj/limitless", entries: [
+        let filesListing = T3ProjectFiles.Listing(cwd: "/tmp/t3fix/proj/limitless", entries: [
             .init(path: "README.md", kind: .file, size: 2048), .init(path: "Package.swift", kind: .file, size: 900),
             .init(path: "Sources", kind: .directory), .init(path: "Sources/Infinitus", kind: .directory),
             .init(path: "Sources/Infinitus/InfinitusApp.swift", kind: .file, size: 5200),
@@ -315,7 +315,7 @@ import InfinitusUI
         let files = NavigationStack { T3FilesScreen(model: model, session: session, fixture: filesListing) }
             .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "files-dark", png: Self.render(files), dir: dir, test: self)
-        let source = T3FileTree.FileRead(path: "Sources/Infinitus/InfinitusApp.swift",
+        let source = T3ProjectFiles.FileRead(path: "Sources/Infinitus/InfinitusApp.swift",
                                          contents: (1...40).map { "let line\($0) = \"value \($0)\"  // a comment that runs a little long" }.joined(separator: "\n"),
                                          byteLength: 5200, truncated: false, mime: "text/x-swift")
         let sourcePage = NavigationStack { T3SourceFileScreen(model: model, session: session, path: source.path, fixture: source) }
