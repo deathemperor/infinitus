@@ -56,6 +56,7 @@ publishes the matching section as the GitHub release body.
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
+- The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

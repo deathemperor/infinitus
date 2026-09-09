@@ -31,6 +31,11 @@ final class StatsModel: ObservableObject {
     /// one while it's still running (git/gh can take minutes on a repo
     /// with a long history).
     private var repoScanRunning = false
+    /// The transcript cache, decoded once and carried across refreshes:
+    /// `scanning` serializes the loops that use it. Re-decoding the
+    /// ~24 MB cache every 5 minutes churned ~600 MB of small objects per
+    /// pass and left the app's RSS near 600 MB (#346).
+    private let cacheHandle = StatsScanner.CacheHandle()
     private var transcriptsFinished = false
     /// Rebuilt separately (transcript+event facts vs. repo facts) and
     /// combined into `notes`/`days`/`summaries` — the transcript chunk
@@ -191,7 +196,7 @@ final class StatsModel: ObservableObject {
             var cumulativeConsumed = 0
             var firstBytesTotal: Int?
             var previousBytesRemaining = Int.max
-            let cacheHandle = StatsScanner.CacheHandle()   // decoded once per loop, not per pass
+            let cacheHandle = self.cacheHandle   // decoded once per process, not per refresh (#346)
             var entries: [String: StatsScanner.FileEntry] = [:]
             while remaining > 0 {
                 passCount += 1
