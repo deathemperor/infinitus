@@ -223,13 +223,17 @@ public enum SessionFeedReader {
     /// folds in-memory state into the disk stamp (an owned session's
     /// parked prompts, #151) so it counts as a change too; `wake` is
     /// broadcast by whoever owns that state, cutting the poll short.
+    /// `isCancelled` is asked once per slice (#399): a store's detached
+    /// loop passes `Task.isCancelled`, so stopping it ends the wait on
+    /// the next slice instead of after `wait` seconds of re-listing.
     public static func waitForChange(pid: Int32, claudeDir: URL, since: String?,
                                      wait: TimeInterval, poll: TimeInterval = 0.3,
                                      decorate: (String) -> String = { $0 },
-                                     wake: NSCondition? = nil) {
+                                     wake: NSCondition? = nil,
+                                     isCancelled: () -> Bool = { false }) {
         guard let since, wait > 0 else { return }
         let deadline = Date().addingTimeInterval(min(wait, MirrorTransport.tailWaitMax))
-        while Date() < deadline {
+        while Date() < deadline, !isCancelled() {
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
                   stamp(record: record, claudeDir: claudeDir).map(decorate) == since else { return }
             if let wake {

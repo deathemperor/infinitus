@@ -104,7 +104,7 @@ final class SessionChatStore: ObservableObject {
                 let owned = box?.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
                 SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax,
                                                 decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
-                                                wake: owned?.wake)
+                                                wake: owned?.wake, isCancelled: { Task.isCancelled })
                 if Task.isCancelled { return }
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else {
                     await MainActor.run { self?.gone = true }

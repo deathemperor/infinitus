@@ -58,14 +58,9 @@ final class T3TimelineStore: ObservableObject {
                 // transcript: they ride the stamp, and its actor wakes
                 // this wait the moment one parks (OwnedFeed).
                 let owned = box.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
-                // 5 s: a stopped store's loop cannot see cancellation
-                // inside waitForChange
-                // (https://github.com/deathemperor/infinitus/issues/399);
-                // a per-thread store churns on every sidebar click, so
-                // the orphan window stays short.
-                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: 5, poll: 1.0,
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax,
                                                 decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
-                                                wake: owned?.wake)
+                                                wake: owned?.wake, isCancelled: { Task.isCancelled })
                 if Task.isCancelled { return }
                 // A pid reuse by an unrelated session must not show as
                 // this thread's transcript — only `gone`.
