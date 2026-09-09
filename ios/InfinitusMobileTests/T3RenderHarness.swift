@@ -248,6 +248,17 @@ import InfinitusUI
         try Self.attach(name: "settings-macs-light", png: Self.render(macsPage), dir: dir, test: self)
         let usagePage = T3SettingsSheet(model: model, path: NavigationPath([SettingsForm.Part.usage])).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "settings-usage-dark", png: Self.render(usagePage), dir: dir, test: self)
+        // The cost tab needs the Mac's engine report, which no fixture
+        // snapshot carries — rendered over a merged report of its own.
+        let costTab = ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                T3UsageCostTab(merged: Self.usageCost, seriesColors: [T3UsageColors.bar(.claude, dark: true), Color(white: 0.6)])
+            }
+            .padding(.horizontal, 20).padding(.vertical, 16)
+        }
+        .background(Color.black.ignoresSafeArea())
+        .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "usage-cost-dark", png: Self.render(costTab), dir: dir, test: self)
         let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
                                              facts: Self.conversation(running: true).facts)
             .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
@@ -272,6 +283,28 @@ import InfinitusUI
     /// Hosts the view in a key window the size of the simulator's screen,
     /// lets two run-loop turns lay it out, and snapshots the hierarchy —
     /// UIKit-backed views (the editor) included.
+    /// Two Macs' cswap reports over three days, as `T3UsageCost.merge` folds them.
+    static var usageCost: T3UsageCost.Merged {
+        func bucket(_ n: Int, _ alias: String, _ usd: Double, _ model: String) -> UsageReport.UsageBucket {
+            .init(number: n, email: "\(alias.lowercased())@x.com", alias: alias, estimatedUSD: usd, messages: 40,
+                  input: 12_000, output: 3_400, cacheRead: 480_000, cacheWrite: 22_000,
+                  models: [.init(model: model, estimatedUSD: usd, messages: 40)])
+        }
+        let studio = UsageReport(days: 3, estimatedTotalUSD: 18.4, priceTable: .init(source: "test", date: "2026-09-01"),
+                                 accounts: [bucket(1, "Work", 18.4, "claude-opus-4-1")], unpricedTokens: nil,
+                                 caveats: ["Cache reads priced at the listed discount."],
+                                 daily: [.init(date: "2026-09-07", account: 1, estimatedUSD: 4.1, messages: 10),
+                                         .init(date: "2026-09-08", account: 1, estimatedUSD: 8.3, messages: 20),
+                                         .init(date: "2026-09-09", account: 1, estimatedUSD: 6.0, messages: 10)])
+        let air = UsageReport(days: 3, estimatedTotalUSD: 5.2, priceTable: .init(source: "test", date: "2026-09-01"),
+                              accounts: [bucket(1, "Home", 5.2, "claude-sonnet-4")], unpricedTokens: 900, caveats: [],
+                              daily: [.init(date: "2026-09-08", account: 1, estimatedUSD: 5.2, messages: 40)])
+        let today = ISO8601DateFormatter().date(from: "2026-09-09T15:00:00Z")!
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        return T3UsageCost.merge([.init(macId: nil, macName: "Studio", provider: .claude, report: studio),
+                                  .init(macId: "m2", macName: "Air", provider: .claude, report: air)], today: today, calendar: cal)!
+    }
+
     static func attach(name: String, png: Data, dir: URL, test: XCTestCase) throws {
         try png.write(to: dir.appendingPathComponent(name + ".png"))
         let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")

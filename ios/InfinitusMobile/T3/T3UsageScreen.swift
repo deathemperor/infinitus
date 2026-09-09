@@ -7,7 +7,8 @@ import InfinitusUI
 /// the per-account rows the refs predate). One group per Mac and engine
 /// fleet; inside it one card per window pooled across the fleet's accounts:
 /// quota left, pace, the next refill, a numbered segment per account and a
-/// row per account. Countdowns anchor to `now` and move only on refresh.
+/// row per account. Countdowns anchor to `now`, re-set on refresh and on
+/// each new snapshot.
 /// The Usage tab (`T3UsageCostTab`) sits beside it behind T3's segmented
 /// control whenever a shown fleet carries an engine report; without one
 /// the screen is Limits alone.
