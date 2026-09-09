@@ -211,6 +211,23 @@ red channel raised where ΔE went over.
 Mac numbers pending the reference captures (`refs/mac-*.png` absent;
 fixture thread to be recreated in T3 Code).
 
+### C parity — 2026-09-09
+
+From `compare-harness.sh` on the render harness's `parity-*` shots at
+main 9c7e7a9b, against `refs/ios-home.png` / `refs/ios-thread.png`
+(2026-09-08 captures), status bar masked:
+
+| screen | over ΔE 6 (≤ 1.5 % passes) |
+|---|---|
+| home | 1.44 % ✅ |
+| thread | 4.79 % |
+
+Thread's remainder is the header block: the reference frames the thread
+as a modal card (rounded top, dimmed parent, content ~19 pt lower) while
+the phone keeps spec §5.1's push (user decision, #223). Composer, bubble
+and reply rows are within 4 px. The number moves only with a new
+`refs/ios-thread.png` captured on a pushed thread.
+
 ## What is in `refs/`
 
 See `refs/PROVENANCE.md` — it records how each committed PNG was
