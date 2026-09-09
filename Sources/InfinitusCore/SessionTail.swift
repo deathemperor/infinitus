@@ -12,6 +12,10 @@ public struct SessionTail: @unchecked Sendable {
     public let maxBytes: Int
     /// The first byte not yet consumed — the end of the last complete line.
     public private(set) var offset: UInt64 = 0
+    /// The file's identity: a transcript replaced under the same path (an
+    /// atomic write-and-rename) starts over even when the new file is no
+    /// shorter — appending its lines onto the old ones would be silently wrong.
+    private var inode: ino_t?
     private(set) var entries: [[String: Any]] = []
     private var sizes: [Int] = []
     private var bytesHeld = 0
@@ -68,10 +72,13 @@ public struct SessionTail: @unchecked Sendable {
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return false }
         var moved = false
-        if size < offset {
+        var st = stat()
+        let id: ino_t? = fstat(handle.fileDescriptor, &st) == 0 ? st.st_ino : nil
+        if size < offset || (inode != nil && id != inode) {
             entries = []; sizes = []; bytesHeld = 0; offset = 0; headGoal = nil
             moved = true
         }
+        inode = id
         guard size > offset else { return moved }
         var start = offset
         if entries.isEmpty, offset == 0, size > UInt64(maxBytes) { start = size - UInt64(maxBytes) }
@@ -79,12 +86,12 @@ public struct SessionTail: @unchecked Sendable {
               let lastNewline = data.lastIndex(of: UInt8(ascii: "\n")) else { return moved }
         let complete = data[data.startIndex...lastNewline]
         offset = start + UInt64(complete.count)
-        for line in complete.split(separator: UInt8(ascii: "\n")) {
-            guard line.first == UInt8(ascii: "{"),
-                  let entry = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { continue }
+        for line in SessionFeedReader.lines(of: Data(complete)) {
+            guard line.utf8.first == UInt8(ascii: "{"),
+                  let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
             entries.append(entry)
-            sizes.append(line.count + 1)
-            bytesHeld += line.count + 1
+            sizes.append(line.utf8.count + 1)
+            bytesHeld += line.utf8.count + 1
             moved = true
         }
         while bytesHeld > maxBytes, entries.count > 1 {

@@ -127,6 +127,21 @@ final class SessionTailTests: XCTestCase {
         XCTAssertNil(tail.progress().awsLoginProfile)
     }
 
+    /// A transcript replaced under its path (atomic write-and-rename, no
+    /// shorter than before) is a new file: its lines must not land on the
+    /// old ones — the size+mtime stamp used to catch this.
+    func testAReplacedFileOfTheSameOrLargerSizeStartsOver() throws {
+        try (user("Old goal") + "\n" + read("Foo.swift", tokens: 3) + "\n").write(to: url, atomically: true, encoding: .utf8)
+        var tail = SessionTail(url: url)
+        XCTAssertTrue(tail.advance())
+        // `atomically: true` writes a temp file and renames it over the old one.
+        try (user("New goal padded to be longer") + "\n" + read("Bar.swift", tokens: 5) + "\n").write(to: url, atomically: true, encoding: .utf8)
+        XCTAssertTrue(tail.advance())
+        XCTAssertEqual(tail.entries.count, 2)
+        XCTAssertEqual(tail.progress().outputTokens, 5)
+        XCTAssertEqual(tail.progress().goal, "New goal padded to be longer")
+    }
+
     func testAMissingFileIsNoProgressUntilItAppears() throws {
         var tail = SessionTail(url: url)
         XCTAssertFalse(tail.advance())
