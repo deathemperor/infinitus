@@ -614,6 +614,18 @@ struct InfinitusTray {
         }
     }
 
+    /// The descriptor's `machineId` (#486): systemd's stable per-machine id
+    /// where one exists — no daemon of its own to persist a minted one in,
+    /// unlike the Mac's `MachineIdentity` (UserDefaults) or the tray's own
+    /// pairing token (a 0600 file, `PairingStore`).
+    static func machineIdentity(path: String = "/etc/machine-id") -> String {
+        if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
+            let trimmed = contents.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return ProcessInfo.processInfo.hostName
+    }
+
     static func serve(port: UInt16, token: String?, tokenFile: String?, themeID: String,
                       interval: UInt64 = 30) async {
         #if canImport(Glibc)
@@ -638,7 +650,21 @@ struct InfinitusTray {
         let firstList = await collectAndExport(themeID: themeID)
         await tickPushes(list: firstList, pushTriggers: &pushTriggers,
                          flags: pushFlags, bin: CswapLocator.locate())
-        let server = PosixHTTPServer(authorize: { MirrorTransport.isAuthorized($0, token: resolved) }) { request in
+        // `GET /.well-known/infinitus` (#486 first slice): what this tray
+        // serves, read before pairing, same as the Mac's descriptor
+        // (`MirrorServer.descriptor`, #223 phase 4) — unauthenticated by
+        // design, so it never changes and is built once up front. Only
+        // `files` is true: the tray answers nothing else the Mac's newer
+        // routes (timeline, sequence, attention, leases, …) cover.
+        let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
+            machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: "dev")))
+            ?? Data()
+        let server = PosixHTTPServer(authorize: {
+            $0.path == MirrorTransport.wellKnownPath || MirrorTransport.isAuthorized($0, token: resolved)
+        }) { request in
+            if request.method == "GET", request.path == MirrorTransport.wellKnownPath {
+                return MirrorTransport.jsonResponse(descriptorBody)
+            }
             guard MirrorTransport.isAuthorized(request, token: resolved) else {
                 return MirrorTransport.unauthorizedResponse()
             }
@@ -691,6 +717,19 @@ struct InfinitusTray {
                 }
                 guard let encoded = try? JSONEncoder().encode(reply) else { return MirrorTransport.notFoundResponse() }
                 return MirrorTransport.jsonResponse(encoded)
+            }
+            // #486 first slice: GET /sessions/<pid>/files and .../file — the
+            // same Core routes the Mac answers (T3ProjectFiles through
+            // MirrorTransport's shared response builders), one thread per
+            // connection so the walk/read blocking here is fine.
+            if request.method == "GET", let pid = MirrorTransport.sessionFilesPid(request.path) {
+                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                return MirrorTransport.filesListResponse(T3ProjectFiles.list(pid: pid, sessions: sessions))
+            }
+            if request.method == "GET", let pid = MirrorTransport.sessionFilePid(request.path) {
+                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
+                return MirrorTransport.fileReadResponse(T3ProjectFiles.read(pid: pid, path: path, sessions: sessions))
             }
             return MirrorTransport.notFoundResponse()
         }
