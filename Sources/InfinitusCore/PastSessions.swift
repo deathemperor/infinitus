@@ -116,7 +116,7 @@ public enum PastSessions {
         let lines = head.split(separator: UInt8(ascii: "\n")).map { String(decoding: $0, as: UTF8.self) }
         let entries = SessionProgress.jsonEntries(lines)
         guard let cwd = entries.lazy.compactMap({ $0["cwd"] as? String }).first(where: { !$0.isEmpty }),
-              let first = SessionProgress.goal(lines: lines),
+              let first = SessionProgress.goal(entries: entries),
               // Infinitus's own headless runs (the session namer's
               // `claude -p`) open with its preface — not the user's work.
               !first.hasPrefix("[Infinitus]") else { return nil }
