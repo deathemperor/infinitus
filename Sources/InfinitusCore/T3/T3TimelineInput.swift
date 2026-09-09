@@ -4,8 +4,14 @@ import Foundation
 /// the same fields the phone's mirror route (`AppModel.mirrorServer.timeline`)
 /// derives per pid, trimmed to what `T3TimelineRows.derive` reads.
 public enum T3TimelineInput {
+    /// `ended`: the session this timeline belongs to is gone (#400) — the
+    /// thread stays open, but its facts froze at their last value, so a
+    /// `running` status there is stale and must not keep a Working row (and
+    /// its elapsed counter) alive. The phone gates its Working pill the same
+    /// way (`T3ThreadScreen.working`). The rows themselves are untouched.
     public static func make(timeline: SessionTimeline, pending: [PendingRequest], facts: SessionFacts?,
-                            expandedTurnIds: Set<String>, expandedWorkGroupIds: Set<String>) -> T3TimelineRows.Input {
+                            expandedTurnIds: Set<String>, expandedWorkGroupIds: Set<String>,
+                            ended: Bool = false) -> T3TimelineRows.Input {
         let latest = timeline.latestTurn
         let latestTurnRunning = latest?.state == .running
         let latestTurn = latest.map {
@@ -17,8 +23,8 @@ public enum T3TimelineInput {
             runningTurnId: latestTurnRunning ? latest?.id : nil,
             expandedTurnIds: expandedTurnIds,
             expandedWorkGroupIds: expandedWorkGroupIds,
-            isWorking: facts?.status == .running || latestTurnRunning,
-            activeTurnStartedAt: latestTurnRunning ? (latest?.startedAt ?? latest?.requestedAt) : nil,
+            isWorking: !ended && (facts?.status == .running || latestTurnRunning),
+            activeTurnStartedAt: !ended && latestTurnRunning ? (latest?.startedAt ?? latest?.requestedAt) : nil,
             turnDiffSummaries: [],
             supportsConversationRollback: false)
     }

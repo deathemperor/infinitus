@@ -128,6 +128,19 @@ struct T3PromptField: NSViewRepresentable {
         }
         view.textColor = NSColor(context.environment.t3.web.foreground.color)
         view.typingAttributes = Self.attributes
+        // The ladder's answer changes with the thread's phase — an approval
+        // arriving, a session ending (#400) — and `makeNSView` only ever set
+        // the first one. Redraw only on a real change: the placeholder is
+        // drawn by `drawRect`, so an unconditional `needsDisplay` would repaint
+        // the field on every republish.
+        if view.placeholder?.string != placeholder {
+            view.placeholder = NSAttributedString(string: placeholder, attributes: [
+                .font: NSFont.systemFont(ofSize: Self.fontSize),
+                .foregroundColor: NSColor(context.environment.t3.web.placeholder.color),
+                .paragraphStyle: Self.paragraphStyle,
+            ])
+            if view.string.isEmpty { view.needsDisplay = true }
+        }
         if focus {
             if view.window?.firstResponder !== view { view.window?.makeFirstResponder(view) }
             DispatchQueue.main.async { onFocusHandled() }

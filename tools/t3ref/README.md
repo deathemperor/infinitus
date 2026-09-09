@@ -258,6 +258,19 @@ hand and never ran, while the fixture's session is `idle`, i.e. `ready`
 (`T3ComposerPlaceholder` ports the whole ladder). Future Mac references should
 be captured with the pointer off the content.
 
+**B-8 (inline code).** `.chat-markdown :not(pre) > code` (index.css:1792-1799)
+is ported: `--muted` behind a 12 pt mono run in full `foreground`, grown by a
+kerned mono space on each side for the `0.35rem` padding plus the 1 px border
+(`MarkdownInline.CodeChip` — a `Text` run's `backgroundColor` is a rectangle,
+so the 6 px radius and the hairline are not reachable inline). The reply's
+`main` chip now measures 43 × 16 pt against the reference's 42 × 19.5, and its
+glyphs land on the same x — the chip's block is gone from the heatmap. The
+re-measure could NOT be the one above: the 2× panel that pair was shot on was
+not attached, so both sides were read at 1× (the reference downscaled to
+1378×823) — 0.86 % before, 0.81 % after, a number comparable only to itself,
+never to the 2× rows. What still moves that paragraph's wrap is the favicon
+upstream draws before a link (≈17 pt), not the chip.
+
 ### C parity — 2026-09-09
 
 From `compare-harness.sh` on the render harness's `parity-*` shots at
