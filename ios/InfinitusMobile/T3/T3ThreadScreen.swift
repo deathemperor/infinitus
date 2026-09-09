@@ -78,7 +78,9 @@ struct T3ThreadScreen: View {
             activeTurnStartedAt: running?.startedAt ?? running?.requestedAt)
     }
 
-    private var working: Bool { follower.state.facts?.status == .running }
+    /// Facts freeze at their last value once the session exits, so a
+    /// running status alone can't mean Working.
+    private var working: Bool { follower.state.facts?.status == .running && !follower.ended }
 
     var body: some View {
         ZStack {
@@ -107,13 +109,15 @@ struct T3ThreadScreen: View {
         // it — a card and the Working pill can be most of the screen.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 12) {
+                // Same copy as the Mac's thread (#400); the rows stay put.
+                if follower.ended { T3ErrorBanner("This session has ended.") }
                 if working { workingControl }
-                if let approval = pending.approval {
+                if let approval = pending.approval, !follower.ended {
                     T3ApprovalCard(approval: approval, sending: sending,
                                    allowOnce: { send(.init(kind: .key, text: "1")) },
                                    allowSession: { send(.init(kind: .approve, text: approval.sessionApproval)) },
                                    decline: { send(.init(kind: .key, text: "3")) })
-                } else if let input = pending.userInput {
+                } else if let input = pending.userInput, !follower.ended {
                     T3UserInputCard(input: input, sending: sending) { submission in
                         switch submission {
                         case .answers(let text): send(.init(kind: .answers, text: text))
@@ -229,6 +233,7 @@ struct T3ThreadScreen: View {
     private var subtitle: String {
         let repo = URL(fileURLWithPath: session.cwd).lastPathComponent
         let mac = model.macName(macId) ?? model.snapshot?.machineName
+        if follower.ended { return "Session ended" }
         if follower.unreachable { return "Reconnecting…" }
         return mac.map { "\(repo) · \($0)" } ?? repo
     }
@@ -472,7 +477,7 @@ struct T3ThreadScreen: View {
     }
 
     private var canSend: Bool {
-        !sending && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty)
+        !sending && !follower.ended && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty)
     }
 
     private var sendButton: some View {
