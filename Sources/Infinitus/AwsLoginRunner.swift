@@ -226,15 +226,15 @@ actor AwsLoginRunner {
 
     /// Replays the redirect the phone intercepted against the CLI's own
     /// localhost listener; the CLI then finishes the exchange itself.
-    func relay(profile: String, url: String) async -> AwsLogin.Reply {
-        let key = AwsLogin.runKey(provider: .aws, profile: profile)
+    func relay(provider: AwsLogin.Provider, profile: String, url: String) async -> AwsLogin.Reply {
+        let key = AwsLogin.runKey(provider: provider, profile: profile)
         guard var run = runs[key] else {
             return AwsLogin.Reply(ok: false, state: finished[key], error: "no login in flight for \(profile)")
         }
         guard run.state.flow == .relay || run.state.flow == .local, let port = run.state.callbackPort else {
             return AwsLogin.Reply(ok: false, state: run.state, error: "this flow takes no callback")
         }
-        guard AwsLogin.isValidCallback(url, port: port), let target = URL(string: url) else {
+        guard AwsLogin.isValidCallback(url, port: port, provider: provider), let target = URL(string: url) else {
             return AwsLogin.Reply(ok: false, state: run.state, error: "not the CLI's callback")
         }
         do {

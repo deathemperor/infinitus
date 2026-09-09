@@ -49,6 +49,10 @@ final class GcloudLoginTests: XCTestCase {
         XCTAssertEqual(GcloudLogin.arguments(profile: "default", flow: .remote), ["auth", "login", "--no-launch-browser"])
         XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .remote), ["auth", "login", "me@example.com", "--no-launch-browser"])
         XCTAssertEqual(GcloudLogin.arguments(profile: "default", flow: .local), ["auth", "login"])
+        // The relay keeps the CLI's localhost listener; the runner suppresses the browser (#403).
+        XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .relay), ["auth", "login", "me@example.com"])
+        XCTAssertEqual(GcloudLogin.arguments(profile: GcloudLogin.adcProfile, flow: .relay), ["auth", "application-default", "login"])
+        XCTAssertEqual(AwsLogin.Provider.gcloud.flow(profile: "me@example.com", configText: ""), .relay)
         XCTAssertEqual(GcloudLogin.arguments(profile: GcloudLogin.adcProfile, flow: .remote),
                        ["auth", "application-default", "login", "--no-launch-browser"])
         // Never a token on stdout the runner could capture: the probe is exit-status only.
@@ -72,6 +76,29 @@ final class GcloudLoginTests: XCTestCase {
         XCTAssertTrue(GcloudLogin.parseOutput(prompt + "4/0AX4\n\nYou are now logged in as [me@example.com].\nYour current project is [p].").succeeded)
         XCTAssertTrue(GcloudLogin.parseOutput("Credentials saved to file: [/Users/me/.config/gcloud/application_default_credentials.json]").succeeded)
         XCTAssertFalse(GcloudLogin.parseOutput("ERROR: gcloud crashed (EOFError): EOF when reading a line").succeeded)
+    }
+
+    func testTheRelayRunPrintsItsURLAndTheCallbackIsGcloudShaped() {
+        // Captured 2026-09-09: `BROWSER=/usr/bin/true gcloud auth login` (SDK 552) prints
+        // the URL and then waits on http://localhost:8085/ — no code prompt.
+        let output = """
+        Your browser has been opened to visit:
+
+            https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=x&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2F&scope=openid&state=S&code_challenge=C
+
+        """
+        let p = GcloudLogin.parseOutput(output)
+        XCTAssertEqual(p.url?.hasPrefix("https://accounts.google.com/o/oauth2/auth?"), true)
+        XCTAssertFalse(p.wantsCode)
+        XCTAssertEqual(AwsLogin.callbackPort(inURL: p.url ?? ""), 8085)
+        let callback = "http://localhost:8085/?state=S&code=4%2F0AX4&scope=openid"
+        XCTAssertTrue(AwsLogin.isValidCallback(callback, port: 8085, provider: .gcloud))
+        XCTAssertTrue(AwsLogin.isValidCallback("http://localhost:8085?code=c", port: 8085, provider: .gcloud), "no path at all")
+        XCTAssertFalse(AwsLogin.isValidCallback(callback, port: 8085), "an aws run takes no gcloud callback")
+        XCTAssertFalse(AwsLogin.isValidCallback("http://127.0.0.1:8085/oauth/callback?code=c", port: 8085, provider: .gcloud), "and no aws one for gcloud")
+        XCTAssertFalse(AwsLogin.isValidCallback("http://localhost:8086/?code=c", port: 8085, provider: .gcloud), "wrong port")
+        XCTAssertFalse(AwsLogin.isValidCallback("http://localhost:8085/?error=access_denied&state=S", port: 8085, provider: .gcloud))
+        XCTAssertFalse(AwsLogin.isValidCallback("https://accounts.google.com/?code=c", port: 8085, provider: .gcloud))
     }
 
     func testProviderRidesTheExistingWireShapesAndOldEntriesStayAws() throws {

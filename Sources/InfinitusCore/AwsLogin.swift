@@ -415,20 +415,29 @@ public enum AwsLogin {
         }
     }
 
-    /// The localhost callback port in a plain `aws login` authorize URL
-    /// (`redirect_uri=http%3A%2F%2F127.0.0.1%3A60861%2Foauth%2Fcallback`).
+    /// The loopback hosts the CLIs listen on: `aws login` redirects to
+    /// `127.0.0.1`, `gcloud auth login` to `localhost` (#403).
+    static let loopbackHosts: Set<String> = ["127.0.0.1", "localhost"]
+
+    /// The localhost callback port in a CLI's authorize URL
+    /// (`redirect_uri=http%3A%2F%2F127.0.0.1%3A60861%2Foauth%2Fcallback`
+    /// for aws, `redirect_uri=http%3A%2F%2Flocalhost%3A8085%2F` for gcloud).
     public static func callbackPort(inURL url: String) -> Int? {
         guard let comps = URLComponents(string: url),
               let redirect = comps.queryItems?.first(where: { $0.name == "redirect_uri" })?.value,
-              let r = URLComponents(string: redirect), r.host == "127.0.0.1" else { return nil }
+              let r = URLComponents(string: redirect), let host = r.host, loopbackHosts.contains(host)
+        else { return nil }
         return r.port
     }
 
-    /// A callback the Mac may replay: plain http to 127.0.0.1 on the
-    /// CLI's own port, the CLI's own path — nothing else is fetched.
-    public static func isValidCallback(_ url: String, port: Int) -> Bool {
-        guard let c = URLComponents(string: url), c.scheme == "http", c.host == "127.0.0.1",
-              c.port == port, c.path == "/oauth/callback",
+    /// A callback the Mac may replay: plain http to the CLI's own
+    /// loopback host, port and path, carrying a code — nothing else is
+    /// fetched. aws: `127.0.0.1:<port>/oauth/callback`; gcloud:
+    /// `localhost:8085/`.
+    public static func isValidCallback(_ url: String, port: Int, provider: Provider = .aws) -> Bool {
+        guard let c = URLComponents(string: url), c.scheme == "http", c.port == port,
+              c.host == (provider == .aws ? "127.0.0.1" : "localhost"),
+              c.path == (provider == .aws ? "/oauth/callback" : "/") || (provider == .gcloud && c.path.isEmpty),
               c.queryItems?.contains(where: { $0.name == "code" && !($0.value ?? "").isEmpty }) == true
         else { return false }
         return true

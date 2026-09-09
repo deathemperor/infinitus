@@ -66,10 +66,11 @@ final class AwsLoginFlow: ObservableObject {
         }
     }
 
-    /// Relay: the intercepted `127.0.0.1` callback.
+    /// Relay: the intercepted loopback callback (`127.0.0.1:<port>/oauth/callback`
+    /// for aws, `localhost:8085/` for gcloud).
     func relay(_ url: URL) {
         relayed = true
-        Task { await post(AwsLogin.CallbackRequest(profile: profile, url: url.absoluteString)) }
+        Task { await post(AwsLogin.CallbackRequest(profile: profile, url: url.absoluteString, provider: item.provider)) }
     }
 
     func send(code: String) {
@@ -379,7 +380,8 @@ struct AwsLoginScreen: View {
 }
 
 /// The relay flow's browser. `decidePolicyFor` sees every navigation:
-/// the one to `http://127.0.0.1:<callbackPort>/oauth/callback` is
+/// the one to the CLI's loopback listener (`http://127.0.0.1:<port>/oauth/callback`
+/// for aws, `http://localhost:8085/` for gcloud) is
 /// cancelled (the phone can't reach it anyway) and handed back; all
 /// else loads. A Safari user agent because some IdPs refuse embedded
 /// views by their default UA ("disallowed_useragent").

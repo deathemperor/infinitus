@@ -28,6 +28,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
 
 ### Phone
+- A gcloud login from the phone can be one tap: "Sign in here instead" signs in on Google's page in the app and the Mac's gcloud picks the login up by itself, no code to paste (#403).
 - A gcloud login need reads as one on the phone — the account instead of a profile, gcloud's own sign-in page in the copy — and the phone tells the Mac which CLI to run (#367).
 - A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).
 - A long thread scrolls and refreshes without stalling: the feed's rows are derived once per update instead of once per row on every redraw; the Mac's chat window gets the same (#380).

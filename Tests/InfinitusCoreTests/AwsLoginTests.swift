@@ -126,6 +126,7 @@ final class AwsLoginTests: XCTestCase {
         XCTAssertFalse(AwsLogin.isValidCallback("http://evil.example/oauth/callback?code=abc", port: 60861))
         XCTAssertFalse(AwsLogin.isValidCallback("http://127.0.0.1:60861/other?code=abc", port: 60861))
         XCTAssertFalse(AwsLogin.isValidCallback("http://127.0.0.1:60861/oauth/callback?error=denied", port: 60861))
+        XCTAssertFalse(AwsLogin.isValidCallback("http://localhost:60861/oauth/callback?code=abc", port: 60861), "aws listens on 127.0.0.1, not localhost")
         XCTAssertEqual(AwsLogin.arguments(profile: "p", flow: .relay), ["login", "--profile", "p"])
     }
 
