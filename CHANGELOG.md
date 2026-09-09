@@ -17,7 +17,9 @@ publishes the matching section as the GitHub release body.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 
 ### Mac
+- Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
 - Workspace: the right panel's Files tab browses the thread's project.
+- Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
@@ -69,6 +71,7 @@ publishes the matching section as the GitHub release body.
 - The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 - A session's sub-agent files are listed with their mtimes in one call instead of one stat per file, a third off every walk of a session with hundreds of agents (#346).
+- A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

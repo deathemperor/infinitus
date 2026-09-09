@@ -44,7 +44,9 @@ public struct SessionTail: @unchecked Sendable {
         self.init(url: url, maxBytes: maxBytes, scansAgents: true)
     }
 
-    private init(url: URL, maxBytes: Int, scansAgents: Bool) {
+    /// `scansAgents: false` reads this one file and nothing else — a
+    /// sub-agent's tail, or the feed reader's incremental window.
+    init(url: URL, maxBytes: Int, scansAgents: Bool) {
         self.url = url
         self.maxBytes = maxBytes
         self.scansAgents = scansAgents

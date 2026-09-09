@@ -17,8 +17,8 @@ import InfinitusUI
 /// `T3TimelineInput.make` passes `turnDiffSummaries: []`); the revert button
 /// (`supportsConversationRollback: false`, so `revertTurnCount` is always
 /// nil); `AgentSpawnCtaRow` (no `agentSpawn` on `T3WorkLogEntry`); the viewed
-/// image body of a work entry (no thread-scoped asset route here);
-/// `TimelineMinimap`. `isCompacting`/`isPreparingWorktree`
+/// image body of a work entry (no thread-scoped asset route here).
+/// `isCompacting`/`isPreparingWorktree`
 /// (`TimelineRowActivityCtx`) have no equivalent on B either, so the working
 /// row only ever renders its "Working for …" branch.
 struct T3TimelineRowView: View, Equatable {

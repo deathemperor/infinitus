@@ -6,11 +6,12 @@ import Foundation
 /// diff side by side.
 ///
 /// Not ported (each is view plumbing or JavaScript-identity memoization with no
-/// value-type shape): the minimap and follow helpers, `resolveTimelineIsAtEnd`,
+/// value-type shape): the follow helpers, `resolveTimelineIsAtEnd`,
 /// `shouldPreserveAssistantLineBreaks`, `resolveAssistantMessageCopyState`,
 /// `resolveWorkGroupScrollIndex`/`shouldFollowWorkGroupAppend`, and
 /// `deriveMessagesTimelineRowsWithState`/`replaceStreamingMessageRows`
-/// (`stable(previous:next:)` carries their intent).
+/// (`stable(previous:next:)` carries their intent). The minimap's own helpers
+/// are `T3TimelineMinimap`.
 public enum T3TimelineRows {
     public static let liveActivityRowId = "live-activity-row"
     private static let workingIndicatorRowId = "working-indicator-row"
