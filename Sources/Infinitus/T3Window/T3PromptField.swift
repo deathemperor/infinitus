@@ -41,9 +41,23 @@ struct T3PromptField: NSViewRepresentable {
     /// (`ComposerPromptEditor.tsx:1973`, `:1982`) — 14 pt on a 1.625 line box.
     private static let fontSize: Double = 14
     private static let lineHeightMultiple: Double = 1.625
+    /// The font's own line height, and the leading `leading-relaxed` adds on
+    /// top of it. CSS splits that extra HALF above the first line and half
+    /// below the last, where AppKit's `lineHeightMultiple` puts all of it
+    /// above every line — which sat the placeholder 18 px below the
+    /// reference's. `lineSpacing` (between lines only) plus half the leading
+    /// as the container's own inset is the same box, in CSS's proportions.
+    private static var naturalLineHeight: Double {
+        let font = NSFont.systemFont(ofSize: fontSize)
+        return Double(font.ascender - font.descender + font.leading)
+    }
+    private static var extraLeading: Double {
+        max(0, fontSize * lineHeightMultiple - naturalLineHeight)
+    }
     /// `whitespace-pre-wrap` inside the body's own padding: the text view adds
-    /// none of its own beyond the container's line-fragment padding.
-    private static let inset = NSSize(width: 0, height: 0)
+    /// none of its own beyond the container's line-fragment padding and the
+    /// half leading above the first line.
+    private static var inset: NSSize { NSSize(width: 0, height: extraLeading / 2) }
 
     func makeNSView(context: Context) -> NSScrollView {
         let view = T3PromptTextView()
@@ -137,14 +151,14 @@ struct T3PromptField: NSViewRepresentable {
         // `boundingRect` ignores a trailing newline; the caret still needs its
         // line.
         let trailing = text.hasSuffix("\n") ? Self.fontSize * Self.lineHeightMultiple : 0
-        return CGSize(width: width, height: min(200, max(70, ceil(bounds.height + trailing))))
+        return CGSize(width: width, height: min(200, max(70, ceil(bounds.height + trailing + Self.extraLeading))))
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     private static var paragraphStyle: NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = lineHeightMultiple
+        style.lineSpacing = extraLeading
         return style
     }
     private static var attributes: [NSAttributedString.Key: Any] {
