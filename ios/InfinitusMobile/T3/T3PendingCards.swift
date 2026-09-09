@@ -64,13 +64,14 @@ struct T3UserInputCard: View {
     /// pick, no typing (the feed's older path).
     private var questions: [T3Pending.Question] { input.owned ? input.questions : Array(input.questions.prefix(1)) }
 
+    /// Core's rules (#422): every question answered, a typed answer standing
+    /// in for the picks where the question allows one; a terminal session's
+    /// first-question menu key.
     private var submission: T3Pending.Submission? {
         if input.owned {
-            return T3Pending.encodeAnswers(questions, picks: picks, custom: custom).map { .answers($0) }
+            return T3PendingAnswers.encode(questions, picks: picks, custom: custom).map { .answers($0) }
         }
-        guard let q = questions.first, let label = picks[q.id]?.first,
-              let i = q.options.firstIndex(where: { $0.label == label }) else { return nil }
-        return .key(String(i + 1))
+        return T3PendingAnswers.menuKey(questions, picks: picks).map { .key($0) }
     }
 
     var body: some View {
@@ -183,7 +184,7 @@ struct T3UserInputCard: View {
                 // Upstream never shows this: its wire carries an array, so a
                 // comma is just a comma. Ours joins on ", ", so on a
                 // multi-select that text reads as two labels and is dropped.
-                if T3Pending.separatorInMultiSelectText(question, custom: custom) {
+                if T3PendingAnswers.separatorInMultiSelectText(question, custom: custom) {
                     Text("A custom answer here can't contain a comma followed by a space — on a multiple-choice question that reads as two options.")
                         .font(T3Font.mobile(.xs)).foregroundStyle(t3.mobile.warningForeground.color)
                         .fixedSize(horizontal: false, vertical: true)

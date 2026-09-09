@@ -48,39 +48,4 @@ final class T3PendingTests: XCTestCase {
                                 payload: ["requestId": .string("perm:q"), "answers": .string("A")])
         XCTAssertEqual(T3Pending.derive(SessionTimeline(activities: [asked, answered])), T3Pending.Live())
     }
-
-    func testAnswersNeedEveryQuestionAndJoinMultiSelects() {
-        let q1 = T3Pending.Question(id: "Color?", question: "Color?", header: "", multiSelect: true,
-                                    options: [.init(label: "Red", description: ""), .init(label: "Blue", description: "")])
-        let q2 = T3Pending.Question(id: "Size?", question: "Size?", header: "", multiSelect: false, options: [])
-        XCTAssertNil(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red", "Blue"]], custom: [:]))
-        XCTAssertEqual(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red", "Blue"]], custom: ["Size?": " large "]),
-                       #"{"Color?":"Red, Blue","Size?":"large"}"#)
-        // A typed answer stands in for the picks; it is never appended to them.
-        XCTAssertEqual(T3Pending.encodeAnswers([q1, q2], picks: ["Color?": ["Red"]], custom: ["Color?": "teal", "Size?": "large"]),
-                       #"{"Color?":"teal","Size?":"large"}"#)
-    }
-
-    func testATypedAnswerCountsOnlyWhereItIsDeliverable() {
-        let multi = T3Pending.Question(id: "Color?", question: "Color?", header: "", multiSelect: true,
-                                       options: [.init(label: "Red", description: ""), .init(label: "Blue", description: "")])
-        let single = T3Pending.Question(id: "Size?", question: "Size?", header: "", multiSelect: false, options: [])
-        // A multi-select's text carrying the separator would be split into
-        // non-options by the Mac and rejected: not an answer, Submit stays off.
-        XCTAssertNil(T3Pending.encodeAnswers([multi], picks: [:], custom: ["Color?": "red, or blue"]))
-        XCTAssertTrue(T3Pending.separatorInMultiSelectText(multi, custom: ["Color?": "red, or blue"]))
-        XCTAssertFalse(T3Pending.separatorInMultiSelectText(multi, custom: ["Color?": "red,or blue"]))
-        XCTAssertFalse(T3Pending.separatorInMultiSelectText(single, custom: ["Size?": "large, please"]))
-        // The same text on a single-select is one answer.
-        XCTAssertEqual(T3Pending.encodeAnswers([single], picks: [:], custom: ["Size?": "large, please"]),
-                       #"{"Size?":"large, please"}"#)
-        // A question that withdrew the custom answer ignores typed text.
-        var noCustom = single
-        noCustom.allowCustomAnswer = false
-        XCTAssertNil(T3Pending.encodeAnswers([noCustom], picks: [:], custom: ["Size?": "large"]))
-        XCTAssertNil(T3Pending.typedAnswer(noCustom, custom: ["Size?": "large"]))
-        XCTAssertFalse(T3Pending.separatorInMultiSelectText(T3Pending.Question(id: "m", question: "m", header: "", multiSelect: true,
-                                                                                options: [], allowCustomAnswer: false),
-                                                            custom: ["m": "a, b"]))
-    }
 }
