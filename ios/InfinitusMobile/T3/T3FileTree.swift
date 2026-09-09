@@ -1,4 +1,5 @@
 import Foundation
+import InfinitusCore
 
 /// The Files browser's tree (upstream 6c583620f `fileTree.ts`): built on the
 /// phone from the Mac's flat entry list, directories before files, natural
@@ -6,29 +7,12 @@ import Foundation
 /// a search shows every match with its ancestors — a token matches a path
 /// segment by containment or a camel-case word by subsequence.
 enum T3FileTree {
-    enum Kind: String, Codable, Equatable { case file, directory }
-
-    struct Entry: Codable, Equatable {
-        let path: String
-        let kind: Kind
-        var size: Int? = nil
-    }
-
-    /// `GET /sessions/<pid>/files` (#223 Files proposal): the workspace, flat.
-    struct Listing: Codable, Equatable {
-        let cwd: String
-        let entries: [Entry]
-        let truncated: Bool
-    }
-
-    /// `GET /sessions/<pid>/file?path=`: one file's text, cut at the Mac's cap.
-    struct FileRead: Codable, Equatable {
-        let path: String
-        let contents: String
-        let byteLength: Int
-        let truncated: Bool
-        let mime: String
-    }
+    // The wire's shapes are Core's (`T3ProjectFiles`, shared with the Mac's
+    // MirrorServer): named here so the tree reads as one unit.
+    typealias Kind = T3ProjectFiles.Kind
+    typealias Entry = T3ProjectFiles.Entry
+    typealias Listing = T3ProjectFiles.Listing
+    typealias FileRead = T3ProjectFiles.FileRead
 
     final class Node: Equatable {
         let path: String

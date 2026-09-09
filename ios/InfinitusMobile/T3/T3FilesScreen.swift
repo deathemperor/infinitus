@@ -7,7 +7,7 @@ import InfinitusUI
 extension NetworkFleetMirror {
     /// The session's workspace files, flat: `GET /sessions/<pid>/files`.
     func files(pid: Int32) async throws -> T3FileTree.Listing {
-        try await getJSON("/sessions/\(pid)/files")
+        try await getJSON(T3ProjectFiles.filesPath(pid: pid))
     }
 
     /// One workspace file's text: `GET /sessions/<pid>/file?path=<rel>`.
@@ -16,7 +16,7 @@ extension NetworkFleetMirror {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
         let encoded = path.addingPercentEncoding(withAllowedCharacters: allowed) ?? path
-        return try await getJSON("/sessions/\(pid)/file?path=\(encoded)")
+        return try await getJSON("\(T3ProjectFiles.filePath(pid: pid))?\(T3ProjectFiles.pathQueryName)=\(encoded)")
     }
 }
 
