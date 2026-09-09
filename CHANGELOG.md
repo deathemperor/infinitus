@@ -59,6 +59,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
 - A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
+- The resume tick probes the last 64 KB of a transcript before reading 512 KB, and a sub-agent's meta file is decoded once, not on every feed read (#346).
 - The machine sample matches hook scripts to processes with a byte search instead of Foundation's `contains` (a second per sample on 70 hooks) (#346).
 
 ### Phone

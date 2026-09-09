@@ -263,12 +263,12 @@ public enum SessionFeedReader {
         guard !wanted.isEmpty else { return items }
         let dir = transcript.deletingPathExtension().appendingPathComponent("subagents")
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return items }
+        metas.keep(dir: dir, names: names)
         var byToolUse: [String: SessionFeedItem.Agent] = [:]
         for name in names where name.hasSuffix(".meta.json") {
             let id = String(name.dropFirst("agent-".count).dropLast(".meta.json".count))
-            guard let data = try? Data(contentsOf: dir.appendingPathComponent(name)),
-                  let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let toolUseId = meta["toolUseId"] as? String, wanted.contains(toolUseId) else { continue }
+            guard let meta = metas.value(dir.appendingPathComponent(name)),
+                  wanted.contains(meta.toolUseId) else { continue }
             let log = dir.appendingPathComponent("agent-\(id).jsonl")
             let entries = tail(of: log, maxBytes: 64 * 1024).compactMap(decodeLine)
             var toolCalls = 0
@@ -297,9 +297,8 @@ public enum SessionFeedReader {
             }
             let mtime = (try? FileManager.default.attributesOfItem(atPath: log.path))?[.modificationDate] as? Date
             let fresh = mtime.map { now.timeIntervalSince($0) < 120 } ?? false
-            byToolUse[toolUseId] = SessionFeedItem.Agent(
-                id: id, type: meta["agentType"] as? String ?? "agent",
-                description: meta["description"] as? String ?? "sub-agent",
+            byToolUse[meta.toolUseId] = SessionFeedItem.Agent(
+                id: id, type: meta.type, description: meta.description,
                 toolCalls: toolCalls, lastTool: lastTool, running: !endsWithText && fresh,
                 lastActivityAt: lastAt ?? mtime)
         }
@@ -308,6 +307,44 @@ public enum SessionFeedReader {
             return SessionFeedItem(kind: .agent, text: agent.description, at: item.at,
                                    toolName: agent.type, agent: agent, toolUseId: id)
         }
+    }
+
+    /// An agent's `.meta.json`, written once when it spawns and never
+    /// again — remembered per path (#346): a watched session with 80
+    /// agents decoded all 80 on every feed read, once per exporter tick
+    /// and once per phone poll.
+    struct AgentMeta { let toolUseId: String; let type: String; let description: String }
+
+    static let metas = AgentMetaCache()
+
+    final class AgentMetaCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: [String: AgentMeta] = [:]
+
+        func value(_ url: URL) -> AgentMeta? {
+            lock.lock()
+            if let hit = stored[url.path] { lock.unlock(); return hit }
+            lock.unlock()
+            guard let data = try? Data(contentsOf: url),
+                  let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let toolUseId = meta["toolUseId"] as? String else { return nil }
+            let parsed = AgentMeta(toolUseId: toolUseId, type: meta["agentType"] as? String ?? "agent",
+                                   description: meta["description"] as? String ?? "sub-agent")
+            lock.lock(); stored[url.path] = parsed; lock.unlock()
+            return parsed
+        }
+
+        /// Drops this directory's entries whose meta file is gone (a session
+        /// folder cleaned up), so the cache follows the disk.
+        func keep(dir: URL, names: [String]) {
+            let prefix = dir.path + "/"
+            let present = Set(names.map { prefix + $0 })
+            lock.lock()
+            stored = stored.filter { !$0.key.hasPrefix(prefix) || present.contains($0.key) }
+            lock.unlock()
+        }
+
+        var count: Int { lock.lock(); defer { lock.unlock() }; return stored.count }
     }
 
     private static func tail(of url: URL, maxBytes: Int) -> [String] {
