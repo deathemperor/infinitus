@@ -8,7 +8,14 @@ import Foundation
 /// rebuild and facts change is numbered into the `SequenceLog` when one
 /// is attached (#223 phase 4).
 public final class TimelineCache: @unchecked Sendable {
-    private struct Slot { let stamp: String; let pid: Int32; let timeline: SessionTimeline; let maxBytes: Int }
+    /// `tail`: the reader's held window, kept for wide (watched) slots
+    /// only so a streaming thread's rebuild decodes just the new lines
+    /// (#346); a narrow slot re-reads its 256 KB, which is cheap, and
+    /// holding a decoded window per idle session is not.
+    private struct Slot {
+        let stamp: String; let pid: Int32; let timeline: SessionTimeline; let maxBytes: Int
+        let tail: SessionTail?
+    }
     private let lock = NSLock()
     private var slots: [String: Slot] = [:]
     private var sessionByPid: [Int32: String] = [:]
@@ -36,14 +43,17 @@ public final class TimelineCache: @unchecked Sendable {
             log?.drop(pid: record.pid)
         }
         let previous = slots[record.sessionId]?.timeline
+        var tail = slots[record.sessionId]?.tail
         lock.unlock()
-        guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit, maxBytes: maxBytes),
+        guard let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit,
+                                                maxBytes: maxBytes, tail: &tail),
               let timeline = feed.timeline else { return nil }
         // The feed's own stamp, taken after the read: a write that lands
         // between the stat above and the read is re-parsed next pass.
         lock.lock()
         parses += 1
-        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", pid: record.pid, timeline: timeline, maxBytes: maxBytes)
+        slots[record.sessionId] = Slot(stamp: feed.stamp ?? "", pid: record.pid, timeline: timeline, maxBytes: maxBytes,
+                                       tail: maxBytes > SessionFeedReader.tailBytes ? tail : nil)
         sessionByPid[record.pid] = record.sessionId
         lock.unlock()
         _ = log?.record(pid: record.pid, old: previous, new: timeline)
