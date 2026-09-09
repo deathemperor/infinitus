@@ -1,7 +1,7 @@
 import Foundation
 
 /// The keys an open menu claims before the field does
-/// (`onComposerCommandKey`, `ChatComposer.tsx:3080-3125`): ↑/↓ move the
+/// (`onComposerCommandKey`, `ChatComposer.tsx:3241-3286`): ↑/↓ move the
 /// highlight, ⏎ and ⇥ pick it, ⎋ shuts the menu (ours — see
 /// `T3ComposerMenuState`).
 public enum T3ComposerMenuKey: Sendable {
@@ -69,7 +69,7 @@ public struct T3ComposerMenuState: Equatable, Sendable {
         case unhandled        // the field keeps the key
     }
 
-    /// `onComposerCommandKey` (`ChatComposer.tsx:3080-3125`): while a menu is
+    /// `onComposerCommandKey` (`ChatComposer.tsx:3241-3286`): while a menu is
     /// open it takes ↑/↓ and ⏎/⇥ first. `trigger` nil (no menu) → `.unhandled`
     /// for every key; ↑/↓ with no rows → `.unhandled`; `.pick` with no active
     /// row → `.unhandled` (⏎ then sends the prompt, as upstream).

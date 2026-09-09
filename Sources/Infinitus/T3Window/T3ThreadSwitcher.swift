@@ -10,9 +10,9 @@ import InfinitusUI
 /// Ported: the dialog shell (`ui/command.tsx:62-79`: `max-w-xl max-h-105`), the
 /// input row (`:99-112`, `px-[var(--command-shell-inset)] py-1.5`), the results
 /// panel (`:148-156`), the "Recent Threads" group label
-/// (`CommandPalette.logic.ts:452-458`), a row's title over
+/// (`CommandPalette.logic.ts:463-469`), a row's title over
 /// `project · Current thread` with a relative timestamp
-/// (`buildThreadActionItems`, `:205-250`), the highlighted row's
+/// (`buildThreadActionItems`, `:216-261`), the highlighted row's
 /// `bg-foreground/[0.09]` (`:177-184`), the empty line
 /// (`CommandPaletteResults.tsx:92-99`) and the footer's key hints
 /// (`CommandPaletteContent.tsx:53-80`).
@@ -41,7 +41,7 @@ struct T3ThreadSwitcher: View {
     private static let maxListHeight: Double = 420 - 96
 
     /// `buildThreadActionItems` sorts with `sortThreads(threads, sortOrder)`
-    /// (`CommandPalette.logic.ts:197-200`) — `T3ThreadSort.sortThreads` here, on
+    /// (`CommandPalette.logic.ts:208-211`) — `T3ThreadSort.sortThreads` here, on
     /// the default `updated_at` order. A draft is not a thread the switcher can
     /// open (upstream's items are built over thread shells only), so drafts are
     /// left out.
@@ -98,7 +98,7 @@ struct T3ThreadSwitcher: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // `CommandGroupLabel` at `ps-[9px]`
                     // (`CommandPaletteResults.tsx:106`), the group's own label
-                    // "Recent Threads" (`CommandPalette.logic.ts:456`).
+                    // "Recent Threads" (`CommandPalette.logic.ts:467`).
                     Text("Recent Threads")
                         .font(T3Font.web(.xs, .medium))
                         .foregroundStyle(t3.web.mutedForeground.color)
@@ -134,7 +134,7 @@ struct T3ThreadSwitcher: View {
             }
             Spacer(minLength: 8)
             // `timestamp: formatRelativeTimeLabel(latestUserMessageAt ??
-            // updatedAt ?? createdAt)` (`CommandPalette.logic.ts:238-240`).
+            // updatedAt ?? createdAt)` (`CommandPalette.logic.ts:249-251`).
             Text(T3RelativeTime.label(from: thread.latestUserMessageAt ?? thread.updatedAt, now: model.now))
                 .font(T3Font.web(.xs))
                 .foregroundStyle(t3.web.mutedForeground.color)
@@ -153,7 +153,7 @@ struct T3ThreadSwitcher: View {
         .onHover { if $0 { highlighted = thread.id } }
     }
 
-    /// `descriptionParts.join(" · ")` (`CommandPalette.logic.ts:206-217`): the
+    /// `descriptionParts.join(" · ")` (`CommandPalette.logic.ts:217-228`): the
     /// project, then "Current thread" for the one already open. B has no branch
     /// on a thread, so that part has nothing to join.
     private func description(_ thread: T3Thread) -> String? {

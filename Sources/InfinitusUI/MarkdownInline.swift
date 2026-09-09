@@ -24,13 +24,13 @@ enum MarkdownInline {
         /// reference's favicon slot.
         var linkGlyph: LinkGlyph? = nil
         /// The phone underlines a link; T3's `.chat-markdown a` is
-        /// `text-decoration: none` (index.css:1745-1747), so `T3ChatMarkdown`
+        /// `text-decoration: none` (index.css:1755-1757), so `T3ChatMarkdown`
         /// turns this off.
         var linkUnderline = true
     }
 
     /// The inline-code chip, `.chat-markdown :not(pre) > code`
-    /// (index.css:1792-1799): a 6 px-radius box on `--muted` with a
+    /// (index.css:1802-1809): a 6 px-radius box on `--muted` with a
     /// `--contrast-border` hairline, `0.1rem 0.35rem` of padding around a
     /// 0.75 rem mono run.
     ///
@@ -61,7 +61,7 @@ enum MarkdownInline {
     }
 
     /// The favicon slot upstream reserves before an external link's text
-    /// (`MarkdownLinkFavicon`, ChatMarkdown.tsx:1190-1215): an
+    /// (`MarkdownLinkFavicon`, ChatMarkdown.tsx:1193-1218): an
     /// `ms-[0.25em] me-[0.2em] size-[14px] [vertical-align:-0.125em]` span
     /// holding the site's favicon, or lucide's globe when there is none.
     ///

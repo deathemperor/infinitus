@@ -1,6 +1,6 @@
 import Foundation
 
-/// `activeThreadModelDisplayName` (`ChatComposer.tsx:5566`) is the model's
+/// `activeThreadModelDisplayName` (`ChatComposer.tsx:5854`) is the model's
 /// display name; the transcript carries only the id
 /// (`claude-sonnet-4-5-20250929`), so this is ours: drop the vendor prefix
 /// and the build date, keep the family and its version.

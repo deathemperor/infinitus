@@ -1,7 +1,7 @@
 import XCTest
 @testable import InfinitusCore
 
-/// `ChatComposer.tsx:5432-5450`'s placeholder ladder — every branch, and the
+/// `ChatComposer.tsx:5718-5736`'s placeholder ladder — every branch, and the
 /// order between them (the ladder is `?:`-chained, so an earlier branch must
 /// win over a later one that also matches).
 final class T3ComposerPlaceholderTests: XCTestCase {

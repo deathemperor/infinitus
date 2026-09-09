@@ -1,12 +1,12 @@
 import Foundation
 
-/// The composer's placeholder rule (`ChatComposer.tsx:5432-5450`), which is a
+/// The composer's placeholder rule (`ChatComposer.tsx:5718-5736`), which is a
 /// seven-branch ladder over the thread's state, not one constant.
 ///
 /// The Mac reference (`tools/t3ref/refs/mac-*.png`) shows the sixth branch —
 /// `DISCONNECTED_COMPOSER_PLACEHOLDER` (`composerPlaceholder.ts:1-2`), reached
 /// only through `phase === "disconnected"`, which `derivePhase`
-/// (`session-logic.ts:1673-1685`) returns for a thread with no session, or one
+/// (`session-logic.ts:1682-1694`) returns for a thread with no session, or one
 /// stopped, interrupted or errored. The reference thread was recreated by hand
 /// in T3 Code and never ran, so its composer is in that state; a live thread's
 /// is not. The string is reference STATE, like the hover-revealed timestamp

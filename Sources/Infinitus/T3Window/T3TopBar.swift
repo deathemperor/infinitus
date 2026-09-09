@@ -21,13 +21,13 @@ import InfinitusUI
 /// active thread" text used to render as `T3NoActiveThreadState`'s own
 /// stacked label row (Task 6); that row moves here. The `border-b` renders
 /// only in that no-thread state — the with-thread `WorkspacePageHeader`
-/// instance in `ChatView.tsx:7847` carries none (B-3 review; Task 8's first
+/// instance in `ChatView.tsx:8140` carries none (B-3 review; Task 8's first
 /// pass had unified the border onto both states).
 struct T3TopBar: View {
     @ObservedObject var model: T3WindowModel
     @ObservedObject var app: AppModel
     /// The main column's width, proposed by `T3Root` (window − sidebar −
-    /// right panel). `ChatHeader.tsx:318-320` marks the header content div
+    /// right panel). `ChatHeader.tsx:315-317` marks the header content div
     /// `@container/header-actions`, and that div fills the column, so this is
     /// what its container queries measure. Measuring it here with a
     /// `GeometryReader` instead would feed this view's own children's widths
@@ -36,7 +36,7 @@ struct T3TopBar: View {
     @Environment(\.t3) private var t3
 
     /// Tailwind v4's `--container-3xl: 48rem` (`theme.css:341`): the one
-    /// breakpoint `ChatHeader.tsx:418` and `OpenInPicker.tsx:283-291` query.
+    /// breakpoint `ChatHeader.tsx:407` and `OpenInPicker.tsx:283-291` query.
     private static let containerBreakpoint3xl: Double = 768
     private var wide: Bool { columnWidth >= Self.containerBreakpoint3xl }
     // Fix round 1 (task-8-fix1-brief.md R1): each menu-fronted control's
@@ -73,17 +73,17 @@ struct T3TopBar: View {
             // flexible member (its own `.frame(maxWidth: .infinity)`) — this
             // gap is fixed, not an expanding `Spacer`, so nothing else in
             // the row competes for leftover width. It is
-            // `ChatHeader.tsx:319`'s `gap-2 sm:gap-3` on the header content
+            // `ChatHeader.tsx:317`'s `gap-2 sm:gap-3` on the header content
             // div — a VIEWPORT breakpoint the window's 840 pt minimum always
             // clears, so always 12, unlike the actions gap below.
             Color.clear.frame(width: 12)
-            // `ChatHeader.tsx:418`: the actions div is `gap-2
+            // `ChatHeader.tsx:407`: the actions div is `gap-2
             // @3xl/header-actions:gap-3` — a CONTAINER query, so the gap is 8
             // until the header itself reaches 768 pt and 12 above it. With
             // the right panel open at 840 the column is ~380 pt wide and the
             // 12 pt gaps overflowed it (B-3 review).
             HStack(spacing: wide ? 12 : 8) { actions }
-            // R4 (fix1 brief): `ChatHeader.tsx:415-418`'s actions div is
+            // R4 (fix1 brief): `ChatHeader.tsx:405-408`'s actions div is
             // `pr-16` (64pt) while the toggle shows (`pr-0` once the right
             // panel is open and the panel itself separates it — B has no
             // such conditional, this task's scope is the toggle-visible
@@ -93,7 +93,7 @@ struct T3TopBar: View {
             // still lands 64pt from the window's right edge.
             // Measured against the 2x reference with both toggles present:
             // the actions cluster's trailing edge sits 12 pt from the panel
-            // controls (`ChatHeader.tsx:319`'s own `gap-3`), and the group's
+            // controls (`ChatHeader.tsx:317`'s own `gap-3`), and the group's
             // 28 + 4 + 28 plus `index.css:110`'s 12 pt inset fill the rest.
             // The 24 here came from reading `pr-16` as the whole trailing
             // run while only ONE toggle stood in it.
@@ -123,7 +123,7 @@ struct T3TopBar: View {
         .background(t3.web.toolbarBackground.color)
         // Upstream borders only the no-thread header (`NoActiveThreadState.tsx:10`
         // `className="border-b border-border"`), not the with-thread bar
-        // (`ChatView.tsx:7847` `className="relative bg-background"`, no
+        // (`ChatView.tsx:8140` `className="relative bg-background"`, no
         // `border-b`) — B-3 review corrects Task 8's "unify onto both" call.
         .overlay(alignment: .bottom) {
             if model.state.selectedThread == nil {
@@ -164,7 +164,7 @@ struct T3TopBar: View {
     // menu, neither of which B wires yet (no `onNewThreadInProject` /
     // thread-rename plumbing in this task's scope).
     //
-    // R2 (fix1 brief): `ChatHeader.tsx:332`'s project button is `max-w-40
+    // R2 (fix1 brief): `ChatHeader.tsx:329`'s project button is `max-w-40
     // truncate` (10rem = 160pt) with `className="shrink"` overriding the
     // breadcrumb item's default `shrink-0` — it's meant to cap AND shrink,
     // not hug its content. The Task 8 first pass's `.fixedSize` on the
@@ -173,9 +173,9 @@ struct T3TopBar: View {
     // proposal left to clamp) — removed; `CapToContent` below does the job.
     //
     // B-3 review: the priority was inverted. CSS gives the title item
-    // `min-w-10 flex-1` (`:352`) — flex-basis 0, so it takes the leftover and
+    // `min-w-10 flex-1` (`:342`) — flex-basis 0, so it takes the leftover and
     // is the member that TRUNCATES — while the project item is `shrink` with
-    // a content basis capped at 160 (`:332`,`:360`), so it keeps
+    // a content basis capped at 160 (`:329`,`:350`), so it keeps
     // min(content, 160) and only gives way under real squeeze. The title's
     // `.layoutPriority(1)` said the opposite (it made the title hold its
     // ideal width and the project cluster collapse), so it is gone: the two
@@ -185,7 +185,7 @@ struct T3TopBar: View {
         HStack(spacing: 12) {
             if let project {
                 HStack(spacing: 6) {
-                    // `ChatHeader.tsx:345-352`'s `<ProjectFavicon …
+                    // `ChatHeader.tsx:341`'s `<ProjectFavicon …
                     // className="size-3.5">` — the same automatic project
                     // glyph the sidebar rows draw (Task 7's `T3ProjectGlyph`),
                     // at 14 pt. `.fixedSize()`: the icon never
@@ -237,7 +237,7 @@ struct T3TopBar: View {
         }
     }
 
-    // `GitActionsControl.tsx:1704-1755`'s `<Group aria-label="Git actions">`:
+    // `GitActionsControl.tsx:1643-1694`'s `<Group aria-label="Git actions">`:
     // the quick action as an `xs` outline button, a `GroupSeparator`, and an
     // `icon-xs` outline `MenuTrigger` carrying `ChevronDownIcon size-4` — the
     // same joined pill `openInControl` builds, and unconditional once the
@@ -306,7 +306,7 @@ struct T3TopBar: View {
         } label: {
             // `size="xs"` at the `sm:` breakpoint is `h-6` (24 pt) `text-xs`
             // (`button.tsx:36`) — `ProjectScriptsControl.tsx:250`'s
-            // "Add action" trigger and `GitActionsControl.tsx:1678`'s
+            // "Add action" trigger and `GitActionsControl.tsx:1617`'s
             // "Commit & push" trigger both carry it.
             // `button.tsx:36`'s xs row is `h-7 gap-1 …` — gap-1 = 4 pt
             // between the leading glyph and the label, not 6.
@@ -464,8 +464,8 @@ struct T3TopBar: View {
 /// Task 8 fix brief's own ask, re-pointed by the B-3 review: a 60-char
 /// project name and a 120-char thread title at a 900 pt width, so BOTH sides
 /// of the breadcrumb's sizing show — the project cluster holding at its
-/// 160 pt cap (`CapToContent`, `ChatHeader.tsx:360`'s `max-w-40`) while the
-/// TITLE is the member that truncates (`:352`'s `min-w-10 flex-1`, no
+/// 160 pt cap (`CapToContent`, `ChatHeader.tsx:350`'s `max-w-40`) while the
+/// TITLE is the member that truncates (`:342`'s `min-w-10 flex-1`, no
 /// `.layoutPriority` anywhere). Standing up a real `T3TopBar` here would need
 /// a live `AppModel` (engine registration, a demo-script subprocess even
 /// under `playground:`), wildly disproportionate for a layout check, so this

@@ -154,7 +154,7 @@ public enum T3ComposerDrafts {
     }
 
     /// `submitComposerDraft`'s two gates (`composerSubmission.ts:33-49`) plus
-    /// the running check `ChatComposer.tsx:5572` makes with `phase ===
+    /// the running check `ChatComposer.tsx:5860` makes with `phase ===
     /// "running"`: the prompt is trimmed first (`:13`), the length rejection
     /// wins over everything a send could do, and a blank prompt is a no-op
     /// rather than a queued nothing.
