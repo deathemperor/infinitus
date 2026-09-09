@@ -26,6 +26,7 @@ publishes the matching section as the GitHub release body.
 - Open workspace: a new window over your sessions, from the popup, ⌘⇧T, or infinitusctl show workspace.
 - Workspace: sidebar with project groups, pinned/snoozed/settled shelves, and the thread header bar.
 - Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
+- Settings › Team's Syncing line stays one line: git's progress can no longer spill over the pane.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 
 ### Phone

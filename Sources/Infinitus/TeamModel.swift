@@ -136,7 +136,10 @@ final class TeamModel: ObservableObject {
         TeamGit.activity.set { [weak self] line in
             Task { @MainActor in
                 guard let self, self.busy != nil || self.loopRunning else { return }
-                self.storeActivity = line
+                // Belt and braces: only the last non-empty segment of
+                // whatever git said, whichever line break it used.
+                self.storeActivity = line.components(separatedBy: .newlines)
+                    .last { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? line
             }
         }
     }
