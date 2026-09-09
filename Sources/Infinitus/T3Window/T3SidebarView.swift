@@ -142,6 +142,14 @@ struct T3SidebarView: View {
 
     // MARK: - Scope
 
+    // `Sidebar.tsx:4343-4396`: a `flex items-center gap-1` line holding the
+    // scope trigger (`SidebarMenuButton`, `min-w-0 flex-1
+    // ps-[calc(var(--sidebar-row-content-inset)-1px)]`) and the "New project"
+    // icon button beside it — the same two-control shape as the search row
+    // above, so the folder-plus lands under the pen. The trigger itself is
+    // `FolderIcon size-4` (`:4389`, the no-scope branch), the label
+    // (`min-w-0 flex-1 truncate`) and `ChevronDownIcon size-4 -mr-px` at the
+    // FAR right (`:4392`), not against the label.
     private var scopeRow: some View {
         HStack(spacing: 4) {
             Menu {
@@ -150,20 +158,51 @@ struct T3SidebarView: View {
                     Button(group.displayName) { model.setScope(.group(ids: group.members.map(\.id))) }
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Text(currentScopeLabel).font(T3Font.web(.sm, .medium)).lineLimit(1)
-                    LucideIcon(.chevronDown, size: 14)
+                HStack(spacing: 8) {   // SidebarMenuButton's own `gap-2`
+                    LucideIcon(.folder, size: 16)
+                    Text(currentScopeLabel)
+                        .font(T3Font.web(.sm, .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LucideIcon(.chevronDown, size: 16)
+                        .padding(.trailing, -1)   // `-mr-px`
                 }
                 .foregroundStyle(t3.web.sidebarForeground.color)
+                .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset - 1)
+                .frame(height: 32)   // `:4451`'s "h-8 min-h-8"
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            Spacer(minLength: 0)
+            // `.borderlessButton` throws a rich label away and draws the
+            // title alone once the menu is not `.fixedSize()` (the folder and
+            // the chevron vanished, measured) — `.button` + `.plain` is the
+            // style the composer's own mode trigger uses to keep its glyphs.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .frame(maxWidth: .infinity)
+            newProjectButton
         }
-        .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
-        // `Sidebar.tsx:4451`'s project-select trigger: "h-8 min-h-8" = 32 pt.
-        .frame(height: 32)
-        .padding(.bottom, 4)
+        .padding(.horizontal, T3Theme.Metrics.sidebarContentInset)
+        // No bottom padding: `gap-1` sits BETWEEN the two rows (the search
+        // row's own bottom 4) and the group's closing `p-2` is what the
+        // thread list's section inset already supplies. Carrying both put the
+        // first card 8 px below the reference's.
+    }
+
+    // `Sidebar.tsx:4492-4510`: the group's second `SidebarMenuButton
+    // size="icon"` (`size-8`), `FolderPlusIcon`, tooltip "New project". B has
+    // no project picker to open — the row exists in the reference and the
+    // button says so rather than silently doing nothing (`T3BranchLine`'s
+    // pattern).
+    private var newProjectButton: some View {
+        Button {} label: {
+            LucideIcon(.folderPlus, size: 16)
+                .foregroundStyle(t3.web.sidebarMutedForeground.color.opacity(0.8))
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New project")
+        .help("Adding projects arrives with the project picker")
     }
 
     private var currentScopeLabel: String {
