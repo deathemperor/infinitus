@@ -67,7 +67,7 @@ sed -i '' 's/"status":"waiting"/"status":"idle"/' "$CLAUDE_CONFIG_DIR/sessions/$
 # The reference window's sidebar is T3's 256 CSS px default seen at that
 # app's ~1.893 zoom, i.e. 241 pt of ours — `T3Root.preferredSidebarWidth`
 # takes it from here so the two columns land on the same x. `stop()` deletes it.
-defaults write "$domain" workspace.sidebarWidth -float 241
+defaults write "$domain" workspace.sidebarWidth -float 256
 cat > "$CLAUDE_CONFIG_DIR/projects/$slug/t3fix-hi.jsonl" <<'EOF'
 {"type":"user","uuid":"u1","timestamp":"2026-09-09T10:38:20.000Z","sessionId":"t3fix-hi","message":{"role":"user","content":"Hi"}}
 {"type":"assistant","uuid":"a1","parentUuid":"u1","timestamp":"2026-09-09T10:38:41.000Z","sessionId":"t3fix-hi","message":{"role":"assistant","content":[{"type":"text","text":"Heads up first: claude-mem can't save memories right now. The memory observer has failed 33 times in a row over 14 minutes. Latest error:\n\n```\nClaude Code process terminated by signal SIGKILL\n```\n\nRestart it here: http://localhost:37701/restart (or `npx claude-mem restart`). Nothing from this or any other session is remembered until then.\n\nHi. On `main` at 024379e2 in the Infinitus repo. What do you want to work on?"}]}}
