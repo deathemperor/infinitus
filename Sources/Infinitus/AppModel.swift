@@ -606,7 +606,15 @@ final class AppModel: ObservableObject {
     @Published var keepAwake: Bool {
         didSet {
             defaults.set(keepAwake, forKey: "keep_awake")
-            awake.update(wanted: keepAwake, busyCount: liveSessions?.busy ?? 0)
+            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
+        }
+    }
+    /// With `keepAwake`: the screen stays on too, the way a caffeine app
+    /// keeps it (#455). Off, only system sleep is held.
+    @Published var keepAwakeDisplay: Bool {
+        didSet {
+            defaults.set(keepAwakeDisplay, forKey: "keep_awake_display")
+            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
         }
     }
     // Away-push triggers beyond switches (PushTriggers has the rules).
@@ -1010,6 +1018,7 @@ final class AppModel: ObservableObject {
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
+        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
         sortByHeadroom = defaults.object(forKey: "sort_headroom") as? Bool ?? true
         mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
         mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
@@ -1144,6 +1153,7 @@ final class AppModel: ObservableObject {
         popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
         glassFocused = defaults.object(forKey: "glass_focused") as? Double ?? 0.7
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
+        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
         sortByHeadroom = defaults.object(forKey: "sort_headroom") as? Bool ?? true
         pushSessionsDone = defaults.object(forKey: "push_sessions_done") as? Bool ?? true
         pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
@@ -2749,7 +2759,7 @@ final class AppModel: ObservableObject {
             notify("switched to account \(current) (\(name))")
         }
         if !isPlayground {
-            awake.update(wanted: keepAwake,
+            awake.update(wanted: keepAwake, display: keepAwakeDisplay,
                          busyCount: list.liveSessions?.busy ?? 0)
         }
         controlServer.heal()
