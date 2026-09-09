@@ -14,6 +14,8 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
+- Workspace: a working thread's status reads in sky, the colour the reference uses.
+- Workspace: drop files onto a sidebar thread to open it with them attached.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.

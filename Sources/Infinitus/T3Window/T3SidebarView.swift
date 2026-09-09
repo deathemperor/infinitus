@@ -291,6 +291,7 @@ struct T3SidebarView: View {
                                 selected: thread.id == model.state.selectedThreadId, now: model.now,
                                 onSelect: { model.select(thread.id) },
                                 onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
+                                onFileDrop: { model.dropFiles($0, onto: thread.id) },
                                 projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
             }
         }

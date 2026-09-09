@@ -4,7 +4,8 @@ import InfinitusCore
 /// T3's `<StatusPill>` (apps/mobile/src/components/StatusPill.tsx) carrying
 /// a thread's status: the labels of `thread-list-v2-items.tsx`'s
 /// `STATUS_LABEL_BY_STATUS` in the tones `threadPresentation.ts` resolves —
-/// amber approval, indigo/primary input and work, red failure.
+/// amber approval, primary-tinted input and work (its label in sky since
+/// `357b8d521`), red failure.
 public struct T3StatusPill: View {
     @Environment(\.t3) private var t3
     let status: T3ThreadStatus
@@ -50,7 +51,11 @@ public struct T3StatusPill: View {
         switch status {
         case .approval: return p.warningForeground.color
         case .failed: return p.dangerForeground.color
-        case .input, .working, .ready: return p.foregroundSecondary.color
+        // `text-adaptive-sky-600-400` (`threadPresentation.ts:70`,
+        // `thread-list-v2-items.tsx:58`): the phone took the desktop's sky for
+        // work in flight; the pill's `bg-primary/10` is unchanged.
+        case .working: return (t3.scheme == .dark ? T3Tailwind.sky400 : T3Tailwind.sky600).color
+        case .input, .ready: return p.foregroundSecondary.color
         }
     }
 }
