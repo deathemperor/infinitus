@@ -44,10 +44,22 @@ public struct T3WorkspaceState: Sendable, Equatable {
     /// needs no draft case, and `pidBySession` deliberately has no entry for
     /// one (a draft has nothing to poll).
     public private(set) var drafts: [T3Thread] = []
-    /// `draftId -> the pid its `SessionStart` answered with`: the draft is
-    /// replaced by the real thread as soon as that pid arrives in the fleet
-    /// with its facts.
-    private var startedDraftPids: [String: Int32] = [:]
+    /// `draftId -> the pid its `SessionStart` answered with`, with the instant
+    /// it answered: the draft is replaced by the real thread as soon as that
+    /// pid arrives in the fleet with its facts — or, if it never does, the
+    /// entry expires (below) so a later pid REUSE cannot hijack the draft.
+    private struct PendingStart: Sendable, Equatable {
+        var pid: Int32
+        var startedAt: Date
+    }
+    private var startedDraftPids: [String: PendingStart] = [:]
+    /// How long a started draft waits for its session to show up in the fleet.
+    public static let startDeadline: TimeInterval = 30
+    /// Drafts whose start never produced a thread; the window model drains
+    /// this (`clearDraftStartTimeout`) to release its own guard and to say so
+    /// in the composer.
+    public private(set) var draftStartTimeouts: Set<String> = []
+    public mutating func clearDraftStartTimeout(_ draftId: String) { draftStartTimeouts.remove(draftId) }
     private var pidBySession: [String: Int32] = [:]
     /// The first `createdAt` `apply` ever computed for a thread id (B-1
     /// review #4): the bridge falls back to `now` when a session carries no
@@ -58,7 +70,11 @@ public struct T3WorkspaceState: Sendable, Equatable {
 
     public init() {}
 
-    public mutating func apply(_ inputs: T3WorkspaceInputs, now: Date) {
+    /// `wallClock` is the clock the start deadline is measured against; `now`
+    /// is deliberately frozen between the window's minute ticks (E2), which
+    /// would stretch the deadline to the next tick. Defaults to `now` so every
+    /// existing caller and test is unchanged.
+    public mutating func apply(_ inputs: T3WorkspaceInputs, now: Date, wallClock: Date? = nil) {
         // ClaudeSessions.list does not dedupe by session id (a resume overlap,
         // or a missing field on either side, can yield two records for the
         // same session under different pids) — keep the one with the newer
@@ -99,10 +115,21 @@ public struct T3WorkspaceState: Sendable, Equatable {
         // landed yet (above), and handing over then would select an id that is
         // not in `threads`, which the guard at the end of this method would
         // immediately clear.
-        for (draftId, pid) in startedDraftPids {
-            guard let i = next.firstIndex(where: { pids[$0.id] == pid }) else { continue }
+        let clock = wallClock ?? now
+        for (draftId, pending) in startedDraftPids {
+            guard let i = next.firstIndex(where: { pids[$0.id] == pending.pid }) else {
+                // Never arrived: expire the entry (so a pid reuse cannot be
+                // mistaken for this start) and tell the model, which releases
+                // its own guard and puts the reason in the composer.
+                if clock.timeIntervalSince(pending.startedAt) >= Self.startDeadline {
+                    startedDraftPids[draftId] = nil
+                    draftStartTimeouts.insert(draftId)
+                }
+                continue
+            }
             drafts.removeAll { $0.id == draftId }
             startedDraftPids[draftId] = nil
+            draftStartTimeouts.remove(draftId)
             guard selectedThreadId == draftId else { continue }
             selectedThreadId = next[i].id
             lastVisitedAt[next[i].id] = now
@@ -158,14 +185,31 @@ public struct T3WorkspaceState: Sendable, Equatable {
         return draft.id
     }
 
+    /// A draft with nothing in it yet, in this project: ⌘N reuses it rather
+    /// than stacking a second "New thread" row (upstream's draft rows only
+    /// exist for drafts that HAVE content, `Sidebar.tsx:797-800`, so it never
+    /// stacks empty ones either). `isUntouched` answers for the composer draft
+    /// the model holds — the reducer knows nothing about typed text.
+    public func reusableDraftId(projectId: String, isUntouched: (String) -> Bool) -> String? {
+        drafts.first { $0.projectId == projectId && startedDraftPids[$0.id] == nil && isUntouched($0.id) }?.id
+    }
+
     /// Discarded (upstream's "Discard draft", `Sidebar.tsx:772`), or replaced
-    /// by the session it started.
-    public mutating func removeDraft(_ draftId: String) {
+    /// by the session it started. A discarded draft that WAS selected hands the
+    /// selection to its neighbour rather than leaving the window with nothing
+    /// selected — `Sidebar.tsx`'s discard leaves the route on a thread.
+    public mutating func removeDraft(_ draftId: String, now: Date) {
+        let fallback = selectedThreadId == draftId
+            ? (adjacentThreadId(.next, now: now) ?? adjacentThreadId(.previous, now: now))
+            : nil
         drafts.removeAll { $0.id == draftId }
         threads.removeAll { $0.id == draftId }
         startedDraftPids[draftId] = nil
+        draftStartTimeouts.remove(draftId)
         lastVisitedAt[draftId] = nil
-        if selectedThreadId == draftId { selectedThreadId = nil }
+        guard selectedThreadId == draftId else { return }
+        selectedThreadId = nil
+        if let fallback, fallback != draftId { select(fallback, now: now) }
     }
 
     /// The hero's project picker moves the open draft to another project in
@@ -178,10 +222,14 @@ public struct T3WorkspaceState: Sendable, Equatable {
 
     /// The draft's `SessionStart` came back with this pid; the next `apply`
     /// that sees it as a thread replaces the draft.
-    public mutating func markDraftStarted(_ draftId: String, pid: Int32) {
+    public mutating func markDraftStarted(_ draftId: String, pid: Int32, now: Date) {
         guard drafts.contains(where: { $0.id == draftId }) else { return }
-        startedDraftPids[draftId] = pid
+        startedDraftPids[draftId] = PendingStart(pid: pid, startedAt: now)
     }
+
+    /// The draft is still waiting for its session (the window model's guard
+    /// mirrors this; it is what keeps a second ⏎ from starting a second child).
+    public func isDraftStarting(_ draftId: String) -> Bool { startedDraftPids[draftId] != nil }
 
     public func pid(of threadId: String) -> Int32? { pidBySession[threadId] }
     public var selectedThread: T3Thread? { selectedThreadId.flatMap { id in threads.first { $0.id == id } } }

@@ -54,6 +54,10 @@ struct T3ComposerView: View {
     /// Set only for a draft thread: ⏎ starts a session instead of delivering
     /// into one (Task 15).
     var draftTarget: T3ComposerDraftTarget?
+    /// The drafts' start state (fix 1). Observed — and only this, not the
+    /// whole model — so a start that begins or ends re-renders the send
+    /// button while a fleet tick still does not.
+    @ObservedObject var draftStart: T3DraftStart
     @Environment(\.t3) private var t3
 
     /// The draft as typed. Deliberately `@State` and not a write into
@@ -109,9 +113,12 @@ struct T3ComposerView: View {
     @State private var rankTask: Task<Void, Never>?
     /// Draft mode only: the start-time permission mode the session will be
     /// born with (`SessionStart.permissionModes`), nil = no
-    /// `--permission-mode` flag, and the `SessionStart` in flight.
+    /// `--permission-mode` flag.
     @State private var startMode: String?
-    @State private var starting = false
+    /// Whether THIS draft's session is starting. Model state, never `@State`:
+    /// the view is remounted on every thread switch and the guard has to
+    /// outlive it (fix 1, important #1).
+    private var starting: Bool { draftTarget.map { draftStart.isStarting($0.draftId) } ?? false }
 
     var body: some View {
         // One detection per body pass: `detect` copies the text's UTF-16, and
@@ -539,9 +546,6 @@ struct T3ComposerView: View {
     /// (`composerPromptHistory.ts:19-20`).
     private var canSend: Bool {
         guard !actions.sending, !starting, !store.gone else { return false }
-        // A start already in flight for this draft (the model's own guard —
-        // `starting` above dies with this view, and the draft outlives it).
-        if let target = draftTarget, model.isStarting(target.draftId) { return false }
         switch verdict {
         case .send, .queue: return true
         // A draft's send IS the session's first prompt (`SessionStart.prompt`),
@@ -610,20 +614,16 @@ struct T3ComposerView: View {
 
     /// Draft mode's send (Task 15): the prompt starts the session, and the
     /// reducer swaps the draft for the real thread once its pid shows up in the
-    /// fleet — this view is remounted by `T3Root` then, which is why `starting`
-    /// is never cleared on success (a second ⏎ in that window would start a
-    /// second session).
+    /// fleet — this view is remounted by `T3Root` then, which is exactly why
+    /// the guard lives on the model and is released only when the draft is
+    /// replaced or its start times out (fix 1).
     private func startDraftSession(_ target: T3ComposerDraftTarget, text: String) -> Bool {
-        starting = true
-        actions.note = nil
-        model.sendDraft(target.draftId, text: text, permissionMode: startMode) { note in
-            starting = false
-            actions.note = note
-        }
+        // Everything else — the guard, the note, and the prompt history (pushed
+        // only once a session really started) — belongs to the model.
+        model.sendDraft(target.draftId, text: text, permissionMode: startMode)
         // Unlike a live send, the prompt STAYS in the field until the session
         // is under way: a refused start (or the disabled-start gate) must leave
         // the draft exactly as it was.
-        model.pushPromptHistory(text)
         return true
     }
 

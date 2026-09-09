@@ -93,8 +93,9 @@ struct T3ThreadView: View {
                 model.retargetDraft(target.draftId, projectId: id)
             }
             VStack(spacing: 0) {
-                T3DraftNoteSlot(actions: actions)
-                T3ComposerView(model: model, app: app, store: store, actions: actions, draftTarget: target)
+                T3DraftNoteSlot(draftStart: model.draftStart, draftId: target.draftId)
+                T3ComposerView(model: model, app: app, store: store, actions: actions,
+                               draftTarget: target, draftStart: model.draftStart)
             }
         }
         // The same column the rows and the docked composer share (`:8019`).
@@ -195,7 +196,8 @@ struct T3ThreadView: View {
             // The composer under the drawers, sharing this view's `actions` —
             // one sender per thread (`T3ThreadActions`' `sending` guard), so a
             // verdict and a message can never race.
-            T3ComposerView(model: model, app: app, store: store, actions: actions)
+            T3ComposerView(model: model, app: app, store: store, actions: actions,
+                           draftStart: model.draftStart)
         }
         // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
@@ -308,14 +310,17 @@ struct T3ThreadView: View {
 
 /// The draft hero's banner slot: `T3ThreadPendingSlot` is the live thread's
 /// (it reads the store's pending requests, which a draft has none of), and
-/// `T3ThreadView` deliberately does not observe `actions` (T3ThreadView.swift:56)
-/// — so a refused `SessionStart` gets this small observer of its own.
+/// `T3ThreadView` deliberately observes neither the model nor `actions`
+/// (T3ThreadView.swift:56) — so a refused (or timed-out) `SessionStart` gets
+/// this small observer of its own, over the model's own start state.
 private struct T3DraftNoteSlot: View {
-    @ObservedObject var actions: T3ThreadActions
+    @ObservedObject var draftStart: T3DraftStart
+    let draftId: String
 
     var body: some View {
-        T3BannerStack(items: actions.note.map { note in
-            [T3BannerItem.error(id: "session-start", message: note, dismiss: { actions.note = nil })]
+        T3BannerStack(items: draftStart.note(draftId).map { note in
+            [T3BannerItem.error(id: "session-start", message: note,
+                                dismiss: { draftStart.clearNote(draftId) })]
         } ?? [])
     }
 }

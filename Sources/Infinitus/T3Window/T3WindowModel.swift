@@ -307,8 +307,11 @@ final class T3WindowModel: ObservableObject {
                 // once at `start()` — not on every fleet tick, so a republish
                 // below reflects a real state change, not the clock.
                 var next = self.state
-                next.apply(inputs, now: self.now)
+                // `wallClock` is a real clock for the start deadline only;
+                // `now` stays frozen between the window's minute ticks (E2).
+                next.apply(inputs, now: self.now, wallClock: Date())
                 if next != self.state { self.state = next }
+                self.reconcileDraftStarts()
                 if let screen = self.focusedScreen { self.applyFocusedScreen(screen) }
                 self.syncTimelineStore()
                 self.refreshing = false
@@ -331,23 +334,31 @@ final class T3WindowModel: ObservableObject {
     /// The inert store's pid. Never 0 or negative — `kill(0, …)` signals the
     /// whole process group — and never a pid the fleet can hold.
     static let draftPid = Int32.max
+    /// Read once: the environment cannot change under a running process, and
+    /// `environment` builds a dictionary on every access.
+    private static let noStart = ProcessInfo.processInfo.environment["INFINITUS_WORKSPACE_NO_START"] != nil
+
+    /// The drafts' start state, observed by the composer (fix 1, important #1).
+    /// It lives here, not in the view: the composer's `@State` dies whenever
+    /// `T3Root` remounts the thread view (a thread switch and back), and a
+    /// draft whose `claude` is already starting must stay guarded until the
+    /// reducer replaces it — or its start times out.
+    let draftStart = T3DraftStart()
+    func isStarting(_ draftId: String) -> Bool { draftStart.starting.contains(draftId) }
 
     /// `startNewThreadFromContext` (`Sidebar.tsx:4210-4229`): a draft in the
     /// project you are in. `projectId` forces one (⌘⇧N, upstream's
     /// `chat.newLocal`); nil resolves the selected thread's project, then the
-    /// sidebar's scope, then the first project — the resolution order
-    /// upstream's `newThreadContext` uses (`:4206-4209`).
-    /// Drafts whose `SessionStart` is in flight or already answered with a pid
-    /// (Task 15 review): the composer's own `starting` flag is `@State` and
-    /// dies with the view, so a thread switch and back — or the window between
-    /// `markDraftStarted` and the fleet tick that replaces the draft — would
-    /// otherwise let a second ⏎ start a second `claude`.
-    private var startingDrafts: Set<String> = []
-    func isStarting(_ draftId: String) -> Bool { startingDrafts.contains(draftId) }
-
+    /// sidebar's scope, then the top project — the resolution order upstream's
+    /// `newThreadContext` uses (`:4206-4209`).
     func startNewThread(projectId: String? = nil) {
         guard let project = projectId ?? currentProjectId else { return }
-        let draft = state.addDraft(projectId: project, now: now)
+        // ⌘N twice in the same project reopens the empty draft it already made
+        // rather than stacking another "New thread" row — upstream never
+        // stacks empty ones either (its rows exist only for drafts that HAVE
+        // content, `Sidebar.tsx:797-800`).
+        let draft = state.reusableDraftId(projectId: project, isUntouched: { self.draft(for: $0).isEmpty })
+            ?? state.addDraft(projectId: project, now: now)
         select(draft)
         composerFocusRequested = true
     }
@@ -370,23 +381,27 @@ final class T3WindowModel: ObservableObject {
     /// Upstream's "Discard draft" (`Sidebar.tsx:772`). The typed prompt goes
     /// with it, or `workspace.drafts` keeps an entry no row can reach again.
     func discardDraft(_ draftId: String) {
-        state.removeDraft(draftId)
-        startingDrafts.remove(draftId)
+        state.removeDraft(draftId, now: now)
+        releaseStart(draftId)
         commit(T3ComposerDraft(), for: draftId)
         syncTimelineStore()
     }
 
     /// A draft's first send: the prompt starts the session (upstream's draft
     /// route promotes the draft to a real thread once the server answers,
-    /// `_chat.draft.$draftId.tsx:38-65`). `onFailure` puts the reason in the
-    /// composer's own banner (`T3ThreadActions.note`) and leaves the draft
-    /// where it is, with its text — nothing typed is ever lost.
-    func sendDraft(_ draftId: String, text: String, permissionMode: String?,
-                   onFailure: @escaping (String) -> Void) {
-        guard !startingDrafts.contains(draftId) else { return }
+    /// `_chat.draft.$draftId.tsx:38-65`). A refusal leaves the draft where it
+    /// is, with its text, and says why through `draftStart.notes` — nothing
+    /// typed is ever lost.
+    func sendDraft(_ draftId: String, text: String, permissionMode: String?) {
+        guard !isStarting(draftId) else {
+            // Never silent: a swallowed call would leave the send button
+            // spinning with nothing behind it.
+            fail(draftId, "A session is already starting for this draft")
+            return
+        }
         guard let app = model, let draft = state.drafts.first(where: { $0.id == draftId }),
               let cwd = state.projects.first(where: { $0.id == draft.projectId })?.cwd else {
-            onFailure("This draft has no project folder to start in")
+            fail(draftId, "This draft has no project folder to start in")
             return
         }
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -403,12 +418,12 @@ final class T3WindowModel: ObservableObject {
         // real Claude session — `AppModel.startSession` resolves the real
         // binary through `ClaudeLocator` however throwaway the config dir is
         // (`tools/t3ref/fixture.sh` exports this).
-        if ProcessInfo.processInfo.environment["INFINITUS_WORKSPACE_NO_START"] != nil {
+        if Self.noStart {
             Self.log.debug("workspace: SessionStart suppressed (INFINITUS_WORKSPACE_NO_START) cwd=\(cwd, privacy: .public) engine=claude promptChars=\(prompt.count, privacy: .public) permissionMode=\(permissionMode ?? "default", privacy: .public) headless=host-decided")
-            onFailure("Session start disabled in this build")
+            fail(draftId, "Session start disabled in this build")
             return
         }
-        startingDrafts.insert(draftId)
+        draftStart.begin(draftId)
         Task.detached(priority: .userInitiated) { [weak self] in
             // "owned" when this Mac can own sessions at all — a capability,
             // never an engine identity: `AppModel.startSession` turns it into
@@ -419,16 +434,18 @@ final class T3WindowModel: ObservableObject {
                 DispatchQueue.global(qos: .userInitiated).async { c.resume(returning: app.ownedSessions() != nil) }
             }
             let reply = await app.startSession(request, preferredHost: owned ? "owned" : "terminal")
-            await MainActor.run { self?.draftStarted(draftId, reply: reply, onFailure: onFailure) }
+            await MainActor.run { self?.draftStarted(draftId, reply: reply, prompt: prompt) }
         }
     }
 
-    private func draftStarted(_ draftId: String, reply: SessionStart.Reply, onFailure: (String) -> Void) {
+    private func draftStarted(_ draftId: String, reply: SessionStart.Reply, prompt: String) {
         guard reply.outcome == "started" else {
-            startingDrafts.remove(draftId)
-            onFailure(reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome)
+            fail(draftId, reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome)
             return
         }
+        // Only a prompt that actually started a session is worth recalling
+        // with ↑ — a refused one is still sitting in the field.
+        if !prompt.isEmpty { pushPromptHistory(prompt) }
         // The prompt is inside the session now; the stored draft must not come
         // back the next time this id is selected.
         commit(T3ComposerDraft(), for: draftId)
@@ -437,19 +454,42 @@ final class T3WindowModel: ObservableObject {
             // (SessionLauncher.swift:48-50). The prompt is gone either way, so
             // keeping the draft would invite starting it twice: drop it, and
             // the thread arrives on a later tick.
-            state.removeDraft(draftId)
-            startingDrafts.remove(draftId)
+            state.removeDraft(draftId, now: now)
+            releaseStart(draftId)
             syncTimelineStore()
             return
         }
-        state.markDraftStarted(draftId, pid: Int32(pid))
-        // The reducer drops the draft on the tick that sees the pid, and this
-        // model never hears about it — so the start guard is released here,
-        // where the session is already under way and a second ⏎ would land in
-        // the real thread's composer, not in this draft's.
-        startingDrafts.remove(draftId)
+        // The guard is NOT released here: the child can still die before its
+        // record and facts reach the fleet, and a released guard plus a
+        // remounted composer would let a second ⏎ start a second `claude`.
+        // `reconcileDraftStarts` releases it when the reducer replaces the
+        // draft — or when the start times out.
+        state.markDraftStarted(draftId, pid: Int32(pid), now: Date())
         // Don't wait for the 200 ms fleet debounce to notice the new pid.
         refresh()
+    }
+
+    /// Run after every `apply`: the reducer owns both endings — the draft is
+    /// replaced by its thread, or its pending pid expires past
+    /// `T3WorkspaceState.startDeadline`.
+    private func reconcileDraftStarts() {
+        for id in state.draftStartTimeouts {
+            state.clearDraftStartTimeout(id)
+            fail(id, "Session did not appear — try again")
+        }
+        // A draft that is no longer in the list was handed over or discarded.
+        let live = Set(state.drafts.map(\.id))
+        for id in draftStart.starting.subtracting(live) { draftStart.end(id) }
+    }
+
+    private func fail(_ draftId: String, _ message: String) {
+        draftStart.end(draftId)
+        draftStart.notes[draftId] = message
+    }
+
+    private func releaseStart(_ draftId: String) {
+        draftStart.end(draftId)
+        draftStart.notes[draftId] = nil
     }
 
     /// Attention on any thread; the fleet tick republishes the result.
@@ -465,4 +505,27 @@ final class T3WindowModel: ObservableObject {
                                         attentionStore: attentionStore, ownedBox: ownedBox)
         }
     }
+}
+
+/// The drafts' start state (fix 1): which starts are in flight and what the
+/// last refusal said, per draft id. Its own `ObservableObject` rather than
+/// fields on `T3WindowModel` so the composer can observe it WITHOUT observing
+/// the model — this publishes when a start begins or ends, never on a fleet
+/// tick (the rule T3ThreadView.swift:37-41 sets for the whole window).
+@MainActor
+final class T3DraftStart: ObservableObject {
+    @Published fileprivate(set) var starting: Set<String> = []
+    @Published fileprivate var notes: [String: String] = [:]
+
+    nonisolated init() {}
+
+    fileprivate func begin(_ draftId: String) {
+        notes[draftId] = nil
+        starting.insert(draftId)
+    }
+    fileprivate func end(_ draftId: String) { starting.remove(draftId) }
+
+    func isStarting(_ draftId: String) -> Bool { starting.contains(draftId) }
+    func note(_ draftId: String) -> String? { notes[draftId] }
+    func clearNote(_ draftId: String) { notes[draftId] = nil }
 }

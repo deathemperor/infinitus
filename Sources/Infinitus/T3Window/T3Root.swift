@@ -143,7 +143,8 @@ struct T3Root: View {
             Button("") { model.startNewThread(projectId: model.currentProjectId) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             // `:38` `mod+k` → `commandPalette.toggle`.
-            Button("") { model.switcherOpen = true }.keyboardShortcut("k", modifiers: .command)
+            // `commandPalette.toggle` (`:38`) — ⌘K again closes it.
+            Button("") { model.switcherOpen.toggle() }.keyboardShortcut("k", modifiers: .command)
             // `:50-51` `mod+shift+[`/`]` → `thread.previous`/`thread.next`.
             // Upstream binds no bare `mod+[` / `mod+]`, so neither does this.
             Button("") { model.selectAdjacent(.previous) }.keyboardShortcut("[", modifiers: [.command, .shift])

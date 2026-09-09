@@ -193,11 +193,11 @@ struct T3SidebarView: View {
                                   onSelect: { model.select(thread.id) },
                                   onDiscard: { model.discardDraft(thread.id) })
             } else {
-            T3ThreadRowView(thread: thread, variant: variant, variantAction: variantAction,
-                            selected: thread.id == model.state.selectedThreadId, now: model.now,
-                            onSelect: { model.select(thread.id) },
-                            onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
-                            projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
+                T3ThreadRowView(thread: thread, variant: variant, variantAction: variantAction,
+                                selected: thread.id == model.state.selectedThreadId, now: model.now,
+                                onSelect: { model.select(thread.id) },
+                                onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
+                                projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
             }
         }
     }
