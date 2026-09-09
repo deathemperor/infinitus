@@ -37,6 +37,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
 
 ### Phone
+- A thread whose session exits keeps its rows under a "This session has ended." banner instead of saying Reconnecting… forever (#400).
 - A thread's question card honors a question that withdrew the custom answer, drops the typed text once an option is picked, and refuses a multiple-choice custom answer that would read as two options instead of sending one the Mac rejects.
 - Live Activity cards are keyed to their Mac's pairing, not its name, so two Macs sharing a name or a renamed Mac keep their cards apart; the Mac echoes the key into the cards it starts by push (#144).
 - A gcloud login from the phone can be one tap: "Sign in here instead" signs in on Google's page in the app and the Mac's gcloud picks the login up by itself, no code to paste (#403).

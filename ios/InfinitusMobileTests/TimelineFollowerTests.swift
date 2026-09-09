@@ -64,4 +64,13 @@ final class TimelineFollowerTests: XCTestCase {
         XCTAssertTrue(state.timeline.messages.isEmpty)
         XCTAssertEqual(state.facts?.status.rawValue, "stopped")
     }
+
+    /// A 404 is the session exiting (the Mac dropped the route); every
+    /// other failure is a Mac that will come back.
+    func testOnlyA404ReadsAsTheSessionEnding() {
+        XCTAssertEqual(TimelineFollower.classify(MirrorTransportError.http(404)), .ended)
+        XCTAssertEqual(TimelineFollower.classify(MirrorTransportError.http(500)), .unreachable)
+        XCTAssertEqual(TimelineFollower.classify(MirrorTransportError.timedOut), .unreachable)
+        XCTAssertEqual(TimelineFollower.classify(URLError(.notConnectedToInternet)), .unreachable)
+    }
 }

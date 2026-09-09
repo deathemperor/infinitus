@@ -19,6 +19,20 @@ import InfinitusCore
     @Published private(set) var state = State()
     /// The last poll failed; the loop keeps trying.
     @Published private(set) var unreachable = false
+    /// The Mac answered 404 for this pid: the session exited. The loop
+    /// stops for good — the wire carries no session id, so a later 200
+    /// could be an unrelated session that reused the pid (the Mac's own
+    /// store matches session ids; the phone can't).
+    @Published private(set) var ended = false
+
+    /// How a failed poll reads. Only a synchronized follower can see the
+    /// 404: the cursorless first fetch tries every stored route and
+    /// reports a miss as `timedOut`.
+    enum Failure: Equatable { case ended, unreachable }
+    nonisolated static func classify(_ error: Error) -> Failure {
+        if case MirrorTransportError.http(404) = error { return .ended }
+        return .unreachable
+    }
 
     private let pid: Int32
     private let mirror: NetworkFleetMirror?
@@ -53,8 +67,15 @@ import InfinitusCore
                     // at once (the Mac already held it for `wait`).
                     if changed { try? await Task.sleep(for: .milliseconds(500)) }
                 } catch {
-                    unreachable = true
-                    try? await Task.sleep(for: .seconds(3))
+                    switch Self.classify(error) {
+                    case .ended:
+                        unreachable = false
+                        ended = true
+                        return
+                    case .unreachable:
+                        unreachable = true
+                        try? await Task.sleep(for: .seconds(3))
+                    }
                 }
             }
         }
