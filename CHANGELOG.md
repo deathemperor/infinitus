@@ -28,6 +28,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
 - Settings › Team's Syncing line stays one line: git's progress can no longer spill over the pane.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
+- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
 
 ### Phone
 - A gcloud login from the phone can be one tap: "Sign in here instead" signs in on Google's page in the app and the Mac's gcloud picks the login up by itself, no code to paste (#403).
