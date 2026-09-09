@@ -27,7 +27,7 @@ struct T3Root: View {
                 main(t3, columnWidth: max(0, geo.size.width - sidebarW - panelW))
                     .frame(maxWidth: .infinity)
                 if model.state.rightPanelOpen {
-                    T3RightPanel()
+                    T3RightPanel(model: model)
                         .frame(width: panelW)
                         .overlay(alignment: .leading) { Rectangle().fill(t3.web.border.color).frame(width: 1) }
                 }

@@ -297,6 +297,32 @@ final class T3WindowModel: ObservableObject {
         return branch
     }
 
+    /// The right panel's Files tab reads its listing here — one
+    /// `T3ProjectFiles.list` (a `git ls-files` spawn with a bounded walk behind
+    /// it) per project cwd, on a detached task and cached, exactly like the
+    /// branch above. `reload` is the refresh button and the thread switch; no
+    /// timer and no file watching watches this cwd.
+    private var filesCache: [String: Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>] = [:]
+    private var filesLoads: [String: Task<Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>, Never>] = [:]
+
+    /// The last listing for `cwd`, to paint before a fresh one lands.
+    func cachedProjectFiles(cwd: String) -> Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>? {
+        filesCache[cwd]
+    }
+
+    func projectFiles(cwd: String,
+                      reload: Bool = false) async -> Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError> {
+        if reload { filesCache[cwd] = nil }
+        if !reload, let cached = filesCache[cwd] { return cached }
+        if let existing = filesLoads[cwd] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) { T3ProjectFiles.list(root: cwd) }
+        filesLoads[cwd] = task
+        let listing = await task.value
+        filesLoads[cwd] = nil
+        filesCache[cwd] = listing
+        return listing
+    }
+
     /// The `@` menu's rows for one query. Ranking a monorepo's 20 000 paths is
     /// tens of milliseconds of scanning, so it happens off the main actor
     /// too — the caller drops a result whose query has moved on.
