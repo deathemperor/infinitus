@@ -25,8 +25,8 @@ import Foundation
 /// - every write action — merge, ready, draft, close, reopen, update-branch,
 ///   auto-merge, revert, approve-workflows (`contracts/pullRequest.ts:78-100`
 ///   `PullRequestAction`) — and the checkout command
-///   (`PullRequestDetailPanel.tsx:2054-2070`).
-/// - title/body editing (`PullRequestDetailPanel.tsx:2004-2045`,
+///   (`PullRequestDetailPanel.tsx:2103-2119`).
+/// - title/body editing (`PullRequestDetailPanel.tsx:2053-2094`,
 ///   `PullRequestMarkdownEditor.tsx`).
 /// - the list's search, filters, labels and involvement narrowing
 ///   (`PullRequestListFilters.tsx`, `contracts/pullRequest.ts:48-66`), the
@@ -516,7 +516,7 @@ public enum T3PullRequests: Sendable {
     }
 
     /// One pull request's markdown body, which the detail renders through the
-    /// chat's own markdown (`PullRequestMarkdown.tsx:38-50`).
+    /// chat's own markdown (`PullRequestMarkdown.tsx:39-52`).
     public static func body(cwd: String, number: Int,
                            gh: GhRunner = GhRunner()) -> Result<String, LoadError> {
         do {

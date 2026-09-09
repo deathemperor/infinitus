@@ -6,7 +6,7 @@ import InfinitusUI
 /// The right panel's Pull request tab (`RightPanelTabs.tsx:359`'s `pr` surface
 /// over `apps/web/src/components/pullRequest/`): the project's open pull
 /// requests as a list, and one of them opened as a detail — its header and its
-/// description through the chat's own markdown (`PullRequestMarkdown.tsx:38-50`
+/// description through the chat's own markdown (`PullRequestMarkdown.tsx:39-52`
 /// hands the body to `ChatMarkdown`, which is `T3ChatMarkdown` here).
 ///
 /// Upstream reads these through its server, which reads them from `gh`
@@ -22,7 +22,7 @@ import InfinitusUI
 /// - the review threads, comments and reactions
 ///   (`PullRequestTimelineTab.tsx`, `PullRequestReactions.tsx`).
 /// - every action: merge, ready/draft, close/reopen, update-branch,
-///   auto-merge, revert, approve-workflows (`PullRequestDetailPanel.tsx:1700-1830`'s
+///   auto-merge, revert, approve-workflows (`PullRequestDetailPanel.tsx:1742-1879`'s
 ///   menu) and the checkout command (`:2054-2070`).
 /// - title and description editing (`:2004-2045`, `PullRequestMarkdownEditor.tsx`).
 /// - the list's search, filters and labels (`PullRequestListFilters.tsx`,
@@ -30,7 +30,7 @@ import InfinitusUI
 ///   (`pullRequestPresentation.tsx:344-366`) and the file/commit/checks tabs
 ///   under the detail header (`PullRequestCodeTab.tsx`,
 ///   `PullRequestChecksPopover.tsx`).
-/// - the upload cards a body's attachments get (`PullRequestMarkdown.tsx:57-80`):
+/// - the upload cards a body's attachments get (`PullRequestMarkdown.tsx:69-90`):
 ///   the body goes through the markdown renderer alone.
 /// - the list's `BranchMark` drawing (`PullRequestListEmptyState.tsx:29-70`),
 ///   which is an SVG at its own viewBox; the empty state wears the tab's own
@@ -51,7 +51,7 @@ struct T3PullRequestPanel: View {
         Group {
             if let project {
                 // A project switch is a new surface, never the old list
-                // re-filtered (`ChatView.tsx:8078`'s `key`).
+                // re-filtered (`ChatView.tsx:8370`'s `key`).
                 T3PullRequestSurface(model: model, cwd: project.cwd)
                     .id(project.cwd)
             } else {
@@ -339,7 +339,7 @@ private struct T3PullRequestRowView: View {
 
 // MARK: - The detail
 
-/// `PullRequestDetailPanel.tsx:1980-2130`'s header, and the body under it. The
+/// `PullRequestDetailPanel.tsx:2029-2179`'s header, and the body under it. The
 /// number is the "open on host" affordance upstream makes it
 /// (`:1376-1394`: the number in the state's own tone with a `size-2.5`
 /// external-link glyph, tooltip `openOnHostLabel` — "Open on GitHub").
@@ -429,7 +429,7 @@ private struct T3PullRequestDetailView: View {
     }
 
     /// `summarizePullRequestChecks` under the rollup's own glyph
-    /// (`pullRequestPresentation.tsx:421-446`, `PullRequestDetailPanel.tsx:1317`).
+    /// (`pullRequestPresentation.tsx:421-446`, `PullRequestDetailPanel.tsx:1359`).
     @ViewBuilder private var checks: some View {
         if let state = entry.checksState {
             HStack(spacing: 6) {
