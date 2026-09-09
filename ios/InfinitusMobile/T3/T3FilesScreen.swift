@@ -43,6 +43,7 @@ struct T3FilesScreen: View {
     let session: SessionDetail
     var macId: String? = nil
     @Environment(\.t3) private var t3
+    @Environment(\.dismiss) private var dismiss
     @State private var listing: T3FileTree.Listing?
     @State private var tree: [T3FileTree.Node] = []
     @State private var expanded: Set<String> = []
@@ -69,21 +70,18 @@ struct T3FilesScreen: View {
 
     var body: some View {
         let p = t3.mobile
-        VStack(spacing: 0) {
-            searchField.padding(.horizontal, 16).padding(.vertical, 8)
+        ZStack(alignment: .bottom) {
             if let error, listing == nil {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Files unavailable").font(T3Font.mobile(.sm, .bold)).foregroundStyle(p.foreground.color)
                     Text(error).font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 20)
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(.horizontal, 16).padding(.vertical, 20)
             } else if loading && listing == nil {
-                Spacer(); ProgressView(); Spacer()
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if tree.isEmpty {
-                Spacer()
                 T3EmptyState(title: "No files", message: "The session's folder has nothing the Mac lists.")
-                Spacer()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -94,41 +92,68 @@ struct T3FilesScreen: View {
                                 .padding(16)
                         }
                     }
-                    .padding(.bottom, 24)
+                    .padding(.top, 8).padding(.bottom, 88)
                 }
                 .refreshable { await load() }
+                .scrollDismissesKeyboard(.interactively)
             }
+            // `FilesToolbarBottomFade` under the bottom search toolbar: sheet
+            // colour 0 → 0.72 at 58 % → 0.96 over 112 pt.
+            LinearGradient(stops: [.init(color: p.sheet.color.opacity(0), location: 0),
+                                   .init(color: p.sheet.color.opacity(0.72), location: 0.58),
+                                   .init(color: p.sheet.color.opacity(0.96), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 112).ignoresSafeArea(edges: .bottom).allowsHitTesting(false)
         }
         .background(p.sheet.color.ignoresSafeArea())
-        .navigationTitle("Files")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 0) {
-                    Text("Files").font(T3Font.mobile(.base, .bold)).foregroundStyle(p.foreground.color)
-                    Text(project).font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color).lineLimit(1)
-                }
-            }
-        }
+        // The system bar would squeeze the leading title into a glass pill on
+        // iOS 26 — drawn here like the thread's, with swipe-back kept.
+        .toolbar(.hidden, for: .navigationBar)
+        .background(InteractivePopGesture())
+        .safeAreaInset(edge: .top, spacing: 0) { header }
+        .safeAreaInset(edge: .bottom, spacing: 0) { searchField.padding(.horizontal, 16).padding(.bottom, 8) }
         .task { if fixture == nil { await load() } }
     }
 
+    /// The native header's title + `unstable_headerSubtitle`, leading.
+    private var header: some View {
+        let p = t3.mobile
+        return HStack(alignment: .center, spacing: 12) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(p.icon.color).frame(width: 32, height: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).accessibilityLabel("Back")
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Files").font(T3Font.mobileLiteral(17, .bold)).lineLimit(1).foregroundStyle(p.foreground.color)
+                Text(project).font(T3Font.mobile(.xs)).lineLimit(1).foregroundStyle(p.foregroundMuted.color)
+            }
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 8).padding(.top, 8).padding(.bottom, 10)
+        .background(p.sheet.color)
+    }
+
+    /// The bottom search toolbar (`NativeHeaderToolbar placement="bottom"`
+    /// + `SearchBarSlot`): one glass pill.
     private var searchField: some View {
         let p = t3.mobile
-        return HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").font(.system(size: 14, weight: .medium)).foregroundStyle(p.iconMuted.color)
-            TextField("Search files", text: $search)
-                .font(T3Font.mobile(.sm)).foregroundStyle(p.foreground.color)
-                .textInputAutocapitalization(.never).autocorrectionDisabled()
-            if !search.isEmpty {
-                Button { search = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(p.iconMuted.color)
+        return T3GlassSurface {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass").font(.system(size: 17, weight: .medium)).foregroundStyle(p.iconMuted.color)
+                TextField("Search files", text: $search)
+                    .font(T3Font.mobile(.base)).foregroundStyle(p.foreground.color)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                if !search.isEmpty {
+                    Button { search = "" } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 16)).foregroundStyle(p.iconMuted.color)
+                    }
+                    .buttonStyle(.plain).accessibilityLabel("Clear search")
                 }
-                .buttonStyle(.plain).accessibilityLabel("Clear search")
             }
+            .padding(.horizontal, 16).frame(height: 48)
         }
-        .padding(.horizontal, 12).frame(height: 36)
-        .background(p.card.color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(Capsule())
     }
 
     /// `FileTreeRow`: 42 pt, 18 pt per depth, chevron for a folder and its
@@ -166,8 +191,8 @@ struct T3FilesScreen: View {
             } else {
                 Color.clear.frame(width: 12, height: 1)
             }
-            Image(systemName: node.kind == .directory ? "folder.fill" : Self.glyph(node.name)).font(.system(size: 15))
-                .foregroundStyle(node.kind == .directory ? p.icon.color : p.iconMuted.color).frame(width: 17)
+            Image(systemName: node.kind == .directory ? "folder" : Self.glyph(node.name).symbol).font(.system(size: 15))
+                .foregroundStyle(node.kind == .directory ? p.iconSubtle.color : Self.glyph(node.name).tint ?? p.iconMuted.color).frame(width: 17)
             Text(node.name).font(T3Font.mobile(.sm, .medium)).foregroundStyle(p.foregroundSecondary.color).lineLimit(1)
             Spacer(minLength: 0)
             if node.kind == .directory {
@@ -179,17 +204,19 @@ struct T3FilesScreen: View {
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    /// `PierreEntryIcon`'s cheap cousin: one SF Symbol per file family.
-    static func glyph(_ name: String) -> String {
+    /// `PierreEntryIcon`'s cheap cousin: one SF Symbol per file family, the
+    /// icon set's tint where it has one (data files orange, markdown green).
+    static func glyph(_ name: String) -> (symbol: String, tint: Color?) {
         switch (name as NSString).pathExtension.lowercased() {
-        case "md", "markdown", "txt": return "doc.text"
-        case "png", "jpg", "jpeg", "gif", "heic", "webp", "svg": return "photo"
-        case "mp4", "mov": return "film"
-        case "pdf": return "doc.richtext"
-        case "json", "yml", "yaml", "toml", "plist": return "curlybraces"
-        case "sh", "zsh", "bash": return "terminal"
-        case "": return "doc"
-        default: return "doc.plaintext"
+        case "md", "markdown": return ("doc.text", Color(red: 0.24, green: 0.62, blue: 0.36))
+        case "txt": return ("doc.text", nil)
+        case "png", "jpg", "jpeg", "gif", "heic", "webp", "svg": return ("photo", nil)
+        case "mp4", "mov": return ("film", nil)
+        case "pdf": return ("doc.richtext", nil)
+        case "json", "yml", "yaml", "toml", "plist": return ("curlybraces", Color(red: 0.87, green: 0.53, blue: 0.20))
+        case "sh", "zsh", "bash": return ("terminal", nil)
+        case "": return ("doc", nil)
+        default: return ("doc.plaintext", nil)
         }
     }
 

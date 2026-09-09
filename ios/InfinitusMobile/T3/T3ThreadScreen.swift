@@ -184,6 +184,9 @@ struct T3ThreadScreen: View {
             default: break
             }
             model.requestedThreadSheet = nil
+            // Files → "Add to message" pops back here; the insert lands on
+            // whichever comes first, this or the change.
+            drainComposerInsert()
         }
         .onDisappear {
             follower.stop()
@@ -224,11 +227,14 @@ struct T3ThreadScreen: View {
         .navigationDestination(for: T3SourceFileRoute.self) { route in
             T3SourceFileScreen(model: model, session: route.session, macId: route.macId, path: route.path)
         }
-        .onChange(of: model.requestedComposerInsert) { _, insert in
-            guard let insert else { return }
-            draft = draft.isEmpty || draft.hasSuffix(" ") || draft.hasSuffix("\n") ? draft + insert : draft + " " + insert
-            model.requestedComposerInsert = nil
-        }
+        .onChange(of: model.requestedComposerInsert) { _, _ in drainComposerInsert() }
+    }
+
+    /// `T3FileMention`'s "@path " from the Files screen, once.
+    private func drainComposerInsert() {
+        guard let insert = model.requestedComposerInsert else { return }
+        model.requestedComposerInsert = nil
+        draft = draft.isEmpty || draft.hasSuffix(" ") || draft.hasSuffix("\n") ? draft + insert : draft + " " + insert
     }
 
     private static let allowedFileTypes: [UTType] = [

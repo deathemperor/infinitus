@@ -73,6 +73,26 @@ import InfinitusUI
         return .init(timeline: timeline, facts: facts, epoch: "e", sequence: 1, synchronized: true)
     }
 
+    /// The tree in `refs/ios-files.png` (child counts included).
+    static let parityListing: T3FileTree.Listing = {
+        func dir(_ p: String) -> T3FileTree.Entry { .init(path: p, kind: .directory, size: nil) }
+        func file(_ p: String) -> T3FileTree.Entry { .init(path: p, kind: .file, size: 100) }
+        var e: [T3FileTree.Entry] = [
+            dir(".claude"), dir(".claude/agents"), file(".claude/agents/coder.md"), dir(".claude/session-logs"),
+            file(".claude/settings.json"),
+            dir(".claude-plugin"), file(".claude-plugin/marketplace.json"),
+            dir(".github"), dir(".github/instructions"), file(".github/instructions/swift.md"),
+            dir(".github/ISSUE_TEMPLATE"), file(".github/ISSUE_TEMPLATE/bug.md"), file(".github/ISSUE_TEMPLATE/feature.md"),
+            dir(".github/workflows"), file(".github/copilot-instructions.md"), file(".github/pull_request_template.md"),
+            file(".github/VOUCHED.td"),
+            dir(".impeccable"), dir(".impeccable/critique"),
+        ]
+        e += (1...6).map { file(".claude/session-logs/\($0).jsonl") }
+        e += (1...7).map { file(".github/workflows/\($0).yml") }
+        e += (1...4).map { file(".impeccable/critique/\($0).md") }
+        return .init(cwd: "/tmp/t3fix/proj/limitless", entries: e, truncated: false)
+    }()
+
     /// Every block MarkdownText draws, for the markdown-* shots.
     static func richMarkdown() -> TimelineFollower.State {
         var state = conversation(running: false)
@@ -303,6 +323,12 @@ import InfinitusUI
         try Self.attach(name: "source-file-dark", png: Self.render(sourcePage), dir: dir, test: self)
         let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
+        // refs/ios-files.png: the fixture project's dotfolders, top level open.
+        let parityFiles = NavigationStack {
+            T3FilesScreen(model: model, session: paritySession, fixture: Self.parityListing)
+        }
+        .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "parity-files", png: Self.render(parityFiles), dir: dir, test: self)
         for (name, state, scheme) in shots {
             let root = NavigationStack {
                 T3ThreadScreen(model: model, session: session, fixture: state)
