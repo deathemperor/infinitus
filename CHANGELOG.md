@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- Workspace: links in replies carry the reference's favicon slot.
 - Workspace: inline code in replies wears the reference's chip.
 - Workspace: a thread whose session ends stays open with "This session has ended." instead of vanishing.
 - Workspace: sidebar rows show their branch and provider, the scope row and top bar carry the reference's controls, and the composer's placeholder follows the thread.

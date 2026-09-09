@@ -20,7 +20,7 @@ Reference versions (spec §0):
 |---|---|
 | `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. |
 | `fixture.sh` | A fake `CLAUDE_CONFIG_DIR` holding the parity fixture, plus the debug app on it. `fixture.sh --stop` tears it down. |
-| `winlist.swift` | `winlist <owner-substring>` → `id width height` of that app's first normal-layer window. |
+| `winlist.swift` | `winlist <owner-substring> [title-substring\|WxH]` → `id width height` of that app's first matching normal-layer window. The filter picks the workspace out of an Infinitus that also has the pop-out open; `WxH` matches the bounds exactly (`kCGWindowName` is empty without Screen Recording permission). |
 | `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
 | `capture-ios.sh` | `capture-ios.sh <screen> <out.png>` — deep-links the T3 dev client in the booted simulator and screenshots it. |
 | `capture-ours.sh` | `capture-ours.sh <mac\|ios> <screen> <out.png>` — the same screen in Infinitus. |
@@ -192,8 +192,10 @@ invocation, or the device is gone by the next one.
 `capture-ours.sh` takes the same screen out of Infinitus. The Mac route
 landed with sub-project B — `infinitusctl show workspace
 <sidebar|thread|composer|draft|switcher>`, next to `show wall`, on the
-fixture's socket — and raises the workspace to the front, so `winlist
-Infinitus` (frontmost first) picks it over the pop-out. The phone's
+fixture's socket — and raises the workspace to the front, but the window
+list is not ordered front-to-back within an app, so the open pop-out was
+being captured instead (#442): the script now asks `winlist` for the
+window whose bounds are the preset workspace frame. The phone's
 `infinitus://t3/<screen>` is still to come with C, so `capture-ours.sh
 ios …` prints `not yet` and exits 4.
 
@@ -270,6 +272,24 @@ not attached, so both sides were read at 1× (the reference downscaled to
 1378×823) — 0.86 % before, 0.81 % after, a number comparable only to itself,
 never to the 2× rows. What still moves that paragraph's wrap is the favicon
 upstream draws before a link (≈17 pt), not the chip.
+
+**B-9 (the link favicon slot).** `MarkdownLinkFavicon`
+(ChatMarkdown.tsx:1190-1215) is ported as a 20.3 pt image in the text flow —
+lucide's `globe` at 14 pt inside the span's `ms-[0.25em]`/`me-[0.2em]` margins,
+drawn in the link's colour — so a paragraph carrying links is built as
+concatenated `Text`s (`MarkdownInline.LinkGlyph`: an `NSTextAttachment` in a
+`Text`'s `AttributedString` draws nothing, `Text(Image(nsImage:))` in a
+concatenation draws inline). The reply's third line now wraps where the
+reference's does — "session" moved to the second line — and the slot lands on
+the reference's own x (both 530-551 px at 1×); the glyph sits ON the baseline
+rather than `-0.125em` below it, because `.baselineOffset` is the only way down
+and it grows the line box by the offset. No favicon is fetched, so the
+reference's Google-served raster globe stays a difference in that 14 px square.
+The same 1× proxy as B-8, both sides at 1×: **0.81 % → 0.77 %** (max ΔE 108.5).
+The 2× rows above are untouched — no scale-2 display was attached — and this
+capture is the first taken with the harness fix (#442): before it,
+`capture-ours.sh mac` shot whichever Infinitus window the window server listed
+first, which with the pop-out open is not the workspace.
 
 ### C parity — 2026-09-09
 
