@@ -29,8 +29,9 @@ private let t3TimelineSpace = "t3-timeline"
 /// spacer (`TIMELINE_LIST_HEADER`, `:246`) above and the composer inset below.
 ///
 /// Not ported: `LegendList`'s virtualization knobs (a `LazyVStack` is the
-/// platform equivalent), the minimap, the titlebar scroll fade, the citation
-/// pins and "load earlier" header — none has a model on B.
+/// platform equivalent), the titlebar scroll fade, the citation pins and
+/// "load earlier" header — none has a model on B. (The minimap is ported:
+/// `T3TimelineMinimapStrip`.)
 ///
 /// Scroll anchoring is `timelineScrollAnchoring.ts`'s three modes:
 /// `following-end` while the end is in view, `anchoring-new-turn` when a user
@@ -58,6 +59,10 @@ struct T3ThreadView: View {
     /// held in `@State` so the per-scroll writes never republish the view.
     @State private var anchors = T3Anchors()
     @State private var composerHeight: CGFloat = 0
+    /// `minimapItems` (`MessagesTimeline.tsx:576`), derived once per rows
+    /// publish rather than per body pass — `now` re-renders this view every
+    /// second and compacting every turn's text that often would be waste.
+    @State private var minimapItems: [T3TimelineMinimap.Item] = []
     /// Task 12's delivery. `@State`, not `@StateObject`: `sending`/`note` flip on
     /// every verdict, and observing them here would re-run this body — and
     /// `Row ==` for every row — for something only the bottom slot draws. The
@@ -180,6 +185,17 @@ struct T3ThreadView: View {
                             }
                     }
                     .padding(.horizontal, Self.listInset)
+                    // The minimap's current turn, once per scrolled frame
+                    // (upstream's `handleScroll`, `MessagesTimeline.tsx:657`).
+                    // NOT on the footer sentinel that `atEnd` rides: a
+                    // `LazyVStack` unmounts it once the reader is away from the
+                    // end, which is exactly when the minimap has work to do.
+                    // The list's own box always exists and its `.scrollView`
+                    // minY moves with every frame. Publishing happens on the
+                    // FLIP only (`T3Anchors.updateMinimap`).
+                    .onGeometryChange(for: Double.self) { $0.frame(in: .scrollView).minY } action: { _ in
+                        anchors.scheduleMinimapUpdate()
+                    }
                 }
                 .onChange(of: store.rows) { old, new in anchor(old: old, new: new, proxy: proxy) }
                 // The drawer mounting/growing moves the footer sentinel
@@ -191,6 +207,7 @@ struct T3ThreadView: View {
                     if anchors.atEnd, anchors.pinned == nil { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
                 .onAppear {
+                    refreshMinimap(store.rows)
                     guard !store.rows.isEmpty else { return }
                     DispatchQueue.main.async { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
@@ -211,6 +228,30 @@ struct T3ThreadView: View {
                             anchors.setScrolledAway(false)
                             withAnimation { proxy.scrollTo(Self.endId, anchor: .bottom) }
                         }
+                    }
+                }
+                // `:885-897`, `z-40` — over the composer overlay and the
+                // pill, so the last overlay of the three.
+                .overlay(alignment: .leading) {
+                    T3TimelineMinimapStrip(anchors: anchors, items: minimapItems,
+                                           viewport: geo.size) { item in
+                        // `onSelect` (`:891-896`): `scrollToIndex` with
+                        // `viewOffset: 24`, the anchor offset a new turn gets.
+                        // `onManualNavigation()` is the follow mode it clears,
+                        // which here is the end-follow flag.
+                        anchors.atEnd = false
+                        // Twice, for the reason the disclosure pin restores
+                        // asynchronously: a `LazyVStack` only estimates a row it
+                        // has not mounted, so the first hop lands on that
+                        // estimate and mounts the target, and the second puts it
+                        // 24 below the viewport top with the measured frames.
+                        // (One of the last turns lands as close as the content
+                        // allows — the scroll clamps at the end, as upstream's
+                        // does. Upstream's `animated: true` is skipped:
+                        // animating the pair shows the correction, not the
+                        // jump.)
+                        scroll(proxy, to: item.id, top: 24)
+                        DispatchQueue.main.async { scroll(proxy, to: item.id, top: 24) }
                     }
                 }
                 // Both overlays measure into this one space: the pill's
@@ -344,6 +385,7 @@ struct T3ThreadView: View {
         // different question: which rows are new.)
         let ids = Set(new.map(\.id))
         anchors.rows = anchors.rows.filter { ids.contains($0.key) }
+        refreshMinimap(new)
         guard !new.isEmpty else { return }
         if let pinned = anchors.pinned {
             anchors.pinned = nil
@@ -359,6 +401,14 @@ struct T3ThreadView: View {
         if old.isEmpty || anchors.atEnd {
             DispatchQueue.main.async { proxy.scrollTo(Self.endId, anchor: .bottom) }
         }
+    }
+
+    /// `deriveTimelineMinimapItems` + the row-index map the per-frame current
+    /// turn is resolved against (`T3Anchors.updateMinimap`).
+    private func refreshMinimap(_ rows: [T3TimelineRows.Row]) {
+        let items = T3TimelineMinimap.items(rows: rows)
+        anchors.setMinimapItems(items, rows: rows)
+        if minimapItems != items { minimapItems = items }
     }
 
     private func isNewUserMessage(_ row: T3TimelineRows.Row, previous: Set<String>) -> Bool {
@@ -416,6 +466,22 @@ private struct T3DraftNoteSlot: View {
     /// `(rowId, its viewport-relative top)` recorded before a disclosure toggle.
     var pinned: (String, Double)?
 
+    /// The minimap's published position: which turn the reader is on and which
+    /// turns are on screen (`minimapCurrentIndex`, `MessagesTimeline.tsx:598`,
+    /// and the strips' `data-in-view`, `:684`). ONE value so a scroll that
+    /// changes both publishes once.
+    struct MinimapPosition: Equatable {
+        var currentIndex: Int?
+        var inView: Set<Int> = []
+    }
+    @Published private(set) var minimap = MinimapPosition()
+
+    /// `deriveTimelineMinimapItems`' result and `id → row index` for every row,
+    /// both refreshed per rows publish so the per-frame work stays O(items).
+    private var minimapItems: [T3TimelineMinimap.Item] = []
+    private var rowIndexById: [String: Int] = [:]
+    private var minimapUpdatePending = false
+
     /// `showScrollToBottom` (`ChatView.tsx:1593`). Upstream debounces the SHOW
     /// by 150 ms to ride out a thread switch (`:4714-4716`); here the flip is
     /// driven by the footer sentinel's own geometry, which never reports a
@@ -437,6 +503,68 @@ private struct T3DraftNoteSlot: View {
 
     func setScrolledAway(_ value: Bool) {
         if scrolledAway != value { scrolledAway = value }
+    }
+
+    func setMinimapItems(_ items: [T3TimelineMinimap.Item], rows: [T3TimelineRows.Row]) {
+        minimapItems = items
+        rowIndexById = Dictionary(uniqueKeysWithValues: rows.enumerated().map { ($1.id, $0) })
+        if items.isEmpty, minimap != MinimapPosition() { minimap = MinimapPosition() }
+        scheduleMinimapUpdate()
+    }
+
+    /// The row frames of a layout pass are written by the rows themselves, and
+    /// the list's own geometry action can run before them — reading straight
+    /// through would answer with the PREVIOUS pass's frames, and at rest
+    /// (a thread that just opened at its end) nothing would ever ask again.
+    /// So the answer is deferred by one runloop turn, coalesced to at most one
+    /// per turn: upstream's `requestAnimationFrame(handleScroll)`
+    /// (`MessagesTimeline.tsx:704-707`), which exists for the same reason.
+    func scheduleMinimapUpdate() {
+        guard !minimapUpdatePending else { return }
+        minimapUpdatePending = true
+        DispatchQueue.main.async { [self] in
+            minimapUpdatePending = false
+            updateMinimap()
+        }
+    }
+
+    /// `handleScroll`'s minimap half (`MessagesTimeline.tsx:663-700`), run once
+    /// per scrolled frame and published only on a change.
+    ///
+    /// Upstream asks `LegendList` for any row's position; a `LazyVStack` only
+    /// mounts what is near the screen, so an off-screen turn has no live frame —
+    /// its last one is from when it left the viewport and goes stale after a
+    /// jump. So a frame is trusted only while it intersects the viewport (which
+    /// is `inView` itself); every other turn is placed above or below by its row
+    /// index against the topmost mounted row, which is what upstream's
+    /// `positionAtIndex` would have said in sign.
+    private func updateMinimap() {
+        guard !minimapItems.isEmpty else { return }
+        let height = viewport.height
+        guard height > 0 else { return }
+        var topMounted = Int.max
+        for (id, rect) in rows where rect.minY < height && rect.maxY > 0 {
+            if let index = rowIndexById[id], index < topMounted { topMounted = index }
+        }
+        // Before the first layout nothing is mounted; leave the last answer be
+        // rather than reading every turn as above the viewport.
+        guard topMounted != Int.max else { return }
+        var bounds: [T3TimelineMinimap.ItemBounds] = []
+        var inView: Set<Int> = []
+        bounds.reserveCapacity(minimapItems.count)
+        for (index, item) in minimapItems.enumerated() {
+            if let rect = rows[item.id], rect.minY < height, rect.maxY > 0 {
+                bounds.append(.init(top: rect.minY, height: rect.height))
+                inView.insert(index)
+            } else {
+                bounds.append(.init(top: item.rowIndex < topMounted ? -1 : height + 1, height: 1))
+            }
+        }
+        let next = MinimapPosition(currentIndex: T3TimelineMinimap.currentIndex(scrollTop: 0,
+                                                                               scrollBottom: height,
+                                                                               itemBounds: bounds),
+                                   inView: inView)
+        if minimap != next { minimap = next }
     }
 
     /// `publishComposerOverlayHeight`'s clearance branch (`:5312-5329`).
