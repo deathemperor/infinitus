@@ -22,7 +22,11 @@ public enum SessionInput {
         /// AskUserQuestion at once — `text` is `Answers.encode`'s JSON
         /// object, question text → chosen label(s). Only a session the
         /// app runs can take it (the terminal has no such channel).
-        public enum Kind: String, Codable, Sendable { case message, key, resume, approve, mode, answers }
+        /// `deny` (#396): refuse the oldest parked permission request;
+        /// `text` is the reason (may be empty — the child then says
+        /// `OwnedWire.denyMessage`). Only a session the app runs can
+        /// carry the reason; elsewhere it is the `3` keypress.
+        public enum Kind: String, Codable, Sendable { case message, key, resume, approve, mode, answers, deny }
         public let kind: Kind
         /// `message`: free text. `key`: one of `SessionInput.allowedKeys`.
         /// `answers`: a JSON object, question text → label(s).
@@ -254,6 +258,18 @@ extension SessionInput {
             // as "first option" to a question. Elsewhere it is a Yes keypress.
             if let reply = owned?(request, record) { return reply }
             return deliver(request: Request(kind: .key, text: "1"), record: record,
+                           hosts: hosts, claudeDir: claudeDir, attachmentsDir: attachmentsDir,
+                           ttyOfPid: ttyOfPid, ancestorsOf: ancestorsOf, socketSend: socketSend,
+                           owned: owned, sleep: sleep)
+        case .deny:
+            // An owned session gets the reason as such — a terminal's
+            // menu has no field for it, so the reason is dropped there
+            // and it becomes a plain "No" keypress.
+            if !request.text.isEmpty, !isValidMessage(request.text) {
+                return Reply(outcome: "rejected", detail: "invalid message")
+            }
+            if let reply = owned?(request, record) { return reply }
+            return deliver(request: Request(kind: .key, text: "3"), record: record,
                            hosts: hosts, claudeDir: claudeDir, attachmentsDir: attachmentsDir,
                            ttyOfPid: ttyOfPid, ancestorsOf: ancestorsOf, socketSend: socketSend,
                            owned: owned, sleep: sleep)

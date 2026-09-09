@@ -33,6 +33,7 @@ publishes the matching section as the GitHub release body.
 - Settings › Team's Syncing line stays one line: git's progress can no longer spill over the pane.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
+- Workspace: a denial with a reason now shows in the activity log like every other answer.
 
 ### Phone
 - A thread's question card honors a question that withdrew the custom answer, drops the typed text once an option is picked, and refuses a multiple-choice custom answer that would read as two options instead of sending one the Mac rejects.

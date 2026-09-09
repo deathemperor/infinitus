@@ -44,6 +44,29 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(seen, [.approve])
     }
 
+    func testDenyReachesTheOwnedHookAsDeny() {
+        var seen: [SessionInput.Request] = []
+        let reply = deliver(SessionInput.Request(kind: .deny, text: "not on main"), hosts: [host(["should not be read"])],
+                            owned: { req, _ in seen.append(req); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
+        XCTAssertEqual(reply, SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        XCTAssertEqual(seen.map(\.kind), [.deny])
+        XCTAssertEqual(seen.map(\.text), ["not on main"])
+    }
+
+    func testDenyWithoutAnOwnedChannelFallsBackToKeyThree() {
+        let h = host(["some menu"])
+        let reply = deliver(.init(kind: .deny, text: "not on main"), hosts: [h], owned: { _, _ in nil })
+        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
+        XCTAssertEqual(h.commands, ["read s1", "line s1 3", "read s1"])
+    }
+
+    func testDenyReasonWithControlCharactersIsRejected() {
+        let h = host(["> "])
+        let reply = deliver(.init(kind: .deny, text: "no\u{1B}[0m"), hosts: [h])
+        XCTAssertEqual(reply, .init(outcome: "rejected", detail: "invalid message"))
+        XCTAssertEqual(h.commands, [])
+    }
+
     func testOwnedHookReturningNilFallsThroughToSocketAndPty() {
         let reply = deliver(SessionInput.Request(kind: .message, text: "hi"), hosts: [host(["❯ "])],
                             socket: "/tmp/x.sock", socketSend: { _, _ in true }, owned: { _, _ in nil })

@@ -69,34 +69,17 @@ final class T3ThreadActions: ObservableObject {
         }
     }
 
-    /// Deny. A plain deny is key `3` through the same path as the shipped chat
-    /// window (SessionChatWindow.swift:302) — `OwnedWire.decision(forKey:)`
-    /// answers it with `OwnedWire.denyMessage`. A typed reason has no
-    /// `SessionInput.Request.Kind` to ride, so it goes straight to the owned
-    /// child as `Decision.deny(message:)` through
-    /// `OwnedSessions.answer(pid:requestId:decision:)` (OwnedSessions.swift:390)
-    /// — which is exactly why the reason field is owned-only.
-    func deny(app: AppModel, pid: Int32, requestId: String, reason: String) {
+    /// Deny — `Kind.deny` (#396) through the same `deliverSessionInput` path
+    /// as every other input, so the mirror log and `infinitusctl events` see
+    /// it. An owned session answers with `Decision.deny(message:)`
+    /// (`OwnedSessions.swift`); elsewhere it lands as the `3` keypress and
+    /// the reason is dropped (a terminal's menu has no field for it).
+    /// A plain deny stays the `3` key the shipped chat window sends
+    /// (SessionChatWindow.swift:302), so the log reads the same as before.
+    func deny(app: AppModel, pid: Int32, reason: String) {
         let message = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else {
-            send(.init(kind: .key, text: "3"), app: app, pid: pid)
-            return
-        }
-        guard !sending else { return }
-        sending = true
-        note = nil
-        Task.detached(priority: .userInitiated) { [weak self] in
-            // `.existing`, never `ownedSessions()`: a request into a session
-            // nobody owns must not pay for locating `claude`
-            // (OwnedSessionsBox.swift:8-10). An unowned pid cannot reach here —
-            // the field only exists when the session is owned.
-            let ok = app.ownedBox.existing?.answer(pid: pid, requestId: requestId,
-                                                   decision: .deny(message: message)) ?? false
-            await MainActor.run {
-                self?.sending = false
-                if !ok { self?.note = "rejected — the session is no longer waiting on this request" }
-            }
-        }
+        send(message.isEmpty ? .init(kind: .key, text: "3") : .init(kind: .deny, text: message),
+             app: app, pid: pid)
     }
 }
 
@@ -489,9 +472,10 @@ struct T3PendingApprovalPanel: View {
     let approval: T3PendingApprovalItem
     /// `pendingCount` (`:6`): the `1/N` marker when more than one waits.
     let pendingCount: Int
-    /// The one owned-only control is the deny reason: `Decision.deny(message:)`
-    /// has no `SessionInput.Request.Kind` to ride, so it can only reach a
-    /// session the app runs. Every other button works on any session.
+    /// The one owned-only control is the deny reason: only the child can
+    /// carry it as `Decision.deny(message:)` — a terminal's `Kind.deny`
+    /// drops it and becomes a plain `3` keypress. Every other button works
+    /// on any session.
     let owned: Bool
     let sending: Bool
     let onApprove: () -> Void
@@ -536,7 +520,7 @@ struct T3PendingApprovalPanel: View {
                     // No upstream equivalent: the web client's decisions carry
                     // no reason. `OwnedWire.Decision.deny(message:)` does, and
                     // the controller asked for the field — so it exists only
-                    // where that decision can be delivered.
+                    // where the child can carry it through to that decision.
                     T3BannerBody {
                         T3Input(text: $reason, placeholder: "Reason for declining (optional)")
                             .padding(.trailing, 4)
@@ -946,8 +930,7 @@ struct T3ThreadPendingSlot: View {
                                        onApprove: { send(.init(kind: .key, text: "1")) },
                                        onAllowSession: { send(.init(kind: .approve, text: approval.sessionApproval)) },
                                        onDeny: { reason in
-                                           actions.deny(app: app, pid: store.pid,
-                                                        requestId: approval.requestId, reason: reason)
+                                           actions.deny(app: app, pid: store.pid, reason: reason)
                                        })
                     // Upstream keys the panel by request id; a new prompt has
                     // to arrive with an empty reason field.
