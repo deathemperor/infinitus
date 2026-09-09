@@ -196,6 +196,30 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.badRequestResponse())?.status, 400)
     }
 
+    // MARK: - Files route responses (#486: the Mac's dispatch and the Linux tray's share these)
+
+    func testFilesListResponseMapsSuccessFailureAndNilPid() {
+        let listing = T3ProjectFiles.Listing(cwd: "/repo", entries: [], truncated: false)
+        let ok = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(.success(listing)))
+        XCTAssertEqual(ok?.status, 200)
+        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.Listing.self, from: ok?.body ?? Data()), listing)
+        let failed = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(.failure(.rootGone)))
+        XCTAssertEqual(failed?.status, 404)
+        let missing = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(nil))
+        XCTAssertEqual(missing?.status, 404)
+    }
+
+    func testFileReadResponseMapsSuccessFailureAndNilPid() {
+        let file = T3ProjectFiles.FileRead(path: "a.swift", contents: "x", byteLength: 1, truncated: false, mime: "text/x-swift")
+        let ok = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.success(file)))
+        XCTAssertEqual(ok?.status, 200)
+        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.FileRead.self, from: ok?.body ?? Data()), file)
+        let failed = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.failure(.binary)))
+        XCTAssertEqual(failed?.status, 415)
+        let missing = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(nil))
+        XCTAssertEqual(missing?.status, 404)
+    }
+
     // MARK: - Request body parsing (#17 layer 2)
 
     func testParseRequestWithBodyWaitsForTheWholeBody() {

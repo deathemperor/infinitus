@@ -1039,16 +1039,7 @@ final class MirrorServer: ObservableObject {
                           let pid = MirrorTransport.sessionFilesPid(request.path) {
                     // `git ls-files` or a tree walk over the whole cwd: off this queue.
                     DispatchQueue.global(qos: .utility).async {
-                        let response: Data
-                        switch files.current?.list(pid) {
-                        case .success(let listing)?:
-                            response = (try? JSONEncoder().encode(listing)).map(MirrorTransport.jsonResponse)
-                                ?? MirrorTransport.errorResponse(status: 500, message: "cannot encode the listing")
-                        case .failure(let error)?:
-                            response = MirrorTransport.errorResponse(status: error.status, message: error.message)
-                        case nil:
-                            response = MirrorTransport.errorResponse(status: 404, message: "no such session")
-                        }
+                        let response = MirrorTransport.filesListResponse(files.current?.list(pid))
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })
@@ -1061,16 +1052,7 @@ final class MirrorServer: ObservableObject {
                     let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
                     // Up to 256 KiB read off disk: off this queue.
                     DispatchQueue.global(qos: .utility).async {
-                        let response: Data
-                        switch files.current?.read(pid, path) {
-                        case .success(let file)?:
-                            response = (try? JSONEncoder().encode(file)).map(MirrorTransport.jsonResponse)
-                                ?? MirrorTransport.errorResponse(status: 500, message: "cannot encode the file")
-                        case .failure(let error)?:
-                            response = MirrorTransport.errorResponse(status: error.status, message: error.message)
-                        case nil:
-                            response = MirrorTransport.errorResponse(status: 404, message: "no such session")
-                        }
+                        let response = MirrorTransport.fileReadResponse(files.current?.read(pid, path))
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })

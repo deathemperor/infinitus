@@ -337,6 +337,35 @@ public enum MirrorTransport {
         return response(status: status, reason: reason, contentType: "application/json", body: body)
     }
 
+    /// `GET /sessions/<pid>/files`'s result → response, shared by the Mac's
+    /// dispatch and the Linux tray's: `nil` (no such pid) is a 404,
+    /// `.failure` is the Core error's own status, `.success` the listing.
+    public static func filesListResponse(_ result: Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>?) -> Data {
+        switch result {
+        case .success(let listing)?:
+            return (try? JSONEncoder().encode(listing)).map(jsonResponse)
+                ?? errorResponse(status: 500, message: "cannot encode the listing")
+        case .failure(let error)?:
+            return errorResponse(status: error.status, message: error.message)
+        case nil:
+            return errorResponse(status: 404, message: "no such session")
+        }
+    }
+
+    /// `GET /sessions/<pid>/file`'s result → response, same shape as
+    /// `filesListResponse`.
+    public static func fileReadResponse(_ result: Result<T3ProjectFiles.FileRead, T3ProjectFiles.ReadError>?) -> Data {
+        switch result {
+        case .success(let file)?:
+            return (try? JSONEncoder().encode(file)).map(jsonResponse)
+                ?? errorResponse(status: 500, message: "cannot encode the file")
+        case .failure(let error)?:
+            return errorResponse(status: error.status, message: error.message)
+        case nil:
+            return errorResponse(status: 404, message: "no such session")
+        }
+    }
+
     public static func notFoundResponse() -> Data {
         response(status: 404, reason: "Not Found", contentType: "text/plain",
                  body: Data("no such route\n".utf8))

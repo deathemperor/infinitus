@@ -1721,16 +1721,11 @@ final class AppModel: ObservableObject {
         // only maps its status.
         mirrorServer.files.set(.init(
             list: { pid in
-                let claudeDir = ClaudeSessions.configHome()
-                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
-                else { return nil }
-                return T3ProjectFiles.list(root: record.cwd)
+                T3ProjectFiles.list(pid: pid, sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             },
             read: { pid, path in
-                let claudeDir = ClaudeSessions.configHome()
-                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
-                else { return nil }
-                return T3ProjectFiles.read(root: record.cwd, path: path)
+                T3ProjectFiles.read(pid: pid, path: path,
+                                    sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
