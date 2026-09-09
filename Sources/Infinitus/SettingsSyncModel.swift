@@ -31,7 +31,7 @@ final class SettingsSyncModel: ObservableObject {
     static let boolKeys: Set<String> = [
         "show_account_name", "title_scoped", "title_remaining", "title_icon_only",
         "compact_rows", "footer_actions_hidden",
-        "update_auto_check", "update_auto_install", "keep_awake",
+        "update_auto_check", "update_auto_install", "keep_awake", "keep_awake_display",
         "sort_headroom",
         "push_sessions_done", "push_all_dead", "push_last_alive",
     ]

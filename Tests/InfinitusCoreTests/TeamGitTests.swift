@@ -85,6 +85,44 @@ final class TeamGitTests: XCTestCase {
         XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v4".utf8))
     }
 
+    /// Member and transcript branches arrive at depth 1 — a reader needs
+    /// their tips, not the 1.3 GB of chunks behind them (#414); the roster
+    /// keeps the history its trust walk reads. A shallow tip still takes
+    /// this identity's own commits on top, and later syncs keep moving.
+    func testMemberAndTranscriptBranchesComeShallowTheRosterInFull() throws {
+        let remote = try makeRemote()
+        let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
+        try a.open()
+        for rev in 1...2 { try a.put("roster/team.json", Data("{\"rev\":\(rev)}".utf8)) }
+        for v in 1...3 { try a.put("m/kid-a/now.json", Data("v\(v)".utf8)) }
+        for v in 1...2 { try a.put("t/kid-a/transcripts/s/\(v).jsonl", Data("chunk\(v)".utf8)) }
+        try a.put("m/kid-b/seed.json", Data("seed".utf8))   // another device of b's, before b ever synced
+
+        let b = TeamGit(dir: scratch.appendingPathComponent("b"), remote: remote, token: nil, author: "kid-b")
+        try b.open()
+        let bGit = scratch.appendingPathComponent("b/store.git").path
+        func depth(_ branch: String) throws -> Int {
+            Int(try git(["--git-dir", bGit, "rev-list", "--count", "refs/remotes/origin/\(branch)"]).trimmingCharacters(in: .whitespacesAndNewlines)) ?? -1
+        }
+        XCTAssertEqual(try depth("m/kid-a"), 1)
+        XCTAssertEqual(try depth("t/kid-a"), 1)
+        XCTAssertEqual(try depth("roster"), 2)
+        XCTAssertEqual(try b.history(of: "roster/team.json", limit: 10).count, 2)
+        XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v3".utf8))
+        XCTAssertEqual(try b.list("t/kid-a/").map(\.path).sorted(), ["t/kid-a/transcripts/s/1.jsonl", "t/kid-a/transcripts/s/2.jsonl"])
+
+        // b commits on its shallow own branch and a sees it; a moves on and b follows.
+        try b.put("m/kid-b/now.json", Data("b".utf8))
+        try a.sync()
+        XCTAssertEqual(try a.list("m/kid-b/").map(\.path).sorted(), ["m/kid-b/now.json", "m/kid-b/seed.json"])
+        let (_, cursor) = try b.changes(since: nil)
+        try a.put("m/kid-a/now.json", Data("v4".utf8))
+        try b.sync()
+        XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v4".utf8))
+        XCTAssertEqual(try b.changes(since: cursor).0.map(\.path), ["m/kid-a/now.json"])
+        XCTAssertEqual(try depth("m/kid-a"), 1)
+    }
+
     func testTwoClonesExchangeFilesThroughTheRemote() throws {
         let remote = try makeRemote()
         let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")

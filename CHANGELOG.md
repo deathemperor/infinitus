@@ -8,11 +8,13 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Team (preview)
+- Teammates' data and transcript branches are fetched at their tip only, not with every chunk ever published behind them, and a removed member's branch disappears from the mirror; the roster keeps its history for the trust walk (#414).
 - A member's publish deletes the pre-split transcript chunks still sitting in its `m/<kid>` branch, so a new member's first fetch no longer downloads 1.3 GB of stale chunks (#414).
 - Leaders can compact their own branch on the store (Settings › Team, `infinitusctl team-compact`): one commit without the pre-split transcript history, the explicit force-push the spec reserves, so a new member's first fetch is megabytes instead of gigabytes (#339).
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.
@@ -47,6 +49,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - Home rows follow upstream: Working reads in the Mac's sky tint, a Mac with several accounts shows which one a session runs on beside the Claude mark, and settle, snooze and pin move the row as one transition.
+- Settings gains Usage: each Mac's 5-hour, weekly and per-model limits pooled across its accounts, with quota left, pace, the next refill and a per-account detail.
 - A thread no longer pulls you to the bottom while you read history: new rows follow only when you are at the end, and a scroll-to-end button appears beside the Working pill otherwise.
 - A thread whose session exits keeps its rows under a "This session has ended." banner instead of saying Reconnecting… forever (#400).
 - A thread's question card honors a question that withdrew the custom answer, drops the typed text once an option is picked, and refuses a multiple-choice custom answer that would read as two options instead of sending one the Mac rejects.

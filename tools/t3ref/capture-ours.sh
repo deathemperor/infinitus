@@ -39,6 +39,19 @@ case "$platform" in
         exit 3
     }
     read -r id _w _h <<<"$line"
+    # T3REF_WINDOW_ORIGIN="x y" (CG points, main display's top-left origin)
+    # drags the window there first — the way to land it on the 2× laptop
+    # panel when that panel is not the main display: T3WindowController clamps
+    # the autosaved frame onto NSScreen.main at show time, so the frame preset
+    # alone cannot. winmove goes through the app's own accessibility tree.
+    if [ -n "${T3REF_WINDOW_ORIGIN:-}" ]; then
+        if [ ! -x "$here/.build/winmove" ] || [ "$here/winmove.swift" -nt "$here/.build/winmove" ]; then
+            swiftc -O "$here/winmove.swift" -o "$here/.build/winmove"
+        fi
+        # shellcheck disable=SC2086
+        "$here/.build/winmove" "$id" $T3REF_WINDOW_ORIGIN
+        sleep 1
+    fi
     # The same settle as capture-mac.sh: a cold first open still has the
     # thread's timeline to load after `show workspace` has returned.
     sleep 3

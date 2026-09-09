@@ -211,6 +211,9 @@ struct DisplayPane: View {
             }
             Toggle("Keep the Mac awake while sessions are working",
                    isOn: $model.keepAwake)
+            Toggle("Keep the screen on too",
+                   isOn: $model.keepAwakeDisplay)
+                .disabled(!model.keepAwake)
         } header: {
             Text("Refresh and startup")
         } footer: {
@@ -220,8 +223,9 @@ struct DisplayPane: View {
                  + "The login item points at where the app is right now — "
                  + "move it and turn this off and on again. Keeping the Mac "
                  + "awake holds a power assertion while any session is "
-                 + "mid-turn; the display may still sleep, the machine "
-                 + "won't.")
+                 + "mid-turn, like a caffeine app; with the screen on too "
+                 + "the display stays lit as well, otherwise it may sleep "
+                 + "while the machine won't.")
         }
         .settingsAnchor("Display/Startup")
     }
@@ -345,6 +349,9 @@ extension DisplayPane {
                   anchor: startupAnchor),
             entry(startup, "Keep the Mac awake while sessions are working",
                   ["keep awake", "awake", "caffeinate", "sleep", "power"],
+                  anchor: startupAnchor),
+            entry(startup, "Keep the screen on too",
+                  ["screen", "display", "awake", "caffeine", "sleep"],
                   anchor: startupAnchor),
         ]
     }()
