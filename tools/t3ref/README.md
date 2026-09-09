@@ -308,6 +308,12 @@ the phone keeps spec §5.1's push (user decision, #223). Composer, bubble
 and reply rows are within 4 px. The number moves only with a new
 `refs/ios-thread.png` captured on a pushed thread.
 
+The phone refs were shot from the dev client at upstream `acc0a219e`
+(PROVENANCE). Ports of later upstream commits — the Working label's sky
+tint (`357b8d521`), the account badge on Home rows (`2c8e95a4b`) —
+read as drift against them by design; the home number is not chased
+until the refs are re-shot from a newer dev client.
+
 ## What is in `refs/`
 
 See `refs/PROVENANCE.md` — it records how each committed PNG was
