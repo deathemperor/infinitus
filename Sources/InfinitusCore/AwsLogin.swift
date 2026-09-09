@@ -272,15 +272,16 @@ public enum AwsLogin {
         "  fix: aws login",
     ]
 
+    private static let expiredMarkerBytes = expiredMarkers.map { Array($0.utf8) }
+    private static let expiredLineStartBytes = expiredLineStarts.map { Array($0.utf8) }
+
     /// The profile a transcript excerpt says needs a login, or nil when
     /// the text carries no expired-session signature. `default` when the
     /// signature names no profile.
     public static func profile(in text: String) -> String? {
-        let lower = text.lowercased()
-        guard expiredMarkers.contains(where: { lower.contains($0) }),
-              lower.split(separator: "\n", omittingEmptySubsequences: true).contains(where: { line in
-                  expiredLineStarts.contains { line.hasPrefix($0) }
-              }) else { return nil }
+        let lower = ASCIIScan.lowered(text)
+        guard expiredMarkerBytes.contains(where: { ASCIIScan.contains(lower, $0) }),
+              ASCIIScan.anyLineStarts(lower, with: expiredLineStartBytes) else { return nil }
         let pattern = #"aws (?:sso )?login(?: --remote)?(?: --profile[ =]([A-Za-z0-9._-]+))"#
         if let re = try? NSRegularExpression(pattern: pattern),
            let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
