@@ -54,6 +54,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
+- Usage gains its cost tab: the engine's raw token cost for the period, a daily chart, per-account and per-model shares and the token totals, across every paired Mac.
 - Home rows follow upstream: Working reads in the Mac's sky tint, a Mac with several accounts shows which one a session runs on beside the Claude mark, and settle, snooze and pin move the row as one transition.
 - Settings gains Usage: each Mac's 5-hour, weekly and per-model limits pooled across its accounts, with quota left, pace, the next refill and a per-account detail.
 - A thread no longer pulls you to the bottom while you read history: new rows follow only when you are at the end, and a scroll-to-end button appears beside the Working pill otherwise.
