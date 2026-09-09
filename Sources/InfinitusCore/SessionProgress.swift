@@ -113,8 +113,11 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// as a JSON object are skipped, never an error, same convention as
     /// Transcript/UsageHistory.
     public static func parse(lines: [String], now: Date = Date()) -> SessionProgress {
-        let entries = jsonEntries(lines)
+        parse(entries: jsonEntries(lines), now: now)
+    }
 
+    /// `parse` over entries already in hand (a `SessionTail`'s window).
+    static func parse(entries: [[String: Any]], now: Date = Date()) -> SessionProgress {
         var lastActivityAt: Date?
         for entry in entries.reversed() {
             if let ts = entry["timestamp"] as? String, let date = UsageHistory.parseISO(ts) {
@@ -447,8 +450,16 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     public static func read(sessionId: String, cwd: String, claudeDir: URL,
                              name: String? = nil, maxBytes: Int = 512 * 1024) -> SessionProgress {
         let url = Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir)
-        let headGoal = readGoal(sessionId: sessionId, cwd: cwd, claudeDir: claudeDir)
-        let progress = parse(lines: tailLines(of: url, maxBytes: maxBytes) ?? [])
+        return assemble(entries: jsonEntries(tailLines(of: url, maxBytes: maxBytes) ?? []),
+                        headGoal: readGoal(at: url), transcript: url, name: name)
+    }
+
+    /// The progress off a tail's entries plus the head's goal — `read`
+    /// for a one-off, `SessionTail.progress` for a session read
+    /// incrementally.
+    static func assemble(entries: [[String: Any]], headGoal: String?, transcript url: URL,
+                         name: String?, now: Date = Date()) -> SessionProgress {
+        let progress = parse(entries: entries, now: now)
         // The session's own tail wins; a sub-agent's lapsed sign-in (#149)
         // fills in only when the parent shows none.
         // One agent-file walk, only when the parent's tail leaves a
@@ -474,7 +485,10 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// the HEAD, the opposite end from everything else `read` extracts.
     public static func readGoal(sessionId: String, cwd: String, claudeDir: URL,
                                  maxBytes: Int = 64 * 1024) -> String? {
-        let url = Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir)
+        readGoal(at: Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir), maxBytes: maxBytes)
+    }
+
+    static func readGoal(at url: URL, maxBytes: Int = 64 * 1024) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let blob = try? handle.read(upToCount: maxBytes) else { return nil }

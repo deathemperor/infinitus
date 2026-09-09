@@ -23,13 +23,12 @@ final class SessionProgressModel: SessionProgressSource {
     @Published private(set) var scanned = false
 
     private let claudeDir = ClaudeSessions.configHome()
-    private struct Stamp: Equatable { let size: Int; let mtime: Date }
-    /// Cheap-skip cache, keyed by sessionId (a pid can flip sessions
-    /// underneath us across refreshes; sessionId doesn't). A transcript
-    /// whose size+mtime haven't moved since the last refresh is not
-    /// re-parsed — the popover ticks every 10s and most sessions are
-    /// between turns most of the time.
-    private var stamps: [String: Stamp] = [:]
+    /// One incremental reader per session (#346), keyed by sessionId (a
+    /// pid can flip sessions underneath us across refreshes; sessionId
+    /// doesn't). A transcript that gained nothing since the last refresh
+    /// is a stat; one that grew is parsed for the new lines only — the
+    /// watcher below fires once a second while a session streams.
+    private var tails: [String: SessionTail] = [:]
     private var cached: [String: SessionProgress] = [:]
     private var busy = false
     /// One vnode watch per matched transcript (#79 without the plugin):
@@ -66,14 +65,14 @@ final class SessionProgressModel: SessionProgressSource {
         busy = true
         lastSessions = sessions
         let claudeDir = claudeDir
-        let stampsCopy = stamps
+        let tailsCopy = tails
         let cachedCopy = cached
         Task.detached(priority: .utility) { [weak self] in
             let records = ClaudeSessions.list(claudeDir: claudeDir)
             let pairs = SessionProgress.match(sessions: sessions, records: records)
             var newByPid: [Int: SessionProgress] = [:]
-            var newStamps = stampsCopy
-            var newCached = cachedCopy
+            var newTails: [String: SessionTail] = [:]
+            var newCached: [String: SessionProgress] = [:]
             var ids: [Int: String] = [:]
             var cwds: [Int: String] = [:]
             var urls: [String: URL] = [:]
@@ -82,32 +81,30 @@ final class SessionProgressModel: SessionProgressSource {
                 cwds[session.pid] = record.cwd
                 let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
                 urls[record.sessionId] = url
-                let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-                let size = (attrs?[.size] as? Int) ?? -1
-                let mtime = (attrs?[.modificationDate] as? Date) ?? .distantPast
-                let stamp = Stamp(size: size, mtime: mtime)
-                if stampsCopy[record.sessionId] == stamp, let previous = cachedCopy[record.sessionId] {
-                    newByPid[session.pid] = previous
-                    continue
+                var tail = tailsCopy[record.sessionId] ?? SessionTail(url: url)
+                let moved = tail.advance()
+                let progress: SessionProgress
+                if !moved, let previous = cachedCopy[record.sessionId] {
+                    progress = previous
+                } else {
+                    progress = tail.progress(name: record.name)
                 }
-                let progress = SessionProgress.read(sessionId: record.sessionId, cwd: record.cwd,
-                                                     claudeDir: claudeDir, name: record.name)
                 newByPid[session.pid] = progress
-                newStamps[record.sessionId] = stamp
+                newTails[record.sessionId] = tail
                 newCached[record.sessionId] = progress
             }
-            await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached, ids: ids, cwds: cwds,
+            await self?.finish(byPid: newByPid, tails: newTails, cached: newCached, ids: ids, cwds: cwds,
                                transcripts: urls, light: light)
         }
     }
 
-    private func finish(byPid: [Int: SessionProgress], stamps: [String: Stamp],
+    private func finish(byPid: [Int: SessionProgress], tails: [String: SessionTail],
                         cached: [String: SessionProgress], ids: [Int: String], cwds: [Int: String],
                         transcripts: [String: URL], light: Bool) {
         busy = false
         watch(transcripts)
         if rescanWanted { rescanWanted = false; transcriptMoved() }
-        self.stamps = stamps
+        self.tails = tails
         self.cached = cached
         if light, Self.awsNeeds(byPid) == Self.awsNeeds(self.byPid) { return }
         sessionIDByPid = ids

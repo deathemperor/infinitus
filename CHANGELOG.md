@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
 - Workspace: a working thread's status reads in sky, the colour the reference uses.
