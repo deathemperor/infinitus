@@ -21,6 +21,9 @@ struct T3ThreadScreen: View {
     /// nil until then, empty when the Mac had none (or could not be asked).
     @State private var commands: [SlashCommand]?
     @State private var commandsTask: Task<Void, Never>?
+    /// `/usage-limits` answered on the phone (`ComposerUsageLimits`), docked
+    /// above the composer until dismissed.
+    @State private var limitsCard: T3ComposerLimits.Report?
     @State private var composerFocused = false
     @State private var sending = false
     @State private var note: String?
@@ -154,6 +157,9 @@ struct T3ThreadScreen: View {
                         case .key(let key): send(.init(kind: .key, text: key))
                         }
                     }
+                }
+                if let report = limitsCard {
+                    T3ComposerLimitsCard(report: report, now: Date()) { limitsCard = nil }
                 }
                 composer
             }
@@ -379,9 +385,19 @@ struct T3ThreadScreen: View {
         guard commands == nil, commandsTask == nil else { return }
         commandsTask = Task {
             let found = try? await model.mirror(for: macId).commands(pid: Int32(session.pid))
-            commands = found ?? []
+            // T3 lists /usage-limits with the provider's own commands.
+            commands = [T3ComposerLimits.command] + (found ?? [])
             commandsTask = nil
         }
+    }
+
+    /// The session's account(s) and their windows from the last snapshot;
+    /// nil when no fleet can be attributed (no snapshot yet).
+    private func usageLimitsReport() -> T3ComposerLimits.Report? {
+        let fleets = model.fleets(macId: macId)
+        let summary = model.accountSummary(macId: macId, pid: session.pid)
+        let provider = fleets.first { $0.engineID == summary?.engineID }?.provider ?? .claude
+        return T3ComposerLimits.report(summary, provider: provider, now: Date())
     }
 
     private var composer: some View {
@@ -529,6 +545,13 @@ struct T3ThreadScreen: View {
     private var sendButton: some View {
         Button {
             let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if attachments.isEmpty, T3ComposerLimits.isCommand(text) {
+                // Answered here, the agent never sees it (`isUsageLimitsCommand`).
+                draft = ""
+                if let report = usageLimitsReport() { limitsCard = report; note = nil }
+                else { note = "no account to report limits for yet" }
+                return
+            }
             let picked = attachments.map(\.wire)
             send(.init(kind: .message, text: text, attachments: picked.isEmpty ? nil : picked,
                        requestId: UUID().uuidString)) {
