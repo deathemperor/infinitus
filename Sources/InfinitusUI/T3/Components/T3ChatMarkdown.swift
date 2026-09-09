@@ -46,6 +46,18 @@ public struct T3ChatMarkdown: View {
     /// the pitch at ~22.7 pt.
     private static let bodyLineSpacing = T3TypeScale.lineSpacing(T3TypeScale.Web.sm.step)
 
+    /// CSS puts HALF the extra leading above the first line of a block and
+    /// half below the last one; `.lineSpacing` only ever goes BETWEEN two
+    /// lines, so a SwiftUI text block is one full leading short of its `div`
+    /// (a one-line paragraph is 17 pt where the browser's box is 22.75). The
+    /// reference measured exactly that: every block ran 6 pt short and the
+    /// error accumulated down the reply. The half goes back on as padding.
+    private static let halfLeading = T3TypeScale.lineSpacing(T3TypeScale.Web.sm.step) / 2
+
+    private static func halfLeading(_ step: T3TypeScale.Step) -> Double {
+        T3TypeScale.lineSpacing(step) / 2
+    }
+
     public var body: some View {
         // `margin: 0.65rem 0` on every block (index.css:1642-1648); adjacent
         // margins collapse to one gap.
@@ -60,11 +72,13 @@ public struct T3ChatMarkdown: View {
         switch block {
         case .heading(let level, let text):
             inline(text, font: headingFont(level), color: p.messageForeground.color)
+                .padding(.vertical, Self.halfLeading(headingStep(level)))
         case .code(let language, let code):
             CodeFence(language: language, code: code, palette: p)
         case .bullet(indent: let indent, let text):
             listRow(marker: "•", text: text)
                 .padding(.leading, CGFloat(indent) * 14)
+                .padding(.vertical, Self.halfLeading)
         case .task(let done, let text):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: done ? "checkmark.square" : "square")
@@ -73,13 +87,17 @@ public struct T3ChatMarkdown: View {
                 inline(text, font: T3Font.web(.sm), color: textColor)
                     .lineSpacing(Self.bodyLineSpacing)
             }
+            .padding(.vertical, Self.halfLeading)
         case .numbered(indent: let indent, let number, let text):
             listRow(marker: "\(number).", text: text)
                 .padding(.leading, CGFloat(indent) * 14)
+                .padding(.vertical, Self.halfLeading)
         case .quote(let text):
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 1).fill(p.border.color).frame(width: 2)
                 inline(text, font: T3Font.web(.sm), color: p.mutedForeground.color)
+                    .lineSpacing(Self.bodyLineSpacing)
+                    .padding(.vertical, Self.halfLeading)
             }
         case .rule:
             Rectangle().fill(p.border.color).frame(height: 1)
@@ -88,6 +106,7 @@ public struct T3ChatMarkdown: View {
         case .paragraph(let text):
             inline(text, font: T3Font.web(.sm), color: textColor)
                 .lineSpacing(Self.bodyLineSpacing)
+                .padding(.vertical, Self.halfLeading)
         }
     }
 
@@ -97,8 +116,12 @@ public struct T3ChatMarkdown: View {
     /// `T3Font.Weight` has no semibold step, so this sets the system font
     /// directly at the CSS weight.
     private func headingFont(_ level: Int) -> Font {
+        .system(size: headingStep(level).size, weight: .semibold)
+    }
+
+    private func headingStep(_ level: Int) -> T3TypeScale.Step {
         let scale: T3TypeScale.Web = level == 1 ? .xl : level == 2 ? .lg : level == 3 ? .base : .sm
-        return .system(size: scale.step.size, weight: .semibold)
+        return scale.step
     }
 
     private func listRow(marker: String, text: String) -> some View {
