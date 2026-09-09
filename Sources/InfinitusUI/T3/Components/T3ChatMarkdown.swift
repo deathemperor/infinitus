@@ -151,13 +151,57 @@ public struct T3ChatMarkdown: View {
             code: p.foreground.color,
             strongFont: font.weight(.semibold), strong: nil,
             codeChip: .init(background: p.muted.color, fontSize: Self.inlineCodeSize,
-                            padding: Self.inlineCodePadding)))
+                            padding: Self.inlineCodePadding),
+            linkGlyph: Self.linkSlot(p.primary)))
     }
 
     /// `font-size: 0.75rem` and `padding: 0.1rem 0.35rem` + `border: 1px`
     /// (index.css:1792-1799).
     private static let inlineCodeSize: Double = 12
     private static let inlineCodePadding: Double = 0.35 * 16 + 1
+
+    /// The favicon slot before a link (`MarkdownLinkFavicon`,
+    /// ChatMarkdown.tsx:1190-1215) as one image in the text flow: lucide's
+    /// `globe` at `size-[14px]`, stroked in the link's own colour (the span
+    /// inherits the anchor's `currentColor`), inside a box widened by the
+    /// span's `ms-[0.25em]` / `me-[0.2em]` margins — em of the 14 pt body —
+    /// so the slot advances exactly as upstream's does and the paragraph
+    /// wraps where the reference's does.
+    ///
+    /// Nothing is FETCHED: a favicon request on the render path is off the
+    /// table here, so every host gets the globe upstream falls back to when
+    /// there is no favicon (`:1211`, the reference's own `localhost` line),
+    /// and no brand mark is drawn (`:1193`). See `MarkdownInline.LinkGlyph`
+    /// for why this is an image and not an attributed run.
+    private static let slotGlyphSize: Double = 14
+    private static let slotMarginStart: Double = 0.25 * 14
+    private static let slotMarginEnd: Double = 0.2 * 14
+
+    #if canImport(AppKit)
+    private static func linkSlot(_ token: T3RGBA) -> MarkdownInline.LinkGlyph {
+        let size = slotGlyphSize, lead = slotMarginStart
+        let box = NSSize(width: lead + size + slotMarginEnd, height: size)
+        // `flipped: true` — lucide's 24-unit view box is y-down, like the
+        // `Path` `LucideShape` builds from it.
+        let image = NSImage(size: box, flipped: true) { _ in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.addPath(LucideShape(icon: .globe)
+                .path(in: CGRect(x: lead, y: 0, width: size, height: size)).cgPath)
+            ctx.setStrokeColor(CGColor(srgbRed: token.r / 255, green: token.g / 255,
+                                       blue: token.b / 255, alpha: token.a))
+            ctx.setLineWidth(2 * size / 24)   // lucide's stroke-width 2 in the view box
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+            ctx.strokePath()
+            return true
+        }
+        return .init(image: Image(nsImage: image))
+    }
+    #else
+    /// The workspace is a Mac window; the phone renders markdown with
+    /// `MarkdownText`, which asks for no slot.
+    private static func linkSlot(_ token: T3RGBA) -> MarkdownInline.LinkGlyph? { nil }
+    #endif
 
     private struct Table: View {
         let header: [String]

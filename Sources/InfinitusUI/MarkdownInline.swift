@@ -19,6 +19,10 @@ enum MarkdownInline {
         /// `nil` renders inline code as font + colour only — the phone's look,
         /// unchanged. `T3ChatMarkdown` passes one (below).
         var codeChip: CodeChip? = nil
+        /// `nil` draws a link as its text alone — the phone's look, unchanged.
+        /// `T3ChatMarkdown` passes one so every external link keeps the
+        /// reference's favicon slot.
+        var linkGlyph: LinkGlyph? = nil
     }
 
     /// The inline-code chip, `.chat-markdown :not(pre) > code`
@@ -52,6 +56,33 @@ enum MarkdownInline {
         var padding: Double
     }
 
+    /// The favicon slot upstream reserves before an external link's text
+    /// (`MarkdownLinkFavicon`, ChatMarkdown.tsx:1190-1215): an
+    /// `ms-[0.25em] me-[0.2em] size-[14px] [vertical-align:-0.125em]` span
+    /// holding the site's favicon, or lucide's globe when there is none.
+    ///
+    /// **Technique, and what it can't do.** SwiftUI draws no attachment
+    /// inside a `Text`'s `AttributedString` — an `NSTextAttachment` carried
+    /// in through `AttributedString(NSAttributedString)` renders NOTHING
+    /// (probed on macOS 26) — but `Text(Image(nsImage:))` in a `Text`
+    /// CONCATENATION does, at the image's own point size and in the text
+    /// flow, wrapping like a word. So a paragraph carrying links is built as
+    /// concatenated `Text`s instead of one attributed run, which costs two
+    /// things:
+    /// - the margins have to be baked into the image's own width rather than
+    ///   set as spacing — a padding space would be a wrap opportunity between
+    ///   the glyph and the link's first word, which upstream's
+    ///   `whitespace-nowrap` span forbids;
+    /// - the glyph sits ON the baseline, not at upstream's `-0.125em`.
+    ///   `.baselineOffset` is the only way down and it GROWS the line box by
+    ///   the offset (17 → 18.75 pt at 14 pt, measured), which would push every
+    ///   following line of the reply down; 1.75 pt too high is the cheaper
+    ///   error, and the reference's own glyph clears the baseline by ~1 pt.
+    struct LinkGlyph {
+        /// The whole slot, margins included — see `T3ChatMarkdown`.
+        var image: Image
+    }
+
     static func text(_ markdown: String, font: Font, color: Color, runs: Runs) -> Text {
         guard var attributed = try? AttributedString(
             markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
@@ -78,7 +109,38 @@ enum MarkdownInline {
         if let chip = runs.codeChip {
             attributed = padded(attributed, chip: chip, codeFont: runs.codeFont)
         }
-        return Text(attributed).font(font).foregroundStyle(color)
+        // Only a paragraph that actually carries an external link is rebuilt
+        // as concatenated `Text`s; everything else takes the single attributed
+        // run it took before.
+        guard let glyph = runs.linkGlyph,
+              attributed.runs.contains(where: { $0.link.map(wantsSlot) ?? false }) else {
+            return Text(attributed).font(font).foregroundStyle(color)
+        }
+        return slotted(attributed, glyph: glyph).font(font).foregroundStyle(color)
+    }
+
+    /// The same string as concatenated `Text`s, with `glyph` in front of every
+    /// external link. One slot per LINK, not per run: a bold or coded word
+    /// inside a link splits it into several runs carrying the same URL.
+    private static func slotted(_ attributed: AttributedString, glyph: LinkGlyph) -> Text {
+        var out = Text(verbatim: "")
+        var previous: URL?
+        for run in attributed.runs {
+            if let link = run.link, link != previous, wantsSlot(link) {
+                out = out + Text(glyph.image)
+            }
+            previous = run.link
+            out = out + Text(AttributedString(attributed[run.range]))
+        }
+        return out
+    }
+
+    /// Which links get the slot: `resolveExternalWebLinkHost`
+    /// (externalLinkContextMenu.ts:76-85) — an http(s) URL with a host.
+    /// A `file:` link or an in-document fragment gets nothing, as upstream.
+    private static func wantsSlot(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
+        return !(url.host()?.isEmpty ?? true)
     }
 
     /// A padding space on each side of every code run, in the run's own font

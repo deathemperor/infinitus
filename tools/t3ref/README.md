@@ -273,6 +273,24 @@ not attached, so both sides were read at 1× (the reference downscaled to
 never to the 2× rows. What still moves that paragraph's wrap is the favicon
 upstream draws before a link (≈17 pt), not the chip.
 
+**B-9 (the link favicon slot).** `MarkdownLinkFavicon`
+(ChatMarkdown.tsx:1190-1215) is ported as a 20.3 pt image in the text flow —
+lucide's `globe` at 14 pt inside the span's `ms-[0.25em]`/`me-[0.2em]` margins,
+drawn in the link's colour — so a paragraph carrying links is built as
+concatenated `Text`s (`MarkdownInline.LinkGlyph`: an `NSTextAttachment` in a
+`Text`'s `AttributedString` draws nothing, `Text(Image(nsImage:))` in a
+concatenation draws inline). The reply's third line now wraps where the
+reference's does — "session" moved to the second line — and the slot lands on
+the reference's own x (both 530-551 px at 1×); the glyph sits ON the baseline
+rather than `-0.125em` below it, because `.baselineOffset` is the only way down
+and it grows the line box by the offset. No favicon is fetched, so the
+reference's Google-served raster globe stays a difference in that 14 px square.
+The same 1× proxy as B-8, both sides at 1×: **0.81 % → 0.77 %** (max ΔE 108.5).
+The 2× rows above are untouched — no scale-2 display was attached — and this
+capture is the first taken with the harness fix (#442): before it,
+`capture-ours.sh mac` shot whichever Infinitus window the window server listed
+first, which with the pop-out open is not the workspace.
+
 ### C parity — 2026-09-09
 
 From `compare-harness.sh` on the render harness's `parity-*` shots at
