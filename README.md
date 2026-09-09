@@ -124,6 +124,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
 - **Three engines** — cswap, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs.
+- **swapd (preview)** — the new multi-provider engine runs beside cswap: one fleet per provider it holds, and igniting an account refreshes it at once.
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats** — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **Sessions, named and narrated** — unnamed sessions get a Haiku title that follows the work; the phone opens on what's waiting, with Continue.

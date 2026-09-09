@@ -24,7 +24,7 @@ public enum T3PendingAnswers {
         public let multiSelect: Bool
         /// `allowCustomAnswer: Schema.optional(Schema.Boolean)`
         /// (providerRuntime.ts:539): absent = allowed, only an explicit
-        /// `false` withdraws the free-text field (pendingUserInput.ts:45).
+        /// `false` withdraws the free-text field (pendingUserInput.ts:48).
         public let allowCustomAnswer: Bool
         public let options: [Option]
         public init(id: String, question: String, header: String, multiSelect: Bool,
@@ -57,7 +57,7 @@ public enum T3PendingAnswers {
         }
     }
 
-    /// `normalizeDraftAnswer` (pendingUserInput.ts:22-28): the question's
+    /// `normalizeDraftAnswer` (pendingUserInput.ts:24-30): the question's
     /// deliverable typed answer, trimmed (whitespacesAndNewlines); nil when
     /// the question withdrew the field, the field is blank, or the text is
     /// a multi-select's carrying `SessionInput.Answers.separator` (the
@@ -78,7 +78,7 @@ public enum T3PendingAnswers {
             .contains(SessionInput.Answers.separator)
     }
 
-    /// `buildPendingUserInputAnswers` (pendingUserInput.ts:100-115): every
+    /// `buildPendingUserInputAnswers` (pendingUserInput.ts:110-125): every
     /// question answered — a typed answer stands in for the picks
     /// (`resolvePendingUserInputAnswer`), otherwise the picked labels in
     /// OPTION order joined by `SessionInput.Answers.separator` — keyed by
@@ -88,7 +88,7 @@ public enum T3PendingAnswers {
         var out: [String: String] = [:]
         for q in questions {
             if let typed = typedAnswer(q, custom: custom) {
-                // `resolvePendingUserInputAnswer` (`pendingUserInput.ts:40-57`)
+                // `resolvePendingUserInputAnswer` (`pendingUserInput.ts:42-68`)
                 // returns the custom answer over the selection, and
                 // `OwnedWire.decision(answers:pending:)` takes one non-option
                 // string per question as Claude Code's "Other"

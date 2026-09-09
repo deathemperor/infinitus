@@ -63,6 +63,9 @@ the engine (`tools/demo-cswap` — fabricated fleet, no credentials, no
 network). The control socket is `/tmp/t3fix.sock`, **never** the real
 app's — running a debug instance without that would unlink the real
 socket and break `infinitusctl` and the phone until the bundle relaunches.
+`INFINITUS_MIRROR_SNAPSHOT` points `MirrorExporter` at
+`/tmp/t3fix/mirror-snapshot.json` too, so the fixture never overwrites
+the real app's mirror snapshot (#474).
 
 ```
 $ tools/t3ref/fixture.sh
@@ -331,6 +334,12 @@ The phone refs were shot from the dev client at upstream `acc0a219e`
 tint (`357b8d521`), the account badge on Home rows (`2c8e95a4b`) —
 read as drift against them by design; the home number is not chased
 until the refs are re-shot from a newer dev client.
+
+The Usage screen (Settings → Usage: limits #458, cost tab #466) is a
+post-ref port of upstream `6c583620f`'s `features/usage/` — the route did
+not exist at `acc0a219e`, so there is no reference for it and it is
+unmeasured. The harness renders it as `settings-usage-dark`; a number
+comes only with an `refs/ios-usage.png` shot from a newer dev client.
 
 ## What is in `refs/`
 

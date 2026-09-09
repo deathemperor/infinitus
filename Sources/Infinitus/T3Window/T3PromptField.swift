@@ -30,7 +30,7 @@ struct T3PromptField: NSViewRepresentable {
     /// ⏎ (a command menu) returns false to swallow it without sending.
     let onSubmit: () -> Bool
     /// ↑/↓/⏎/⇥/⎋ offered to an open menu first (`onComposerCommandKey`,
-    /// `ChatComposer.tsx:3080-3125`); true = the menu took the key.
+    /// `ChatComposer.tsx:3241-3286`); true = the menu took the key.
     let onMenuKey: (T3ComposerMenuKey) -> Bool
     /// −1 = older, +1 = newer; false leaves the key to normal caret movement.
     let onRecall: (Int) -> Bool
@@ -224,7 +224,7 @@ private final class T3PromptTextView: NSTextView {
                 return
             }
             // An open menu takes ⏎ to pick its row, and nothing is sent
-            // (`onComposerCommandKey`, `ChatComposer.tsx:3104-3106`).
+            // (`onComposerCommandKey`, `ChatComposer.tsx:3265-3267`).
             if coordinator?.parent.onMenuKey(.pick) == true { return }
             _ = coordinator?.parent.onSubmit()
             return

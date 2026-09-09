@@ -72,13 +72,13 @@ struct T3SidebarView: View {
 
     // MARK: - Search
 
-    // `Sidebar.tsx:4252-4275`: not an `<Input>` — a borderless sidebar row
+    // `Sidebar.tsx:4293-4316`: not an `<Input>` — a borderless sidebar row
     // (`flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5
     // text-sm font-medium text-sidebar-muted-foreground
     // hover:bg-sidebar-row-hover`) holding an `unstyled` field, with the
     // new-thread button beside it on the same `flex items-center gap-1` line.
     // The row and the scope row share one `SidebarGroup`
-    // (`p-[var(--sidebar-content-inset)] gap-1`, `:4250`), which is where the
+    // (`p-[var(--sidebar-content-inset)] gap-1`, `:4291`), which is where the
     // 8 above and the 4 below come from.
     private var searchRow: some View {
         HStack(spacing: 4) {
@@ -119,10 +119,10 @@ struct T3SidebarView: View {
         .padding(.bottom, 4)
     }
 
-    // `Sidebar.tsx:4276-4318`: a `SidebarMenuButton size="icon"` (`size-8`,
+    // `Sidebar.tsx:4317-4359`: a `SidebarMenuButton size="icon"` (`size-8`,
     // `--control-radius`) carrying `SquarePenIcon` at `size-4`. Upstream's
     // multi-project setup routes ⌘N through the palette's "New thread in…"
-    // picker (`:4210-4229`); B resolves the project directly
+    // picker (`:4251-4270`); B resolves the project directly
     // (`T3WindowModel.currentProjectId`), so the button and ⌘N do the same
     // thing here. Disabled with no project — a draft has nowhere to start.
     private var newThreadButton: some View {
@@ -142,14 +142,14 @@ struct T3SidebarView: View {
 
     // MARK: - Scope
 
-    // `Sidebar.tsx:4343-4396`: a `flex items-center gap-1` line holding the
+    // `Sidebar.tsx:4384-4430`: a `flex items-center gap-1` line holding the
     // scope trigger (`SidebarMenuButton`, `min-w-0 flex-1
     // ps-[calc(var(--sidebar-row-content-inset)-1px)]`) and the "New project"
     // icon button beside it — the same two-control shape as the search row
     // above, so the folder-plus lands under the pen. The trigger itself is
-    // `FolderIcon size-4` (`:4389`, the no-scope branch), the label
+    // `FolderIcon size-4` (`:4423`, the no-scope branch), the label
     // (`min-w-0 flex-1 truncate`) and `ChevronDownIcon size-4 -mr-px` at the
-    // FAR right (`:4392`), not against the label.
+    // FAR right (`:4426`), not against the label.
     private var scopeRow: some View {
         HStack(spacing: 4) {
             Menu {
@@ -189,7 +189,7 @@ struct T3SidebarView: View {
         // first card 8 px below the reference's.
     }
 
-    // `Sidebar.tsx:4492-4510`: the group's second `SidebarMenuButton
+    // `Sidebar.tsx:4505-4523`: the group's second `SidebarMenuButton
     // size="icon"` (`size-8`), `FolderPlusIcon`, tooltip "New project". B has
     // no project picker to open — the row exists in the reference and the
     // button says so rather than silently doing nothing (`T3BranchLine`'s
@@ -252,7 +252,7 @@ struct T3SidebarView: View {
                 if section.threads.count > shown.count {
                     // Sidebar.tsx's settled tail: 10 initial, 25 a page
                     // (`T3ThreadList.settledInitialCount`/`settledPageCount`).
-                    // `Sidebar.tsx:4877`'s button: "flex h-9 w-full … gap-2.5
+                    // `Sidebar.tsx:4862`'s button: "flex h-9 w-full … gap-2.5
                     // px-2.5 text-left text-sm text-sidebar-muted-foreground/55"
                     // — h-9 = 36 pt (fix round 1 R4; was 28), text-sm not -xs,
                     // leading `PlusIcon` "size-4 shrink-0" (16 pt).
@@ -272,7 +272,7 @@ struct T3SidebarView: View {
         }
     }
 
-    // `Sidebar.tsx:4627-4643`'s `renderThreadRowInner`: `isCard = section ===
+    // `Sidebar.tsx:4628-4644`'s `renderThreadRowInner`: `isCard = section ===
     // "active" || section === "pinned"`, and `variantAction` is "unsnooze" in
     // the snoozed shelf, "unsettle" in the settled tail, "settle" elsewhere.
     @ViewBuilder private func rows(_ threads: [T3Thread], _ kind: T3SidebarList.Section) -> some View {
@@ -314,7 +314,7 @@ struct T3SidebarView: View {
             // Shelf toggle row: no upstream 1:1 found (this compact port's
             // own shelf header markup, not traced to a `Sidebar.tsx`
             // element) — 32 pt matches the scope row's own h-8
-            // (`Sidebar.tsx:4451`), kept as this sidebar's own rhythm for
+            // (`Sidebar.tsx:4471`), kept as this sidebar's own rhythm for
             // its non-thread control rows.
             .frame(height: 32)
             if expanded.wrappedValue { content() }
@@ -348,18 +348,18 @@ struct T3SidebarView: View {
     }
 }
 
-/// `SidebarDraftRow` (`Sidebar.tsx:689-786`): one unsent draft, two lines —
+/// `SidebarDraftRow` (`Sidebar.tsx:681-770`): one unsent draft, two lines —
 /// the pen, the project name, a hover-only discard, then the typed prompt.
 ///
 /// Two deliberate differences from upstream, both in the dispatch's scope:
 /// upstream surfaces a draft row only once the draft HAS content
-/// (`:797-800`, "Draft sessions with user content") and shows an attachment
+/// (`:781-784`, "Draft sessions with user content") and shows an attachment
 /// count when the prompt is empty — here every draft has a row from the moment
 /// ⌘N makes one, and an empty one reads `T3WorkspaceState.draftTitle`
 /// ("New thread"). And the preview is a snapshot, not a live mirror of the
 /// composer: `T3WindowModel.drafts` is not `@Published` (Task 13's rule), which
 /// is exactly the freeze upstream applies to the OPEN draft's row anyway
-/// (`:686-688`, `:814`).
+/// (`:678-680`, `:795`).
 ///
 /// The vendored Lucide set has no `square-pen` (Lucide.generated.swift) —
 /// `pencil` is its nearest glyph for the same "unsent work" mark.

@@ -2,7 +2,7 @@ import SwiftUI
 import InfinitusCore
 import InfinitusUI
 
-/// The composer's context strip (`ChatView.tsx:8168-8180` renders
+/// The composer's context strip (`ChatView.tsx:8461-8473` renders
 /// `<BranchToolbar>` in a `relative z-0` / `pointer-events-auto` wrapper
 /// directly under the composer card): the workspace on the left, the checked
 /// out branch on the right.
@@ -11,14 +11,14 @@ import InfinitusUI
 /// shell — `mx-auto -mt-4 w-[calc(100%-2*var(--chat-composer-drawer-inset))]`
 /// (1.375 rem = 22 a side) `items-center gap-2 ps-1 pe-2 pt-5 pb-1`, over a
 /// `before` outline rounded 16 at the bottom whose top 1 rem is masked away
-/// (it runs up behind the card). `BranchToolbar.tsx:540-560` fills it at
+/// (it runs up behind the card). `BranchToolbar.tsx:535-555` fills it at
 /// `gap-1 text-xs font-normal text-muted-foreground/70`.
 ///
 /// The two controls are the LOCKED forms this window can honour today:
 /// `BranchToolbarEnvModeSelector`'s `envLocked` span
 /// (`:52-75` — `FolderIcon size-3` + `resolveLockedWorkspaceLabel`, no
 /// chevron) and `BranchToolbarBranchSelector`'s ghost `xs` trigger
-/// (`:775-793` — `GitBranchIcon size-3 opacity-70`, the branch,
+/// (`:775-795` — `GitBranchIcon size-3 opacity-70`, the branch,
 /// `ChevronDownIcon size-3 opacity-50`). Neither opens anything yet: this
 /// window has no worktree mode and no branch switching, and a trigger that
 /// silently did nothing would be worse than one that says so, so both carry

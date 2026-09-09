@@ -32,7 +32,7 @@ public enum T3ComposerTrigger: Sendable {
         public let end: Int
         /// The same span as string indices, for a caller that slices the text.
         public let range: Range<String.Index>
-        /// `composerMenuSearchKey` (`ChatComposer.tsx:2024-2026`) — the
+        /// `composerMenuSearchKey` (`ChatComposer.tsx:2153-2155`) — the
         /// identity the highlight is kept across.
         public var searchKey: String {
             "\(kind.rawValue):\(query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
@@ -123,7 +123,7 @@ public enum T3ComposerTrigger: Sendable {
 /// `resolveComposerMenuActiveItemId` (`composerMenuHighlight.ts:1-20`) keeps
 /// the highlight while the query behind the list is unchanged and the row is
 /// still there, and falls back to the first row otherwise;
-/// `nudgeComposerMenuHighlight` (`ChatComposer.tsx:2810-2824`) moves it with
+/// `nudgeComposerMenuHighlight` (`ChatComposer.tsx:2967-2981`) moves it with
 /// ↑/↓, wrapping, from the last row for ↑ and the first for ↓ when nothing is
 /// highlighted yet.
 public enum T3ComposerMenuHighlight: Sendable {

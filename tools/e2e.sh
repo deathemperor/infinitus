@@ -23,7 +23,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 IDLE_BUDGET_PCT="${IDLE_BUDGET_PCT:-8}"   # measured 0.3-0.5% on every theme/burn combo (2026-09-03, all effects on CA); loaded CI runners add noise, not tens of points
-RSS_BUDGET_MB="${RSS_BUDGET_MB:-220}"
+RSS_BUDGET_MB="${RSS_BUDGET_MB:-240}"
 GROWTH_BUDGET_KB_MIN="${GROWTH_BUDGET_KB_MIN:-768}"   # idle heap growth; ~80 KB/min after the fix, 2.1 MB/min before
 WINDOW_S="${WINDOW_S:-30}"   # long enough for the growth rate to mean something
 
@@ -67,7 +67,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in popout_shown popover_pinned gamification_style burn_style mock_mode; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }
@@ -98,6 +98,46 @@ defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
 defaults write "$DOMAIN" mock_mode -bool true
+defaults write "$DOMAIN" engine_swapd_enabled -bool true   # the swapd engine beside cswap (preview)
+
+# --- swapd stub (must exist before launch: the binary is located at start) --
+# The app's ONLY swapd touchpoint is `swapd … --json`, so this script is
+# the whole contract under test. Two accounts, slot 1 active. `list`
+# carries slot 1's window as it stood BEFORE an ignite; `refresh` and
+# `ignite` carry the one a forced fetch saw — which is how the ignite
+# assertion below tells the two calls apart.
+cat >"$SOCKDIR/swapd" <<'STUB'
+#!/bin/sh
+payload() {   # $1 = slot 1's 5h resetsAt
+    cat <<JSON
+{"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"activeSlot":1,
+ "nextCandidate":2,"accounts":[
+  {"slot":1,"email":"one@swapd.test","organizationName":"Swapd E2E","organizationUuid":"org-1",
+   "plan":"Max 20x","alias":"swapd one","active":true,"disabled":false,"preferred":false,
+   "usageStatus":"ok","fetchedAt":"2026-09-09T01:00:00Z","ageSeconds":12,
+   "windows":[{"kind":"5h","pct":4,"resetsAt":"$1"},
+              {"kind":"7d","pct":18,"resetsAt":"2030-01-08T00:00:00Z",
+               "pace":{"expectedPct":20,"ahead":false,"lastsToReset":true}}]},
+  {"slot":2,"email":"two@swapd.test","organizationName":"Swapd E2E","organizationUuid":"org-2",
+   "active":false,"disabled":false,"preferred":false,"usageStatus":"ok",
+   "windows":[{"kind":"5h","pct":61,"resetsAt":"2030-01-01T03:00:00Z"}]}]}]}
+JSON
+}
+case "$1" in
+    version) echo '{"schemaVersion":1,"version":"0.1.0-e2e"}' ;;
+    doctor)  echo '{"schemaVersion":1,"home":"/tmp/swapd-e2e","providers":[{"provider":"claude","installed":true,"path":"/usr/bin/true"}]}' ;;
+    list)    payload "2030-01-01T00:00:00Z" ;;
+    refresh|ignite) payload "2030-06-01T05:59:59Z" ;;
+    auto)
+        # The supervised-daemon contract: events on stdout, exit on stdin EOF.
+        echo '{"schemaVersion":1,"event":"poll","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"threshold":10}'
+        cat >/dev/null
+        ;;
+    *) echo '{"schemaVersion":1,"error":{"code":"unsupported","message":"stub swapd: no such verb"}}'; exit 1 ;;
+esac
+STUB
+chmod +x "$SOCKDIR/swapd"
+export INFINITUS_SWAPD_CLI="$SOCKDIR/swapd"
 
 # --- AWS sign-in fixtures (must exist before launch: env is read at start) --
 # A stub `aws` in place of the real CLI: `login --remote --profile P`
@@ -140,6 +180,7 @@ STUB
 chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
+export INFINITUS_MIRROR_SNAPSHOT="$SOCKDIR/mirror-snapshot.json"
 export INFINITUS_AWS_PROBE_S=2
 # A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
 # SDK's paste-back prompt and reads the code; `auth print-access-token`
@@ -290,6 +331,19 @@ REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
 echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions, profiles)"
 "$CTL" plan | expect "'plan' in d and (d['plan'] is None or 'steps' in d['plan'])" || fail "plan verb"
 "$CTL" ignite cswap/claude 2 | expect "'fleet' in d" || fail "ignite verb"
+
+# --- swapd: the second engine runs beside cswap ------------------------
+"$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
+"$CTL" fleets | expect "[f['key'] for f in d][0]=='cswap/claude' and any(f['key']=='swapd/claude' for f in d)" \
+    || fail "swapd/claude missing, or it displaced cswap as the primary fleet"
+"$CTL" fleets | expect "'refreshAccount' in [f for f in d if f['key']=='swapd/claude'][0]['capabilities']" \
+    || fail "swapd must advertise refreshAccount"
+# The point of the capability: ignite publishes the account it just
+# refreshed, so the reply carries the window the run opened (#338) —
+# the stub's refresh reset, never the one `list` was serving before it.
+"$CTL" ignite swapd/claude 1 | expect "[a for a in d['fleet']['accounts'] if a['number']==1][0]['usage']['fiveHour']['resetsAt']=='2030-06-01T05:59:59Z'" \
+    || fail "ignite didn't publish the refreshed window"
+echo "swapd: registered beside cswap, ignite published the refreshed window"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"

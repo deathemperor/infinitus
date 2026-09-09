@@ -8,7 +8,7 @@ import InfinitusUI
 ///
 /// Upstream draws it in a `ComposerBanner.Surface` attached above the composer
 /// (`:92-96`) and portals it through `ComposerCommandMenuLayer`
-/// (`ChatComposer.tsx:5046-5059`); this is a plain overlay on the composer card
+/// (`ChatComposer.tsx:5273-5286`); this is a plain overlay on the composer card
 /// in the `popover` tokens — the drawer surface (`T3BannerRoot`) is private to
 /// the pending panels and a menu is not one of that file's banners.
 ///
