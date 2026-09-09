@@ -101,6 +101,41 @@ final class PastSessionsTests: XCTestCase {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir).map(\.sessionId), ["real"])
     }
 
+    /// The head cache (#346): a scan re-reads a head only while the file
+    /// is short enough for appends to still reach it; what changes per
+    /// scan — mtime, size, liveness — comes from the listing, not the cache.
+    func testRescansReuseTheHeadButRefreshMtimeSizeAndLiveness() throws {
+        let pad = #"{"type":"progress","filler":""# + String(repeating: "x", count: 4096) + #""}"#
+        let big = [user("Long session", cwd: "/p/big")] + Array(repeating: pad, count: 20)
+        try write(cwd: "/p", id: "a", lines: big, age: 100)
+        let first = try XCTUnwrap(PastSessions.scan(claudeDir: dir, liveIds: ["a"]).first)
+        XCTAssertGreaterThan(first.bytes, PastSessions.headBytes)
+        XCTAssertTrue(first.live)
+
+        // Past headBytes the head is frozen: a rewrite the picker would
+        // never see (transcripts are append-only) keeps the cached prompt,
+        // while the newer mtime, size and the ended session come through.
+        try write(cwd: "/p", id: "a", lines: [user("Rewritten", cwd: "/p/big")] + big.dropFirst() + [pad], age: 1)
+        let again = try XCTUnwrap(PastSessions.scan(claudeDir: dir).first)
+        XCTAssertEqual(again.firstMessage, "Long session")
+        XCTAssertGreaterThan(again.lastActivityAt, first.lastActivityAt)
+        XCTAssertGreaterThan(again.bytes, first.bytes)
+        XCTAssertFalse(again.live)
+    }
+
+    func testShortTranscriptsRereadOnMtimeAndGoneOnesLeaveTheCache() throws {
+        try write(cwd: "/p", id: "s", lines: [#"{"type":"last-prompt","lastPrompt":"x","cwd":"/p/s"}"#], age: 50)
+        XCTAssertEqual(PastSessions.scan(claudeDir: dir), [])
+        // The prompt lands later, with a newer mtime — the empty head is
+        // not what a short transcript keeps.
+        try write(cwd: "/p", id: "s", lines: [user("Now started", cwd: "/p/s")], age: 1)
+        XCTAssertEqual(PastSessions.scan(claudeDir: dir).map(\.firstMessage), ["Now started"])
+        let held = PastSessions.heads.count
+        try FileManager.default.removeItem(at: Transcript.path(cwd: "/p", sessionId: "s", claudeDir: dir))
+        XCTAssertEqual(PastSessions.scan(claudeDir: dir), [])
+        XCTAssertEqual(PastSessions.heads.count, held - 1)
+    }
+
     func testMissingProjectsDirIsEmpty() {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir.appendingPathComponent("none")), [])
     }

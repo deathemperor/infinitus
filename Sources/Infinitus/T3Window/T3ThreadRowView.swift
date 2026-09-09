@@ -42,6 +42,10 @@ struct T3ThreadRowView: View {
     let now: Date
     let onSelect: () -> Void
     let onAttention: (AttentionStore.Action, Date?) -> Void
+    /// External files dropped onto this row (`onFileDropThreads`,
+    /// `Sidebar.tsx:988-991`): the drop opens the thread and stages the files
+    /// in its composer.
+    let onFileDrop: ([URL]) -> Void
     /// Resolved by `T3SidebarView` from `model.state.projects` — `T3Thread`
     /// itself carries no path/name (no `cwd` field yet). Both default to
     /// `""`, which `T3ProjectIcon.select` degrades gracefully over (same as
@@ -54,6 +58,8 @@ struct T3ThreadRowView: View {
 
     @Environment(\.t3) private var t3
     @State private var hover = false
+    /// `isFileDragOver` (`:1239`): a file drag is over this row.
+    @State private var fileDragOver = false
     /// The card's branch line. Filled from `T3WindowModel`'s cache — one git
     /// call per distinct project cwd, on the thread's own `.task`, never a
     /// timer (`T3GitFacts`, B-6).
@@ -86,6 +92,16 @@ struct T3ThreadRowView: View {
             }
         }
         .background(rowBackground, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+        .overlay { if fileDragOver { fileDropTarget } }
+        // Only file URLs: the composer's other branch (bare image bytes from
+        // Photos or a browser drag) writes a temp PNG and reports a failed
+        // write in the banner over the thread, which a sidebar row has no
+        // channel to — and upstream's own note for this is "drag files from
+        // your computer" (`docs/user/thread-sidebar.md:27`).
+        .onDrop(of: [.fileURL], isTargeted: $fileDragOver) { providers in
+            T3FileDrop.loadURLs(providers) { onFileDrop($0) }
+            return true
+        }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .onTapGesture(perform: onSelect)
@@ -94,6 +110,17 @@ struct T3ThreadRowView: View {
         // sits 2 pt clear of its neighbours; the slim `li` (`:1541-1547`)
         // has no such padding.
         .padding(.vertical, variant == .card ? 2 : 0)
+    }
+
+    /// `:1374-1377`: `ring-1 ring-inset ring-primary/70` on every row under a
+    /// file drag, plus `bg-sidebar-row-hover` — but only where it cannot
+    /// clobber the open row's own surface.
+    private var fileDropTarget: some View {
+        let shape = RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius)
+        return shape
+            .fill(selected ? Color.clear : p.sidebarRowHover.color)
+            .overlay(shape.strokeBorder(p.primary.color.opacity(0.7), lineWidth: 1))
+            .allowsHitTesting(false)
     }
 
     // MARK: - Card (`Sidebar.tsx:1723-1897`)
@@ -360,15 +387,6 @@ struct T3ThreadRowView: View {
     private func copyToPasteboard(_ s: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(s, forType: .string)
-    }
-}
-
-/// Core carries its colours as plain 0-255 components (`T3ProjectIcon.RGB`)
-/// because `InfinitusCore` may not depend on `InfinitusUI` — this is the one
-/// place they become SwiftUI colours.
-extension T3ProjectIcon.RGB {
-    var color: Color {
-        Color(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
     }
 }
 
