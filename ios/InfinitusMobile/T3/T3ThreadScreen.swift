@@ -184,6 +184,9 @@ struct T3ThreadScreen: View {
             default: break
             }
             model.requestedThreadSheet = nil
+            // Files → "Add to message" pops back here; the insert lands on
+            // whichever comes first, this or the change.
+            drainComposerInsert()
         }
         .onDisappear {
             follower.stop()
@@ -217,6 +220,21 @@ struct T3ThreadScreen: View {
         .sheet(isPresented: $showGit) {
             T3GitSheet(branch: model.progress(macId: macId, pid: session.pid)?.gitBranch, session: session, macId: macId).t3(platform: .mobile)
         }
+        // Spec §5.1: `…/files` and `…/files/:path*` push.
+        .navigationDestination(for: T3FilesRoute.self) { route in
+            T3FilesScreen(model: model, session: route.session, macId: route.macId)
+        }
+        .navigationDestination(for: T3SourceFileRoute.self) { route in
+            T3SourceFileScreen(model: model, session: route.session, macId: route.macId, path: route.path)
+        }
+        .onChange(of: model.requestedComposerInsert) { _, _ in drainComposerInsert() }
+    }
+
+    /// `T3FileMention`'s "@path " from the Files screen, once.
+    private func drainComposerInsert() {
+        guard let insert = model.requestedComposerInsert else { return }
+        model.requestedComposerInsert = nil
+        draft = draft.isEmpty || draft.hasSuffix(" ") || draft.hasSuffix("\n") ? draft + insert : draft + " " + insert
     }
 
     private static let allowedFileTypes: [UTType] = [
@@ -237,11 +255,16 @@ struct T3ThreadScreen: View {
             Spacer(minLength: 8)
             T3GlassSurface {
                 HStack(spacing: 0) {
-                    Image(systemName: "terminal").frame(width: 60, height: 44).accessibilityLabel("Terminal (soon)")
-                    Image(systemName: "folder").frame(width: 60, height: 44).accessibilityLabel("Files (soon)")
+                    Image(systemName: "terminal").frame(width: 60, height: 44)
+                        .foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Terminal (soon)")
+                    NavigationLink(value: T3FilesRoute(session: session, macId: macId)) {
+                        Image(systemName: "folder").frame(width: 60, height: 44)
+                            .foregroundStyle(t3.mobile.icon.color).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Files")
                 }
                 .font(.system(size: 18))
-                .foregroundStyle(t3.mobile.iconSubtle.color)
             }
             .clipShape(Capsule())
             Button { showGit = true } label: {

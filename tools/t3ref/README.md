@@ -328,12 +328,21 @@ main 9c7e7a9b, against `refs/ios-home.png` / `refs/ios-thread.png`
 |---|---|
 | home | 1.44 % ✅ |
 | thread | 4.79 % |
+| files | 6.51 % |
 
 Thread's remainder is the header block: the reference frames the thread
 as a modal card (rounded top, dimmed parent, content ~19 pt lower) while
 the phone keeps spec §5.1's push (user decision, #223). Composer, bubble
 and reply rows are within 4 px. The number moves only with a new
 `refs/ios-thread.png` captured on a pushed thread.
+
+Files (`parity-files`, the Files screen over `refs/ios-files.png`'s tree,
+measured with the Files PR) matches row for row — 42 pt rows, 18 pt per
+depth, the search pill in a bottom toolbar over the fade — and carries
+the thread's framing offset (the ref is the modal card again, content
+~17 pt lower) plus the back chevron a push needs and the ref's gear
+button (gone upstream at `6c583620f`, not drawn). Same caveat: the number
+moves only with a re-shot reference.
 
 The phone refs were shot from the dev client at upstream `acc0a219e`
 (PROVENANCE). Ports of later upstream commits — the Working label's sky
