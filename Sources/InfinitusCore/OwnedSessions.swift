@@ -1,4 +1,7 @@
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 
 #if !os(iOS)
 /// Claude Code sessions the app owns (#151): `claude` spawned with
@@ -51,11 +54,11 @@ public actor OwnedSessions {
             // SIGPIPE at the app (TeamGit.feed's idiom).
             #if canImport(Darwin)
             _ = fcntl(stdin.fileDescriptor, F_SETNOSIGPIPE, 1)
-            #else
-            _ = Child.ignoreSigpipe
+            #elseif canImport(Glibc)
+            _ = Child.ignoreSigpipe   // Windows has no SIGPIPE: the write just fails
             #endif
         }
-        #if !canImport(Darwin)
+        #if canImport(Glibc)
         private static let ignoreSigpipe: Void = { _ = signal(SIGPIPE, SIG_IGN) }()
         #endif
 
@@ -294,7 +297,9 @@ public actor OwnedSessions {
             for _ in 0..<20 where processes[pid]?.isRunning == true {
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
-            if processes[pid]?.isRunning == true { kill(pid, SIGKILL) }
+            #if canImport(Darwin) || canImport(Glibc)
+            if processes[pid]?.isRunning == true { kill(pid, SIGKILL) }   // Windows' terminate() is already TerminateProcess
+            #endif
         }
     }
 
@@ -306,6 +311,26 @@ public actor OwnedSessions {
         }
     }
 
+    /// `sweepOrphans` defaults. POSIX: a null signal probes, SIGTERM asks.
+    /// Windows has neither (#406): the process handle answers, and
+    /// TerminateProcess is the only ask there is.
+    public nonisolated static func orphanAlive(_ pid: Int32) -> Bool {
+        #if os(Windows)
+        ClaudeSessions.isAlive(pid)
+        #else
+        kill(pid, 0) == 0
+        #endif
+    }
+    public nonisolated static func orphanTerminate(_ pid: Int32) {
+        #if os(Windows)
+        guard let handle = OpenProcess(DWORD(PROCESS_TERMINATE), false, DWORD(pid)) else { return }
+        defer { CloseHandle(handle) }
+        _ = TerminateProcess(handle, 1)
+        #else
+        kill(pid, SIGTERM)
+        #endif
+    }
+
     /// Launch-time cleanup (#151 follow-up): a headless child survives a
     /// SIGKILL of the app (no PDEATHSIG on Darwin), so the NEXT launch
     /// reconciles last run's ledger against the live roster. A pid is only
@@ -315,8 +340,8 @@ public actor OwnedSessions {
     /// first step. Every entry is removed whether or not it matched: a
     /// stale one (pid dead, record gone, sessionId changed) is just noise.
     public nonisolated static func sweepOrphans(ledger: OwnedLedger, claudeDir: URL,
-                                                alive: (Int32) -> Bool = { kill($0, 0) == 0 },
-                                                signal: (Int32) -> Void = { kill($0, SIGTERM) }) -> [Int32] {
+                                                alive: (Int32) -> Bool = OwnedSessions.orphanAlive,
+                                                signal: (Int32) -> Void = OwnedSessions.orphanTerminate) -> [Int32] {
         let records = ClaudeSessions.list(claudeDir: claudeDir, alive: alive)
         var signalled: [Int32] = []
         for entry in ledger.entries() {
