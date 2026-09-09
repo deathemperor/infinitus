@@ -250,6 +250,19 @@ import InfinitusUI
                                              facts: Self.conversation(running: true).facts)
             .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "thread-settings-light", png: Self.render(settings), dir: dir, test: self)
+        let limitsNow = ISO8601DateFormatter().date(from: "2026-09-03T11:00:00Z")!
+        let limits = T3ComposerLimits.Report(provider: .claude, members: [
+            .init(number: 2, name: "Work", email: "work@x.com", plan: "Max", disabled: false, windows: [
+                .init(kind: .session, id: "session", label: "Session", usedPct: 62, resetsAt: limitsNow.addingTimeInterval(2 * 3600),
+                      length: T3UsageLimits.sessionSeconds, expectedPct: nil),
+                .init(kind: .weekly, id: "weekly", label: "Weekly", usedPct: 88, resetsAt: limitsNow.addingTimeInterval(3 * 86400 + 3 * 3600),
+                      length: T3UsageLimits.weekSeconds, expectedPct: nil),
+            ]),
+        ], notices: ["Work: cooling down after a rate limit"])
+        let limitsCard = VStack { Spacer(); T3ComposerLimitsCard(report: limits, now: limitsNow) {}.padding(.horizontal, 12).padding(.bottom, 80) }
+            .background(T3ThemeBackground())
+            .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "composer-limits-dark", png: Self.render(limitsCard), dir: dir, test: self)
         let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         for (name, state, scheme) in shots {

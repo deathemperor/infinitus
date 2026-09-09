@@ -74,6 +74,7 @@ publishes the matching section as the GitHub release body.
 - A custom answer typed under a session's question now reaches Claude Code; it stands in for the picked options, as the reference does.
 - Typing / at the start of a line in the thread composer lists the session's slash commands and skills to pick from, as the reference does (#223).
 - Team actions on the phone (join, invite, request, file) no longer need the app lock turned on.
+- Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
 
 ## 0.4.4-alpha.2
 
