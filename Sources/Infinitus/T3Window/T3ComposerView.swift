@@ -191,6 +191,13 @@ struct T3ComposerView: View {
         // any app that promises a URL, and bare image bytes from one that
         // promises no file (Photos, a browser drag).
         .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
+            // Draft mode has nothing to stage into (see `stage`): the drop is
+            // refused rather than half-taken, so the Finder animates the file
+            // back and `stage` says why.
+            guard draftTarget == nil else {
+                actions.note = Self.draftAttachmentRefusal
+                return false
+            }
             load(providers: providers)
             return true
         }
@@ -222,19 +229,13 @@ struct T3ComposerView: View {
         // Opening a menu is what loads its rows — a keystroke inside one only
         // re-ranks what is already in hand.
         .onChange(of: trigger?.kind) { _, kind in openMenu(kind) }
-        .onChange(of: trigger?.query) { _, _ in rankMentions() }
+        .onChange(of: trigger?.query) { _, _ in rankMentions(trigger) }
         // A dismissal outlives only the trigger it shut: the moment the caret
         // is on another one (or on none — a send empties the field) it lapses.
         // Keyed on the raw detection, or clearing it would reopen the menu ⎋
         // just closed.
         .onChange(of: raw.map(Self.dismissKey)) { _, key in
             if key != dismissed { dismissed = nil }
-        }
-        .onChange(of: store.threadId) { _, _ in
-            commands = []
-            mentionRows = []
-            mentionCwd = nil
-            dismissed = nil
         }
     }
 
@@ -475,8 +476,17 @@ struct T3ComposerView: View {
     /// image bytes with no file behind them (a screenshot) claim it too —
     /// anything else falls through to the normal text paste.
     private func paste() -> Bool {
+        // Draft mode stages nothing (see `stage`), and claiming the paste
+        // would eat a pasted path instead of typing it.
+        guard draftTarget == nil else { return false }
         let board = NSPasteboard.general
-        if let urls = board.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
+        // File URLs only: `readObjects(forClasses: [NSURL.self])` also answers
+        // for a copied web link (`https://…`), and claiming that paste would
+        // swallow the link instead of typing it — upstream reads the clipboard's
+        // FILES (`event.clipboardData.files`, `composerAttachmentFiles.ts:148-166`).
+        if let urls = board.readObjects(forClasses: [NSURL.self],
+                                        options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !urls.isEmpty {
             stage(urls)
             return true
         }
@@ -493,6 +503,14 @@ struct T3ComposerView: View {
     /// an allowed type. A rejection is said out loud in the banner stack
     /// rather than swallowed (`composerAttachmentFiles.ts:141-147`).
     private func stage(_ urls: [URL]) {
+        // `SessionStart.Request` carries no attachments (a draft's send is the
+        // session's first prompt), so a file staged here would be dropped
+        // silently at send — the paperclip is already hidden in draft mode
+        // (`footer`), and this is the same refusal for the drop and paste paths.
+        guard draftTarget == nil else {
+            actions.note = Self.draftAttachmentRefusal
+            return
+        }
         var rejection: String?
         for url in urls {
             guard draft.attachments.count < SessionInput.maxAttachments else {
@@ -517,6 +535,10 @@ struct T3ComposerView: View {
         }
         if let rejection { actions.note = rejection }
     }
+
+    /// Ours: upstream's draft composer does take files, over a wire B has no
+    /// equivalent for.
+    private static let draftAttachmentRefusal = "A new thread's first prompt can't carry attachments"
 
     // MARK: - Sending
 
@@ -563,6 +585,9 @@ struct T3ComposerView: View {
         guard canSend else { return false }
         let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let target = draftTarget { return startDraftSession(target, text: text) }
+        // Like every other wire call here: `store.pid` is the inert store's
+        // sentinel in draft mode, and only `livePid` can never be it.
+        guard let pid = livePid else { return false }
         var attachments: [SessionInput.Attachment] = []
         for ref in draft.attachments {
             // Read here, on the actor: the files are capped at 5 MB (20 for a
@@ -584,7 +609,7 @@ struct T3ComposerView: View {
         // Mac.
         actions.send(.init(kind: .message, text: text,
                            attachments: attachments.isEmpty ? nil : attachments),
-                     app: app, pid: store.pid) { reply in
+                     app: app, pid: pid) { reply in
             guard reply.outcome == "delivered" else {
                 // Nothing reached the session — "rejected" (an invalid or
                 // unknown message), "running" (SessionInput.swift:344, the pty
@@ -759,11 +784,11 @@ struct T3ComposerView: View {
         case .mention:
             if mentionCwd != cwd { mentionRows = [] }
             mentionLoading = true
-            rankMentions()
+            rankMentions(trigger)
             Task {
                 _ = await model.fileMentions(cwd: cwd)
                 guard self.cwd == cwd, trigger?.kind == .mention else { return }
-                rankMentions()
+                rankMentions(trigger)
             }
         }
     }
@@ -773,9 +798,9 @@ struct T3ComposerView: View {
     /// dropped, and the rows in view stay until the new ones arrive — upstream
     /// leaves the previous entries up while its search is `isPending` too
     /// (`ComposerCommandMenu.tsx:116-119`).
-    private func rankMentions() {
-        guard let cwd, let trigger, trigger.kind == .mention else { return }
-        let query = trigger.query
+    private func rankMentions(_ found: T3ComposerTrigger.Detected?) {
+        guard let cwd, let found, found.kind == .mention else { return }
+        let query = found.query
         // One rank in flight: the next keystroke abandons the previous query's
         // before asking for its own, so on a 20 000-path checkout a stale rank
         // can no longer land after the newest one. (The detached scan itself
@@ -1057,238 +1082,4 @@ private struct T3ComposerAttachmentRow: View {
             .resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
-}
-
-// MARK: - The prompt field
-
-/// The prompt editor (`ComposerPromptEditor.tsx:1971-1990`) as an `NSTextView`.
-///
-/// Why not SwiftUI: `TextEditor` has no submit at all (⏎ always inserts a
-/// newline) and `TextField(axis: .vertical)`'s `onSubmit` cannot tell ⏎ from
-/// ⇧⏎ — AppKit binds both to `insertNewline:` and only ⌥⏎ to
-/// `insertNewlineIgnoringFieldEditor:` — nor can either intercept ⌘V to claim
-/// a pasted screenshot, or ↑/↓ for prompt recall. `doCommand(by:)` on an
-/// `NSTextView` answers all four.
-private struct T3PromptField: NSViewRepresentable {
-    @Binding var text: String
-    let placeholder: String
-    /// The insertion point in UTF-16 code units — `NSTextView`'s own unit, and
-    /// the one `T3ComposerTrigger` reads the prompt at. Reported by the view.
-    @Binding var caret: Int
-    /// A caret the composer asks for (after an insertion); taken and cleared.
-    @Binding var caretRequest: Int?
-    /// A one-shot focus request; `onFocusHandled` clears it once taken.
-    let focus: Bool
-    /// Whether prompt recall is already walking the history — ↑ from a
-    /// non-empty field only steps when it is (`composerPromptHistory.ts:196`).
-    let recalling: Bool
-    let onFocusHandled: () -> Void
-    /// ⏎. The result says whether the composer sent — either way the newline
-    /// stays out of the field (⇧⏎ is the newline); a future overlay that owns
-    /// ⏎ (a command menu) returns false to swallow it without sending.
-    let onSubmit: () -> Bool
-    /// ↑/↓/⏎/⇥/⎋ offered to an open menu first (`onComposerCommandKey`,
-    /// `ChatComposer.tsx:3080-3125`); true = the menu took the key.
-    let onMenuKey: (T3ComposerMenuKey) -> Bool
-    /// −1 = older, +1 = newer; false leaves the key to normal caret movement.
-    let onRecall: (Int) -> Bool
-    /// True when the paste was claimed as attachments.
-    let onPaste: () -> Bool
-
-    /// `[font-size:var(--font-size-prompt,0.875rem)]` with `leading-relaxed`
-    /// (`ComposerPromptEditor.tsx:1973`, `:1982`) — 14 pt on a 1.625 line box.
-    private static let fontSize: Double = 14
-    private static let lineHeightMultiple: Double = 1.625
-    /// `whitespace-pre-wrap` inside the body's own padding: the text view adds
-    /// none of its own beyond the container's line-fragment padding.
-    private static let inset = NSSize(width: 0, height: 0)
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let view = T3PromptTextView()
-        view.delegate = context.coordinator
-        view.coordinator = context.coordinator
-        view.isRichText = false
-        view.importsGraphics = false
-        view.allowsUndo = true
-        view.isAutomaticQuoteSubstitutionEnabled = false
-        view.isAutomaticDashSubstitutionEnabled = false
-        view.isAutomaticTextReplacementEnabled = false
-        view.isAutomaticSpellingCorrectionEnabled = false
-        view.drawsBackground = false
-        view.textContainerInset = Self.inset
-        // The canonical text-view-in-a-scroll-view setup: the container
-        // tracks the view's width and the view grows with its text, so the
-        // string lays out from the top and overflow scrolls.
-        view.minSize = NSSize(width: 0, height: 0)
-        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        view.isVerticallyResizable = true
-        view.isHorizontallyResizable = false
-        view.autoresizingMask = [.width]
-        view.textContainer?.widthTracksTextView = true
-        view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
-        view.font = .systemFont(ofSize: Self.fontSize)
-        view.defaultParagraphStyle = Self.paragraphStyle
-        view.typingAttributes = Self.attributes
-        view.textColor = NSColor(context.environment.t3.web.foreground.color)
-        view.placeholder = NSAttributedString(string: placeholder, attributes: [
-            .font: NSFont.systemFont(ofSize: Self.fontSize),
-            .foregroundColor: NSColor(context.environment.t3.web.placeholder.color),
-            .paragraphStyle: Self.paragraphStyle,
-        ])
-        view.string = text
-
-        let scroll = NSScrollView()
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.borderType = .noBorder
-        scroll.documentView = view
-        return scroll
-    }
-
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
-        guard let view = scroll.documentView as? T3PromptTextView else { return }
-        context.coordinator.parent = self
-        // Only when it differs: an unconditional assignment would reset the
-        // caret and the undo stack on every unrelated republish.
-        if view.string != text {
-            view.string = text
-            view.needsDisplay = true
-        }
-        // The caret only moves when it was asked to: assigning it on every
-        // pass would fight typing.
-        if let request = caretRequest {
-            let location = max(0, min((view.string as NSString).length, request))
-            view.setSelectedRange(NSRange(location: location, length: 0))
-            view.scrollRangeToVisible(NSRange(location: location, length: 0))
-            // Off the update pass: the delegate callback `setSelectedRange`
-            // fires runs INSIDE `updateNSView`, and a `@State` write there is
-            // dropped — the caret would stay where the last keystroke left it
-            // and no menu would open for a restored draft.
-            DispatchQueue.main.async {
-                caret = location
-                caretRequest = nil
-            }
-        }
-        view.textColor = NSColor(context.environment.t3.web.foreground.color)
-        view.typingAttributes = Self.attributes
-        if focus {
-            if view.window?.firstResponder !== view { view.window?.makeFirstResponder(view) }
-            DispatchQueue.main.async { onFocusHandled() }
-        }
-    }
-
-    /// The editor grows with its text between `min-h-17.5` (70) and `max-h-50`
-    /// (200) and scrolls past that (`overflow-y-auto`,
-    /// `ComposerPromptEditor.tsx:1982`) — measured from the string rather than
-    /// the live layout so no measurement writes back into the view.
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
-        // A pass may propose no width at all; 320 wraps narrower than the
-        // real card, so such a pass can only over-report a line, and the
-        // next (sized) pass corrects it.
-        let width = proposal.width ?? 320
-        let padding = ((nsView.documentView as? NSTextView)?.textContainer?.lineFragmentPadding ?? 5) * 2
-        let bounds = (text as NSString).boundingRect(
-            with: CGSize(width: max(1, width - padding), height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: Self.attributes)
-        // `boundingRect` ignores a trailing newline; the caret still needs its
-        // line.
-        let trailing = text.hasSuffix("\n") ? Self.fontSize * Self.lineHeightMultiple : 0
-        return CGSize(width: width, height: min(200, max(70, ceil(bounds.height + trailing))))
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    private static var paragraphStyle: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = lineHeightMultiple
-        return style
-    }
-    private static var attributes: [NSAttributedString.Key: Any] {
-        [.font: NSFont.systemFont(ofSize: fontSize), .paragraphStyle: paragraphStyle]
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: T3PromptField
-        init(_ parent: T3PromptField) { self.parent = parent }
-
-        func textDidChange(_ notification: Notification) {
-            guard let view = notification.object as? T3PromptTextView else { return }
-            parent.text = view.string
-            parent.caret = view.selectedRange().location
-            view.needsDisplay = true   // the placeholder appears and disappears
-        }
-
-        /// A trigger is read at the caret, so moving it alone (a click, ← / →)
-        /// opens and closes the menus just as typing does.
-        func textViewDidChangeSelection(_ notification: Notification) {
-            guard let view = notification.object as? T3PromptTextView else { return }
-            let location = view.selectedRange().location
-            if parent.caret != location { parent.caret = location }
-        }
-    }
-}
-
-/// The field itself: draws the placeholder an `NSTextView` has no property
-/// for, and routes the four keys SwiftUI cannot reach.
-private final class T3PromptTextView: NSTextView {
-    var placeholder: NSAttributedString?
-    weak var coordinator: T3PromptField.Coordinator?
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard string.isEmpty, let placeholder else { return }
-        placeholder.draw(at: NSPoint(x: textContainerInset.width + (textContainer?.lineFragmentPadding ?? 5),
-                                     y: textContainerInset.height))
-    }
-
-    override func doCommand(by selector: Selector) {
-        switch selector {
-        case #selector(NSResponder.insertNewline(_:)):
-            // AppKit sends `insertNewline:` for both ⏎ and ⇧⏎ — only the event
-            // tells them apart (`composerSubmissionIntentForEnter`,
-            // `composer-logic.ts:33-34`: shift is a newline, never a send).
-            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
-                super.doCommand(by: #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)))
-                return
-            }
-            // An open menu takes ⏎ to pick its row, and nothing is sent
-            // (`onComposerCommandKey`, `ChatComposer.tsx:3104-3106`).
-            if coordinator?.parent.onMenuKey(.pick) == true { return }
-            _ = coordinator?.parent.onSubmit()
-            return
-        case #selector(NSResponder.insertTab(_:)):
-            // ⇥ picks as well (`:3104`); with no menu open it stays AppKit's.
-            if coordinator?.parent.onMenuKey(.pick) == true { return }
-        case #selector(NSResponder.cancelOperation(_:)):
-            // Ours: ⎋ shuts the menu (upstream has none to shut, `:2023`).
-            if coordinator?.parent.onMenuKey(.dismiss) == true { return }
-        case #selector(NSResponder.moveUp(_:)):
-            if coordinator?.parent.onMenuKey(.up) == true { return }
-            if canRecall, coordinator?.parent.onRecall(-1) == true { return }
-        case #selector(NSResponder.moveDown(_:)):
-            if coordinator?.parent.onMenuKey(.down) == true { return }
-            if coordinator?.parent.recalling == true, coordinator?.parent.onRecall(1) == true { return }
-        default:
-            break
-        }
-        super.doCommand(by: selector)
-    }
-
-    /// Backward recall starts from an empty prompt and continues while
-    /// browsing (`stepComposerPromptHistory`, `composerPromptHistory.ts:196`).
-    private var canRecall: Bool {
-        string.isEmpty || coordinator?.parent.recalling == true
-    }
-
-    override func paste(_ sender: Any?) {
-        if coordinator?.parent.onPaste() == true { return }
-        super.paste(sender)
-    }
-
-    /// ⌥⏎ keeps AppKit's own meaning (a newline) — `insertNewlineIgnoringFieldEditor:`
-    /// arrives here and is passed straight through by `doCommand(by:)`.
-    override var acceptsFirstResponder: Bool { true }
 }

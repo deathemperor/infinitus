@@ -145,14 +145,55 @@ final class T3WindowModel: ObservableObject {
 
     private func commit(_ draft: T3ComposerDraft, for threadId: String) {
         var next = drafts
+        var draft = draft
         // A draft row that is gone (discarded, or replaced by the session it
         // started) must not come back through the composer's `onDisappear`
         // flush — that flush runs AFTER the row left `state.drafts`, with the
         // field's text still in hand, and would re-persist it under an id no
         // row can ever reach again.
-        let gone = T3WorkspaceState.isDraft(threadId) && !state.drafts.contains { $0.id == threadId }
+        let row = T3WorkspaceState.isDraft(threadId) ? state.drafts.first { $0.id == threadId } : nil
+        let gone = T3WorkspaceState.isDraft(threadId) && row == nil
+        // The project the row is in, so `restoreDrafts` can rebuild it after a
+        // relaunch; the composer never has to remember to pass it.
+        draft.projectId = row?.projectId
         if draft.isEmpty || gone { next.removeValue(forKey: threadId) } else { next[threadId] = draft }
         guard next != drafts else { return }
+        drafts = next
+        UserDefaults.standard.set(T3ComposerDrafts.save(next), forKey: Key.drafts)
+    }
+
+    /// Whether the persisted `draft:` entries have been put back yet. Until
+    /// they are, nothing may be pruned: none of them has a row, so `prunable`
+    /// would read every one as unreachable and drop the lot.
+    private var restoredDrafts = false
+
+    /// The persisted drafts, back as sidebar rows — upstream's drafts survive
+    /// a reload because the draft record itself is persisted
+    /// (`composerDraftStore.ts`), and here the row is the record. Once, on the
+    /// first apply that knows the projects rather than in `init`: which
+    /// entries are still reachable is decided by the project list, and that
+    /// list only exists after the first `projectSummaries` walk. Restored in
+    /// id order so the rows do not shuffle between launches.
+    private func restoreDrafts(into state: inout T3WorkspaceState, projects: [ProjectSummary]) {
+        guard !restoredDrafts, !projects.isEmpty else { return }
+        restoredDrafts = true
+        for (id, projectId) in T3ComposerDrafts.restorable(drafts, projects: Set(projects.map(\.id)))
+            .sorted(by: { $0.key < $1.key }) {
+            state.addDraft(id: id, projectId: projectId, now: now)
+        }
+    }
+
+    /// The entries no row can reach any more, dropped after every apply
+    /// (`T3ComposerDrafts.prunable`): `workspace.drafts` would otherwise keep
+    /// a key for every draft ever discarded and every thread ever run.
+    private func pruneDrafts() {
+        guard restoredDrafts else { return }
+        let live = Set(state.threads.map(\.id).filter { state.pid(of: $0) != nil })
+        let stale = T3ComposerDrafts.prunable(drafts, liveDraftIds: Set(state.drafts.map(\.id)),
+                                              liveThreadIds: live)
+        guard !stale.isEmpty else { return }
+        var next = drafts
+        for id in stale { next.removeValue(forKey: id) }
         drafts = next
         UserDefaults.standard.set(T3ComposerDrafts.save(next), forKey: Key.drafts)
     }
@@ -277,6 +318,14 @@ final class T3WindowModel: ObservableObject {
         refreshing = false
         timelineStore?.stop()
         timelineStore = nil
+        // A menu's load outlives the window otherwise: `T3FileMention.list`
+        // spawns `git ls-files` on a monorepo, which must not still be running
+        // for a window nobody has open (B-5 review). The caches stay — they are
+        // what the next open serves at once.
+        for task in commandLoads.values { task.cancel() }
+        for task in mentionLoads.values { task.cancel() }
+        commandLoads = [:]
+        mentionLoads = [:]
     }
 
     func tick() { now = Date() }
@@ -307,10 +356,15 @@ final class T3WindowModel: ObservableObject {
                 // once at `start()` — not on every fleet tick, so a republish
                 // below reflects a real state change, not the clock.
                 var next = self.state
+                // Before the apply, like the visits in `init`: the restored
+                // rows are then part of the very first published state, and
+                // `apply`'s own `lastVisitedAt` filter keeps their visits.
+                self.restoreDrafts(into: &next, projects: inputs.projects)
                 // `wallClock` is a real clock for the start deadline only;
                 // `now` stays frozen between the window's minute ticks (E2).
                 next.apply(inputs, now: self.now, wallClock: Date())
                 if next != self.state { self.state = next }
+                self.pruneDrafts()
                 self.reconcileDraftStarts()
                 if let screen = self.focusedScreen { self.applyFocusedScreen(screen) }
                 self.syncTimelineStore()
@@ -376,7 +430,13 @@ final class T3WindowModel: ObservableObject {
         return state.groups.first?.members.first?.id ?? state.projects.first?.id
     }
 
-    func retargetDraft(_ draftId: String, projectId: String) { state.retargetDraft(draftId, projectId: projectId) }
+    func retargetDraft(_ draftId: String, projectId: String) {
+        state.retargetDraft(draftId, projectId: projectId)
+        // The persisted entry names the project its row is rebuilt in
+        // (`commit`), so a retargeted draft that is never typed into again
+        // would otherwise come back in the project it left.
+        if let draft = drafts[draftId] { commit(draft, for: draftId) }
+    }
 
     /// Upstream's "Discard draft" (`Sidebar.tsx:772`). The typed prompt goes
     /// with it, or `workspace.drafts` keeps an entry no row can reach again.
@@ -465,6 +525,15 @@ final class T3WindowModel: ObservableObject {
         // `reconcileDraftStarts` releases it when the reducer replaces the
         // draft — or when the start times out.
         state.markDraftStarted(draftId, pid: Int32(pid), now: Date())
+        // The deadline is only ever evaluated inside `apply`, i.e. on a fleet
+        // tick — and a fleet whose sessions are all idle can go a minute and a
+        // half without one, leaving the send button spinning long past the 30 s
+        // (B-5 review). One wake, no timer: it either finds the draft already
+        // handed over (nothing to do) or runs the expiry.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(T3WorkspaceState.startDeadline + 1))
+            self?.refresh()
+        }
         // Don't wait for the 200 ms fleet debounce to notice the new pid.
         refresh()
     }

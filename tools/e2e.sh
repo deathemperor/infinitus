@@ -48,6 +48,9 @@ export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bund
 export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
 export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
+# The workspace window must never start a real `claude` from this run
+# (tools/t3ref/fixture.sh:97 exports the same gate for the same reason).
+export INFINITUS_WORKSPACE_NO_START=1
 LOG="$(mktemp -t infinitus-e2e)"
 DOMAIN=Infinitus   # the unbundled debug binary's defaults domain
 
@@ -82,6 +85,9 @@ wall_visible() { "$CTL" windows | expect "any(w['visible'] and 'WallRoot' in w['
 # after `hide workspace`. The content view is the workspace's own
 # (NSHostingView<LockGate<T3Root>>, detached to nothing on close), and the
 # size floor is T3WindowController.minimumSize, which contentMinSize holds.
+# What it proves is that the window EXISTS, is on screen and idles — the
+# gate matches the LockGate host, so a locked Mac showing the unlock panel
+# passes it too; it says nothing about the workspace itself having rendered.
 workspace_visible() { "$CTL" windows | expect "any(w['visible'] and 'T3Root' in w['content'] and w['size'][0]>=840 and w['size'][1]>=620 for w in d)"; }
 
 "$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased

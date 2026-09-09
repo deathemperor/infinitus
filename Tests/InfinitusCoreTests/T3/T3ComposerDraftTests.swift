@@ -34,6 +34,51 @@ final class T3ComposerDraftTests: XCTestCase {
         XCTAssertEqual(T3ComposerDrafts.load(from: saved), ["b": T3ComposerDraft(text: "kept")])
     }
 
+    /// A draft written before `projectId` existed still decodes — its rows
+    /// are simply not restorable (below), and the entry is pruned.
+    func testDraftDecodesWithoutAProjectId() throws {
+        let legacy = Data(#"{"draft:9E0B":{"text":"half a sentence","attachments":[]}}"#.utf8)
+        let drafts = T3ComposerDrafts.load(from: legacy)
+        XCTAssertEqual(drafts["draft:9E0B"]?.text, "half a sentence")
+        XCTAssertNil(drafts["draft:9E0B"]?.projectId)
+    }
+
+    func testDraftRoundTripsItsProjectId() {
+        let drafts = ["draft:9E0B": T3ComposerDraft(text: "half a sentence", projectId: "abc123")]
+        XCTAssertEqual(T3ComposerDrafts.load(from: T3ComposerDrafts.save(drafts)), drafts)
+    }
+
+    // MARK: - restorable / prunable
+
+    /// The relaunch decision: a `draft:` entry gets its sidebar row back only
+    /// when the project it names is still one this Mac has.
+    func testRestorableKeepsDraftsWhoseProjectIsKnown() {
+        let drafts: [String: T3ComposerDraft] = [
+            "draft:known": T3ComposerDraft(text: "a", projectId: "p1"),
+            "draft:gone": T3ComposerDraft(text: "b", projectId: "p9"),
+            "draft:legacy": T3ComposerDraft(text: "c"),
+            "t3fix-hi": T3ComposerDraft(text: "a live thread's draft", projectId: "p1"),
+        ]
+        XCTAssertEqual(T3ComposerDrafts.restorable(drafts, projects: ["p1", "p2"]), ["draft:known": "p1"])
+    }
+
+    /// The leak: without a row (or a live session) an entry can never be
+    /// reached again, so it must not sit in the defaults forever.
+    func testPrunableDropsUnreachableEntries() {
+        let drafts: [String: T3ComposerDraft] = [
+            "draft:onscreen": T3ComposerDraft(text: "a", projectId: "p1"),
+            "draft:discarded": T3ComposerDraft(text: "b", projectId: "p1"),
+            "live-thread": T3ComposerDraft(text: ""),
+            "dead-thread": T3ComposerDraft(text: "", attachments: [
+                T3ComposerAttachmentRef(path: "/tmp/shot.png", mime: "image/png"),
+            ]),
+            "dead-thread-with-text": T3ComposerDraft(text: "worth keeping"),
+        ]
+        XCTAssertEqual(T3ComposerDrafts.prunable(drafts, liveDraftIds: ["draft:onscreen"],
+                                                 liveThreadIds: ["live-thread"]),
+                       ["draft:discarded", "dead-thread"])
+    }
+
     // MARK: - pushHistory
 
     func testPushHistoryPutsTheNewestFirst() {

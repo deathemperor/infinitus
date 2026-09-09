@@ -198,6 +198,12 @@ struct T3ThreadSwitcher: View {
             Button("") { move(-1) }.keyboardShortcut(.upArrow, modifiers: [])
             Button("") { move(1) }.keyboardShortcut(.downArrow, modifiers: [])
             Button("") { close() }.keyboardShortcut(.cancelAction)
+            // `commandPalette.toggle` (`keybindings.ts:38`) — ⌘K closes the
+            // palette as well as opens it. `T3Root`'s own ⌘K cannot do it
+            // while this sheet is up (the sheet's window is key, and
+            // `performKeyEquivalent:` never reaches the presenter), so the
+            // shortcut is repeated here.
+            Button("") { close() }.keyboardShortcut("k", modifiers: .command)
         }
         .buttonStyle(.plain).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
     }

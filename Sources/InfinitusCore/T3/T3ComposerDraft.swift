@@ -31,10 +31,19 @@ public struct T3ComposerAttachmentRef: Codable, Sendable, Equatable {
 public struct T3ComposerDraft: Codable, Sendable, Equatable {
     public var text: String
     public var attachments: [T3ComposerAttachmentRef]
+    /// Draft keys only: the project the row was in. Upstream's draft survives
+    /// a reload because the draft record itself is persisted
+    /// (`composerDraftStore.ts`); here the row is rebuilt at launch from this
+    /// field, so a `draft:` entry that predates it (or one whose project is
+    /// gone) is unreachable and gets pruned instead
+    /// (`T3ComposerDrafts.restorable` / `prunable`). Optional so a draft
+    /// written before this field decodes.
+    public var projectId: String?
 
-    public init(text: String = "", attachments: [T3ComposerAttachmentRef] = []) {
+    public init(text: String = "", attachments: [T3ComposerAttachmentRef] = [], projectId: String? = nil) {
         self.text = text
         self.attachments = attachments
+        self.projectId = projectId
     }
 
     /// Nothing worth keeping: no prompt and no staged file.
@@ -70,6 +79,42 @@ public enum T3ComposerDrafts {
     /// not state to restore, and its key would otherwise live forever).
     public static func save(_ drafts: [String: T3ComposerDraft]) -> Data {
         (try? JSONEncoder().encode(drafts.filter { !$0.value.isEmpty })) ?? Data()
+    }
+
+    /// The persisted `draft:` entries a relaunch can put a sidebar row back
+    /// for: the ones that still name a project this Mac has
+    /// (`draftId -> projectId`). Everything else — an entry written before
+    /// `projectId` existed, or one whose project is gone — has no row to
+    /// reach it and is `prunable` below.
+    public static func restorable(_ drafts: [String: T3ComposerDraft],
+                                  projects: Set<String>) -> [String: String] {
+        var out: [String: String] = [:]
+        for (id, draft) in drafts where T3WorkspaceState.isDraft(id) {
+            guard let projectId = draft.projectId, projects.contains(projectId) else { continue }
+            out[id] = projectId
+        }
+        return out
+    }
+
+    /// Keys `workspace.drafts` should stop carrying, decided after an apply:
+    /// a draft key with no row left (discarded, started, or never restorable)
+    /// and a thread key whose session is not in the fleet and whose entry is
+    /// only staged files — the text is what a returning session would want
+    /// back, and an attachment path may not even exist by then. Without this
+    /// the defaults key grows with every thread this Mac ever ran.
+    public static func prunable(_ drafts: [String: T3ComposerDraft],
+                                liveDraftIds: Set<String>,
+                                liveThreadIds: Set<String>) -> Set<String> {
+        var out: Set<String> = []
+        for (id, draft) in drafts {
+            if T3WorkspaceState.isDraft(id) {
+                if !liveDraftIds.contains(id) { out.insert(id) }
+            } else if !liveThreadIds.contains(id),
+                      draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                out.insert(id)
+            }
+        }
+        return out
     }
 
     // MARK: - Prompt recall

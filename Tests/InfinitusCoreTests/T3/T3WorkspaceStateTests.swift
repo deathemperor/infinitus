@@ -293,6 +293,19 @@ final class T3WorkspaceStateTests: XCTestCase {
         XCTAssertEqual(s.selectedThreadId, draft)
     }
 
+    /// The relaunch path (B-5 review): a persisted draft's row comes back
+    /// under the id its text is stored under, and asking twice cannot stack a
+    /// second row for it.
+    func testRestoredDraftKeepsItsIdAndIsNotDuplicated() {
+        var s = T3WorkspaceState()
+        let id = T3WorkspaceState.draftIdPrefix + "9E0B"
+        XCTAssertEqual(s.addDraft(id: id, projectId: "project-1", now: now), id)
+        s.addDraft(id: id, projectId: "project-1", now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [id])
+        XCTAssertEqual(s.threads.map(\.id), [id])
+        XCTAssertEqual(s.drafts.first?.projectId, "project-1")
+    }
+
     func testRemoveDraftDropsItAndItsSelection() {
         var s = T3WorkspaceState()
         let draft = s.addDraft(projectId: "project-1", now: now)

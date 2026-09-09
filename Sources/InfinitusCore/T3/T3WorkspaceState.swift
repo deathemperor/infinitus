@@ -177,8 +177,16 @@ public struct T3WorkspaceState: Sendable, Equatable {
     /// A new draft in `projectId`, newest first. Returns its id.
     @discardableResult
     public mutating func addDraft(projectId: String, now: Date) -> String {
-        let draft = T3Thread(id: Self.draftIdPrefix + UUID().uuidString,
-                             environmentId: T3Thread.localEnvironmentId, projectId: projectId,
+        addDraft(id: Self.draftIdPrefix + UUID().uuidString, projectId: projectId, now: now)
+    }
+
+    /// The same row under an id the caller already has: a draft persisted in
+    /// `workspace.drafts` put back at launch (B-5 review), which only works if
+    /// the row keeps the id its text is stored under.
+    @discardableResult
+    public mutating func addDraft(id: String, projectId: String, now: Date) -> String {
+        guard !drafts.contains(where: { $0.id == id }) else { return id }
+        let draft = T3Thread(id: id, environmentId: T3Thread.localEnvironmentId, projectId: projectId,
                              title: Self.draftTitle, createdAt: now, updatedAt: now)
         drafts.insert(draft, at: 0)
         threads.insert(draft, at: 0)
