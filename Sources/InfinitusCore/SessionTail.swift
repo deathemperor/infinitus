@@ -15,7 +15,7 @@ public struct SessionTail: @unchecked Sendable {
     /// The file's identity: a transcript replaced under the same path (an
     /// atomic write-and-rename) starts over even when the new file is no
     /// shorter — appending its lines onto the old ones would be silently wrong.
-    private var inode: ino_t?
+    private var inode: UInt64?
     private(set) var entries: [[String: Any]] = []
     private var sizes: [Int] = []
     private var bytesHeld = 0
@@ -86,8 +86,13 @@ public struct SessionTail: @unchecked Sendable {
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return false }
         var moved = false
+        #if os(Windows)
+        // No `fileDescriptor` on Windows Foundation: the file index by path.
+        let id = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.systemFileNumber] as? UInt64
+        #else
         var st = stat()
-        let id: ino_t? = fstat(handle.fileDescriptor, &st) == 0 ? st.st_ino : nil
+        let id: UInt64? = fstat(handle.fileDescriptor, &st) == 0 ? UInt64(st.st_ino) : nil
+        #endif
         if size < offset || (inode != nil && id != inode) {
             entries = []; sizes = []; bytesHeld = 0; offset = 0; headGoal = nil
             moved = true
