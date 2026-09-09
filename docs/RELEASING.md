@@ -70,7 +70,8 @@ for `generic/platform=iOS`, exported with `ios/ExportOptions.plist`
 `aps-environment` to production); `--build N` sets the build number
 TestFlight will not take twice, `--upload` sends it with the
 notarization API key (`NOTARY_KEY_ID` / `NOTARY_ISSUER_ID`, the `.p8` at
-`~/.private_keys/`; uploads need the App Manager role). Every bundle
+`~/.private_keys/`; Apple's role table says which roles may upload builds
+— check the key's role if the upload is refused). Every bundle
 carries a `PrivacyInfo.xcprivacy` (UserDefaults CA92.1, file timestamps
 C617.1, nothing collected, no tracking). Human steps before the first
 export: the App Store Connect record for `run.infinitus.mobile`, one

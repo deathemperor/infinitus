@@ -15,8 +15,9 @@
 # --upload    hand the export to App Store Connect. Authenticates with the
 #             notarization API key (NOTARY_KEY_ID / NOTARY_ISSUER_ID from
 #             .env, the .p8 at ~/.private_keys/AuthKey_<id>.p8 or
-#             NOTARY_KEY_PATH); that key needs the App Manager role for
-#             uploads where notarization got by with Developer.
+#             NOTARY_KEY_PATH). Notarization accepts a Developer-role
+#             key; if the upload is refused, check the key's role against
+#             Apple's role table (App Store Connect → Users and Access).
 # Output: ios/build/archive/InfinitusMobile.xcarchive and, without
 # --upload, ios/build/archive/export/InfinitusMobile.ipa.
 set -euo pipefail
