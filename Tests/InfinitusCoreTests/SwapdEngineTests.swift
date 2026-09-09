@@ -63,6 +63,10 @@ final class SwapdMappingTests: XCTestCase {
         // `lastGood` with no windows is a fetch that carried nothing.
         XCTAssertEqual(account.lastGoodFetchedAt, "2026-09-09T01:11:03Z")
         XCTAssertNil(account.lastGoodUsage)
+        // The engine's own list rides along, in its report order, each
+        // window named — `UsageWindow` has no `kind` to name them by.
+        XCTAssertEqual(account.windows?.map(\.name), ["5h", "7d", "Fable"])
+        XCTAssertEqual(account.windows?.map(\.pct), [0, 19, 29])
     }
 
     /// The payload a fresh install prints (probed against the real binary):
@@ -85,7 +89,36 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(SwapdMapping.fleets(from: list, now: now).map(\.provider), [.other, .codex])
     }
 
-    func testStaleServesItsWindowsAsTheLastGoodFetch() throws {
+    /// The shape the engine ACTUALLY emits (`collect.rs account_view`:
+    /// every non-`ok` status empties `windows` and moves the measurement
+    /// into `lastGood`) — not the shape spec §4's prose describes. A
+    /// stale row has no sentinel note to show, so it must still show
+    /// numbers; served from `lastGood`, it does.
+    func testStaleWithEmptyWindowsIsServedFromLastGood() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[
+          {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"","active":true,
+           "disabled":false,"preferred":false,"usageStatus":"stale","windows":[],
+           "lastGood":{"fetchedAt":"2026-09-09T00:00:00Z","ageSeconds":900,
+                       "windows":[{"kind":"5h","pct":41,"resetsAt":"2026-09-09T05:59:59Z"}]}}]}]}
+        """)
+        let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
+        XCTAssertEqual(account.usageStatus, "ok")
+        XCTAssertNil(SentinelNotes.note(for: account.usageStatus), "stale is not a sentinel")
+        // Without this the row would be both noteless and dataless, and
+        // `usage == nil` drops an account out of liveness and revival.
+        XCTAssertEqual(account.usage?.fiveHour?.pct, 41)
+        XCTAssertEqual(account.windows?.map(\.name), ["5h"])
+        // The age shown is the fetch's, not this pass's.
+        XCTAssertEqual(account.usageFetchedAt, "2026-09-09T00:00:00Z")
+        XCTAssertEqual(account.usageAgeSeconds, 900)
+        XCTAssertEqual(account.lastGoodUsage?.fiveHour?.pct, 41)
+        XCTAssertEqual(account.lastGoodAgeSeconds, 900)
+    }
+
+    /// The shape spec §4's prose describes — `windows` IS the last good
+    /// fetch. Read as is, so either emitter renders the same row.
+    func testStaleWithItsOwnWindowsIsServedAsIs() throws {
         let list = try list("""
         {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[
           {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"","active":true,
@@ -94,13 +127,31 @@ final class SwapdMappingTests: XCTestCase {
            "windows":[{"kind":"5h","pct":41,"resetsAt":"2026-09-09T05:59:59Z"}]}]}]}
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
-        // "stale" is not a sentinel: the row shows usage, not a note.
         XCTAssertEqual(account.usageStatus, "ok")
-        XCTAssertNil(SentinelNotes.note(for: account.usageStatus))
         XCTAssertEqual(account.usage?.fiveHour?.pct, 41)
+        XCTAssertEqual(account.usageAgeSeconds, 900)
+    }
+
+    /// A sentinel keeps `usage` nil even though the engine parked a
+    /// measurement in `lastGood`: its NOTE is the row (cswap's sentinel
+    /// rows read the same), and serving numbers under "re-login needed"
+    /// would say the account works.
+    func testASentinelShowsItsNoteRatherThanTheParkedMeasurement() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[
+          {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"","active":true,
+           "disabled":false,"preferred":false,"usageStatus":"relogin-required","windows":[],
+           "lastGood":{"fetchedAt":"2026-09-08T00:00:00Z","ageSeconds":90000,
+                       "windows":[{"kind":"5h","pct":41}]}}]}]}
+        """)
+        let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
+        XCTAssertEqual(account.usageStatus, "relogin_required")
+        XCTAssertNil(account.usage)
+        XCTAssertNil(account.windows)
+        XCTAssertNotNil(SentinelNotes.note(for: account.usageStatus))
+        // Kept for a display that wants to say how stale the last read was.
         XCTAssertEqual(account.lastGoodUsage?.fiveHour?.pct, 41)
-        XCTAssertEqual(account.lastGoodFetchedAt, "2026-09-09T00:00:00Z")
-        XCTAssertEqual(account.lastGoodAgeSeconds, 900)
+        XCTAssertEqual(account.lastGoodAgeSeconds, 90000)
     }
 
     func testSentinelStatusesTakeCswapsSpelling() {

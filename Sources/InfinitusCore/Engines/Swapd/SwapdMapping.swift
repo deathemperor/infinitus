@@ -150,19 +150,16 @@ public enum SwapdMapping {
     }
 
     public static func account(_ view: SwapdAccountView, now: Date = Date()) -> Account {
-        let live = usage(view.windows, now: now)
-        var lastGoodUsage: Usage?, lastGoodFetchedAt: String?, lastGoodAgeSeconds: Double?
-        if let lastGood = view.lastGood {
-            lastGoodUsage = usage(lastGood.windows, now: now)
-            lastGoodFetchedAt = lastGood.fetchedAt
-            lastGoodAgeSeconds = lastGood.ageSeconds
-        } else if view.usageStatus == "stale" {
-            // "stale" means `windows` IS the last good fetch (spec §4), so
-            // the display-grade copy is the same data with its own age.
-            lastGoodUsage = live
-            lastGoodFetchedAt = view.fetchedAt
-            lastGoodAgeSeconds = view.ageSeconds
-        }
+        let status = usageStatus(view.usageStatus)
+        // What the row DISPLAYS. `stale` is not a sentinel — it has no
+        // note to show instead — so it shows numbers, and the engine as
+        // landed empties `windows` and moves the measurement into
+        // `lastGood` for every non-`ok` status (collect.rs `account_view`:
+        // "one shape per status"), which would otherwise leave the row
+        // both noteless and dataless. A sentinel keeps `usage` nil: its
+        // note IS the row, the way cswap's sentinel rows read.
+        let shown = view.windows.isEmpty && view.usageStatus == "stale"
+            ? (view.lastGood?.windows ?? []) : view.windows
         return Account(number: view.slot, email: view.email,
                        organizationName: view.organizationName,
                        organizationUuid: view.organizationUuid,
@@ -170,12 +167,25 @@ public enum SwapdMapping {
                        // the app reads one (the proxy's rows say false too).
                        isOrganization: false,
                        active: view.active,
-                       usageStatus: usageStatus(view.usageStatus),
-                       usage: live, alias: view.alias, icon: view.icon, plan: view.plan,
+                       usageStatus: status,
+                       usage: usage(shown, now: now),
+                       // The engine's own list, in its report order. A
+                       // `UsageWindow` has no `kind`, so a window without a
+                       // name of its own wears its kind as one — otherwise
+                       // 5h, 7d and monthly would be indistinguishable
+                       // here. Same source as `usage`, so the raw list and
+                       // the derived view can never disagree.
+                       windows: shown.isEmpty ? nil
+                           : shown.map { window($0, now: now, fallbackName: $0.kind) },
+                       alias: view.alias, icon: view.icon, plan: view.plan,
                        disabled: view.disabled, preferred: view.preferred,
-                       usageFetchedAt: view.fetchedAt, usageAgeSeconds: view.ageSeconds,
-                       lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
-                       lastGoodAgeSeconds: lastGoodAgeSeconds)
+                       // A served measurement carries the age of the fetch
+                       // it came from, not of the pass that served it.
+                       usageFetchedAt: view.fetchedAt ?? view.lastGood?.fetchedAt,
+                       usageAgeSeconds: view.ageSeconds ?? view.lastGood?.ageSeconds,
+                       lastGoodUsage: view.lastGood.map { usage($0.windows, now: now) } ?? nil,
+                       lastGoodFetchedAt: view.lastGood?.fetchedAt,
+                       lastGoodAgeSeconds: view.lastGood?.ageSeconds)
     }
 
     /// The contract's window list as today's UI (and the phone's decoder)
