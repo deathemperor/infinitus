@@ -53,7 +53,9 @@ public enum PastSessions {
     public static func scan(claudeDir: URL, liveIds: Set<String> = [], limit: Int = 50,
                             search: String? = nil) -> [PastSession] {
         let needle = search?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-        return files(claudeDir: claudeDir).prefix(max(limit, 0)).compactMap { file in
+        let files = files(claudeDir: claudeDir)
+        heads.keep(paths: Set(files.map(\.url.path)))
+        return files.prefix(max(limit, 0)).compactMap { file in
             guard let session = session(of: file, liveIds: liveIds) else { return nil }
             guard needle.isEmpty || [session.repo, session.cwd, session.firstMessage]
                 .contains(where: { $0.lowercased().contains(needle) }) else { return nil }
@@ -94,9 +96,23 @@ public enum PastSessions {
     }
 
     /// One transcript's head → its session, or nil when no user prompt
-    /// has landed yet.
+    /// has landed yet. The head-derived pair is remembered per file:
+    /// `projectSummaries` rescans every minute and re-reading 200 heads
+    /// (13 MB, ~0.2 s of CPU) answered the same cwd and prompt each time
+    /// (#346). A transcript is append-only, so once it has grown past
+    /// `headBytes` its head is fixed; a shorter one re-reads on mtime.
     private static func session(of file: File, liveIds: Set<String>) -> PastSession? {
-        guard let head = head(of: file.url) else { return nil }
+        let key = Head.Key(path: file.url.path, mtime: file.bytes < headBytes ? file.mtime : nil)
+        let head = heads.value(key) { read(file.url) }
+        guard let head else { return nil }
+        let id = file.url.deletingPathExtension().lastPathComponent
+        return PastSession(sessionId: id, cwd: head.cwd, repo: (head.cwd as NSString).lastPathComponent,
+                           firstMessage: head.first, lastActivityAt: file.mtime, bytes: file.bytes,
+                           live: liveIds.contains(id))
+    }
+
+    private static func read(_ url: URL) -> Head? {
+        guard let head = head(of: url) else { return nil }
         let lines = head.split(separator: UInt8(ascii: "\n")).map { String(decoding: $0, as: UTF8.self) }
         let entries = SessionProgress.jsonEntries(lines)
         guard let cwd = entries.lazy.compactMap({ $0["cwd"] as? String }).first(where: { !$0.isEmpty }),
@@ -104,10 +120,37 @@ public enum PastSessions {
               // Infinitus's own headless runs (the session namer's
               // `claude -p`) open with its preface — not the user's work.
               !first.hasPrefix("[Infinitus]") else { return nil }
-        let id = file.url.deletingPathExtension().lastPathComponent
-        return PastSession(sessionId: id, cwd: cwd, repo: (cwd as NSString).lastPathComponent,
-                           firstMessage: first, lastActivityAt: file.mtime, bytes: file.bytes,
-                           live: liveIds.contains(id))
+        return Head(cwd: cwd, first: first)
+    }
+
+    struct Head {
+        let cwd: String, first: String
+        struct Key: Hashable { let path: String; let mtime: Date? }
+    }
+
+    /// The remembered heads, one per transcript on disk — `scan` drops the
+    /// entries whose file is gone. Read from whichever thread asks
+    /// (the control socket, the mirror, the exporter's tick).
+    static let heads = HeadCache()
+
+    final class HeadCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: [String: (key: Head.Key, head: Head?)] = [:]
+
+        func value(_ key: Head.Key, read: () -> Head?) -> Head? {
+            lock.lock()
+            if let hit = stored[key.path], hit.key == key { lock.unlock(); return hit.head }
+            lock.unlock()
+            let head = read()
+            lock.lock(); stored[key.path] = (key, head); lock.unlock()
+            return head
+        }
+
+        func keep(paths: Set<String>) {
+            lock.lock(); stored = stored.filter { paths.contains($0.key) }; lock.unlock()
+        }
+
+        var count: Int { lock.lock(); defer { lock.unlock() }; return stored.count }
     }
 
     private static func head(of url: URL) -> Data? {

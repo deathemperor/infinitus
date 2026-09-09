@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
