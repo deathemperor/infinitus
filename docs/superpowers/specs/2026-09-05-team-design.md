@@ -93,9 +93,10 @@ every member's leader-shared data plus the same.
   is the moment the passkey PRF runs, so one prompt serves both.
   Re-lock hides the team views; the working key stays in memory so the
   publish/fetch loop keeps running without a prompt.
-- Create team, Accept invite, Request to join are disabled until the
-  setting is on, with "Turn on biometric unlock first" and a button to
-  the setting. Turning it off while in a team is allowed with a
+- Mac: Create team, Accept invite, Request to join are disabled until
+  the setting is on, with "Turn on biometric unlock first" and a button
+  to the setting. Phone: no such gate (user 2026-09-09) — team actions
+  work with the lock off. Turning it off while in a team is allowed with a
   warning; team data then re-locks behind the passkey prompt on each
   launch. The app never leaves a team silently.
 - Unavailable biometrics fall back to the device passcode as the OS
