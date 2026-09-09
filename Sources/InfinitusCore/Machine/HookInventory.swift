@@ -174,9 +174,9 @@ public enum HookInventory {
     }
 
     public static func live(of registration: HookRegistration, rows: [ProcessRow],
-                            children: [Int: [ProcessRow]]? = nil) -> Live {
+                            index: ProcessIndex? = nil) -> Live {
         var live = Live()
-        let (instances, helpers) = instanceRows(of: registration, rows: rows, children: children)
+        let (instances, helpers) = instanceRows(of: registration, rows: rows, index: index)
         live.instances = instances.count
         live.helpers = helpers.count
         for row in instances + helpers {
@@ -187,15 +187,20 @@ public enum HookInventory {
     }
 
     /// The rows whose command carries the registration's script path,
-    /// and their descendants (a shell hook's python helpers). `children`
-    /// is `childrenByParent(rows)`, built once by a caller that asks for
-    /// every registration — 70 registrations regrouping 1,100 rows each
-    /// was most of the machine sample's CPU (#346).
+    /// and their descendants (a shell hook's python helpers). `index` is
+    /// `ProcessIndex(rows)`, built once by a caller that asks for every
+    /// registration — 70 registrations regrouping 1,100 rows each was
+    /// most of the machine sample's CPU (#346), and Foundation's
+    /// `String.contains` over the same 80k pairs cost a second per
+    /// sample; the byte search is 25× cheaper.
     public static func instanceRows(of registration: HookRegistration, rows: [ProcessRow],
-                                    children: [Int: [ProcessRow]]? = nil) -> (instances: [ProcessRow], helpers: [ProcessRow]) {
+                                    index: ProcessIndex? = nil) -> (instances: [ProcessRow], helpers: [ProcessRow]) {
         guard let path = registration.scriptPath else { return ([], []) }
-        let byParent = children ?? childrenByParent(rows)
-        let instances = rows.filter { $0.command.contains(path) }
+        let index = index ?? ProcessIndex(rows)
+        let byParent = index.children
+        let needle = Array(path.utf8)
+        var instances: [ProcessRow] = []
+        for (i, bytes) in index.commands.enumerated() where bytesContain(bytes, needle) { instances.append(rows[i]) }
         var seen = Set(instances.map(\.pid))
         var helpers: [ProcessRow] = []
         var queue = instances
@@ -208,8 +213,31 @@ public enum HookInventory {
         return (instances, helpers)
     }
 
-    public static func childrenByParent(_ rows: [ProcessRow]) -> [Int: [ProcessRow]] {
-        Dictionary(grouping: rows, by: \.ppid)
+    /// One sample's rows, grouped by parent and with each command as
+    /// bytes, shared by every registration's `instanceRows`.
+    public struct ProcessIndex {
+        public let children: [Int: [ProcessRow]]
+        let commands: [[UInt8]]
+        public init(_ rows: [ProcessRow]) {
+            children = Dictionary(grouping: rows, by: \.ppid)
+            commands = rows.map { Array($0.command.utf8) }
+        }
+    }
+
+    static func bytesContain(_ hay: [UInt8], _ needle: [UInt8]) -> Bool {
+        let n = needle.count, h = hay.count
+        guard n > 0, h >= n else { return n == 0 }
+        let first = needle[0]
+        var i = 0
+        while i <= h - n {
+            if hay[i] == first {
+                var j = 1
+                while j < n, hay[i + j] == needle[j] { j += 1 }
+                if j == n { return true }
+            }
+            i += 1
+        }
+        return false
     }
 
     /// A stable fingerprint of the registrations: a change means an
