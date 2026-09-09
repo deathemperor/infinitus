@@ -209,7 +209,7 @@ struct T3ThreadScreen: View {
             T3ThreadSettingsSheet(model: model, session: session, macId: macId, facts: follower.state.facts).t3(platform: .mobile)
         }
         .sheet(isPresented: $showGit) {
-            T3GitSheet(branch: model.progress(macId: macId, pid: session.pid)?.gitBranch).t3(platform: .mobile)
+            T3GitSheet(branch: model.progress(macId: macId, pid: session.pid)?.gitBranch, session: session, macId: macId).t3(platform: .mobile)
         }
     }
 

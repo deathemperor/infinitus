@@ -250,7 +250,7 @@ import InfinitusUI
                                              facts: Self.conversation(running: true).facts)
             .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "thread-settings-light", png: Self.render(settings), dir: dir, test: self)
-        let git = T3GitSheet(branch: "t3-c5").t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         for (name, state, scheme) in shots {
             let root = NavigationStack {
