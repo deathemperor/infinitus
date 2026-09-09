@@ -377,6 +377,18 @@ final class SessionFeedLongPollTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(start), 0.5)
     }
 
+    /// A stopped store's loop ends the wait on the next slice, not at the
+    /// deadline (#399).
+    func testCancellationEndsTheWaitOnTheNextSlice() {
+        let stamp = SessionFeedReader.stamp(record: record, claudeDir: dir)
+        let mark = Mark()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.15) { mark.value = "cancel" }
+        let start = Date()
+        SessionFeedReader.waitForChange(pid: pid, claudeDir: dir, since: stamp, wait: 5, poll: 0.05,
+                                        isCancelled: { mark.value == "cancel" })
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1.0)
+    }
+
     func testWaitsUntilDeadlineWhenNothingChanges() {
         let stamp = SessionFeedReader.stamp(record: record, claudeDir: dir)
         let start = Date()

@@ -28,6 +28,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
 - Settings › Team's Syncing line stays one line: git's progress can no longer spill over the pane.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
+- Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
 
 ### Phone
 - Live Activity cards are keyed to their Mac's pairing, not its name, so two Macs sharing a name or a renamed Mac keep their cards apart; the Mac echoes the key into the cards it starts by push (#144).
