@@ -58,6 +58,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
 - A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
+- A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
