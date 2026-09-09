@@ -363,15 +363,6 @@ struct T3ThreadRowView: View {
     }
 }
 
-/// Core carries its colours as plain 0-255 components (`T3ProjectIcon.RGB`)
-/// because `InfinitusCore` may not depend on `InfinitusUI` — this is the one
-/// place they become SwiftUI colours.
-extension T3ProjectIcon.RGB {
-    var color: Color {
-        Color(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
-    }
-}
-
 /// `ProjectFavicon.tsx`'s automatic-icon path (`selectProjectIcon` +
 /// `PROJECT_ICONS`, fix round 1 R2): a bare coloured Lucide glyph — no
 /// background box, no radius, no letter fallback (upstream has none of those
