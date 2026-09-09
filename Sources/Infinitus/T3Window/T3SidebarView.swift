@@ -57,7 +57,12 @@ struct T3SidebarView: View {
     private var brandRow: some View {
         HStack(spacing: 8) {
             T3ProviderIcon(size: 20)
+            // The slot is what the sidebar's width leaves after the
+            // traffic-light inset: at a narrowed sidebar the wordmark truncates
+            // on one line rather than wrapping onto a second.
             T3Wordmark()
+                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.leading, 130)

@@ -51,11 +51,23 @@ struct T3BranchLine: View {
         .background {
             // The `before` outline, minus the 1 rem the mask removes: the
             // sides and the 16-radius bottom, in `dark:before:border-white/7`.
+            // Outline only: the dark `before` background (`:89`) is a 1 % white
+            // wash the reference paints under a narrower strip, and filling
+            // ours — which the window's own scale makes wider — measured
+            // further from the reference than leaving it, so it stays off.
             UnevenRoundedRectangle(bottomLeadingRadius: 16, bottomTrailingRadius: 16,
                                    style: .continuous)
                 .stroke(Color.white.opacity(0.07), lineWidth: 1)
                 .padding(.top, -16)
         }
+        // `-mt-4` (`ComposerSurface.tsx:87`) tucks the strip back under the
+        // card's own bottom margin — `T3ComposerView`'s `.padding(.bottom, 16)`
+        // — so `pt-5` leaves the 4 upstream shows between the two. The 20
+        // below is what the reference window keeps under the strip; upstream
+        // gets it from a container this port has no counterpart for, so it is
+        // set to the measured inset.
+        .padding(.top, -16)
+        .padding(.bottom, 20)
         .padding(.horizontal, Self.drawerInset)
         .task(id: threadId) {
             branch = model.cachedBranch(cwd: cwd)

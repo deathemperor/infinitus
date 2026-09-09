@@ -218,17 +218,37 @@ reference's width (the window lands 1 px wider):
 
 | screen | over ΔE 6 | max ΔE |
 |---|---|---|
-| thread | 2.72 % | 110.9 |
-| composer | 2.72 % | 110.9 |
+| thread | 2.08 % | 110.9 |
+| composer | 2.08 % | 110.9 |
 
-Above the 1.5 % bar. What the heatmap shows, in order of area: the
-sidebar is 256 pt wide here
-against about 240 pt; the reply column starts about 7 pt higher and the
-composer card sits about 24 pt higher, with no `Local checkout` / branch
-strip under it and no `5:38 PM` stamp under the reply; the header wordmark
-is the app's own; the composer's model / effort / access controls are
-capability-gated and the reference session has them. Tracked in the
-parity follow-up issue named in the PR that added these numbers.
+(2.72 % before the six fixes in #435; the two screens are one window, so
+both columns read the same capture.)
+
+**The reference is not at 1:1 scale, and that caps the number.** Its
+window chrome is 1× — the traffic lights are 11 px tall in
+`mac-thread.png` against 23 px in ours — while its web content is zoomed
+1.893×. Every content measurement agrees: the composer card is 1454 px for `max-w-3xl` (1454/768 = 1.893),
+the sidebar is 484 px for the `16rem` default (484/1.893 = 255.7, i.e.
+**not** a resized sidebar), and one identical line of the reply is 1434 px
+against our 1515 (1434 × 2 / 1515 = 1.893). Ours renders at 2× on a
+Retina display, so the whole frame is 5.3 % larger and every column lands
+a few points off however exact the port is. Normalized out, the port now
+matches: that line of the reply is **757.5 design px wide in both**, its
+glyph peak is 198 in both (`text-foreground/80`), the user bubble's top
+is 76.5 against 76.6, the line pitch 23.0 against 22.7
+(`leading-relaxed`). Getting under the bar needs a **new
+`mac-thread.png`, shot on the 2× display with T3's zoom reset (⌘0)** —
+not more porting.
+
+What is left in the heatmap, in order of area: the 5.3 % scale
+(everything doubled a few px sideways), the composer's model / effort /
+access controls (capability-gated here, the reference session has them),
+the sidebar row's relative timestamp and project glyph, the header
+wordmark (the app's own), and the `5:38 PM` stamp — which is hover state
+baked into the reference: upstream's message footer is
+`opacity-0 group-hover/assistant:opacity-100` (`MessagesTimeline.tsx:1625`),
+so the cursor was over the reply when the shot was taken. Future Mac
+references should be captured with the pointer off the content.
 
 ### C parity — 2026-09-09
 
