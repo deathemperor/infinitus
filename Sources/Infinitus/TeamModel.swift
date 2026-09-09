@@ -1034,6 +1034,18 @@ final class TeamModel: ObservableObject {
         }
     }
 
+    /// #339: rewrite my member branch to one commit (the only force-push
+    /// the spec allows, on an explicit ask), then fetch so the mirror
+    /// and the snapshot follow.
+    func compact() async {
+        await action("Compacting…") { paths, secrets in
+            guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
+            _ = try client.fetch()
+            _ = try client.compactOwnBranch()
+            _ = try client.fetch()
+        }
+    }
+
     func reshare(days: Int) async {
         await action("Re-sharing…") { paths, secrets in
             guard let client = try Self.openClient(paths, secrets) else { throw TeamClient.ClientError.notInTeam }
