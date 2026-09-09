@@ -154,44 +154,10 @@ struct T3PendingApprovalItem: Equatable {
 
 /// One question of a parked `AskUserQuestion`, decoded from the activity
 /// payload the way the phone decodes it (`T3Pending.derive`,
-/// ios/InfinitusMobile/T3/T3Pending.swift:69-81).
-struct T3PendingQuestionItem: Identifiable, Equatable {
-    struct Option: Identifiable, Equatable {
-        let label: String
-        let description: String
-        var id: String { label }
-    }
-    /// Upstream's `question.id`; the option rows key off it.
-    let id: String
-    /// The `answers` JSON *key*: `OwnedWire.decision(answers:pending:)` looks
-    /// each answer up by the question's TEXT (OwnedWire.swift:280), so this is
-    /// what the encoder must use — never `id`.
-    let question: String
-    let header: String
-    let multiSelect: Bool
-    /// `allowCustomAnswer: Schema.optional(Schema.Boolean)`
-    /// (`providerRuntime.ts:539`) — absent means allowed, and only an
-    /// explicit `false` withdraws the free-text field
-    /// (`pendingUserInput.ts:45`). A `var` so the memberwise init defaults it.
-    var allowCustomAnswer = true
-    let options: [Option]
-
-    static func parse(_ questions: [JSONValue]) -> [T3PendingQuestionItem] {
-        questions.compactMap { q in
-            guard let o = q.objectValue, let text = o["question"]?.stringValue else { return nil }
-            let options = (o["options"]?.arrayValue ?? []).compactMap { opt -> Option? in
-                guard let d = opt.objectValue, let label = d["label"]?.stringValue else { return nil }
-                return Option(label: label, description: d["description"]?.stringValue ?? "")
-            }
-            guard !options.isEmpty else { return nil }
-            return T3PendingQuestionItem(id: o["id"]?.stringValue ?? text, question: text,
-                                         header: o["header"]?.stringValue ?? "",
-                                         multiSelect: o["multiSelect"].map { $0 == .bool(true) } ?? false,
-                                         allowCustomAnswer: o["allowCustomAnswer"] != .bool(false),
-                                         options: options)
-        }
-    }
-}
+/// ios/InfinitusMobile/T3/T3Pending.swift:69-81). The type and its `parse`
+/// live in Core (`T3PendingAnswers.Question`, #422) — one copy for the Mac
+/// and the phone; this alias keeps the panel's own call sites unchanged.
+typealias T3PendingQuestionItem = T3PendingAnswers.Question
 
 // MARK: - Banner primitives
 
@@ -669,55 +635,31 @@ struct T3PendingUserInputPanel: View {
     /// `buildPendingUserInputAnswers` (`pendingUserInput.ts:100-115`) against
     /// this port's encoder: every question answered, a multi-select's labels
     /// joined by `SessionInput.Answers.separator` in option order, keyed by the
-    /// question text (what `OwnedWire.decision(answers:)` looks up).
+    /// question text (what `OwnedWire.decision(answers:)` looks up). The rule
+    /// itself is `T3PendingAnswers` (Core, #422) — one copy for the Mac and
+    /// the phone; this is only the wire shape an owned vs. a terminal session
+    /// takes.
     private var submission: T3PendingSubmission? {
-        if owned {
-            var out: [String: String] = [:]
-            for q in visible {
-                if let typed = typedAnswer(q) {
-                    // `resolvePendingUserInputAnswer` (`pendingUserInput.ts:40-57`)
-                    // returns the custom answer over the selection, and
-                    // `OwnedWire.decision(answers:pending:)` takes one non-option
-                    // string per question as Claude Code's "Other"
-                    // (OwnedWire.swift:283-289).
-                    out[q.question] = typed
-                    continue
-                }
-                let chosen = q.options.map(\.label).filter { picks[q.id]?.contains($0) == true }
-                guard !chosen.isEmpty else { return nil }
-                out[q.question] = chosen.joined(separator: SessionInput.Answers.separator)
-            }
-            return .answers(SessionInput.Answers.encode(out))
-        }
-        guard let q = visible.first, let label = picks[q.id]?.first,
-              let i = q.options.firstIndex(where: { $0.label == label }), i < 9 else { return nil }
-        return .key(String(i + 1))
+        owned ? T3PendingAnswers.encode(visible, picks: picks, custom: custom).map { .answers($0) }
+              : T3PendingAnswers.menuKey(visible, picks: picks).map { .key($0) }
     }
 
-    /// `normalizeDraftAnswer` (`pendingUserInput.ts:22-28`): trimmed, and nil
-    /// when empty or when the question withdrew the field. Terminal sessions
-    /// never have one — only a menu key reaches them.
+    /// Terminal sessions never have one — only a menu key reaches them.
     ///
-    /// One shape more has no wire and so is no answer here either: a
-    /// multi-select whose text carries `Answers.separator`.
-    /// `OwnedWire.decision(answers:pending:)` (OwnedWire.swift:285-288) splits
-    /// a multi-select's answer on it and needs every part to be an option, so
-    /// that text can only be rejected. Refusing it in *this* one place keeps
-    /// `answered` and `submission` on one rule — deciding it in `submission`
-    /// alone let "Next question" pass an undeliverable answer and killed
-    /// Submit two questions later, with the offending field off-screen.
+    /// Refusing an undeliverable typed answer here, the one place `answered`
+    /// and `submission` both route through, keeps them on one rule —
+    /// deciding it in `submission` alone let "Next question" pass an
+    /// undeliverable answer and killed Submit two questions later, with the
+    /// offending field off-screen.
     private func typedAnswer(_ q: T3PendingQuestionItem) -> String? {
-        guard owned, q.allowCustomAnswer else { return nil }
-        let trimmed = (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return q.multiSelect && trimmed.contains(SessionInput.Answers.separator) ? nil : trimmed
+        guard owned else { return nil }
+        return T3PendingAnswers.typedAnswer(q, custom: custom)
     }
 
     /// Text typed into a multi-select's field that `typedAnswer` has to drop.
     private func separatorInMultiSelectText(_ q: T3PendingQuestionItem) -> Bool {
-        guard owned, q.allowCustomAnswer, q.multiSelect else { return false }
-        return (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            .contains(SessionInput.Answers.separator)
+        guard owned else { return false }
+        return T3PendingAnswers.separatorInMultiSelectText(q, custom: custom)
     }
 
     /// `setPendingUserInputCustomAnswer` (`pendingUserInput.ts:60-71`): a
@@ -965,7 +907,7 @@ struct T3ThreadPendingSlot: View {
     }
     private var questions: [T3PendingQuestionItem] {
         guard approval == nil, let input = store.pending.userInputs.first else { return [] }
-        return T3PendingQuestionItem.parse(input.questions)
+        return T3PendingAnswers.parse(input.questions)
     }
     private var userInputRequestId: String? { store.pending.userInputs.first?.requestId }
 
