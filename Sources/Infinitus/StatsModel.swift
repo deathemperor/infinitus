@@ -62,7 +62,18 @@ final class StatsModel: ObservableObject {
 
     func loadIfNeeded() { if days.isEmpty, !scanning { refresh() } }
 
-    func refreshIfStale(_ interval: TimeInterval = 300) {
+    /// Every 5 min while someone is looking at stats (a `stats` lease:
+    /// the pop-out's tab, the phone) — otherwise only the team publish
+    /// reads the scan, and its day-level figures can lag half an hour:
+    /// the scan parses whatever every session on the Mac wrote since the
+    /// last pass (a subagent burst was 127 MB, a minute at 95 %, #346).
+    static let watchedInterval: TimeInterval = 300
+    static let teamOnlyInterval: TimeInterval = 1800
+    func refreshIfStale() {
+        let watched = leases?.holds(.stats) ?? true
+        refreshIfStale(watched ? Self.watchedInterval : Self.teamOnlyInterval)
+    }
+    func refreshIfStale(_ interval: TimeInterval) {
         if lastRefresh.map({ Date().timeIntervalSince($0) > interval }) ?? true { refresh() }
     }
 
