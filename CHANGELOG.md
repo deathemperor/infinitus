@@ -69,6 +69,7 @@ publishes the matching section as the GitHub release body.
 - The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
+- The phone's session feed poll decodes only the transcript lines appended since its last poll, so a busy thread costs the delta instead of a fresh window every 5 s (#380).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
