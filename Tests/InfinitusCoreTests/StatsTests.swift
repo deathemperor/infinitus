@@ -755,6 +755,23 @@ final class StatsTests: XCTestCase {
         let again = StatsScanner.scan(projectsDir: dir, cacheURL: heldCache, calendar: cal)
         XCTAssertEqual(again.days, full.days)
         XCTAssertEqual(again.files, 1)
+
+        // Held across refreshes: a caught-up corpus that keeps moving is
+        // carried in memory and rewritten on the settled cadence, not
+        // after every pass — and the handle never re-reads the file.
+        let written = try Data(contentsOf: heldCache)
+        try FileManager.default.removeItem(at: heldCache)
+        let more = lines[0...1].joined(separator: "\n").appending("\n")
+        let fh = try FileHandle(forWritingTo: project.appendingPathComponent("s1.jsonl"))
+        try fh.seekToEnd(); try fh.write(contentsOf: Data(more.utf8)); try fh.close()
+        let settled = StatsScanner.scan(projectsDir: dir, cacheURL: heldCache, calendar: cal, handle: handle)
+        XCTAssertEqual(settled.remaining, 0)
+        XCTAssertEqual(settled.days["2026-09-04"]?.outputTokens, full.days["2026-09-04"]!.outputTokens + 20, "the pass parsed the new lines off the held cache")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: heldCache.path), "a settled pass inside the write interval does not rewrite the cache")
+        handle.lastWrite = .distantPast
+        _ = StatsScanner.scan(projectsDir: dir, cacheURL: heldCache, calendar: cal, handle: handle)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: heldCache.path), "past the interval it is written")
+        XCTAssertNotEqual(try Data(contentsOf: heldCache), written)
     }
 
     /// Throughput on the real corpus — opt in with INFINITUS_BENCH=1;
