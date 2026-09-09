@@ -328,6 +328,26 @@ final class SessionFeedTests: XCTestCase {
         let size = (try FileManager.default.attributesOfItem(atPath: url.path))[.size] as? UInt64
         XCTAssertEqual(tail?.offset, size)
         XCTAssertEqual(tail?.maxBytes, SessionFeedReader.tailBytes, "a small transcript never widens")
+
+        // Proof the held window is reused: a byte range the tail already
+        // consumed is rewritten in place (same length), then more lines
+        // land. The full read sees the rewrite; the incremental one
+        // decodes only the appended bytes and keeps what it held.
+        var bytes = try Data(contentsOf: url)
+        let marker = Data("ask 1\"".utf8)
+        let hit = try XCTUnwrap(bytes.range(of: marker))
+        bytes.replaceSubrange(hit, with: Data("ask 9\"".utf8))
+        try bytes.write(to: url)
+        let tweak = try FileHandle(forWritingTo: url)
+        try tweak.seekToEnd()
+        try tweak.write(contentsOf: Data(((9...10).map(line).joined(separator: "\n") + "\n").utf8))
+        try tweak.close()
+        let full3 = SessionFeedReader.read(record: record, claudeDir: claudeDir)
+        let inc3 = SessionFeedReader.read(record: record, claudeDir: claudeDir, tail: &tail)
+        XCTAssertEqual(full3?.items.first?.text, "ask 9")
+        XCTAssertEqual(inc3?.items.first?.text, "ask 1", "only the appended bytes were decoded")
+        XCTAssertEqual(inc3?.items.last?.text, "answer 10")
+        XCTAssertEqual(inc3?.items.dropFirst().map(\.text), full3?.items.dropFirst().map(\.text))
     }
 
     /// The incremental read grows its window past an oversized line the
