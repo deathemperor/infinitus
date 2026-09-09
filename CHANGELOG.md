@@ -30,6 +30,7 @@ publishes the matching section as the GitHub release body.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 
 ### Phone
+- Live Activity cards are keyed to their Mac's pairing, not its name, so two Macs sharing a name or a renamed Mac keep their cards apart; the Mac echoes the key into the cards it starts by push (#144).
 - A gcloud login from the phone can be one tap: "Sign in here instead" signs in on Google's page in the app and the Mac's gcloud picks the login up by itself, no code to paste (#403).
 - A gcloud login need reads as one on the phone — the account instead of a profile, gcloud's own sign-in page in the copy — and the phone tells the Mac which CLI to run (#367).
 - A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).

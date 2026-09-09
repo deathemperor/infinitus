@@ -86,9 +86,19 @@ final class MirrorModel: ObservableObject, FleetModel {
         return otherMirror(for: pairing)
     }
 
-    /// The mirror of the Mac named `machine` — a Live Activity's owner
-    /// (#144). The primary when it wears the name or when no paired Mac
-    /// does: a card can predate the pairing that would name its Mac.
+    /// The mirror of the Mac filed under `key` (`LiveActivities.macKey`,
+    /// the hash of its pair token) — a keyed Live Activity's owner
+    /// (#144); nil when no pairing hashes to it (forgotten since).
+    func mirror(key: String) -> NetworkFleetMirror? {
+        if NetworkFleetMirror.parkedKey(defaults: defaults) == key { return .shared }
+        guard let pairing = others.first(where: { NetworkFleetMirror.parkedKey(token: $0.pairing.token) == key })?.pairing
+        else { return nil }
+        return otherMirror(for: pairing)
+    }
+
+    /// The mirror of the Mac named `machine` — a keyless Live Activity's
+    /// owner (#144). The primary when it wears the name or when no paired
+    /// Mac does: a card can predate the pairing that would name its Mac.
     func mirror(machine: String) -> NetworkFleetMirror {
         if snapshot?.machineName == machine { return .shared }
         guard let pairing = others.first(where: { $0.pairing.name == machine })?.pairing else { return .shared }
@@ -620,11 +630,13 @@ final class MirrorModel: ObservableObject, FleetModel {
         MacPairing.save(list, defaults)
     }
 
-    /// A forgotten Mac's Live Activities go with it (#144) — unless it
-    /// wore the primary's name, whose cards those then are.
+    /// A forgotten Mac's Live Activities go with it (#144): the cards
+    /// keyed to its token, and the keyless ones wearing its name — unless
+    /// that is also the primary's name, whose cards those then are.
     private func endActivities(of pairing: MacPairing?) {
-        guard let name = pairing?.name, name != snapshot?.machineName else { return }
-        LiveActivities.shared.end(machine: name)
+        guard let pairing else { return }
+        LiveActivities.shared.end(key: NetworkFleetMirror.parkedKey(token: pairing.token),
+                                  machine: pairing.name == snapshot?.machineName ? nil : pairing.name)
     }
 
     private func renameOther(id: String, to name: String) {

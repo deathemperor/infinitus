@@ -122,7 +122,8 @@ final class LiveActivityPusher: ObservableObject {
                 // Silent: the activity appearing is the news, and work
                 // starts many times a day.
                 send(LiveActivityPush.startPayload(
-                        attributesType: LiveActivityPush.workingAttributesType, machine: machine, state: state,
+                        attributesType: LiveActivityPush.workingAttributesType, machine: machine,
+                        macId: registration.macId, state: state,
                         staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale)),
                      to: registration, what: "start working")
             case .revivalStart:
@@ -131,7 +132,8 @@ final class LiveActivityPusher: ObservableObject {
                       lastRevival[registration.slot] == nil else { continue }
                 lastRevival[registration.slot] = state
                 send(LiveActivityPush.startPayload(
-                        attributesType: LiveActivityPush.revivalAttributesType, machine: machine, state: state,
+                        attributesType: LiveActivityPush.revivalAttributesType, machine: machine,
+                        macId: registration.macId, state: state,
                         staleDate: state.revivesAt.addingTimeInterval(60),
                         alertTitle: "All accounts limited",
                         alertBody: "\(state.reviver) \(state.reviveWord) at \(state.revivesAt.formatted(date: .omitted, time: .shortened))"),
