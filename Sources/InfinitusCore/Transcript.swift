@@ -217,13 +217,17 @@ public enum Transcript {
 
     /// Every `agent-*.jsonl` under a session's `subagents/` dir, plus one
     /// level deeper for workflow runs (`subagents/workflows/<run>/`) —
-    /// fixed depths, not a recursive walk (matches StatsScanner).
+    /// fixed depths, not a recursive walk (matches StatsScanner). The
+    /// listing prefetches each file's mtime, so every caller's
+    /// `resourceValues(forKeys: [.contentModificationDateKey])` is answered
+    /// from the URL instead of one stat per file: a walk over 1,900 agent
+    /// files went 33 → 19 ms (#346).
     static func agentFiles(under subagentsDir: URL) -> [URL] {
         let fm = FileManager.default
         func agents(in dir: URL) -> [URL] {
-            (try? fm.contentsOfDirectory(atPath: dir.path))?
-                .filter { $0.hasPrefix("agent-") && $0.hasSuffix(".jsonl") }
-                .map { dir.appendingPathComponent($0) } ?? []
+            (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]))?
+                .filter { let name = $0.lastPathComponent; return name.hasPrefix("agent-") && name.hasSuffix(".jsonl") }
+                ?? []
         }
         var files = agents(in: subagentsDir)
         let workflowsDir = subagentsDir.appendingPathComponent("workflows")
