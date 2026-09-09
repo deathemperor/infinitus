@@ -394,6 +394,9 @@ private struct T3DraftNoteSlot: View {
             [T3BannerItem.error(id: "session-start", message: note,
                                 dismiss: { draftStart.clearNote(draftId) })]
         } ?? [])
+        // The hero's drawer column is the same `ComposerBanner.Dock`
+        // attachment as the thread's (`ComposerBanner.tsx:111`, `:122`).
+        .padding(.horizontal, t3DrawerInset)
     }
 }
 

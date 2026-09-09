@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 - Workspace: drop files onto a sidebar thread to open it with them attached.
 - Workspace: a "Scroll to end" button above the composer while the thread is scrolled away from its newest message.
 - Workspace: the new-thread project picker lists each project with its own icon.
+- Workspace: an open drawer tucks under the composer the way the reference's does.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.
