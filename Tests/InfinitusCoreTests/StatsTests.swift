@@ -894,6 +894,15 @@ final class StatsTests: XCTestCase {
         }
     }
 
+    func testTheCacheIsPerClaudeConfigHome() {
+        let real = StatsScanner.defaultCacheURL(environment: [:])
+        let fixture = StatsScanner.defaultCacheURL(environment: ["CLAUDE_CONFIG_DIR": "/tmp/t3fix/claude"])
+        XCTAssertEqual(real.lastPathComponent, "transcripts.json")
+        XCTAssertEqual(fixture.lastPathComponent, "transcripts--tmp-t3fix-claude.json")
+        XCTAssertEqual(fixture.deletingLastPathComponent(), real.deletingLastPathComponent())
+        XCTAssertEqual(StatsScanner.defaultCacheURL(environment: ["CLAUDE_CONFIG_DIR": ""]), real)
+    }
+
     func testFastPathParsesBigToolResultLineWithoutFullJSON() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stats-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

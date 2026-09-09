@@ -22,6 +22,11 @@ public struct SwapdProviderView: Decodable, Sendable {
     public let provider: String
     public let installed: Bool
     public let activeSlot: Int?
+    /// Present only when `activeSlot` is absent for a KNOWN reason (swapd
+    /// #8): `"switch-in-progress" | "keychain-unavailable" | "cli-busy"`.
+    /// Absent alongside a missing `activeSlot` means genuinely no active
+    /// account — the distinction `SwapdActiveMemory` carries forward on.
+    public let activeUnreadable: String?
     public let nextCandidate: Int?
     public let nextRecovery: SwapdRecovery?
     public let accounts: [SwapdAccountView]
@@ -107,7 +112,8 @@ public enum SwapdMapping {
     /// reports because its CLI is installed has nothing to render, and an
     /// empty fleet would sit in the popup as an empty section.
     public static func fleets(from list: SwapdList, engineID: String = engineID,
-                              now: Date = Date()) -> [EngineFleet] {
+                              now: Date = Date(),
+                              carriedActive: (Provider) -> Int? = { _ in nil }) -> [EngineFleet] {
         var seen: Set<Provider> = []
         var fleets: [EngineFleet] = []
         for view in list.providers where !view.accounts.isEmpty {
@@ -115,17 +121,33 @@ public enum SwapdMapping {
             // Two unknown providers would both key on "swapd/other" and the
             // registry holds one state per key: the first one wins.
             guard seen.insert(provider).inserted else { continue }
-            fleets.append(fleet(from: view, provider: provider, engineID: engineID, now: now))
+            fleets.append(fleet(from: view, provider: provider, engineID: engineID, now: now,
+                                carriedActive: carriedActive(provider)))
         }
         return fleets
     }
 
     public static func fleet(from view: SwapdProviderView, provider: Provider? = nil,
-                             engineID: String = engineID, now: Date = Date()) -> EngineFleet {
-        EngineFleet(engineID: engineID,
+                             engineID: String = engineID, now: Date = Date(),
+                             carriedActive: Int? = nil) -> EngineFleet {
+        // Carry the previous active slot forward while swapd can't say who
+        // is active — `activeSlot` absent WITH a reason (`activeUnreadable`:
+        // a switch mid-flight, its engine lock held, the keychain or CLI
+        // busy) — but only when that slot still exists, so a removed
+        // account never resurfaces as active from stale memory. Absent
+        // with no reason given is genuinely no active account, and stays
+        // nil like before.
+        var carried: Int?
+        if view.activeSlot == nil, view.activeUnreadable != nil,
+           let candidate = carriedActive, view.accounts.contains(where: { $0.slot == candidate }) {
+            carried = candidate
+        }
+        return EngineFleet(engineID: engineID,
                     provider: provider ?? self.provider(for: view.provider),
-                    accounts: view.accounts.map { account($0, now: now) },
-                    activeNumber: view.activeSlot,
+                    accounts: view.accounts.map {
+                        account($0, now: now, activeOverride: carried == $0.slot ? true : nil)
+                    },
+                    activeNumber: view.activeSlot ?? carried,
                     nextCandidate: view.nextCandidate,
                     nextRecovery: view.nextRecovery.map { NextRecovery(number: $0.slot, at: $0.at) },
                     // swapd knows nothing about this Mac's Claude Code
@@ -149,7 +171,8 @@ public enum SwapdMapping {
         }
     }
 
-    public static func account(_ view: SwapdAccountView, now: Date = Date()) -> Account {
+    public static func account(_ view: SwapdAccountView, now: Date = Date(),
+                               activeOverride: Bool? = nil) -> Account {
         let status = usageStatus(view.usageStatus)
         // What the row DISPLAYS. `stale` is not a sentinel — it has no
         // note to show instead — so it shows numbers, and the engine as
@@ -166,7 +189,7 @@ public enum SwapdMapping {
                        // swapd reports no org/personal flag and nothing in
                        // the app reads one (the proxy's rows say false too).
                        isOrganization: false,
-                       active: view.active,
+                       active: activeOverride ?? view.active,
                        usageStatus: status,
                        usage: usage(shown, now: now),
                        // The engine's own list, in its report order. A

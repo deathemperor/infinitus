@@ -42,6 +42,7 @@ stop() {
     fi
     [ -f "$state/pid" ] && kill "$(cat "$state/pid")" 2>/dev/null || true
     for k in mirror_lan_enabled popout_shown mock_mode workspace.sidebarWidth \
+             workspace.filesExplorerOpen \
              migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2 mirror_pair_token; do
         defaults delete "$domain" "$k" >/dev/null 2>&1 || true
     done

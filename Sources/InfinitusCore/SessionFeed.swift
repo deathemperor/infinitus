@@ -182,6 +182,42 @@ public enum SessionFeedReader {
             entries = tail(of: url, maxBytes: window).compactMap(decodeLine)
             parsed = parse(entries: entries, limit: limit)
         }
+        return assemble(record: record, claudeDir: claudeDir, url: url, entries: entries, parsed: parsed)
+    }
+
+    /// The same read, decoding only what the transcript gained since the
+    /// last one (#346): `tail` is the reader's held window, handed back
+    /// updated. A watched thread's transcript moves every second while it
+    /// streams and every move rebuilt its timeline from a fresh 4 MB
+    /// read — decoding that window was most of the ~105 ms per write.
+    /// The held tail is reused when it is this transcript's and no wider
+    /// than `maxBytes` allows; otherwise (first read, a different file, a
+    /// narrower ask) it starts over at `tailBytes` and grows like `read`
+    /// does. Once grown, the window stays grown until the tail is dropped.
+    /// A trailing line without its newline waits for it (Claude Code
+    /// writes whole lines), where `read` would decode it at once.
+    public static func read(record: ClaudeSessionRecord, claudeDir: URL,
+                             limit: Int = 30, maxBytes: Int = tailBytesMax,
+                             tail: inout SessionTail?) -> SessionFeed? {
+        guard !record.sessionId.isEmpty else { return nil }
+        let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+        var held = tail.flatMap { $0.url == url && $0.maxBytes <= maxBytes ? $0 : nil }
+            ?? SessionTail(url: url, maxBytes: tailBytes, scansAgents: false)
+        _ = held.advance()
+        var parsed = parse(entries: held.entries, limit: limit)
+        let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
+        while parsed.count < limit, held.maxBytes < size, held.maxBytes < maxBytes {
+            held = SessionTail(url: url, maxBytes: held.maxBytes * 4, scansAgents: false)
+            _ = held.advance()
+            parsed = parse(entries: held.entries, limit: limit)
+        }
+        tail = held
+        return assemble(record: record, claudeDir: claudeDir, url: url, entries: held.entries, parsed: parsed)
+    }
+
+    /// Everything past the decode, shared by both reads.
+    private static func assemble(record: ClaudeSessionRecord, claudeDir: URL, url: URL,
+                                 entries: [[String: Any]], parsed: [SessionFeedItem]) -> SessionFeed {
         let raw = attachAgents(parsed, transcript: url)
         let (items, waiting) = finalize(items: raw, status: record.status,
                                         statusUpdatedAt: record.statusUpdatedAt)

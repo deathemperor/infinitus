@@ -8,7 +8,8 @@ import InfinitusUI
 /// an expand-all / collapse-all toggle in the panel's own subheader
 /// (`:375-413`). Upstream mounts it inside `FilePreviewPanel`, and with no file
 /// open the browser IS the whole surface (`FilePreviewPanel.tsx:1331-1338`
-/// `min-w-0 flex-1`) — which is this tab.
+/// `min-w-0 flex-1`); a click on a file splits the tab in two
+/// (`T3FilesSurface`, and `T3FilePreviewPane` for the preview itself).
 ///
 /// The listing is one `T3ProjectFiles.list` per project cwd, cached on the
 /// window model the way the composer's branch and mention lists are
@@ -17,10 +18,6 @@ import InfinitusUI
 /// `@pierre/trees`, `FileBrowserPanel.tsx:7`).
 ///
 /// Not ported, each with its upstream line:
-/// - the file PREVIEW a click opens (`FilePreviewPanel.tsx:1340-1352`
-///   `onOpenFile` → an editor with a save coordinator): a surface of its own, so
-///   a click selects the row; a double click hands the file to the user's
-///   editor through `NSWorkspace`.
 /// - drag-to-mention (`fileTreeDragMention.ts:83`'s `COMPOSER_MENTION_DRAG_TYPE`):
 ///   B's composer takes dropped file URLs as attachments (`T3ComposerView.swift:191`),
 ///   it has no mention drop type to tag a drag with.
@@ -32,19 +29,23 @@ struct T3FilesPanel: View {
     @Environment(\.t3) private var t3
     @ObservedObject var model: T3WindowModel
 
-    /// The selected thread's project cwd — `nil` is "no project open", which is
-    /// what `filesAvailable` gates on (`RightPanelTabs.tsx:339`).
-    private var cwd: String? {
+    /// The selected thread's project — `nil` is "no project open", which is
+    /// what `filesAvailable` gates on (`RightPanelTabs.tsx:339`). Its name is
+    /// the first crumb in the preview's header (`projectName`,
+    /// `FilePreviewPanel.tsx:1129`).
+    private var project: T3ProjectGrouping.Project? {
         guard let thread = model.state.selectedThread else { return nil }
-        return model.state.projects.first { $0.id == thread.projectId }?.cwd
+        return model.state.projects.first { $0.id == thread.projectId }
     }
 
     var body: some View {
-        // `key={`${environmentId}:${cwd}`}` (`FilePreviewPanel.tsx:1341`): a
-        // project switch is a new browser, not the old one re-filtered.
+        // `key={`${environmentId}:${cwd}`}` (`ChatView.tsx:8078`): a project
+        // switch is a new surface — a new browser AND no carried-over
+        // selection, never the old one re-filtered.
         Group {
-            if let cwd {
-                T3FilesBrowser(model: model, cwd: cwd).id(cwd)
+            if let project {
+                T3FilesSurface(model: model, cwd: project.cwd, projectName: project.name)
+                    .id(project.cwd)
             } else {
                 T3FilesUnavailable()
             }
@@ -77,10 +78,93 @@ private struct T3FilesUnavailable: View {
     }
 }
 
+/// The tab's two columns (`FilePreviewPanel.tsx:1225-1349`). With nothing
+/// selected the browser is the whole surface; a click on a file gives the
+/// preview the room and pushes the browser into the aside upstream sizes
+/// `w-[min(22rem,46%)] min-w-64 border-l border-border/60` (`:1332-1336`,
+/// `shrink-0`), which the header's `folder-tree` toggle can hide. Both panels
+/// are the same width (42 vw clamped to [360, 560], `T3Root.rightPanelWidth`),
+/// so the aside's 256 pt floor bites at exactly the same window widths it does
+/// upstream.
+private struct T3FilesSurface: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var model: T3WindowModel
+    let cwd: String
+    let projectName: String
+
+    /// The clicked file, `relativePath` in upstream's props (`:86`).
+    @State private var selected: String?
+    @State private var explorerOpen = T3FilesSurface.storedExplorerOpen
+    /// The refresh button's counter: the open file is read again with the
+    /// listing (`onRefreshSelectedFile`, `:1345-1347`).
+    @State private var revision = 0
+    /// `nil` until the first listing lands (`T3FilesBrowser` reports it).
+    @State private var available: Bool?
+
+    /// Upstream keeps the toggle in `localStorage` under
+    /// `"t3code.fileExplorerOpen"`, default open (`:100`, `:946-953`); the Mac's
+    /// equivalent is the workspace's own defaults domain.
+    private static let explorerKey = "workspace.filesExplorerOpen"
+    private static var storedExplorerOpen: Bool {
+        UserDefaults.standard.object(forKey: explorerKey) as? Bool ?? true
+    }
+
+    /// `shouldShowFileExplorer` (`filePreviewMode.ts:5-14`): with no file open
+    /// the tree is the surface whatever the toggle says.
+    private var showExplorer: Bool { selected == nil || explorerOpen }
+
+    var body: some View {
+        if available == false {
+            T3FilesUnavailable()
+        } else {
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    if let selected {
+                        T3FilePreviewPane(model: model, cwd: cwd, projectName: projectName,
+                                          path: selected, revision: revision,
+                                          explorerOpen: explorerOpen, toggleExplorer: toggleExplorer)
+                    }
+                    if showExplorer { browser(width: geometry.size.width) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func browser(width: Double) -> some View {
+        let split = selected != nil
+        T3FilesBrowser(model: model, cwd: cwd, selected: $selected,
+                       onRefresh: refresh, onAvailability: { available in
+                           self.available = available
+                           if !available { selected = nil }
+                       })
+            .frame(width: split ? max(256, min(22 * 16, 0.46 * width)) : nil)
+            .overlay(alignment: .leading) {
+                if split { Rectangle().fill(t3.web.border.color.opacity(0.6)).frame(width: 1) }
+            }
+    }
+
+    private func toggleExplorer() {
+        explorerOpen.toggle()
+        UserDefaults.standard.set(explorerOpen, forKey: Self.explorerKey)
+    }
+
+    /// The listing and the open file are one refresh: the reads for this cwd go
+    /// first so the pane's re-read cannot land on the cache it just dropped.
+    private func refresh() {
+        model.invalidateFileReads(cwd: cwd)
+        revision += 1
+    }
+}
+
 private struct T3FilesBrowser: View {
     @Environment(\.t3) private var t3
     @ObservedObject var model: T3WindowModel
     let cwd: String
+    /// The preview's file: a click on a row writes it (`onOpenFile`,
+    /// `FileBrowserPanel.tsx:240-242`).
+    @Binding var selected: String?
+    let onRefresh: () -> Void
+    let onAvailability: (Bool) -> Void
 
     @State private var nodes: [T3FileTree.Node] = []
     /// Bumped when a listing lands, so the flatten below re-runs without
@@ -90,11 +174,7 @@ private struct T3FilesBrowser: View {
     @State private var directories: [String] = []
     @State private var expanded: Set<String> = []
     @State private var query = ""
-    @State private var selected: String?
     @State private var failure: String?
-    /// `nil` until the first listing lands: the cwd's existence is what
-    /// `filesAvailable` means, and `T3ProjectFiles.list` is what checks it.
-    @State private var available: Bool?
     @State private var pending = true
     @FocusState private var searching: Bool
 
@@ -103,17 +183,9 @@ private struct T3FilesBrowser: View {
     private struct Flow: Equatable { let query: String; let expanded: Set<String>; let revision: Int }
 
     var body: some View {
-        Group {
-            // No surface at all when the project is gone: upstream never shows
-            // the browser's chrome over that state (`RightPanelTabs.tsx:560-575`).
-            if available == false {
-                T3FilesUnavailable()
-            } else {
-                VStack(spacing: 0) {
-                    header
-                    content
-                }
-            }
+        VStack(spacing: 0) {
+            header
+            content
         }
         .task(id: cwd) {
             // The listing this cwd was last seen with paints first — the
@@ -149,6 +221,7 @@ private struct T3FilesBrowser: View {
     /// loads (never a SwiftUI repeatForever — #18).
     private var refreshButton: some View {
         T3FilesIconButton(help: pending ? "Refreshing…" : "Refresh files") {
+            onRefresh()
             Task { await load(reload: true) }
         } content: {
             if pending { T3Spinner(size: 14) } else { LucideIcon(.refreshCw, size: 14) }
@@ -222,7 +295,8 @@ private struct T3FilesBrowser: View {
                               expanded: expanded.contains(row.node.path),
                               selected: selected == row.node.path,
                               action: { open(row.node) })
-                        // The way out to an editor until the preview pane lands.
+                        // The way out to the file's own app (the header's
+                        // editor picker upstream, `FilePreviewPanel.tsx:1140-1148`).
                         .simultaneousGesture(TapGesture(count: 2).onEnded { reveal(row.node) })
                 }
             }
@@ -256,13 +330,12 @@ private struct T3FilesBrowser: View {
 
     // MARK: - Behaviour
 
-    /// A folder toggles (`FileTreeBrowser.tsx:63-66`), a file is selected —
-    /// upstream then opens it in the preview pane it is embedded in
-    /// (`FileBrowserPanel.tsx:240-242`, `FilePreviewPanel.tsx:1347`). That
-    /// surface is not ported, so a click only selects the row — never a jump
-    /// to another app, which upstream's click never causes either. A double
-    /// click hands the file to whatever app owns it (`NSWorkspace`), the one
-    /// deliberate way out until the preview lands.
+    /// A folder toggles (`FileTreeBrowser.tsx:63-66`), a file is selected and
+    /// the preview pane it is embedded in shows it (`FileBrowserPanel.tsx:240-242`,
+    /// `FilePreviewPanel.tsx:1347`) — never a jump to another app, which
+    /// upstream's click never causes either. A double click hands the file to
+    /// whatever app owns it (`NSWorkspace`), which upstream spells as the
+    /// header's editor picker.
     private func open(_ node: T3FileTree.Node) {
         guard node.kind == .file else {
             if expanded.contains(node.path) { expanded.remove(node.path) } else { expanded.insert(node.path) }
@@ -286,7 +359,7 @@ private struct T3FilesBrowser: View {
     private func apply(_ result: Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>) async {
         switch result {
         case .success(let listing):
-            available = true
+            onAvailability(true)
             failure = nil
             let tree = await Task.detached(priority: .userInitiated) {
                 T3FileTree.build(listing.entries)
@@ -301,12 +374,12 @@ private struct T3FilesBrowser: View {
             // A cwd that is gone is not an error to show, it is the tab's
             // unavailable state (`RightPanelTabs.tsx:339`).
             if case .rootGone = error {
-                available = false
+                onAvailability(false)
                 nodes = []
                 rows = []
                 directories = []
             } else {
-                available = true
+                onAvailability(true)
                 failure = error.message
             }
         }
@@ -404,20 +477,25 @@ private struct T3FileRow: View {
 
 /// A ghost `icon-xs` button: `size-6` on the Mac's `sm:` breakpoint with a
 /// `size-3.5` glyph (`button.tsx:29-30`), `hover:bg-accent` from the ghost
-/// variant, the tooltip as the native help tag.
-private struct T3FilesIconButton<Content: View>: View {
+/// variant, the tooltip as the native help tag. The Diff tab's subheader
+/// (`T3DiffPanel`) is the same row of the same buttons, so this one is shared
+/// rather than transcribed twice. `pressed` is the `<Toggle>` variant of the
+/// same button (`toggle.tsx`, `data-pressed:bg-accent`), which is how the
+/// preview's header shows the explorer is up (`FilePreviewPanel.tsx:1199-1207`).
+struct T3FilesIconButton<Content: View>: View {
     @Environment(\.t3) private var t3
     @State private var hover = false
     let help: String
+    var pressed = false
     let action: () -> Void
     @ViewBuilder let content: Content
 
     var body: some View {
         Button(action: action) {
             content
-                .foregroundStyle(hover ? t3.web.accentForeground.color : t3.web.foreground.color)
+                .foregroundStyle(hover || pressed ? t3.web.accentForeground.color : t3.web.foreground.color)
                 .frame(width: 24, height: 24)
-                .background(hover ? t3.web.accent.color : .clear,
+                .background(hover || pressed ? t3.web.accent.color : .clear,
                             in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
                 .contentShape(Rectangle())
         }
