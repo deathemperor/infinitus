@@ -183,6 +183,7 @@ final class StatsModel: ObservableObject {
         transcriptsFinished = false
         let store = eventStore
         let repos = repoScanner
+        let cacheHandle = cacheHandle
         Task.detached(priority: .utility) {
             let calendar = Calendar.current
             let projectsDir = TokenRateScanner.defaultProjectsDir()
@@ -196,7 +197,6 @@ final class StatsModel: ObservableObject {
             var cumulativeConsumed = 0
             var firstBytesTotal: Int?
             var previousBytesRemaining = Int.max
-            let cacheHandle = self.cacheHandle   // decoded once per process, not per refresh (#346)
             var entries: [String: StatsScanner.FileEntry] = [:]
             while remaining > 0 {
                 passCount += 1
