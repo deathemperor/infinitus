@@ -32,11 +32,21 @@ case "$platform" in
     # workspace by its own frame — the one the README's parity procedure
     # presets. Without the preset there is nothing to match on and the first
     # window wins, as before.
-    want=$(defaults read Infinitus "NSWindow Frame Workspace" 2>/dev/null \
-           | awk 'NF >= 4 { printf "%dx%d", $3, $4 }' || true)
+    # T3REF_WINDOW_SIZE=WxH wins over the preset: the app writes the frame
+    # BACK into that default on every move/resize (and clamps a preset whose
+    # screen rect names no attached display to its fallback size), so after
+    # the first capture the default no longer says what the reference wants.
+    want=${T3REF_WINDOW_SIZE:-$(defaults read Infinitus "NSWindow Frame Workspace" 2>/dev/null \
+           | awk 'NF >= 4 { printf "%dx%d", $3, $4 }' || true)}
     line=$("$here/.build/winlist" Infinitus ${want:+"$want"}) || {
-        echo "no Infinitus window${want:+ of $want pt} on screen — is the workspace open at that frame?" >&2
-        exit 3
+        # With a move requested the frame is about to be set anyway, so any
+        # workspace-sized window will do (the preset is not honoured when its
+        # screen rect names no attached screen; the window then opens at the
+        # controller's fallback size).
+        [ -n "${T3REF_WINDOW_ORIGIN:-}" ] && line=$("$here/.build/winlist" Infinitus) || {
+            echo "no Infinitus window${want:+ of $want pt} on screen — is the workspace open at that frame?" >&2
+            exit 3
+        }
     }
     read -r id _w _h <<<"$line"
     # T3REF_WINDOW_ORIGIN="x y" (CG points, main display's top-left origin)
@@ -48,8 +58,10 @@ case "$platform" in
         if [ ! -x "$here/.build/winmove" ] || [ "$here/winmove.swift" -nt "$here/.build/winmove" ]; then
             swiftc -O "$here/winmove.swift" -o "$here/.build/winmove"
         fi
+        # The preset's size travels with the move, so the window ends at the
+        # reference frame wherever it opened.
         # shellcheck disable=SC2086
-        "$here/.build/winmove" "$id" $T3REF_WINDOW_ORIGIN
+        "$here/.build/winmove" "$id" $T3REF_WINDOW_ORIGIN ${want:+$(echo "$want" | tr x ' ')}
         sleep 1
     fi
     # The same settle as capture-mac.sh: a cold first open still has the
