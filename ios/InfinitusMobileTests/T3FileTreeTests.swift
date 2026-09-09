@@ -50,5 +50,7 @@ final class T3FileTreeTests: XCTestCase {
     func testSplitsCamelCaseWords() {
         XCTAssertEqual(T3FileTree.splitWords("ChatHeader.test.ts"), ["chat", "header", "test", "ts"])
         XCTAssertEqual(T3FileTree.splitWords("JSONParser2"), ["json", "parser2"])
+        XCTAssertEqual(T3FileTree.splitWords("XMLHttpRequest2Go"), ["xml", "http", "request2", "go"])
+        XCTAssertEqual(T3FileTree.splitWords("ISSUE_TEMPLATE"), ["issue", "template"])
     }
 }

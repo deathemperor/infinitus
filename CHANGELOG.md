@@ -95,6 +95,7 @@ publishes the matching section as the GitHub release body.
 - Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
 - Settings → Appearance gains Text size: a slider from 11 to 22 pt that scales every session-screen font, 16 pt being the reference.
 - A thread's Files pill opens the session's workspace: a searchable folder tree, a file's source with line numbers or its markdown rendered, and Add to message drops @path into the composer (#223).
+- The Files tree builds twice as fast and off the main thread, and a search re-derives its rows once per keystroke instead of once per redraw.
 
 ## 0.4.4-alpha.2
 

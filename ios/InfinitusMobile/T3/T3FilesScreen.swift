@@ -62,10 +62,14 @@ struct T3FilesScreen: View {
         _listing = State(initialValue: fixture)
         let nodes = T3FileTree.build(fixture.entries)
         _tree = State(initialValue: nodes)
-        _expanded = State(initialValue: T3FileTree.defaultExpanded(nodes))
+        let open = T3FileTree.defaultExpanded(nodes)
+        _expanded = State(initialValue: open)
+        _rows = State(initialValue: T3FileTree.flatten(nodes, expanded: open, search: ""))
     }
 
-    private var rows: [T3FileTree.Visible] { T3FileTree.flatten(tree, expanded: expanded, search: search) }
+    /// The visible rows, derived once per tree/expansion/search change —
+    /// not per body pass (a search over 20 000 entries is ~16 ms).
+    @State private var rows: [T3FileTree.Visible] = []
     private var project: String { URL(fileURLWithPath: listing?.cwd ?? session.cwd).lastPathComponent }
 
     var body: some View {
@@ -113,6 +117,8 @@ struct T3FilesScreen: View {
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) { searchField.padding(.horizontal, 16).padding(.bottom, 8) }
         .task { if fixture == nil { await load() } }
+        .onChange(of: search) { _, _ in rows = T3FileTree.flatten(tree, expanded: expanded, search: search) }
+        .onChange(of: expanded) { _, _ in rows = T3FileTree.flatten(tree, expanded: expanded, search: search) }
     }
 
     /// The native header's title + `unstable_headerSubtitle`, leading.
@@ -226,9 +232,13 @@ struct T3FilesScreen: View {
         defer { loading = false }
         do {
             let reply = try await model.mirror(for: macId).files(pid: Int32(session.pid))
+            // A 20 000-entry build is ~180 ms: off the main actor, the spinner
+            // keeps turning.
+            let nodes = await Task.detached(priority: .userInitiated) { T3FileTree.build(reply.entries) }.value
             listing = reply
-            tree = T3FileTree.build(reply.entries)
-            if expanded.isEmpty { expanded = T3FileTree.defaultExpanded(tree) }
+            tree = nodes
+            if expanded.isEmpty { expanded = T3FileTree.defaultExpanded(nodes) }
+            rows = T3FileTree.flatten(nodes, expanded: expanded, search: search)
             error = nil
         } catch MirrorTransportError.http(404) {
             error = "This Mac doesn't serve files yet — update Infinitus on the Mac, or the session's folder is gone."
