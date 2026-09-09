@@ -430,6 +430,94 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(third.days["2026-09-04"]?.peakTokensPerMinute, 800)
     }
 
+    /// A day before yesterday settles once the corpus is caught up (#499):
+    /// the summed peak is written into every file's share and the minute
+    /// buckets go; yesterday and today keep theirs. A file that lands on
+    /// a settled day later can only raise the peak with its own share.
+    func testSettledDaysDropTheirMinuteBucketsAndKeepTheSummedPeak() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("stats-settle-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = root.appendingPathComponent("-r-a")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        func entry(_ stamp: String, _ id: String, _ output: Int) -> String {
+            #"{"type":"assistant","timestamp":"\#(stamp)","message":{"id":"\#(id)","model":"claude-opus-5","usage":{"input_tokens":10,"output_tokens":\#(output)},"content":[{"type":"text","text":"a"}]}}"#
+        }
+        let s1 = project.appendingPathComponent("s1.jsonl"), s2 = project.appendingPathComponent("s2.jsonl")
+        try [entry("2026-09-04T01:00:05.000Z", "a1", 700), entry("2026-09-04T01:03:05.000Z", "a2", 300),
+             entry("2026-09-05T01:00:05.000Z", "a3", 50), entry("2026-09-06T01:00:05.000Z", "a4", 60)]
+            .joined(separator: "\n").appending("\n").write(to: s1, atomically: true, encoding: .utf8)
+        try [entry("2026-09-04T01:00:40.000Z", "b1", 300)]
+            .joined(separator: "\n").appending("\n").write(to: s2, atomically: true, encoding: .utf8)
+        let cacheURL = root.appendingPathComponent("cache.json")
+        let now = date("2026-09-06T02:00:00Z")
+        func cached() throws -> StatsScanner.Cache {
+            try JSONDecoder().decode(StatsScanner.Cache.self, from: Data(contentsOf: cacheURL))
+        }
+        let first = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now)
+        XCTAssertEqual(first.days["2026-09-04"]?.peakTokensPerMinute, 1000, "the two files' same minute, summed")
+        XCTAssertEqual(first.days["2026-09-04"]?.peakMinute, 480, "01:00Z in the test calendar's +7")
+        // Cache keys are the scanner's own paths (a temp dir resolves
+        // differently), so entries are found by file name.
+        func entry(_ name: String) throws -> StatsScanner.FileEntry {
+            try XCTUnwrap(cached().files.first { $0.key.hasSuffix("/\(name).jsonl") }?.value, name)
+        }
+        for name in ["s1", "s2"] {
+            XCTAssertEqual(try entry(name).days["2026-09-04"]?.minuteTokens, [:], name)
+            XCTAssertEqual(try entry(name).days["2026-09-04"]?.peakTokensPerMinute, 1000, name)
+            XCTAssertEqual(try entry(name).days["2026-09-04"]?.peakMinute, 480, name)
+        }
+        XCTAssertEqual(try entry("s1").days["2026-09-05"]?.minuteTokens.count, 1, "yesterday keeps its buckets")
+        XCTAssertEqual(try entry("s1").days["2026-09-06"]?.minuteTokens.count, 1, "today keeps its buckets")
+        // From the cache alone the settled peak stands, without buckets.
+        let second = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now)
+        XCTAssertEqual(second.days["2026-09-04"]?.peakTokensPerMinute, 1000)
+        XCTAssertEqual(second.days["2026-09-04"]?.peakMinute, 480)
+        XCTAssertEqual(second.days["2026-09-04"]?.minuteTokens, [:])
+        // A late entry on the settled day: its own share can't lower the peak…
+        func append(_ line: String, to file: URL) throws {
+            let handle = try FileHandle(forWritingTo: file)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((line + "\n").utf8))
+            try handle.close()
+        }
+        try append(entry("2026-09-04T01:10:05.000Z", "a5", 400), to: s1)
+        let third = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now)
+        XCTAssertEqual(third.days["2026-09-04"]?.peakTokensPerMinute, 1000)
+        XCTAssertEqual(try entry("s1").days["2026-09-04"]?.minuteTokens, [:], "settled again")
+        // …but a bigger one raises it.
+        try append(entry("2026-09-04T01:11:05.000Z", "b2", 1200), to: s2)
+        let fourth = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now)
+        XCTAssertEqual(fourth.days["2026-09-04"]?.peakTokensPerMinute, 1200)
+        XCTAssertEqual(fourth.days["2026-09-04"]?.peakMinute, 491)
+        XCTAssertEqual(try entry("s1").days["2026-09-04"]?.peakTokensPerMinute, 1200, "every file carries the new total")
+    }
+
+    /// Settling waits for the corpus to catch up: a file still owed bytes
+    /// could add to an old day, and a partial sum must not be frozen.
+    func testSettlingWaitsForTheCorpusToCatchUp() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("stats-settle-wait-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = root.appendingPathComponent("-r-a")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let line = #"{"type":"assistant","timestamp":"2026-09-04T01:00:05.000Z","message":{"id":"a1","model":"claude-opus-5","usage":{"input_tokens":10,"output_tokens":700},"content":[{"type":"text","text":"a"}]}}"#
+        for name in ["s1", "s2", "s3"] {
+            try (line + "\n").write(to: project.appendingPathComponent("\(name).jsonl"), atomically: true, encoding: .utf8)
+        }
+        let cacheURL = root.appendingPathComponent("cache.json")
+        let now = date("2026-09-06T02:00:00Z")
+        // A budget that stops after the first file leaves the rest owed.
+        let partial = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now, byteBudget: 1)
+        XCTAssertGreaterThan(partial.remaining, 0)
+        let disk = try JSONDecoder().decode(StatsScanner.Cache.self, from: Data(contentsOf: cacheURL))
+        XCTAssertFalse(disk.files.values.allSatisfy { $0.days["2026-09-04"]?.minuteTokens.isEmpty ?? true }, "nothing settles mid-backfill")
+        let full = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now)
+        XCTAssertEqual(full.remaining, 0)
+        XCTAssertEqual(full.days["2026-09-04"]?.peakTokensPerMinute, 2100)
+        let settled = try JSONDecoder().decode(StatsScanner.Cache.self, from: Data(contentsOf: cacheURL))
+        XCTAssertTrue(settled.files.values.allSatisfy { $0.days["2026-09-04"]?.minuteTokens.isEmpty ?? false })
+        XCTAssertTrue(settled.files.values.allSatisfy { $0.days["2026-09-04"]?.peakTokensPerMinute == 2100 })
+    }
+
     // MARK: engines and effort (issue #24, round 2)
 
     func testIngestChargesEngineAndEffortForClaudeEntries() {

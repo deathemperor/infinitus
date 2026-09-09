@@ -367,6 +367,38 @@ public enum StatsScanner {
         var files: [String: FileEntry] = [:]
     }
 
+    /// Once the corpus is caught up, a day before yesterday is settled
+    /// (#499): its summed peak is written into every file's share of it
+    /// and the per-minute buckets go — they were the cache's biggest
+    /// part (31 MB decoded over a year, 24,000 day entries) and only
+    /// ever served that one peak. Every file carries the total so a
+    /// deleted transcript can't take the day's record with it, and
+    /// `Day.+` keeps the max across files. Yesterday keeps its buckets
+    /// for a session that straddled midnight. The result's own days lose
+    /// theirs too, so a fresh scan and a cached one answer alike. True
+    /// when a file's share moved.
+    static func settle(_ live: inout [String: FileEntry], days: inout [String: Stats.Day],
+                       now: Date, calendar: Calendar) -> Bool {
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: now) else { return false }
+        let cutoff = Stats.dayKey(yesterday, calendar: calendar)
+        for key in days.keys where key < cutoff { days[key]!.minuteTokens = [:] }
+        var moved = false
+        for (path, entry) in live {
+            var entry = entry
+            var changed = false
+            for (key, day) in entry.days where key < cutoff {
+                guard let total = days[key],
+                      !day.minuteTokens.isEmpty || day.peakTokensPerMinute < total.peakTokensPerMinute else { continue }
+                entry.days[key]!.minuteTokens = [:]
+                entry.days[key]!.peakTokensPerMinute = total.peakTokensPerMinute
+                entry.days[key]!.peakMinute = total.peakMinute
+                changed = true
+            }
+            if changed { live[path] = entry; moved = true }
+        }
+        return moved
+    }
+
     /// Codex CLI's transcripts: `$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl`
     /// (`~/.codex` by default) — see `StatsCodex`.
     public static func defaultCodexDir(home: String = NSHomeDirectory(),
@@ -616,7 +648,8 @@ public enum StatsScanner {
         // Every file's share of a day is in: the day's peak minute is
         // the sum across sessions, not any one file's.
         for key in result.days.keys { result.days[key]!.finalizePeak() }
-        let unchanged = filesTouched == 0 && live.count == cache.files.count && handle?.dirty != true
+        let settled = result.remaining == 0 ? settle(&live, days: &result.days, now: now, calendar: calendar) : false
+        let unchanged = filesTouched == 0 && live.count == cache.files.count && handle?.dirty != true && !settled
         cache.files = live
         handle?.cache = cache
         if !unchanged { handle?.dirty = true }

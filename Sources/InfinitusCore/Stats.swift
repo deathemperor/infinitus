@@ -242,11 +242,15 @@ public enum Stats {
         /// tally once the set is empty.
         /// The day's peak from its minute buckets — after every file's
         /// share of the day has been merged in (a merge of two files'
-        /// same minute adds up to more than either's peak).
+        /// same minute adds up to more than either's peak). Only ever
+        /// raises it: a settled day (#499) carries its peak without its
+        /// buckets, and a file that lands on it later brings buckets that
+        /// are its own share alone.
         public mutating func finalizePeak() {
             // Ties go to the earliest minute, so the answer doesn't depend
             // on dictionary order (a cached and a fresh scan must agree).
-            guard let top = minuteTokens.max(by: { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }) else { return }
+            guard let top = minuteTokens.max(by: { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }),
+                  top.value > peakTokensPerMinute else { return }
             peakTokensPerMinute = top.value
             peakMinute = top.key
         }
