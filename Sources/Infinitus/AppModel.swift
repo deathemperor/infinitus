@@ -1608,7 +1608,9 @@ final class AppModel: ObservableObject {
             },
             callback: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                return await self.awsLoginRunner.relay(profile: request.profile, url: request.url)
+                let items = await MainActor.run { self.awsLogins }
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: nil, items: items)
+                return await self.awsLoginRunner.relay(provider: provider, profile: request.profile, url: request.url)
             })
         let thumbnails = ThumbnailCache()
         mirrorServer.sessionImage.set { pid, id in

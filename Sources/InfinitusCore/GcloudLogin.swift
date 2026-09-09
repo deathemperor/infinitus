@@ -9,12 +9,16 @@ import Foundation
 /// Application Default Credentials a library reads), the CLI
 /// invocation and its prompts.
 ///
-/// One flow for the phone: `gcloud auth login --no-launch-browser`
-/// prints a URL and then waits for the verification code the browser
-/// shows after sign-in — `AwsLogin.Flow.remote`, paste-back. `.local`
-/// is the same command with this Mac's browser. The code goes phone →
-/// Mac and straight into the CLI's stdin — never logged, never stored.
-/// Infinitus never reads `~/.config/gcloud`.
+/// Two flows for the phone. `.relay` (#403): plain `gcloud auth login`
+/// with the browser suppressed keeps the CLI's own listener on
+/// `http://localhost:8085/` (gcloud 552, verified 2026-09-09); the
+/// phone's web view is the browser and hands the final redirect to the
+/// Mac, which replays it against that listener — one tap plus Google's
+/// consent screen. `.remote`: `--no-launch-browser` prints a URL and
+/// waits for the verification code the browser shows after sign-in,
+/// paste-back. `.local` is the plain command with this Mac's browser.
+/// The code goes phone → Mac and straight into the CLI's stdin — never
+/// logged, never stored. Infinitus never reads `~/.config/gcloud`.
 public enum GcloudLogin {
     /// The "profile" of an Application Default Credentials need
     /// (`gcloud auth application-default login`), beside the user
@@ -87,16 +91,17 @@ public enum GcloudLogin {
 
     // MARK: running
 
-    /// The CLI invocation. `.remote` is the paste-back prompt; `.local`
-    /// this Mac's browser; the other flows are AWS-only and fall back
-    /// to those two.
+    /// The CLI invocation. `.remote` is the paste-back prompt; `.relay`
+    /// and `.local` keep the localhost listener (the runner suppresses
+    /// the browser for the relay); `.deviceCode` is AWS-only and falls
+    /// back to the paste-back.
     public static func arguments(profile: String, flow: AwsLogin.Flow) -> [String] {
         var args = profile == adcProfile
             ? ["auth", "application-default", "login"]
             : ["auth", "login"] + (profile == "default" ? [] : [profile])
         switch flow {
-        case .remote, .deviceCode, .relay: args.append("--no-launch-browser")
-        case .local: break
+        case .remote, .deviceCode: args.append("--no-launch-browser")
+        case .relay, .local: break
         }
         return args
     }
@@ -173,10 +178,11 @@ public extension AwsLogin.Provider {
         self == .aws ? AwsLogin.parseOutput(text) : GcloudLogin.parseOutput(text)
     }
 
-    /// The phone's flow for a profile: AWS reads the config, gcloud is
-    /// always the paste-back.
+    /// The phone's flow for a profile: AWS reads the config; gcloud's
+    /// listener is always there, so its items offer the relay (the
+    /// phone still starts the paste-back by default, `remote: true`).
     func flow(profile: String, configText: String) -> AwsLogin.Flow {
-        self == .aws ? AwsLogin.flow(profile: profile, configText: configText) : .remote
+        self == .aws ? AwsLogin.flow(profile: profile, configText: configText) : .relay
     }
 
     func continueMessage(profile: String, fromPhone: Bool, released: Bool = false) -> String {

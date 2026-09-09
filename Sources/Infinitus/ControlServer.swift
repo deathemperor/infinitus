@@ -464,9 +464,12 @@ final class ControlServer {
 
         case "aws-login-callback":
             guard let profile = r.args.first, let url = r.secret, !url.isEmpty else {
-                throw Fail("usage: aws-login-callback <profile>  (the intercepted http://127.0.0.1:<port>/oauth/callback?… URL on stdin)")
+                throw Fail("usage: aws-login-callback <profile|account>  (the intercepted http://127.0.0.1:<port>/oauth/callback?… or http://localhost:8085/?… URL on stdin)")
             }
-            let reply = await model.awsLoginRunner.relay(profile: profile, url: url)
+            // The outstanding item for that profile says which CLI's listener the callback is for.
+            let items = await MainActor.run { model.awsLogins }
+            let provider = AwsLogin.inferProvider(profile: profile, pid: nil, items: items)
+            let reply = await model.awsLoginRunner.relay(provider: provider, profile: profile, url: url)
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "not accepted") }
             return ControlReply(ok: true, result: try .of(["state": state]))
 
