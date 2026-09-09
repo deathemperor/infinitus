@@ -1724,8 +1724,8 @@ final class AppModel: ObservableObject {
                 T3ProjectFiles.list(pid: pid, sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             },
             read: { pid, path in
-                T3ProjectFiles.read(pid: pid, path: path,
-                                    sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
+                T3ProjectFiles.answer(pid: pid, path: path,
+                                      sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog

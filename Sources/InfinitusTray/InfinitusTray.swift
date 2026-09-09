@@ -729,7 +729,8 @@ struct InfinitusTray {
             if request.method == "GET", let pid = MirrorTransport.sessionFilePid(request.path) {
                 let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
                 let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
-                return MirrorTransport.fileReadResponse(T3ProjectFiles.read(pid: pid, path: path, sessions: sessions))
+                return MirrorTransport.fileAnswerResponse(
+                    T3ProjectFiles.answer(pid: pid, path: path, sessions: sessions))
             }
             return MirrorTransport.notFoundResponse()
         }

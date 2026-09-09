@@ -300,7 +300,7 @@ final class MirrorCommandsBox: @unchecked Sendable {
 final class MirrorFilesBox: @unchecked Sendable {
     struct Handlers: Sendable {
         let list: @Sendable (Int32) -> Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>?
-        let read: @Sendable (Int32, String) -> Result<T3ProjectFiles.FileRead, T3ProjectFiles.ReadError>?
+        let read: @Sendable (Int32, String) -> Result<T3ProjectFiles.FileAnswer, T3ProjectFiles.ReadError>?
     }
     private let lock = NSLock()
     private var handlers: Handlers?
@@ -1050,9 +1050,10 @@ final class MirrorServer: ObservableObject {
                     // A missing `path` is refused like any other path outside
                     // the workspace — the Core read decides, not the route.
                     let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
-                    // Up to 256 KiB read off disk: off this queue.
+                    // Up to 256 KiB of text, or 8 MB of image, read off disk:
+                    // off this queue.
                     DispatchQueue.global(qos: .utility).async {
-                        let response = MirrorTransport.fileReadResponse(files.current?.read(pid, path))
+                        let response = MirrorTransport.fileAnswerResponse(files.current?.read(pid, path))
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })

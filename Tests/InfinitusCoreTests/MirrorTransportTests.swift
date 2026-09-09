@@ -220,6 +220,29 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertEqual(missing?.status, 404)
     }
 
+    /// #223's image contract: raw bytes under the image's own type, no JSON
+    /// envelope, and 413 for one over the cap.
+    func testFileAnswerResponseSendsImageBytesRawAndKeepsTextAsJSON() {
+        let bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF])
+        let image = T3ProjectFiles.ImageRead(path: "logo.png", bytes: bytes, mime: "image/png")
+        let raw = MirrorTransport.fileAnswerResponse(.success(.image(image)))
+        XCTAssertEqual(MirrorTransport.parseResponse(raw)?.status, 200)
+        XCTAssertEqual(MirrorTransport.parseResponse(raw)?.body, bytes)
+        XCTAssertTrue(String(decoding: raw, as: UTF8.self).contains("Content-Type: image/png\r\n"),
+                      String(decoding: raw.prefix(120), as: UTF8.self))
+        // A workspace file changes under its path, so nothing may be cached.
+        XCTAssertFalse(String(decoding: raw.prefix(200), as: UTF8.self).contains("Cache-Control"))
+        // Text is byte-for-byte the envelope the phone already parses.
+        let file = T3ProjectFiles.FileRead(path: "a.swift", contents: "x", byteLength: 1,
+                                           truncated: false, mime: "text/x-swift")
+        XCTAssertEqual(MirrorTransport.fileAnswerResponse(.success(.text(file))),
+                       MirrorTransport.fileReadResponse(.success(file)))
+        let big = MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(.failure(.tooLarge)))
+        XCTAssertEqual(big?.status, 413)
+        XCTAssertEqual(String(decoding: big?.body ?? Data(), as: UTF8.self), #"{"error":"file too large"}"#)
+        XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(nil))?.status, 404)
+    }
+
     // MARK: - Request body parsing (#17 layer 2)
 
     func testParseRequestWithBodyWaitsForTheWholeBody() {
