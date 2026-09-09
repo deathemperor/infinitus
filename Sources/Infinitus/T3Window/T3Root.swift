@@ -42,6 +42,15 @@ struct T3Root: View {
         .ignoresSafeArea()
         .environment(\.t3, t3)
         .overlay { keyboard }   // hidden buttons: the ⌘F pattern
+        // `CommandDialog` (`ui/command.tsx:62-79`) is a modal over the whole
+        // app; a sheet is the platform's own form of one.
+        // ⌘K's thread switcher (`CommandPalette.tsx`, B ships only its
+        // thread-switcher mode). The flag lives on the model (not in a
+        // `@State` here) so `show workspace switcher` can raise it too.
+        .sheet(isPresented: $model.switcherOpen) {
+            T3ThreadSwitcher(model: model) { model.switcherOpen = false }
+                .environment(\.t3, t3)
+        }
     }
 
     // `threadSidebarWidth.ts`: expanded width clamps between
@@ -94,13 +103,18 @@ struct T3Root: View {
             .frame(height: T3Theme.Metrics.topbarHeight)
             if model.state.projects.isEmpty && model.state.threads.isEmpty {
                 T3NoProjectsHero(action: nil)
-            } else if let store = model.timelineStore, model.state.selectedThread != nil {
+            } else if let store = model.timelineStore, let thread = model.state.selectedThread {
                 // `.id` per upstream's `key={activeThread.id}` on
                 // `<MessagesTimeline>` (`ChatView.tsx:7939`): a thread switch
                 // remounts the list, which is also what drops the outgoing
                 // thread's row geometry. A rebind (same thread, new pid) keeps
                 // the same store id and so keeps the scroll position.
-                T3ThreadView(model: model, app: app, store: store, now: model.now)
+                T3ThreadView(model: model, app: app, store: store, now: model.now,
+                             // A draft has no transcript: the hero + composer
+                             // instead (Task 15).
+                             draftTarget: T3WorkspaceState.isDraft(thread.id)
+                                 ? T3ComposerDraftTarget(draftId: thread.id, projectId: thread.projectId)
+                                 : nil)
                     .id(store.threadId)
             } else {
                 T3NoActiveThreadState()
@@ -121,6 +135,19 @@ struct T3Root: View {
             // bar to route the standard close item, so this is the only way
             // in (the ⌘⇧T pattern in PinnedRoot).
             Button("") { model.closeRequested?() }.keyboardShortcut("w", modifiers: .command)
+            // `keybindings.ts:44-46`: `mod+n` → `chat.new` (the project you
+            // are in, upstream's picker for a multi-project setup — B resolves
+            // it directly, `T3WindowModel.currentProjectId`), `mod+shift+n` →
+            // `chat.newLocal` (the CURRENT project, no picker).
+            Button("") { model.startNewThread() }.keyboardShortcut("n", modifiers: .command)
+            Button("") { model.startNewThread(projectId: model.currentProjectId) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+            // `:38` `mod+k` → `commandPalette.toggle`.
+            Button("") { model.switcherOpen = true }.keyboardShortcut("k", modifiers: .command)
+            // `:50-51` `mod+shift+[`/`]` → `thread.previous`/`thread.next`.
+            // Upstream binds no bare `mod+[` / `mod+]`, so neither does this.
+            Button("") { model.selectAdjacent(.previous) }.keyboardShortcut("[", modifiers: [.command, .shift])
+            Button("") { model.selectAdjacent(.next) }.keyboardShortcut("]", modifiers: [.command, .shift])
         }
         .buttonStyle(.plain).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
     }

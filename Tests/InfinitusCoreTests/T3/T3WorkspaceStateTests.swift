@@ -245,4 +245,60 @@ final class T3WorkspaceStateTests: XCTestCase {
         XCTAssertEqual(s.visibleThreads(now: now), [])
         XCTAssertEqual(s.sidebarSections(now: now), [])
     }
+    // MARK: - Drafts (Task 15)
+
+    func testDraftSurvivesApplyAndKeepsItsSelection() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        XCTAssertTrue(T3WorkspaceState.isDraft(draft))
+        s.select(draft, now: now)
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertTrue(s.threads.contains { $0.id == draft })
+        XCTAssertEqual(s.selectedThreadId, draft)
+        XCTAssertNil(s.pid(of: draft))
+    }
+
+    func testDraftsSortAboveActiveThreads() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "active"), facts())]), now: now)
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        let active = s.sidebarSections(now: now).first { $0.kind == .active }
+        XCTAssertEqual(active?.threads.map(\.id), [draft, "active"])
+    }
+
+    func testStartedDraftIsReplacedByItsSessionAndSelectionMoves() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7)
+        s.apply(inputs([(record(pid: 7, id: "s7"), facts())]), now: now)
+        XCTAssertTrue(s.drafts.isEmpty)
+        XCTAssertEqual(s.threads.map(\.id), ["s7"])
+        XCTAssertEqual(s.selectedThreadId, "s7")
+    }
+
+    // A record can land a tick before its facts do (`apply` skips a pid with
+    // no facts): replacing on record-sight alone would move the selection to
+    // an id that is not in `threads` yet.
+    func testStartedDraftWaitsForTheRecordsFacts() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7)
+        s.apply(T3WorkspaceInputs(records: [record(pid: 7, id: "s7")], facts: [:], progress: [:],
+                                  startedAt: [:], projects: []), now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertEqual(s.selectedThreadId, draft)
+    }
+
+    func testRemoveDraftDropsItAndItsSelection() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: "project-1", now: now)
+        s.select(draft, now: now)
+        s.removeDraft(draft)
+        XCTAssertTrue(s.drafts.isEmpty)
+        XCTAssertNil(s.selectedThreadId)
+    }
 }

@@ -30,6 +30,16 @@ import InfinitusUI
 /// producer on B — `T3ComposerTrigger` carries the reason), and the model
 /// *picker* — the model a live session runs is read from its transcript and
 /// cannot be changed from here.
+/// What a composer with no session yet sends into (Task 15): upstream's
+/// `composerDraftTarget` / `draftId` props on `<ChatComposer>`
+/// (`ChatView.tsx:8052-8060`). `nil` is a live thread, and the whole live path
+/// below is unchanged by draft mode.
+struct T3ComposerDraftTarget: Equatable {
+    let draftId: String
+    /// The project the first prompt starts its session in.
+    let projectId: String
+}
+
 struct T3ComposerView: View {
     /// Plain references, like `T3ThreadView`'s (T3ThreadView.swift:37-41):
     /// observing either would re-run this body on every fleet tick. `app` is
@@ -41,6 +51,9 @@ struct T3ComposerView: View {
     /// thread, so a verdict and a message can never be in flight at once
     /// (`T3ThreadActions.send`'s `sending` guard).
     @ObservedObject var actions: T3ThreadActions
+    /// Set only for a draft thread: ⏎ starts a session instead of delivering
+    /// into one (Task 15).
+    var draftTarget: T3ComposerDraftTarget?
     @Environment(\.t3) private var t3
 
     /// The draft as typed. Deliberately `@State` and not a write into
@@ -94,6 +107,11 @@ struct T3ComposerView: View {
     @State private var commandLoading = false
     /// The rank in flight, so the next keystroke can abandon it.
     @State private var rankTask: Task<Void, Never>?
+    /// Draft mode only: the start-time permission mode the session will be
+    /// born with (`SessionStart.permissionModes`), nil = no
+    /// `--permission-mode` flag, and the `SessionStart` in flight.
+    @State private var startMode: String?
+    @State private var starting = false
 
     var body: some View {
         // One detection per body pass: `detect` copies the text's UTF-16, and
@@ -260,8 +278,14 @@ struct T3ComposerView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {   // `gap-2` on the right group
-                T3ComposerIconButton(icon: .paperclip, tooltip: "Attach files", action: openAttachmentPanel)
-                    .disabled(draft.attachments.count >= SessionInput.maxAttachments)
+                // `SessionStart.Request` carries no attachments (a draft's
+                // send is the session's first prompt), so draft mode has
+                // nothing to stage them into — upstream's draft composer does
+                // take files, over a wire B has no equivalent for.
+                if draftTarget == nil {
+                    T3ComposerIconButton(icon: .paperclip, tooltip: "Attach files", action: openAttachmentPanel)
+                        .disabled(draft.attachments.count >= SessionInput.maxAttachments)
+                }
                 if !queued.isEmpty {
                     // Ours (see `queued`): the count of sends the running turn
                     // has not answered yet.
@@ -299,7 +323,8 @@ struct T3ComposerView: View {
                     // The same request `TeamSessionChatWindow.swift:183` puts
                     // on the wire; `AppModel.setSessionMode` (:260-274) checks
                     // the floor again and records the move on the birth.
-                    actions.send(.init(kind: .mode, text: choice.mode), app: app, pid: store.pid)
+                    guard let pid = livePid else { startMode = choice.mode; return }
+                    actions.send(.init(kind: .mode, text: choice.mode), app: app, pid: pid)
                 } label: {
                     // Upstream's select hides its indicator (`:5019`,
                     // `hideIndicator`) and shows the mode in the trigger
@@ -320,8 +345,8 @@ struct T3ComposerView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .disabled(actions.sending)
-        .accessibilityLabel("Runtime mode")
+        .disabled(actions.sending || starting)
+        .accessibilityLabel(draftTarget == nil ? "Runtime mode" : "Permission mode for the new session")
     }
 
     /// `ComposerPrimaryActions.tsx:222-272`: a 32 pt round button
@@ -332,7 +357,7 @@ struct T3ComposerView: View {
         Button { send() } label: {
             ZStack {
                 Circle().fill(t3.web.messageAction.color)
-                if actions.sending {
+                if actions.sending || starting {
                     T3Spinner(size: 14)
                 } else {
                     LucideIcon(.arrowUp, size: 14, strokeWidth: 1.8)
@@ -357,7 +382,8 @@ struct T3ComposerView: View {
             // (SessionChatWindow.swift:301) — `esc`, which `OwnedSessions`
             // turns into a real interrupt (OwnedSessions.swift:443) and the
             // terminal path types.
-            actions.send(.init(kind: .key, text: "esc"), app: app, pid: store.pid)
+            guard let pid = livePid else { return }
+            actions.send(.init(kind: .key, text: "esc"), app: app, pid: pid)
         } label: {
             ZStack {
                 Circle().fill(t3.web.destructive.color.opacity(0.9))
@@ -488,6 +514,10 @@ struct T3ComposerView: View {
     // MARK: - Sending
 
     private var running: Bool { store.timeline?.latestTurn?.state == .running }
+    /// The session's pid — nil in draft mode, where there is no session and the
+    /// store is inert (its pid is `T3WindowModel.draftPid`, a sentinel). Every
+    /// `actions.send` here goes through this, so a draft can reach no wire.
+    private var livePid: Int32? { draftTarget == nil ? store.pid : nil }
     private var verdict: T3ComposerDrafts.SendVerdict {
         T3ComposerDrafts.canSend(text: draft.text, running: running)
     }
@@ -508,10 +538,16 @@ struct T3ComposerView: View {
     /// which is upstream's `ATTACHMENT_ONLY_BOOTSTRAP_PROMPT`
     /// (`composerPromptHistory.ts:19-20`).
     private var canSend: Bool {
-        guard !actions.sending, !store.gone else { return false }
+        guard !actions.sending, !starting, !store.gone else { return false }
+        // A start already in flight for this draft (the model's own guard —
+        // `starting` above dies with this view, and the draft outlives it).
+        if let target = draftTarget, model.isStarting(target.draftId) { return false }
         switch verdict {
         case .send, .queue: return true
-        case .empty: return !draft.attachments.isEmpty
+        // A draft's send IS the session's first prompt (`SessionStart.prompt`),
+        // and the start wire carries no attachments — so an attachment-only
+        // send has nothing to start with.
+        case .empty: return draftTarget == nil && !draft.attachments.isEmpty
         case .tooLong, .invalid: return false
         }
     }
@@ -522,6 +558,7 @@ struct T3ComposerView: View {
     private func send() -> Bool {
         guard canSend else { return false }
         let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let target = draftTarget { return startDraftSession(target, text: text) }
         var attachments: [SessionInput.Attachment] = []
         for ref in draft.attachments {
             // Read here, on the actor: the files are capped at 5 MB (20 for a
@@ -568,6 +605,25 @@ struct T3ComposerView: View {
         draft = cleared
         recall = nil
         model.flushDraft(cleared, for: store.threadId)
+        return true
+    }
+
+    /// Draft mode's send (Task 15): the prompt starts the session, and the
+    /// reducer swaps the draft for the real thread once its pid shows up in the
+    /// fleet — this view is remounted by `T3Root` then, which is why `starting`
+    /// is never cleared on success (a second ⏎ in that window would start a
+    /// second session).
+    private func startDraftSession(_ target: T3ComposerDraftTarget, text: String) -> Bool {
+        starting = true
+        actions.note = nil
+        model.sendDraft(target.draftId, text: text, permissionMode: startMode) { note in
+            starting = false
+            actions.note = note
+        }
+        // Unlike a live send, the prompt STAYS in the field until the session
+        // is under way: a refused start (or the disabled-start gate) must leave
+        // the draft exactly as it was.
+        model.pushPromptHistory(text)
         return true
     }
 
@@ -825,13 +881,13 @@ struct T3ComposerView: View {
     // shows wherever the mode can move, owned or not, exactly as the team
     // window's Mode menu does (TeamSessionChatWindow.swift:181-183).
 
-    private var birth: SessionBirth? { app.sessionBirths[Int(store.pid)] }
+    private var birth: SessionBirth? { livePid.flatMap { app.sessionBirths[Int($0)] } }
     /// `SessionProgress.model`, off the newest transcript entry that names one
     /// (SessionProgress.swift:52-56).
     private var sessionModel: String? {
-        app.sessionProgress.byPid[Int(store.pid)]?.model
+        livePid.flatMap { app.sessionProgress.byPid[Int($0)]?.model }
     }
-    private var currentMode: String? { birth?.effectiveMode }
+    private var currentMode: String? { draftTarget == nil ? birth?.effectiveMode : startMode }
     private var currentModeLabel: String {
         guard let mode = currentMode else { return "Supervised" }
         return SessionStart.hookModes.first { $0.mode == mode }?.label
@@ -844,6 +900,11 @@ struct T3ComposerView: View {
     /// menu lists the modes at or above the mode the session started in — the
     /// same comparison `AppModel.setSessionMode` rejects on (:265-270).
     private var modeChoices: [(mode: String, label: String)] {
+        // Draft mode picks the mode the session is BORN in, which has no floor
+        // to respect yet — `SessionStart.permissionModes` (the four
+        // `--permission-mode` values), not the running-session hook modes.
+        // Until one is picked there is no flag at all, which is "Supervised".
+        if draftTarget != nil { return SessionStart.permissionModes }
         let floor = SessionStart.modeRank(birth?.permissionMode)
         return SessionStart.hookModes.filter {
             SessionStart.modeRank($0.mode == "supervised" ? nil : $0.mode) >= floor

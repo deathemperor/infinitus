@@ -645,11 +645,11 @@ final class ControlServer {
             case "wall": controller.toggleWall()
             case "workspace":
                 let screen = r.args.dropFirst().first
-                if let screen, !["sidebar", "thread", "composer"].contains(screen) {
-                    throw Fail("usage: show workspace [sidebar|thread|composer]")
+                if let screen, !["sidebar", "thread", "composer", "draft", "switcher"].contains(screen) {
+                    throw Fail("usage: show workspace [sidebar|thread|composer|draft|switcher]")
                 }
                 controller.showWorkspace(screen: screen)
-            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer]")
+            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
