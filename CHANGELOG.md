@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Workspace: links in replies carry the reference's favicon slot.
+- Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.
 - Workspace: a thread whose session ends stays open with "This session has ended." instead of vanishing.
 - Workspace: sidebar rows show their branch and provider, the scope row and top bar carry the reference's controls, and the composer's placeholder follows the thread.
