@@ -133,7 +133,10 @@ struct T3ThreadView: View {
     private var bottomSlot: some View {
         VStack(spacing: 0) {
             T3ThreadPendingSlot(app: app, store: store, actions: actions)
-            // Task 13: the composer.
+            // The composer under the drawers, sharing this view's `actions` —
+            // one sender per thread (`T3ThreadActions`' `sending` guard), so a
+            // verdict and a message can never race.
+            T3ComposerView(model: model, app: app, store: store, actions: actions)
         }
         // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so

@@ -79,7 +79,84 @@ final class T3WindowModel: ObservableObject {
         store.start()
     }
 
-    init(model: AppModel) { self.model = model }
+    // MARK: - Drafts, prompt recall and visits (Task 13)
+
+    private enum Key {
+        static let drafts = "workspace.drafts"
+        static let promptHistory = "workspace.promptHistory"
+        static let lastVisitedAt = "workspace.lastVisitedAt"
+    }
+    /// One draft per thread id (`composerDraftStore.ts`, keyed by its draft
+    /// target), persisted through `T3ComposerDrafts.save`.
+    @Published private(set) var drafts: [String: T3ComposerDraft] =
+        T3ComposerDrafts.load(from: UserDefaults.standard.data(forKey: Key.drafts))
+    /// Prompts the composer can recall with ↑, newest first.
+    @Published private(set) var promptHistory: [String] =
+        UserDefaults.standard.stringArray(forKey: Key.promptHistory) ?? []
+    /// Keystrokes never publish `drafts` (that would re-render the sidebar and
+    /// the top bar): they land here and the debounced sink below commits one
+    /// value per typing burst.
+    private let draftEdits = PassthroughSubject<(String, T3ComposerDraft), Never>()
+    private var persistence: Set<AnyCancellable> = []
+    /// The most recently visited threads kept; the whole map would otherwise
+    /// grow with every session this Mac ever ran.
+    private static let visitLimit = 200
+
+    func draft(for threadId: String) -> T3ComposerDraft { drafts[threadId] ?? T3ComposerDraft() }
+    /// Debounced (500 ms): the composer calls this on every keystroke.
+    func setDraft(_ draft: T3ComposerDraft, for threadId: String) { draftEdits.send((threadId, draft)) }
+    /// Immediate — a thread switch or a window close would otherwise lose the
+    /// last keystrokes inside the debounce window.
+    func flushDraft(_ draft: T3ComposerDraft, for threadId: String) { commit(draft, for: threadId) }
+
+    private func commit(_ draft: T3ComposerDraft, for threadId: String) {
+        var next = drafts
+        if draft.isEmpty { next.removeValue(forKey: threadId) } else { next[threadId] = draft }
+        guard next != drafts else { return }
+        drafts = next
+        UserDefaults.standard.set(T3ComposerDrafts.save(next), forKey: Key.drafts)
+    }
+
+    func pushPromptHistory(_ prompt: String) {
+        let next = T3ComposerDrafts.pushHistory(promptHistory, prompt: prompt)
+        guard next != promptHistory else { return }
+        promptHistory = next
+        UserDefaults.standard.set(next, forKey: Key.promptHistory)
+    }
+
+    /// `[String: Date]` under one key. Loaded in `init`, before the first
+    /// `apply`: without it every ready thread reads as unseen after a relaunch
+    /// (`T3ThreadSettled`'s unseen rule over `T3Thread.lastVisitedAt`).
+    private static func loadVisits() -> [String: Date] {
+        guard let data = UserDefaults.standard.data(forKey: Key.lastVisitedAt),
+              let visits = try? JSONDecoder().decode([String: Date].self, from: data) else { return [:] }
+        return capped(visits)
+    }
+
+    private static func saveVisits(_ visits: [String: Date]) {
+        guard let data = try? JSONEncoder().encode(capped(visits)) else { return }
+        UserDefaults.standard.set(data, forKey: Key.lastVisitedAt)
+    }
+
+    private static func capped(_ visits: [String: Date]) -> [String: Date] {
+        guard visits.count > visitLimit else { return visits }
+        let newest = visits.sorted { $0.value > $1.value }.prefix(visitLimit)
+        return Dictionary(uniqueKeysWithValues: newest.map { ($0.key, $0.value) })
+    }
+
+    init(model: AppModel) {
+        self.model = model
+        state.lastVisitedAt = Self.loadVisits()
+        draftEdits
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] threadId, draft in self?.commit(draft, for: threadId) }
+            .store(in: &persistence)
+        // Same mechanism for the visits: one write per burst of selections.
+        $state.map(\.lastVisitedAt).removeDuplicates()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { Self.saveVisits($0) }
+            .store(in: &persistence)
+    }
 
     func start() {
         guard sink == nil, let model else { return }

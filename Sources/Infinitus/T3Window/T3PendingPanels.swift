@@ -49,7 +49,11 @@ final class T3ThreadActions: ObservableObject {
     /// make one without a hop.
     nonisolated init() {}
 
-    func send(_ request: SessionInput.Request, app: AppModel, pid: Int32) {
+    /// `onOutcome` runs on the main actor once the reply is in, for a caller
+    /// that has to know what the session did with it — Task 13's queue badge
+    /// only counts a message the session actually took.
+    func send(_ request: SessionInput.Request, app: AppModel, pid: Int32,
+              onOutcome: ((SessionInput.Reply) -> Void)? = nil) {
         guard !sending else { return }
         sending = true
         note = nil
@@ -60,6 +64,7 @@ final class T3ThreadActions: ObservableObject {
                 if reply.outcome != "delivered" {
                     self?.note = reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome
                 }
+                onOutcome?(reply)
             }
         }
     }
