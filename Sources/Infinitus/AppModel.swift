@@ -1736,14 +1736,12 @@ final class AppModel: ObservableObject {
                 }
             }
             // "Allow for this session": remember the rule for the plugin's
-            // PreToolUse hook, then answer the prompt on screen with Yes.
-            var request = request
-            if request.kind == .approve {
-                if let rule = ToolApproval.decode(request.text) {
-                    self.toolApprovals.add(rule, sessionId: record.sessionId)
-                    Task { @MainActor in self.logMirrorInput("🛡️", "\(source) allows \(rule.label) for the rest of session \(pid)") }
-                }
-                request = SessionInput.Request(kind: .key, text: "1")
+            // PreToolUse hook; the request itself goes down as `.approve`,
+            // and Core's arm answers it — an owned session gets the wire's
+            // allow-for-session, a terminal a Yes keypress (#430).
+            if request.kind == .approve, let rule = ToolApproval.decode(request.text) {
+                self.toolApprovals.add(rule, sessionId: record.sessionId)
+                Task { @MainActor in self.logMirrorInput("🛡️", "\(source) allows \(rule.label) for the rest of session \(pid)") }
             }
             let reply = SessionInput.deliver(request: request, record: record,
                                              hosts: PtyHosts.available(), claudeDir: claudeDir,
