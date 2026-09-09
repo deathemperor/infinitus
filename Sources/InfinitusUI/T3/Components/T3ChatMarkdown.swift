@@ -136,11 +136,28 @@ public struct T3ChatMarkdown: View {
     /// against the web palette's tokens (it has no dedicated `md*` set —
     /// that's mobile-only). `strong: nil` — `<strong>` only bumps the
     /// weight here, it doesn't repaint the color.
+    ///
+    /// Inline code wears the chip `.chat-markdown :not(pre) > code`
+    /// (index.css:1792-1799) describes: `--muted` behind a 0.75 rem
+    /// (`Self.inlineCodeSize`) mono run in `--contrast-foreground` — full
+    /// `foreground`, brighter than the 80 % body around it — with
+    /// `0.35rem` of padding and the 1 px `--contrast-border` the rectangle
+    /// stands in for. See `MarkdownInline.CodeChip` for what a SwiftUI text
+    /// run can and cannot paint (no radius, no border).
     private func inline(_ text: String, font: Font, color: Color) -> some View {
         MarkdownInline.text(text, font: font, color: color, runs: .init(
-            link: p.primary.color, codeFont: .system(size: 13, design: .monospaced), code: p.mutedForeground.color,
-            strongFont: font.weight(.semibold), strong: nil))
+            link: p.primary.color,
+            codeFont: .system(size: Self.inlineCodeSize, design: .monospaced),
+            code: p.foreground.color,
+            strongFont: font.weight(.semibold), strong: nil,
+            codeChip: .init(background: p.muted.color, fontSize: Self.inlineCodeSize,
+                            padding: Self.inlineCodePadding)))
     }
+
+    /// `font-size: 0.75rem` and `padding: 0.1rem 0.35rem` + `border: 1px`
+    /// (index.css:1792-1799).
+    private static let inlineCodeSize: Double = 12
+    private static let inlineCodePadding: Double = 0.35 * 16 + 1
 
     private struct Table: View {
         let header: [String]
