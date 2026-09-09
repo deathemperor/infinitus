@@ -5,6 +5,11 @@ links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
 publishes the matching section as the GitHub release body.
 
+## Unreleased
+
+### Mac
+- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
+
 ## 0.5.0-alpha.1
 
 ### Release

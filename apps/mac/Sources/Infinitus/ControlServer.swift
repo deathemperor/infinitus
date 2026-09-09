@@ -205,6 +205,14 @@ final class ControlServer {
         ]))
     }
 
+    /// A teammate by kid or by roster name (exact, then case-insensitive).
+    private func teammate(_ who: String?) throws -> String {
+        guard let who, !who.isEmpty else { throw Fail("a teammate's kid or name is expected") }
+        let members = model.team.snapshot?.members ?? []
+        if let m = members.first(where: { $0.kid == who || $0.name == who }) ?? members.first(where: { $0.name.lowercased() == who.lowercased() }) { return m.kid }
+        throw Fail("no teammate \(who)")
+    }
+
     private func teamReply() throws -> ControlReply {
         if let err = model.team.lastError { throw Fail(err) }
         return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
@@ -923,6 +931,21 @@ final class ControlServer {
             guard let kid = r.args.first, !kid.isEmpty else { throw Fail("usage: \(r.command) <kid>") }
             if r.command == "team-approve" { await model.team.approve(kid: kid) } else { await model.team.decline(kid: kid) }
             return try teamReply()
+
+        case "team-sessions":
+            let kid = try teammate(r.args.first)
+            return ControlReply(ok: true, result: try JSONValue.of(model.team.drivableSessions(of: kid)))
+
+        case "team-drive":
+            guard r.args.count >= 3 else { throw Fail("usage: team-drive <kid|name> <session> <send|approve|mode|resume|key> [text…]") }
+            let kid = try teammate(r.args[0])
+            let action = r.args[2]
+            guard TeamGrants.driveCapabilities.contains(action) else { throw Fail("team-drive: action must be one of \(TeamGrants.driveCapabilities.joined(separator: ", "))") }
+            let text = r.args.dropFirst(3).joined(separator: " ")
+            guard let delivery = await model.team.drive(kid: kid, session: r.args[1], action: action, text: text.isEmpty ? nil : text) else {
+                throw Fail(model.team.lastError ?? "team-drive: not delivered")
+            }
+            return ControlReply(ok: true, result: try JSONValue.of(delivery))
 
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {
