@@ -91,7 +91,7 @@ struct T3NoActiveThreadState: View {
 /// of the draft's project, which is why it needs no `draftId` hash to stay
 /// stable across captures.
 ///
-/// Not ported: the menu's "New project" item (`:181-184` opens the command
+/// Not ported: the menu's "New project" item (`:187-190` opens the command
 /// palette's add-project flow, which B has no host for) and the tooltip over a
 /// truncated name.
 struct T3DraftHeroHeadline: View {
@@ -137,7 +137,24 @@ struct T3DraftHeroHeadline: View {
     private var picker: some View {
         Menu {
             ForEach(groups) { group in
-                Button(group.displayName) { onPick(group) }
+                // `:168-183`: the group's own favicon, `size-4 shrink-0`,
+                // before a `gap-2` and the name. The item's picture is a
+                // `Label`'s icon, which AppKit draws as the menu item's image
+                // — its gap to the title, and upstream's `min-w-0 truncate`
+                // on the name, are AppKit's own and have no knob here.
+                Button { onPick(group) } label: {
+                    Label {
+                        Text(group.displayName)
+                    } icon: {
+                        // `<ProjectFavicon project={group}>` classifies over
+                        // the group's representative, the same member
+                        // `T3ThreadView` retargets a draft into.
+                        if let glyph = T3ProjectMenuGlyph.image(name: group.representative.name,
+                                                                cwd: group.representative.cwd, t3: t3) {
+                            Image(nsImage: glyph).renderingMode(.original)
+                        }
+                    }
+                }
             }
         } label: {
             Text(projectName ?? "Choose a project")
@@ -155,5 +172,33 @@ struct T3DraftHeroHeadline: View {
         .fixedSize()
         .disabled(groups.isEmpty)
         .accessibilityLabel(projectName == nil ? "Choose a project" : "Change project")
+    }
+}
+
+/// `T3ProjectGlyph` in the form a menu item can hold: SwiftUI hands a `Label`'s
+/// icon to AppKit as an `NSImage`, and the kit's Lucide glyph is a stroked
+/// `Shape`, which an `NSMenuItem` cannot host — so it is rasterised once.
+///
+/// Cached on what the picture actually depends on, the selected icon and the
+/// scheme, never on the project: `selectProjectIcon` maps every name onto one
+/// of 22 glyphs, so the cache tops out at 44 images and re-rendering the
+/// headline draws none of them again.
+@MainActor
+enum T3ProjectMenuGlyph {
+    private static var cache: [String: NSImage] = [:]
+
+    static func image(name: String, cwd: String, t3: T3Environment, size: Double = 16) -> NSImage? {
+        let key = "\(T3ProjectIcon.select(name: name, cwd: cwd).rawValue)\u{0}\(t3.scheme)\u{0}\(size)"
+        if let hit = cache[key] { return hit }
+        let renderer = ImageRenderer(content: T3ProjectGlyph(projectName: name, projectCwd: cwd, size: size)
+            .frame(width: size, height: size)
+            .environment(\.t3, t3))
+        renderer.scale = 2
+        guard let image = renderer.nsImage else { return nil }
+        // Never a template: the automatic icon's whole point is its colour
+        // (`PROJECT_ICON_COLOR_BY_NAME`), which a template image would drop.
+        image.isTemplate = false
+        cache[key] = image
+        return image
     }
 }
