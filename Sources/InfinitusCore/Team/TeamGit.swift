@@ -141,9 +141,48 @@ public final class TeamGit: TeamStore {
         // one and fetch everything.
         if let branches, branches.isEmpty { return }
         heads = [:]; branchNames = nil
-        let refspecs = branches?.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
-            ?? ["+refs/heads/*:refs/remotes/origin/*"]
-        _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
+        // Member and transcript branches are read at their tip only, and
+        // their history is every object ever published (1.3 GB behind
+        // the Papaya leader's `m/`, #414): they come at depth 1. The
+        // roster keeps its history — `history(of:)` walks it back to a
+        // signature the trust root made — and so do the requests.
+        let patterns = branches ?? ["roster", "requests", "m/", "t/"]
+        let shallow = patterns.filter { $0.hasPrefix("m/") || $0.hasPrefix("t/") }
+        let full = patterns.filter { !($0.hasPrefix("m/") || $0.hasPrefix("t/")) }
+        if !full.isEmpty {
+            let refspecs = full.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
+            _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
+        }
+        guard !shallow.isEmpty else { return }
+        // A depth-1 fetch whose patterns match no remote head exits 1
+        // where a full one matches nothing quietly, and `--prune` under
+        // exact refspecs prunes nothing — so the remote's heads are
+        // listed first: the matching ones come at depth 1, and a local
+        // ref the remote no longer has (a removed member) is dropped.
+        let remote = try remoteHeads().filter { name in shallow.contains { name.hasPrefix($0) } }
+        let local = try localHeads().filter { name in shallow.contains { name.hasPrefix($0) } }
+        for gone in local where !remote.contains(gone) {
+            _ = try run(["update-ref", "-d", "refs/remotes/origin/\(gone)"])
+        }
+        guard !remote.isEmpty else { return }
+        let refspecs = remote.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
+        _ = try run(["fetch", "--progress", "--depth", "1", "origin"] + refspecs, network: true)
+    }
+
+    /// The remote's branch names (`ls-remote --heads`), sorted.
+    private func remoteHeads() throws -> [String] {
+        let text = String(decoding: try run(["ls-remote", "--heads", "origin"], network: true), as: UTF8.self)
+        return text.split(separator: "\n").compactMap { line -> String? in
+            guard let tab = line.firstIndex(of: "\t") else { return nil }
+            let ref = line[line.index(after: tab)...]
+            return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : nil
+        }.sorted()
+    }
+
+    /// The mirror's `refs/remotes/origin/*` names, sorted.
+    private func localHeads() throws -> [String] {
+        let text = String(decoding: try run(["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"]), as: UTF8.self)
+        return text.split(separator: "\n").map { String($0.dropFirst("origin/".count)) }.sorted()
     }
 
     /// Spec §6.1's "empty private repo", asked of the REMOTE. Not
@@ -281,6 +320,37 @@ public final class TeamGit: TeamStore {
             .filter { $0 == "roster" || $0 == "requests" || $0.hasPrefix("m/") || $0.hasPrefix("t/") }
         branchNames = names
         return names
+    }
+
+    /// Spec §4.2's one force-push: the branch becomes a single commit
+    /// holding its current tree minus `dropping` (an explicit, once-per-
+    /// branch action — #339, never the loop's). Readers cope: a cursor
+    /// whose commit is gone falls back to the full listing, headers are
+    /// cached by blob version, and a member's depth-1 mirror just takes
+    /// the new tip. Returns how many paths were dropped.
+    public func compact(branch: String, dropping prefix: String) throws -> Int {
+        guard opened else { throw GitError.notOpen }
+        guard let parent = try head(of: branch) else { return 0 }
+        let dropped = try run(["ls-tree", "-r", "--name-only", parent, "--", prefix])
+        let paths = String(decoding: dropped, as: UTF8.self).split(separator: "\n").map(String.init)
+        let index = dir.appendingPathComponent("index-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: index) }
+        let env = ["GIT_INDEX_FILE": index.path]
+        _ = try run(["read-tree", parent], env: env)
+        if !paths.isEmpty {
+            let lines = paths.map { "0 0000000000000000000000000000000000000000\t\($0)\n" }.joined()
+            _ = try run(["update-index", "--index-info"], stdin: Data(lines.utf8), env: env)
+        }
+        let treeSha = String(decoding: try run(["write-tree"], env: env), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let commit = String(decoding: try run(["commit-tree", treeSha, "-m", "compacted (\(paths.count) dropped under \(prefix))"], env: [
+            "GIT_AUTHOR_NAME": "Infinitus", "GIT_AUTHOR_EMAIL": "\(author)@infinitus.run",
+            "GIT_COMMITTER_NAME": "Infinitus", "GIT_COMMITTER_EMAIL": "\(author)@infinitus.run",
+        ]), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        heads = [:]; branchNames = nil
+        _ = try run(["push", "--progress", "--force", "origin", "\(commit):refs/heads/\(branch)"], network: true)
+        _ = try run(["update-ref", "refs/remotes/origin/\(branch)", commit])
+        return paths.count
     }
 
     private func head(of branch: String) throws -> String? {

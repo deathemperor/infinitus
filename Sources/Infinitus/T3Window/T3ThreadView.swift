@@ -19,6 +19,11 @@ struct T3ComposerHeightKey: PreferenceKey {
     }
 }
 
+/// The messages wrapper's own box (`ChatView.tsx:7931`, `relative`): what the
+/// scroll-to-end pill's `bottom` and the composer overlay's rects are measured
+/// in. File scope because the pill lives outside `T3ThreadView`.
+private let t3TimelineSpace = "t3-timeline"
+
 /// The scrolling thread (`MessagesTimeline.tsx:803-865`): the row list in a
 /// centred `max-w-3xl` column inside a `px-5` scroll area, with the header
 /// spacer (`TIMELINE_LIST_HEADER`, `:240`) above and the composer inset below.
@@ -166,6 +171,12 @@ struct T3ThreadView: View {
                                 // `maintainScrollAtEndThreshold` of 1 px, as the
                                 // bottom sentinel: the end is in view.
                                 anchors.atEnd = rect.maxY <= anchors.viewport.height + 2
+                                // `showScrollToBottom` (`ChatView.tsx:8272`).
+                                // This fires on every scrolled frame, so the
+                                // publish happens on the FLIP only — the pill
+                                // is the sole observer and nothing else may
+                                // re-render per frame.
+                                anchors.setScrolledAway(!anchors.atEnd)
                             }
                     }
                     .padding(.horizontal, Self.listInset)
@@ -190,6 +201,21 @@ struct T3ThreadView: View {
                 // full height and scrolls UNDER it, which is what the footer
                 // inset reserves room for. So: an overlay, not a stacked row.
                 .overlay(alignment: .bottom) { bottomSlot }
+                // `:8271-8291`, `z-30` over the composer overlay's `z-20`, so
+                // the second overlay. An empty timeline has no end to scroll
+                // to (`:7982`'s own `hideEmptyPlaceholder` state).
+                .overlay(alignment: .bottom) {
+                    if !store.rows.isEmpty {
+                        T3ScrollToEndPill(anchors: anchors) {
+                            anchors.atEnd = true
+                            anchors.setScrolledAway(false)
+                            withAnimation { proxy.scrollTo(Self.endId, anchor: .bottom) }
+                        }
+                    }
+                }
+                // Both overlays measure into this one space: the pill's
+                // clearance is a distance between their boxes.
+                .coordinateSpace(name: t3TimelineSpace)
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { anchors.viewport = $0 }
@@ -201,11 +227,23 @@ struct T3ThreadView: View {
     private var bottomSlot: some View {
         VStack(spacing: 0) {
             T3ThreadPendingSlot(app: app, store: store, actions: actions)
+                // `[data-composer-banner-surface="attached"]` (`:5316`): the
+                // drawers the pill has to clear. This port stacks them in one
+                // full-width column, so the group is one box.
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(t3TimelineSpace)) } action: {
+                    anchors.drawers = $0
+                    anchors.updateScrollToEndClearance()
+                }
             // The composer under the drawers, sharing this view's `actions` —
             // one sender per thread (`T3ThreadActions`' `sending` guard), so a
             // verdict and a message can never race.
             T3ComposerView(model: model, app: app, store: store, actions: actions,
                            draftStart: model.draftStart)
+                // `[data-chat-composer-main-surface="true"]` (`:5313`).
+                .onGeometryChange(for: Double.self) { $0.frame(in: .named(t3TimelineSpace)).minY } action: {
+                    anchors.composerTop = $0
+                    anchors.updateScrollToEndClearance()
+                }
             // `ChatView.tsx:8167-8180`: the context strip sits in the same
             // floating column, directly under the card — so it is inside the
             // slot whose height the timeline's footer reserves.
@@ -223,7 +261,13 @@ struct T3ThreadView: View {
                 Color.clear.preference(key: T3ComposerHeightKey.self, value: geo.size.height)
             }
         }
-        .onPreferenceChange(T3ComposerHeightKey.self) { composerHeight = $0 }
+        .onPreferenceChange(T3ComposerHeightKey.self) {
+            composerHeight = $0
+            // `publishComposerOverlayHeight` (`:5290-5330`) feeds the timeline
+            // inset AND the pill's clearance from the same measurement.
+            anchors.overlayHeight = $0
+            anchors.updateScrollToEndClearance()
+        }
     }
 
     /// The strip only exists where there is a folder to name: the selected
@@ -355,12 +399,116 @@ private struct T3DraftNoteSlot: View {
 
 /// Scroll bookkeeping outside SwiftUI's invalidation: row frames arrive on
 /// every scrolled frame, and republishing them would re-render the list.
-@MainActor final class T3Anchors {
+///
+/// It is an `ObservableObject` for the scroll-to-end pill alone, which is the
+/// only view that holds it as an `@ObservedObject`; `T3ThreadView` keeps it in
+/// plain `@State`, which does NOT observe. Only the two `@Published` members
+/// below are ever published, and only when they change — everything else here
+/// is written per frame.
+@MainActor final class T3Anchors: ObservableObject {
     /// Viewport-relative row frames (`.scrollView` coordinate space).
     var rows: [String: CGRect] = [:]
     var viewport: CGSize = .zero
     var atEnd = true
     /// `(rowId, its viewport-relative top)` recorded before a disclosure toggle.
     var pinned: (String, Double)?
+
+    /// `showScrollToBottom` (`ChatView.tsx:1576`). Upstream debounces the SHOW
+    /// by 150 ms to ride out a thread switch (`:4543-4545`); here the flip is
+    /// driven by the footer sentinel's own geometry, which never reports a
+    /// settling list, so there is no timer.
+    @Published private(set) var scrolledAway = false
+    /// `scrollToEndClearance` (`:1664`).
+    @Published private(set) var scrollToEndClearance: Double = 0
+
+    /// The clearance's inputs, in the timeline's own coordinate space.
+    var overlayHeight: Double = 0
+    var composerTop: Double = 0
+    var drawers: CGRect = .zero
+    /// `nil` until the pill has been laid out once. The drawers report their
+    /// boxes first, and a pill span of `0...0` would read as "no drawer is
+    /// under it" — the subtraction would fire and the first frame would land a
+    /// drawer's height too low, then jump. Unbounded means every drawer counts
+    /// as under it, which is the settled answer here anyway.
+    var pill: ClosedRange<Double>?
+
+    func setScrolledAway(_ value: Bool) {
+        if scrolledAway != value { scrolledAway = value }
+    }
+
+    /// `publishComposerOverlayHeight`'s clearance branch (`:5312-5329`).
+    func updateScrollToEndClearance() {
+        // One box, not one per banner: this port stacks every attached drawer
+        // in a single full-width column (`T3ThreadPendingSlot`), so the group
+        // always spans the pill and the clearance always resolves to the whole
+        // overlay height. The call stays honest about that rather than
+        // hard-coding it — a drawer docked beside the composer, which upstream
+        // has and this port does not, is the case the subtraction exists for.
+        let attachments = drawers.height > 0
+            ? [T3ComposerFooterLayout.Attachment(top: drawers.minY, left: drawers.minX, right: drawers.maxX)]
+            : []
+        let next = T3ComposerFooterLayout.scrollToEndClearance(overlayHeight: overlayHeight,
+                                                              mainSurfaceTop: composerTop,
+                                                              buttonLeft: pill?.lowerBound ?? -.infinity,
+                                                              buttonRight: pill?.upperBound ?? .infinity,
+                                                              attachments: attachments)
+        if scrollToEndClearance != next { scrollToEndClearance = next }
+    }
+}
+
+/// The scroll-to-end pill (`ChatView.tsx:8271-8291`): an `xs` glass button,
+/// `rounded-full px-3 gap-1.5` with a `size-3.5` chevron, `text-muted-foreground
+/// hover:text-foreground`, in a `py-1.5` wrapper the clearance lifts to
+/// `bottom: clearance + 4` — the rule the upstream fix is about, so the pill
+/// stays against the composer instead of drifting with the overlay's box.
+///
+/// Shown only while the reader is away from the live edge, so a thread at its
+/// end — every capture the harness takes — draws nothing.
+private struct T3ScrollToEndPill: View {
+    @ObservedObject var anchors: T3Anchors
+    let onTap: () -> Void
+    @Environment(\.t3) private var t3
+    @State private var hover = false
+
+    var body: some View {
+        if anchors.scrolledAway {
+            Button(action: onTap) {
+                HStack(spacing: 6) {   // `gap-1.5`
+                    LucideIcon(.chevronDown, size: 14)   // `size-3.5`
+                    // `xs`'s `sm:text-xs` over the base's `font-medium`.
+                    Text("Scroll to end").font(T3Font.web(.xs, .medium))
+                }
+                // `text-muted-foreground hover:text-foreground`.
+                .foregroundStyle(hover ? t3.web.foreground.color : t3.web.mutedForeground.color)
+                .padding(.horizontal, 12)   // `px-3`, over `xs`'s own padding
+                .frame(height: T3ButtonMetrics.height(.xs))
+                // `variant="glass"`: `surface-glass` is `--background` at
+                // `--glass-opacity` behind a backdrop blur (index.css:260-264),
+                // and this window has no CABackdropLayer host — a flat fill,
+                // the same call `T3ComposerView` makes for its own surface
+                // (T3ComposerView.swift:149-152).
+                .background(t3.web.background.color, in: Capsule())
+                // `border-border/60 [:hover]:border-border`.
+                .overlay(Capsule().stroke(t3.web.border.color.opacity(hover ? 1 : 0.6), lineWidth: 1))
+                // `shadow-sm`: `0 1px 3px 0 rgb(0 0 0 / 0.1)`.
+                .shadow(color: .black.opacity(0.1), radius: 1.5, y: 1)
+            }
+            .buttonStyle(.plain)
+            .onHover { hover = $0 }
+            .accessibilityLabel("Scroll to end")
+            // The pill's own span, which decides whether a drawer is in its
+            // way. Horizontal only: reading its `y` here would feed the
+            // clearance back into the padding that sets it.
+            .onGeometryChange(for: ClosedRange<Double>.self) { proxy in
+                let frame = proxy.frame(in: .named(t3TimelineSpace))
+                return frame.minX...max(frame.minX, frame.maxX)
+            } action: {
+                anchors.pill = $0
+                anchors.updateScrollToEndClearance()
+            }
+            .padding(.vertical, 6)   // `py-1.5`
+            .padding(.bottom, anchors.scrollToEndClearance + 4)
+        }
+    }
 }
 

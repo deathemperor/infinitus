@@ -164,10 +164,15 @@ struct T3ThreadSettingsSheet: View {
 
 /// T3's git overview (`GitOverviewSheet.tsx`) as C's shell: the branch
 /// as the title, the six rows with the subtitles they show before any
-/// action runs. The actions light up in E when the Mac serves git facts;
-/// until then the rows are inert and say so.
+/// action runs. Review changes is live — it pushes the session's
+/// checkpoint timeline (#167), the phone's turn diffs today; the git
+/// actions light up in E when the Mac serves git facts, and say so.
 struct T3GitSheet: View {
     let branch: String?
+    /// The session whose checkpoints Review changes opens; nil (the
+    /// render harness) keeps the row inert like the others.
+    var session: SessionDetail? = nil
+    var macId: String? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.t3) private var t3
 
@@ -180,42 +185,61 @@ struct T3GitSheet: View {
         ("Branches & worktrees", "Switch branch, create branch, or move to a worktree", "arrow.triangle.branch"),
     ]
 
+    private static let reviewRow = 4
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(branch ?? "No branch").font(T3Font.mobile(.xxl, .bold)).foregroundStyle(t3.mobile.foreground.color)
-                    Text(branch == nil ? "This session's folder is not on a git branch the Mac has reported."
-                                       : "Git actions from the phone arrive with a later release; the Mac's terminal has them today.")
-                        .font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundMuted.color)
-                }
-                .padding(.horizontal, 24).padding(.top, 28)
-                VStack(spacing: 0) {
-                    ForEach(Array(Self.rows.enumerated()), id: \.offset) { i, row in
-                        if i > 0 { Divider().overlay(t3.mobile.border.color).padding(.leading, 72) }
-                        HStack(spacing: 14) {
-                            Image(systemName: row.glyph).font(.system(size: 16))
-                                .foregroundStyle(t3.mobile.iconMuted.color)
-                                .frame(width: 36, height: 36)
-                                .background(t3.mobile.subtle.color, in: Circle())
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.title).font(T3Font.mobile(.lg, .bold)).foregroundStyle(t3.mobile.foregroundMuted.color)
-                                Text(row.subtitle).font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundTertiary.color)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(t3.mobile.chevron.color)
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 14)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(branch ?? "No branch").font(T3Font.mobile(.xxl, .bold)).foregroundStyle(t3.mobile.foreground.color)
+                        Text(branch == nil ? "This session's folder is not on a git branch the Mac has reported."
+                                           : "Review changes shows this session's turn diffs; the other git actions arrive with a later release, the Mac's terminal has them today.")
+                            .font(T3Font.mobile(.sm)).foregroundStyle(t3.mobile.foregroundMuted.color)
                     }
+                    .padding(.horizontal, 24).padding(.top, 28)
+                    VStack(spacing: 0) {
+                        ForEach(Array(Self.rows.enumerated()), id: \.offset) { i, row in
+                            if i > 0 { Divider().overlay(t3.mobile.border.color).padding(.leading, 72) }
+                            if i == Self.reviewRow, let session {
+                                NavigationLink { CheckpointsScreen(session: session, macId: macId) } label: { label(row, live: true) }
+                                    .buttonStyle(.plain)
+                            } else {
+                                label(row, live: false)
+                            }
+                        }
+                    }
+                    .background(t3.mobile.card.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .padding(.horizontal, 20)
                 }
-                .background(t3.mobile.card.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .padding(.bottom, 24)
+            .background(t3.mobile.sheet.color.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .background(t3.mobile.sheet.color.ignoresSafeArea())
         .presentationDetents([.fraction(0.55), .fraction(0.92)])
         .presentationDragIndicator(.visible)
+    }
+
+    /// One row; a live one reads in the foreground colours, an inert one
+    /// stays muted.
+    private func label(_ row: (title: String, subtitle: String, glyph: String), live: Bool) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: row.glyph).font(.system(size: 16))
+                .foregroundStyle(live ? t3.mobile.icon.color : t3.mobile.iconMuted.color)
+                .frame(width: 36, height: 36)
+                .background(t3.mobile.subtle.color, in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).font(T3Font.mobile(.lg, .bold))
+                    .foregroundStyle(live ? t3.mobile.foreground.color : t3.mobile.foregroundMuted.color)
+                Text(row.subtitle).font(T3Font.mobile(.sm))
+                    .foregroundStyle(live ? t3.mobile.foregroundMuted.color : t3.mobile.foregroundTertiary.color)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(t3.mobile.chevron.color)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
 }

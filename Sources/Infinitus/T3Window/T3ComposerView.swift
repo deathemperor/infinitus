@@ -206,6 +206,8 @@ struct T3ComposerView: View {
             // The window was opened straight at the composer, or reopened
             // while the request was still pending.
             if model.composerFocusRequested { consumeFocusRequest() } else { focusRequest = true }
+            // After the draft is in hand, never before: `stage` appends to it.
+            consumeFileDrops()
         }
         .onDisappear {
             // The debounce would drop the last keystrokes of a thread switch
@@ -223,6 +225,11 @@ struct T3ComposerView: View {
             insert(text)
             model.pendingComposerInsert = nil
         }
+        // A sidebar row's drop onto the thread that is ALREADY open: there is
+        // no remount to carry it, so the queue itself is what wakes this
+        // (upstream's own `pendingSidebarFileDrops` effect,
+        // `ChatView.tsx:7876-7918`).
+        .onChange(of: model.pendingFileDrops) { _, _ in consumeFileDrops() }
         .onChange(of: store.timeline) { _, timeline in drain(timeline) }
         // Opening a menu is what loads its rows — a keystroke inside one only
         // re-ranks what is already in hand.
@@ -465,16 +472,11 @@ struct T3ComposerView: View {
     }
 
     /// A drop's promised URLs, resolved off the main actor by the item
-    /// provider itself, then staged on it.
+    /// provider itself (`T3FileDrop` — the sidebar's row drops take the same
+    /// path), then staged on it.
     private func load(providers: [NSItemProvider]) {
-        for provider in providers {
-            if provider.canLoadObject(ofClass: URL.self) {
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    guard let url else { return }
-                    Task { @MainActor in stage([url]) }
-                }
-                continue
-            }
+        T3FileDrop.loadURLs(providers) { stage($0) }
+        for provider in providers where !provider.canLoadObject(ofClass: URL.self) {
             // Image bytes with no file behind them — the same case as a pasted
             // screenshot, and staged the same way.
             let type = UTType.image.identifier
@@ -525,6 +527,17 @@ struct T3ComposerView: View {
         else { return false }
         stageImageData(tiff)
         return true
+    }
+
+    /// Files a sidebar row's drop left for THIS thread
+    /// (`consumePendingFileDrop`, `sidebarPendingFileDropStore.ts:63-75`):
+    /// taken once and staged through the same `stage` a drop on the composer
+    /// itself goes through, so the cap, the type table and the size limits all
+    /// still apply and a refusal is still said out loud.
+    private func consumeFileDrops() {
+        let urls = model.takeFileDrops(for: store.threadId)
+        guard !urls.isEmpty else { return }
+        stage(urls)
     }
 
     /// `addComposerAttachments`' limits, as `SessionInput` spells them: at

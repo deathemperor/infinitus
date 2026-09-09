@@ -176,8 +176,16 @@ enum T3BannerVariant {
 ///
 /// `attached` rounds only the top (`before:rounded-t-[16px]`); a floating
 /// notice rounds all four (`before:rounded-[1rem]`). The
-/// `--chat-composer-attachment-overlap` negative margin and its mask are not
-/// ported: nothing sits under the drawer until Task 13's composer does.
+/// `--chat-composer-attachment-overlap` negative margin itself is not ported
+/// (the drawer sits ON the composer here rather than 17 pt inside it), but its
+/// mask's one-pixel bleed is (`ComposerBanner.tsx:59-63`): the cut-off moved to
+/// `overlap - 1px` so the surface runs one point PAST the seam and the thing
+/// stacked under it covers the extra row — without it a fractional layout
+/// coordinate leaves a hairline of scrolling timeline between the two fills.
+/// Here that is `.padding(.bottom, -1)` on the whole surface (fill, tint and
+/// border, the way the mask covers the whole `before`); the composer — a later
+/// sibling in `T3ThreadView`'s bottom slot, so drawn over this one — is what
+/// hides it.
 private struct T3BannerRoot<Content: View>: View {
     var variant: T3BannerVariant = .default
     var attached = true
@@ -198,6 +206,9 @@ private struct T3BannerRoot<Content: View>: View {
                     .fill(p.card.color)
                     .overlay(shape.fill(variant.tint(p)))
                     .overlay(shape.stroke(variant.outline(p), lineWidth: 1))
+                    // The seam bleed. A floating notice has nothing under it
+                    // (`overlap: 0px`, `:56`), so it keeps its own bottom edge.
+                    .padding(.bottom, attached ? -1 : 0)
             }
     }
 

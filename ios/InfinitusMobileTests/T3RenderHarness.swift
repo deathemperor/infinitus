@@ -244,13 +244,13 @@ import InfinitusUI
         }
         .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "parity-home", png: Self.render(parityHome), dir: dir, test: self)
-        let macsPage = T3SettingsSheet(model: model, path: [.macs]).t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        let macsPage = T3SettingsSheet(model: model, path: NavigationPath([SettingsForm.Part.macs])).t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "settings-macs-light", png: Self.render(macsPage), dir: dir, test: self)
         let settings = T3ThreadSettingsSheet(model: model, session: session, macId: nil,
                                              facts: Self.conversation(running: true).facts)
             .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
         try Self.attach(name: "thread-settings-light", png: Self.render(settings), dir: dir, test: self)
-        let git = T3GitSheet(branch: "t3-c5").t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         for (name, state, scheme) in shots {
             let root = NavigationStack {

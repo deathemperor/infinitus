@@ -632,6 +632,11 @@ final class ControlServer {
             if let err = model.team.lastError { throw Fail(err) }
             return ControlReply(ok: true, result: try JSONValue.of(model.team.lastReport ?? TeamPublisher.Report()))
 
+        case "team-compact":
+            await model.team.compact()
+            if let err = model.team.lastError { throw Fail(err) }
+            return try teamReply()
+
         case "team-approve", "team-decline":
             guard let kid = r.args.first, !kid.isEmpty else { throw Fail("usage: \(r.command) <kid>") }
             if r.command == "team-approve" { await model.team.approve(kid: kid) } else { await model.team.decline(kid: kid) }

@@ -34,6 +34,20 @@ final class T3WindowModel: ObservableObject {
     /// it and clears it; upstream does the same thing by writing the composer's
     /// own draft (`ComposerPrimaryActions.tsx:166-181`, the "Refine" branch).
     @Published var pendingComposerInsert: String?
+    /// Files a sidebar row's drop staged for a thread, keyed by thread id
+    /// (`sidebarPendingFileDropStore.ts`): the composer takes them the moment
+    /// it is mounted on that thread and clears the entry. Published because
+    /// a drop onto the row of the thread already open has no remount to carry
+    /// it — a rare event, like `pendingComposerInsert` above.
+    ///
+    /// Ours: upstream carries a per-drop id so a FAILED `router.navigate` can
+    /// retract just its own drop (`handleThreadFileDrop`,
+    /// `Sidebar.tsx:2784-2818`). `select` here is synchronous and cannot land
+    /// on another thread, so that id would have no caller; the queue keeps
+    /// upstream's other three properties — drops accumulate rather than
+    /// replace, other threads' drops survive one thread's consumption, and a
+    /// thread that goes away drops its files (`pruneFileDrops`).
+    @Published var pendingFileDrops: [String: [URL]] = [:]
     /// The hidden ⌘W button in `T3Root` (E6c); the controller sets this to `close()`.
     var closeRequested: (() -> Void)?
 
@@ -261,7 +275,7 @@ final class T3WindowModel: ObservableObject {
         return candidates
     }
 
-    /// The composer strip's branch (`T3GitFacts.branch` → one `git rev-parse`)
+    /// The composer strip's branch (`T3GitFacts.branch` → one HEAD-file read)
     /// per project cwd, on a detached task and cached — the strip asks when it
     /// mounts on a thread, never on a timer. `reload` is the thread switch:
     /// the checkout may have moved since this cwd was last looked at.
@@ -397,6 +411,7 @@ final class T3WindowModel: ObservableObject {
                 next.apply(inputs, now: self.now, wallClock: Date())
                 if next != self.state { self.state = next }
                 self.pruneDrafts()
+                self.pruneFileDrops()
                 self.reconcileDraftStarts()
                 if let screen = self.focusedScreen { self.applyFocusedScreen(screen) }
                 self.syncTimelineStore()
@@ -406,6 +421,36 @@ final class T3WindowModel: ObservableObject {
     }
 
     func select(_ threadId: String?) { state.select(threadId, now: now); syncTimelineStore() }
+
+    // MARK: - Sidebar file drops (`bde39d4d7`)
+
+    /// A sidebar row took a drop of files (`handleThreadFileDrop`,
+    /// `Sidebar.tsx:2784-2818`): the thread opens and its composer stages the
+    /// files. The queue is filled BEFORE the selection, so the composer that
+    /// mounts on the new thread already finds them in `onAppear`.
+    func dropFiles(_ urls: [URL], onto threadId: String) {
+        guard !urls.isEmpty else { return }
+        pendingFileDrops[threadId, default: []] += urls
+        // `landedBefore` (`:2795-2800`): the row of the open thread needs no
+        // navigation, and re-selecting would re-stamp its visit.
+        if state.selectedThreadId != threadId { select(threadId) }
+    }
+
+    /// The composer's side of it, oldest file first; the entry is gone
+    /// afterwards (`consumePendingFileDrop`).
+    func takeFileDrops(for threadId: String) -> [URL] {
+        pendingFileDrops.removeValue(forKey: threadId) ?? []
+    }
+
+    /// `clearPendingFileDropsForThread` (`_chat.$environmentId.$threadId.tsx:66-75`):
+    /// a thread that has gone missing can never take its drop, so the files
+    /// are released instead of surprising the user in some later composer.
+    private func pruneFileDrops() {
+        guard !pendingFileDrops.isEmpty else { return }
+        let live = Set(state.threads.map(\.id))
+        let next = pendingFileDrops.filter { live.contains($0.key) }
+        if next.count != pendingFileDrops.count { pendingFileDrops = next }
+    }
     func toggleSidebar() { state.sidebarCollapsed.toggle() }
     func toggleRightPanel() { state.rightPanelOpen.toggle() }
     func setScope(_ s: T3SidebarScope) { state.scope = s }
