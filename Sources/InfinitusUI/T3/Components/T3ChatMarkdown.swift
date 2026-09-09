@@ -28,12 +28,28 @@ import AppKit
 public struct T3ChatMarkdown: View {
     @Environment(\.t3) private var t3
     public let text: String
-    public init(text: String) { self.text = text }
+    /// The surface is `text-foreground/80` (`ChatMarkdown.tsx:3129`); a caller
+    /// overrides it the way the user bubble does
+    /// (`className="text-message-foreground"`, `MessagesTimeline.tsx:2446`).
+    private let foreground: Color?
+    public init(text: String, foreground: Color? = nil) {
+        self.text = text
+        self.foreground = foreground
+    }
 
     private var p: T3Theme.WebPalette { t3.web }
+    private var textColor: Color { foreground ?? p.foreground.color.opacity(0.8) }
+
+    /// `leading-relaxed` on the surface (`:3129`): a 22.75 px line box under
+    /// the 14 px body. SwiftUI's `.lineSpacing` is the gap ADDED to the font's
+    /// own line height — SF at 14 pt is ~16.7 — so the scale step's 6 lands
+    /// the pitch at ~22.7 pt.
+    private static let bodyLineSpacing = T3TypeScale.lineSpacing(T3TypeScale.Web.sm.step)
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // `margin: 0.65rem 0` on every block (index.css:1642-1648); adjacent
+        // margins collapse to one gap.
+        VStack(alignment: .leading, spacing: 0.65 * 16) {
             ForEach(Array(MarkdownBlocks.parse(text).enumerated()), id: \.offset) { _, block in
                 render(block)
             }
@@ -54,7 +70,8 @@ public struct T3ChatMarkdown: View {
                 Image(systemName: done ? "checkmark.square" : "square")
                     .font(.system(size: 13))
                     .foregroundStyle(p.mutedForeground.color)
-                inline(text, font: T3Font.web(.sm), color: p.messageForeground.color)
+                inline(text, font: T3Font.web(.sm), color: textColor)
+                    .lineSpacing(Self.bodyLineSpacing)
             }
         case .numbered(indent: let indent, let number, let text):
             listRow(marker: "\(number).", text: text)
@@ -69,7 +86,8 @@ public struct T3ChatMarkdown: View {
         case .table(let header, let rows):
             Table(header: header, rows: rows, palette: p)
         case .paragraph(let text):
-            inline(text, font: T3Font.web(.sm), color: p.messageForeground.color)
+            inline(text, font: T3Font.web(.sm), color: textColor)
+                .lineSpacing(Self.bodyLineSpacing)
         }
     }
 
@@ -85,8 +103,9 @@ public struct T3ChatMarkdown: View {
 
     private func listRow(marker: String, text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(marker).font(T3Font.web(.sm)).foregroundStyle(p.messageForeground.color)
-            inline(text, font: T3Font.web(.sm), color: p.messageForeground.color)
+            Text(marker).font(T3Font.web(.sm)).foregroundStyle(textColor)
+            inline(text, font: T3Font.web(.sm), color: textColor)
+                .lineSpacing(Self.bodyLineSpacing)
         }
     }
 

@@ -186,7 +186,7 @@ private struct T3UserTimelineRow: View {
             // `max-h-44 overflow-hidden` (176) under the
             // `COLLAPSED_USER_MESSAGE_FADE_MASK` — black to transparent over
             // the last 1.75 rem (28) (`:2345-2346`).
-            T3ChatMarkdown(text: text)
+            T3ChatMarkdown(text: text, foreground: t3.web.messageForeground.color)
                 .frame(maxHeight: 176, alignment: .top)
                 .clipped()
                 .mask(LinearGradient(stops: [.init(color: .black, location: 0),
@@ -194,7 +194,9 @@ private struct T3UserTimelineRow: View {
                                              .init(color: .clear, location: 1)],
                                      startPoint: .top, endPoint: .bottom))
         } else {
-            T3ChatMarkdown(text: text)
+            // `className="text-message-foreground"` (`:2446`) — the bubble
+            // overrides the surface's `text-foreground/80`.
+            T3ChatMarkdown(text: text, foreground: t3.web.messageForeground.color)
         }
     }
 

@@ -126,8 +126,15 @@ struct T3ThreadView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        // `TIMELINE_LIST_HEADER` (`:240`): `h-3 sm:h-4`.
-                        Color.clear.frame(height: 16)
+                        // `TIMELINE_LIST_FADE_HEADER` (`:241`):
+                        // `--workspace-titlebar-scroll-fade-height` (1.5 rem,
+                        // index.css:114). `ChatView.tsx:7977` passes
+                        // `topFadeEnabled={!hasTimelineTopBanner}`, so this is
+                        // the ordinary header — `TIMELINE_LIST_HEADER`'s
+                        // `h-3 sm:h-4` (16) belongs to the banner state, which
+                        // this window has no timeline slot for. (The fade mask
+                        // itself is in the not-ported list above.)
+                        Color.clear.frame(height: 24)
                         // Hoisted out of the row closure: `rows.last(where:)`
                         // is O(n) and was running once PER row (O(n^2) over
                         // the timeline) to answer the same question every time.
