@@ -87,6 +87,20 @@ final class LiveActivityPusher: ObservableObject {
         persist()
     }
 
+    /// A phone forgotten in Settings › Devices: nothing is pushed to it
+    /// any more. It registers afresh if it opens the app again.
+    func forget(deviceId: String) {
+        let slots = registrations.values.filter { $0.deviceId == deviceId }.map(\.slot)
+        guard !slots.isEmpty else { return }
+        for slot in slots {
+            registrations[slot] = nil
+            lastWorking[slot] = nil
+            lastRevival[slot] = nil
+        }
+        log?("📲", "forgot \(slots.count) push token\(slots.count == 1 ? "" : "s") of a forgotten phone")
+        persist()
+    }
+
     private func persist() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

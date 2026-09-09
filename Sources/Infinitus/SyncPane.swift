@@ -18,6 +18,7 @@ struct SyncPane: View {
     @ObservedObject private var tunnel: QuickTunnel
     @ObservedObject private var named: NamedTunnel
     @ObservedObject private var pusher: LiveActivityPusher
+    @ObservedObject private var phones: PairedPhoneStore
     /// Typed hostname/token live here until Save: the model restarts the
     /// tunnel on a hostname change, and a half-typed one shouldn't.
     @State private var namedHost = ""
@@ -53,6 +54,7 @@ struct SyncPane: View {
         _tunnel = ObservedObject(wrappedValue: app.quickTunnel)
         _named = ObservedObject(wrappedValue: app.namedTunnel)
         _pusher = ObservedObject(wrappedValue: app.liveActivityPusher)
+        _phones = ObservedObject(wrappedValue: app.mirrorServer.phones)
     }
 
     var body: some View {
@@ -129,6 +131,22 @@ struct SyncPane: View {
                      + "falls through to Wi-Fi or Tailscale. Every request must carry the "
                      + "pairing token; the snapshot it answers with carries account names, "
                      + "emails and usage estimates, never tokens or push secrets.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Section {
+                if phones.phones.isEmpty {
+                    Text("No phone has paired yet \u{2014} scan the code above with each one.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    phoneRows
+                }
+            } header: {
+                Text("Phones")
+            } footer: {
+                Text("Every phone that has fetched with the pairing token, any number of them. "
+                     + "Forget drops the phone's push tokens from this Mac; it does not revoke "
+                     + "access while the token is shared \u{2014} the phone is listed again on its "
+                     + "next request. Regenerate the token above to cut every phone off.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             // The Tunnel group below shows once this Mac is serving — the
@@ -308,25 +326,35 @@ struct SyncPane: View {
         }
     }
 
-    /// Who is talking to the mirror (user 2026-09-03: "show active/
-    /// connected devices"): one row per phone, green while it has been
-    /// heard from inside MirrorClient.activeWindow, grey after.
-    private var connectedDevices: some View {
+    /// One row per phone this Mac has served (user 2026-09-03: "show
+    /// active/connected devices"; 2026-09-09: a list that survives a
+    /// relaunch, any number of phones): green while heard from inside
+    /// MirrorClient.activeWindow, grey after; what it holds on this Mac
+    /// from the pusher's registrations; Forget.
+    private var phoneRows: some View {
         TimelineView(.periodic(from: .now, by: 5)) { context in
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Connected devices").font(.caption.weight(.semibold))
-                ForEach(server.clients) { client in
-                    let active = client.isActive(now: context.date)
-                    HStack(spacing: 6) {
-                        Circle().fill(active ? Color.green : Color.secondary).frame(width: 7, height: 7)
-                        Text(client.name)
-                        Text("· \(client.route) · \(relative(client.lastSeen, now: context.date))")
-                            .foregroundStyle(.secondary)
+            ForEach(phones.phones.sorted { $0.lastSeen > $1.lastSeen }) { phone in
+                let kinds = Set(pusher.registrations.values.filter { $0.deviceId == phone.id }.map(\.kind))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Circle().fill(phone.isActive(now: context.date) ? Color.green : Color.secondary)
+                        .frame(width: 7, height: 7)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(phone.name)
+                            Text("\u{B7} \(phone.route) \u{B7} \(relative(phone.lastSeen, now: context.date))")
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(PairedPhones.pushSummary(kinds)).font(.caption).foregroundStyle(.secondary)
                     }
-                    .font(.caption)
+                    Spacer(minLength: 8)
+                    Button("Forget") {
+                        pusher.forget(deviceId: phone.id)
+                        phones.forget(id: phone.id)
+                    }
+                    .help("Drop this phone's push tokens and its row. It is listed again if it fetches again.")
                 }
+                .accessibilityElement(children: .combine)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -438,9 +466,6 @@ struct SyncPane: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 2)
-                }
-                if !server.clients.isEmpty {
-                    connectedDevices
                 }
                 // Hand the rest to an agent (user 2026-09-02): the same
                 // state as the checklist, plus the exact commands, as one
