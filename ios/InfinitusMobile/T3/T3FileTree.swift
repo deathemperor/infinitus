@@ -14,6 +14,22 @@ enum T3FileTree {
         var size: Int? = nil
     }
 
+    /// `GET /sessions/<pid>/files` (#223 Files proposal): the workspace, flat.
+    struct Listing: Codable, Equatable {
+        let cwd: String
+        let entries: [Entry]
+        let truncated: Bool
+    }
+
+    /// `GET /sessions/<pid>/file?path=`: one file's text, cut at the Mac's cap.
+    struct FileRead: Codable, Equatable {
+        let path: String
+        let contents: String
+        let byteLength: Int
+        let truncated: Bool
+        let mime: String
+    }
+
     final class Node: Equatable {
         let path: String
         let name: String

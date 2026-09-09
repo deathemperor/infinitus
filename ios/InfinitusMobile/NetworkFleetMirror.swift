@@ -382,7 +382,8 @@ actor NetworkFleetMirror: FleetMirror {
         try await postJSON(AccountAction.path, body: request)
     }
 
-    private func getJSON<R: Decodable>(_ path: String, dates: Bool = false) async throws -> R {
+    /// Internal, not private: the app-only T3 routes (Files) extend the client from their own file.
+    func getJSON<R: Decodable>(_ path: String, dates: Bool = false) async throws -> R {
         let token = pairToken()
         let data: Data
         if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) {

@@ -752,6 +752,9 @@ final class MirrorModel: ObservableObject, FleetModel {
     /// sheet up (`requestedThreadSheet`). Consumed by SessionsScreen.
     @Published var requestedT3Screen: String?
     @Published var requestedThreadSheet: String?
+    /// Text a pushed screen (Files → "Add to message") wants in the open
+    /// thread's composer; the thread appends it and clears this.
+    @Published var requestedComposerInsert: String?
     /// A per-Mac widget's tap (#144) asking the sessions list to scroll
     /// to that Mac's section; SessionsScreen consumes it.
     @Published var requestedSectionMacId: String?
