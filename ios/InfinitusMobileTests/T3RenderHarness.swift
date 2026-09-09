@@ -93,6 +93,16 @@ import InfinitusUI
         return .init(cwd: "/tmp/t3fix/proj/limitless", entries: e, truncated: false)
     }()
 
+    /// A 320×200 PNG, the top half one colour and the bottom another.
+    static let fixturePNG: Data = {
+        let size = CGSize(width: 320, height: 200)
+        let renderer = UIGraphicsImageRenderer(size: size, format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+        return renderer.pngData { ctx in
+            UIColor(red: 0.26, green: 0.42, blue: 0.86, alpha: 1).setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 320, height: 100))
+            UIColor(red: 0.95, green: 0.62, blue: 0.24, alpha: 1).setFill(); ctx.fill(CGRect(x: 0, y: 100, width: 320, height: 100))
+        }
+    }()
+
     /// Every block MarkdownText draws, for the markdown-* shots.
     static func richMarkdown() -> TimelineFollower.State {
         var state = conversation(running: false)
@@ -318,9 +328,15 @@ import InfinitusUI
         let source = T3ProjectFiles.FileRead(path: "Sources/Infinitus/InfinitusApp.swift",
                                          contents: (1...40).map { "let line\($0) = \"value \($0)\"  // a comment that runs a little long" }.joined(separator: "\n"),
                                          byteLength: 5200, truncated: false, mime: "text/x-swift")
-        let sourcePage = NavigationStack { T3SourceFileScreen(model: model, session: session, path: source.path, fixture: source) }
+        let sourcePage = NavigationStack { T3SourceFileScreen(model: model, session: session, path: source.path, fixture: .text(source)) }
             .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "source-file-dark", png: Self.render(sourcePage), dir: dir, test: self)
+        // An image answered as bytes (B-26): a 320×200 two-tone PNG.
+        let imagePage = NavigationStack {
+            T3SourceFileScreen(model: model, session: session, path: "docs/site/hero.png", fixture: .image(Self.fixturePNG))
+        }
+        .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "image-file-dark", png: Self.render(imagePage), dir: dir, test: self)
         let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         // refs/ios-files.png: the fixture project's dotfolders, top level open.
