@@ -293,6 +293,12 @@ struct InfinitusApp: App {
                                                    settings: settingsModel,
                                                    update: updateModel,
                                                    reliability: reliabilityModel))),
+        SettingsTab(title: "swapd", symbol: "bolt.horizontal",
+                    keywords: ["swapd", "engine", "provider", "claude", "codex",
+                               "kiro", "gemini", "preview", "rust"],
+                    provider: ProviderBadge(live: model.swapdRegistered
+                                            && model.engineErrors[SwapdEngine.engineID] == nil),
+                    view: AnyView(SwapdEnginePane(model: model))),
         SettingsTab(title: "CLIProxyAPI", symbol: "network",
                     keywords: ["proxy", "cliproxy", "router", "management",
                                "key", "engine", "provider", "claude"],

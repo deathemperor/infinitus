@@ -486,8 +486,10 @@ final class ControlServer {
             let (fleet, n) = try target(r)
             guard fleet.capabilities.contains(.ignite) else { throw Fail("\(fleet.id) cannot ignite (no per-account request verb)") }
             guard fleet.accounts.contains(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
-            try await fleet.engine.ignite(fleet: fleet.provider, number: n)
-            await model.refreshSnapshot()
+            // Publishes the fresh account itself when the engine can
+            // refresh one, so the reply carries the window the run just
+            // opened rather than the row from before it.
+            try await model.igniteAndPublish(fleet, number: n)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "add":
@@ -666,7 +668,7 @@ final class ControlServer {
 
         case "engine":
             guard r.args.count == 2, ["on", "off"].contains(r.args[1]) else {
-                throw Fail("usage: engine cswap|cliproxy|9router on|off")
+                throw Fail("usage: engine cswap|swapd|cliproxy|9router on|off")
             }
             let on = r.args[1] == "on"
             switch r.args[0] {
@@ -674,6 +676,10 @@ final class ControlServer {
                 guard model.cswap != nil || !on else { throw Fail("cswap is not installed") }
                 guard model.cswapEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
                 model.cswapEnabled = on
+            case "swapd":
+                guard model.swapd != nil || !on else { throw Fail("swapd is not installed") }
+                guard model.swapdEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
+                model.swapdEnabled = on
             case "cliproxy":
                 guard model.cliproxyKeyPresent || !on else { throw Fail("store a management key first (proxy-key)") }
                 guard model.cliproxyEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
@@ -785,6 +791,8 @@ final class ControlServer {
             engines: [
                 "cswap": EngineStatus(enabled: model.cswapEnabled, registered: model.cswapRegistered,
                                       keyPresent: nil),
+                "swapd": EngineStatus(enabled: model.swapdEnabled, registered: model.swapdRegistered,
+                                      keyPresent: nil),
                 "cliproxy": EngineStatus(enabled: model.cliproxyEnabled,
                                          registered: model.registry.engine(id: CLIProxyEngine.engineID) != nil,
                                          keyPresent: model.cliproxyKeyPresent),
@@ -805,6 +813,7 @@ final class ControlServer {
             (.addToken, "addToken"), (.addOAuth, "addOAuth"), (.autoSwitch, "autoSwitch"),
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
             (.prefer, "prefer"), (.ignite, "ignite"), (.backup, "backup"),
+            (.refreshAccount, "refreshAccount"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }
