@@ -58,3 +58,24 @@ final class SessionAttentionTests: XCTestCase {
                        .init(action: .pin, until: nil, commandId: "c1"))
     }
 }
+
+final class SessionAttentionRequestTests: XCTestCase {
+    /// A phone from before #391 sends no `sessionId`; the field decodes as absent.
+    func testRequestDecodesWithoutSessionId() throws {
+        let data = Data(#"{"action":"settle"}"#.utf8)
+        let request = try JSONDecoder().decode(SessionAttention.Request.self, from: data)
+        XCTAssertNil(request.sessionId)
+        XCTAssertEqual(request.action, .settle)
+    }
+
+    /// #391: the session id wins over the pid, because a pid reused after a
+    /// resume names a different session; the pid is only the fallback.
+    func testRecordResolvesBySessionIdFirst() {
+        let records = [ClaudeSessionRecord(pid: 10, sessionId: "A", cwd: "/a"),
+                       ClaudeSessionRecord(pid: 20, sessionId: "B", cwd: "/b")]
+        XCTAssertEqual(ClaudeSessions.record(pid: 10, sessionId: "B", in: records)?.sessionId, "B")
+        XCTAssertEqual(ClaudeSessions.record(pid: 10, sessionId: nil, in: records)?.sessionId, "A")
+        XCTAssertEqual(ClaudeSessions.record(pid: 99, sessionId: "B", in: records)?.sessionId, "B")
+        XCTAssertNil(ClaudeSessions.record(pid: 99, sessionId: nil, in: records))
+    }
+}

@@ -112,7 +112,7 @@ final class T3WindowModel: ObservableObject {
     /// actor, before detaching.
     func attention(_ action: AttentionStore.Action, threadId: String, until: Date? = nil) {
         guard let model, let pid = state.pid(of: threadId) else { return }
-        let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString)
+        let request = SessionAttention.Request(action: action, until: until, commandId: UUID().uuidString, sessionId: threadId)
         let timelineCache = model.timelineCache, attentionStore = model.attentionStore, ownedBox = model.ownedBox
         Task.detached(priority: .userInitiated) {
             _ = AppModel.applyAttention(pid: pid, request, timelineCache: timelineCache,
