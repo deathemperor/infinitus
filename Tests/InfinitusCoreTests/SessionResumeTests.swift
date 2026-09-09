@@ -102,6 +102,16 @@ final class SessionResumeTests: XCTestCase {
         XCTAssertFalse(Transcript.isLimitStop(nil))
     }
 
+    /// The 64 KB probe answers the common case; a stop buried under more
+    /// than that of progress lines is still found by the full tail (#346).
+    func testLastTurnEntryReachesPastTheProbeIntoTheFullTail() throws {
+        let filler = #"{"type":"progress","uuid":"p-x","pad":""# + String(repeating: "x", count: 4000) + #""}"#
+        try writeTranscript(cwd: "/p", id: "deep", lines: [userTurn, limitStop] + Array(repeating: filler, count: 40))
+        let entry = Transcript.lastTurnEntry(at: Transcript.path(cwd: "/p", sessionId: "deep", claudeDir: dir))
+        XCTAssertEqual(entry?["uuid"] as? String, "stop-1")
+        XCTAssertGreaterThan(40 * 4000, Transcript.probeBytes)
+    }
+
     func testFindStoppedIncludesSocketlessSessions() throws {
         try writeSession(pid: 11, id: "s1", cwd: "/p")                          // herdr-style, no socket
         try writeSession(pid: 12, id: "s2", cwd: "/p", socket: "/tmp/x.sock")
