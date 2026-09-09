@@ -62,6 +62,19 @@ plain `xcodebuild -destination 'generic/platform=iOS'` is a team-signed
 device build; add `-allowProvisioningUpdates` once so Xcode registers
 the three bundle ids and mints their profiles (the wizard's stage 5
 does, and installs with `devicectl`). CI's simulator job still passes
-`CODE_SIGNING_ALLOWED=NO` on the command line. TestFlight is not wired:
-it needs an App Store Connect app record and an archive/export, which
-flips `aps-environment` to production.
+`CODE_SIGNING_ALLOWED=NO` on the command line.
+
+`tools/ios-archive.sh` is the App Store lane (#143): a Release archive
+for `generic/platform=iOS`, exported with `ios/ExportOptions.plist`
+(method `app-store-connect`, automatic signing — the export flips
+`aps-environment` to production); `--build N` sets the build number
+TestFlight will not take twice, `--upload` sends it with the
+notarization API key (`NOTARY_KEY_ID` / `NOTARY_ISSUER_ID`, the `.p8` at
+`~/.private_keys/`; uploads need the App Manager role). Every bundle
+carries a `PrivacyInfo.xcprivacy` (UserDefaults CA92.1, file timestamps
+C617.1, nothing collected, no tracking). Human steps before the first
+export: the App Store Connect record for `run.infinitus.mobile`, one
+run with `--provision` to mint the Apple Distribution certificate and
+profiles, the App Privacy answers and the export-compliance question
+(Team sharing uses swift-crypto), screenshots and review notes on the
+Mac pairing — tracked on #10.
