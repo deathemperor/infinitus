@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Team (preview)
+- Teammates' data and transcript branches are fetched at their tip only, not with every chunk ever published behind them, and a removed member's branch disappears from the mirror; the roster keeps its history for the trust walk (#414).
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
