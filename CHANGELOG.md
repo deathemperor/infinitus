@@ -18,6 +18,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
+- Workspace: clicking a file in the Files tab previews it.
 - Workspace: the right panel's Files tab browses the thread's project.
 - Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
