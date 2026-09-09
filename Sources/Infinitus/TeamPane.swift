@@ -170,6 +170,7 @@ struct TeamPane: View {
     @State private var removeTarget: TeamSnapshot.Member?
     @State private var leaveConfirm = false
     @State private var reshareConfirm = false
+    @State private var compactConfirm = false
 
     private func inTeam(_ snap: TeamSnapshot) -> some View {
         Group {
@@ -183,6 +184,15 @@ struct TeamPane: View {
                     Button("Fetch now") { Task { await team.fetchNow() } }
                     Button("Publish now") { Task { await team.publishNow() } }
                     if snap.role == "pending" { Text("Waiting for a leader to approve you.").font(.caption).foregroundStyle(.secondary) }
+                }
+                if snap.role == "leader" {
+                    Button("Compact my branch…") { compactConfirm = true }
+                        .confirmationDialog("Compact your branch on the store?", isPresented: $compactConfirm) {
+                            Button("Compact") { Task { await team.compact() } }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Your member branch becomes a single commit without the transcript history from before the split. Teammates pick it up on their next fetch; a new member then downloads megabytes, not gigabytes.")
+                        }
                 }
             }
             if snap.role == "leader", !snap.requests.isEmpty {

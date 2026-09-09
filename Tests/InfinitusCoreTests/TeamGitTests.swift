@@ -54,6 +54,37 @@ final class TeamGitTests: XCTestCase {
         XCTAssertNil(StorePath.branch(of: "roster/../x"))
     }
 
+    /// #339: `compact` leaves one commit holding the tree minus the dropped
+    /// prefix, force-pushed; a mirror with an old cursor still reads it.
+    func testCompactRewritesTheBranchToOneCommitWithoutTheDroppedPrefix() throws {
+        let remote = try makeRemote()
+        let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
+        try a.open()
+        for v in 1...3 { try a.put("m/kid-a/now.json", Data("v\(v)".utf8)) }
+        try a.putAll(["m/kid-a/transcripts/s/1.jsonl": Data("old".utf8), "m/kid-a/transcripts/s/2.jsonl": Data("old2".utf8),
+                      "m/kid-a/days/2026-09-01.json": Data("d".utf8)])
+        let b = TeamGit(dir: scratch.appendingPathComponent("b"), remote: remote, token: nil, author: "kid-b")
+        try b.open()
+        let (_, cursor) = try b.changes(since: nil)
+        let bare = scratch.appendingPathComponent("remote.git").path
+
+        XCTAssertEqual(try a.compact(branch: "m/kid-a", dropping: "transcripts/"), 2)
+        XCTAssertEqual(try git(["--git-dir", bare, "rev-list", "--count", "refs/heads/m/kid-a"]).trimmingCharacters(in: .whitespacesAndNewlines), "1")
+        XCTAssertEqual(try a.list("m/kid-a/").map(\.path).sorted(), ["m/kid-a/days/2026-09-01.json", "m/kid-a/now.json"])
+        XCTAssertEqual(try a.get("m/kid-a/now.json"), Data("v3".utf8))
+        // Nothing to drop: a second compaction is a no-op rewrite that still reads back.
+        XCTAssertEqual(try a.compact(branch: "m/kid-a", dropping: "transcripts/"), 0)
+        // The other mirror follows, and its pre-rewrite cursor falls back to a full listing rather than failing.
+        try b.sync()
+        XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v3".utf8))
+        XCTAssertEqual(try b.list("m/kid-a/transcripts/"), [])
+        XCTAssertNoThrow(try b.changes(since: cursor))
+        // Writing on top of the compacted tip works.
+        try a.put("m/kid-a/now.json", Data("v4".utf8))
+        try b.sync()
+        XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v4".utf8))
+    }
+
     func testTwoClonesExchangeFilesThroughTheRemote() throws {
         let remote = try makeRemote()
         let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
