@@ -14,10 +14,11 @@ struct SettingsForm: View {
     /// One group of the Form, when the T3 settings sheet pushes it on
     /// its own page; nil is the whole Form (the Settings tab).
     enum Part: Hashable {
-        case macs, appearance, dictation, screenshots, notifications, team, about
+        case macs, usage, appearance, dictation, screenshots, notifications, team, about
         var title: String {
             switch self {
             case .macs: return "Macs"
+            case .usage: return "Usage"
             case .appearance: return "Appearance"
             case .dictation: return "Dictation"
             case .screenshots: return "Screenshots"

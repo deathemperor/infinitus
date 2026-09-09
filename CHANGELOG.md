@@ -47,6 +47,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - Home rows follow upstream: Working reads in the Mac's sky tint, a Mac with several accounts shows which one a session runs on beside the Claude mark, and settle, snooze and pin move the row as one transition.
+- Settings gains Usage: each Mac's 5-hour, weekly and per-model limits pooled across its accounts, with quota left, pace, the next refill and a per-account detail.
 - A thread no longer pulls you to the bottom while you read history: new rows follow only when you are at the end, and a scroll-to-end button appears beside the Working pill otherwise.
 - A thread whose session exits keeps its rows under a "This session has ended." banner instead of saying Reconnecting… forever (#400).
 - A thread's question card honors a question that withdrew the custom answer, drops the typed text once an option is picked, and refuses a multiple-choice custom answer that would read as two options instead of sending one the Mac rejects.

@@ -10,7 +10,7 @@ import InfinitusUI
 struct T3SettingsSheet: View {
     @ObservedObject var model: MirrorModel
     /// The pushed group; the harness seeds it to render a page.
-    @State var path: [SettingsForm.Part] = []
+    @State var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.t3) private var t3
 
@@ -24,6 +24,7 @@ struct T3SettingsSheet: View {
                         row(.laptop, "Macs", value: macCount == 0 ? "None" : "\(macCount)", part: .macs)
                     }
                     group("General") {
+                        row(.gauge, "Usage", part: .usage)
                         row(.palette, "Appearance", part: .appearance)
                         row(.messageSquare, "Dictation", part: .dictation)
                         row(.frame, "Screenshots", part: .screenshots)
@@ -38,9 +39,13 @@ struct T3SettingsSheet: View {
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) { header }
             .navigationDestination(for: SettingsForm.Part.self) { part in
-                SettingsForm(part: part, model: model)
-                    .navigationTitle(part.title)
-                    .navigationBarTitleDisplayMode(.inline)
+                if part == .usage {
+                    T3UsageScreen(model: model)
+                } else {
+                    SettingsForm(part: part, model: model)
+                        .navigationTitle(part.title)
+                        .navigationBarTitleDisplayMode(.inline)
+                }
             }
         }
         .presentationDragIndicator(.visible)
