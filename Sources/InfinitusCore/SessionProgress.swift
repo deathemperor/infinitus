@@ -113,8 +113,11 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// as a JSON object are skipped, never an error, same convention as
     /// Transcript/UsageHistory.
     public static func parse(lines: [String], now: Date = Date()) -> SessionProgress {
-        let entries = jsonEntries(lines)
+        parse(entries: jsonEntries(lines), now: now)
+    }
 
+    /// `parse` over entries already in hand (a `SessionTail`'s window).
+    static func parse(entries: [[String: Any]], now: Date = Date()) -> SessionProgress {
         var lastActivityAt: Date?
         for entry in entries.reversed() {
             if let ts = entry["timestamp"] as? String, let date = UsageHistory.parseISO(ts) {
@@ -286,20 +289,37 @@ public struct SessionProgress: Sendable, Equatable, Codable {
 
     /// One walk of the agent files for both providers (#367): each tail
     /// is read once and fed to both detectors.
+    typealias LoginNeeds = (aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?)
+
     static func subagentLoginNeeds(transcript: URL, now: Date = Date(), window: TimeInterval = subagentAwsLoginWindow)
-        -> (aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?) {
+        -> LoginNeeds {
         let subagentsDir = transcript.deletingPathExtension().appendingPathComponent("subagents")
+        var needs: [LoginNeeds] = []
+        for file in Transcript.agentFiles(under: subagentsDir) {
+            guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
+                .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
+            guard let lines = tailLines(of: file, maxBytes: subagentTailBytes) else { continue }
+            needs.append(loginNeeds(entries: jsonEntries(lines)))
+        }
+        return newest(needs)
+    }
+
+    static let subagentTailBytes = 128 * 1024
+
+    /// One tail's lapsed sign-in per provider.
+    static func loginNeeds(entries: [[String: Any]]) -> LoginNeeds {
+        (awsLoginNeed(entries: entries), gcloudLoginNeed(entries: entries))
+    }
+
+    /// The newest failure per provider across several tails' readings.
+    static func newest(_ needs: [LoginNeeds]) -> LoginNeeds {
         var aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?
         func newer(_ need: (profile: String, failedAt: Date?), than current: (profile: String, failedAt: Date?)?) -> Bool {
             current == nil || (need.failedAt ?? .distantPast) > (current?.failedAt ?? .distantPast)
         }
-        for file in Transcript.agentFiles(under: subagentsDir) {
-            guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
-                .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
-            guard let lines = tailLines(of: file, maxBytes: 128 * 1024) else { continue }
-            let entries = jsonEntries(lines)
-            if let need = awsLoginNeed(entries: entries), newer(need, than: aws) { aws = need }
-            if let need = gcloudLoginNeed(entries: entries), newer(need, than: gcloud) { gcloud = need }
+        for need in needs {
+            if let a = need.aws, newer(a, than: aws) { aws = a }
+            if let g = need.gcloud, newer(g, than: gcloud) { gcloud = g }
         }
         return (aws, gcloud)
     }
@@ -447,8 +467,18 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     public static func read(sessionId: String, cwd: String, claudeDir: URL,
                              name: String? = nil, maxBytes: Int = 512 * 1024) -> SessionProgress {
         let url = Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir)
-        let headGoal = readGoal(sessionId: sessionId, cwd: cwd, claudeDir: claudeDir)
-        let progress = parse(lines: tailLines(of: url, maxBytes: maxBytes) ?? [])
+        return assemble(entries: jsonEntries(tailLines(of: url, maxBytes: maxBytes) ?? []),
+                        headGoal: readGoal(at: url), transcript: url, name: name)
+    }
+
+    /// The progress off a tail's entries plus the head's goal — `read`
+    /// for a one-off, `SessionTail.progress` for a session read
+    /// incrementally.
+    /// `subagents`: the recent sub-agents' lapsed sign-ins when the caller
+    /// holds them (a `SessionTail`); nil walks the agent files afresh.
+    static func assemble(entries: [[String: Any]], headGoal: String?, transcript url: URL,
+                         name: String?, now: Date = Date(), subagents: LoginNeeds? = nil) -> SessionProgress {
+        let progress = parse(entries: entries, now: now)
         // The session's own tail wins; a sub-agent's lapsed sign-in (#149)
         // fills in only when the parent shows none.
         // One agent-file walk, only when the parent's tail leaves a
@@ -456,7 +486,7 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         var aws: (profile: String, failedAt: Date?)? = progress.awsLoginProfile.map { ($0, progress.awsLoginFailedAt) }
         var gcloud: (profile: String, failedAt: Date?)? = progress.gcloudLoginProfile.map { ($0, progress.gcloudLoginFailedAt) }
         if aws == nil || gcloud == nil {
-            let sub = subagentLoginNeeds(transcript: url)
+            let sub = subagents ?? subagentLoginNeeds(transcript: url, now: now)
             if aws == nil { aws = sub.aws }
             if gcloud == nil { gcloud = sub.gcloud }
         }
@@ -474,7 +504,10 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// the HEAD, the opposite end from everything else `read` extracts.
     public static func readGoal(sessionId: String, cwd: String, claudeDir: URL,
                                  maxBytes: Int = 64 * 1024) -> String? {
-        let url = Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir)
+        readGoal(at: Transcript.locate(cwd: cwd, sessionId: sessionId, claudeDir: claudeDir), maxBytes: maxBytes)
+    }
+
+    static func readGoal(at url: URL, maxBytes: Int = 64 * 1024) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let blob = try? handle.read(upToCount: maxBytes) else { return nil }
