@@ -129,6 +129,26 @@ chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
 export INFINITUS_AWS_PROBE_S=2
+# A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
+# SDK's paste-back prompt and reads the code; `auth print-access-token`
+# is the app's probe — signed in only once the gate says so.
+cat >"$SOCKDIR/gcloud" <<'STUB'
+#!/bin/sh
+if [ "$2" = "print-access-token" ]; then
+    [ -f "$(dirname "$0")/gcloud-probe-ok" ] && exit 0
+    echo "ERROR: (gcloud.auth.print-access-token) You do not currently have an active account selected."; exit 1
+fi
+echo "Go to the following link in your browser, and complete the sign-in prompts:"
+echo ""
+echo "    https://e2e.invalid/o/oauth2/auth?client_id=e2e"
+echo ""
+printf 'Once finished, enter the verification code provided in your browser: '
+read code
+[ "$code" = "E2E-GCLOUD-OK" ] || { echo "ERROR: (gcloud.auth.login) invalid_grant: Bad Request"; exit 1; }
+echo "You are now logged in as [e2e@example.com]."
+STUB
+chmod +x "$SOCKDIR/gcloud"
+export INFINITUS_GCLOUD_CLI="$SOCKDIR/gcloud"
 # The fake Claude session: a process with no tty (setsid, so the nudge
 # can't fall back to typing into THIS terminal) listening on the record's
 # messaging socket, writing every frame it receives to an inbox file.
@@ -325,8 +345,8 @@ echo "control: ok (dead socket path re-bound after ${i}s)"
 
 # --- AWS sign-in from the phone -------------------------------------------
 # The transcript scan surfaces the expired profile against the session.
-aws_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e-login' and l['pid']==$SESSION_PID for l in d['logins'])"; }
-aws_phase() { "$CTL" aws-logins | json "next((l.get('state') or {}).get('phase') for l in d['logins'] if l['profile']=='$1')"; }
+aws_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e-login' and l['pid']==$SESSION_PID and not l.get('provider') for l in d['logins'])"; }
+aws_phase() { "$CTL" aws-logins | json "next((l.get('state') or {}).get('phase') for l in d['logins'] if l['profile']=='$1' and not l.get('provider'))"; }
 i=0
 until aws_login_item; do
     i=$((i + 1)); [ "$i" -lt 60 ] || fail "expired AWS session never surfaced in aws-logins"
@@ -370,6 +390,42 @@ while pgrep -f "aws login --profile e2e-login" >/dev/null; do
 done
 grep -q "Your own .aws login. was stopped" "$INBOX" || fail "nudge does not say the session's own login was stopped"
 echo "aws: the session's own stuck login released, nudge says so"
+# --- gcloud sign-in from the phone (#367) --------------------------------
+# The same session's gcloud call dies on lapsed credentials: the need
+# surfaces as a gcloud item against the pid, the paste-back flow signs
+# in, the item clears, the session is nudged with the gcloud wording.
+TS2="$(python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
+cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
+{"type":"assistant","timestamp":"$TS2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_gc","name":"Bash","input":{"command":"gcloud storage ls --account=e2e@example.com"}}]}}
+{"type":"user","timestamp":"$TS2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_gc","content":"ERROR: (gcloud.storage.ls) There was a problem refreshing your current auth tokens: invalid_grant\nPlease run:\n\n  $ gcloud auth login\n\nto obtain new credentials."}]}}
+EOF
+gcloud_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e@example.com' and l['pid']==$SESSION_PID and l.get('provider')=='gcloud' for l in d['logins'])"; }
+gcloud_phase() { "$CTL" aws-logins | json "next((l.get('state') or {}).get('phase') for l in d['logins'] if l['profile']=='e2e@example.com' and l.get('provider')=='gcloud')"; }
+i=0
+until gcloud_login_item; do
+    i=$((i + 1)); [ "$i" -lt 60 ] || fail "lapsed gcloud credentials never surfaced in aws-logins"
+    sleep 1
+done
+echo "gcloud: need surfaced after ${i}s"
+"$CTL" gcloud-login e2e@example.com --remote --pid "$SESSION_PID" | expect "d['state']['flow']=='remote' and d['state']['provider']=='gcloud'" || fail "gcloud-login --remote"
+i=0
+until [ "$(gcloud_phase)" = "waitingForCode" ]; do
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud login never asked for the code (phase $(gcloud_phase))"
+    sleep 1
+done
+"$CTL" aws-logins | expect "next(l['state']['url'] for l in d['logins'] if l.get('provider')=='gcloud').startswith('https://e2e.invalid/')" || fail "no gcloud URL for the phone"
+printf 'E2E-GCLOUD-OK' | "$CTL" gcloud-login-code e2e@example.com >/dev/null || fail "gcloud-login-code"
+i=0
+while gcloud_login_item; do
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud need did not clear after the login (phase $(gcloud_phase))"
+    sleep 1
+done
+i=0
+until grep -q "gcloud login for e2e@example.com completed from the phone" "$INBOX" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "session never got the gcloud continue nudge"
+    sleep 1
+done
+echo "gcloud: code flow signed in, need cleared, session nudged"
 # Rebind refusal: the CLI asks to overwrite the profile's session; the
 # app answers n and reports which account it was bound to.
 "$CTL" aws-login e2e-rebind --remote >/dev/null || fail "aws-login e2e-rebind"

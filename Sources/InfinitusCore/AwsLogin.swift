@@ -36,6 +36,16 @@ public enum AwsLogin {
         case starting, waitingForBrowser, waitingForCode, done, failed
     }
 
+    /// Which CLI a login is for (#367). Absent on the wire and in the
+    /// ledger means `.aws` — phones and entries from before the field.
+    public enum Provider: String, Codable, Sendable, CaseIterable {
+        case aws, gcloud
+    }
+
+    /// One runner slot per (provider, profile): "default" is a name
+    /// both CLIs use.
+    public static func runKey(provider: Provider, profile: String) -> String { "\(provider.rawValue):\(profile)" }
+
     /// One login in flight (or just finished), as the runner reports it.
     public struct State: Codable, Sendable, Equatable {
         public let profile: String
@@ -52,9 +62,13 @@ public enum AwsLogin {
         public let startedAt: Double
         /// The session that needed it, if the login was started for one.
         public let pid: Int?
+        /// nil = aws (see `Provider`).
+        public let provider: Provider?
+        public var providerOrAws: Provider { provider ?? .aws }
+        public var runKey: String { AwsLogin.runKey(provider: providerOrAws, profile: profile) }
         public init(profile: String, flow: Flow, phase: Phase = .starting, url: String? = nil,
                     userCode: String? = nil, callbackPort: Int? = nil, message: String? = nil,
-                    startedAt: Double, pid: Int?) {
+                    startedAt: Double, pid: Int?, provider: Provider? = nil) {
             self.profile = profile
             self.flow = flow
             self.phase = phase
@@ -64,13 +78,16 @@ public enum AwsLogin {
             self.message = message
             self.startedAt = startedAt
             self.pid = pid
+            self.provider = provider
         }
     }
 
     /// What the snapshot carries: every session that needs a login,
     /// merged with the runner's state for that profile.
     public struct Item: Codable, Sendable, Equatable, Identifiable {
-        public var id: String { "\(profile)|\(pid ?? 0)" }
+        /// The aws id is byte-identical to before the provider field —
+        /// it is persisted in the announced-pushes set.
+        public var id: String { (provider == .gcloud ? "gcloud:" : "") + "\(profile)|\(pid ?? 0)" }
         public let profile: String
         /// The flow the phone would start (`.remote` / `.deviceCode`).
         public let flow: Flow
@@ -85,8 +102,12 @@ public enum AwsLogin {
         /// The account id (and IAM user name) the sign-in page asks for,
         /// from the profile's config; nil when the config names none.
         public let account: Account?
+        /// nil = aws (see `Provider`).
+        public let provider: Provider?
+        public var providerOrAws: Provider { provider ?? .aws }
+        public var runKey: String { AwsLogin.runKey(provider: providerOrAws, profile: profile) }
         public init(profile: String, flow: Flow, pid: Int?, sessionLabel: String?, state: State?,
-                    failedAt: Date? = nil, account: Account? = nil) {
+                    failedAt: Date? = nil, account: Account? = nil, provider: Provider? = nil) {
             self.profile = profile
             self.flow = flow
             self.pid = pid
@@ -94,6 +115,7 @@ public enum AwsLogin {
             self.state = state
             self.failedAt = failedAt
             self.account = account
+            self.provider = provider
         }
     }
 
@@ -159,11 +181,14 @@ public enum AwsLogin {
         /// Paste-back (`aws login --remote`) instead of the relay — for a
         /// client without an intercepting web view.
         public let remote: Bool?
-        public init(profile: String, pid: Int? = nil, local: Bool? = nil, remote: Bool? = nil) {
+        /// nil = aws (see `Provider`).
+        public let provider: Provider?
+        public init(profile: String, pid: Int? = nil, local: Bool? = nil, remote: Bool? = nil, provider: Provider? = nil) {
             self.profile = profile
             self.pid = pid
             self.local = local
             self.remote = remote
+            self.provider = provider
         }
     }
 
@@ -171,9 +196,12 @@ public enum AwsLogin {
     public struct CodeRequest: Codable, Sendable, Equatable {
         public let profile: String
         public let code: String
-        public init(profile: String, code: String) {
+        /// nil = aws (see `Provider`).
+        public let provider: Provider?
+        public init(profile: String, code: String, provider: Provider? = nil) {
             self.profile = profile
             self.code = code
+            self.provider = provider
         }
     }
 
@@ -182,9 +210,12 @@ public enum AwsLogin {
     public struct CallbackRequest: Codable, Sendable, Equatable {
         public let profile: String
         public let url: String
-        public init(profile: String, url: String) {
+        /// nil = aws (see `Provider`).
+        public let provider: Provider?
+        public init(profile: String, url: String, provider: Provider? = nil) {
             self.profile = profile
             self.url = url
+            self.provider = provider
         }
     }
 
@@ -487,7 +518,12 @@ public enum AwsLogin {
     /// runs, so a dev instance on its own stub never touches the real
     /// app's logins.
     public static func orphanLogins(ps: String, aws: String) -> [Int32] {
-        let marker = "script -q /dev/null \(aws) login"
+        orphanLogins(ps: ps, marker: "script -q /dev/null \(aws) login")
+    }
+
+    /// The same sweep for any wrapped login command line (#367: gcloud's
+    /// is `script -q /dev/null <gcloud> auth login`).
+    public static func orphanLogins(ps: String, marker: String) -> [Int32] {
         return ps.split(separator: "\n").compactMap { line in
             let fields = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
             guard fields.count == 3, let pid = Int32(fields[0]), fields[1] == "1",

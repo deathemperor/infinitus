@@ -2,7 +2,9 @@ import Foundation
 import InfinitusCore
 
 /// Runs the AWS CLI sign-in for a profile and reports its prompts
-/// (AwsLogin.swift). One process per profile at a time; the CLI runs
+/// (AwsLogin.swift) — and gcloud's (#367, GcloudLogin.swift): every
+/// slot is keyed by (provider, profile), `AwsLogin.runKey`. One process
+/// per slot at a time; the CLI runs
 /// under `script` so its prompts behave as on a terminal, with the code
 /// written to its stdin and nothing else. Output is parsed for the URL /
 /// code / success line only — never logged whole.
@@ -14,6 +16,7 @@ actor AwsLoginRunner {
         var state: AwsLogin.State
     }
 
+    /// Keyed by `AwsLogin.runKey` (provider + profile).
     private var runs: [String: Run] = [:]
     private var finished: [String: AwsLogin.State] = [:]
     /// Every CLI still running, reachable without hopping onto the actor:
@@ -47,7 +50,7 @@ actor AwsLoginRunner {
         self.onDone = onDone
         self.ledgerURL = ledgerURL
         if let ledgerURL, let data = try? Data(contentsOf: ledgerURL) {
-            for state in AwsLogin.Ledger.decode(data) { finished[state.profile] = state }
+            for state in AwsLogin.Ledger.decode(data) { finished[state.runKey] = state }
         }
         if !finished.isEmpty { onChange(Array(finished.values)) }
         Task.detached(priority: .utility) { Self.sweepOrphans() }
@@ -57,9 +60,12 @@ actor AwsLoginRunner {
     /// each holds the cred broker's refresh lock, so every caller on
     /// that profile fails until it dies. Once, at launch, off the actor.
     nonisolated static func sweepOrphans() {
-        let aws = ProcessInfo.processInfo.environment["INFINITUS_AWS_CLI"] ?? Subprocess.find(awsCandidates) ?? "aws"
         guard let ps = try? Subprocess.run("/bin/ps", ["-axo", "pid=,ppid=,command="]) else { return }
-        for pid in AwsLogin.orphanLogins(ps: ps, aws: aws) {
+        let markers = AwsLogin.Provider.allCases.compactMap { provider in
+            // `auth ` covers `auth login` and `auth application-default login`.
+            cli(provider).map { "script -q /dev/null \($0) " + (provider == .aws ? "login" : "auth ") }
+        }
+        for pid in markers.flatMap({ AwsLogin.orphanLogins(ps: ps, marker: $0) }) {
             kill(pid, SIGTERM)
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) {
                 if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
@@ -72,36 +78,77 @@ actor AwsLoginRunner {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/aws").path,
         "/usr/bin/aws",
     ]
+    /// The SDK's installer unpacks `google-cloud-sdk/` wherever the user
+    /// ran it — home, or one folder down (`~/death/google-cloud-sdk`).
+    static let gcloudCandidates: [String] = {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let oneDown = ((try? FileManager.default.contentsOfDirectory(atPath: home.path)) ?? []).sorted()
+            .map { home.appendingPathComponent($0).appendingPathComponent("google-cloud-sdk/bin/gcloud").path }
+        return ["/opt/homebrew/bin/gcloud", "/usr/local/bin/gcloud",
+                "/opt/homebrew/share/google-cloud-sdk/bin/gcloud", "/usr/local/share/google-cloud-sdk/bin/gcloud",
+                home.appendingPathComponent("google-cloud-sdk/bin/gcloud").path] + oneDown
+    }()
 
-    func states() -> [AwsLogin.State] {
-        Array(runs.values.map(\.state)) + finished.values.filter { s in runs[s.profile] == nil }
+    /// The CLI for a provider: the e2e stub (`INFINITUS_AWS_CLI` /
+    /// `INFINITUS_GCLOUD_CLI`), a known install spot, else wherever the
+    /// user's login shell finds it (the SDK's installer drops it in a
+    /// folder of the user's choosing and only edits the shell rc). The
+    /// shell lookup runs once.
+    nonisolated static func cli(_ provider: AwsLogin.Provider) -> String? {
+        if let stub = ProcessInfo.processInfo.environment[provider.cliOverrideEnv] { return stub }
+        if let found = Subprocess.find(provider == .aws ? awsCandidates : gcloudCandidates) { return found }
+        return shellPath.value(provider.cliName)
+    }
+    private static let shellPath = ShellPathCache()
+    private final class ShellPathCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var known: [String: String?] = [:]
+        func value(_ name: String) -> String? {
+            lock.lock(); if let hit = known[name] { lock.unlock(); return hit }; lock.unlock()
+            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            // Interactive AND login: the SDK installer puts its PATH line
+            // in .zshrc, which a plain login shell never reads. The last
+            // line: a chatty rc file prints before the answer; the run's
+            // timeout bounds an rc that never returns.
+            let out = (try? Subprocess.run(shell, ["-lic", "command -v \(name)"]))?
+                .split(separator: "\n").last.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            let path = (out?.hasPrefix("/") == true && FileManager.default.isExecutableFile(atPath: out!)) ? out : nil
+            lock.lock(); known[name] = path; lock.unlock()
+            return path
+        }
     }
 
-    func state(profile: String) -> AwsLogin.State? { runs[profile]?.state ?? finished[profile] }
+    func states() -> [AwsLogin.State] {
+        Array(runs.values.map(\.state)) + finished.values.filter { s in runs[s.runKey] == nil }
+    }
+
+    func state(provider: AwsLogin.Provider = .aws, profile: String) -> AwsLogin.State? {
+        let key = AwsLogin.runKey(provider: provider, profile: profile)
+        return runs[key]?.state ?? finished[key]
+    }
 
     /// Starts the flow, or returns the login already in flight for that
     /// profile. `pid` is the session to nudge when it lands.
-    func start(profile: String, flow: AwsLogin.Flow, pid: Int?) -> AwsLogin.Reply {
-        if let run = runs[profile] {
+    func start(provider: AwsLogin.Provider = .aws, profile: String, flow: AwsLogin.Flow, pid: Int?) -> AwsLogin.Reply {
+        let key = AwsLogin.runKey(provider: provider, profile: profile)
+        if let run = runs[key] {
             // Same flow: the login already in flight. Another flow (the
             // phone's "Use a code" after the relay page couldn't do a
             // passkey, 2026-09-03): drop the old CLI and start over.
             if run.state.flow == flow { return AwsLogin.Reply(ok: true, state: run.state) }
-            runs[profile] = nil
+            runs[key] = nil
             run.process.terminationHandler = nil
             run.process.terminate()
             live.remove(run.process)
         }
-        // INFINITUS_AWS_CLI: the e2e gate's stub in place of the real CLI.
-        guard let aws = ProcessInfo.processInfo.environment["INFINITUS_AWS_CLI"]
-                ?? Subprocess.find(Self.awsCandidates) else {
-            return AwsLogin.Reply(ok: false, error: "aws CLI not found")
+        guard let cli = Self.cli(provider) else {
+            return AwsLogin.Reply(ok: false, error: "\(provider.cliName) CLI not found")
         }
         let process = Process()
         // `script -q /dev/null <cmd>`: a pty for the CLI, so its prompt
         // reads the pasted code the way it would from a terminal.
         process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
-        process.arguments = ["-q", "/dev/null", aws] + AwsLogin.arguments(profile: profile, flow: flow)
+        process.arguments = ["-q", "/dev/null", cli] + provider.arguments(profile: profile, flow: flow)
         var env = ProcessInfo.processInfo.environment
         env["AWS_PAGER"] = ""
         env["NO_COLOR"] = "1"
@@ -113,49 +160,51 @@ actor AwsLoginRunner {
         process.standardInput = stdin
         process.standardOutput = out
         process.standardError = out
-        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970, pid: pid)
+        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970, pid: pid,
+                                   provider: provider == .aws ? nil : provider)
         out.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let self else { return }
             let chunk = String(decoding: data, as: UTF8.self)
-            Task { await self.consume(profile: profile, process: process, chunk: chunk) }
+            Task { await self.consume(key: key, process: process, chunk: chunk) }
         }
         process.terminationHandler = { [weak self] proc in
             out.fileHandleForReading.readabilityHandler = nil
             guard let self else { return }
-            Task { await self.ended(profile: profile, process: proc, status: proc.terminationStatus) }
+            Task { await self.ended(key: key, process: proc, status: proc.terminationStatus) }
         }
         do {
             try process.run()
         } catch {
-            return AwsLogin.Reply(ok: false, error: "could not start aws: \(error.localizedDescription)")
+            return AwsLogin.Reply(ok: false, error: "could not start \(provider.cliName): \(error.localizedDescription)")
         }
         live.add(process)
-        runs[profile] = Run(process: process, stdin: stdin, state: state)
-        finished[profile] = nil
+        runs[key] = Run(process: process, stdin: stdin, state: state)
+        finished[key] = nil
         publish()
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(AwsLogin.timeout))
-            await self?.expire(profile: profile)
+            await self?.expire(key: key)
         }
         return AwsLogin.Reply(ok: true, state: state)
     }
 
     /// Writes the pasted code to the waiting `--remote` flow.
-    func submit(profile: String, code: String) -> AwsLogin.Reply {
-        guard var run = runs[profile] else {
-            return AwsLogin.Reply(ok: false, state: finished[profile], error: "no login in flight for \(profile)")
+    func submit(provider: AwsLogin.Provider = .aws, profile: String, code: String) -> AwsLogin.Reply {
+        let key = AwsLogin.runKey(provider: provider, profile: profile)
+        guard var run = runs[key] else {
+            return AwsLogin.Reply(ok: false, state: finished[key], error: "no login in flight for \(profile)")
         }
         guard run.state.flow == .remote else {
             return AwsLogin.Reply(ok: false, state: run.state, error: "this flow takes no code")
         }
         guard AwsLogin.isValidCode(code) else { return AwsLogin.Reply(ok: false, state: run.state, error: "invalid code") }
         guard Self.write(code + "\n", to: run) else {
-            return AwsLogin.Reply(ok: false, state: run.state, error: "the aws CLI is no longer waiting for a code")
+            return AwsLogin.Reply(ok: false, state: run.state, error: "the \(provider.cliName) CLI is no longer waiting for a code")
         }
         run.state.phase = .waitingForBrowser
         run.state.message = "code submitted"
-        runs[profile] = run
+        runs[key] = run
         publish()
         return AwsLogin.Reply(ok: true, state: run.state)
     }
@@ -178,8 +227,9 @@ actor AwsLoginRunner {
     /// Replays the redirect the phone intercepted against the CLI's own
     /// localhost listener; the CLI then finishes the exchange itself.
     func relay(profile: String, url: String) async -> AwsLogin.Reply {
-        guard var run = runs[profile] else {
-            return AwsLogin.Reply(ok: false, state: finished[profile], error: "no login in flight for \(profile)")
+        let key = AwsLogin.runKey(provider: .aws, profile: profile)
+        guard var run = runs[key] else {
+            return AwsLogin.Reply(ok: false, state: finished[key], error: "no login in flight for \(profile)")
         }
         guard run.state.flow == .relay || run.state.flow == .local, let port = run.state.callbackPort else {
             return AwsLogin.Reply(ok: false, state: run.state, error: "this flow takes no callback")
@@ -193,17 +243,17 @@ actor AwsLoginRunner {
             return AwsLogin.Reply(ok: false, state: run.state, error: "callback not accepted: \(error.localizedDescription)")
         }
         run.state.message = "callback relayed"
-        runs[profile] = run
+        runs[key] = run
         publish()
         return AwsLogin.Reply(ok: true, state: run.state)
     }
 
-    private func consume(profile: String, process: Process, chunk: String) {
+    private func consume(key: String, process: Process, chunk: String) {
         // A replaced CLI's last output must not land on its successor.
-        guard var run = runs[profile], run.process === process else { return }
+        guard var run = runs[key], run.process === process else { return }
         run.output += chunk
         if run.output.count > 64 * 1024 { run.output = String(run.output.suffix(32 * 1024)) }
-        let prompt = AwsLogin.parseOutput(run.output)
+        let prompt = run.state.providerOrAws.parseOutput(run.output)
         if let url = prompt.url, run.state.url == nil {
             run.state.url = url
             run.state.phase = .waitingForBrowser
@@ -222,14 +272,14 @@ actor AwsLoginRunner {
             run.state.message = refusal
             _ = Self.write("n\n", to: run)
         }
-        runs[profile] = run
+        runs[key] = run
         publish()
     }
 
-    private func ended(profile: String, process: Process, status: Int32) {
+    private func ended(key: String, process: Process, status: Int32) {
         live.remove(process)
-        guard var run = runs[profile], run.process === process else { return }
-        let prompt = AwsLogin.parseOutput(run.output)
+        guard var run = runs[key], run.process === process else { return }
+        let prompt = run.state.providerOrAws.parseOutput(run.output)
         if status == 0 || prompt.succeeded {
             run.state.phase = .done
             run.state.message = "signed in"
@@ -241,17 +291,17 @@ actor AwsLoginRunner {
             let last = run.output.replacingOccurrences(of: "\r", with: "\n")
                 .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
                 .last { !$0.isEmpty && !$0.hasPrefix("https://") && !$0.lowercased().hasPrefix("enter the authorization") }
-            run.state.message = last.map { String($0.prefix(160)) } ?? "aws exited \(status)"
+            run.state.message = last.map { String($0.prefix(160)) } ?? "\(run.state.providerOrAws.cliName) exited \(status)"
         }
         try? run.stdin.fileHandleForWriting.close()
-        runs[profile] = nil
-        finished[profile] = run.state
+        runs[key] = nil
+        finished[key] = run.state
         publish()
         if run.state.phase == .done { onDone(run.state) }
     }
 
-    private func expire(profile: String) {
-        guard let run = runs[profile], run.process.isRunning else { return }
+    private func expire(key: String) {
+        guard let run = runs[key], run.process.isRunning else { return }
         run.process.terminate()
         // `script` can sit on its pty past SIGTERM; SIGKILL after a grace
         // (a wrapper found alive 1d 21h after its 600 s, #274).
@@ -264,26 +314,33 @@ actor AwsLoginRunner {
     /// Records a profile as signed in without a run of its own — its need
     /// was met by another profile's login — so the need clears and the
     /// sessions on it get their nudge.
-    func markDone(profile: String, via: String) {
-        guard runs[profile] == nil else { return }
-        finished[profile] = AwsLogin.State(profile: profile, flow: .local, phase: .done,
-                                           message: "signed in with \(via)",
-                                           startedAt: Date().timeIntervalSince1970, pid: nil)
+    func markDone(provider: AwsLogin.Provider = .aws, profile: String, via: String) {
+        let key = AwsLogin.runKey(provider: provider, profile: profile)
+        guard runs[key] == nil else { return }
+        finished[key] = AwsLogin.State(profile: profile, flow: .local, phase: .done,
+                                       message: "signed in with \(via)",
+                                       startedAt: Date().timeIntervalSince1970, pid: nil,
+                                       provider: provider == .aws ? nil : provider)
         publish()
     }
 
     /// Whether the profile's credentials work right now: `aws sts
-    /// get-caller-identity`, nothing interactive (no browser, no stdin),
-    /// 30 s at most. Off the actor — a broker profile can take a while.
-    nonisolated static func signedIn(profile: String) async -> Bool {
-        guard let aws = ProcessInfo.processInfo.environment["INFINITUS_AWS_CLI"]
-                ?? Subprocess.find(awsCandidates) else { return false }
+    /// get-caller-identity` / `gcloud auth print-access-token`, nothing
+    /// interactive (no browser, no stdin, no prompts), by exit status
+    /// only — gcloud's prints the token, so stdout stays on the null
+    /// device. 30 s at most. Off the actor — a broker profile can take
+    /// a while.
+    nonisolated static func signedIn(provider: AwsLogin.Provider = .aws, profile: String) async -> Bool {
+        guard let cli = cli(provider) else { return false }
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: aws)
-        process.arguments = ["sts", "get-caller-identity", "--profile", profile]
+        process.executableURL = URL(fileURLWithPath: cli)
+        process.arguments = provider == .aws ? ["sts", "get-caller-identity", "--profile", profile]
+                                             : GcloudLogin.probeArguments(profile: profile)
         var env = ProcessInfo.processInfo.environment
         env["AWS_PAGER"] = ""
         env["BROWSER"] = "/usr/bin/true"
+        env["CLOUDSDK_CORE_DISABLE_PROMPTS"] = "1"
+        env["NO_GCE_CHECK"] = "true"
         process.environment = env
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
@@ -330,8 +387,8 @@ actor AwsLoginRunner {
         return released
     }
 
-    func forget(profile: String) {
-        finished[profile] = nil
+    func forget(provider: AwsLogin.Provider = .aws, profile: String) {
+        finished[AwsLogin.runKey(provider: provider, profile: profile)] = nil
         publish()
     }
 
