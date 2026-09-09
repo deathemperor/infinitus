@@ -17,8 +17,8 @@ struct T3UsageScreen: View {
     @State private var now = Date()
     enum Tab: Hashable { case usage, limits }
     @State private var tab: Tab = .usage
-    /// Another Mac's report, decoded once per snapshot (`loadIfNeeded`
-    /// does the same for the primary's); keyed by Mac id → capture time.
+    /// Another Mac's report, decoded once per snapshot; keyed by Mac id →
+    /// capture time (the primary's sits on its fleet, see `decodeReports`).
     @State private var otherReports: [String: (Date, UsageReport?)] = [:]
     /// nil = every Mac; otherwise the Macs kept (nil member = this phone's primary).
     @State private var selectedMacs: Set<String?>? = nil
@@ -51,7 +51,11 @@ struct T3UsageScreen: View {
         }
     }
 
-    private func decodeOtherReports() {
+    /// The primary's report lives on its fleet and decodes on demand
+    /// (`loadIfNeeded`, the old Fleet screen's onAppear) — this screen is
+    /// the only T3 reader, so it asks itself; another Mac's decodes here.
+    private func decodeReports() {
+        for fleet in model.fleets { fleet.loadIfNeeded() }
         for mac in model.others {
             guard let snapshot = mac.snapshot, otherReports[mac.id]?.0 != snapshot.capturedAt else { continue }
             otherReports[mac.id] = (snapshot.capturedAt, snapshot.usageJSON.flatMap { try? JSONDecoder().decode(UsageReport.self, from: $0) })
@@ -96,8 +100,8 @@ struct T3UsageScreen: View {
             await model.refresh(macId: model.others.first?.id)
             now = Date()
         }
-        .onAppear { now = Date(); decodeOtherReports() }
-        .onChange(of: model.others.map { $0.snapshot?.capturedAt }) { _, _ in decodeOtherReports() }
+        .onAppear { now = Date(); decodeReports() }
+        .onChange(of: [model.snapshot?.capturedAt] + model.others.map { $0.snapshot?.capturedAt }) { _, _ in decodeReports() }
         .navigationDestination(for: T3UsageAccountRoute.self) { route in
             T3UsageAccountScreen(model: model, route: route)
         }
