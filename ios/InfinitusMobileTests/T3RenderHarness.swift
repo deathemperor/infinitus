@@ -208,6 +208,24 @@ import InfinitusUI
             .t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
             try Self.attach(name: "home-\(scheme == .dark ? "dark" : "light")", png: Self.render(home), dir: dir, test: self)
         }
+        // The composer's `/` popover on its own, over the screen colour.
+        let commands = [SlashCommand(name: "review", description: "Review the current PR", source: .projectCommand),
+                        SlashCommand(name: "commit", description: "Commit staged changes with a message", source: .userCommand),
+                        SlashCommand(name: "ship", description: "", source: .projectSkill)]
+        for scheme in [ColorScheme.light, .dark] {
+            let popover = ZStack {
+                Color.clear
+                VStack {
+                    Spacer()
+                    T3CommandPopover(items: commands, loading: false) { _ in }.padding(.horizontal, 12)
+                    T3CommandPopover(items: [], loading: true) { _ in }.padding(.horizontal, 12)
+                    T3CommandPopover(items: [], loading: false) { _ in }.padding(.horizontal, 12).padding(.bottom, 120)
+                }
+            }
+            .background(T3ThemeBackground())
+            .t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
+            try Self.attach(name: "commands-\(scheme == .dark ? "dark" : "light")", png: Self.render(popover), dir: dir, test: self)
+        }
         for scheme in [ColorScheme.light, .dark] {
             let sheet = T3SettingsSheet(model: model).t3(platform: .mobile, scheme: scheme).preferredColorScheme(scheme)
             try Self.attach(name: "settings-\(scheme == .dark ? "dark" : "light")", png: Self.render(sheet), dir: dir, test: self)
@@ -309,4 +327,10 @@ import InfinitusUI
         let samples = [px(2, 2), px(w - 3, 2), px(w / 2, h / 2), px(w / 2, h / 3), px(w / 3, h - 3)]
         return Set(samples).count == 1
     }
+}
+
+/// The screen colour from the installed palette, for standalone component shots.
+private struct T3ThemeBackground: View {
+    @Environment(\.t3) private var t3
+    var body: some View { t3.mobile.screen.color.ignoresSafeArea() }
 }

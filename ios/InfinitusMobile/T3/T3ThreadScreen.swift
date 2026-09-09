@@ -17,6 +17,10 @@ struct T3ThreadScreen: View {
     @StateObject private var follower: TimelineFollower
     @Environment(\.t3) private var t3
     @State private var draft = ""
+    /// The session's slash commands, fetched once the first `/` is typed;
+    /// nil until then, empty when the Mac had none (or could not be asked).
+    @State private var commands: [SlashCommand]?
+    @State private var commandsTask: Task<Void, Never>?
     @State private var composerFocused = false
     @State private var sending = false
     @State private var note: String?
@@ -307,6 +311,28 @@ struct T3ThreadScreen: View {
     /// on a row beneath, T3's 14 pt inset.
     private var expanded: Bool { composerFocused }
 
+    private var slashTrigger: T3SlashTrigger.Match? { T3SlashTrigger.detect(draft) }
+
+    /// `ComposerCommandPopover` docked 8 pt above the composer while a `/`
+    /// trigger is live (`ThreadComposer.tsx`: `bottom-full mb-2`); drawn as
+    /// an overlay so the composer keeps its place.
+    @ViewBuilder private func commandPopover(_ match: T3SlashTrigger.Match) -> some View {
+        T3CommandPopover(items: SlashCommands.filter(commands ?? [], query: match.query),
+                         loading: commands == nil) { command in
+            draft = T3SlashTrigger.apply(command, to: draft, match: match)
+        }
+        .onAppear { loadCommands() }
+    }
+
+    private func loadCommands() {
+        guard commands == nil, commandsTask == nil else { return }
+        commandsTask = Task {
+            let found = try? await model.mirror(for: macId).commands(pid: Int32(session.pid))
+            commands = found ?? []
+            commandsTask = nil
+        }
+    }
+
     private var composer: some View {
         VStack(alignment: .leading, spacing: 4) {
             Group {
@@ -343,6 +369,11 @@ struct T3ThreadScreen: View {
             .background(t3.mobile.input.color, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(t3.mobile.inputBorder.color, lineWidth: 1))
             .shadow(color: t3.mobile.drawerShadow.color, radius: 14, y: 6)
+            .overlay(alignment: .top) {
+                if let match = slashTrigger {
+                    commandPopover(match).alignmentGuide(.top) { $0[.bottom] + 8 }
+                }
+            }
             if let note {
                 Text(note).font(T3Font.mobile(.xxs)).foregroundStyle(t3.mobile.dangerForeground.color)
                     .padding(.leading, 14)
