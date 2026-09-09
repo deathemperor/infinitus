@@ -17,9 +17,9 @@ import InfinitusUI
 ///
 /// Not ported, each with its reason at the call site: the peek's hover
 /// choreography and the 220 ms dismiss transition (`ComposerBannerStack.tsx:9`,
-/// `:151-175`), the `--chat-composer-attachment-overlap` mask that slides an
-/// attached banner under the composer surface (there is no composer surface
-/// until Task 13), the description popover on a narrow container
+/// `:151-175`), the one-device-pixel mask under the overlap
+/// (`ComposerBanner.tsx:59-63`, a Chromium backdrop-filter workaround; this
+/// port's surfaces are flat fills), the description popover on a narrow container
 /// (`:290-311`), the number-key shortcuts (`ComposerPendingUserInputPanel.tsx:141-166`
 /// guards on focus not being in an editable field — no SwiftUI equivalent, and
 /// Task 13's composer would lose its digits), and single-select auto-advance
@@ -175,41 +175,55 @@ enum T3BannerVariant {
 /// `density="comfortable"` (`--spacing(1.25)`).
 ///
 /// `attached` rounds only the top (`before:rounded-t-[16px]`); a floating
-/// notice rounds all four (`before:rounded-[1rem]`). The
-/// `--chat-composer-attachment-overlap` negative margin itself is not ported
-/// (the drawer sits ON the composer here rather than 17 pt inside it), but its
-/// mask's one-pixel bleed is (`ComposerBanner.tsx:59-63`): the cut-off moved to
-/// `overlap - 1px` so the surface runs one point PAST the seam and the thing
-/// stacked under it covers the extra row — without it a fractional layout
-/// coordinate leaves a hairline of scrolling timeline between the two fills.
-/// Here that is `.padding(.bottom, -1)` on the whole surface (fill, tint and
-/// border, the way the mask covers the whole `before`); the composer — a later
-/// sibling in `T3ThreadView`'s bottom slot, so drawn over this one — is what
-/// hides it.
+/// notice rounds all four (`before:rounded-[1rem]`).
+///
+/// `tuck` is the bottom-most attachment's `--chat-composer-attachment-overlap`
+/// (`ComposerBanner.tsx:55`): the surface runs 17 pt (`calc(1rem+1px)`) past
+/// its own bottom padding — `pb-[calc(var(--chat-composer-attachment-overlap)+var(--composer-banner-padding-block))]`
+/// (`:164`) — and the box is pulled back by the same 17, which is `Column`'s
+/// `last-child:mb-0` (`:140`) plus `Dock`'s `-mb-[calc(1rem+1px)]` (`:111`).
+/// The drawer therefore ends UNDER the composer, whose opaque card covers the
+/// overlap the way upstream's mask (`:63`) hides it there. The layout height is
+/// unchanged, so the footer's reservation is too. Only the bottom-most drawer
+/// tucks: upstream's adjacent attachments share an outline
+/// (`before:rounded-none before:border-t-0`, `:113`) and that rule is not
+/// ported, so a stacked pair keeps its own two edges — and at THAT seam the
+/// mask's one-pixel bleed (`:59-63`, the cut-off at `overlap - 1px`) is what
+/// stops a fractional layout coordinate from leaving a hairline of timeline
+/// between the two fills: `.padding(.bottom, -1)` on the surface of an
+/// attached drawer that does not tuck. A tucked one has 17 pt under the
+/// composer already.
 private struct T3BannerRoot<Content: View>: View {
     var variant: T3BannerVariant = .default
     var attached = true
     var comfortable = false
+    var tuck = false
     @ViewBuilder let content: Content
     @Environment(\.t3) private var t3
 
     var body: some View {
         let p = t3.web
+        let block: Double = comfortable ? 5 : 4
         // `text-xs/4` on the Root: 12 pt with a 16 pt line box.
         content
             .font(T3Font.web(.xs))
             .padding(.horizontal, 4)
-            .padding(.vertical, comfortable ? 5 : 4)
+            .padding(.top, block)
+            .padding(.bottom, block + (tuck ? t3BannerOverlap : 0))
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 shape
                     .fill(p.card.color)
                     .overlay(shape.fill(variant.tint(p)))
                     .overlay(shape.stroke(variant.outline(p), lineWidth: 1))
-                    // The seam bleed. A floating notice has nothing under it
+                    // The seam bleed, for the seam between two attached
+                    // drawers; the tucked one's overlap already covers its
+                    // seam, and a floating notice has nothing under it
                     // (`overlap: 0px`, `:56`), so it keeps its own bottom edge.
-                    .padding(.bottom, attached ? -1 : 0)
+                    .padding(.bottom, attached && !tuck ? -1 : 0)
             }
+            // After the background, so the surface covers the overlap.
+            .padding(.bottom, tuck ? -t3BannerOverlap : 0)
     }
 
     private var shape: some InsettableShape {
@@ -223,6 +237,17 @@ private struct T3BannerRoot<Content: View>: View {
 /// `--composer-banner-icon-column`: `--spacing(6)` = 24 from `sm` up
 /// (`ComposerBanner.tsx:144`), which every Mac window is.
 private let t3BannerIconColumn: Double = 24
+
+/// `--chat-composer-attachment-overlap` on an attached surface
+/// (`ComposerBanner.tsx:55`): `calc(1rem+1px)`.
+private let t3BannerOverlap: Double = 17
+
+/// `--chat-composer-drawer-inset` (`ComposerSurface.tsx:17`): 1.375 rem, which
+/// `ComposerBanner.Attachment` takes off each side of the drawer column
+/// (`w-[calc(100%-2*var(--chat-composer-drawer-inset))] mx-auto`, `:111`). The
+/// 44 pt narrower, centred column is what keeps an attached drawer's square
+/// bottom corners inside the composer's rounded top while it tucks under it.
+let t3DrawerInset: Double = 1.375 * 16
 
 /// `ComposerBanner.Row` (`:172-202`) with its `.Icon` (`:204`), `.Content`
 /// (`:218`) and `.Actions` (`:245`) slots: a
@@ -350,6 +375,10 @@ struct T3BannerItem: Identifiable {
 /// a timer, and this window's budget is zero idle work.
 struct T3BannerStack: View {
     let items: [T3BannerItem]
+    /// The front alert is the drawer column's last attachment — and so the one
+    /// that tucks under the composer — unless a panel sits below it
+    /// (`ChatComposer.tsx:5005-5142` renders the stack above the top drawer).
+    var tucks = true
     @State private var expanded = false
     @Environment(\.t3) private var t3
 
@@ -375,7 +404,7 @@ struct T3BannerStack: View {
                         peek(variant: stacked[0].variant)
                     }
                 }
-                alert(front, attached: true)
+                alert(front, attached: true, tuck: tucks)
             }
             .onChange(of: items.count) { _, count in if count < 2 { expanded = false } }
         }
@@ -398,8 +427,8 @@ struct T3BannerStack: View {
     }
 
     /// `ComposerBannerStackAlert` (`:243-331`).
-    private func alert(_ item: T3BannerItem, attached: Bool) -> some View {
-        T3BannerRoot(variant: item.variant, attached: attached, comfortable: true) {
+    private func alert(_ item: T3BannerItem, attached: Bool, tuck: Bool = false) -> some View {
+        T3BannerRoot(variant: item.variant, attached: attached, comfortable: true, tuck: tuck) {
             VStack(alignment: .leading, spacing: 1) {   // `.Children`'s `gap-px`
                 T3BannerRow(icon: item.icon) {
                     HStack(spacing: 4) {
@@ -496,7 +525,9 @@ struct T3PendingApprovalPanel: View {
     @Environment(\.t3) private var t3
 
     var body: some View {
-        T3BannerRoot(variant: .warning) {
+        // Always the drawer column's last attachment, so it is the one that
+        // tucks under the composer.
+        T3BannerRoot(variant: .warning, tuck: true) {
             VStack(alignment: .leading, spacing: 4) {
                 T3BannerRow {
                     // `<code aria-label=… class="block max-h-20 min-w-0 flex-1
@@ -670,7 +701,8 @@ struct T3PendingUserInputPanel: View {
     }
 
     var body: some View {
-        T3BannerRoot(variant: .info) {
+        // The last attachment either way (the stack renders above it).
+        T3BannerRoot(variant: .info, tuck: true) {
             VStack(alignment: .leading, spacing: 0) {
                 trigger
                 if !collapsed, let active {
@@ -938,7 +970,10 @@ struct T3ThreadPendingSlot: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            T3BannerStack(items: bannerItems)
+            // Only the column's LAST attachment tucks under the composer: with
+            // a panel below it the front alert keeps its own bottom edge, since
+            // upstream's shared outline for adjacent attachments is not ported.
+            T3BannerStack(items: bannerItems, tucks: approval == nil && questions.isEmpty)
             if let approval {
                 T3PendingApprovalPanel(approval: approval, pendingCount: store.pending.approvals.count,
                                        owned: owned, sending: actions.sending,
@@ -960,6 +995,10 @@ struct T3ThreadPendingSlot: View {
                 .id(userInputRequestId ?? "")
             }
         }
+        // `ComposerBanner.Dock` is an `.Attachment` (`ComposerBanner.tsx:111`,
+        // `:122`): the drawer column is `--chat-composer-drawer-inset` narrower
+        // on each side, centred over the composer.
+        .padding(.horizontal, t3DrawerInset)
     }
 
     private func send(_ request: SessionInput.Request) {
