@@ -118,13 +118,23 @@ final class SessionTailTests: XCTestCase {
 
         let handle = try FileHandle(forWritingTo: agent)
         try handle.seekToEnd(); try handle.write(contentsOf: Data((failed + "\n").utf8)); try handle.close()
-        XCTAssertTrue(tail.advance(), "the agent moved, the parent did not")
+        // An append to an existing agent file leaves the folder's mtime
+        // alone: the walk waits for its cadence, not every refresh.
+        XCTAssertFalse(tail.advance(), "inside the walk cadence the agents are not re-listed")
+        let later = Date().addingTimeInterval(SessionTail.agentWalkInterval + 1)
+        XCTAssertTrue(tail.advance(now: later), "the agent moved, the parent did not")
         XCTAssertEqual(tail.progress().awsLoginProfile, "papaya-login")
         XCTAssertEqual(tail.progress(), SessionProgress.read(sessionId: "s", cwd: "/p", claudeDir: dir))
 
+        // A new file changes the folder's mtime and is seen at once.
+        let second = subagents.appendingPathComponent("agent-b.jsonl")
+        try (fine + "\n").write(to: second, atomically: true, encoding: .utf8)
+        XCTAssertTrue(tail.advance(now: later), "a new agent file is a folder change")
+
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-2 * 60 * 60)], ofItemAtPath: agent.path)
-        XCTAssertTrue(tail.advance(), "the agent aged out of the window")
-        XCTAssertNil(tail.progress().awsLoginProfile)
+        let muchLater = later.addingTimeInterval(SessionTail.agentWalkInterval + 1)
+        XCTAssertTrue(tail.advance(now: muchLater), "the agent aged out of the window")
+        XCTAssertNil(tail.progress(now: muchLater).awsLoginProfile)
     }
 
     /// A transcript replaced under its path (atomic write-and-rename, no

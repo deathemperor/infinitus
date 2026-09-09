@@ -382,14 +382,28 @@ public enum StatsScanner {
     /// rebuild — 2026-09-05). Disk gets a checkpoint every
     /// `checkpointInterval` and the final state when the pass finishes
     /// the corpus; an interrupted backfill loses at most that interval.
-    public final class CacheHandle {
+    public final class CacheHandle: @unchecked Sendable {
         var cache: Cache?
         /// Starts "now": the first checkpoint follows a full interval, so
         /// a one-pass refresh writes once, at the end.
         var lastWrite = Date()
+        /// The last pass found the corpus caught up. The first settled
+        /// pass writes the finished corpus; later ones write on the
+        /// settled cadence.
+        var caughtUp = false
+        /// The held cache moved since it last reached disk.
+        var dirty = false
         public init() {}
     }
     public static let checkpointInterval: TimeInterval = 30
+    /// A handle held across refreshes (the app's `StatsModel` keeps one
+    /// for its lifetime, #346) rewrites a caught-up corpus at most this
+    /// often: the cache is ~24 MB of JSON on a year of transcripts, and
+    /// encoding it after every 5-minute pass — because some live session
+    /// always moved — cost more than the pass itself. A quit in between
+    /// loses only the watermarks since the last write; the next launch
+    /// re-reads those bytes.
+    public static let settledWriteInterval: TimeInterval = 600
 
     public static func defaultCacheURL() -> URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -452,6 +466,7 @@ public enum StatsScanner {
         func write(_ c: Cache, to url: URL) {
             writeCache(c, to: url, fm: fm)
             handle?.lastWrite = Date()
+            handle?.dirty = false
         }
         let fm = FileManager.default
 
@@ -601,12 +616,23 @@ public enum StatsScanner {
         // Every file's share of a day is in: the day's peak minute is
         // the sum across sessions, not any one file's.
         for key in result.days.keys { result.days[key]!.finalizePeak() }
-        let unchanged = filesTouched == 0 && live.count == cache.files.count
+        let unchanged = filesTouched == 0 && live.count == cache.files.count && handle?.dirty != true
         cache.files = live
         handle?.cache = cache
-        // A held cache reaches disk when the corpus is caught up or a
-        // checkpoint is due; otherwise the next pass carries it.
-        let due = handle == nil || result.remaining == 0 || checkpointDue(1)
+        if !unchanged { handle?.dirty = true }
+        // A held cache reaches disk when a checkpoint is due mid-backfill,
+        // once when the corpus catches up, then on the settled cadence;
+        // otherwise the next pass carries it.
+        let due: Bool
+        if let handle {
+            let settled = result.remaining == 0
+            due = settled
+                ? !handle.caughtUp || Date().timeIntervalSince(handle.lastWrite) >= settledWriteInterval
+                : checkpointDue(1)
+            handle.caughtUp = settled
+        } else {
+            due = true
+        }
         if let cacheURL, !unchanged, due { write(cache, to: cacheURL) }
         result.entries = live
         return result

@@ -61,6 +61,9 @@ publishes the matching section as the GitHub release body.
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
 - The resume tick probes the last 64 KB of a transcript before reading 512 KB, and a sub-agent's meta file is decoded once, not on every feed read (#346).
 - The machine sample matches hook scripts to processes with a byte search instead of Foundation's `contains` (a second per sample on 70 hooks) (#346).
+- The lapsed-sign-in scan over tool results folds bytes instead of Unicode-lowercasing and Foundation-searching each one — 49× faster per result (#346).
+- The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
+- A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
