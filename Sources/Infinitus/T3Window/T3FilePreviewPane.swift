@@ -24,9 +24,12 @@ import InfinitusUI
 /// - the rendered-markdown / rendered-HTML toggle (`:1147-1175`, `Eye` ↔ `Code2`
 ///   over `renderMarkdown` / `renderBrowserFile`): a second renderer per file
 ///   type, and the markdown one would want `T3ChatMarkdown` inside a scroller.
-/// - the image, video, PDF and browser previews (`:1220-1250`): `T3ProjectFiles.read`
-///   answers `.binary` for those extensions by design (it is the phone's text
-///   route), so they land in the binary state.
+/// - the video, PDF and browser previews (`:1220-1250`): `T3ProjectFiles.read`
+///   answers `.binary` for those extensions by design, so they land in the
+///   binary state. The IMAGE one is ported (`WorkspaceImagePreview`,
+///   `FilePreviewPanel.tsx:148-205`) over the bytes `T3ProjectFiles.readImage`
+///   answers — upstream fetches an asset URL and has no size ceiling, this port
+///   stops at `T3ProjectFiles.imageCap` and says so.
 /// - "open in preview browser" (`:1177-1194`) — no in-app browser here — and
 ///   `OpenInPicker`'s editor list (`:1140-1148`): the Mac hands the file to
 ///   whatever app owns it, one button.
@@ -49,6 +52,15 @@ struct T3FilePreviewPane: View {
     /// (`:1268-1270`, a centred spinner).
     @State private var read: Result<T3ProjectFiles.FileRead, T3ProjectFiles.ReadError>?
     @State private var slice = T3FilePreview.Slice(lines: [], trimmed: false)
+    /// The image half's own pair: the bytes as read, and the decoded image
+    /// (`nil` inside a `.success` is upstream's `onError` — bytes that no
+    /// decoder took, `:180-188`).
+    @State private var imageRead: Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError>?
+    @State private var decoded: NSImage?
+
+    /// Which half of the pane this file gets — Core's table decides, the same
+    /// one the wire branches on.
+    private var isImage: Bool { T3ProjectFiles.imageMime(for: path) != nil }
 
     private struct Load: Equatable { let path: String; let revision: Int }
 
@@ -158,30 +170,99 @@ struct T3FilePreviewPane: View {
     }
 
     @ViewBuilder private var content: some View {
+        if isImage { imageContent } else { textContent }
+    }
+
+    @ViewBuilder private var textContent: some View {
         switch read {
         case nil:
-            // "flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
-            // with a `size-5` spinner (`:1268-1270`).
-            T3Spinner(size: 20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            spinner
         case .failure(let error):
-            // "flex min-h-0 flex-1 items-center justify-center px-6 text-center
-            // text-xs leading-relaxed text-destructive" (`:1257-1261`).
-            Text(T3FilePreview.message(for: error, path: path, root: cwd))
-                .font(T3Font.web(.xs))
-                .lineSpacing(T3TypeScale.lineSpacing(T3TypeScale.Web.xs.step))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(t3.web.destructive.color)
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            failure(T3FilePreview.message(for: error, path: path, root: cwd))
         case .success:
             T3FileLines(lines: slice.lines)
         }
     }
 
+    /// `WorkspaceImagePreview` (`:148-205`): the image centred and contained in
+    /// a padded box on the pane's own background — no checkerboard and no size
+    /// caption upstream, so neither here.
+    @ViewBuilder private var imageContent: some View {
+        switch imageRead {
+        case nil:
+            spinner
+        case .failure(let error):
+            failure(T3FilePreview.message(for: error, path: path, root: cwd))
+        case .success:
+            if let decoded {
+                // "flex min-h-0 flex-1 items-center justify-center overflow-auto
+                // p-4" around "max-h-full max-w-full object-contain" (`:190-199`)
+                // — `max-*` shrinks a big image to the pane and leaves a small
+                // one at its own size.
+                Image(nsImage: decoded)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: max(1, decoded.size.width), maxHeight: max(1, decoded.size.height))
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel(path)
+            } else {
+                failure("Unable to load workspace image.")   // `:182-184`
+            }
+        }
+    }
+
+    /// "flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
+    /// with a `size-5` spinner (`:1268-1270`).
+    private var spinner: some View {
+        T3Spinner(size: 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// "flex min-h-0 flex-1 items-center justify-center px-6 text-center
+    /// text-xs leading-relaxed text-destructive" (`:1257-1261`).
+    private func failure(_ text: String) -> some View {
+        Text(text)
+            .font(T3Font.web(.xs))
+            .lineSpacing(T3TypeScale.lineSpacing(T3TypeScale.Web.xs.step))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(t3.web.destructive.color)
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Behaviour
 
     private func load() async {
+        if isImage {
+            await loadImage()
+        } else {
+            await loadText()
+        }
+    }
+
+    /// The bytes come from the model's cache like the text does; the DECODE is
+    /// off the main actor (#18) — up to 8 MB of PNG is not main-thread work.
+    private func loadImage() async {
+        read = nil
+        slice = T3FilePreview.Slice(lines: [], trimmed: false)
+        // The image that WAS open goes with the header that has moved on.
+        decoded = nil
+        imageRead = nil
+        let result = await model.imageRead(cwd: cwd, path: path)
+        guard !Task.isCancelled else { return }
+        if case .success(let image) = result {
+            let bytes = image.bytes
+            let box = await Task.detached(priority: .userInitiated) { DecodedImage(image: NSImage(data: bytes)) }.value
+            guard !Task.isCancelled else { return }
+            decoded = box.image
+        }
+        imageRead = result
+    }
+
+    private func loadText() async {
+        imageRead = nil
+        decoded = nil
         // The lines go first: they belong to the file that WAS open, and the
         // header above them has already moved on to this one.
         slice = T3FilePreview.Slice(lines: [], trimmed: false)
@@ -201,6 +282,12 @@ struct T3FilePreviewPane: View {
         }
         read = result
     }
+}
+
+/// `NSImage` is not `Sendable`, and the decode belongs off the main actor: one
+/// image crosses back inside this box, handed over once and read once.
+private struct DecodedImage: @unchecked Sendable {
+    let image: NSImage?
 }
 
 /// The text. Upstream hands it to `@pierre/diffs`' `File` inside a `Virtualizer`
