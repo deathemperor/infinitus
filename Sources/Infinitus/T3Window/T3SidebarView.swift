@@ -91,12 +91,18 @@ struct T3SidebarView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             Spacer(minLength: 0)
-            // Task 15 wires `startNewThread` in the current scope; until
-            // then the control is a live tooltip over a disabled action.
+            // `Sidebar.tsx:4300-4338`'s new-thread button (its `SquarePenIcon`
+            // sits in the search row upstream; Task 7 put this port's control in
+            // the scope row and it stays there). Upstream's multi-project setup
+            // routes ⌘N through the palette's "New thread in…" picker
+            // (`:4210-4229`); B resolves the project directly
+            // (`T3WindowModel.currentProjectId`), so the button and ⌘N do the
+            // same thing here. Disabled with no project — a draft has nowhere
+            // to start.
             T3Tooltip("New thread ⌘N") {
-                Button(action: {}) { LucideIcon(.plus, size: 16) }
+                Button(action: { model.startNewThread() }) { LucideIcon(.plus, size: 16) }
                     .buttonStyle(.plain)
-                    .disabled(true)
+                    .disabled(model.state.projects.isEmpty)
             }
         }
         .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
@@ -179,11 +185,20 @@ struct T3SidebarView: View {
         let variant: T3ThreadRowView.Variant = (kind == .active || kind == .pinned) ? .card : .slim
         let variantAction: T3ThreadRowView.VariantAction = kind == .snoozed ? .unsnooze : (kind == .settled ? .unsettle : .settle)
         ForEach(threads) { thread in
-            T3ThreadRowView(thread: thread, variant: variant, variantAction: variantAction,
-                            selected: thread.id == model.state.selectedThreadId, now: model.now,
-                            onSelect: { model.select(thread.id) },
-                            onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
-                            projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
+            if T3WorkspaceState.isDraft(thread.id) {
+                T3SidebarDraftRow(draftId: thread.id,
+                                  projectName: projectName(thread.projectId),
+                                  preview: model.draft(for: thread.id).text,
+                                  selected: thread.id == model.state.selectedThreadId,
+                                  onSelect: { model.select(thread.id) },
+                                  onDiscard: { model.discardDraft(thread.id) })
+            } else {
+                T3ThreadRowView(thread: thread, variant: variant, variantAction: variantAction,
+                                selected: thread.id == model.state.selectedThreadId, now: model.now,
+                                onSelect: { model.select(thread.id) },
+                                onAttention: { action, until in model.attention(action, threadId: thread.id, until: until) },
+                                projectName: projectName(thread.projectId), projectCwd: projectCwd(thread.projectId))
+            }
         }
     }
 
@@ -235,5 +250,76 @@ struct T3SidebarView: View {
         Button("") { searchFocused = true }
             .keyboardShortcut("f", modifiers: .command)
             .buttonStyle(.plain).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
+    }
+}
+
+/// `SidebarDraftRow` (`Sidebar.tsx:689-786`): one unsent draft, two lines —
+/// the pen, the project name, a hover-only discard, then the typed prompt.
+///
+/// Two deliberate differences from upstream, both in the dispatch's scope:
+/// upstream surfaces a draft row only once the draft HAS content
+/// (`:797-800`, "Draft sessions with user content") and shows an attachment
+/// count when the prompt is empty — here every draft has a row from the moment
+/// ⌘N makes one, and an empty one reads `T3WorkspaceState.draftTitle`
+/// ("New thread"). And the preview is a snapshot, not a live mirror of the
+/// composer: `T3WindowModel.drafts` is not `@Published` (Task 13's rule), which
+/// is exactly the freeze upstream applies to the OPEN draft's row anyway
+/// (`:686-688`, `:814`).
+///
+/// The vendored Lucide set has no `square-pen` (Lucide.generated.swift) —
+/// `pencil` is its nearest glyph for the same "unsent work" mark.
+private struct T3SidebarDraftRow: View {
+    @Environment(\.t3) private var t3
+    let draftId: String
+    let projectName: String?
+    let preview: String
+    let selected: Bool
+    let onSelect: () -> Void
+    let onDiscard: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {   // `mt-0.5` between the lines
+            HStack(spacing: 6) {   // `gap-1.5` on the `h-5` head row
+                LucideIcon(.pencil, size: 14)
+                    .foregroundStyle(t3.web.sidebarMutedForeground.color)
+                Text(projectName ?? "No project")
+                    .font(T3Font.web(.xs, .medium))
+                    .foregroundStyle(t3.web.secondaryLabel.color)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                // `:769-781`: the discard button is `opacity-0` until the row
+                // is hovered or the button focused.
+                Button(action: onDiscard) { LucideIcon(.x, size: 12) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(t3.web.mutedForeground.color)
+                    .opacity(hover ? 1 : 0)
+                    .accessibilityLabel("Discard draft")
+                    .help("Discard draft")
+            }
+            .frame(height: 20)
+            Text(firstLine)
+                .font(T3Font.web(.sm, .medium))
+                .foregroundStyle(t3.web.foreground.color.opacity(0.9))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
+        .padding(.vertical, T3Theme.Metrics.sidebarContentInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // `:747`: the open draft's row takes `bg-sidebar-row-active`, an idle
+        // one the draft surface (`draftSurfaceClassName`, `:519-521` — the same
+        // look unsent work shares with a thread's unsent draft).
+        .background(selected ? t3.web.sidebarRowActive.color : (hover ? t3.web.sidebarRowHover.color : .clear),
+                    in: RoundedRectangle(cornerRadius: T3Theme.Metrics.radius))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
+        .onHover { hover = $0 }
+        .accessibilityLabel("Draft in \(projectName ?? "no project")")
+    }
+
+    private var firstLine: String {
+        let line = preview.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? ""
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? T3WorkspaceState.draftTitle : trimmed
     }
 }

@@ -94,6 +94,7 @@ INFINITUS_CSWAP=$root/tools/demo-cswap \
 INFINITUS_DEMO_STATE=$state/demo-state.json \
 INFINITUS_PROFILES=$state/profiles.json \
 INFINITUS_TEAM_DIR=$state/team \
+INFINITUS_WORKSPACE_NO_START=1 \
     "$root/.build/debug/Infinitus" -mock_mode NO >/tmp/t3fix.log 2>&1 &
 echo $! > "$state/app.pid"
 echo "app on $sock (log /tmp/t3fix.log)"

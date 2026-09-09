@@ -48,6 +48,9 @@ export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bund
 export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
 export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
+# The workspace window must never start a real `claude` from this run
+# (tools/t3ref/fixture.sh:97 exports the same gate for the same reason).
+export INFINITUS_WORKSPACE_NO_START=1
 LOG="$(mktemp -t infinitus-e2e)"
 DOMAIN=Infinitus   # the unbundled debug binary's defaults domain
 
@@ -77,6 +80,15 @@ expect() { python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
 popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
 wall_visible() { "$CTL" windows | expect "any(w['visible'] and 'WallRoot' in w['content'] for w in d)"; }
+# Not the title: the pop-out is called "Infinitus" too, and is wider than
+# the workspace's minimum — matching on the title would keep saying "yes"
+# after `hide workspace`. The content view is the workspace's own
+# (NSHostingView<LockGate<T3Root>>, detached to nothing on close), and the
+# size floor is T3WindowController.minimumSize, which contentMinSize holds.
+# What it proves is that the window EXISTS, is on screen and idles — the
+# gate matches the LockGate host, so a locked Mac showing the unlock panel
+# passes it too; it says nothing about the workspace itself having rendered.
+workspace_visible() { "$CTL" windows | expect "any(w['visible'] and 'T3Root' in w['content'] and w['size'][0]>=840 and w['size'][1]>=620 for w in d)"; }
 
 "$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
 
@@ -292,6 +304,28 @@ sleep 2
 wall_visible && fail "wall still visible after toggling off"
 popout_visible || fail "pop-out not restored after the wall closed"
 echo "windows: ok (wall over pop-out, restored)"
+
+# --- windows: the workspace opens beside the pop-out and idles ----------
+"$CTL" show workspace thread | expect "d['shown']=='workspace'" || fail "show workspace"
+sleep 3
+workspace_visible || fail "workspace window not visible after show workspace"
+popout_visible || fail "pop-out closed by the workspace (it is not a mode)"
+"$CTL" show workspace bogus 2>/dev/null && fail "show workspace accepted an unknown screen"
+# A cold first open builds the window, loads the thread's timeline and
+# parses its markdown — measured 29% over the 15 s starting 3 s after
+# `show`, 0.5% once that is done (parity fixture, 2026-09-09). The gate is
+# about what the window costs while it sits there, so settle first.
+sleep 12
+WA="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep 15
+WB="$("$CTL" perf | json "d['cpuSeconds']")"
+WPCT="$(python3 -c "print(round(($WB-$WA)/15*100,1))")"
+echo "idle CPU with the workspace open: ${WPCT}%"
+python3 -c "import sys; sys.exit(0 if $WPCT <= $IDLE_BUDGET_PCT else 1)" || fail "workspace idle CPU ${WPCT}% over budget ${IDLE_BUDGET_PCT}%"
+"$CTL" hide workspace | expect "d['hidden']=='workspace'" || fail "hide workspace"
+sleep 1
+workspace_visible && fail "workspace still visible after hide"
+echo "windows: ok (workspace beside pop-out, idle ${WPCT}%, hidden)"
 
 # --- scenarios: all-dead (every window maxed, no candidate) --------------
 "$INFINITUS_CSWAP" simulate alldead >/dev/null

@@ -239,7 +239,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Approve a join request (leaders).", replyShape: "team-status"),
         ControlCommand(name: "team-decline", args: ["<kid>"], effect: .write,
                        summary: "Decline a join request (leaders).", replyShape: "team-status"),
-        ControlCommand(name: "show", args: ["popout|settings|wall|workspace [sidebar|thread|composer]"], effect: .write,
+        ControlCommand(name: "show", args: ["popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]"], effect: .write,
                        summary: "Open a window: the pinned pop-out, Settings, the wall (toggle), or the workspace (optionally on a screen).",
                        replyShape: "{shown}"),
         ControlCommand(name: "hide", args: ["popout|workspace"], effect: .write,

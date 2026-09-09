@@ -245,4 +245,132 @@ final class T3WorkspaceStateTests: XCTestCase {
         XCTAssertEqual(s.visibleThreads(now: now), [])
         XCTAssertEqual(s.sidebarSections(now: now), [])
     }
+    // MARK: - Drafts (Task 15)
+
+    func testDraftSurvivesApplyAndKeepsItsSelection() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        XCTAssertTrue(T3WorkspaceState.isDraft(draft))
+        s.select(draft, now: now)
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertTrue(s.threads.contains { $0.id == draft })
+        XCTAssertEqual(s.selectedThreadId, draft)
+        XCTAssertNil(s.pid(of: draft))
+    }
+
+    func testDraftsSortAboveActiveThreads() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "active"), facts())]), now: now)
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        let active = s.sidebarSections(now: now).first { $0.kind == .active }
+        XCTAssertEqual(active?.threads.map(\.id), [draft, "active"])
+    }
+
+    func testStartedDraftIsReplacedByItsSessionAndSelectionMoves() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7, now: now)
+        s.apply(inputs([(record(pid: 7, id: "s7"), facts())]), now: now)
+        XCTAssertTrue(s.drafts.isEmpty)
+        XCTAssertEqual(s.threads.map(\.id), ["s7"])
+        XCTAssertEqual(s.selectedThreadId, "s7")
+    }
+
+    // A record can land a tick before its facts do (`apply` skips a pid with
+    // no facts): replacing on record-sight alone would move the selection to
+    // an id that is not in `threads` yet.
+    func testStartedDraftWaitsForTheRecordsFacts() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7, now: now)
+        s.apply(T3WorkspaceInputs(records: [record(pid: 7, id: "s7")], facts: [:], progress: [:],
+                                  startedAt: [:], projects: []), now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertEqual(s.selectedThreadId, draft)
+    }
+
+    /// The relaunch path (B-5 review): a persisted draft's row comes back
+    /// under the id its text is stored under, and asking twice cannot stack a
+    /// second row for it.
+    func testRestoredDraftKeepsItsIdAndIsNotDuplicated() {
+        var s = T3WorkspaceState()
+        let id = T3WorkspaceState.draftIdPrefix + "9E0B"
+        XCTAssertEqual(s.addDraft(id: id, projectId: "project-1", now: now), id)
+        s.addDraft(id: id, projectId: "project-1", now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [id])
+        XCTAssertEqual(s.threads.map(\.id), [id])
+        XCTAssertEqual(s.drafts.first?.projectId, "project-1")
+    }
+
+    func testRemoveDraftDropsItAndItsSelection() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: "project-1", now: now)
+        s.select(draft, now: now)
+        s.removeDraft(draft, now: now)
+        XCTAssertTrue(s.drafts.isEmpty)
+        XCTAssertNil(s.selectedThreadId)
+    }
+
+    // Fix 1: a discarded draft hands its selection to the neighbour, so the
+    // window is never left with nothing selected while threads exist.
+    func testRemoveDraftFallsBackToTheAdjacentThread() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.removeDraft(draft, now: now)
+        XCTAssertEqual(s.selectedThreadId, "s1")
+    }
+
+    // Fix 1 (important #1): a start whose session never appears must not leave
+    // the draft "starting" forever — the pending pid expires past the deadline,
+    // the draft stays, and the id is reported so the model can say so.
+    func testAStartedDraftWhoseSessionNeverAppearsTimesOut() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7, now: now)
+        // Just short of the deadline: still waiting.
+        s.apply(inputs([]), now: now, wallClock: now.addingTimeInterval(T3WorkspaceState.startDeadline - 1))
+        XCTAssertTrue(s.isDraftStarting(draft))
+        XCTAssertTrue(s.draftStartTimeouts.isEmpty)
+        // Past it: released, reported, and the draft is still there to edit.
+        s.apply(inputs([]), now: now, wallClock: now.addingTimeInterval(T3WorkspaceState.startDeadline + 1))
+        XCTAssertFalse(s.isDraftStarting(draft))
+        XCTAssertEqual(s.draftStartTimeouts, [draft])
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertEqual(s.selectedThreadId, draft)
+        s.clearDraftStartTimeout(draft)
+        XCTAssertTrue(s.draftStartTimeouts.isEmpty)
+    }
+
+    // …and once expired, a pid REUSE by an unrelated session cannot be taken
+    // for this draft's own start.
+    func testAnExpiredStartIsNotHijackedByAPidReuse() {
+        var s = T3WorkspaceState()
+        let draft = s.addDraft(projectId: ProjectSummary.projectId(cwd: "/w/a"), now: now)
+        s.select(draft, now: now)
+        s.markDraftStarted(draft, pid: 7, now: now)
+        s.apply(inputs([]), now: now, wallClock: now.addingTimeInterval(T3WorkspaceState.startDeadline + 1))
+        s.apply(inputs([(record(pid: 7, id: "someone-else"), facts())]), now: now)
+        XCTAssertEqual(s.drafts.map(\.id), [draft])
+        XCTAssertEqual(s.selectedThreadId, draft)
+    }
+
+    func testReusableDraftFindsAnUntouchedDraftInTheSameProject() {
+        var s = T3WorkspaceState()
+        let a = s.addDraft(projectId: "p1", now: now)
+        let b = s.addDraft(projectId: "p2", now: now)
+        XCTAssertEqual(s.reusableDraftId(projectId: "p1", isUntouched: { _ in true }), a)
+        XCTAssertEqual(s.reusableDraftId(projectId: "p2", isUntouched: { _ in true }), b)
+        XCTAssertNil(s.reusableDraftId(projectId: "p1", isUntouched: { _ in false }))
+        XCTAssertNil(s.reusableDraftId(projectId: "p3", isUntouched: { _ in true }))
+        // A draft whose session is already starting is not free to reuse.
+        s.markDraftStarted(a, pid: 5, now: now)
+        XCTAssertNil(s.reusableDraftId(projectId: "p1", isUntouched: { _ in true }))
+    }
 }

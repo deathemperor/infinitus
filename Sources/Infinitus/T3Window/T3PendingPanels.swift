@@ -49,7 +49,11 @@ final class T3ThreadActions: ObservableObject {
     /// make one without a hop.
     nonisolated init() {}
 
-    func send(_ request: SessionInput.Request, app: AppModel, pid: Int32) {
+    /// `onOutcome` runs on the main actor once the reply is in, for a caller
+    /// that has to know what the session did with it — Task 13's queue badge
+    /// only counts a message the session actually took.
+    func send(_ request: SessionInput.Request, app: AppModel, pid: Int32,
+              onOutcome: ((SessionInput.Reply) -> Void)? = nil) {
         guard !sending else { return }
         sending = true
         note = nil
@@ -60,6 +64,7 @@ final class T3ThreadActions: ObservableObject {
                 if reply.outcome != "delivered" {
                     self?.note = reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome
                 }
+                onOutcome?(reply)
             }
         }
     }
@@ -164,6 +169,11 @@ struct T3PendingQuestionItem: Identifiable, Equatable {
     let question: String
     let header: String
     let multiSelect: Bool
+    /// `allowCustomAnswer: Schema.optional(Schema.Boolean)`
+    /// (`providerRuntime.ts:539`) — absent means allowed, and only an
+    /// explicit `false` withdraws the free-text field
+    /// (`pendingUserInput.ts:45`). A `var` so the memberwise init defaults it.
+    var allowCustomAnswer = true
     let options: [Option]
 
     static func parse(_ questions: [JSONValue]) -> [T3PendingQuestionItem] {
@@ -177,6 +187,7 @@ struct T3PendingQuestionItem: Identifiable, Equatable {
             return T3PendingQuestionItem(id: o["id"]?.stringValue ?? text, question: text,
                                          header: o["header"]?.stringValue ?? "",
                                          multiSelect: o["multiSelect"].map { $0 == .bool(true) } ?? false,
+                                         allowCustomAnswer: o["allowCustomAnswer"] != .bool(false),
                                          options: options)
         }
     }
@@ -627,11 +638,13 @@ enum T3PendingSubmission: Equatable {
 /// - the primary action lives here. Upstream's Previous / "Next question" /
 ///   "Submit answer(s)" sit in the composer's own footer
 ///   (`ComposerPrimaryActions.tsx:40-56`, `:110-161`), which is Task 13.
-/// - there is no free-text answer. Upstream has none in this panel either —
-///   `progress.customAnswer` comes from the composer draft
-///   (`pendingUserInput.ts:44`) — and `OwnedWire.decision(answers:pending:)`
-///   (OwnedWire.swift:277-288) rejects any label that is not one of the
-///   question's options, so typed text could not be delivered today.
+/// - the free-text answer lives here too, as a field under the options.
+///   Upstream types it into the composer instead (`ChatComposer.tsx:4881`
+///   "Write custom answer", `:4987` "Type your own answer, or leave this
+///   blank to use the selected option"); this port follows the phone's
+///   layout, which puts the same field inside the card
+///   (`apps/mobile/.../PendingUserInputCard.tsx:308-318`) — B's composer is
+///   already carrying the next prompt, and one draft cannot be both.
 struct T3PendingUserInputPanel: View {
     let questions: [T3PendingQuestionItem]
     /// A terminal-hosted session answers by menu key: one question, one pick
@@ -641,6 +654,8 @@ struct T3PendingUserInputPanel: View {
     let onSubmit: (T3PendingSubmission) -> Void
     @State private var questionIndex = 0
     @State private var picks: [String: Set<String>] = [:]
+    /// Upstream's `draft.customAnswer`, per question id.
+    @State private var custom: [String: String] = [:]
     @State private var collapsed = false
     @Environment(\.t3) private var t3
 
@@ -659,6 +674,15 @@ struct T3PendingUserInputPanel: View {
         if owned {
             var out: [String: String] = [:]
             for q in visible {
+                if let typed = typedAnswer(q) {
+                    // `resolvePendingUserInputAnswer` (`pendingUserInput.ts:40-57`)
+                    // returns the custom answer over the selection, and
+                    // `OwnedWire.decision(answers:pending:)` takes one non-option
+                    // string per question as Claude Code's "Other"
+                    // (OwnedWire.swift:283-289).
+                    out[q.question] = typed
+                    continue
+                }
                 let chosen = q.options.map(\.label).filter { picks[q.id]?.contains($0) == true }
                 guard !chosen.isEmpty else { return nil }
                 out[q.question] = chosen.joined(separator: SessionInput.Answers.separator)
@@ -668,6 +692,44 @@ struct T3PendingUserInputPanel: View {
         guard let q = visible.first, let label = picks[q.id]?.first,
               let i = q.options.firstIndex(where: { $0.label == label }), i < 9 else { return nil }
         return .key(String(i + 1))
+    }
+
+    /// `normalizeDraftAnswer` (`pendingUserInput.ts:22-28`): trimmed, and nil
+    /// when empty or when the question withdrew the field. Terminal sessions
+    /// never have one — only a menu key reaches them.
+    ///
+    /// One shape more has no wire and so is no answer here either: a
+    /// multi-select whose text carries `Answers.separator`.
+    /// `OwnedWire.decision(answers:pending:)` (OwnedWire.swift:285-288) splits
+    /// a multi-select's answer on it and needs every part to be an option, so
+    /// that text can only be rejected. Refusing it in *this* one place keeps
+    /// `answered` and `submission` on one rule — deciding it in `submission`
+    /// alone let "Next question" pass an undeliverable answer and killed
+    /// Submit two questions later, with the offending field off-screen.
+    private func typedAnswer(_ q: T3PendingQuestionItem) -> String? {
+        guard owned, q.allowCustomAnswer else { return nil }
+        let trimmed = (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return q.multiSelect && trimmed.contains(SessionInput.Answers.separator) ? nil : trimmed
+    }
+
+    /// Text typed into a multi-select's field that `typedAnswer` has to drop.
+    private func separatorInMultiSelectText(_ q: T3PendingQuestionItem) -> Bool {
+        guard owned, q.allowCustomAnswer, q.multiSelect else { return false }
+        return (custom[q.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            .contains(SessionInput.Answers.separator)
+    }
+
+    /// `setPendingUserInputCustomAnswer` (`pendingUserInput.ts:60-71`): a
+    /// non-empty custom answer drops the question's selected options, which is
+    /// what clears the checks (upstream hides them instead, through
+    /// `customAnswerActive`, `ComposerPendingUserInputPanel.tsx:172`, `:244`).
+    private func customBinding(_ q: T3PendingQuestionItem) -> Binding<String> {
+        Binding(get: { custom[q.id] ?? "" },
+                set: { value in
+                    custom[q.id] = value
+                    if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { picks[q.id] = [] }
+                })
     }
 
     var body: some View {
@@ -694,6 +756,27 @@ struct T3PendingUserInputPanel: View {
                             VStack(spacing: 2) {
                                 ForEach(active.options.indices, id: \.self) { i in
                                     option(active, index: i)
+                                }
+                                if owned, active.allowCustomAnswer {
+                                    // The phone's field (`PendingUserInputCard.tsx:316`),
+                                    // sized to this card's rows rather than its
+                                    // `min-h-[54px]`.
+                                    T3Input(text: customBinding(active), placeholder: "Or type a custom answer")
+                                        .padding(.top, 4)
+                                        .accessibilityLabel("Write custom answer")
+                                        .accessibilityHint("Answers in place of the options above")
+                                    // Upstream never shows this: its wire carries an
+                                    // array, so a comma is just a comma. Ours joins on
+                                    // ", ", so on a multi-select that text cannot be
+                                    // told from two labels and `typedAnswer` drops it —
+                                    // say why, rather than leave Submit dead.
+                                    if separatorInMultiSelectText(active) {
+                                        Text("A custom answer here can't contain a comma followed by a space — on a multiple-choice question that reads as two options.")
+                                            .font(T3Font.web(.xs))
+                                            .foregroundStyle(t3.web.warningForeground.color)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .padding(.top, 4)
+                                    }
                                 }
                             }
                             .padding(.top, 8)
@@ -770,6 +853,10 @@ struct T3PendingUserInputPanel: View {
             else if question.multiSelect, owned { set.insert(option.label) }
             else { set = [option.label] }
             picks[question.id] = set
+            // `togglePendingUserInputOptionSelection` (`pendingUserInput.ts:75-95`)
+            // writes `customAnswer: ""` on every branch: picking an option
+            // withdraws the typed answer, or the typed one would still win.
+            custom[question.id] = ""
         } label: {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {   // `gap-0.5`
@@ -829,9 +916,11 @@ struct T3PendingUserInputPanel: View {
         }
     }
 
-    /// `canAdvance`: the active question has an answer.
+    /// `canAdvance`: the active question has an answer — `resolvedAnswer`,
+    /// so a typed one counts (`pendingUserInput.ts:40-47`).
     private var answered: Bool {
         guard let active else { return false }
+        if typedAnswer(active) != nil { return true }
         return !(picks[active.id] ?? []).isEmpty
     }
 
@@ -956,6 +1045,14 @@ private enum T3PendingSamples {
                                         .init(label: "e2e", description: ""),
                                         .init(label: "linux", description: "")]),
     ]
+    static let customAnswerQuestions = [
+        questions[0],   // single-select, field offered
+        questions[1],   // multi-select, field offered (and its separator rule)
+        T3PendingQuestionItem(id: "q3", question: "Which release should this land in?",
+                              header: "Release", multiSelect: false, allowCustomAnswer: false,
+                              options: [.init(label: "Next", description: "The open milestone"),
+                                        .init(label: "Hold", description: "Wait for a decision")]),
+    ]
     static let limitNote = "Claude usage limit reached. This turn is paused until the 5-hour limit resets in 2h 14m."
 }
 
@@ -979,6 +1076,28 @@ private enum T3PendingSamples {
 
 #Preview("Question panel") {
     T3PendingUserInputPanel(questions: T3PendingSamples.questions, owned: true, sending: false) { _ in }
+        .frame(width: 560)
+        .padding(24)
+        .t3(platform: .web, scheme: .dark)
+        .preferredColorScheme(.dark)
+}
+
+/// The owned card with its free-text field: a single-select and a multi-select
+/// offer it, the third withdrew it (`allowCustomAnswer: false`). The parity
+/// fixture is terminal-hosted, so this is the only place the field can be
+/// looked at. (The multi-select's separator warning needs typed text, which a
+/// preview cannot seed — that line is compile-checked only.)
+#Preview("Question panel, custom answer") {
+    T3PendingUserInputPanel(questions: T3PendingSamples.customAnswerQuestions,
+                            owned: true, sending: false) { _ in }
+        .frame(width: 560)
+        .padding(24)
+        .t3(platform: .web, scheme: .dark)
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Question panel, terminal session") {
+    T3PendingUserInputPanel(questions: T3PendingSamples.questions, owned: false, sending: false) { _ in }
         .frame(width: 560)
         .padding(24)
         .t3(platform: .web, scheme: .dark)

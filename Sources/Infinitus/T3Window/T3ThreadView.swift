@@ -44,6 +44,9 @@ struct T3ThreadView: View {
     @ObservedObject var store: T3TimelineStore
     /// `T3WindowModel.now`, passed down by `T3Root` (never `Date()`).
     let now: Date
+    /// Set when the selected thread is a draft (Task 15): there is no
+    /// transcript to scroll, so the view is the hero + the composer only.
+    var draftTarget: T3ComposerDraftTarget?
     @Environment(\.t3) private var t3
 
     /// Row geometry, `atEnd` and the pending disclosure pin. A reference type
@@ -55,6 +58,10 @@ struct T3ThreadView: View {
     /// `Row ==` for every row — for something only the bottom slot draws. The
     /// slot observes it instead (`T3ThreadPendingSlot`).
     @State private var actions = T3ThreadActions()
+    /// The draft hero's one-shot fade-in (`draftHeroTransition.ts:2-3`:
+    /// 180 ms on `cubic-bezier(0.4, 0, 0.2, 1)`). One `withAnimation` on
+    /// appear — never a repeating one.
+    @State private var heroShown = false
 
     /// `max-w-3xl` (48 rem) inside the list's own `sm:px-5`.
     private static let columnMax: Double = 768
@@ -62,6 +69,59 @@ struct T3ThreadView: View {
     private static let endId = "t3-timeline-end"
 
     var body: some View {
+        if let draftTarget {
+            draftHero(draftTarget)
+        } else {
+            timeline
+        }
+    }
+
+    // MARK: - The draft hero (Task 15)
+
+    /// `ChatView.tsx:8005-8039`'s draft-hero state: the composer overlay
+    /// becomes `absolute inset-0 … flex items-center` — the card CENTRED in the
+    /// column rather than docked at its bottom — with the headline pinned
+    /// directly above it (`absolute inset-x-0 bottom-full` + `pb-8` = 32) and no
+    /// timeline at all.
+    private func draftHero(_ target: T3ComposerDraftTarget) -> some View {
+        VStack(spacing: 32) {
+            T3DraftHeroHeadline(projectName: projectName(target), groups: model.state.groups) { group in
+                // The picker retargets the OPEN draft in place
+                // (`DraftHeroHeadline.tsx:141-149`); a group's representative
+                // member is the physical project it starts in.
+                guard let id = group.members.first?.id else { return }
+                model.retargetDraft(target.draftId, projectId: id)
+            }
+            VStack(spacing: 0) {
+                T3DraftNoteSlot(draftStart: model.draftStart, draftId: target.draftId)
+                T3ComposerView(model: model, app: app, store: store, actions: actions,
+                               draftTarget: target, draftStart: model.draftStart)
+            }
+        }
+        // The same column the rows and the docked composer share (`:8019`).
+        .frame(maxWidth: Self.columnMax)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Self.listInset)
+        .frame(maxHeight: .infinity)   // `items-center`
+        .opacity(heroShown ? 1 : 0)
+        .onAppear {
+            withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.18)) { heroShown = true }
+        }
+    }
+
+    /// `activeProjectGroup?.displayName ?? activeProjectTitle`
+    /// (`DraftHeroHeadline.tsx:105`): the logical group's name when the project
+    /// belongs to one, else the project's own.
+    private func projectName(_ target: T3ComposerDraftTarget) -> String? {
+        if let group = model.state.groups.first(where: { $0.members.contains { $0.id == target.projectId } }) {
+            return group.displayName
+        }
+        return model.state.projects.first { $0.id == target.projectId }?.name
+    }
+
+    // MARK: - The timeline
+
+    private var timeline: some View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView {
@@ -133,7 +193,11 @@ struct T3ThreadView: View {
     private var bottomSlot: some View {
         VStack(spacing: 0) {
             T3ThreadPendingSlot(app: app, store: store, actions: actions)
-            // Task 13: the composer.
+            // The composer under the drawers, sharing this view's `actions` —
+            // one sender per thread (`T3ThreadActions`' `sending` guard), so a
+            // verdict and a message can never race.
+            T3ComposerView(model: model, app: app, store: store, actions: actions,
+                           draftStart: model.draftStart)
         }
         // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
@@ -241,6 +305,23 @@ struct T3ThreadView: View {
         let slack = anchors.viewport.height - height
         let fraction = slack > 1 ? min(1, max(0, top / slack)) : 0
         proxy.scrollTo(id, anchor: UnitPoint(x: 0, y: fraction))
+    }
+}
+
+/// The draft hero's banner slot: `T3ThreadPendingSlot` is the live thread's
+/// (it reads the store's pending requests, which a draft has none of), and
+/// `T3ThreadView` deliberately observes neither the model nor `actions`
+/// (T3ThreadView.swift:56) — so a refused (or timed-out) `SessionStart` gets
+/// this small observer of its own, over the model's own start state.
+private struct T3DraftNoteSlot: View {
+    @ObservedObject var draftStart: T3DraftStart
+    let draftId: String
+
+    var body: some View {
+        T3BannerStack(items: draftStart.note(draftId).map { note in
+            [T3BannerItem.error(id: "session-start", message: note,
+                                dismiss: { draftStart.clearNote(draftId) })]
+        } ?? [])
     }
 }
 

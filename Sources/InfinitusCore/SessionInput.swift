@@ -132,12 +132,16 @@ public enum SessionInput {
     public static let allowedKeys: Set<String> = [
         "y", "n", "1", "2", "3", "4", "5", "6", "7", "8", "9", "enter", "esc",
     ]
+
+    /// Longest message any client may send. Outside the delivery block
+    /// below on purpose: the composer's own gate
+    /// (`T3ComposerDrafts.canSend`) is platform-independent, and the phone
+    /// builds that file too.
+    public static let maxMessageLength = 4000
 }
 
 #if !os(iOS)
 extension SessionInput {
-    public static let maxMessageLength = 4000
-
     /// Non-empty, within the length cap, and free of control characters
     /// other than newline (a stray Tab/CR/ESC byte from a malformed
     /// client should never reach a real terminal).

@@ -85,7 +85,7 @@ public enum PatchReview {
     /// Lines of a hunk quoted under a comment, at most.
     public static let excerptLines = 12
     /// The message must pass `SessionInput.isValidMessage`: under its cap
-    /// (`SessionInput.maxMessageLength`, Mac-only code — the test pins the
+    /// (`SessionInput.maxMessageLength` — the test pins the
     /// two together), no control characters but newlines (a tab is one —
     /// code excerpts have them).
     public static let maxLength = 4000

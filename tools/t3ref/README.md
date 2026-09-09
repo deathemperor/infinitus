@@ -130,6 +130,10 @@ $ export T3_THREAD_ID=$(sqlite3 ~/.t3/userdata/state.sqlite \
 $ tools/t3ref/capture-mac.sh thread tools/t3ref/refs/mac-thread.png
 ```
 
+Nothing is committed under `refs/mac-*.png` yet: the `Hi` thread is gone
+from the desktop, so the window can only be shot on the user's live work.
+Recreate the fixture thread in T3 Code first — see `refs/PROVENANCE.md`.
+
 ### iOS
 
 The dev client recipe (spec §0), already run once on this Mac — the app
@@ -165,7 +169,9 @@ $ tools/t3ref/capture-ios.sh git      tools/t3ref/refs/ios-git.png
 $ tools/t3ref/capture-ios.sh settings tools/t3ref/refs/ios-settings.png
 ```
 
-`sleep 6` in the script is a warm-app number. A cold dev client has to
+The script's `sleep 9` is a warm-app number: 3 s of settle for the route
+transition (`openurl` returns before the navigation starts) plus the 6 s
+render wait. A cold dev client has to
 pull the bundle from Metro first — open the `expo-development-client` URL
 and give it ~25 s before the first deep link.
 
@@ -183,10 +189,13 @@ invocation, or the device is gone by the next one.
 
 ## Comparing
 
-`capture-ours.sh` takes the same screen out of Infinitus. Both routes it
-needs are still to come — `infinitusctl show workspace <screen>` (next to
-`show wall`) with sub-project B, `infinitus://t3/<screen>` with C — so
-until then it prints `not yet` and exits 4.
+`capture-ours.sh` takes the same screen out of Infinitus. The Mac route
+landed with sub-project B — `infinitusctl show workspace
+<sidebar|thread|composer|draft|switcher>`, next to `show wall`, on the
+fixture's socket — and raises the workspace to the front, so `winlist
+Infinitus` (frontmost first) picks it over the pop-out. The phone's
+`infinitus://t3/<screen>` is still to come with C, so `capture-ours.sh
+ios …` prints `not yet` and exits 4.
 
 ```
 $ tools/t3ref/capture-ours.sh ios thread /tmp/ours-thread.png
@@ -196,6 +205,11 @@ over: 0.83% max ΔE 41.2
 
 `--out` writes a heatmap: the reference dimmed to 30 % luminance with the
 red channel raised where ΔE went over.
+
+### B parity — 2026-09-09
+
+Mac numbers pending the reference captures (`refs/mac-*.png` absent;
+fixture thread to be recreated in T3 Code).
 
 ## What is in `refs/`
 
