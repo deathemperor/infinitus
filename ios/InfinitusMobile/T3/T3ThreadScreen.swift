@@ -227,6 +227,9 @@ struct T3ThreadScreen: View {
         .navigationDestination(for: T3SourceFileRoute.self) { route in
             T3SourceFileScreen(model: model, session: route.session, macId: route.macId, path: route.path)
         }
+        .navigationDestination(for: T3TerminalRoute.self) { route in
+            T3TerminalScreen(model: model, session: route.session, macId: route.macId)
+        }
         .onChange(of: model.requestedComposerInsert) { _, _ in drainComposerInsert() }
     }
 
@@ -255,8 +258,12 @@ struct T3ThreadScreen: View {
             Spacer(minLength: 8)
             T3GlassSurface {
                 HStack(spacing: 0) {
-                    Image(systemName: "terminal").frame(width: 60, height: 44)
-                        .foregroundStyle(t3.mobile.iconSubtle.color).accessibilityLabel("Terminal (soon)")
+                    NavigationLink(value: T3TerminalRoute(session: session, macId: macId)) {
+                        Image(systemName: "terminal").frame(width: 60, height: 44)
+                            .foregroundStyle(t3.mobile.icon.color).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Terminal")
                     NavigationLink(value: T3FilesRoute(session: session, macId: macId)) {
                         Image(systemName: "folder").frame(width: 60, height: 44)
                             .foregroundStyle(t3.mobile.icon.color).contentShape(Rectangle())

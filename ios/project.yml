@@ -8,6 +8,10 @@ options:
 packages:
   Infinitus:
     path: ..
+  # The phone terminal's emulator (spec F decision: SwiftTerm both ends).
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm.git
+    from: 1.20.0
 # Both bundles need a version pair — the simulator refuses to install an
 # app extension without one ("Invalid placeholder attributes").
 settings:
@@ -81,6 +85,8 @@ targets:
         embed: true
       - target: InfinitusMobileShare
         embed: true
+      - package: SwiftTerm
+        product: SwiftTerm
     settings:
       base:
         # Mobile has its own id under the mac app's run.infinitus

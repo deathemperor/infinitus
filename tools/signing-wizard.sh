@@ -330,7 +330,7 @@ if confirm "Build the phone app now?"; then
   # the team; generic/platform=iOS only signs for devices already there.
   DEST="generic/platform=iOS"
   [[ -n "$DEVICE_UDID" ]] && DEST="id=$DEVICE_UDID"
-  (cd ios && xcodegen generate >/dev/null && xcodebuild -quiet \
+  (cd ios && xcodegen generate >/dev/null && xcodebuild -quiet -skipPackagePluginValidation \
       -project InfinitusMobile.xcodeproj -scheme InfinitusMobile \
       -destination "$DEST" -derivedDataPath build \
       -allowProvisioningUpdates build)
