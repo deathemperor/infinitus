@@ -524,6 +524,8 @@ final class MirrorServer: ObservableObject {
     /// Every phone that fetched with the right token this session, newest
     /// first (user 2026-09-03: "show active/connected devices").
     @Published private(set) var clients: [MirrorClient] = []
+    /// The same phones, kept across relaunches (Settings › Devices › Phones).
+    let phones = PairedPhoneStore()
 
     /// Handed to MirrorExporter so every export lands here too.
     let payload = MirrorPayloadBox()
@@ -756,6 +758,7 @@ final class MirrorServer: ObservableObject {
                 guard let self else { return }
                 self.lastServed = client.lastSeen
                 self.clients = MirrorClient.merge(client, into: self.clients)
+                self.phones.record(client)
             }
         }
         listener.newConnectionHandler = { [queue] connection in
