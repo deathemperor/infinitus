@@ -55,6 +55,11 @@ public struct EngineCapabilities: OptionSet, Sendable, Codable, Hashable {
     /// engine may manage accounts without being able to hand them over
     /// (the proxy holds keys it never reveals).
     public static let backup      = EngineCapabilities(rawValue: 1 << 16)
+    /// Force ONE account's usage fetch now, past whatever serve floor the
+    /// engine polls on, and answer with the fleet that follows — swapd
+    /// `refresh --slot n`. cswap has no per-account force (its list serves
+    /// what its policy last fetched), which is why this is not in `.all`.
+    public static let refreshAccount = EngineCapabilities(rawValue: 1 << 17)
 
     public static let all: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
@@ -150,6 +155,11 @@ public protocol AccountEngine: Sendable {
     /// Usage other engines fetched this refresh, by email (see SharedUsage).
     func offerSharedUsage(_ byEmail: [String: SharedUsage]) async
 
+    /// Fetch account n's usage NOW, past the engine's own serve floor, and
+    /// return the provider's fleet as it reads afterwards — what the ignite
+    /// path publishes so a just-started window shows its real reset
+    /// instead of a guess (#338). Only with `.refreshAccount`.
+    func refresh(fleet: Provider, number: Int) async throws -> EngineFleet
     func switchTo(fleet: Provider, number: Int) async throws
     func rotate(fleet: Provider) async throws
     func reorder(fleet: Provider, _ numbers: [Int]) async throws
@@ -197,6 +207,9 @@ public struct SharedUsage: Sendable {
 public extension AccountEngine {
     /// Default: engines that read usage from their own store ignore it.
     func offerSharedUsage(_ byEmail: [String: SharedUsage]) async {}
+    func refresh(fleet: Provider, number: Int) async throws -> EngineFleet {
+        throw EngineError.unsupported("refresh")
+    }
     func switchTo(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("switch") }
     func rotate(fleet: Provider) async throws { throw EngineError.unsupported("rotate") }
     func reorder(fleet: Provider, _ numbers: [Int]) async throws { throw EngineError.unsupported("reorder") }

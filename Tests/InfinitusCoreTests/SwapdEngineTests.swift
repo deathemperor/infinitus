@@ -146,4 +146,130 @@ final class SwapdMappingTests: XCTestCase {
         """
     }
 }
+
+/// The subprocess side: what the engine actually runs, and what it makes
+/// of the answers. A stub `swapd` script stands in for the binary — the
+/// only engine touchpoint is `swapd … --json`, so the stub is the whole
+/// contract surface.
+final class SwapdEngineTests: XCTestCase {
+    var dir: URL!
+
+    override func setUpWithError() throws {
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("swapd-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    /// `list` answers with one healthy account; `refresh`/`ignite` answer
+    /// with the same account carrying the window the fetch just saw;
+    /// anything else answers the error envelope on stdout and exits 1,
+    /// the way swapd's `--json` failures do.
+    func makeEngine() throws -> SwapdEngine {
+        let argv = dir.appendingPathComponent("argv").path
+        func payload(_ resets: String?) -> String {
+            let window = resets.map { #"{"kind":"5h","pct":3,"resetsAt":"\#($0)"}"# } ?? ""
+            return """
+            {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"activeSlot":1,\
+            "accounts":[{"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"",\
+            "active":true,"disabled":false,"preferred":false,"usageStatus":"ok","windows":[\(window)]}]}]}
+            """
+        }
+        let script = """
+        #!/bin/sh
+        echo "$@" >> "\(argv)"
+        case "$1" in
+          list|prefer|alias) echo '\(payload(nil))' ;;
+          refresh|ignite) echo '\(payload("2026-09-09T05:59:59Z"))' ;;
+          *) echo '{"schemaVersion":1,"error":{"code":"no-such-slot","message":"no slot 9 for claude"}}'; exit 1 ;;
+        esac
+        """
+        let binary = dir.appendingPathComponent("swapd")
+        try script.write(to: binary, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        return SwapdEngine(cli: SwapdCLI(binaryPath: binary.path))
+    }
+
+    func argv() throws -> [String] {
+        let text = try String(contentsOf: dir.appendingPathComponent("argv"), encoding: .utf8)
+        return text.split(separator: "\n").map(String.init)
+    }
+
+    func testSnapshotIsOneListCallStampedWithTheEngineID() async throws {
+        let fleets = try await makeEngine().snapshot()
+        XCTAssertEqual(try argv(), ["list --json"], "one subprocess, no per-account calls")
+        XCTAssertEqual(fleets.map(\.key), ["swapd/claude"])
+        XCTAssertEqual(fleets[0].accounts.map(\.number), [1])
+    }
+
+    /// The ignite path's second half: the reset the popup announces comes
+    /// from the fetch this call forced, not from the next poll (#338).
+    func testRefreshForcesTheSlotAndAnswersWithThatProvidersFleet() async throws {
+        let fleet = try await makeEngine().refresh(fleet: .claude, number: 1)
+        XCTAssertEqual(try argv(), ["refresh --slot 1 --provider claude --json"])
+        XCTAssertEqual(fleet.provider, .claude)
+        XCTAssertEqual(fleet.accounts[0].usage?.fiveHour?.resetsAt, "2026-09-09T05:59:59Z")
+    }
+
+    func testAFailedVerbThrowsTheEnginesOwnMessage() async throws {
+        do {
+            try await makeEngine().remove(fleet: .claude, number: 9)
+            XCTFail("a refusal must throw")
+        } catch let error as CLIError {
+            // The envelope rides STDOUT with a non-zero exit — "exited 1"
+            // would tell the user nothing.
+            XCTAssertEqual(error.message, "no slot 9 for claude")
+        }
+        XCTAssertEqual(try argv(), ["remove 9 --yes --provider claude --json"],
+                       "--yes is the confirmation swapd demands")
+    }
+
+    /// swapd's schema is additive-stable: a BUMP means a shape this build
+    /// cannot read, and reading it anyway would render wrong numbers.
+    func testANewerSchemaIsRefusedInsteadOfRendered() throws {
+        let cli = try makeEngine().cli
+        XCTAssertNoThrow(try cli.decodeList(Data(#"{"schemaVersion":1,"providers":[]}"#.utf8)))
+        do {
+            _ = try cli.decodeList(Data(#"{"schemaVersion":2,"providers":[]}"#.utf8))
+            XCTFail("a bumped schema must be refused")
+        } catch let error as EngineError {
+            XCTAssertEqual(error, .unsupported("swapd speaks schema v2; this build reads v1"))
+        }
+    }
+
+    func testWritesCarryTheProviderAndAnUnknownOneIsRefused() async throws {
+        let engine = try makeEngine()
+        try await engine.setPreferred(fleet: .claude, number: 2, true)
+        try await engine.rename(fleet: .claude, number: 2, "  ")
+        do {
+            try await engine.switchTo(fleet: .other, number: 1)
+            XCTFail("`.other` has no id to send back")
+        } catch let error as EngineError {
+            XCTAssertEqual(error, .unsupported(
+                "that provider (swapd calls it something this build doesn't know)"))
+        }
+        XCTAssertEqual(try argv(), ["prefer 2 on --provider claude --json",
+                                    "alias 2 --unset --provider claude --json"])
+    }
+
+    func testCapabilitiesOmitWhatSwapdHasNoVerbFor() async throws {
+        let engine = try makeEngine()
+        XCTAssertTrue(engine.capabilities.contains(.refreshAccount))
+        for missing in [EngineCapabilities.costReport, .addOAuth, .notify] {
+            XCTAssertFalse(engine.capabilities.contains(missing))
+        }
+        do {
+            _ = try await engine.usageReport(days: 7)
+            XCTFail("no cost report")
+        } catch let error as EngineError {
+            XCTAssertEqual(error, .unsupported("costReport"))
+        }
+        // The default the protocol gives every other engine.
+        XCTAssertFalse(CswapEngine(cli: CswapCLI(binaryPath: "/bin/true"))
+            .capabilities.contains(.refreshAccount))
+    }
+}
 #endif
