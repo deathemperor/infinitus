@@ -197,6 +197,23 @@ final class T3ProjectFilesTests: XCTestCase {
         XCTAssertEqual(T3ProjectFiles.ReadError.binary.message, "binary file")
         XCTAssertEqual(T3ProjectFiles.ReadError.failed("io").status, 500)
     }
+
+    // MARK: - pid → cwd (#486: the Mac's AppModel and the Linux tray share this hop)
+
+    func testListAndReadByPidResolveTheOwningSessionsCwd() throws {
+        let root = try tree(["a.swift": Data("import Foundation".utf8)])
+        let sessions = [ClaudeSessionRecord(pid: 111, sessionId: "s1", cwd: root.path)]
+        let listing = try T3ProjectFiles.list(pid: 111, sessions: sessions)?.get()
+        XCTAssertEqual(listing?.cwd, root.path)
+        let read = try T3ProjectFiles.read(pid: 111, path: "a.swift", sessions: sessions)?.get()
+        XCTAssertEqual(read?.contents, "import Foundation")
+    }
+
+    func testListAndReadByPidAreNilForAnUnknownPid() {
+        let sessions = [ClaudeSessionRecord(pid: 111, sessionId: "s1", cwd: "/tmp")]
+        XCTAssertNil(T3ProjectFiles.list(pid: 222, sessions: sessions))
+        XCTAssertNil(T3ProjectFiles.read(pid: 222, path: "a.swift", sessions: sessions))
+    }
 }
 
 private extension Result {

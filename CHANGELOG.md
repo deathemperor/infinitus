@@ -13,6 +13,9 @@ publishes the matching section as the GitHub release body.
 - Leaders can compact their own branch on the store (Settings › Team, `infinitusctl team-compact`): one commit without the pre-split transcript history, the explicit force-push the spec reserves, so a new member's first fetch is megabytes instead of gigabytes (#339).
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
+### Linux tray
+- The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
+
 ### Mac
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).

@@ -158,6 +158,16 @@ public enum T3ProjectFiles: Sendable {
         return .success(Listing(cwd: root, entries: entries, truncated: truncated))
     }
 
+    /// The pid → cwd hop both dispatchers make before they can list at all
+    /// (the Mac's `AppModel` and the Linux tray's `serve`, each already
+    /// holding its own live `[ClaudeSessionRecord]`): `nil` when no live
+    /// session owns `pid` — both routes answer that as a 404.
+    public static func list(pid: Int32, sessions: [ClaudeSessionRecord],
+                            cap: Int = entryCap, fileManager: FileManager = .default) -> Result<Listing, ListError>? {
+        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
+        return list(root: record.cwd, cap: cap, fileManager: fileManager)
+    }
+
     // MARK: - Reading
 
     /// One file's text under `root`. `path` is cwd-relative; symlinks are
@@ -196,6 +206,13 @@ public enum T3ProjectFiles: Sendable {
         let body = truncated ? utf8Prefix(head) : head
         return .success(FileRead(path: relative, contents: String(decoding: body, as: UTF8.self),
                                  byteLength: byteLength, truncated: truncated, mime: mime))
+    }
+
+    /// The same pid → cwd hop as `list(pid:sessions:)`, for the read route.
+    public static func read(pid: Int32, path: String, sessions: [ClaudeSessionRecord],
+                            cap: Int = readCap, fileManager: FileManager = .default) -> Result<FileRead, ReadError>? {
+        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
+        return read(root: record.cwd, path: path, cap: cap, fileManager: fileManager)
     }
 
     /// The build and vendor trees the browser never lists (#223 names
