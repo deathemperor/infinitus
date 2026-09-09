@@ -87,13 +87,7 @@ struct TeamScreen: View {
                         }
                     }
                 }
-                .disabled(!lock.enabled || joinCode.isEmpty || busy != nil)
-                // The Mac has the same rule: no join from a phone that
-                // anyone who picks it up can open (spec §2.2).
-                if !lock.enabled {
-                    Text("Turn on the Team lock in Settings first.")
-                        .font(.caption).foregroundStyle(.orange)
-                }
+                .disabled(joinCode.isEmpty || busy != nil)
             }
             Section {
                 Text("Create a team on the Mac (Settings › Team).")
@@ -260,7 +254,7 @@ struct TeamScreen: View {
                             await loadNearby()
                         }
                     }
-                    .disabled(!lock.enabled || joinName.isEmpty || busy != nil)
+                    .disabled(joinName.isEmpty || busy != nil)
                 }
             }
             Button("Scan") { Task { await scanNearby() } }.disabled(busy != nil || scanning)
@@ -285,7 +279,7 @@ struct TeamScreen: View {
                                     await loadNearby()
                                 }
                             }
-                            .disabled(!lock.enabled || joinName.isEmpty || busy != nil)
+                            .disabled(joinName.isEmpty || busy != nil)
                             Button("Ignore", role: .destructive) {
                                 Task {
                                     _ = await act("Ignoring…") {
@@ -333,7 +327,7 @@ struct TeamScreen: View {
                                 await loadNearby()
                             }
                         }
-                        .disabled(!lock.enabled || busy != nil)
+                        .disabled(busy != nil)
                     }
                 }
             }

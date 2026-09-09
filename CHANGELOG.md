@@ -40,6 +40,7 @@ publishes the matching section as the GitHub release body.
 - Home pages the settled tail ten rows at a time behind a Show more footer, and a long press on a row offers Settle, Snooze presets, Pin, Un-settle or Wake as the reference does (#223).
 - A custom answer typed under a session's question now reaches Claude Code; it stands in for the picked options, as the reference does.
 - Typing / at the start of a line in the thread composer lists the session's slash commands and skills to pick from, as the reference does (#223).
+- Team actions on the phone (join, invite, request, file) no longer need the app lock turned on.
 
 ## 0.4.4-alpha.2
 

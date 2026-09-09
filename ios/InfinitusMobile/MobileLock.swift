@@ -33,8 +33,7 @@ final class MobileLock: ObservableObject {
     /// Unlock button can both ask.
     private var prompting = false
 
-    /// The join rule TeamScreen shares with the Mac: no join from a
-    /// phone anyone who picks it up can open. Settable so the plain
+    /// Whether the lock is on at all. Settable so the plain
     /// Team-tab switch still binds to it.
     var enabled: Bool {
         get { scope != .off }
