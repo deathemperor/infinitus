@@ -232,11 +232,18 @@ final class MirrorTransportTests: XCTestCase {
                       String(decoding: raw.prefix(120), as: UTF8.self))
         // A workspace file changes under its path, so nothing may be cached.
         XCTAssertFalse(String(decoding: raw.prefix(200), as: UTF8.self).contains("Cache-Control"))
-        // Text is byte-for-byte the envelope the phone already parses.
+        // Text is the envelope the phone already parses — the same builder,
+        // so the same status, type and decoded body (Linux's JSONEncoder
+        // orders keys differently per encode, so not the same bytes).
         let file = T3ProjectFiles.FileRead(path: "a.swift", contents: "x", byteLength: 1,
                                            truncated: false, mime: "text/x-swift")
-        XCTAssertEqual(MirrorTransport.fileAnswerResponse(.success(.text(file))),
-                       MirrorTransport.fileReadResponse(.success(file)))
+        let text = MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(.success(.text(file))))
+        let plain = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.success(file)))
+        XCTAssertEqual(text?.status, plain?.status)
+        XCTAssertEqual(text?.status, 200)
+        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.FileRead.self, from: text?.body ?? Data()), file)
+        XCTAssertTrue(String(decoding: MirrorTransport.fileAnswerResponse(.success(.text(file))).prefix(80), as: UTF8.self)
+                        .contains("Content-Type: application/json\r\n"))
         let big = MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(.failure(.tooLarge)))
         XCTAssertEqual(big?.status, 413)
         XCTAssertEqual(String(decoding: big?.body ?? Data(), as: UTF8.self), #"{"error":"file too large"}"#)
