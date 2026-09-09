@@ -516,7 +516,13 @@ public enum Stats {
         keyLock.lock(); defer { keyLock.unlock() }
         if let f = keyFormatters[calendar.timeZone] { return f }
         let f = DateFormatter()
-        f.calendar = calendar
+        // Store keys are Gregorian whatever the caller's calendar (#409):
+        // a Buddhist-calendar Mac published days/2569-09-09.json and its
+        // team never counted it as today. Day boundaries stay the
+        // caller's (same civil days, only the year numbering differs).
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        f.calendar = gregorian
         f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
