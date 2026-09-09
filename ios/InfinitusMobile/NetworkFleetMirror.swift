@@ -384,18 +384,23 @@ actor NetworkFleetMirror: FleetMirror {
 
     /// Internal, not private: the app-only T3 routes (Files) extend the client from their own file.
     func getJSON<R: Decodable>(_ path: String, dates: Bool = false) async throws -> R {
-        let token = pairToken()
-        let data: Data
-        if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) {
-            data = stored
-        } else {
-            let discovered = try await discover()
-            (data, _) = try await fetch(discovered, path: path, hostHeader: "infinitus",
-                                        useTLS: false, token: token, timeout: Self.candidateTimeout)
-        }
+        let data = try await getData(path)
         let decoder = JSONDecoder()
         if dates { decoder.dateDecodingStrategy = .iso8601 }
         return try decoder.decode(R.self, from: data)
+    }
+
+    /// A GET's body as bytes — stored endpoints first, Bonjour last, the
+    /// pairing token on every try; a non-2xx is `MirrorTransportError.http`.
+    func getData(_ path: String) async throws -> Data {
+        let token = pairToken()
+        if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout) {
+            return stored
+        }
+        let discovered = try await discover()
+        let (data, _) = try await fetch(discovered, path: path, hostHeader: "infinitus",
+                                        useTLS: false, token: token, timeout: Self.candidateTimeout)
+        return data
     }
 
     /// The session timeline (#223 phase 4): a snapshot on the first ask,

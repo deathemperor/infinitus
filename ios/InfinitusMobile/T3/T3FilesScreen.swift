@@ -10,13 +10,30 @@ extension NetworkFleetMirror {
         try await getJSON(T3ProjectFiles.filesPath(pid: pid))
     }
 
-    /// One workspace file's text: `GET /sessions/<pid>/file?path=<rel>`.
-    /// 400 outside the workspace, 404 gone, 415 binary — surfaced as `.http`.
-    func file(pid: Int32, path: String) async throws -> T3ProjectFiles.FileRead {
+    /// One workspace file: `GET /sessions/<pid>/file?path=<rel>` — the
+    /// text as a JSON `FileRead`, or (B-26, #223) an image's raw bytes with
+    /// its `Content-Type`. 400 outside the workspace, 404 gone, 413 an
+    /// image over 8 MB, 415 other binaries — surfaced as `.http`.
+    func file(pid: Int32, path: String) async throws -> T3FileReply {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
         let encoded = path.addingPercentEncoding(withAllowedCharacters: allowed) ?? path
-        return try await getJSON("\(T3ProjectFiles.filePath(pid: pid))?\(T3ProjectFiles.pathQueryName)=\(encoded)")
+        return try T3FileReply.decode(await getData("\(T3ProjectFiles.filePath(pid: pid))?\(T3ProjectFiles.pathQueryName)=\(encoded)"))
+    }
+}
+
+/// What the file route answered. The transport hands back the body only,
+/// so the shape is read off the bytes: a JSON envelope opens with `{`, no
+/// image format does.
+enum T3FileReply: Equatable {
+    case text(T3ProjectFiles.FileRead)
+    case image(Data)
+
+    static func decode(_ data: Data) throws -> T3FileReply {
+        if data.first == UInt8(ascii: "{") {
+            return .text(try JSONDecoder().decode(T3ProjectFiles.FileRead.self, from: data))
+        }
+        return .image(data)
     }
 }
 
@@ -261,18 +278,25 @@ struct T3SourceFileScreen: View {
     @Environment(\.t3) private var t3
     @Environment(\.dismiss) private var dismiss
     @State private var file: T3ProjectFiles.FileRead?
+    @State private var image: UIImage?
+    @State private var imageBytes = 0
+    @State private var showImageFull = false
     @State private var error: String?
     @State private var binary = false
     @State private var copied = false
-    private let fixture: T3ProjectFiles.FileRead?
+    private let fixture: T3FileReply?
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil, path: String) {
         self.model = model; self.session = session; self.macId = macId; self.path = path; fixture = nil
     }
 
-    init(model: MirrorModel, session: SessionDetail, path: String, fixture: T3ProjectFiles.FileRead) {
+    init(model: MirrorModel, session: SessionDetail, path: String, fixture: T3FileReply) {
         self.model = model; self.session = session; self.path = path; self.fixture = fixture
-        _file = State(initialValue: fixture)
+        switch fixture {
+        case .text(let read): _file = State(initialValue: read)
+        case .image(let data):
+            _image = State(initialValue: UIImage(data: data)); _imageBytes = State(initialValue: data.count)
+        }
     }
 
     private static let mono = Font.system(size: 12, design: .monospaced)
@@ -298,6 +322,8 @@ struct T3SourceFileScreen: View {
                         source(file.contents)
                     }
                 }
+            } else if let image {
+                imagePreview(image)
             } else if binary {
                 T3EmptyState(title: "No preview", message: "This file is not text; its path can still go into a message.")
             } else if let error {
@@ -333,6 +359,30 @@ struct T3SourceFileScreen: View {
             }
         }
         .task { if fixture == nil { await load() } }
+        .fullScreenCover(isPresented: $showImageFull) {
+            AttachmentPreview(name: (path as NSString).lastPathComponent, bytes: imageBytes, image: image)
+        }
+    }
+
+    /// `WorkspaceFileImagePreview`: the image fit inside a `subtle` field
+    /// with 16 pt of air, a tap opens it full-screen (pinch to zoom); its
+    /// pixel size and weight underneath.
+    private func imagePreview(_ image: UIImage) -> some View {
+        let p = t3.mobile
+        return VStack(spacing: 0) {
+            Button { showImageFull = true } label: {
+                Image(uiImage: image).resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(16)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(p.subtle.color)
+            .accessibilityLabel("Open full-screen preview of \((path as NSString).lastPathComponent)")
+            Text("\(Int(image.size.width * image.scale)) × \(Int(image.size.height * image.scale)) · \(Self.kb(imageBytes))")
+                .font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color)
+                .frame(maxWidth: .infinity).padding(.vertical, 10)
+        }
     }
 
     /// Line rows in a two-axis scroll: the gutter's width from the line count.
@@ -363,7 +413,14 @@ struct T3SourceFileScreen: View {
     @MainActor
     private func load() async {
         do {
-            file = try await model.mirror(for: macId).file(pid: Int32(session.pid), path: path)
+            switch try await model.mirror(for: macId).file(pid: Int32(session.pid), path: path) {
+            case .text(let read): file = read
+            case .image(let data):
+                guard let decoded = UIImage(data: data) else { binary = true; return }
+                image = decoded; imageBytes = data.count
+            }
+        } catch MirrorTransportError.http(413) {
+            error = "Too large to preview (over 8 MB); its path can still go into a message."
         } catch MirrorTransportError.http(415) {
             binary = true
         } catch MirrorTransportError.http(404) {
