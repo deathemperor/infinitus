@@ -333,6 +333,38 @@ final class OwnedSessionsProcessTests: XCTestCase {
         await owned.stopAll()
     }
 
+    func testDeliverDenyCarriesTheReasonOnTheWire() async throws {
+        let (owned, states) = try await make()
+        let pid = try await startedPid(owned, request())
+        waitFor("init") { states.all.contains(.idle) }
+
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .message, text: "[Infinitus] hello"), record: record(pid)),
+                       SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("pending") { !owned.pending(pid: pid).isEmpty }
+
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .deny, text: "not on main"), record: record(pid)),
+                       SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("denied") { self.file("answers").contains("\"deny\"") }
+        XCTAssertTrue(file("answers").contains("\"message\":\"not on main\""), file("answers"))
+        await owned.stopAll()
+    }
+
+    func testDeliverDenyWithNoReasonUsesOwnedWireDenyMessage() async throws {
+        let (owned, states) = try await make()
+        let pid = try await startedPid(owned, request())
+        waitFor("init") { states.all.contains(.idle) }
+
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .message, text: "[Infinitus] hello"), record: record(pid)),
+                       SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("pending") { !owned.pending(pid: pid).isEmpty }
+
+        XCTAssertEqual(owned.deliver(SessionInput.Request(kind: .deny, text: ""), record: record(pid)),
+                       SessionInput.Reply(outcome: "delivered", channel: "stdin"))
+        waitFor("denied") { self.file("answers").contains("\"deny\"") }
+        XCTAssertTrue(file("answers").contains("\"message\":\"\(OwnedWire.denyMessage)\""), file("answers"))
+        await owned.stopAll()
+    }
+
     func testDeliverAnswersEveryQuestionOfTheParkedPrompt() async throws {
         let (owned, states) = try await make()
         let pid = try await startedPid(owned, request())
