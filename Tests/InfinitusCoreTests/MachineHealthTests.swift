@@ -118,6 +118,11 @@ final class MachineHealthTests: XCTestCase {
         let rows = MachineSampler.parsePS(ps)
         let live = HookInventory.live(of: byOwner["peon-ping"]!.first!, rows: rows)
         XCTAssertEqual(live.instances, 1); XCTAssertEqual(live.helpers, 1)
+        let shared = HookInventory.live(of: byOwner["peon-ping"]!.first!, rows: rows, index: HookInventory.ProcessIndex(rows))
+        XCTAssertEqual(shared.instances, 1); XCTAssertEqual(shared.helpers, 1)
+        XCTAssertTrue(HookInventory.bytesContain(Array("/usr/bin/python3 /Users/x/hooks/run.sh --fast".utf8), Array("/Users/x/hooks/run.sh".utf8)))
+        XCTAssertFalse(HookInventory.bytesContain(Array("/Users/x/hooks/run.s".utf8), Array("/Users/x/hooks/run.sh".utf8)))
+        XCTAssertTrue(HookInventory.bytesContain(Array("abc".utf8), []))
         XCTAssertEqual(live.uninterruptible, 2); XCTAssertEqual(live.oldestSeconds, 53 * 60 + 10)
 
         let before = Set(regs.dropLast().map(\.id))
