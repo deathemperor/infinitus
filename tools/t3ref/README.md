@@ -20,7 +20,7 @@ Reference versions (spec §0):
 |---|---|
 | `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. |
 | `fixture.sh` | A fake `CLAUDE_CONFIG_DIR` holding the parity fixture, plus the debug app on it. `fixture.sh --stop` tears it down. |
-| `winlist.swift` | `winlist <owner-substring>` → `id width height` of that app's first normal-layer window. |
+| `winlist.swift` | `winlist <owner-substring> [title-substring\|WxH]` → `id width height` of that app's first matching normal-layer window. The filter picks the workspace out of an Infinitus that also has the pop-out open; `WxH` matches the bounds exactly (`kCGWindowName` is empty without Screen Recording permission). |
 | `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
 | `capture-ios.sh` | `capture-ios.sh <screen> <out.png>` — deep-links the T3 dev client in the booted simulator and screenshots it. |
 | `capture-ours.sh` | `capture-ours.sh <mac\|ios> <screen> <out.png>` — the same screen in Infinitus. |
@@ -192,8 +192,10 @@ invocation, or the device is gone by the next one.
 `capture-ours.sh` takes the same screen out of Infinitus. The Mac route
 landed with sub-project B — `infinitusctl show workspace
 <sidebar|thread|composer|draft|switcher>`, next to `show wall`, on the
-fixture's socket — and raises the workspace to the front, so `winlist
-Infinitus` (frontmost first) picks it over the pop-out. The phone's
+fixture's socket — and raises the workspace to the front, but the window
+list is not ordered front-to-back within an app, so the open pop-out was
+being captured instead (#442): the script now asks `winlist` for the
+window whose bounds are the preset workspace frame. The phone's
 `infinitus://t3/<screen>` is still to come with C, so `capture-ours.sh
 ios …` prints `not yet` and exits 4.
 
