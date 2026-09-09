@@ -887,10 +887,14 @@ struct T3ThreadPendingSlot: View {
         // `.first`, not a search: every key and `.approve` answers
         // `pending(pid:).first` (OwnedSessions.swift:421-449), so the panel has
         // to render exactly that one.
-        store.pending.approvals.first.map(T3PendingApprovalItem.init)
+        // `!store.gone` (#400): the thread stays open when its session exits,
+        // but the prompt it was parked on has no one to answer it — the phone
+        // hides its cards the same way (`T3ThreadScreen`, `!follower.ended`).
+        guard !store.gone else { return nil }
+        return store.pending.approvals.first.map(T3PendingApprovalItem.init)
     }
     private var questions: [T3PendingQuestionItem] {
-        guard approval == nil, let input = store.pending.userInputs.first else { return [] }
+        guard !store.gone, approval == nil, let input = store.pending.userInputs.first else { return [] }
         return T3PendingAnswers.parse(input.questions)
     }
     private var userInputRequestId: String? { store.pending.userInputs.first?.requestId }

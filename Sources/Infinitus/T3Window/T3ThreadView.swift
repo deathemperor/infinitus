@@ -233,7 +233,9 @@ struct T3ThreadView: View {
             if let cwd = model.state.projects.first(where: { $0.id == target.projectId })?.cwd {
                 T3BranchLine(cwd: cwd, threadId: target.draftId, model: model)
             }
-        } else if let thread = model.state.threads.first(where: { $0.id == store.threadId }),
+        // `selectedThread`, not `threads`: an ended thread (#400) is off the
+        // live list but still open, and its project still names the folder.
+        } else if let thread = model.state.selectedThread, thread.id == store.threadId,
                   let cwd = model.state.projects.first(where: { $0.id == thread.projectId })?.cwd {
             T3BranchLine(cwd: cwd, threadId: thread.id, model: model)
         }
@@ -255,7 +257,8 @@ struct T3ThreadView: View {
     /// (OwnedSessions.swift:445), so a plan behind another approval must not
     /// offer the button — it would approve the wrong tool.
     private var planIsActionable: Bool {
-        store.pending.approvals.first?.toolName == "ExitPlanMode"
+        // An ended session (#400) has no one to answer the parked prompt.
+        !store.gone && store.pending.approvals.first?.toolName == "ExitPlanMode"
     }
 
     /// …and only on ONE card: the parked prompt belongs to the newest plan, so

@@ -29,6 +29,11 @@ public struct T3WorkspaceState: Sendable, Equatable {
     public var projects: [T3ProjectGrouping.Project] = []
     public var groups: [T3ProjectGrouping.Group] = []
     public var selectedThreadId: String?
+    /// The selected thread's last value after its session exited (#400): it
+    /// stays open with "This session has ended." instead of vanishing, so it
+    /// has to outlive `threads`, which only ever holds live sessions. Written
+    /// by `apply`, cleared by any other `select` or by the session's return.
+    public private(set) var endedThread: T3Thread?
     public var scope: T3SidebarScope = .all
     public var search = ""
     public var expandedTurnIds: [String: Set<String>] = [:]
@@ -137,6 +142,7 @@ public struct T3WorkspaceState: Sendable, Equatable {
         }
         // Drafts first: `Sidebar.tsx:797-800` keeps the draft block above the
         // list so an interrupted "new thread" stays one click away.
+        let previousThreads = threads
         threads = drafts + next.sorted { $0.updatedAt > $1.updatedAt }
         pidBySession = pids
         // Drop memory for threads that are gone; a thread that comes back gets
@@ -149,13 +155,35 @@ public struct T3WorkspaceState: Sendable, Equatable {
         projects = inputs.projects.map { T3ProjectGrouping.Project(summary: $0) }
         groups = T3ProjectGrouping.groups(projects: projects, settings: .init(),
                                           primaryEnvironmentId: T3Thread.localEnvironmentId, environmentLabel: { _ in nil })
+        // #400: the selected thread's session exited — keep it SELECTED. The
+        // window then holds its rows, shows "This session has ended." and
+        // refuses sends, which is the phone's rule (`T3ThreadScreen`). The
+        // value is stashed here rather than left in `threads` because that
+        // list is the live sessions the sidebar shows, and an ended thread is
+        // no longer one. A session that comes back (same id, new pid) lands in
+        // `pids` again and clears the stash; `select` drops it for good.
         if let id = selectedThreadId, pids[id] == nil, !drafts.contains(where: { $0.id == id }) {
-            selectedThreadId = nil
+            if endedThread?.id != id {
+                // Not a thread this state ever carried (a selection restored
+                // for a session this launch never saw): nothing to keep open.
+                guard let last = previousThreads.first(where: { $0.id == id }) else {
+                    selectedThreadId = nil
+                    endedThread = nil
+                    return
+                }
+                endedThread = last
+            }
+        } else {
+            endedThread = nil
         }
     }
 
     public mutating func select(_ threadId: String?, now: Date) {
         guard threadId == nil || threads.contains(where: { $0.id == threadId }) else { return }
+        // Any other selection — a live thread, a draft, or nothing — drops the
+        // ended thread for good (#400). The ended id itself is not in
+        // `threads`, so it cannot be re-selected through here.
+        endedThread = nil
         selectedThreadId = threadId
         guard let threadId else { return }
         lastVisitedAt[threadId] = now
@@ -247,7 +275,14 @@ public struct T3WorkspaceState: Sendable, Equatable {
     public func isDraftStarting(_ draftId: String) -> Bool { startedDraftPids[draftId] != nil }
 
     public func pid(of threadId: String) -> Int32? { pidBySession[threadId] }
-    public var selectedThread: T3Thread? { selectedThreadId.flatMap { id in threads.first { $0.id == id } } }
+    /// The ended thread (#400) resolves through here too — everything that
+    /// draws the open thread (the top bar's title, the branch line's project)
+    /// reads this, so it keeps working after the session exits.
+    public var selectedThread: T3Thread? {
+        guard let id = selectedThreadId else { return nil }
+        if let live = threads.first(where: { $0.id == id }) { return live }
+        return endedThread?.id == id ? endedThread : nil
+    }
 
     /// Scope + search applied; an empty search shows the whole scope
     /// (`T3SidebarList.searchByTitle`'s empty query matches nothing, so it

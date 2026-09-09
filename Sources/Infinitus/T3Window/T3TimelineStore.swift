@@ -67,7 +67,7 @@ final class T3TimelineStore: ObservableObject {
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid && $0.sessionId == threadId }) else {
                     await MainActor.run { [pid] in
                         guard let self, self.pid == pid else { return }
-                        self.gone = true
+                        self.markGone()
                     }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     continue
@@ -76,7 +76,13 @@ final class T3TimelineStore: ObservableObject {
                     guard let self, self.pid == pid else { return }
                     // Only publish on the flip: an unconditional write fires
                     // objectWillChange every poll for nothing.
-                    if self.gone { self.gone = false }
+                    if self.gone {
+                        self.gone = false
+                        // The rows were derived with the Working row
+                        // suppressed (#400) — put it back before the next
+                        // transcript read, which may find nothing new.
+                        self.rederive()
+                    }
                 }
                 guard let raw = timelineCache.timeline(record: record, claudeDir: claudeDir) else {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -119,6 +125,17 @@ final class T3TimelineStore: ObservableObject {
         loop = nil
     }
 
+    /// The session is gone (#400): the thread stays open with the banner, so
+    /// the rows are re-derived once with `ended` set — a turn that was running
+    /// when the session exited must not leave a Working row counting up.
+    /// Idempotent; the window model calls this too, since its own state knows
+    /// the pid left the fleet before the next poll wakes.
+    func markGone() {
+        guard !gone else { return }
+        gone = true
+        rederive()
+    }
+
     /// A resume lands a new pid under the same session — keep the store
     /// (and its rows' identity) rather than the caller tearing it down.
     func rebind(pid: Int32) {
@@ -138,7 +155,8 @@ final class T3TimelineStore: ObservableObject {
         let expandedTurnIds = window?.state.expandedTurnIds[threadId] ?? []
         let expandedWorkGroupIds = window?.state.expandedWorkGroupIds[threadId] ?? []
         let input = T3TimelineInput.make(timeline: built, pending: ownedPending, facts: facts,
-                                         expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds)
+                                         expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds,
+                                         ended: gone)
         let next = T3TimelineRows.stable(previous: rows, next: T3TimelineRows.derive(input))
         if next != rows { rows = next }
     }

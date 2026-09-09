@@ -95,6 +95,16 @@ final class T3WindowModel: ObservableObject {
             return
         }
         guard let id = state.selectedThreadId, let pid = state.pid(of: id) else {
+            // #400: the SAME thread whose session just exited keeps its store.
+            // The poll's own "no record for this pid under this session id"
+            // branch sets `gone` (the banner, the disconnected composer), and
+            // it keeps looking — a session that comes back under a new pid
+            // arrives here as a live selection and rebinds below. Only a
+            // selection change drops the store.
+            if let id = state.selectedThreadId, timelineStore?.threadId == id {
+                timelineStore?.markGone()
+                return
+            }
             timelineStore?.stop()
             if timelineStore != nil { timelineStore = nil }
             return

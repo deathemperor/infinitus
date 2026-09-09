@@ -36,7 +36,7 @@ final class T3WorkspaceStateTests: XCTestCase {
         XCTAssertEqual(s.threads.map(\.id), ["s1"])
     }
 
-    func testSelectionSurvivesPidChangeAndClearsWhenGone() {
+    func testSelectionSurvivesPidChangeAndStaysOpenWhenGone() {
         var s = T3WorkspaceState()
         s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
         s.select("s1", now: now)
@@ -45,9 +45,77 @@ final class T3WorkspaceStateTests: XCTestCase {
         s.apply(inputs([(record(pid: 9, id: "s1"), facts())]), now: now)   // resumed under a new pid
         XCTAssertEqual(s.selectedThreadId, "s1")
         XCTAssertEqual(s.pid(of: "s1"), 9)
+        XCTAssertNil(s.endedThread)
+        // #400: the session exits — the thread stays open, off the sidebar.
         s.apply(inputs([]), now: now)
-        XCTAssertNil(s.selectedThreadId)
+        XCTAssertEqual(s.selectedThreadId, "s1")
+        XCTAssertEqual(s.endedThread?.id, "s1")
+        XCTAssertEqual(s.selectedThread?.id, "s1")
+        XCTAssertNil(s.pid(of: "s1"))
+        XCTAssertEqual(s.threads.map(\.id), [])
+    }
+
+    func testEndedThreadSurvivesFurtherApplies() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        s.select("s1", now: now)
+        s.apply(inputs([]), now: now)
+        s.apply(inputs([(record(pid: 4, id: "other"), facts())]), now: now)
+        XCTAssertEqual(s.selectedThread?.id, "s1")
+        XCTAssertEqual(s.endedThread?.id, "s1")
+    }
+
+    func testReturningSessionClearsTheEndedThread() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        s.select("s1", now: now)
+        s.apply(inputs([]), now: now)
+        s.apply(inputs([(record(pid: 7, id: "s1"), facts())]), now: now)   // same session, new pid
+        XCTAssertNil(s.endedThread)
+        XCTAssertEqual(s.selectedThreadId, "s1")
+        XCTAssertEqual(s.pid(of: "s1"), 7)
+    }
+
+    func testSelectingAnotherThreadDropsTheEndedOne() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts()), (record(pid: 2, id: "s2"), facts())]), now: now)
+        s.select("s1", now: now)
+        s.apply(inputs([(record(pid: 2, id: "s2"), facts())]), now: now)
+        XCTAssertEqual(s.endedThread?.id, "s1")
+        s.select("s2", now: now)
+        XCTAssertNil(s.endedThread)
+        XCTAssertEqual(s.selectedThread?.id, "s2")
+        // …and it does not come back on the next tick.
+        s.apply(inputs([(record(pid: 2, id: "s2"), facts())]), now: now)
+        XCTAssertNil(s.endedThread)
+    }
+
+    func testSelectingNothingDropsTheEndedThread() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        s.select("s1", now: now)
+        s.apply(inputs([]), now: now)
+        s.select(nil, now: now)
+        XCTAssertNil(s.endedThread)
         XCTAssertNil(s.selectedThread)
+    }
+
+    func testDraftSelectionIsUnaffectedByTheEndedRule() {
+        var s = T3WorkspaceState()
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        let draft = s.addDraft(projectId: "p", now: now)
+        s.select(draft, now: now)
+        s.apply(inputs([]), now: now)   // the other session exits; the draft is the selection
+        XCTAssertNil(s.endedThread)
+        XCTAssertEqual(s.selectedThread?.id, draft)
+    }
+
+    func testSelectionForAThreadThisStateNeverSawStillClears() {
+        var s = T3WorkspaceState()
+        s.selectedThreadId = "ghost"
+        s.apply(inputs([(record(pid: 1, id: "s1"), facts())]), now: now)
+        XCTAssertNil(s.selectedThreadId)
+        XCTAssertNil(s.endedThread)
     }
 
     func testSectionsPinnedActiveSnoozedSettled() {

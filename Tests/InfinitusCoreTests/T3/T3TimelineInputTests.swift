@@ -66,6 +66,25 @@ final class T3TimelineInputTests: XCTestCase {
         XCTAssertNil(input.activeTurnStartedAt)
     }
 
+    /// #400: the session exited while a turn was running — the frozen
+    /// `running` must not leave a Working row (and its elapsed counter)
+    /// spinning under the "This session has ended." banner. The rows
+    /// themselves stay.
+    func testEndedSessionIsNeverWorking() {
+        let requestedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let t = timeline(state: .running, startedAt: requestedAt, requestedAt: requestedAt)
+        let facts = SessionFacts(status: .running, hasPendingApprovals: false, hasPendingUserInput: false,
+                                 hasPlan: false, latestTurn: nil, planProgress: nil, latestUserMessageAt: nil,
+                                 settledOverride: nil, settledAt: nil, unsettledAt: nil, snoozedUntil: nil,
+                                 snoozedAt: nil, pinnedAt: nil)
+        let input = T3TimelineInput.make(timeline: t, pending: [], facts: facts,
+                                         expandedTurnIds: [], expandedWorkGroupIds: [], ended: true)
+        XCTAssertFalse(input.isWorking)
+        XCTAssertNil(input.activeTurnStartedAt)
+        XCTAssertFalse(T3TimelineRows.derive(input).contains { $0.kind == "working" })
+        XCTAssertFalse(input.entries.isEmpty)
+    }
+
     func testExpandedSetsPassThrough() {
         let requestedAt = Date(timeIntervalSince1970: 1_700_000_000)
         let t = timeline(state: .completed, startedAt: requestedAt, requestedAt: requestedAt)

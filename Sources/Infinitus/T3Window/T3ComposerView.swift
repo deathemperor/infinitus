@@ -260,8 +260,11 @@ struct T3ComposerView: View {
     /// reads "Ask for changes…": its thread was recreated by hand in T3 Code
     /// and never ran.
     private var placeholder: String {
-        let approval = store.pending.approvals.first
-        let question = store.pending.userInputs.first
+        // An ended session's parked prompt is not shown any more (#400), so
+        // the ladder must not ask for it either — it falls through to
+        // `disconnected`, the branch below.
+        let approval = store.gone ? nil : store.pending.approvals.first
+        let question = store.gone ? nil : store.pending.userInputs.first
             .map { T3PendingAnswers.parse($0.questions) }?.first
         return T3ComposerPlaceholder.text(
             phase: phase,
@@ -568,7 +571,10 @@ struct T3ComposerView: View {
 
     // MARK: - Sending
 
-    private var running: Bool { store.timeline?.latestTurn?.state == .running }
+    /// `!store.gone` (#400): a session that exited froze its timeline, so a
+    /// turn left in `.running` there is stale — it must not keep the stop
+    /// button up or route a send into the queue path.
+    private var running: Bool { !store.gone && store.timeline?.latestTurn?.state == .running }
     /// The session's pid — nil in draft mode, where there is no session and the
     /// store is inert (its pid is `T3WindowModel.draftPid`, a sentinel). Every
     /// `actions.send` here goes through this, so a draft can reach no wire.
