@@ -227,11 +227,13 @@ $ tools/t3ref/fixture.sh --stop; rm -f /tmp/t3fix.sock
 
 | screen | over ΔE 6 (≤ 1.5 % passes) | max ΔE |
 |---|---|---|
-| thread | 1.17 % ✅ | 107.4 |
-| composer | 1.17 % ✅ | 107.4 |
+| thread | 1.11 % ✅ | 107.4 |
+| composer | 1.11 % ✅ | 107.4 |
 
 No crop: the sizes match. The two screens are one window, so both rows read
-the same capture. 2.12 % before the six fixes in #435 (2.72 % before the first
+the same capture. 1.17 % before B-8, B-9 and #446 (re-measured at 2× with the
+window moved onto the built-in panel by the Accessibility API, since the
+autosave preset is clamped back onto the main display at show time). 2.12 % before the six fixes in #435 (2.72 % before the first
 round). The first Mac pair was a 1× capture of a window zoomed 1.893× — every
 content measurement was off by that factor however exact the port — and was
 replaced by this one rather than normalized around.
