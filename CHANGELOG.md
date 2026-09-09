@@ -18,6 +18,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
+- Workspace: the right panel's Files tab browses the thread's project.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
