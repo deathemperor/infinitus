@@ -722,10 +722,30 @@ final class AppModel: ObservableObject {
     /// popup over an open chat window drops nothing.
     private var visibleSurfaces = Set<String>()
     private var localUIVisible: Bool { !visibleSurfaces.isEmpty }
+    /// The pass a surface's very first appearance starts (below).
+    private var localSurfaceRefresh: Task<Void, Never>?
     func uiSurface(_ id: String, visible: Bool) {
         let was = localUIVisible
         if visible { visibleSurfaces.insert(id) } else { visibleSurfaces.remove(id) }
         if localUIVisible != was || visible { reportLocalActivity(visible: localUIVisible) }
+        // The exporter's one unthrottled pass (launch) can land before this
+        // lease does — a startup race between StatusItemController's
+        // delayed pop-out/workspace restore and refreshSnapshot's first,
+        // faster turnaround. That pass then writes an empty factsByPid,
+        // and the 30 s throttle after it starves every thread's row
+        // (`guard let f = inputs.facts[...]`) for the rest of the window
+        // (#468). A surface's first appearance forces the next export
+        // through, the same bypass an AWS-login need uses below — but only
+        // while facts are actually empty: a reopen soon after a good
+        // export has real facts already and must not fight the 30 s
+        // throttle #346 relies on to keep a busy fleet cheap.
+        if !was, localUIVisible, !isPlayground, sessionProgress.facts.isEmpty, localSurfaceRefresh == nil {
+            mirrorExportDue = true
+            localSurfaceRefresh = Task { [weak self] in
+                await self?.refreshSnapshot()
+                self?.localSurfaceRefresh = nil
+            }
+        }
     }
     private func reportLocalActivity(visible: Bool) {
         if visible {

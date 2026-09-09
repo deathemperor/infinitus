@@ -14,6 +14,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
+- Workspace: a newly opened window no longer races the app's first refresh into an empty sidebar (#468).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
 - Workspace: a working thread's status reads in sky, the colour the reference uses.
 - Workspace: drop files onto a sidebar thread to open it with them attached.
