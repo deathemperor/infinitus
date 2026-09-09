@@ -15,8 +15,10 @@ import InfinitusUI
 /// validation line (`ComposerPromptLengthValidation.tsx`), the footer's mode
 /// control (`ChatComposer.tsx:931-1043`) and model label
 /// (`ProviderModelPicker`, `:3979-4013`), the attach action (`:5528-5556`),
-/// the primary actions (`ComposerPrimaryActions.tsx:222-283`) and terminal-style
-/// prompt recall (`composerPromptHistory.ts:183-211`).
+/// the primary actions (`ComposerPrimaryActions.tsx:222-283`), terminal-style
+/// prompt recall (`composerPromptHistory.ts:183-211`) and the `/` command and
+/// `@` file menus (`ComposerCommandMenu.tsx` over `detectComposerTrigger`,
+/// `packages/shared/src/composerTrigger.ts`).
 ///
 /// Not ported, each with its reason at the call site: the context-window meter
 /// (`ContextWindowMeter.tsx` — B has no per-thread token usage), the resting /
@@ -24,9 +26,10 @@ import InfinitusUI
 /// (`CompactComposerControlsMenu.tsx` — one Mac window, one width regime, and
 /// the two controls always fit), plan/interaction mode (`plan` is Claude
 /// Code's own mode, not something a running session can be moved to), the
-/// prompt stash (⌘S, `ComposerStashMenu`), `@`-mentions, `$`-skills and `/`
-/// commands (no producer on B), and the model *picker* — the model a live
-/// session runs is read from its transcript and cannot be changed from here.
+/// prompt stash (⌘S, `ComposerStashMenu`), `$`-skills and `/model` (no
+/// producer on B — `T3ComposerTrigger` carries the reason), and the model
+/// *picker* — the model a live session runs is read from its transcript and
+/// cannot be changed from here.
 struct T3ComposerView: View {
     /// Plain references, like `T3ThreadView`'s (T3ThreadView.swift:37-41):
     /// observing either would re-run this body on every fleet tick. `app` is
@@ -59,6 +62,34 @@ struct T3ComposerView: View {
     @State private var recall: (index: Int, text: String)?
     @State private var dropTargeted = false
 
+    // MARK: - The `/` and `@` menus (Task 14)
+
+    /// The caret as the field reports it, in UTF-16 code units — what
+    /// `T3ComposerTrigger.detect` reads the trigger at
+    /// (`ComposerPromptEditor.tsx`'s `selection.anchor` upstream).
+    @State private var caret = 0
+    /// A caret the composer wants the field to move to (after an insertion or
+    /// a restored draft); the field takes it and clears it.
+    @State private var caretRequest: Int?
+    /// The project's commands / path candidates, loaded when a menu opens and
+    /// cached on the model by cwd — never read per keystroke.
+    @State private var commands: [SlashCommand] = []
+    @State private var mentionRows: [String] = []
+    @State private var mentionCwd: String?
+    @State private var mentionLoading = false
+    /// The highlighted row and the query it was highlighted under
+    /// (`composerHighlightedItemId` / `composerHighlightedSearchKey`,
+    /// `ChatComposer.tsx:2027-2041`).
+    @State private var highlighted: String?
+    @State private var highlightedKey: String?
+    /// Ours: upstream's menu is open exactly while a trigger is under the
+    /// caret (`:2023`) and ⎋ does nothing. ⎋ here records which trigger it
+    /// shut (`dismissKey`) and the menu stays shut until the caret is on a
+    /// different one — never longer, or ⎋ would make `/` a dead key.
+    @State private var dismissed: String?
+    /// The open menu's measured height (`T3ComposerMenuHeightKey`).
+    @State private var menuHeight: Double = 0
+
     var body: some View {
         // `ComposerSurface.Main` (`ComposerSurface.tsx:67`): `rounded-[22px]
         // p-px` over the inner surface's `rounded-[20px]` (`:4959`).
@@ -88,6 +119,23 @@ struct T3ComposerView: View {
         // makes for the drawers above it.
         .shadow(color: t3.scheme == .dark ? .clear : .black.opacity(0.4), radius: 14, x: 0, y: 12)
         .padding(.bottom, 16)
+        // `ComposerCommandMenuLayer` (`:5046-5059`) portals the menu to an
+        // anchor above the composer; here it is an overlay whose BOTTOM edge is
+        // pinned to the card's top — the drawer position upstream's
+        // `ComposerBanner.Surface` sits in. Anchoring to the caret's own line
+        // is out of scope (the field would have to report its layout).
+        .overlay(alignment: .topLeading) {
+            if trigger != nil {
+                T3ComposerMenu(items: menuItems, activeID: activeItemID, emptyText: menuEmptyText,
+                               onHighlight: highlight, onPick: pick)
+                    // Lifted by its own measured height: an alignment guide
+                    // cannot push an overlay outside its container (it lands on
+                    // the field instead — seen on the fixture).
+                    .offset(y: -menuHeight)
+                    .opacity(menuHeight > 0 ? 1 : 0)
+                    .onPreferenceChange(T3ComposerMenuHeightKey.self) { menuHeight = $0 }
+            }
+        }
         // `isDragOverComposer` (`:4962`): `bg-accent/45 ring-1 ring-primary/70`.
         .overlay {
             if dropTargeted {
@@ -108,6 +156,8 @@ struct T3ComposerView: View {
         }
         .onAppear {
             draft = model.draft(for: store.threadId)
+            // A restored draft is typed-into at its end, not at its start.
+            caretRequest = draft.text.utf16.count
             // The window was opened straight at the composer, or reopened
             // while the request was still pending.
             if model.composerFocusRequested { consumeFocusRequest() } else { focusRequest = true }
@@ -129,6 +179,23 @@ struct T3ComposerView: View {
             model.pendingComposerInsert = nil
         }
         .onChange(of: store.timeline) { _, timeline in drain(timeline) }
+        // Opening a menu is what loads its rows — a keystroke inside one only
+        // re-ranks what is already in hand.
+        .onChange(of: trigger?.kind) { _, kind in openMenu(kind) }
+        .onChange(of: trigger?.query) { _, _ in rankMentions() }
+        // A dismissal outlives only the trigger it shut: the moment the caret
+        // is on another one (or on none — a send empties the field) it lapses.
+        // Keyed on the raw detection, or clearing it would reopen the menu ⎋
+        // just closed.
+        .onChange(of: rawTrigger.map(Self.dismissKey)) { _, key in
+            if key != dismissed { dismissed = nil }
+        }
+        .onChange(of: store.threadId) { _, _ in
+            commands = []
+            mentionRows = []
+            mentionCwd = nil
+            dismissed = nil
+        }
     }
 
     // MARK: - The editor
@@ -139,10 +206,13 @@ struct T3ComposerView: View {
                       // `/` commands, none of which exist here; `:4998`'s
                       // shorter form of the same string is the honest one.
                       placeholder: "Ask anything...",
+                      caret: $caret,
+                      caretRequest: $caretRequest,
                       focus: focusRequest,
                       recalling: recall != nil,
                       onFocusHandled: { focusRequest = false },
                       onSubmit: send,
+                      onMenuKey: menuKey,
                       onRecall: step(recall:),
                       onPaste: paste)
     }
@@ -518,6 +588,182 @@ struct T3ComposerView: View {
             draft.text += "\n\n" + text
         }
         recall = nil
+        caretRequest = draft.text.utf16.count
+        focusRequest = true
+    }
+
+    // MARK: - The `/` and `@` menus
+
+    /// The trigger under the caret (`detectComposerTrigger`), unless ⎋ shut
+    /// this one. Derived, never stored: the text and the caret land in
+    /// separate passes and detection is a scan of one line.
+    private var trigger: T3ComposerTrigger.Detected? {
+        guard let found = rawTrigger else { return nil }
+        return Self.dismissKey(found) == dismissed ? nil : found
+    }
+
+    /// The same detection with ⎋'s dismissal ignored — what tells the
+    /// dismissal it has been outlived.
+    private var rawTrigger: T3ComposerTrigger.Detected? {
+        T3ComposerTrigger.detect(text: draft.text, caret: caret)
+    }
+
+    /// Which trigger occurrence ⎋ shut: its kind and where it starts, not its
+    /// query — typing on inside a dismissed trigger keeps it shut, while a
+    /// fresh `/` (or an `@` at the same offset) opens a menu again.
+    private static func dismissKey(_ found: T3ComposerTrigger.Detected) -> String {
+        "\(found.kind.rawValue):\(found.start)"
+    }
+
+    /// The selected thread's project folder — where both menus read from.
+    private var cwd: String? {
+        guard let thread = model.state.threads.first(where: { $0.id == store.threadId }) else { return nil }
+        return model.state.projects.first { $0.id == thread.projectId }?.cwd
+    }
+
+    /// `composerMenuItems` (`ChatComposer.tsx:1921-1996`): a path row is its
+    /// basename over the directory it sits in (`:1929-1930`), a command row is
+    /// `/name` over its description (`:1972-1973`). Ours are Claude Code's own
+    /// commands and skills, both invoked as `/name` — upstream's `/skill:`
+    /// prefix (`:1983`) would misstate what the row inserts.
+    private var menuItems: [T3ComposerMenuItem] {
+        guard let trigger else { return [] }
+        switch trigger.kind {
+        case .command:
+            return SlashCommands.filter(commands, query: trigger.query)
+                .prefix(T3FileMention.limit)
+                .map { T3ComposerMenuItem(id: $0.id, label: "/\($0.name)",
+                                          description: $0.description, icon: nil) }
+        case .mention:
+            return mentionRows.map { path in
+                T3ComposerMenuItem(id: "path:\(path)",
+                                   label: (path as NSString).lastPathComponent,
+                                   description: (path as NSString).deletingLastPathComponent,
+                                   icon: .file)
+            }
+        }
+    }
+
+    /// `resolveComposerMenuActiveItemId` (`composerMenuHighlight.ts`).
+    private var activeItemID: String? {
+        T3ComposerMenuHighlight.resolve(itemIDs: menuItems.map(\.id), highlighted: highlighted,
+                                        currentKey: trigger?.searchKey, highlightedKey: highlightedKey)
+    }
+
+    /// `ComposerCommandMenu.tsx:117-125`.
+    private var menuEmptyText: String {
+        switch trigger?.kind {
+        case .command: return "No matching command."
+        case .mention: return mentionLoading ? "Searching workspace files..." : "No matching files or folders."
+        case nil: return ""
+        }
+    }
+
+    /// A menu opening (and only that) loads its source: `SlashCommands.discover`
+    /// reads every command file and `T3FileMention.list` runs `git ls-files`,
+    /// so both go to `T3WindowModel`'s per-cwd cache on a detached task, which
+    /// serves what it has at once and refreshes behind it.
+    private func openMenu(_ kind: T3ComposerTrigger.Kind?) {
+        highlighted = nil
+        highlightedKey = nil
+        guard let kind, let cwd else { return }
+        switch kind {
+        case .command:
+            commands = model.cachedSlashCommands(cwd: cwd)
+            Task {
+                let discovered = await model.slashCommands(cwd: cwd)
+                guard self.cwd == cwd, trigger?.kind == .command else { return }
+                commands = discovered
+            }
+        case .mention:
+            if mentionCwd != cwd { mentionRows = [] }
+            mentionLoading = true
+            rankMentions()
+            Task {
+                _ = await model.fileMentions(cwd: cwd)
+                guard self.cwd == cwd, trigger?.kind == .mention else { return }
+                rankMentions()
+            }
+        }
+    }
+
+    /// The `@` rows for the query as it stands. The ranking runs off the main
+    /// actor (a monorepo is 20 000 paths); a result whose query has moved on is
+    /// dropped, and the rows in view stay until the new ones arrive — upstream
+    /// leaves the previous entries up while its search is `isPending` too
+    /// (`ComposerCommandMenu.tsx:116-119`).
+    private func rankMentions() {
+        guard let cwd, let trigger, trigger.kind == .mention else { return }
+        let query = trigger.query
+        Task {
+            let rows = await model.mentionRows(cwd: cwd, query: query)
+            guard self.cwd == cwd, let current = self.trigger,
+                  current.kind == .mention, current.query == query else { return }
+            mentionRows = rows
+            mentionCwd = cwd
+            mentionLoading = false
+        }
+    }
+
+    private func highlight(_ id: String) {
+        highlighted = id
+        highlightedKey = trigger?.searchKey
+    }
+
+    /// `onComposerCommandKey` (`ChatComposer.tsx:3080-3125`): while a menu is
+    /// open it takes ↑/↓ and ⏎/⇥ first, and only then does the key fall
+    /// through to prompt recall and to sending. False = the field keeps the key.
+    private func menuKey(_ key: T3ComposerMenuKey) -> Bool {
+        guard let trigger else { return false }
+        switch key {
+        case .up, .down:
+            // Upstream nudges from the STORED highlight, which its sync effect
+            // (`:2298-2320`) has already set to the resolved active row; this
+            // port resolves on read instead, so the nudge starts there.
+            guard !menuItems.isEmpty else { return false }
+            highlighted = T3ComposerMenuHighlight.nudge(itemIDs: menuItems.map(\.id),
+                                                        highlighted: activeItemID,
+                                                        direction: key == .down ? 1 : -1)
+            highlightedKey = trigger.searchKey
+            return true
+        case .pick:
+            // `(key === "Enter" || key === "Tab") && selectedItem` (`:3104`):
+            // with nothing to pick, ⏎ sends the prompt as upstream does.
+            guard let item = menuItems.first(where: { $0.id == activeItemID }) else { return false }
+            pick(item)
+            return true
+        case .dismiss:
+            dismissed = Self.dismissKey(trigger)
+            return true
+        }
+    }
+
+    /// `onSelectComposerItem`: the trigger span is replaced by what the row
+    /// inserts and the caret follows it (`replaceTextRange`,
+    /// `composerTrigger.ts:118-128`). The insertion ends in a space, so no
+    /// trigger is under the caret afterwards and the menu closes on its own.
+    private func pick(_ item: T3ComposerMenuItem) {
+        guard let trigger else { return }
+        let insertion: String
+        switch trigger.kind {
+        case .command:
+            guard let command = commands.first(where: { $0.id == item.id }) else { return }
+            insertion = command.insertion
+        case .mention:
+            insertion = T3FileMention.insertion(for: String(item.id.dropFirst("path:".count)))
+        }
+        let result = T3ComposerTrigger.replacing(draft.text, start: trigger.start,
+                                                 end: trigger.end, with: insertion)
+        draft.text = result.text
+        caret = result.caret
+        caretRequest = result.caret
+        recall = nil
+        highlighted = nil
+        highlightedKey = nil
+        dismissed = nil
+        // `onMouseDown` `preventDefault` (`ComposerCommandMenu.tsx:158-160`)
+        // keeps a click on a row from taking focus off the editor; a SwiftUI
+        // tap gives no such promise, so the field is asked back.
         focusRequest = true
     }
 
@@ -731,6 +977,11 @@ private struct T3ComposerAttachmentRow: View {
 private struct T3PromptField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    /// The insertion point in UTF-16 code units — `NSTextView`'s own unit, and
+    /// the one `T3ComposerTrigger` reads the prompt at. Reported by the view.
+    @Binding var caret: Int
+    /// A caret the composer asks for (after an insertion); taken and cleared.
+    @Binding var caretRequest: Int?
     /// A one-shot focus request; `onFocusHandled` clears it once taken.
     let focus: Bool
     /// Whether prompt recall is already walking the history — ↑ from a
@@ -741,6 +992,9 @@ private struct T3PromptField: NSViewRepresentable {
     /// stays out of the field (⇧⏎ is the newline); a future overlay that owns
     /// ⏎ (a command menu) returns false to swallow it without sending.
     let onSubmit: () -> Bool
+    /// ↑/↓/⏎/⇥/⎋ offered to an open menu first (`onComposerCommandKey`,
+    /// `ChatComposer.tsx:3080-3125`); true = the menu took the key.
+    let onMenuKey: (T3ComposerMenuKey) -> Bool
     /// −1 = older, +1 = newer; false leaves the key to normal caret movement.
     let onRecall: (Int) -> Bool
     /// True when the paste was claimed as attachments.
@@ -806,6 +1060,21 @@ private struct T3PromptField: NSViewRepresentable {
             view.string = text
             view.needsDisplay = true
         }
+        // The caret only moves when it was asked to: assigning it on every
+        // pass would fight typing.
+        if let request = caretRequest {
+            let location = max(0, min((view.string as NSString).length, request))
+            view.setSelectedRange(NSRange(location: location, length: 0))
+            view.scrollRangeToVisible(NSRange(location: location, length: 0))
+            // Off the update pass: the delegate callback `setSelectedRange`
+            // fires runs INSIDE `updateNSView`, and a `@State` write there is
+            // dropped — the caret would stay where the last keystroke left it
+            // and no menu would open for a restored draft.
+            DispatchQueue.main.async {
+                caret = location
+                caretRequest = nil
+            }
+        }
         view.textColor = NSColor(context.environment.t3.web.foreground.color)
         view.typingAttributes = Self.attributes
         if focus {
@@ -853,7 +1122,16 @@ private struct T3PromptField: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? T3PromptTextView else { return }
             parent.text = view.string
+            parent.caret = view.selectedRange().location
             view.needsDisplay = true   // the placeholder appears and disappears
+        }
+
+        /// A trigger is read at the caret, so moving it alone (a click, ← / →)
+        /// opens and closes the menus just as typing does.
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let view = notification.object as? T3PromptTextView else { return }
+            let location = view.selectedRange().location
+            if parent.caret != location { parent.caret = location }
         }
     }
 }
@@ -881,11 +1159,22 @@ private final class T3PromptTextView: NSTextView {
                 super.doCommand(by: #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)))
                 return
             }
+            // An open menu takes ⏎ to pick its row, and nothing is sent
+            // (`onComposerCommandKey`, `ChatComposer.tsx:3104-3106`).
+            if coordinator?.parent.onMenuKey(.pick) == true { return }
             _ = coordinator?.parent.onSubmit()
             return
+        case #selector(NSResponder.insertTab(_:)):
+            // ⇥ picks as well (`:3104`); with no menu open it stays AppKit's.
+            if coordinator?.parent.onMenuKey(.pick) == true { return }
+        case #selector(NSResponder.cancelOperation(_:)):
+            // Ours: ⎋ shuts the menu (upstream has none to shut, `:2023`).
+            if coordinator?.parent.onMenuKey(.dismiss) == true { return }
         case #selector(NSResponder.moveUp(_:)):
+            if coordinator?.parent.onMenuKey(.up) == true { return }
             if canRecall, coordinator?.parent.onRecall(-1) == true { return }
         case #selector(NSResponder.moveDown(_:)):
+            if coordinator?.parent.onMenuKey(.down) == true { return }
             if coordinator?.parent.recalling == true, coordinator?.parent.onRecall(1) == true { return }
         default:
             break

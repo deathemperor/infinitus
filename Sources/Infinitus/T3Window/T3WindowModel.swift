@@ -128,6 +128,63 @@ final class T3WindowModel: ObservableObject {
         UserDefaults.standard.set(next, forKey: Key.promptHistory)
     }
 
+    // MARK: - The composer's menus (Task 14)
+
+    /// `/` commands and `@` files per project cwd. `SlashCommands.discover`
+    /// reads every command and skill file and `T3FileMention.list` spawns
+    /// `git ls-files`, so both run on a detached task when a menu OPENS —
+    /// once per cwd, cached, refreshed on the next open — and never per
+    /// keystroke (B-1 review #11). Not `@Published`: like the drafts above,
+    /// the composer holds the result in its own `@State`.
+    private var commandCache: [String: [SlashCommand]] = [:]
+    private var mentionCache: [String: [T3FileMention.Candidate]] = [:]
+    /// One load per cwd in flight; a second opener awaits the same task.
+    private var commandLoads: [String: Task<[SlashCommand], Never>] = [:]
+    private var mentionLoads: [String: Task<[T3FileMention.Candidate], Never>] = [:]
+
+    /// What the menu can show at once, before its load lands.
+    func cachedSlashCommands(cwd: String) -> [SlashCommand] { commandCache[cwd] ?? [] }
+
+    /// `claudeDir` is `ClaudeSessions.configHome()` — `CLAUDE_CONFIG_DIR` when
+    /// it is set, so a fixture instance sees the fixture's commands and the
+    /// real app sees `~/.claude`'s, exactly like every other read of Claude
+    /// Code's own files here (T3WindowModel.refresh, :201).
+    func slashCommands(cwd: String) async -> [SlashCommand] {
+        if let existing = commandLoads[cwd] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) {
+            SlashCommands.discover(cwd: cwd, claudeDir: ClaudeSessions.configHome())
+        }
+        commandLoads[cwd] = task
+        let commands = await task.value
+        commandLoads[cwd] = nil
+        commandCache[cwd] = commands
+        return commands
+    }
+
+    /// The project's paths, prepared for ranking once (`T3FileMention.Candidate`).
+    func fileMentions(cwd: String) async -> [T3FileMention.Candidate] {
+        if let existing = mentionLoads[cwd] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) {
+            T3FileMention.candidates(T3FileMention.list(cwd: cwd))
+        }
+        mentionLoads[cwd] = task
+        let candidates = await task.value
+        mentionLoads[cwd] = nil
+        mentionCache[cwd] = candidates
+        return candidates
+    }
+
+    /// The `@` menu's rows for one query. Ranking a monorepo's 20 000 paths is
+    /// tens of milliseconds of scanning, so it happens off the main actor
+    /// too — the caller drops a result whose query has moved on.
+    func mentionRows(cwd: String, query: String) async -> [String] {
+        let candidates: [T3FileMention.Candidate]
+        if let cached = mentionCache[cwd] { candidates = cached } else { candidates = await fileMentions(cwd: cwd) }
+        return await Task.detached(priority: .userInitiated) {
+            T3FileMention.rank(candidates, query: query, limit: T3FileMention.limit)
+        }.value
+    }
+
     /// `[String: Date]` under one key. Loaded in `init`, before the first
     /// `apply`: without it every ready thread reads as unseen after a relaunch
     /// (`T3ThreadSettled`'s unseen rule over `T3Thread.lastVisitedAt`).
