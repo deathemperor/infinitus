@@ -88,10 +88,14 @@ final class T3WindowModel: ObservableObject {
     }
     /// One draft per thread id (`composerDraftStore.ts`, keyed by its draft
     /// target), persisted through `T3ComposerDrafts.save`.
-    @Published private(set) var drafts: [String: T3ComposerDraft] =
+    /// Not `@Published`: the composer reads a draft once (`onAppear`) and
+    /// keeps it in its own `@State`, so a publish here would re-render the
+    /// window on every debounced save and buy nothing.
+    private(set) var drafts: [String: T3ComposerDraft] =
         T3ComposerDrafts.load(from: UserDefaults.standard.data(forKey: Key.drafts))
     /// Prompts the composer can recall with ↑, newest first.
-    @Published private(set) var promptHistory: [String] =
+    /// Read on ↑/↓ only — not `@Published` either, for the same reason.
+    private(set) var promptHistory: [String] =
         UserDefaults.standard.stringArray(forKey: Key.promptHistory) ?? []
     /// Keystrokes never publish `drafts` (that would re-render the sidebar and
     /// the top bar): they land here and the debounced sink below commits one

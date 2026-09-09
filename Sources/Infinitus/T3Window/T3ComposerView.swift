@@ -51,19 +51,13 @@ struct T3ComposerView: View {
     /// seen come back as a user message — the badge's count. Ours: upstream
     /// has no queue (it sends into the running turn and the server orders
     /// them), so there is no component to transcribe.
-    @State private var queued: [QueuedSend] = []
+    @State private var queued: [T3QueuedSend] = []
     /// Where prompt recall stands: the index into `model.promptHistory` the
     /// field is showing (`ComposerPromptHistoryPosition`,
     /// `composerPromptHistory.ts:39-42`), and the text it put there — an edit
     /// ends browsing (`:172`).
     @State private var recall: (index: Int, text: String)?
     @State private var dropTargeted = false
-
-    /// One send waiting on the running turn.
-    private struct QueuedSend: Equatable {
-        let text: String
-        let sentAt: Date
-    }
 
     var body: some View {
         // `ComposerSurface.Main` (`ComposerSurface.tsx:67`): `rounded-[22px]
@@ -76,7 +70,7 @@ struct T3ComposerView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
-            if case let .tooLong(length) = verdict { validation(length: length) }
+            if let message = validationMessage { validation(message) }
             footer
         }
         .background {
@@ -106,8 +100,9 @@ struct T3ComposerView: View {
             }
         }
         // `onDropCapture` on the form (`:4762-4765`) — files from Finder or
-        // any app that promises a URL.
-        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
+        // any app that promises a URL, and bare image bytes from one that
+        // promises no file (Photos, a browser drag).
+        .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
             load(providers: providers)
             return true
         }
@@ -155,8 +150,8 @@ struct T3ComposerView: View {
     /// `ComposerPromptLengthValidation.tsx:5-11`: `px-3 pb-2 text-xs
     /// text-destructive sm:px-4`, the sentence from
     /// `getComposerPromptLengthValidationMessage` (`composerSubmission.ts:20-22`).
-    private func validation(length: Int) -> some View {
-        Text(T3ComposerDrafts.tooLongMessage(length: length))
+    private func validation(_ message: String) -> some View {
+        Text(message)
             .font(T3Font.web(.xs))
             .foregroundStyle(t3.web.destructive.color)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,7 +216,14 @@ struct T3ComposerView: View {
                     // the floor again and records the move on the birth.
                     actions.send(.init(kind: .mode, text: choice.mode), app: app, pid: store.pid)
                 } label: {
-                    Text(choice.label)
+                    // Upstream's select hides its indicator (`:5019`,
+                    // `hideIndicator`) and shows the mode in the trigger
+                    // instead; a Mac menu marks the item in force as well.
+                    if choice.mode == (currentMode ?? "supervised") {
+                        Label(choice.label, systemImage: "checkmark")
+                    } else {
+                        Text(choice.label)
+                    }
                 }
             }
         } label: {
@@ -242,7 +244,7 @@ struct T3ComposerView: View {
     /// 1.8 stroke (`:261-268` — lucide's own `arrow-up` geometry), the spinner
     /// while a send is in flight (`:258-259`).
     private var sendButton: some View {
-        Button(action: send) {
+        Button { send() } label: {
             ZStack {
                 Circle().fill(t3.web.messageAction.color)
                 if actions.sending {
@@ -318,11 +320,36 @@ struct T3ComposerView: View {
     /// provider itself, then staged on it.
     private func load(providers: [NSItemProvider]) {
         for provider in providers {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                Task { @MainActor in stage([url]) }
+            if provider.canLoadObject(ofClass: URL.self) {
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url else { return }
+                    Task { @MainActor in stage([url]) }
+                }
+                continue
+            }
+            // Image bytes with no file behind them — the same case as a pasted
+            // screenshot, and staged the same way.
+            let type = UTType.image.identifier
+            guard provider.hasItemConformingToTypeIdentifier(type) else { continue }
+            provider.loadDataRepresentation(forTypeIdentifier: type) { data, _ in
+                guard let data else { return }
+                Task { @MainActor in stageImageData(data) }
             }
         }
+    }
+
+    /// Bytes with no path: `T3ComposerAttachmentRef` is a path (and
+    /// `SessionInput.deliver` copies from it), so they are written to the temp
+    /// dir first — which is also what lets the draft survive a relaunch.
+    private func stageImageData(_ data: Data) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("infinitus-image-\(UUID().uuidString).png")
+        guard let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]),
+              (try? png.write(to: url, options: .atomic)) != nil else {
+            actions.note = "couldn't stage the image"
+            return
+        }
+        stage([url])
     }
 
     /// ⌘V in the field. `shouldHandleComposerAttachmentPaste`
@@ -337,20 +364,9 @@ struct T3ComposerView: View {
         }
         guard board.canReadItem(withDataConformingToTypes: [UTType.image.identifier]),
               let image = NSImage(pasteboard: board),
-              let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+              let tiff = image.tiffRepresentation
         else { return false }
-        // A pasted screenshot has no path; `T3ComposerAttachmentRef` is one,
-        // and `SessionInput.deliver` copies from it — so write the bytes to a
-        // temp file first. (It lands in the session's attachments dir at send;
-        // this copy is what the draft can survive a relaunch with.)
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("infinitus-paste-\(UUID().uuidString).png")
-        guard (try? png.write(to: url, options: .atomic)) != nil else {
-            actions.note = "couldn't stage the pasted image"
-            return true
-        }
-        stage([url])
+        stageImageData(tiff)
         return true
     }
 
@@ -379,7 +395,7 @@ struct T3ComposerView: View {
                 rejection = "\(url.lastPathComponent) is over the \(SessionInput.maxAttachmentBytes(mime: mime) / (1024 * 1024)) MB limit"
                 continue
             }
-            draft.attachments.append(T3ComposerAttachmentRef(path: url.path, mime: mime))
+            draft.attachments.append(T3ComposerAttachmentRef(path: url.path, mime: mime, bytes: size))
         }
         if let rejection { actions.note = rejection }
     }
@@ -389,6 +405,16 @@ struct T3ComposerView: View {
     private var running: Bool { store.timeline?.latestTurn?.state == .running }
     private var verdict: T3ComposerDrafts.SendVerdict {
         T3ComposerDrafts.canSend(text: draft.text, running: running)
+    }
+    /// What the destructive line under the field says, if anything: the length
+    /// sentence, or the control-character refusal the wire would answer with
+    /// (`T3ComposerDrafts.invalidMessage`).
+    private var validationMessage: String? {
+        switch verdict {
+        case let .tooLong(length): return T3ComposerDrafts.tooLongMessage(length: length)
+        case .invalid: return T3ComposerDrafts.invalidMessage
+        case .send, .queue, .empty: return nil
+        }
     }
 
     /// `hasSendableContent` (`ComposerPrimaryActions.tsx:237`): a staged file
@@ -401,12 +427,15 @@ struct T3ComposerView: View {
         switch verdict {
         case .send, .queue: return true
         case .empty: return !draft.attachments.isEmpty
-        case .tooLong: return false
+        case .tooLong, .invalid: return false
         }
     }
 
-    private func send() {
-        guard canSend else { return }
+    /// True when the prompt went out — false when there was nothing to send or
+    /// a staged file could not be read (⏎ still swallows the newline).
+    @discardableResult
+    private func send() -> Bool {
+        guard canSend else { return false }
         let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         var attachments: [SessionInput.Attachment] = []
         for ref in draft.attachments {
@@ -415,12 +444,14 @@ struct T3ComposerView: View {
             // cannot read lazily.
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: ref.path)) else {
                 actions.note = "\(ref.name) could not be read"
-                return
+                return false
             }
             attachments.append(SessionInput.Attachment(name: ref.name, mime: ref.mime, data: data))
         }
         let wasRunning = running
         let sentAt = Date()
+        // What to put back if the wire refuses it (below).
+        let sent = draft
         // No `queuedAt`: it marks a request that waited in the phone's outbox
         // and drives a push when it lands (SessionInput.swift:36-39,
         // AppModel.swift:1745) — this one was typed just now, in front of the
@@ -428,26 +459,35 @@ struct T3ComposerView: View {
         actions.send(.init(kind: .message, text: text,
                            attachments: attachments.isEmpty ? nil : attachments),
                      app: app, pid: store.pid) { reply in
-            // Only a request the session actually took is queued behind the
-            // turn: a pty-hosted session that is busy answers "running"
-            // (SessionInput.swift:344), and the banner already says so.
-            guard wasRunning, reply.outcome == "delivered", !text.isEmpty else { return }
-            queued.append(QueuedSend(text: text, sentAt: sentAt))
+            guard reply.outcome == "delivered" else {
+                // Nothing reached the session — "rejected" (an invalid or
+                // unknown message), "running" (SessionInput.swift:344, the pty
+                // is busy) or "captured". The banner says why; the prompt and
+                // its staged files go back into the field, which is the only
+                // copy of them there is. Unless something has been typed in the
+                // meantime, which is now the newer draft.
+                guard draft.isEmpty else { return }
+                draft = sent
+                model.flushDraft(sent, for: store.threadId)
+                return
+            }
+            // Only a request the session actually took waits behind the turn.
+            guard wasRunning, !text.isEmpty else { return }
+            queued.append(T3QueuedSend(text: text, sentAt: sentAt))
         }
         // Upstream clears optimistically too (`submitComposer`); a failure
         // comes back as the banner stack's note, not as a lost prompt —
         // recall (↑) puts it back.
         model.pushPromptHistory(text)
-        draft = T3ComposerDraft()
+        let cleared = T3ComposerDraft()
+        draft = cleared
         recall = nil
-        model.flushDraft(draft, for: store.threadId)
+        model.flushDraft(cleared, for: store.threadId)
+        return true
     }
 
-    /// A queued send has landed once a user message carrying its text shows up
-    /// in the transcript. Matched by `contains`, not equality: the delivered
-    /// text is prefaced (`PeerSocket.phonePreface`, SessionInput.swift:327-328)
-    /// and carries the `[attached: …]` line. Oldest first, so two identical
-    /// prompts drain in order.
+    /// A queued send has landed once a user message carrying its text shows
+    /// up in the transcript (`T3ComposerDrafts.drainQueue`).
     private func drain(_ timeline: SessionTimeline?) {
         guard !queued.isEmpty else { return }
         guard running, let timeline else {
@@ -455,13 +495,7 @@ struct T3ComposerView: View {
             queued = []
             return
         }
-        var remaining = queued
-        for message in timeline.messages where message.role == .user {
-            guard let index = remaining.firstIndex(where: {
-                message.createdAt >= $0.sentAt.addingTimeInterval(-1) && message.text.contains($0.text)
-            }) else { continue }
-            remaining.remove(at: index)
-        }
+        let remaining = T3ComposerDrafts.drainQueue(queued: queued, userMessages: timeline.messages)
         if remaining != queued { queued = remaining }
     }
 
@@ -487,33 +521,17 @@ struct T3ComposerView: View {
         focusRequest = true
     }
 
-    /// `stepComposerPromptHistory` (`composerPromptHistory.ts:183-211`):
-    /// backward starts only from an empty prompt and stops at the oldest
-    /// entry; forward past the newest empties the field and ends browsing; an
-    /// edited recall (the field no longer holds what was recalled) restarts
-    /// browsing from scratch. Ours is one flat list across threads
-    /// (`T3ComposerDrafts.pushHistory`), not the thread's own user messages.
+    /// `stepComposerPromptHistory` (`composerPromptHistory.ts:183-211`) —
+    /// the rules live in `T3ComposerDrafts.stepHistory`; this only moves the
+    /// field and the position. False leaves the key to normal caret movement.
     private func step(recall direction: Int) -> Bool {
-        let history = model.promptHistory
-        guard !history.isEmpty else { return false }
-        let active = self.recall.flatMap { $0.text == draft.text ? $0.index : nil }
-        if direction < 0 {
-            guard active != nil || draft.text.isEmpty else { return false }
-            let next = (active ?? -1) + 1
-            guard next < history.count else { return false }
-            self.recall = (next, history[next])
-            draft.text = history[next]
-            return true
-        }
-        guard let active else { return false }
-        let next = active - 1
-        if next < 0 {
-            self.recall = nil
-            draft.text = ""
-            return true
-        }
-        self.recall = (next, history[next])
-        draft.text = history[next]
+        guard let step = T3ComposerDrafts.stepHistory(history: model.promptHistory,
+                                                      index: recall?.index,
+                                                      current: draft.text,
+                                                      direction: direction)
+        else { return false }
+        self.recall = step.index.map { ($0, step.text) }
+        draft.text = step.text
         return true
     }
 
@@ -690,8 +708,11 @@ private struct T3ComposerAttachmentRow: View {
     }
 
     /// `formatAttachmentSize`'s job, done by the platform's own formatter.
+    /// The size was stat'ed when the file was staged: a body runs on every
+    /// keystroke, and a file read there would too. A draft persisted before
+    /// `bytes` existed has none, and is the one case worth a stat.
     private static func size(of attachment: T3ComposerAttachmentRef) -> String {
-        let bytes = (try? URL(fileURLWithPath: attachment.path)
+        let bytes = attachment.bytes ?? (try? URL(fileURLWithPath: attachment.path)
             .resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
@@ -716,7 +737,10 @@ private struct T3PromptField: NSViewRepresentable {
     /// non-empty field only steps when it is (`composerPromptHistory.ts:196`).
     let recalling: Bool
     let onFocusHandled: () -> Void
-    let onSubmit: () -> Void
+    /// ⏎. The result says whether the composer sent — either way the newline
+    /// stays out of the field (⇧⏎ is the newline); a future overlay that owns
+    /// ⏎ (a command menu) returns false to swallow it without sending.
+    let onSubmit: () -> Bool
     /// −1 = older, +1 = newer; false leaves the key to normal caret movement.
     let onRecall: (Int) -> Bool
     /// True when the paste was claimed as attachments.
@@ -784,10 +808,8 @@ private struct T3PromptField: NSViewRepresentable {
         }
         view.textColor = NSColor(context.environment.t3.web.foreground.color)
         view.typingAttributes = Self.attributes
-        if focus, view.window?.firstResponder !== view {
-            view.window?.makeFirstResponder(view)
-            DispatchQueue.main.async { onFocusHandled() }
-        } else if focus {
+        if focus {
+            if view.window?.firstResponder !== view { view.window?.makeFirstResponder(view) }
             DispatchQueue.main.async { onFocusHandled() }
         }
     }
@@ -859,7 +881,7 @@ private final class T3PromptTextView: NSTextView {
                 super.doCommand(by: #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)))
                 return
             }
-            coordinator?.parent.onSubmit()
+            _ = coordinator?.parent.onSubmit()
             return
         case #selector(NSResponder.moveUp(_:)):
             if canRecall, coordinator?.parent.onRecall(-1) == true { return }

@@ -10,10 +10,15 @@ public struct T3ComposerAttachmentRef: Codable, Sendable, Equatable {
     public var path: String
     /// One of `SessionInput.allowedAttachmentMimes`.
     public var mime: String
+    /// The file's size, stat'ed once when it was staged. Optional so a draft
+    /// written before this field decodes, and because the row that shows it
+    /// must not stat the file on every keystroke.
+    public var bytes: Int?
 
-    public init(path: String, mime: String) {
+    public init(path: String, mime: String, bytes: Int? = nil) {
         self.path = path
         self.mime = mime
+        self.bytes = bytes
     }
 
     public var name: String { (path as NSString).lastPathComponent }
@@ -97,6 +102,10 @@ public enum T3ComposerDrafts {
         case empty
         /// The trimmed prompt's length, over the cap.
         case tooLong(Int)
+        /// A control scalar other than `\n` — the wire would answer "invalid
+        /// message" (`SessionInput.isValidMessage`), and by then the composer
+        /// would have cleared the draft.
+        case invalid
     }
 
     /// `submitComposerDraft`'s two gates (`composerSubmission.ts:33-49`) plus
@@ -109,8 +118,28 @@ public enum T3ComposerDrafts {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .empty }
         if trimmed.count > maxLength { return .tooLong(trimmed.count) }
+        if hasUnsupportedControlCharacters(trimmed) { return .invalid }
         return running ? .queue : .send
     }
+
+    /// `SessionInput.isValidMessage`'s scalar loop (SessionInput.swift:150-153),
+    /// ported rather than called: that check lives behind `#if !os(iOS)`, and
+    /// this file builds for the phone too. A stray Tab or CR — pasted from a
+    /// terminal, or the `\r\n` of a Windows file — must never reach a real
+    /// terminal, so the wire refuses it; the composer has to refuse it first or
+    /// it clears the draft (and loses the staged attachments) for a send that
+    /// comes back rejected.
+    static func hasUnsupportedControlCharacters(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars where scalar != "\n" {
+            if scalar.properties.generalCategory == .control { return true }
+        }
+        return false
+    }
+
+    /// Ours. Upstream has no such message: a browser textarea cannot produce a
+    /// raw control character, so `composerSubmission.ts` validates length and
+    /// nothing else.
+    public static let invalidMessage = "Message contains unsupported control characters"
 
     /// `getComposerPromptLengthValidationMessage`'s sentence
     /// (`composerSubmission.ts:20-22`) with its `toLocaleString("en-US")`
@@ -119,6 +148,78 @@ public enum T3ComposerDrafts {
         let excess = length - maxLength
         let label = excess == 1 ? "character" : "characters"
         return "Prompt is \(grouped(excess)) \(label) over the \(grouped(maxLength))-character limit. Shorten or split it before sending."
+    }
+
+    // MARK: - Prompt recall, stepped
+
+    /// `stepComposerPromptHistory` (`composerPromptHistory.ts:183-211`) over a
+    /// flat newest-first list: nil when the key should fall through to normal
+    /// caret movement, else the new position (nil = not browsing any more) and
+    /// the text to put in the field. `direction` is −1 backward (older), +1
+    /// forward (newer).
+    ///
+    /// Browsing is identified the way upstream does it (`:198`): the position
+    /// counts only while the field still holds what was recalled into it, so an
+    /// edit ends browsing by itself and there is no "edited" flag to keep in
+    /// sync.
+    public static func stepHistory(history: [String], index: Int?, current: String,
+                                   direction: Int) -> (index: Int?, text: String)? {
+        let active = index.flatMap { $0 >= 0 && $0 < history.count && history[$0] == current ? $0 : nil }
+        if direction < 0 {
+            // Backward starts only from an empty composer (`:200`).
+            guard active != nil || current.isEmpty else { return nil }
+            let next = (active ?? -1) + 1
+            guard next < history.count else { return nil }   // stops at the oldest
+            return (next, history[next])
+        }
+        guard let active else { return nil }
+        let next = active - 1
+        // "Forward past the newest entry empties the composer and ends
+        // browsing" (`:186-187`, `:209`) — it does not restore a stashed
+        // prompt; upstream stashes only through ⌘S, which B does not port.
+        guard next >= 0 else { return (nil, "") }
+        return (next, history[next])
+    }
+
+    // MARK: - The queue badge
+
+    /// A user message drains the oldest queued send whose text it carries. The
+    /// comparison is exact on the delivered body, never `contains`: a later
+    /// prompt that quotes this one is a different send, and the badge would
+    /// clear on the wrong message.
+    public static func drainQueue(queued: [T3QueuedSend],
+                                  userMessages: [SessionTimeline.Message]) -> [T3QueuedSend] {
+        guard !queued.isEmpty else { return queued }
+        var remaining = queued
+        for message in userMessages where message.role == .user {
+            let body = deliveredBody(message.text)
+            guard let index = remaining.firstIndex(where: {
+                body == $0.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    && message.createdAt >= $0.sentAt.addingTimeInterval(-stampSlack)
+            }) else { continue }
+            remaining.remove(at: index)   // oldest first: two identical prompts drain in order
+        }
+        return remaining
+    }
+
+    /// A transcript entry may be stamped to the whole second — `parseStamp`
+    /// accepts `2026-09-05T04:02:47Z` as readily as `…47.463Z`
+    /// (TokenRates.swift:196-199) — so a message written moments after a send
+    /// can carry a `createdAt` up to a second before it. Without this the badge
+    /// would sit on a delivered send until the turn ended.
+    static let stampSlack: TimeInterval = 1
+
+    /// The prompt as the transcript kept it: `SessionInput.deliver` appends
+    /// `\n\n[attached: …]` for staged files (SessionInput.swift:321) and the
+    /// timeline keeps that line (`SessionTimelineBuilder.visitUser`), while the
+    /// phone preface is already stripped by the reader
+    /// (`SessionFeedReader`, SessionFeed.swift:682-684).
+    static func deliveredBody(_ text: String) -> String {
+        var body = text
+        if body.hasSuffix("]"), let line = body.range(of: "\n\n[attached: ", options: .backwards) {
+            body = String(body[..<line.lowerBound])
+        }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// `Number.toLocaleString("en-US")`: thousands separated by commas
@@ -130,5 +231,19 @@ public enum T3ComposerDrafts {
         formatter.groupingSize = 3
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+}
+
+/// One message the composer sent while a turn was running and has not yet seen
+/// come back as a user message — the queue badge's unit. Ours: upstream sends
+/// into the running turn and lets the server order the result, so it has no
+/// queue and no component for one.
+public struct T3QueuedSend: Sendable, Equatable {
+    public var text: String
+    public var sentAt: Date
+
+    public init(text: String, sentAt: Date) {
+        self.text = text
+        self.sentAt = sentAt
     }
 }
