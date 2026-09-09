@@ -28,6 +28,7 @@ public enum T3GitFacts {
     /// ancestor with a `.git` entry — a directory, or a file whose one
     /// line is `gitdir: <path>` (linked worktrees, submodules).
     static func headFile(cwd: String) -> URL? {
+        guard cwd.hasPrefix("/") else { return nil }   // never resolve against the process cwd
         let fm = FileManager.default
         var dir = URL(fileURLWithPath: cwd).standardizedFileURL
         while true {

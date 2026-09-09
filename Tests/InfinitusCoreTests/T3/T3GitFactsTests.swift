@@ -75,6 +75,8 @@ final class T3GitFactsTests: XCTestCase {
         XCTAssertEqual(T3GitFacts.branch(cwd: root.path), "feature/two")
         XCTAssertEqual(T3GitFacts.branch(cwd: sub.path), "feature/two")
         XCTAssertEqual(T3GitFacts.branch(cwd: root.path + "/"), "feature/two")
+        XCTAssertNil(T3GitFacts.branch(cwd: ""))
+        XCTAssertNil(T3GitFacts.branch(cwd: "relative/path"))
 
         let wtGit = dotGit.appendingPathComponent("worktrees/linked")
         try fm.createDirectory(at: wtGit, withIntermediateDirectories: true)
