@@ -263,6 +263,7 @@ public enum SessionFeedReader {
         guard !wanted.isEmpty else { return items }
         let dir = transcript.deletingPathExtension().appendingPathComponent("subagents")
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return items }
+        metas.keep(dir: dir, names: names)
         var byToolUse: [String: SessionFeedItem.Agent] = [:]
         for name in names where name.hasSuffix(".meta.json") {
             let id = String(name.dropFirst("agent-".count).dropLast(".meta.json".count))
@@ -331,6 +332,16 @@ public enum SessionFeedReader {
                                    description: meta["description"] as? String ?? "sub-agent")
             lock.lock(); stored[url.path] = parsed; lock.unlock()
             return parsed
+        }
+
+        /// Drops this directory's entries whose meta file is gone (a session
+        /// folder cleaned up), so the cache follows the disk.
+        func keep(dir: URL, names: [String]) {
+            let prefix = dir.path + "/"
+            let present = Set(names.map { prefix + $0 })
+            lock.lock()
+            stored = stored.filter { !$0.key.hasPrefix(prefix) || present.contains($0.key) }
+            lock.unlock()
         }
 
         var count: Int { lock.lock(); defer { lock.unlock() }; return stored.count }
