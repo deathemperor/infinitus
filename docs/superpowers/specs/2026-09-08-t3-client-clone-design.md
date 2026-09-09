@@ -129,6 +129,8 @@ continuous motion goes through `LayerEffect`, never a TimelineView.
 | settled / snoozed / pinned | `AttentionStore` overlays | `POST /sessions/{pid}/attention` |
 | archived thread | past session | `PastSessions` |
 | messages + activities + turns | `SessionTimeline` | `GET /sessions/{pid}/timeline`, `TimelineCache` |
+| project files (`…/files/:path*`) | `T3ProjectFiles.Listing` | `GET /sessions/{pid}/files` (flat, cap 20k) |
+| one file's text | `T3ProjectFiles.FileRead` | `GET /sessions/{pid}/file?path=` (cap 256 KiB) |
 | proposed plan | `PendingRequest.planMarkdown` | owned sessions |
 | model / effort / permission mode | `SessionStart` fields, `SessionInput.Kind.mode` | start form, mode route |
 | turn diff summary | checkpoint diff | `Checkpoints` (E extends) |

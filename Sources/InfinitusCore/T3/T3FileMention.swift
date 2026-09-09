@@ -26,17 +26,20 @@ public enum T3FileMention: Sendable {
     // MARK: - Listing
 
     /// Relative paths under `cwd`, `git ls-files` first. Blocking: the caller
-    /// runs it off the main actor (the composer's detached load).
-    public static func list(cwd: String, fileManager: FileManager = .default) -> [String] {
-        if let tracked = gitListed(cwd: cwd), !tracked.isEmpty { return tracked }
-        return walk(cwd: cwd, fileManager: fileManager)
+    /// runs it off the main actor (the composer's detached load). `limit`
+    /// bounds both sources — the file browser asks for one over its own cap
+    /// so it can tell a full listing from a truncated one.
+    public static func list(cwd: String, fileManager: FileManager = .default,
+                            limit: Int = maxListed) -> [String] {
+        if let tracked = gitListed(cwd: cwd, limit: limit), !tracked.isEmpty { return tracked }
+        return walk(cwd: cwd, fileManager: fileManager, maxEntries: limit)
     }
 
     /// `--cached --others --exclude-standard`: what the repo tracks plus what
     /// it does not ignore — upstream's index excludes gitignored files and
     /// nothing else (`server.test.ts:6810`). `-z` because git quotes odd
     /// filenames otherwise. nil = no repo here (or no git), so the walk answers.
-    static func gitListed(cwd: String) -> [String]? {
+    static func gitListed(cwd: String, limit: Int = maxListed) -> [String]? {
         #if os(Windows) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         // No child processes here (Checkpoints.swift:234 makes the same call);
         // the walk covers every platform.
@@ -68,7 +71,7 @@ public enum T3FileMention: Sendable {
         guard process.terminationStatus == 0 else { return nil }
         let paths = String(decoding: data, as: UTF8.self)
             .split(separator: "\0", omittingEmptySubsequences: true).map(String.init)
-        return Array(paths.prefix(maxListed))
+        return Array(paths.prefix(limit))
         #endif
     }
 
