@@ -31,6 +31,19 @@ struct T3ThreadScreen: View {
     @State private var showCamera = false
     @State private var showSettings = false
     @State private var showGit = false
+    /// T3's live-follow latch (`T3LiveFollow`): new rows scroll the feed
+    /// only while this holds. `userScrolling` spans a drag through its
+    /// momentum; `atEnd` is the last geometry's answer; `foldPending`
+    /// marks a fold toggle whose layout has yet to settle.
+    @State private var following = true
+    @State private var userScrolling = false
+    @State private var atEnd = true
+    @State private var foldPending = false
+    /// Bumped to scroll to the end from outside the reader (the button,
+    /// a send).
+    @State private var scrollToEndRequest = 0
+    /// Within this many points of the bottom counts as at the end.
+    private static let endThreshold: CGFloat = 24
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
         self.model = model
@@ -94,15 +107,27 @@ struct T3ThreadScreen: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 }
-                // The conversation sits at the bottom, as a chat does.
-                .defaultScrollAnchor(.bottom)
+                .modifier(FollowTracking(atEnd: $atEnd, userScrolling: $userScrolling, following: $following,
+                                         foldPending: $foldPending, threshold: Self.endThreshold,
+                                         scrollToEnd: { proxy.scrollTo("end", anchor: .bottom) }))
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: rows.last?.id) { _, _ in
+                    guard following else { return }
                     withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("end", anchor: .bottom) }
                 }
                 .onChange(of: follower.state.synchronized) { _, now in
-                    if now { proxy.scrollTo("end", anchor: .bottom) }
+                    guard now else { return }
+                    following = T3LiveFollow.resolve(following, .reset)
+                    proxy.scrollTo("end", anchor: .bottom)
                 }
+                .onChange(of: scrollToEndRequest) { _, _ in
+                    following = T3LiveFollow.resolve(following, .reset)
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("end", anchor: .bottom) }
+                }
+                // A fold above the end pushes content past it; whether that
+                // left the reader at the end is known once geometry settles.
+                .onChange(of: expandedTurnIds) { _, _ in foldPending = true }
+                .onChange(of: expandedWorkGroupIds) { _, _ in foldPending = true }
             }
         }
         // The bottom stack is a safe-area inset, so the feed always clears
@@ -111,7 +136,12 @@ struct T3ThreadScreen: View {
             VStack(spacing: 12) {
                 // Same copy as the Mac's thread (#400); the rows stay put.
                 if follower.ended { T3ErrorBanner("This session has ended.") }
-                if working { workingControl }
+                if working || !following {
+                    HStack(spacing: 16) {
+                        if working { workingControl }
+                        if !following { scrollToEndButton }
+                    }
+                }
                 if let approval = pending.approval, !follower.ended {
                     T3ApprovalCard(approval: approval, sending: sending,
                                    allowOnce: { send(.init(kind: .key, text: "1")) },
@@ -309,6 +339,22 @@ struct T3ThreadScreen: View {
         .overlay(Capsule().stroke(t3.mobile.border.color, lineWidth: 1))
     }
 
+    /// `ScrollToEndButton` beside the pill (`floating-working-control.tsx`:
+    /// `h-11 w-11 border border-border bg-card shadow-md`), shown while
+    /// follow is broken; a tap re-arms it.
+    private var scrollToEndButton: some View {
+        Button { scrollToEndRequest += 1 } label: {
+            Image(systemName: "chevron.down").font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(t3.mobile.foreground.color)
+                .frame(width: 44, height: 44)
+                .background(t3.mobile.card.color, in: Circle())
+                .overlay(Circle().stroke(t3.mobile.border.color, lineWidth: 1))
+                .shadow(color: .black.opacity(0.1), radius: 6, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Scroll to end")
+    }
+
     // MARK: composer (T3 `ThreadComposer.tsx`)
 
     /// Collapsed: one capsule row — attach, the single-line editor, send.
@@ -488,6 +534,8 @@ struct T3ThreadScreen: View {
                        requestId: UUID().uuidString)) {
                 draft = ""
                 attachments = []
+                // Sending re-arms follow (T3 resets the latch on submit).
+                scrollToEndRequest += 1
             }
         } label: {
             Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
@@ -677,5 +725,60 @@ struct T3FoldRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(expanded ? "Collapse \(label)" : "Expand \(label)")
+    }
+}
+
+
+/// The feed's scroll tracking for `T3LiveFollow`. iOS 18 reports geometry
+/// and phases; there the bottom anchor only sets the initial offset and the
+/// alignment of short content, and following is this modifier's job (a
+/// size-change anchor would re-pin the reader on every streamed chunk).
+/// iOS 17 keeps the plain bottom anchor and always follows.
+private struct FollowTracking: ViewModifier {
+    @Binding var atEnd: Bool
+    @Binding var userScrolling: Bool
+    @Binding var following: Bool
+    @Binding var foldPending: Bool
+    let threshold: CGFloat
+    let scrollToEnd: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(.bottom, for: .alignment)
+                .onScrollGeometryChange(for: Bool.self) { g in
+                    g.visibleRect.maxY >= g.contentSize.height - threshold
+                } action: { _, isAtEnd in
+                    atEnd = isAtEnd
+                    if foldPending {
+                        foldPending = false
+                        following = T3LiveFollow.resolve(following, .disclosureSettled(isAtEnd: isAtEnd, sessionActive: userScrolling))
+                    } else {
+                        following = T3LiveFollow.resolve(following, .scroll(isAtEnd: isAtEnd, sessionActive: userScrolling))
+                    }
+                }
+                // A streamed chunk grows the last row without a new row id:
+                // follow the height, not just the ids.
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                    if new > old, following, !userScrolling { scrollToEnd() }
+                }
+                .onScrollPhaseChange { _, phase in
+                    switch phase {
+                    case .interacting:
+                        guard !userScrolling else { return }
+                        userScrolling = true
+                        following = T3LiveFollow.resolve(following, .userScrollBegin)
+                    case .idle:
+                        guard userScrolling else { return }
+                        userScrolling = false
+                        following = T3LiveFollow.resolve(following, .userScrollEnd(isAtEnd: atEnd, sessionActive: true))
+                    default:
+                        break
+                    }
+                }
+        } else {
+            content.defaultScrollAnchor(.bottom)
+        }
     }
 }
