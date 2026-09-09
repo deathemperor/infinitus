@@ -206,7 +206,7 @@ struct T3FilePreviewPane: View {
 /// The text. Upstream hands it to `@pierre/diffs`' `File` inside a `Virtualizer`
 /// (`FilePreviewPanel.tsx:1284-1305`) — numbered lines on `--code-background`
 /// that soft-wrap, since `wordWrap` defaults on (`packages/contracts/src/
-/// settings.ts:448`; its toggle is a client setting this port has no surface
+/// settings.ts:527`; its toggle is a client setting this port has no surface
 /// for, so the lines always wrap and there is no wrap button).
 ///
 /// A `LazyVStack` of rows is the virtualizer: a 256 KB file is thousands of
