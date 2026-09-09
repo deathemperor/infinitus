@@ -69,6 +69,15 @@ final class LiveActivityPushTests: XCTestCase {
             attributesType: "WorkingActivity", machine: "Mac", state: S(), staleDate: nil,
             now: now)) as! [String: Any]
         XCTAssertNil((silent["aps"] as! [String: Any])["alert"])
+        // No key from the phone: the attributes stay as they were (#144).
+        XCTAssertNil(((silent["aps"] as! [String: Any])["attributes"] as! [String: Any])["macId"])
+        // The registration's key rides in the attributes so the phone files the card under its Mac.
+        let keyed = try JSONSerialization.jsonObject(with: LiveActivityPush.startPayload(
+            attributesType: "WorkingActivity", machine: "Mac", macId: "3f9a1c0b7e2d", state: S(), staleDate: nil,
+            now: now)) as! [String: Any]
+        let kattrs = (keyed["aps"] as! [String: Any])["attributes"] as! [String: Any]
+        XCTAssertEqual(kattrs["machine"] as? String, "Mac")
+        XCTAssertEqual(kattrs["macId"] as? String, "3f9a1c0b7e2d")
 
         let end = try JSONSerialization.jsonObject(with: LiveActivityPush.endPayload(
             state: S(), dismissalDate: now, now: now)) as! [String: Any]
@@ -98,6 +107,16 @@ final class LiveActivityPushTests: XCTestCase {
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         XCTAssertEqual(try decoder.decode(ActivityPushRegistration.self, from: try encoder.encode(reg)), reg)
+        XCTAssertNil(reg.macId)
+        // The phone's key for this Mac rides along and round-trips (#144); a
+        // registration persisted before the field decodes without it.
+        let keyed = ActivityPushRegistration(kind: .workingStart, token: "ff", deviceId: "d1", deviceName: "Titan",
+                                             environment: "sandbox", themeID: nil, macId: "3f9a1c0b7e2d")
+        XCTAssertEqual(try decoder.decode(ActivityPushRegistration.self, from: try encoder.encode(keyed)).macId, "3f9a1c0b7e2d")
+        let legacy = Data("""
+        {"kind":"working","token":"ff","deviceId":"d1","deviceName":"Titan","environment":"sandbox","registeredAt":"2026-09-09T00:00:00Z"}
+        """.utf8)
+        XCTAssertNil(try decoder.decode(ActivityPushRegistration.self, from: legacy).macId)
     }
 }
 

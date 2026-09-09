@@ -34,9 +34,15 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
     /// phone would; nil = the Mac's own.
     public let themeID: String?
     public var registeredAt: Date
+    /// The key the phone files this Mac under (#144: the hash of its pair
+    /// token, stable across renames and primary swaps). A push-to-start
+    /// echoes it into the card's attributes so the phone adopts the card
+    /// into the right Mac's slot even when two Macs share a name. nil
+    /// from a phone before the field: the card is matched by name.
+    public var macId: String?
 
     public init(kind: Kind, token: String, deviceId: String, deviceName: String,
-                environment: String, themeID: String?, registeredAt: Date = Date()) {
+                environment: String, themeID: String?, registeredAt: Date = Date(), macId: String? = nil) {
         self.kind = kind
         self.token = token
         self.deviceId = deviceId
@@ -44,6 +50,7 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
         self.environment = environment
         self.themeID = themeID
         self.registeredAt = registeredAt
+        self.macId = macId
     }
 
     public var isSandbox: Bool { environment == "sandbox" }
@@ -93,15 +100,18 @@ public enum LiveActivityPush {
 
     /// `event: start` (push-to-start): the activity's attributes plus
     /// its first content, and — when given — the alert iOS shows as it
-    /// appears; without one the activity lands silently.
-    public static func startPayload<S: Encodable>(attributesType: String, machine: String, state: S,
-                                                  staleDate: Date?, alertTitle: String? = nil,
+    /// appears; without one the activity lands silently. `macId` is the
+    /// registration's, echoed so the phone files the card under its Mac.
+    public static func startPayload<S: Encodable>(attributesType: String, machine: String, macId: String? = nil,
+                                                  state: S, staleDate: Date?, alertTitle: String? = nil,
                                                   alertBody: String? = nil, now: Date = Date()) -> Data {
+        var attributes: [String: Any] = ["machine": machine]
+        if let macId { attributes["macId"] = macId }
         var aps: [String: Any] = [
             "timestamp": Int(now.timeIntervalSince1970), "event": "start",
             "content-state": json(state),
             "attributes-type": attributesType,
-            "attributes": ["machine": machine],
+            "attributes": attributes,
         ]
         if let alertTitle, let alertBody { aps["alert"] = ["title": alertTitle, "body": alertBody] }
         if let staleDate { aps["stale-date"] = Int(staleDate.timeIntervalSince1970) }
