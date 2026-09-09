@@ -251,6 +251,28 @@ final class T3WindowModel: ObservableObject {
         return candidates
     }
 
+    /// The composer strip's branch (`T3GitFacts.branch` → one `git rev-parse`)
+    /// per project cwd, on a detached task and cached — the strip asks when it
+    /// mounts on a thread, never on a timer. `reload` is the thread switch:
+    /// the checkout may have moved since this cwd was last looked at.
+    private var branchCache: [String: String?] = [:]
+    private var branchLoads: [String: Task<String?, Never>] = [:]
+
+    /// The last answer for `cwd`, to paint before the load lands.
+    func cachedBranch(cwd: String) -> String? { branchCache[cwd] ?? nil }
+
+    func gitBranch(cwd: String, reload: Bool = false) async -> String? {
+        if reload { branchCache[cwd] = nil }
+        if !reload, let cached = branchCache[cwd] { return cached }
+        if let existing = branchLoads[cwd] { return await existing.value }
+        let task = Task.detached(priority: .utility) { T3GitFacts.branch(cwd: cwd) }
+        branchLoads[cwd] = task
+        let branch = await task.value
+        branchLoads[cwd] = nil
+        branchCache[cwd] = branch
+        return branch
+    }
+
     /// The `@` menu's rows for one query. Ranking a monorepo's 20 000 paths is
     /// tens of milliseconds of scanning, so it happens off the main actor
     /// too — the caller drops a result whose query has moved on.

@@ -96,6 +96,7 @@ struct T3ThreadView: View {
                 T3DraftNoteSlot(draftStart: model.draftStart, draftId: target.draftId)
                 T3ComposerView(model: model, app: app, store: store, actions: actions,
                                draftTarget: target, draftStart: model.draftStart)
+                branchLine
             }
         }
         // The same column the rows and the docked composer share (`:8019`).
@@ -205,6 +206,10 @@ struct T3ThreadView: View {
             // verdict and a message can never race.
             T3ComposerView(model: model, app: app, store: store, actions: actions,
                            draftStart: model.draftStart)
+            // `ChatView.tsx:8167-8180`: the context strip sits in the same
+            // floating column, directly under the card — so it is inside the
+            // slot whose height the timeline's footer reserves.
+            branchLine
         }
         // `:8017` `sm:ps/pe 1.25rem` (the list's own inset) and `:8019`
         // `mx-auto w-full max-w-3xl` — the slot shares the rows' column so
@@ -219,6 +224,19 @@ struct T3ThreadView: View {
             }
         }
         .onPreferenceChange(T3ComposerHeightKey.self) { composerHeight = $0 }
+    }
+
+    /// The strip only exists where there is a folder to name: the selected
+    /// thread's project, or the draft's target project.
+    @ViewBuilder private var branchLine: some View {
+        if let target = draftTarget {
+            if let cwd = model.state.projects.first(where: { $0.id == target.projectId })?.cwd {
+                T3BranchLine(cwd: cwd, threadId: target.draftId, model: model)
+            }
+        } else if let thread = model.state.threads.first(where: { $0.id == store.threadId }),
+                  let cwd = model.state.projects.first(where: { $0.id == thread.projectId })?.cwd {
+            T3BranchLine(cwd: cwd, threadId: thread.id, model: model)
+        }
     }
 
     /// `:795-799`: `rows.length === 0 && !isWorking` — a working turn always
