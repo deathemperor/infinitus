@@ -15,11 +15,20 @@ final class T3WindowModel: ObservableObject {
     /// this, never `Date()`.
     @Published private(set) var now = Date()
     @Published var focusedScreen: String?
+    /// The selected thread's rows (Task 9's store, Task 11's plumbing): one
+    /// store per selected thread, kept across a resume (same session id, new
+    /// pid) through `rebind`.
+    @Published private(set) var timelineStore: T3TimelineStore?
     private(set) weak var model: AppModel?
     private var sink: AnyCancellable?
     private var refreshing = false
     /// Task 13's composer focuses its field when this flips true, then clears it.
     @Published var composerFocusRequested = false
+    /// Text a panel wants in the composer's draft — the proposed plan's markdown
+    /// when the plan card's Edit is pressed (Task 12). Task 13's composer takes
+    /// it and clears it; upstream does the same thing by writing the composer's
+    /// own draft (`ComposerPrimaryActions.tsx:166-181`, the "Refine" branch).
+    @Published var pendingComposerInsert: String?
     /// The hidden ⌘W button in `T3Root` (E6c); the controller sets this to `close()`.
     var closeRequested: (() -> Void)?
 
@@ -46,6 +55,28 @@ final class T3WindowModel: ObservableObject {
     func applyPendingScreen() {
         guard let screen = focusedScreen else { return }
         applyFocusedScreen(screen)
+        syncTimelineStore()
+    }
+
+    /// The selected thread ↔ `timelineStore` invariant, run after every
+    /// selection change and every state apply: no selection stops and drops the
+    /// store, a different thread replaces it, and the same thread on a new pid
+    /// (a resume) rebinds the existing one so the rows keep their identity.
+    private func syncTimelineStore() {
+        guard let model else { return }
+        guard let id = state.selectedThreadId, let pid = state.pid(of: id) else {
+            timelineStore?.stop()
+            if timelineStore != nil { timelineStore = nil }
+            return
+        }
+        if let store = timelineStore, store.threadId == id {
+            if store.pid != pid { store.rebind(pid: pid) }
+            return
+        }
+        timelineStore?.stop()
+        let store = T3TimelineStore(threadId: id, pid: pid, model: model, window: self)
+        timelineStore = store
+        store.start()
     }
 
     init(model: AppModel) { self.model = model }
@@ -53,13 +84,26 @@ final class T3WindowModel: ObservableObject {
     func start() {
         guard sink == nil, let model else { return }
         now = Date()
+        // The controller reuses this model across close/open, and `stop()`
+        // dropped the store while `state` kept its selection: rebuild it here,
+        // or a reopen shows the no-thread state until `refresh()`'s detached
+        // walk lands. A pid that moved meanwhile is what `rebind` is for, and a
+        // thread that vanished gets stop+nil on the first apply.
+        syncTimelineStore()
         sink = model.sessionProgress.$facts.combineLatest(model.sessionProgress.$byPid)
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] _, _ in self?.refresh() }
         refresh()
     }
 
-    func stop() { sink = nil; refreshing = false }
+    /// Drops the store rather than leaving it stopped: a stopped-but-present
+    /// store looks unchanged to `syncTimelineStore` and would never poll again.
+    func stop() {
+        sink = nil
+        refreshing = false
+        timelineStore?.stop()
+        timelineStore = nil
+    }
 
     func tick() { now = Date() }
 
@@ -92,12 +136,13 @@ final class T3WindowModel: ObservableObject {
                 next.apply(inputs, now: self.now)
                 if next != self.state { self.state = next }
                 if let screen = self.focusedScreen { self.applyFocusedScreen(screen) }
+                self.syncTimelineStore()
                 self.refreshing = false
             }
         }
     }
 
-    func select(_ threadId: String?) { state.select(threadId, now: now) }
+    func select(_ threadId: String?) { state.select(threadId, now: now); syncTimelineStore() }
     func toggleSidebar() { state.sidebarCollapsed.toggle() }
     func toggleRightPanel() { state.rightPanelOpen.toggle() }
     func setScope(_ s: T3SidebarScope) { state.scope = s }

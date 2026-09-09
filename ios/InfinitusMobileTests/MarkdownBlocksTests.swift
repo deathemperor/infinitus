@@ -11,7 +11,7 @@ final class MarkdownBlocksTests: XCTestCase {
 
     func testTaskItemsAndRules() {
         let blocks = MarkdownText.blocks("- [x] done\n- [ ] open\n- plain\n---\n***\ntext")
-        XCTAssertEqual(blocks, [.task(done: true, "done"), .task(done: false, "open"), .bullet("plain"),
+        XCTAssertEqual(blocks, [.task(done: true, "done"), .task(done: false, "open"), .bullet(indent: 0, "plain"),
                                 .rule, .rule, .paragraph("text")])
     }
 

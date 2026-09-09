@@ -1,4 +1,5 @@
 import SwiftUI
+import InfinitusCore
 #if canImport(UIKit)
 import UIKit
 #else
@@ -75,17 +76,10 @@ public struct MarkdownText: View {
         }
     }
 
-    enum Block: Equatable {
-        case heading(level: Int, text: String)
-        case code(language: String?, String)
-        case bullet(String)
-        case task(done: Bool, String)
-        case numbered(String, String)
-        case quote(String)
-        case rule
-        case table(header: [String], rows: [[String]])
-        case paragraph(String)
-    }
+    /// The block split lives in InfinitusCore (`MarkdownBlocksTests` needs it
+    /// without linking SwiftUI); this keeps the phone's `MarkdownText.Block`
+    /// / `.blocks(_:)` call sites compiling unchanged.
+    public typealias Block = MarkdownBlock
 
     @ViewBuilder private func render(_ block: Block) -> some View {
         switch block {
@@ -110,13 +104,15 @@ public struct MarkdownText: View {
                 }
                 .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
             }
-        case .bullet(let text):
+        case .bullet(indent: let indent, let text):
             listRow(marker: "•", markerWidth: 18, text: text)
+                .padding(.leading, CGFloat(indent) * 14)
         case .task(let done, let text):
             // U+FE0E keeps the boxes as text glyphs, not emoji (T3's "☑︎"/"☐︎").
             listRow(marker: done ? "☑\u{FE0E}" : "☐\u{FE0E}", markerWidth: 20, text: text)
-        case .numbered(let number, let text):
+        case .numbered(indent: let indent, let number, let text):
             listRow(marker: "\(number).", markerWidth: 28, text: text, trailingMarker: true)
+                .padding(.leading, CGFloat(indent) * 14)
         case .quote(let text):
             HStack(spacing: style == nil ? 8 : 11) {
                 RoundedRectangle(cornerRadius: 1).fill(style?.quoteBorder ?? Color.secondary).frame(width: 2)
@@ -173,24 +169,10 @@ public struct MarkdownText: View {
     /// face, inline code in mono two points smaller (no background —
     /// `runStyle` only paints fences), links in the link color.
     private func inline(_ text: String, font: Font, color: Color) -> Text {
-        guard let style, var attributed = try? AttributedString(
-            markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
-            return Text(text).font(font).foregroundStyle(color)
-        }
-        for run in attributed.runs {
-            let intent = run.inlinePresentationIntent ?? []
-            if run.link != nil {
-                attributed[run.range].foregroundColor = style.link
-                attributed[run.range].underlineStyle = .single
-            } else if intent.contains(.code) {
-                attributed[run.range].font = style.inlineCodeFont
-                attributed[run.range].foregroundColor = style.inlineCode
-            } else if intent.contains(.stronglyEmphasized) {
-                attributed[run.range].font = style.boldFont
-                attributed[run.range].foregroundColor = style.strong
-            }
-        }
-        return Text(attributed).font(font).foregroundStyle(color)
+        guard let style else { return Text(text).font(font).foregroundStyle(color) }
+        return MarkdownInline.text(text, font: font, color: color, runs: .init(
+            link: style.link, codeFont: style.inlineCodeFont, code: style.inlineCode,
+            strongFont: style.boldFont, strong: style.strong))
     }
 
     /// T3's table (`NativeTable`): 160 pt cells in a 8 pt bordered box,
@@ -284,87 +266,7 @@ public struct MarkdownText: View {
         }
     }
 
-    static func tableCells(_ line: String) -> [String] {
-        var inner = Substring(line)
-        inner = inner.dropFirst()
-        if inner.hasSuffix("|") { inner = inner.dropLast() }
-        return inner.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-    }
-
-    static func isSeparatorRow(_ cells: [String]) -> Bool {
-        !cells.isEmpty && cells.allSatisfy { c in
-            c.count >= 3 && c.allSatisfy { $0 == "-" || $0 == ":" } && c.contains("-")
-        }
-    }
-
-    /// Line-based block split. Consecutive plain lines join into one
-    /// paragraph (soft wraps); a blank line ends it.
-    static func blocks(_ text: String) -> [Block] {
-        var out: [Block] = []
-        var paragraph: [String] = []
-        var code: (language: String?, lines: [String])?
-        var tableOpen = false
-        func flush() {
-            if !paragraph.isEmpty { out.append(.paragraph(paragraph.joined(separator: " "))); paragraph = [] }
-        }
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = String(rawLine)
-            if let open = code {
-                if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                    out.append(.code(language: open.language, open.lines.joined(separator: "\n")))
-                    code = nil
-                } else {
-                    code = (open.language, open.lines + [line])
-                }
-                continue
-            }
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") {
-                flush()
-                let language = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
-                code = (language.isEmpty ? nil : language, [])
-                continue
-            }
-            if trimmed.isEmpty { flush(); tableOpen = false; continue }
-            if trimmed.count >= 3, trimmed.allSatisfy({ $0 == "-" }) || trimmed.allSatisfy({ $0 == "*" }) || trimmed.allSatisfy({ $0 == "_" }) {
-                flush(); out.append(.rule); continue
-            }
-            if trimmed.hasPrefix("#") {
-                let level = trimmed.prefix { $0 == "#" }.count
-                let rest = trimmed.dropFirst(level).trimmingCharacters(in: .whitespaces)
-                if level <= 6, !rest.isEmpty { flush(); out.append(.heading(level: level, text: rest)); continue }
-            }
-            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("• ") {
-                let item = String(trimmed.dropFirst(2))
-                flush()
-                if item.hasPrefix("[ ] ") { out.append(.task(done: false, String(item.dropFirst(4)))) }
-                else if item.lowercased().hasPrefix("[x] ") { out.append(.task(done: true, String(item.dropFirst(4)))) }
-                else { out.append(.bullet(item)) }
-                continue
-            }
-            if let dot = trimmed.firstIndex(of: "."), trimmed.distance(from: trimmed.startIndex, to: dot) <= 3,
-               trimmed[..<dot].allSatisfy(\.isNumber), trimmed[trimmed.index(after: dot)...].hasPrefix(" ") {
-                flush()
-                out.append(.numbered(String(trimmed[..<dot]),
-                                     String(trimmed[trimmed.index(after: dot)...]).trimmingCharacters(in: .whitespaces)))
-                continue
-            }
-            if trimmed.hasPrefix("> ") { flush(); out.append(.quote(String(trimmed.dropFirst(2)))); continue }
-            if trimmed.hasPrefix("|"), trimmed.hasSuffix("|") {
-                let cells = tableCells(trimmed)
-                if case .table(let header, var rows)? = out.last, tableOpen, cells.count >= 1 {
-                    if isSeparatorRow(cells), rows.isEmpty { continue }   // the |---|---| line under the header
-                    rows.append(cells); out[out.count - 1] = .table(header: header, rows: rows); continue
-                }
-                flush(); out.append(.table(header: cells, rows: [])); tableOpen = true; continue
-            }
-            tableOpen = false
-            paragraph.append(trimmed)
-        }
-        if let open = code { out.append(.code(language: open.language, open.lines.joined(separator: "\n"))) }
-        flush()
-        return out
-    }
+    static func blocks(_ text: String) -> [Block] { MarkdownBlocks.parse(text) }
 }
 
 private struct MarkdownStyleKey: EnvironmentKey {

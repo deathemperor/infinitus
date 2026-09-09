@@ -24,6 +24,7 @@ publishes the matching section as the GitHub release body.
 - The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
 - Open workspace: a new window over your sessions, from the popup, ⌘⇧T, or infinitusctl show workspace.
 - Workspace: sidebar with project groups, pinned/snoozed/settled shelves, and the thread header bar.
+- Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
 
 ### Phone
 - A video picked from Photos reaches the Mac as the .mov/.mp4 it is (up to 20 MB) with its path in the message, in both composers, instead of one still frame; the chip shows its first frame with a play badge (#381).
