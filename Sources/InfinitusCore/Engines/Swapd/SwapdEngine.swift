@@ -10,8 +10,16 @@ import Foundation
 public struct SwapdEngine: AccountEngine {
     public static let engineID = "swapd"
     public let cli: SwapdCLI
+    /// Last known active slot per provider, so a switch mid-flight
+    /// (`activeUnreadable`) carries it forward instead of flashing "no
+    /// active account" (#476). A struct engine can't hold state itself —
+    /// this is the reference-typed sliver that does.
+    let memory: SwapdActiveMemory
 
-    public init(cli: SwapdCLI) { self.cli = cli }
+    public init(cli: SwapdCLI) {
+        self.cli = cli
+        self.memory = SwapdActiveMemory()
+    }
 
     public var id: String { Self.engineID }
     public var displayName: String { "swapd" }
@@ -29,24 +37,37 @@ public struct SwapdEngine: AccountEngine {
     ]
 
     public func snapshot() async throws -> [EngineFleet] {
-        SwapdMapping.fleets(from: try await cli.list(), engineID: Self.engineID)
+        let list = try await cli.list()
+        let fleets = SwapdMapping.fleets(from: list, engineID: Self.engineID,
+                                         carriedActive: { [memory] provider in memory.last(provider) })
+        for view in list.providers {
+            let provider = SwapdMapping.provider(for: view.provider)
+            guard let fleet = fleets.first(where: { $0.provider == provider }) else { continue }
+            memory.remember(fleet, unreadable: view.activeUnreadable != nil)
+        }
+        return fleets
     }
 
     /// One forced fetch for account n, then the fleet as it reads AFTER it
     /// — the caller publishes that instead of waiting for the next poll.
     public func refresh(fleet: Provider, number: Int) async throws -> EngineFleet {
-        try Self.fleet(from: try await cli.refresh(provider: fleet, slot: number), provider: fleet)
+        let list = try await cli.refresh(provider: fleet, slot: number)
+        let result = try Self.fleet(from: list, provider: fleet, carriedActive: memory.last(fleet))
+        if let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == fleet }) {
+            memory.remember(result, unreadable: view.activeUnreadable != nil)
+        }
+        return result
     }
 
     /// The provider's view out of a list reply. swapd answers a
     /// single-provider verb with that provider alone, but the reply is
     /// still a full list payload, so this never assumes the index.
-    static func fleet(from list: SwapdList, provider: Provider) throws -> EngineFleet {
+    static func fleet(from list: SwapdList, provider: Provider, carriedActive: Int? = nil) throws -> EngineFleet {
         guard let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == provider })
         else {
             throw EngineError.remote(status: 0, body: "swapd answered without a \(provider.rawValue) fleet")
         }
-        return SwapdMapping.fleet(from: view, provider: provider, engineID: engineID)
+        return SwapdMapping.fleet(from: view, provider: provider, engineID: engineID, carriedActive: carriedActive)
     }
 
     public func switchTo(fleet: Provider, number: Int) async throws {
@@ -82,6 +103,33 @@ public struct SwapdEngine: AccountEngine {
     }
     public func importAccounts(from path: URL, force: Bool) async throws {
         try await cli.importAccounts(provider: .claude, from: path, force: force)
+    }
+}
+
+/// The one bit of state `SwapdEngine` (a struct) can't hold itself: the
+/// last known active slot per provider, so a switch mid-flight
+/// (`activeUnreadable`) carries it forward across polls instead of
+/// flashing "no active account" (#476).
+final class SwapdActiveMemory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastActive: [Provider: Int] = [:]
+
+    /// `activeSlot` present ⇒ remember it (this also re-remembers a
+    /// carried slot, harmlessly). Absent with `unreadable` ⇒ swapd knows
+    /// but couldn't say — keep whatever's remembered. Absent with neither
+    /// ⇒ genuinely no active account: forget this provider.
+    func remember(_ fleet: EngineFleet, unreadable: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        if let active = fleet.activeNumber {
+            lastActive[fleet.provider] = active
+        } else if !unreadable {
+            lastActive[fleet.provider] = nil
+        }
+    }
+
+    func last(_ provider: Provider) -> Int? {
+        lock.lock(); defer { lock.unlock() }
+        return lastActive[provider]
     }
 }
 #endif
