@@ -101,6 +101,7 @@ private struct T3HomeSwipe: ViewModifier {
         let actions = T3ThreadList.swipeActions(variant: item.variant, settlementSupported: true, snoozeSupported: true,
                                                 snoozable: T3ThreadSettled.canSnooze(entry.thread, now: Date()), snoozed: item.snoozed)
         content
+            .contextMenu { menu(secondary: actions.secondary) }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 swipe(actions.primary)
                 if let secondary = actions.secondary { swipe(secondary) }
@@ -111,6 +112,43 @@ private struct T3HomeSwipe: ViewModifier {
                 } label: { Label(entry.thread.pinnedAt == nil ? "Pin" : "Unpin", systemImage: "pin") }
                     .tint(.orange)
             }
+    }
+
+    /// The long-press menu `thread-list-v2-items.tsx` builds per variant —
+    /// card: Settle, Snooze ▸ presets, Pin; slim: Un-settle (+ Pin while
+    /// pinned); snoozed: Wake thread. Delete and title regeneration are
+    /// left out: the phone has no equivalent action (as upstream omits
+    /// them where unsupported).
+    @ViewBuilder private func menu(secondary: T3ThreadList.SwipeAction?) -> some View {
+        let pid = entry.session.pid, macId = entry.macId
+        let pinButton = Button {
+            Task { await model.attention(entry.thread.pinnedAt == nil ? .pin : .unpin, macId: macId, pid: pid) }
+        } label: { Label(entry.thread.pinnedAt == nil ? "Pin" : "Unpin", systemImage: entry.thread.pinnedAt == nil ? "pin" : "pin.slash") }
+        if item.snoozed {
+            Button { Task { await model.attention(.unsnooze, macId: macId, pid: pid) } } label: { Label("Wake thread", systemImage: "clock") }
+        } else if item.variant == .slim {
+            Button { Task { await model.attention(.unsettle, macId: macId, pid: pid) } } label: { Label("Un-settle", systemImage: "arrow.uturn.backward") }
+            if entry.thread.pinnedAt != nil { pinButton }
+        } else {
+            Button { Task { await model.attention(.settle, macId: macId, pid: pid) } } label: { Label("Settle", systemImage: "checkmark") }
+            if secondary == .snooze {
+                Menu {
+                    ForEach(T3ThreadSettled.snoozePresets(now: Date()), id: \.id) { preset in
+                        Button { Task { await model.attention(.snooze, macId: macId, pid: pid, until: preset.snoozedUntil) } } label: {
+                            Text(preset.label)
+                            Text(Self.whenLabel(preset))
+                        }
+                    }
+                } label: { Label("Snooze", systemImage: "clock") }
+            }
+            pinButton
+        }
+    }
+
+    /// `whenLabel`: the wake time, with the weekday for next week.
+    static func whenLabel(_ preset: T3ThreadSettled.Preset) -> String {
+        let time = preset.snoozedUntil.formatted(date: .omitted, time: .shortened)
+        return preset.id == .nextWeek ? preset.snoozedUntil.formatted(.dateTime.weekday(.abbreviated)) + " " + time : time
     }
 
     @ViewBuilder private func swipe(_ action: T3ThreadList.SwipeAction) -> some View {
@@ -158,20 +196,26 @@ struct T3HomeBody: View {
     @State private var search = ""
     @State private var showSnoozed = false
     @State private var showSettled = true
+    /// The settled tail renders in pages (`HomeScreen.tsx` settledVisibleCount):
+    /// ten, then twenty-five more per "Show more"; a search flip starts over.
+    @State private var settledVisible = T3ThreadList.settledInitialCount
 
     /// `threadListV2.ts` over the entries: pinned and active cards, the
     /// snoozed shelf, the settled tail — search by title, as upstream.
-    private var listItems: [T3ThreadList.ListItem] {
+    private var listItems: [T3ThreadList.ListItem] { listLayout.items }
+    private var listLayout: (items: [T3ThreadList.ListItem], hiddenSettled: Int) {
         let now = Date()
         var input = T3ThreadList.Input(threads: entries.map(\.thread), now: now)
         input.searchQuery = search
         input.snoozedShelfExpanded = showSnoozed
         input.settledShelfExpanded = showSettled
+        input.settledLimit = settledVisible
         let layout = T3ThreadList.buildItems(input)
-        return T3ThreadList.buildListItems(items: layout.items, pendingTasks: [], snoozedCount: layout.snoozedCount,
-                                           snoozedShelfExpanded: showSnoozed, snoozedShelfHeaderIndex: layout.snoozedShelfHeaderIndex,
-                                           settledCount: layout.settledCount, settledShelfExpanded: showSettled,
-                                           settledShelfHeaderIndex: layout.settledShelfHeaderIndex, snoozeLabelNow: now)
+        let items = T3ThreadList.buildListItems(items: layout.items, pendingTasks: [], snoozedCount: layout.snoozedCount,
+                                                snoozedShelfExpanded: showSnoozed, snoozedShelfHeaderIndex: layout.snoozedShelfHeaderIndex,
+                                                settledCount: layout.settledCount, settledShelfExpanded: showSettled,
+                                                settledShelfHeaderIndex: layout.settledShelfHeaderIndex, snoozeLabelNow: now)
+        return (items, layout.hiddenSettledCount)
     }
     private var entriesByKey: [String: T3HomeEntry] { Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
 
@@ -227,9 +271,10 @@ struct T3HomeBody: View {
 
     private var list: some View {
         let byKey = entriesByKey
+        let layout = listLayout
         return List {
             ForEach(awsLogins) { awsRow($0) }
-            ForEach(listItems) { listItem in
+            ForEach(layout.items) { listItem in
                 switch listItem {
                 case let .thread(item, snoozeWakeLabel):
                     if let e = byKey[item.thread.key] { rowItem(e, item: item, snoozeLabel: snoozeWakeLabel) }
@@ -247,10 +292,28 @@ struct T3HomeBody: View {
                     EmptyView()   // queued drafts arrive with the new-task flow's pending tasks
                 }
             }
+            if showSettled, layout.hiddenSettled > 0 { showMore(hidden: layout.hiddenSettled) }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 1)
+        .onChange(of: search) { _, _ in settledVisible = T3ThreadList.settledInitialCount }
+    }
+
+    /// The Home list's footer (`HomeScreen.tsx` ListFooterComponent): a
+    /// dashed capsule reading "Show more (N settled hidden)".
+    private func showMore(hidden: Int) -> some View {
+        Button { settledVisible += T3ThreadList.settledPageCount } label: {
+            Text("Show more (\(hidden) settled hidden)")
+                .font(T3Font.mobile(.xs, .medium)).foregroundStyle(t3.mobile.foregroundMuted.color)
+                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3])).foregroundStyle(t3.mobile.border.color))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show \(min(hidden, T3ThreadList.settledPageCount)) more settled threads")
+        .padding(.horizontal, 16).padding(.top, 8)
+        .listRowInsets(EdgeInsets()).listRowSeparator(.hidden).listRowBackground(t3.mobile.screen.color)
     }
 
     private func rowItem(_ e: T3HomeEntry, item: T3ThreadList.Item, snoozeLabel: String?) -> some View {
