@@ -97,6 +97,23 @@ final class ModelsTests: XCTestCase {
 }
 
 final class ChillDepthTests: XCTestCase {
+    func testSessionRowsTakeTheSessionIdByPidAndDecodeWithout() throws {
+        let rows = LiveSessions(busy: 1, total: 2, sessions: [
+            SessionDetail(pid: 1, cwd: "/a", status: "busy", kind: "interactive", startedAt: 0),
+            SessionDetail(pid: 2, cwd: "/b", status: "idle", kind: "interactive", startedAt: 0),
+        ])
+        let tagged = rows.tagging(sessionIds: [1: "s-one", 9: "stranger"])
+        XCTAssertEqual(tagged.sessions?.map(\.sessionId), ["s-one", nil])
+        XCTAssertEqual(tagged.busy, 1)
+        XCTAssertEqual(rows.tagging(sessionIds: [:]), rows)
+        // An engine row (or an older Mac's snapshot) has no such key.
+        let engineRow = try JSONDecoder().decode(
+            SessionDetail.self, from: Data(#"{"pid":7,"cwd":"/c","status":"busy","kind":"interactive","startedAt":1}"#.utf8))
+        XCTAssertNil(engineRow.sessionId)
+        let wire = try JSONDecoder().decode(SessionDetail.self, from: try JSONEncoder().encode(tagged.sessions![0]))
+        XCTAssertEqual(wire.sessionId, "s-one")
+    }
+
     func testBehindPaceScales() {
         XCTAssertEqual(GaugeMath.chillDepth(usedPct: 22, expectedPct: 31, ahead: false),
                        0.3, accuracy: 0.001)

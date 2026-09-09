@@ -93,6 +93,10 @@ actor MirrorExporter {
         let usageJSON = try? Data(contentsOf: UsageModel.cacheURL)
         let perMinute = TokenRate.perMinute(progressByPid, now: now)
         tokenPeak = TokenRate.nextPeak(tokenPeak, seeing: perMinute)
+        // The engine's rows know pids only; the session records know the
+        // ids (#391), so a phone can act on a session by id as well as pid.
+        let sessionIds = Dictionary(allRecords.map { (Int($0.pid), $0.sessionId) }, uniquingKeysWith: { a, _ in a })
+        let fleets = fleets.map { $0.with(liveSessions: $0.liveSessions?.tagging(sessionIds: sessionIds)) }
         let snapshot = MirrorSnapshot(
             capturedAt: now,
             machineName: MachineName.current(),
