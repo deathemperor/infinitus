@@ -60,26 +60,31 @@ final class T3TerminalController: NSObject, ObservableObject, TerminalViewDelega
         return SwiftTerm.Color(red8: UInt16((v >> 16) & 0xff), green8: UInt16((v >> 8) & 0xff), blue8: UInt16(v & 0xff))
     }
 
-    func feed(_ frame: T3TerminalWire.Frame) {
+    /// A (re)connect's first `snapshot` replaces the screen; the chunks
+    /// that follow it (16 KB each, the status repeated) only append.
+    var awaitingSnapshot = true
+
+    func feed(_ frame: T3Terminal.Frame) {
         switch frame {
         case .snapshot(let s):
-            view.getTerminal().resetToInitialState()
+            if awaitingSnapshot {
+                view.getTerminal().resetToInitialState()
+                awaitingSnapshot = false
+            }
             view.feed(text: s.history)
             switch s.status {
-            case "exited": phase = .exited(s.exitCode)
-            case "error": phase = .unavailable("the shell failed to start")
-            default: phase = .running
+            case .exited: phase = .exited(s.exitCode)
+            case .error: phase = .unavailable("the shell failed to start")
+            case .starting, .running: phase = .running
             }
-        case .output(let data, _):
-            view.feed(text: data)
-        case .exited(let code, _):
-            phase = .exited(code)
-        case .closed(let reason):
-            phase = .closed(reason)
-        case .error(let message):
-            phase = .unavailable(message)
-        case .other:
-            break
+        case .output(let o):
+            view.feed(text: o.data)
+        case .exited(let e):
+            phase = .exited(e.exitCode)
+        case .closed(let c):
+            phase = .closed(c.reason)
+        case .error(let e):
+            phase = .unavailable(e.message)
         }
     }
 
@@ -156,11 +161,11 @@ struct T3TerminalScreen: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dismiss) private var dismiss
     @StateObject private var controller: T3TerminalController
-    @State private var terminalId = T3TerminalWire.defaultId
+    @State private var terminalId = T3Terminal.defaultTerminalId
     @State private var sequence: Int?
     @State private var stream: Task<Void, Never>?
     @State private var reconnecting = false
-    private let fixture: [T3TerminalWire.Frame]?
+    private let fixture: [T3Terminal.Frame]?
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
         self.model = model; self.session = session; self.macId = macId; fixture = nil
@@ -168,7 +173,7 @@ struct T3TerminalScreen: View {
     }
 
     /// The render harness's canned stream; nothing is opened or fetched.
-    init(model: MirrorModel, session: SessionDetail, fixture: [T3TerminalWire.Frame]) {
+    init(model: MirrorModel, session: SessionDetail, fixture: [T3Terminal.Frame]) {
         self.model = model; self.session = session; self.fixture = fixture
         _controller = StateObject(wrappedValue: T3TerminalController(font: Self.font))
     }
@@ -226,7 +231,7 @@ struct T3TerminalScreen: View {
     private var statusStrip: String? {
         switch controller.phase {
         case .exited(let code): return code.map { "Shell exited (\($0))" } ?? "Shell exited"
-        case .closed(let reason): return reason == "backpressure" ? nil : "Terminal closed"
+        case .closed(let reason): return reason == T3Terminal.closedReasonBackpressure ? nil : "Terminal closed"
         default: return reconnecting ? "Reconnecting…" : nil
         }
     }
@@ -318,7 +323,7 @@ struct T3TerminalScreen: View {
     }
 
     /// The attach loop: a dropped stream (network, or the Mac's
-    /// backpressure `closed`) resumes from the last sequence after 1, 2,
+    /// backpressure `closed`) resumes from the last byte offset after 1, 2,
     /// 4… 8 s; a stale `since` gets a fresh snapshot from the Mac (#507
     /// ruling 1). A real `closed` or `exited` ends it.
     private func startStream() {
@@ -327,13 +332,14 @@ struct T3TerminalScreen: View {
             var delay: UInt64 = 1
             while !Task.isCancelled {
                 do {
+                    controller.awaitingSnapshot = true
                     for try await frame in model.mirror(for: macId).terminalStream(pid: Int32(session.pid), id: terminalId, since: sequence) {
                         delay = 1
                         reconnecting = false
-                        if let s = frame.sequence { sequence = s }
+                        if let s = frame.resumeSequence { sequence = s }
                         controller.feed(frame)
                         if case .exited = frame { return }
-                        if case .closed(let reason) = frame, reason != "backpressure" { return }
+                        if case .closed(let c) = frame, c.reason != T3Terminal.closedReasonBackpressure { return }
                     }
                 } catch MirrorTransportError.http(404) {
                     controller.phase = .closed("gone")

@@ -1,32 +1,38 @@
 import XCTest
+import InfinitusCore
 @testable import InfinitusMobile
 
-/// The attach stream's frames (#507), upstream `terminal.ts` names.
+/// The phone's reading of Core's terminal stream (#507).
 final class T3TerminalWireTests: XCTestCase {
-    private func frame(_ json: String) throws -> T3TerminalWire.Frame { try T3TerminalWire.Frame.decode(Data(json.utf8)) }
-
-    func testDecodesEveryFrame() throws {
-        XCTAssertEqual(try frame(#"{"type":"snapshot","snapshot":{"terminalId":"default","status":"running","history":"$ ","sequence":7,"exitCode":null,"exitSignal":null}}"#),
-                       .snapshot(.init(terminalId: "default", status: "running", history: "$ ", sequence: 7, exitCode: nil, exitSignal: nil)))
-        XCTAssertEqual(try frame(#"{"type":"output","data":"ls\r\n","sequence":8}"#), .output(data: "ls\r\n", sequence: 8))
-        XCTAssertEqual(try frame(#"{"type":"exited","exitCode":0,"exitSignal":null}"#), .exited(exitCode: 0, exitSignal: nil))
-        XCTAssertEqual(try frame(#"{"type":"closed","reason":"backpressure"}"#), .closed(reason: "backpressure"))
-        XCTAssertEqual(try frame(#"{"type":"closed"}"#), .closed(reason: nil))
-        XCTAssertEqual(try frame(#"{"type":"error","message":"spawn failed"}"#), .error(message: "spawn failed"))
+    func testKnownFramesDecodeAndCarryTheResumeOffset() throws {
+        let snapshot = try T3TerminalWire.decodeLine(Data(#"{"type":"snapshot","history":"$ ","status":"running","sequence":2}"#.utf8))
+        XCTAssertEqual(snapshot, .snapshot(.init(history: "$ ", status: .running, sequence: 2)))
+        XCTAssertEqual(snapshot?.resumeSequence, 2)
+        let output = try T3TerminalWire.decodeLine(Data(#"{"type":"output","data":"ls","sequence":4}"#.utf8))
+        XCTAssertEqual(output?.resumeSequence, 4)
+        let closed = try T3TerminalWire.decodeLine(Data(#"{"type":"closed","reason":"backpressure"}"#.utf8))
+        XCTAssertEqual(closed, .closed(.init(reason: T3Terminal.closedReasonBackpressure)))
+        XCTAssertNil(closed?.resumeSequence)
     }
 
     func testUnknownFrameIsSkippedNotFatal() throws {
-        XCTAssertEqual(try frame(#"{"type":"activity","hasRunningSubprocess":true,"label":"vim"}"#), .other(type: "activity"))
+        XCTAssertNil(try T3TerminalWire.decodeLine(Data(#"{"type":"activity","hasRunningSubprocess":true,"label":"vim"}"#.utf8)))
     }
 
-    func testSequenceIsTheResumeCursor() throws {
-        XCTAssertEqual(try frame(#"{"type":"output","data":"x","sequence":12}"#).sequence, 12)
-        XCTAssertNil(try frame(#"{"type":"closed"}"#).sequence)
+    func testMalformedKnownFrameThrows() {
+        XCTAssertThrowsError(try T3TerminalWire.decodeLine(Data(#"{"type":"output","sequence":"x"}"#.utf8)))
     }
 
-    func testPaths() {
-        XCTAssertEqual(T3TerminalWire.terminalPath(pid: 42), "/sessions/42/terminal")
-        XCTAssertEqual(T3TerminalWire.streamPath(pid: 42, id: "default"), "/sessions/42/terminal/default/stream")
-        XCTAssertEqual(T3TerminalWire.closePath(pid: 42, id: "default"), "/sessions/42/terminal/default")
+    @MainActor
+    func testChunkedSnapshotResetsOnceThenAppends() {
+        let controller = T3TerminalController(font: .monospacedSystemFont(ofSize: 10, weight: .regular))
+        controller.view.frame = CGRect(x: 0, y: 0, width: 400, height: 300)
+        controller.feed(.output(.init(data: "stale", sequence: 5)))
+        controller.awaitingSnapshot = true
+        controller.feed(.snapshot(.init(history: "one ", status: .running, sequence: 4)))
+        controller.feed(.snapshot(.init(history: "two", status: .running, sequence: 7)))
+        let line = controller.view.getTerminal().getLine(row: 0)?.translateToString(trimRight: true) ?? ""
+        XCTAssertEqual(line, "one two")
+        XCTAssertEqual(controller.phase, .running)
     }
 }

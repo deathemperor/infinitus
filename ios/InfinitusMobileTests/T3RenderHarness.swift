@@ -341,11 +341,10 @@ import InfinitusUI
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         // A canned attach stream (#507): the snapshot's scrollback, then one
         // output frame — no username, as the reference's redaction demands.
-        let terminalFrames: [T3TerminalWire.Frame] = [
-            .snapshot(.init(terminalId: "default", status: "running",
-                            history: "limitless % ls\r\nCHANGELOG.md   Package.swift  Sources  Tests  ios  tools\r\nlimitless % git status --short\r\n M ios/project.yml\r\nlimitless % ",
-                            sequence: 3, exitCode: nil, exitSignal: nil)),
-            .output(data: "swift test", sequence: 4),
+        let terminalHistory = "limitless % ls\r\nCHANGELOG.md   Package.swift  Sources  Tests  ios  tools\r\nlimitless % git status --short\r\n M ios/project.yml\r\nlimitless % "
+        let terminalFrames: [T3Terminal.Frame] = [
+            .snapshot(.init(history: terminalHistory, status: .running, sequence: terminalHistory.utf8.count)),
+            .output(.init(data: "swift test", sequence: terminalHistory.utf8.count + 10)),
         ]
         let terminal = NavigationStack { T3TerminalScreen(model: model, session: session, fixture: terminalFrames) }
             .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
