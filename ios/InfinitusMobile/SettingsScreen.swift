@@ -79,6 +79,7 @@ struct SettingsForm: View {
             }
             if shows(.appearance) {
                 appearanceSection
+                if model.t3Screens { textSection }
                 if !model.followMac {
                     themeSection
                     motionSection
@@ -277,6 +278,37 @@ struct SettingsForm: View {
             Text("Appearance")
         } footer: {
             Text("Follow Mac shows what the Mac popup shows — theme, rows, pace fire and intro; turn it off to choose your own here. Show as Mac popup renders that popup in place of the phone layout. New session screens is the thread list, thread view, task sheet and settings sheet the app now opens with; turn it off for the previous grouped list and feed.")
+        }
+    }
+
+    /// Upstream's Appearance → Text: a sample at the chosen size over the
+    /// slider, the value in points beside the label.
+    private var textSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("The quick brown fox jumps over the lazy dog.").font(T3Font.mobileLiteral(16))
+                Text("Messages, labels, and headings scale with this size.").font(T3Font.mobileLiteral(14)).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+            .id(model.t3TextSize)
+            VStack(spacing: 4) {
+                HStack {
+                    Label("Text size", systemImage: "textformat.size")
+                    Spacer()
+                    Text("\(model.t3TextSize) pt").foregroundStyle(.secondary).monospacedDigit()
+                }
+                HStack(spacing: 12) {
+                    Image(systemName: "textformat.size.smaller").foregroundStyle(.secondary).font(.footnote)
+                    Slider(value: Binding(get: { Double(model.t3TextSize) }, set: { model.t3TextSize = Int($0.rounded()) }),
+                           in: Double(MirrorModel.minTextSize)...Double(MirrorModel.maxTextSize), step: 1)
+                        .accessibilityLabel("Text size").accessibilityValue("\(model.t3TextSize) points")
+                    Image(systemName: "textformat.size.larger").foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Text")
+        } footer: {
+            Text("The size of the session screens' text; 16 pt is the reference.")
         }
     }
 

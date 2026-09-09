@@ -8,7 +8,7 @@ import InfinitusUI
 /// top drawer that holds either a pending approval
 /// (`ComposerPendingApprovalPanel.tsx` + `ComposerPendingApprovalActions.tsx`),
 /// or a pending question (`ComposerPendingUserInputPanel.tsx`) — the first two
-/// branches of `ChatComposer.tsx:4805-4846`, in that order.
+/// branches of `ChatComposer.tsx:5022-5067`, in that order.
 ///
 /// Every verdict leaves through `T3ThreadActions`, which wraps
 /// `AppModel.deliverSessionInput(pid:_:from:)` exactly as the shipped Mac chat
@@ -17,14 +17,14 @@ import InfinitusUI
 ///
 /// Not ported, each with its reason at the call site: the peek's hover
 /// choreography and the 220 ms dismiss transition (`ComposerBannerStack.tsx:9`,
-/// `:151-175`), the one-device-pixel mask under the overlap
+/// `:152-176`), the one-device-pixel mask under the overlap
 /// (`ComposerBanner.tsx:59-63`, a Chromium backdrop-filter workaround; this
 /// port's surfaces are flat fills), the description popover on a narrow container
 /// (`:290-311`), the number-key shortcuts (`ComposerPendingUserInputPanel.tsx:141-166`
 /// guards on focus not being in an editable field — no SwiftUI equivalent, and
 /// Task 13's composer would lose its digits), and single-select auto-advance
 /// (`:126-132`, a 200 ms timer). The drawer's third branch,
-/// `ComposerPlanFollowUpBanner` (`ChatComposer.tsx:4841-4845`), is not ported
+/// `ComposerPlanFollowUpBanner` (`ChatComposer.tsx:5062-5066`), is not ported
 /// either: it needs an actionable proposed plan and B has no producer for one —
 /// a parked `ExitPlanMode` arrives as an `approval.requested`, so the first
 /// branch already claims the drawer.
@@ -168,7 +168,7 @@ enum T3BannerVariant {
     }
 }
 
-/// `ComposerBanner.Surface` + `.Root` (`:36-118`, `:141-170`): the glass
+/// `ComposerBanner.Surface` + `.Root` (`:36-122`, `:145-174`): the glass
 /// surface (light `--card`, dark `--surface-raised` — the same value in this
 /// port's dark palette), `border`, the variant tint over it, `px-1` and a
 /// `--composer-banner-padding-block` of 4 (`--spacing(1)`) or 5 when
@@ -235,7 +235,7 @@ private struct T3BannerRoot<Content: View>: View {
 }
 
 /// `--composer-banner-icon-column`: `--spacing(6)` = 24 from `sm` up
-/// (`ComposerBanner.tsx:144`), which every Mac window is.
+/// (`ComposerBanner.tsx:148`), which every Mac window is.
 private let t3BannerIconColumn: Double = 24
 
 /// `--chat-composer-attachment-overlap` on an attached surface
@@ -249,8 +249,8 @@ private let t3BannerOverlap: Double = 17
 /// bottom corners inside the composer's rounded top while it tucks under it.
 let t3DrawerInset: Double = 1.375 * 16
 
-/// `ComposerBanner.Row` (`:172-202`) with its `.Icon` (`:204`), `.Content`
-/// (`:218`) and `.Actions` (`:245`) slots: a
+/// `ComposerBanner.Row` (`:176-206`) with its `.Icon` (`:208`), `.Content`
+/// (`:222`) and `.Actions` (`:249`) slots: a
 /// `grid-cols-[var(--composer-banner-icon-column)_minmax(0,1fr)_auto]` with
 /// `gap-x-1` and `min-h-(--composer-banner-icon-column)` — the icon column is
 /// `--spacing(6)` = 24 at `sm` and up, which every Mac window is.
@@ -263,7 +263,7 @@ private struct T3BannerRow<Content: View, Actions: View>: View {
     var body: some View {
         HStack(spacing: 4) {
             // Upstream keeps the column even with no glyph in it
-            // (`<ComposerBanner.Icon />`, ChatComposer.tsx:4813) — the content
+            // (`<ComposerBanner.Icon />`, ChatComposer.tsx:5030) — the content
             // aligns across rows either way. `[&>svg]:size-3` = 12.
             Group {
                 if let icon { LucideIcon(icon, size: 12).foregroundStyle(t3.web.mutedForeground.color) }
@@ -277,7 +277,7 @@ private struct T3BannerRow<Content: View, Actions: View>: View {
     }
 }
 
-/// `ComposerBanner.Body` (`:299`): `ps-[calc(var(--composer-banner-icon-column)+(--spacing(1)))]`
+/// `ComposerBanner.Body` (`:302`): `ps-[calc(var(--composer-banner-icon-column)+(--spacing(1)))]`
 /// — a block under a row, aligned with that row's content column.
 private struct T3BannerBody<Content: View>: View {
     @ViewBuilder let content: Content
@@ -365,12 +365,12 @@ struct T3BannerItem: Identifiable {
     }
 }
 
-/// `ComposerBannerStack` (`:47-241`): the front item is the attached banner,
+/// `ComposerBannerStack` (`:47-242`): the front item is the attached banner,
 /// the rest hide behind a peek cap that opens them as floating notices above
 /// it. The stack renders bottom-up (`flex flex-col-reverse`, `:121`).
 ///
 /// The peek opens on click only — upstream also opens on pointer enter
-/// (`:151-157`) and animates the dismissal for 220 ms before dropping the item
+/// (`:152-158`) and animates the dismissal for 220 ms before dropping the item
 /// (`:9`, `:109-112`); neither survives the port to a value-typed list without
 /// a timer, and this window's budget is zero idle work.
 struct T3BannerStack: View {
@@ -426,7 +426,7 @@ struct T3BannerStack: View {
         .accessibilityLabel("Show other notices")
     }
 
-    /// `ComposerBannerStackAlert` (`:243-331`).
+    /// `ComposerBannerStackAlert` (`:244-332`).
     private func alert(_ item: T3BannerItem, attached: Bool, tuck: Bool = false) -> some View {
         T3BannerRoot(variant: item.variant, attached: attached, comfortable: true, tuck: tuck) {
             VStack(alignment: .leading, spacing: 1) {   // `.Children`'s `gap-px`
@@ -450,8 +450,8 @@ struct T3BannerStack: View {
                     }
                 }
                 if !item.children.isEmpty {
-                    // `ComposerBanner.Children` (`:262`) + the usage-limits
-                    // `.Body` (`ComposerUsageLimits.tsx:58`, `gap-2 pt-1 pb-1.5 pe-2`).
+                    // `ComposerBanner.Children` (`:266`) + the usage-limits
+                    // `.Body` (`ComposerUsageLimits.tsx:82`, `gap-2 pt-1 pb-1.5 pe-2`).
                     T3BannerBody {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(item.children, id: \.self) { line in
@@ -472,7 +472,7 @@ struct T3BannerStack: View {
 }
 
 extension T3BannerItem {
-    /// `usageLimitsBannerItem` (`ComposerUsageLimits.tsx:24-46`): the limits
+    /// `usageLimitsBannerItem` (`ComposerUsageLimits.tsx:46-70`): the limits
     /// report as a dismissible `info` notice. B's report is the session's own
     /// `LimitNote`s — no account list and no windows to gauge, just one
     /// sentence each (`LimitNote.text`, OwnedWire.swift:142) — so the caller
@@ -487,7 +487,7 @@ extension T3BannerItem {
 
     /// `ThreadErrorBanner` (`ThreadErrorBanner.tsx:36-70`) as a stack entry —
     /// upstream renders it as a floating `Alert` over the composer; the stack
-    /// is where `ChatView.tsx:5698` collects the composer's own error items,
+    /// is where `ChatView.tsx:5890` collects the composer's own error items,
     /// and one place for every notice keeps the drawer's geometry honest.
     static func error(id: String, message: String, dismiss: (() -> Void)?) -> T3BannerItem {
         T3BannerItem(id: id, variant: .error, priority: .urgent, icon: .circleAlert,
@@ -498,7 +498,7 @@ extension T3BannerItem {
 // MARK: - Pending approval
 
 /// `ComposerPendingApprovalPanel.tsx` inside its top-drawer Root
-/// (`ChatComposer.tsx:4805-4830`, `variant="warning"` while an approval is
+/// (`ChatComposer.tsx:5022-5047`, `variant="warning"` while an approval is
 /// parked) with `ComposerPendingApprovalActions.tsx`'s buttons.
 ///
 /// The wire is the shipped Mac chat window's (SessionChatWindow.swift:300-316):
@@ -631,12 +631,13 @@ enum T3PendingSubmission: Equatable {
 ///   "Submit answer(s)" sit in the composer's own footer
 ///   (`ComposerPrimaryActions.tsx:40-56`, `:110-161`), which is Task 13.
 /// - the free-text answer lives here too, as a field under the options.
-///   Upstream types it into the composer instead (`ChatComposer.tsx:4881`
-///   "Write custom answer", `:4987` "Type your own answer, or leave this
+///   Upstream types it into the composer instead (`ChatComposer.tsx:5106`
+///   "Write custom answer", `:5212` "Type your own answer, or leave this
 ///   blank to use the selected option"); this port follows the phone's
 ///   layout, which puts the same field inside the card
-///   (`apps/mobile/.../PendingUserInputCard.tsx:308-318`) — B's composer is
-///   already carrying the next prompt, and one draft cannot be both.
+///   (`apps/mobile/.../PendingUserInputCard.tsx:308-318`, gone at 6c583620f) —
+///   B's composer is already carrying the next prompt, and one draft cannot be
+///   both.
 struct T3PendingUserInputPanel: View {
     let questions: [T3PendingQuestionItem]
     /// A terminal-hosted session answers by menu key: one question, one pick
@@ -658,7 +659,7 @@ struct T3PendingUserInputPanel: View {
     }
     private var isLastQuestion: Bool { questionIndex >= visible.count - 1 }
 
-    /// `buildPendingUserInputAnswers` (`pendingUserInput.ts:100-115`) against
+    /// `buildPendingUserInputAnswers` (`pendingUserInput.ts:110-125`) against
     /// this port's encoder: every question answered, a multi-select's labels
     /// joined by `SessionInput.Answers.separator` in option order, keyed by the
     /// question text (what `OwnedWire.decision(answers:)` looks up). The rule
@@ -688,7 +689,7 @@ struct T3PendingUserInputPanel: View {
         return T3PendingAnswers.separatorInMultiSelectText(q, custom: custom)
     }
 
-    /// `setPendingUserInputCustomAnswer` (`pendingUserInput.ts:60-71`): a
+    /// `setPendingUserInputCustomAnswer` (`pendingUserInput.ts:70-81`): a
     /// non-empty custom answer drops the question's selected options, which is
     /// what clears the checks (upstream hides them instead, through
     /// `customAnswerActive`, `ComposerPendingUserInputPanel.tsx:172`, `:244`).
@@ -727,7 +728,7 @@ struct T3PendingUserInputPanel: View {
                                     option(active, index: i)
                                 }
                                 if owned, active.allowCustomAnswer {
-                                    // The phone's field (`PendingUserInputCard.tsx:316`),
+                                    // The phone's field (`PendingUserInputCard.tsx:316`, gone at 6c583620f),
                                     // sized to this card's rows rather than its
                                     // `min-h-[54px]`.
                                     T3Input(text: customBinding(active), placeholder: "Or type a custom answer")
@@ -790,7 +791,7 @@ struct T3PendingUserInputPanel: View {
                             .monospacedDigit()
                             .foregroundStyle(t3.web.mutedForeground.color)
                     }
-                    // `ComposerBanner.ToggleIcon` (`:325`): `size-3.5`, rotated
+                    // `ComposerBanner.ToggleIcon` (`:330`): `size-3.5`, rotated
                     // when closed.
                     LucideIcon(.chevronDown, size: 14)
                         .foregroundStyle(t3.web.mutedForeground.color)
@@ -822,7 +823,7 @@ struct T3PendingUserInputPanel: View {
             else if question.multiSelect, owned { set.insert(option.label) }
             else { set = [option.label] }
             picks[question.id] = set
-            // `togglePendingUserInputOptionSelection` (`pendingUserInput.ts:75-95`)
+            // `togglePendingUserInputOptionSelection` (`pendingUserInput.ts:85-105`)
             // writes `customAnswer: ""` on every branch: picking an option
             // withdraws the typed answer, or the typed one would still win.
             custom[question.id] = ""
@@ -886,7 +887,7 @@ struct T3PendingUserInputPanel: View {
     }
 
     /// `canAdvance`: the active question has an answer — `resolvedAnswer`,
-    /// so a typed one counts (`pendingUserInput.ts:40-47`).
+    /// so a typed one counts (`pendingUserInput.ts:42-50`).
     private var answered: Bool {
         guard let active else { return false }
         if typedAnswer(active) != nil { return true }
@@ -904,7 +905,7 @@ struct T3PendingUserInputPanel: View {
 
 /// What `T3ThreadView.bottomSlot` renders above Task 13's composer: the banner
 /// stack, then the top drawer's one panel — `ComposerBanner.Dock` >
-/// `.Column` > the stack and the drawer (`ChatComposer.tsx:4786-4809`).
+/// `.Column` > the stack and the drawer (`ChatComposer.tsx:5003-5026`).
 ///
 /// A view of its own so that `sending`/`note` (which flip on every verdict)
 /// re-render this and nothing else: `T3ThreadView`'s body runs `Row ==` for

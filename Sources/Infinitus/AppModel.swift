@@ -1716,6 +1716,22 @@ final class AppModel: ObservableObject {
                 try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
             }
         }
+        // The phone's file browser (#223, spec E): the session's cwd is the
+        // workspace, and `T3ProjectFiles` decides every refusal — the route
+        // only maps its status.
+        mirrorServer.files.set(.init(
+            list: { pid in
+                let claudeDir = ClaudeSessions.configHome()
+                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
+                else { return nil }
+                return T3ProjectFiles.list(root: record.cwd)
+            },
+            read: { pid, path in
+                let claudeDir = ClaudeSessions.configHome()
+                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
+                else { return nil }
+                return T3ProjectFiles.read(root: record.cwd, path: path)
+            }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in

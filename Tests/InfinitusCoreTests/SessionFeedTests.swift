@@ -197,6 +197,19 @@ final class SessionFeedTests: XCTestCase {
         let data = try JSONEncoder().encode(items[0])
         XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("toolUseId"))
         XCTAssertEqual(try JSONDecoder().decode(SessionFeedItem.self, from: data).agent?.toolCalls, 2)
+
+        // The meta is written once when the agent spawns; a second read
+        // is the cache (#346) — a rewrite the app would never see keeps
+        // the remembered description, while the log is re-tailed.
+        let meta = sub.appendingPathComponent("agent-abc.meta.json")
+        try #"{"toolUseId":"toolu_A","agentType":"coder","description":"renamed"}"#.write(to: meta, atomically: true, encoding: .utf8)
+        let again = SessionFeedReader.attachAgents(SessionFeedReader.parse(lines: main, limit: 30), transcript: transcript)
+        XCTAssertEqual(again[0].agent?.description, agent.description)
+        let held = SessionFeedReader.metas.count
+        XCTAssertGreaterThan(held, 0)
+        try FileManager.default.removeItem(at: meta)
+        _ = SessionFeedReader.attachAgents(SessionFeedReader.parse(lines: main, limit: 30), transcript: transcript)
+        XCTAssertEqual(SessionFeedReader.metas.count, held - 1, "a gone meta file leaves the cache")
     }
 
     func testLimitReturnsOnlyNewestItems() {
