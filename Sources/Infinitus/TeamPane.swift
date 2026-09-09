@@ -28,7 +28,9 @@ struct TeamPane: View {
             .disabled(team.busy != nil)
             .overlay(alignment: .top) {
                 if let line = statusLine {
-                    HStack { ProgressView().controlSize(.small); Text(line) }
+                    // One line, head-truncated: git's progress is the useful
+                    // end, and a stream that arrives unsplit must not flood the pane.
+                    HStack { ProgressView().controlSize(.small); Text(line).lineLimit(1).truncationMode(.head) }
                         .font(.caption).padding(6).background(.thinMaterial, in: Capsule()).padding(.top, 6)
                 }
             }
