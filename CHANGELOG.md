@@ -15,6 +15,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
+- A debug or fixture instance keeps its mirror snapshot in its own state dir instead of overwriting the app's (INFINITUS_MIRROR_SNAPSHOT).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
 - Workspace: a newly opened window no longer races the app's first refresh into an empty sidebar (#468).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.

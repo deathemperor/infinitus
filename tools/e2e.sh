@@ -140,6 +140,7 @@ STUB
 chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
+export INFINITUS_MIRROR_SNAPSHOT="$SOCKDIR/mirror-snapshot.json"
 export INFINITUS_AWS_PROBE_S=2
 # A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
 # SDK's paste-back prompt and reads the code; `auth print-access-token`
