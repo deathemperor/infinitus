@@ -231,7 +231,10 @@ struct T3TerminalScreen: View {
     private var statusStrip: String? {
         switch controller.phase {
         case .exited(let code): return code.map { "Shell exited (\($0))" } ?? "Shell exited"
-        case .closed(let reason): return reason == T3Terminal.closedReasonBackpressure ? nil : "Terminal closed"
+        // The Mac's reasons: "idle" (30 min with no phone attached), "app quit".
+        case .closed(let reason):
+            if reason == T3Terminal.closedReasonBackpressure { return nil }
+            return reason.map { "Terminal closed — \($0)" } ?? "Terminal closed"
         default: return reconnecting ? "Reconnecting…" : nil
         }
     }
