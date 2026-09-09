@@ -279,6 +279,18 @@ public enum Stats {
             return out
         }
 
+        enum CodingKeys: String, CodingKey, CaseIterable {
+            case humanMessages, phoneMessages, agentMessages, nudges, turns, toolCalls
+            case toolErrors, questions, denials, waitingSeconds, subagents, compactions
+            case retries, longestUnattended, inputTokens, outputTokens, usd, activities
+            case byModel, byEngine, byEffort, sessions, sessionTally, sessionSeconds
+            case sessionBuckets, hours, commits, linesAdded, linesRemoved, filesTouched
+            case coAuthoredByClaude, reverts, repos, repoTally, prsOpened, prsMerged
+            case mergeHoursTotal, mergeCount, switches, limitStops, revivals, ignites, resumes
+            case minutesLostToLimits, minuteTokens, peakTokensPerMinute, peakMinute
+            case cacheReadTokens, cacheWriteTokens, cacheSavingsUSD, hourSlots
+        }
+
         /// Hand-written so a Day written by a NEWER build still decodes:
         /// every field falls back to its memberwise default. The
         /// synthesized initializer throws on the first missing key,
@@ -314,7 +326,15 @@ public enum Stats {
             sessionTally = try c.decodeIfPresent(Int.self, forKey: .sessionTally) ?? d.sessionTally
             sessionSeconds = try c.decodeIfPresent(Double.self, forKey: .sessionSeconds) ?? d.sessionSeconds
             sessionBuckets = try c.decodeIfPresent([Int].self, forKey: .sessionBuckets) ?? d.sessionBuckets
-            hours = try c.decodeIfPresent([Int].self, forKey: .hours) ?? d.hours
+            if let slots = try c.decodeIfPresent([Int].self, forKey: .hourSlots) {
+                var dense = d.hours
+                for i in stride(from: 0, to: slots.count - 1, by: 2) where dense.indices.contains(slots[i]) {
+                    dense[slots[i]] = slots[i + 1]
+                }
+                hours = dense
+            } else {
+                hours = try c.decodeIfPresent([Int].self, forKey: .hours) ?? d.hours
+            }
             commits = try c.decodeIfPresent(Int.self, forKey: .commits) ?? d.commits
             linesAdded = try c.decodeIfPresent(Int.self, forKey: .linesAdded) ?? d.linesAdded
             linesRemoved = try c.decodeIfPresent(Int.self, forKey: .linesRemoved) ?? d.linesRemoved
@@ -344,6 +364,76 @@ public enum Stats {
             cacheReadTokens = try c.decodeIfPresent(Int.self, forKey: .cacheReadTokens) ?? d.cacheReadTokens
             cacheWriteTokens = try c.decodeIfPresent(Int.self, forKey: .cacheWriteTokens) ?? d.cacheWriteTokens
             cacheSavingsUSD = try c.decodeIfPresent(Double.self, forKey: .cacheSavingsUSD) ?? d.cacheSavingsUSD
+        }
+
+        /// Hand-written too (#499): a field at its default is left out —
+        /// every reader's decoder above takes a missing key as that
+        /// default, so nothing older breaks — and `hours` travels as
+        /// `hourSlots` (slot, count pairs, sorted) when at most 24 of its
+        /// 168 slots are set, dense otherwise: a per-file day has one or
+        /// two hours in it and 7 in 10 have none, and the 168 zeros were
+        /// the cache's single biggest field (a folded period keeps the
+        /// dense form, which an older reader still understands). An
+        /// emptied `hours` (`compacted()`) round-trips as `[]`.
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            let d = Day()
+            if humanMessages != d.humanMessages { try c.encode(humanMessages, forKey: .humanMessages) }
+            if phoneMessages != d.phoneMessages { try c.encode(phoneMessages, forKey: .phoneMessages) }
+            if agentMessages != d.agentMessages { try c.encode(agentMessages, forKey: .agentMessages) }
+            if nudges != d.nudges { try c.encode(nudges, forKey: .nudges) }
+            if turns != d.turns { try c.encode(turns, forKey: .turns) }
+            if toolCalls != d.toolCalls { try c.encode(toolCalls, forKey: .toolCalls) }
+            if toolErrors != d.toolErrors { try c.encode(toolErrors, forKey: .toolErrors) }
+            if questions != d.questions { try c.encode(questions, forKey: .questions) }
+            if denials != d.denials { try c.encode(denials, forKey: .denials) }
+            if waitingSeconds != d.waitingSeconds { try c.encode(waitingSeconds, forKey: .waitingSeconds) }
+            if subagents != d.subagents { try c.encode(subagents, forKey: .subagents) }
+            if compactions != d.compactions { try c.encode(compactions, forKey: .compactions) }
+            if retries != d.retries { try c.encode(retries, forKey: .retries) }
+            if longestUnattended != d.longestUnattended { try c.encode(longestUnattended, forKey: .longestUnattended) }
+            if inputTokens != d.inputTokens { try c.encode(inputTokens, forKey: .inputTokens) }
+            if outputTokens != d.outputTokens { try c.encode(outputTokens, forKey: .outputTokens) }
+            if usd != d.usd { try c.encode(usd, forKey: .usd) }
+            if activities != d.activities { try c.encode(activities, forKey: .activities) }
+            if byModel != d.byModel { try c.encode(byModel, forKey: .byModel) }
+            if byEngine != d.byEngine { try c.encode(byEngine, forKey: .byEngine) }
+            if byEffort != d.byEffort { try c.encode(byEffort, forKey: .byEffort) }
+            if sessions != d.sessions { try c.encode(sessions, forKey: .sessions) }
+            if sessionTally != d.sessionTally { try c.encode(sessionTally, forKey: .sessionTally) }
+            if sessionSeconds != d.sessionSeconds { try c.encode(sessionSeconds, forKey: .sessionSeconds) }
+            if sessionBuckets != d.sessionBuckets { try c.encode(sessionBuckets, forKey: .sessionBuckets) }
+            if hours.isEmpty {
+                try c.encode(hours, forKey: .hours)
+            } else {
+                let set = hours.enumerated().filter { $0.element != 0 }
+                if set.count > 24 { try c.encode(hours, forKey: .hours) }
+                else if !set.isEmpty { try c.encode(set.flatMap { [$0.offset, $0.element] }, forKey: .hourSlots) }
+            }
+            if commits != d.commits { try c.encode(commits, forKey: .commits) }
+            if linesAdded != d.linesAdded { try c.encode(linesAdded, forKey: .linesAdded) }
+            if linesRemoved != d.linesRemoved { try c.encode(linesRemoved, forKey: .linesRemoved) }
+            if filesTouched != d.filesTouched { try c.encode(filesTouched, forKey: .filesTouched) }
+            if coAuthoredByClaude != d.coAuthoredByClaude { try c.encode(coAuthoredByClaude, forKey: .coAuthoredByClaude) }
+            if reverts != d.reverts { try c.encode(reverts, forKey: .reverts) }
+            if repos != d.repos { try c.encode(repos, forKey: .repos) }
+            if repoTally != d.repoTally { try c.encode(repoTally, forKey: .repoTally) }
+            if prsOpened != d.prsOpened { try c.encode(prsOpened, forKey: .prsOpened) }
+            if prsMerged != d.prsMerged { try c.encode(prsMerged, forKey: .prsMerged) }
+            if mergeHoursTotal != d.mergeHoursTotal { try c.encode(mergeHoursTotal, forKey: .mergeHoursTotal) }
+            if mergeCount != d.mergeCount { try c.encode(mergeCount, forKey: .mergeCount) }
+            if switches != d.switches { try c.encode(switches, forKey: .switches) }
+            if limitStops != d.limitStops { try c.encode(limitStops, forKey: .limitStops) }
+            if revivals != d.revivals { try c.encode(revivals, forKey: .revivals) }
+            if ignites != d.ignites { try c.encode(ignites, forKey: .ignites) }
+            if resumes != d.resumes { try c.encode(resumes, forKey: .resumes) }
+            if minutesLostToLimits != d.minutesLostToLimits { try c.encode(minutesLostToLimits, forKey: .minutesLostToLimits) }
+            if minuteTokens != d.minuteTokens { try c.encode(minuteTokens, forKey: .minuteTokens) }
+            if peakTokensPerMinute != d.peakTokensPerMinute { try c.encode(peakTokensPerMinute, forKey: .peakTokensPerMinute) }
+            if peakMinute != d.peakMinute { try c.encode(peakMinute, forKey: .peakMinute) }
+            if cacheReadTokens != d.cacheReadTokens { try c.encode(cacheReadTokens, forKey: .cacheReadTokens) }
+            if cacheWriteTokens != d.cacheWriteTokens { try c.encode(cacheWriteTokens, forKey: .cacheWriteTokens) }
+            if cacheSavingsUSD != d.cacheSavingsUSD { try c.encode(cacheSavingsUSD, forKey: .cacheSavingsUSD) }
         }
 
         // Derived — nil when the denominator is zero (tiles show "—").
