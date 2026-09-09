@@ -6,13 +6,13 @@ import InfinitusUI
 /// compiles NetworkFleetMirror.swift without the T3 tree.
 extension NetworkFleetMirror {
     /// The session's workspace files, flat: `GET /sessions/<pid>/files`.
-    func files(pid: Int32) async throws -> T3FileTree.Listing {
+    func files(pid: Int32) async throws -> T3ProjectFiles.Listing {
         try await getJSON(T3ProjectFiles.filesPath(pid: pid))
     }
 
     /// One workspace file's text: `GET /sessions/<pid>/file?path=<rel>`.
     /// 400 outside the workspace, 404 gone, 415 binary — surfaced as `.http`.
-    func file(pid: Int32, path: String) async throws -> T3FileTree.FileRead {
+    func file(pid: Int32, path: String) async throws -> T3ProjectFiles.FileRead {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
         let encoded = path.addingPercentEncoding(withAllowedCharacters: allowed) ?? path
@@ -34,8 +34,9 @@ struct T3SourceFileRoute: Hashable {
 }
 
 /// T3's Files (`ThreadFilesRouteScreen.tsx` + `FileTreeBrowser.tsx` at
-/// upstream 6c583620f): the session's workspace as a folder tree from the
-/// Mac's flat listing (#223 Files wire), top-level folders open, a search
+/// upstream 6c583620f): the session's workspace as a folder tree (Core's
+/// `T3FileTree`, shared with the Mac's Files tab) from the Mac's flat
+/// listing (#223 Files wire), top-level folders open, a search
 /// field that shows matches with their ancestors, a tap on a file pushes
 /// its source. A Mac without the route says so instead of a tree.
 struct T3FilesScreen: View {
@@ -44,28 +45,32 @@ struct T3FilesScreen: View {
     var macId: String? = nil
     @Environment(\.t3) private var t3
     @Environment(\.dismiss) private var dismiss
-    @State private var listing: T3FileTree.Listing?
+    @State private var listing: T3ProjectFiles.Listing?
     @State private var tree: [T3FileTree.Node] = []
     @State private var expanded: Set<String> = []
     @State private var search = ""
     @State private var error: String?
     @State private var loading = false
-    private let fixture: T3FileTree.Listing?
+    private let fixture: T3ProjectFiles.Listing?
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
         self.model = model; self.session = session; self.macId = macId; fixture = nil
     }
 
     /// The render harness's listing; nothing is fetched.
-    init(model: MirrorModel, session: SessionDetail, fixture: T3FileTree.Listing) {
+    init(model: MirrorModel, session: SessionDetail, fixture: T3ProjectFiles.Listing) {
         self.model = model; self.session = session; self.fixture = fixture
         _listing = State(initialValue: fixture)
         let nodes = T3FileTree.build(fixture.entries)
         _tree = State(initialValue: nodes)
-        _expanded = State(initialValue: T3FileTree.defaultExpanded(nodes))
+        let open = T3FileTree.defaultExpanded(nodes)
+        _expanded = State(initialValue: open)
+        _rows = State(initialValue: T3FileTree.flatten(nodes: nodes, expanded: open, searchQuery: ""))
     }
 
-    private var rows: [T3FileTree.Visible] { T3FileTree.flatten(tree, expanded: expanded, search: search) }
+    /// The visible rows, derived once per tree/expansion/search change —
+    /// not per body pass (a search over 20 000 entries is ~16 ms).
+    @State private var rows: [T3FileTree.Visible] = []
     private var project: String { URL(fileURLWithPath: listing?.cwd ?? session.cwd).lastPathComponent }
 
     var body: some View {
@@ -113,6 +118,8 @@ struct T3FilesScreen: View {
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) { searchField.padding(.horizontal, 16).padding(.bottom, 8) }
         .task { if fixture == nil { await load() } }
+        .onChange(of: search) { _, _ in rows = T3FileTree.flatten(nodes: tree, expanded: expanded, searchQuery: search) }
+        .onChange(of: expanded) { _, _ in rows = T3FileTree.flatten(nodes: tree, expanded: expanded, searchQuery: search) }
     }
 
     /// The native header's title + `unstable_headerSubtitle`, leading.
@@ -226,9 +233,13 @@ struct T3FilesScreen: View {
         defer { loading = false }
         do {
             let reply = try await model.mirror(for: macId).files(pid: Int32(session.pid))
+            // A 20 000-entry build is ~180 ms: off the main actor, the spinner
+            // keeps turning.
+            let nodes = await Task.detached(priority: .userInitiated) { T3FileTree.build(reply.entries) }.value
             listing = reply
-            tree = T3FileTree.build(reply.entries)
-            if expanded.isEmpty { expanded = T3FileTree.defaultExpanded(tree) }
+            tree = nodes
+            if expanded.isEmpty { expanded = T3FileTree.defaultExpanded(nodes) }
+            rows = T3FileTree.flatten(nodes: nodes, expanded: expanded, searchQuery: search)
             error = nil
         } catch MirrorTransportError.http(404) {
             error = "This Mac doesn't serve files yet — update Infinitus on the Mac, or the session's folder is gone."
@@ -249,17 +260,17 @@ struct T3SourceFileScreen: View {
     let path: String
     @Environment(\.t3) private var t3
     @Environment(\.dismiss) private var dismiss
-    @State private var file: T3FileTree.FileRead?
+    @State private var file: T3ProjectFiles.FileRead?
     @State private var error: String?
     @State private var binary = false
     @State private var copied = false
-    private let fixture: T3FileTree.FileRead?
+    private let fixture: T3ProjectFiles.FileRead?
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil, path: String) {
         self.model = model; self.session = session; self.macId = macId; self.path = path; fixture = nil
     }
 
-    init(model: MirrorModel, session: SessionDetail, path: String, fixture: T3FileTree.FileRead) {
+    init(model: MirrorModel, session: SessionDetail, path: String, fixture: T3ProjectFiles.FileRead) {
         self.model = model; self.session = session; self.path = path; self.fixture = fixture
         _file = State(initialValue: fixture)
     }
