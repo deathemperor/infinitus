@@ -7,16 +7,16 @@ import InfinitusUI
 /// variants upstream renders. `Sidebar.tsx:4628`:
 /// `const isCard = section === "active" || section === "pinned"` — settling
 /// and snoozing are the ONLY things that collapse a row, so pinned/active
-/// rows are 78 pt two-line CARDS (`:1723-1815`) and snoozed/settled rows are
-/// the 36 pt SLIM row (`:1538-1636`). The B-3 review found this port had
+/// rows are 78 pt two-line CARDS (`:1721-1808`) and snoozed/settled rows are
+/// the 36 pt SLIM row (`:1539-1632`). The B-3 review found this port had
 /// only ever built the slim row and used it everywhere.
 ///
-/// Both variants share `rowSurfaceClassName` (`:1359-1379`) and the leading
+/// Both variants share `rowSurfaceClassName` (`:1359-1382`) and the leading
 /// project icon (`ProjectFavicon.tsx`, ported as `T3ProjectGlyph`/
 /// `T3ProjectIcon`). What differs: the card carries the project display name
-/// and the `topStatus` pill on its own first line (`:1725-1770`) with the
-/// thread title below (`:1873-1880`); the slim row is one line whose only
-/// trailing content is a time label (`:1628-1637`) — never a pill.
+/// and the `topStatus` pill on its own first line (`:1723-1763`) with the
+/// thread title below (`:1866-1873`); the slim row is one line whose only
+/// trailing content is a time label (`:1624-1633`) — never a pill.
 ///
 /// Right-click ports `buildThreadActionMenuItems`
 /// (`threadActionMenu.logic.ts`), keeping only pin/unpin, settle/unsettle,
@@ -29,7 +29,7 @@ struct T3ThreadRowView: View {
     enum Variant { case card, slim }
     /// `Sidebar.tsx:4638-4644`'s `variantAction`: a snoozed row wakes, a
     /// settled row un-settles, a card settles. The slim row reads it to pick
-    /// its trailing label (`:1606`, `:1633-1635`).
+    /// its trailing label (`:1602`, `:1629-1631`).
     enum VariantAction { case settle, unsettle, unsnooze }
 
     let thread: T3Thread
@@ -395,7 +395,7 @@ struct T3ThreadRowView: View {
 /// background box, no radius, no letter fallback (upstream has none of those
 /// for the automatic path; the favicon-image and emoji-override branches have
 /// no B equivalent, see `T3ProjectIcon`'s header comment). `size` is the
-/// caller's own class: 16 in the sidebar rows (`Sidebar.tsx:1728`/`:1580`'s
+/// caller's own class: 16 in the sidebar rows (`Sidebar.tsx:1725`/`:1580`'s
 /// `size-4`), 14 in the breadcrumb (`ChatHeader.tsx:341`'s `size-3.5`).
 struct T3ProjectGlyph: View {
     let projectName: String

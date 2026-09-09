@@ -12,7 +12,7 @@ import InfinitusUI
 /// panel (`:148-156`), the "Recent Threads" group label
 /// (`CommandPalette.logic.ts:463-469`), a row's title over
 /// `project · Current thread` with a relative timestamp
-/// (`buildThreadActionItems`, `:205-250`), the highlighted row's
+/// (`buildThreadActionItems`, `:216-261`), the highlighted row's
 /// `bg-foreground/[0.09]` (`:177-184`), the empty line
 /// (`CommandPaletteResults.tsx:92-99`) and the footer's key hints
 /// (`CommandPaletteContent.tsx:53-80`).

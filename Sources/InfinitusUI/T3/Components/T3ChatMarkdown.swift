@@ -173,8 +173,8 @@ public struct T3ChatMarkdown: View {
     ///
     /// Nothing is FETCHED: a favicon request on the render path is off the
     /// table here, so every host gets the globe upstream falls back to when
-    /// there is no favicon (`:1211`, the reference's own `localhost` line),
-    /// and no brand mark is drawn (`:1193`). See `MarkdownInline.LinkGlyph`
+    /// there is no favicon (`:1214`, the reference's own `localhost` line),
+    /// and no brand mark is drawn (`:1196`). See `MarkdownInline.LinkGlyph`
     /// for why this is an image and not an attributed run.
     private static let slotGlyphSize: Double = 14
     private static let slotMarginStart: Double = 0.25 * 14

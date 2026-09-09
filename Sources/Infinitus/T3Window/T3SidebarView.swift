@@ -78,7 +78,7 @@ struct T3SidebarView: View {
     // hover:bg-sidebar-row-hover`) holding an `unstyled` field, with the
     // new-thread button beside it on the same `flex items-center gap-1` line.
     // The row and the scope row share one `SidebarGroup`
-    // (`p-[var(--sidebar-content-inset)] gap-1`, `:4250`), which is where the
+    // (`p-[var(--sidebar-content-inset)] gap-1`, `:4291`), which is where the
     // 8 above and the 4 below come from.
     private var searchRow: some View {
         HStack(spacing: 4) {
@@ -122,7 +122,7 @@ struct T3SidebarView: View {
     // `Sidebar.tsx:4317-4359`: a `SidebarMenuButton size="icon"` (`size-8`,
     // `--control-radius`) carrying `SquarePenIcon` at `size-4`. Upstream's
     // multi-project setup routes ⌘N through the palette's "New thread in…"
-    // picker (`:4210-4229`); B resolves the project directly
+    // picker (`:4251-4270`); B resolves the project directly
     // (`T3WindowModel.currentProjectId`), so the button and ⌘N do the same
     // thing here. Disabled with no project — a draft has nowhere to start.
     private var newThreadButton: some View {
@@ -147,9 +147,9 @@ struct T3SidebarView: View {
     // ps-[calc(var(--sidebar-row-content-inset)-1px)]`) and the "New project"
     // icon button beside it — the same two-control shape as the search row
     // above, so the folder-plus lands under the pen. The trigger itself is
-    // `FolderIcon size-4` (`:4389`, the no-scope branch), the label
+    // `FolderIcon size-4` (`:4423`, the no-scope branch), the label
     // (`min-w-0 flex-1 truncate`) and `ChevronDownIcon size-4 -mr-px` at the
-    // FAR right (`:4392`), not against the label.
+    // FAR right (`:4426`), not against the label.
     private var scopeRow: some View {
         HStack(spacing: 4) {
             Menu {
@@ -353,13 +353,13 @@ struct T3SidebarView: View {
 ///
 /// Two deliberate differences from upstream, both in the dispatch's scope:
 /// upstream surfaces a draft row only once the draft HAS content
-/// (`:797-800`, "Draft sessions with user content") and shows an attachment
+/// (`:781-784`, "Draft sessions with user content") and shows an attachment
 /// count when the prompt is empty — here every draft has a row from the moment
 /// ⌘N makes one, and an empty one reads `T3WorkspaceState.draftTitle`
 /// ("New thread"). And the preview is a snapshot, not a live mirror of the
 /// composer: `T3WindowModel.drafts` is not `@Published` (Task 13's rule), which
 /// is exactly the freeze upstream applies to the OPEN draft's row anyway
-/// (`:686-688`, `:814`).
+/// (`:678-680`, `:795`).
 ///
 /// The vendored Lucide set has no `square-pen` (Lucide.generated.swift) —
 /// `pencil` is its nearest glyph for the same "unsent work" mark.

@@ -481,7 +481,7 @@ final class T3WindowModel: ObservableObject {
     /// project you are in. `projectId` forces one (⌘⇧N, upstream's
     /// `chat.newLocal`); nil resolves the selected thread's project, then the
     /// sidebar's scope, then the top project — the resolution order upstream's
-    /// `newThreadContext` uses (`:4206-4209`).
+    /// `newThreadContext` uses (`:4247-4250`).
     func startNewThread(projectId: String? = nil) {
         guard let project = projectId ?? currentProjectId else { return }
         // ⌘N twice in the same project reopens the empty draft it already made

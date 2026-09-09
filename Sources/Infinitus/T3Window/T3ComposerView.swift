@@ -14,7 +14,7 @@ import InfinitusUI
 /// (`composerSubmissionIntentForEnter`, `composer-logic.ts:27-37`), the length
 /// validation line (`ComposerPromptLengthValidation.tsx`), the footer's mode
 /// control (`ChatComposer.tsx:1000-1112`) and model label
-/// (`ProviderModelPicker`, `:3979-4013`), the attach action (`:5528-5556`),
+/// (`ProviderModelPicker`, `:4147-4189`), the attach action (`:5815-5843`),
 /// the primary actions (`ComposerPrimaryActions.tsx:222-283`), terminal-style
 /// prompt recall (`composerPromptHistory.ts:183-211`) and the `/` command and
 /// `@` file menus (`ComposerCommandMenu.tsx` over `detectComposerTrigger`,
@@ -98,7 +98,7 @@ struct T3ComposerView: View {
     /// row and the query it was highlighted under
     /// (`composerHighlightedItemId` / `composerHighlightedSearchKey`,
     /// `ChatComposer.tsx:2156-2170`), and which trigger ⎋ shut. Upstream's
-    /// menu is open exactly while a trigger is under the caret (`:2023`) and
+    /// menu is open exactly while a trigger is under the caret (`:2152`) and
     /// ⎋ does nothing; a dismissal here stays until the caret is on a
     /// different trigger — never longer, or ⎋ would make `/` a dead key.
     @State private var menu = T3ComposerMenuState()
@@ -755,10 +755,10 @@ struct T3ComposerView: View {
     }
 
     /// `composerMenuItems` (`ChatComposer.tsx:2050-2125`): a path row is its
-    /// basename over the directory it sits in (`:1929-1930`), a command row is
-    /// `/name` over its description (`:1972-1973`). Ours are Claude Code's own
+    /// basename over the directory it sits in (`:2058-2059`), a command row is
+    /// `/name` over its description (`:2101-2102`). Ours are Claude Code's own
     /// commands and skills, both invoked as `/name` — upstream's `/skill:`
-    /// prefix (`:1983`) would misstate what the row inserts.
+    /// prefix (`:2112`) would misstate what the row inserts.
     private func menuItems(_ trigger: T3ComposerTrigger.Detected) -> [T3ComposerMenuItem] {
         switch trigger.kind {
         case .command:
@@ -1056,7 +1056,7 @@ private struct T3ComposerIconButton: View {
 
 /// One staged file (`ChatComposer.tsx:5609-5615`): `flex items-center gap-2
 /// py-1 text-sm`, the name truncating, its size in `text-xs
-/// text-secondary-label` (`:5334`) and an `icon-xs` remove button (`:5390`).
+/// text-secondary-label` (`:5619`) and an `icon-xs` remove button (`:5390`).
 private struct T3ComposerAttachmentRow: View {
     let attachment: T3ComposerAttachmentRef
     let onRemove: () -> Void

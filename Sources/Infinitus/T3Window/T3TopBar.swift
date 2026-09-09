@@ -36,7 +36,7 @@ struct T3TopBar: View {
     @Environment(\.t3) private var t3
 
     /// Tailwind v4's `--container-3xl: 48rem` (`theme.css:341`): the one
-    /// breakpoint `ChatHeader.tsx:408` and `OpenInPicker.tsx:283-291` query.
+    /// breakpoint `ChatHeader.tsx:407` and `OpenInPicker.tsx:283-291` query.
     private static let containerBreakpoint3xl: Double = 768
     private var wide: Bool { columnWidth >= Self.containerBreakpoint3xl }
     // Fix round 1 (task-8-fix1-brief.md R1): each menu-fronted control's
@@ -73,11 +73,11 @@ struct T3TopBar: View {
             // flexible member (its own `.frame(maxWidth: .infinity)`) — this
             // gap is fixed, not an expanding `Spacer`, so nothing else in
             // the row competes for leftover width. It is
-            // `ChatHeader.tsx:316`'s `gap-2 sm:gap-3` on the header content
+            // `ChatHeader.tsx:317`'s `gap-2 sm:gap-3` on the header content
             // div — a VIEWPORT breakpoint the window's 840 pt minimum always
             // clears, so always 12, unlike the actions gap below.
             Color.clear.frame(width: 12)
-            // `ChatHeader.tsx:408`: the actions div is `gap-2
+            // `ChatHeader.tsx:407`: the actions div is `gap-2
             // @3xl/header-actions:gap-3` — a CONTAINER query, so the gap is 8
             // until the header itself reaches 768 pt and 12 above it. With
             // the right panel open at 840 the column is ~380 pt wide and the
@@ -93,7 +93,7 @@ struct T3TopBar: View {
             // still lands 64pt from the window's right edge.
             // Measured against the 2x reference with both toggles present:
             // the actions cluster's trailing edge sits 12 pt from the panel
-            // controls (`ChatHeader.tsx:316`'s own `gap-3`), and the group's
+            // controls (`ChatHeader.tsx:317`'s own `gap-3`), and the group's
             // 28 + 4 + 28 plus `index.css:110`'s 12 pt inset fill the rest.
             // The 24 here came from reading `pr-16` as the whole trailing
             // run while only ONE toggle stood in it.
@@ -173,9 +173,9 @@ struct T3TopBar: View {
     // proposal left to clamp) — removed; `CapToContent` below does the job.
     //
     // B-3 review: the priority was inverted. CSS gives the title item
-    // `min-w-10 flex-1` (`:352`) — flex-basis 0, so it takes the leftover and
+    // `min-w-10 flex-1` (`:342`) — flex-basis 0, so it takes the leftover and
     // is the member that TRUNCATES — while the project item is `shrink` with
-    // a content basis capped at 160 (`:332`,`:360`), so it keeps
+    // a content basis capped at 160 (`:329`,`:350`), so it keeps
     // min(content, 160) and only gives way under real squeeze. The title's
     // `.layoutPriority(1)` said the opposite (it made the title hold its
     // ideal width and the project cluster collapse), so it is gone: the two
@@ -465,7 +465,7 @@ struct T3TopBar: View {
 /// project name and a 120-char thread title at a 900 pt width, so BOTH sides
 /// of the breadcrumb's sizing show — the project cluster holding at its
 /// 160 pt cap (`CapToContent`, `ChatHeader.tsx:350`'s `max-w-40`) while the
-/// TITLE is the member that truncates (`:352`'s `min-w-10 flex-1`, no
+/// TITLE is the member that truncates (`:342`'s `min-w-10 flex-1`, no
 /// `.layoutPriority` anywhere). Standing up a real `T3TopBar` here would need
 /// a live `AppModel` (engine registration, a demo-script subprocess even
 /// under `playground:`), wildly disproportionate for a layout check, so this

@@ -18,7 +18,7 @@ import InfinitusUI
 /// `BranchToolbarEnvModeSelector`'s `envLocked` span
 /// (`:52-75` — `FolderIcon size-3` + `resolveLockedWorkspaceLabel`, no
 /// chevron) and `BranchToolbarBranchSelector`'s ghost `xs` trigger
-/// (`:775-793` — `GitBranchIcon size-3 opacity-70`, the branch,
+/// (`:775-795` — `GitBranchIcon size-3 opacity-70`, the branch,
 /// `ChevronDownIcon size-3 opacity-50`). Neither opens anything yet: this
 /// window has no worktree mode and no branch switching, and a trigger that
 /// silently did nothing would be worse than one that says so, so both carry
