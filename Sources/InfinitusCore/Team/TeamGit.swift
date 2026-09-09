@@ -322,6 +322,37 @@ public final class TeamGit: TeamStore {
         return names
     }
 
+    /// Spec §4.2's one force-push: the branch becomes a single commit
+    /// holding its current tree minus `dropping` (an explicit, once-per-
+    /// branch action — #339, never the loop's). Readers cope: a cursor
+    /// whose commit is gone falls back to the full listing, headers are
+    /// cached by blob version, and a member's depth-1 mirror just takes
+    /// the new tip. Returns how many paths were dropped.
+    public func compact(branch: String, dropping prefix: String) throws -> Int {
+        guard opened else { throw GitError.notOpen }
+        guard let parent = try head(of: branch) else { return 0 }
+        let dropped = try run(["ls-tree", "-r", "--name-only", parent, "--", prefix])
+        let paths = String(decoding: dropped, as: UTF8.self).split(separator: "\n").map(String.init)
+        let index = dir.appendingPathComponent("index-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: index) }
+        let env = ["GIT_INDEX_FILE": index.path]
+        _ = try run(["read-tree", parent], env: env)
+        if !paths.isEmpty {
+            let lines = paths.map { "0 0000000000000000000000000000000000000000\t\($0)\n" }.joined()
+            _ = try run(["update-index", "--index-info"], stdin: Data(lines.utf8), env: env)
+        }
+        let treeSha = String(decoding: try run(["write-tree"], env: env), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let commit = String(decoding: try run(["commit-tree", treeSha, "-m", "compacted (\(paths.count) dropped under \(prefix))"], env: [
+            "GIT_AUTHOR_NAME": "Infinitus", "GIT_AUTHOR_EMAIL": "\(author)@infinitus.run",
+            "GIT_COMMITTER_NAME": "Infinitus", "GIT_COMMITTER_EMAIL": "\(author)@infinitus.run",
+        ]), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        heads = [:]; branchNames = nil
+        _ = try run(["push", "--progress", "--force", "origin", "\(commit):refs/heads/\(branch)"], network: true)
+        _ = try run(["update-ref", "refs/remotes/origin/\(branch)", commit])
+        return paths.count
+    }
+
     private func head(of branch: String) throws -> String? {
         if let known = heads[branch] { return known }
         let sha: String?

@@ -402,6 +402,16 @@ public final class TeamClient {
     /// removal instant; envelopes it sealed at or before `now` stay
     /// readable, later ones are ignored, and its next `fetch` ends its
     /// membership.
+    /// #339: this identity's `m/<kid>` becomes one commit — its current
+    /// tree without any pre-split `transcripts/` — force-pushed. Explicit
+    /// and once; the store's history behind a member branch is otherwise
+    /// every chunk ever published (1.3 GB on Papaya's leader, #414).
+    @discardableResult
+    public func compactOwnBranch() throws -> Int {
+        guard isMember else { throw ClientError.notInTeam }
+        return try store.compact(branch: "m/\(identity.kid)", dropping: "transcripts/")
+    }
+
     public func remove(kid: String, now: Int = Int(Date().timeIntervalSince1970)) throws {
         try editRoster { current in
             guard let keys = current.keys(for: kid) else { throw ClientError.unknownMember }

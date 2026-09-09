@@ -10,13 +10,17 @@ publishes the matching section as the GitHub release body.
 ### Team (preview)
 - Teammates' data and transcript branches are fetched at their tip only, not with every chunk ever published behind them, and a removed member's branch disappears from the mirror; the roster keeps its history for the trust walk (#414).
 - A member's publish deletes the pre-split transcript chunks still sitting in its `m/<kid>` branch, so a new member's first fetch no longer downloads 1.3 GB of stale chunks (#414).
+- Leaders can compact their own branch on the store (Settings › Team, `infinitusctl team-compact`): one commit without the pre-split transcript history, the explicit force-push the spec reserves, so a new member's first fetch is megabytes instead of gigabytes (#339).
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
 - Workspace: a working thread's status reads in sky, the colour the reference uses.
 - Workspace: drop files onto a sidebar thread to open it with them attached.
+- Workspace: a "Scroll to end" button above the composer while the thread is scrolled away from its newest message.
+- Workspace: the new-thread project picker lists each project with its own icon.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.
@@ -49,8 +53,10 @@ publishes the matching section as the GitHub release body.
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
 - A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
+- The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
 
 ### Phone
+- A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
 - Home rows follow upstream: Working reads in the Mac's sky tint, a Mac with several accounts shows which one a session runs on beside the Claude mark, and settle, snooze and pin move the row as one transition.
 - Settings gains Usage: each Mac's 5-hour, weekly and per-model limits pooled across its accounts, with quota left, pace, the next refill and a per-account detail.
 - A thread no longer pulls you to the bottom while you read history: new rows follow only when you are at the end, and a scroll-to-end button appears beside the Working pill otherwise.

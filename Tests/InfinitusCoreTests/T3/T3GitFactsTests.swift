@@ -62,6 +62,37 @@ final class T3GitFactsTests: XCTestCase {
         #endif
     }
 
+    /// No git needed: HEAD is read as a file, from any folder inside the
+    /// work tree, and a linked worktree's `.git` file points at its own
+    /// git dir (#346).
+    func testReadsHeadWithoutGitFromASubfolderAndThroughAWorktreeFile() throws {
+        let fm = FileManager.default
+        let dotGit = root.appendingPathComponent(".git")
+        try fm.createDirectory(at: dotGit, withIntermediateDirectories: true)
+        try "ref: refs/heads/feature/two\n".write(to: dotGit.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let sub = root.appendingPathComponent("Sources/Deep")
+        try fm.createDirectory(at: sub, withIntermediateDirectories: true)
+        XCTAssertEqual(T3GitFacts.branch(cwd: root.path), "feature/two")
+        XCTAssertEqual(T3GitFacts.branch(cwd: sub.path), "feature/two")
+        XCTAssertEqual(T3GitFacts.branch(cwd: root.path + "/"), "feature/two")
+        XCTAssertNil(T3GitFacts.branch(cwd: ""))
+        XCTAssertNil(T3GitFacts.branch(cwd: "relative/path"))
+
+        let wtGit = dotGit.appendingPathComponent("worktrees/linked")
+        try fm.createDirectory(at: wtGit, withIntermediateDirectories: true)
+        try "ref: refs/heads/linked-branch\n".write(to: wtGit.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let linked = root.appendingPathComponent("linked")
+        try fm.createDirectory(at: linked, withIntermediateDirectories: true)
+        try "gitdir: \(wtGit.path)\n".write(to: linked.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(T3GitFacts.branch(cwd: linked.path), "linked-branch")
+        // A relative gitdir (a submodule's `.git` file) resolves from the folder.
+        try "gitdir: ../.git/worktrees/linked\n".write(to: linked.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(T3GitFacts.branch(cwd: linked.path), "linked-branch")
+
+        try "0123456789abcdef0123456789abcdef01234567\n".write(to: dotGit.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        XCTAssertNil(T3GitFacts.branch(cwd: sub.path))
+    }
+
     func testWorkspaceLabel() {
         XCTAssertEqual(T3GitFacts.workspaceLabel(worktreePath: nil), "Local checkout")
         XCTAssertEqual(T3GitFacts.workspaceLabel(worktreePath: "/tmp/wt"), "Worktree")

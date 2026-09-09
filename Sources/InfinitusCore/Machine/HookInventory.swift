@@ -173,9 +173,10 @@ public enum HookInventory {
         return nil
     }
 
-    public static func live(of registration: HookRegistration, rows: [ProcessRow]) -> Live {
+    public static func live(of registration: HookRegistration, rows: [ProcessRow],
+                            children: [Int: [ProcessRow]]? = nil) -> Live {
         var live = Live()
-        let (instances, helpers) = instanceRows(of: registration, rows: rows)
+        let (instances, helpers) = instanceRows(of: registration, rows: rows, children: children)
         live.instances = instances.count
         live.helpers = helpers.count
         for row in instances + helpers {
@@ -186,10 +187,14 @@ public enum HookInventory {
     }
 
     /// The rows whose command carries the registration's script path,
-    /// and their descendants (a shell hook's python helpers).
-    public static func instanceRows(of registration: HookRegistration, rows: [ProcessRow]) -> (instances: [ProcessRow], helpers: [ProcessRow]) {
+    /// and their descendants (a shell hook's python helpers). `children`
+    /// is `childrenByParent(rows)`, built once by a caller that asks for
+    /// every registration — 70 registrations regrouping 1,100 rows each
+    /// was most of the machine sample's CPU (#346).
+    public static func instanceRows(of registration: HookRegistration, rows: [ProcessRow],
+                                    children: [Int: [ProcessRow]]? = nil) -> (instances: [ProcessRow], helpers: [ProcessRow]) {
         guard let path = registration.scriptPath else { return ([], []) }
-        let byParent = Dictionary(grouping: rows, by: \.ppid)
+        let byParent = children ?? childrenByParent(rows)
         let instances = rows.filter { $0.command.contains(path) }
         var seen = Set(instances.map(\.pid))
         var helpers: [ProcessRow] = []
@@ -201,6 +206,10 @@ public enum HookInventory {
             }
         }
         return (instances, helpers)
+    }
+
+    public static func childrenByParent(_ rows: [ProcessRow]) -> [Int: [ProcessRow]] {
+        Dictionary(grouping: rows, by: \.ppid)
     }
 
     /// A stable fingerprint of the registrations: a change means an
