@@ -317,9 +317,5 @@ private struct T3SidebarDraftRow: View {
         .accessibilityLabel("Draft in \(projectName ?? "no project")")
     }
 
-    private var firstLine: String {
-        let line = preview.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? ""
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? T3WorkspaceState.draftTitle : trimmed
-    }
+    private var firstLine: String { T3WorkspaceState.draftRowTitle(preview) }
 }

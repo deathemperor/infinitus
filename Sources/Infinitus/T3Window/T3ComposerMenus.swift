@@ -17,10 +17,6 @@ import InfinitusUI
 /// `at-sign` (Lucide.generated.swift) — nothing here needs either, so no SF
 /// Symbol stands in for them; a file row gets `file`, the nearest vendored
 /// glyph to upstream's `PierreEntryIcon`.
-/// The keys an open menu claims before the field does
-/// (`onComposerCommandKey`, `ChatComposer.tsx:3080-3125`): ↑/↓ move the
-/// highlight, ⏎ and ⇥ pick it, ⎋ shuts the menu (ours — see `T3ComposerView`).
-enum T3ComposerMenuKey { case up, down, pick, dismiss }
 
 /// The open menu's measured height, so the composer can lift it clear of the
 /// card (the same mechanism `T3ComposerHeightKey` uses one level up).

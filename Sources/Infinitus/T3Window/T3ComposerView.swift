@@ -94,16 +94,14 @@ struct T3ComposerView: View {
     @State private var mentionRows: [String] = []
     @State private var mentionCwd: String?
     @State private var mentionLoading = false
-    /// The highlighted row and the query it was highlighted under
+    /// The menu's own state (`T3ComposerMenuState`, Core): the highlighted
+    /// row and the query it was highlighted under
     /// (`composerHighlightedItemId` / `composerHighlightedSearchKey`,
-    /// `ChatComposer.tsx:2027-2041`).
-    @State private var highlighted: String?
-    @State private var highlightedKey: String?
-    /// Ours: upstream's menu is open exactly while a trigger is under the
-    /// caret (`:2023`) and ⎋ does nothing. ⎋ here records which trigger it
-    /// shut (`dismissKey`) and the menu stays shut until the caret is on a
-    /// different one — never longer, or ⎋ would make `/` a dead key.
-    @State private var dismissed: String?
+    /// `ChatComposer.tsx:2027-2041`), and which trigger ⎋ shut. Upstream's
+    /// menu is open exactly while a trigger is under the caret (`:2023`) and
+    /// ⎋ does nothing; a dismissal here stays until the caret is on a
+    /// different trigger — never longer, or ⎋ would make `/` a dead key.
+    @State private var menu = T3ComposerMenuState()
     /// The open menu's measured height (`T3ComposerMenuHeightKey`).
     @State private var menuHeight: Double = 0
     /// True while `SlashCommands.discover` is reading the command files and no
@@ -125,7 +123,7 @@ struct T3ComposerView: View {
         // the menu, both `onChange`s and the dismissal's lapse all want the
         // same answer for this (text, caret).
         let raw = rawTrigger
-        let trigger = raw.flatMap { Self.dismissKey($0) == dismissed ? nil : $0 }
+        let trigger = menu.trigger(raw)
         // `ComposerSurface.Main` (`ComposerSurface.tsx:67`): `rounded-[22px]
         // p-px` over the inner surface's `rounded-[20px]` (`:4959`).
         VStack(spacing: 0) {
@@ -234,9 +232,7 @@ struct T3ComposerView: View {
         // is on another one (or on none — a send empties the field) it lapses.
         // Keyed on the raw detection, or clearing it would reopen the menu ⎋
         // just closed.
-        .onChange(of: raw.map(Self.dismissKey)) { _, key in
-            if key != dismissed { dismissed = nil }
-        }
+        .onChange(of: raw) { _, raw in menu.triggerMoved(raw) }
     }
 
     // MARK: - The editor
@@ -313,7 +309,7 @@ struct T3ComposerView: View {
     /// the transcript (`SessionProgress.model`, SessionProgress.swift:56) and
     /// no wire moves a live Claude Code session to another one.
     private func modelLabel(_ name: String) -> some View {
-        T3ComposerControl(label: Self.modelLabel(name), chevron: false) {
+        T3ComposerControl(label: T3ModelLabel.display(name), chevron: false) {
             T3ProviderIcon(size: 16)
         }
         .accessibilityLabel("Model \(name)")
@@ -694,21 +690,13 @@ struct T3ComposerView: View {
     /// this one. Derived, never stored: the text and the caret land in
     /// separate passes and detection is a scan of one line.
     private var trigger: T3ComposerTrigger.Detected? {
-        guard let found = rawTrigger else { return nil }
-        return Self.dismissKey(found) == dismissed ? nil : found
+        menu.trigger(rawTrigger)
     }
 
     /// The same detection with ⎋'s dismissal ignored — what tells the
     /// dismissal it has been outlived.
     private var rawTrigger: T3ComposerTrigger.Detected? {
         T3ComposerTrigger.detect(text: draft.text, caret: caret)
-    }
-
-    /// Which trigger occurrence ⎋ shut: its kind and where it starts, not its
-    /// query — typing on inside a dismissed trigger keeps it shut, while a
-    /// fresh `/` (or an `@` at the same offset) opens a menu again.
-    private static func dismissKey(_ found: T3ComposerTrigger.Detected) -> String {
-        "\(found.kind.rawValue):\(found.start)"
     }
 
     /// The selected thread's project folder — where both menus read from.
@@ -742,8 +730,7 @@ struct T3ComposerView: View {
     /// `resolveComposerMenuActiveItemId` (`composerMenuHighlight.ts`).
     private func activeItemID(_ items: [T3ComposerMenuItem],
                              _ trigger: T3ComposerTrigger.Detected) -> String? {
-        T3ComposerMenuHighlight.resolve(itemIDs: items.map(\.id), highlighted: highlighted,
-                                        currentKey: trigger.searchKey, highlightedKey: highlightedKey)
+        menu.activeItemID(items.map(\.id), trigger: trigger)
     }
 
     /// `ComposerCommandMenu.tsx:113-127`: `isLoading` wins over the empty
@@ -764,8 +751,7 @@ struct T3ComposerView: View {
     /// so both go to `T3WindowModel`'s per-cwd cache on a detached task, which
     /// serves what it has at once and refreshes behind it.
     private func openMenu(_ kind: T3ComposerTrigger.Kind?) {
-        highlighted = nil
-        highlightedKey = nil
+        menu.opened()
         // The overlay leaves the tree with its trigger, and a removed view
         // reports no preference — without this a later open would render one
         // frame lifted by the last menu's height.
@@ -818,41 +804,28 @@ struct T3ComposerView: View {
     }
 
     private func highlight(_ id: String) {
-        highlighted = id
-        highlightedKey = trigger?.searchKey
+        guard let trigger else { return }
+        menu.highlight(id, trigger: trigger)
     }
 
     /// `onComposerCommandKey` (`ChatComposer.tsx:3080-3125`): while a menu is
     /// open it takes ↑/↓ and ⏎/⇥ first, and only then does the key fall
     /// through to prompt recall and to sending. False = the field keeps the key.
     private func menuKey(_ key: T3ComposerMenuKey) -> Bool {
+        // Computed once, only when a trigger is open: `menuItems` reads the
+        // command/mention caches, not worth it for the common no-menu key.
         guard let trigger else { return false }
-        switch key {
-        case .up, .down:
-            // Upstream nudges from the STORED highlight, which its sync effect
-            // (`:2298-2320`) has already set to the resolved active row; this
-            // port resolves on read instead, so the nudge starts there.
-            let items = menuItems(trigger)
-            guard !items.isEmpty else { return false }
-            highlighted = T3ComposerMenuHighlight.nudge(itemIDs: items.map(\.id),
-                                                        highlighted: activeItemID(items, trigger),
-                                                        direction: key == .down ? 1 : -1)
-            highlightedKey = trigger.searchKey
+        let items = menuItems(trigger)
+        switch menu.key(key, trigger: trigger, itemIDs: items.map(\.id)) {
+        case .moved, .dismissed:
             return true
-        case .pick:
-            // `(key === "Enter" || key === "Tab") && selectedItem` (`:3104`):
-            // with nothing to pick, ⏎ sends the prompt as upstream does.
-            let items = menuItems(trigger)
-            guard let active = activeItemID(items, trigger),
-                  let item = items.first(where: { $0.id == active }) else { return false }
-            pick(item)
+        case .pick(let id):
+            if let item = items.first(where: { $0.id == id }) { pick(item) }
             return true
-        case .dismiss:
-            dismissed = Self.dismissKey(trigger)
-            return true
+        case .unhandled:
+            return false
         }
     }
-
     /// `onSelectComposerItem`: the trigger span is replaced by what the row
     /// inserts and the caret follows it (`replaceTextRange`,
     /// `composerTrigger.ts:118-128`). The insertion ends in a space, so no
@@ -873,9 +846,7 @@ struct T3ComposerView: View {
         caret = result.caret
         caretRequest = result.caret
         recall = nil
-        highlighted = nil
-        highlightedKey = nil
-        dismissed = nil
+        menu.picked()
         // `onMouseDown` `preventDefault` (`ComposerCommandMenu.tsx:158-160`)
         // keeps a click on a row from taking focus off the editor; a SwiftUI
         // tap gives no such promise, so the field is asked back.
@@ -946,19 +917,6 @@ struct T3ComposerView: View {
         case "bypassPermissions": return .zap
         default: return .shieldCheck
         }
-    }
-
-    /// `activeThreadModelDisplayName` (`ChatComposer.tsx:5566`) is the model's
-    /// display name, not its id; B has only the id the transcript carries
-    /// (`claude-sonnet-4-5-20250929`), so this is ours: drop the vendor prefix
-    /// and the build date, keep the family and its version.
-    private static func modelLabel(_ id: String) -> String {
-        var parts = id.split(separator: "-").map(String.init)
-        if parts.first == "claude" { parts.removeFirst() }
-        if let last = parts.last, last.count == 8, last.allSatisfy(\.isNumber) { parts.removeLast() }
-        guard let family = parts.first else { return id }
-        let version = parts.dropFirst().joined(separator: ".")
-        return version.isEmpty ? family.capitalized : "\(family.capitalized) \(version)"
     }
 
     private var surface: Color {

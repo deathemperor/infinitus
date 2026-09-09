@@ -373,4 +373,24 @@ final class T3WorkspaceStateTests: XCTestCase {
         s.markDraftStarted(a, pid: 5, now: now)
         XCTAssertNil(s.reusableDraftId(projectId: "p1", isUntouched: { _ in true }))
     }
+
+    // MARK: - draftRowTitle
+
+    func testDraftRowTitleIsTheFirstLineTrimmed() {
+        XCTAssertEqual(T3WorkspaceState.draftRowTitle("  fix the sidebar  \nsecond line"), "fix the sidebar")
+    }
+
+    func testDraftRowTitleOfAnEmptyPreviewIsTheDraftTitle() {
+        XCTAssertEqual(T3WorkspaceState.draftRowTitle(""), T3WorkspaceState.draftTitle)
+    }
+
+    /// `trimmingCharacters(in: .whitespaces)` runs on the first line ONLY —
+    /// a blank (whitespace) first line falls back even with real text on the
+    /// next one. A genuinely EMPTY first line ("\nsecond") is different:
+    /// `split(separator:)` omits empty subsequences by default, so the split
+    /// skips straight to "second" — the real function returns "second"
+    /// there, not `draftTitle`.
+    func testDraftRowTitleWithAWhitespaceOnlyFirstLineIsTheDraftTitle() {
+        XCTAssertEqual(T3WorkspaceState.draftRowTitle("   \nsecond"), T3WorkspaceState.draftTitle)
+    }
 }
