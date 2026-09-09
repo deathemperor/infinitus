@@ -208,8 +208,27 @@ red channel raised where ΔE went over.
 
 ### B parity — 2026-09-09
 
-Mac numbers pending the reference captures (`refs/mac-*.png` absent;
-fixture thread to be recreated in T3 Code).
+`refs/mac-thread.png` and `refs/mac-composer.png` (2755×1646, the desktop
+app's window as the user had it sized; the two differ by focus only) against
+`capture-ours.sh mac …` on `T3FIX_MAC_REF=1 fixture.sh`, whose transcript is
+the reference thread's own "Hi" and reply, with the workspace window preset
+to the same frame (`defaults write Infinitus "NSWindow Frame Workspace"
+"1433 910 1377.5 823 0 0 7680 2130"`) and the capture cropped to the
+reference's width (the window lands 1 px wider):
+
+| screen | over ΔE 6 | max ΔE |
+|---|---|---|
+| thread | 2.72 % | 110.9 |
+| composer | 2.72 % | 110.9 |
+
+Above the 1.5 % bar. What the heatmap shows, in order of area: the
+sidebar is 256 pt wide here
+against about 240 pt; the reply column starts about 7 pt higher and the
+composer card sits about 24 pt higher, with no `Local checkout` / branch
+strip under it and no `5:38 PM` stamp under the reply; the header wordmark
+is the app's own; the composer's model / effort / access controls are
+capability-gated and the reference session has them. Tracked in the
+parity follow-up issue named in the PR that added these numbers.
 
 ### C parity — 2026-09-09
 

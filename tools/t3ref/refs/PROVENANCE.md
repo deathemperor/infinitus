@@ -50,6 +50,21 @@ diff:
 - the status bar carries a **"◀ Infinitus"** back link, left over from
   the app-switch chain that launched the client.
 
+## The Mac references
+
+`mac-thread.png` and `mac-composer.png` are the desktop app, **T3 Code
+(Alpha)** as installed in `/Applications`, captured 2026-09-09 17:41 with
+`capture-mac.sh` from the window as the user had it (1377.5×823 pt on a
+2× display → 2755×1646). The thread is a fresh `Hi` in a `limitless`
+project — the original fixture thread had been deleted, so this one was
+recreated by driving the app through its accessibility tree (New thread →
+⌘2 limitless → "Hi" → ⏎) — and the reply is what that session gave, which
+`T3FIX_MAC_REF=1 fixture.sh` reproduces verbatim. The sidebar rows under
+`Hi` (the user's other threads of the day) are flat-filled with the
+sidebar surface, the way the redactions below were done, so the sidebar
+matches the fixture's single thread. Stored with PNG level-9 compression
+(lossless; `compare.py` decodes them, checked).
+
 ## Redactions
 
 This repository is public. Five of the captures showed the machine's
