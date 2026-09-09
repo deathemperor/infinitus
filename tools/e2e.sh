@@ -345,11 +345,13 @@ done
 # is up and the re-sort has settled, the all-dead state must idle like
 # any other — a per-frame regression shows up here, not only in the
 # long idle gate at the end.
-sleep 4
+# Settle and sample like the workspace gate: the re-sort's tail and a loaded
+# runner's scheduling noise read as 14 % over a 6 s window (#428).
+sleep 8
 RA="$("$CTL" perf | json "d['cpuSeconds']")"
-sleep 6
+sleep 12
 RB="$("$CTL" perf | json "d['cpuSeconds']")"
-RPCT="$(python3 -c "print(round(($RB-$RA)/6*100,1))")"
+RPCT="$(python3 -c "print(round(($RB-$RA)/12*100,1))")"
 echo "all-dead CPU with the reviver band: ${RPCT}%"
 python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$INFINITUS_CSWAP" simulate off >/dev/null
@@ -364,12 +366,20 @@ echo "scenarios: ok (all-dead and back, revival panel up and gone)"
 # re-binds the path; killed, it leaves an inode nobody answers and the
 # bundle was unreachable for 25 minutes (2026-09-03). The app must notice
 # on its next snapshot and bind again.
-python3 - "$SOCKDIR/control.sock" <<'PYS'
+# The refusal is asserted right here, in the same process that planted the
+# inode: the app re-binds on its next snapshot, and a `status` probe from the
+# shell a few ms later already raced that heal once (#434).
+python3 - "$SOCKDIR/control.sock" <<'PYS' || fail "a dead socket path should refuse"
 import os, socket, sys
 p = sys.argv[1]; os.unlink(p)
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.bind(p); s.listen(1); s.close()  # dead inode stays
+c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); c.settimeout(2)
+try:
+    c.connect(p)
+except (ConnectionRefusedError, socket.timeout):
+    sys.exit(0)
+sys.exit(1)
 PYS
-"$CTL" status >/dev/null 2>&1 && fail "a dead socket path should refuse"
 i=0
 until "$CTL" status >/dev/null 2>&1; do
     i=$((i + 1)); [ "$i" -le 75 ] || fail "control socket not re-bound within a refresh interval"
