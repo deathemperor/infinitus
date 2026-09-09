@@ -152,42 +152,88 @@ public struct T3ChatMarkdown: View {
         }
     }
 
-    /// `MarkdownCodeBlock` (ChatMarkdown.tsx:883-1010): a bordered surface on
-    /// `codeBackground`, a header with the language and a copy action whose
-    /// label flips "Copy code" -> "Copied" (`copyLabel` :898). Upstream
-    /// resets its label after 1200 ms via `setTimeout`; this keeps
-    /// `MarkdownText.CodeFence`'s 1.5 s `Task.sleep` (no Timer, per the
+    /// `MarkdownCodeBlock` (ChatMarkdown.tsx:883-1010): a surface on
+    /// `codeBackground` (index.css:1318-1322 wins over the utility classes),
+    /// a header (`pt-1.5 pr-1.5 pb-0 pl-3`) carrying the language in MONO at
+    /// 0.6875 rem and, at its right, a two-button toolbar (`gap-0.5`) of
+    /// `icon-xs` ghosts — wrap and copy, both `size-3`, in
+    /// `code-foreground` at 72 % (index.css:1333-1336). "Wrap lines" /
+    /// "Copy code" are the tooltip labels, never text in the row. The body is
+    /// `pre`'s `padding: 0.8rem 0.9rem` (index.css:1812-1819), scrolling
+    /// horizontally until the wrap toggle turns soft wrap on
+    /// (`readInitialWordWrapSetting` starts it off).
+    ///
+    /// Upstream resets the copied label after 1200 ms via `setTimeout`; this
+    /// keeps `MarkdownText.CodeFence`'s 1.5 s `Task.sleep` (no Timer, per the
     /// idle-CPU rule).
     private struct CodeFence: View {
         let language: String?
         let code: String
         let palette: T3Theme.WebPalette
         @State private var copied = false
+        @State private var wrapped = false
+
+        /// `extractFenceLanguage` (`:518-522`): a fence with no info string
+        /// is labelled `text`.
+        private var label: String { language ?? "text" }
+        private var chrome: Color { palette.codeForeground.color.opacity(0.72) }
+
         var body: some View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Text(language ?? "code").font(T3Font.web(.xs)).foregroundStyle(palette.mutedForeground.color)
+                    Text(label)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(chrome)
+                        .lineLimit(1)
                     Spacer(minLength: 0)
-                    T3Button(copied ? "Copied" : "Copy code", variant: .ghost, size: .xs,
-                             icon: copied ? .check : .copy) {
-                        Self.copy(code)
-                        copied = true
-                        Task {
-                            try? await Task.sleep(nanoseconds: 1_500_000_000)
-                            copied = false
+                    HStack(spacing: 2) {
+                        action(.wrapText, pressed: wrapped,
+                               help: wrapped ? "Disable line wrap" : "Wrap lines") { wrapped.toggle() }
+                        action(copied ? .check : .copy, pressed: false,
+                               help: copied ? "Copied" : "Copy code") {
+                            Self.copy(code)
+                            copied = true
+                            Task {
+                                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                copied = false
+                            }
                         }
                     }
                 }
-                .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(code)
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(palette.codeForeground.color)
-                        .textSelection(.enabled)
-                        .padding(.horizontal, 12).padding(.vertical, 10)
+                .padding(.top, 6).padding(.trailing, 6).padding(.leading, 12)
+                if wrapped {
+                    body_.frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) { body_ }
                 }
             }
             .background(palette.codeBackground.color, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius, style: .continuous))
+        }
+
+        private var body_: some View {
+            Text(code)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(palette.codeForeground.color)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: !wrapped, vertical: true)
+                .padding(.horizontal, 0.9 * 16).padding(.vertical, 0.8 * 16)
+        }
+
+        /// `size="icon-xs"` = `size-6` at this breakpoint with a `size-3`
+        /// glyph; `.chat-markdown-chrome-action:hover` and its pressed state
+        /// take the full `code-foreground`.
+        private func action(_ icon: Lucide, pressed: Bool, help: String,
+                            _ act: @escaping () -> Void) -> some View {
+            Button(action: act) {
+                LucideIcon(icon, size: 12)
+                    .foregroundStyle(pressed ? palette.codeForeground.color : chrome)
+                    .frame(width: 24, height: 24)
+                    .background(pressed ? palette.muted.color : .clear,
+                                in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help(help)
+            .accessibilityLabel(help)
         }
         private static func copy(_ text: String) {
             #if canImport(UIKit)
