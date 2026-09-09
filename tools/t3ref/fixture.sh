@@ -35,7 +35,7 @@ stop() {
         kill "$app" 2>/dev/null || true
     fi
     [ -f "$state/pid" ] && kill "$(cat "$state/pid")" 2>/dev/null || true
-    for k in mirror_lan_enabled popout_shown mock_mode \
+    for k in mirror_lan_enabled popout_shown mock_mode workspace.sidebarWidth \
              migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2 mirror_pair_token; do
         defaults delete "$domain" "$k" >/dev/null 2>&1 || true
     done
@@ -64,6 +64,10 @@ t0=2026-09-07T08:42:00.000Z; t1=2026-09-07T08:42:03.000Z; t2=2026-09-07T08:42:10
 # was recreated by hand after the original was deleted (refs/PROVENANCE.md).
 if [ "${T3FIX_MAC_REF:-}" = 1 ]; then
 sed -i '' 's/"status":"waiting"/"status":"idle"/' "$CLAUDE_CONFIG_DIR/sessions/$pid.json"
+# The reference window's sidebar is T3's 256 CSS px default seen at that
+# app's ~1.893 zoom, i.e. 241 pt of ours — `T3Root.preferredSidebarWidth`
+# takes it from here so the two columns land on the same x. `stop()` deletes it.
+defaults write "$domain" workspace.sidebarWidth -float 241
 cat > "$CLAUDE_CONFIG_DIR/projects/$slug/t3fix-hi.jsonl" <<'EOF'
 {"type":"user","uuid":"u1","timestamp":"2026-09-09T10:38:20.000Z","sessionId":"t3fix-hi","message":{"role":"user","content":"Hi"}}
 {"type":"assistant","uuid":"a1","parentUuid":"u1","timestamp":"2026-09-09T10:38:41.000Z","sessionId":"t3fix-hi","message":{"role":"assistant","content":[{"type":"text","text":"Heads up first: claude-mem can't save memories right now. The memory observer has failed 33 times in a row over 14 minutes. Latest error:\n\n```\nClaude Code process terminated by signal SIGKILL\n```\n\nRestart it here: http://localhost:37701/restart (or `npx claude-mem restart`). Nothing from this or any other session is remembered until then.\n\nHi. On `main` at 024379e2 in the Infinitus repo. What do you want to work on?"}]}}
