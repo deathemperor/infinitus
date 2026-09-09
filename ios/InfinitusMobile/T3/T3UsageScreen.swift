@@ -60,6 +60,9 @@ struct T3UsageScreen: View {
             guard let snapshot = mac.snapshot, otherReports[mac.id]?.0 != snapshot.capturedAt else { continue }
             otherReports[mac.id] = (snapshot.capturedAt, snapshot.usageJSON.flatMap { try? JSONDecoder().decode(UsageReport.self, from: $0) })
         }
+        // A fresh snapshot re-anchors the countdowns, and the redraw picks
+        // up the primary's report (its fleet isn't observed here).
+        now = Date()
     }
 
     var body: some View {
@@ -100,7 +103,7 @@ struct T3UsageScreen: View {
             await model.refresh(macId: model.others.first?.id)
             now = Date()
         }
-        .onAppear { now = Date(); decodeReports() }
+        .onAppear { decodeReports() }
         .onChange(of: [model.snapshot?.capturedAt] + model.others.map { $0.snapshot?.capturedAt }) { _, _ in decodeReports() }
         .navigationDestination(for: T3UsageAccountRoute.self) { route in
             T3UsageAccountScreen(model: model, route: route)
