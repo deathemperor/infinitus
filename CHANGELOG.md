@@ -48,6 +48,7 @@ publishes the matching section as the GitHub release body.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
+- The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
 
 ### Phone
 - Home rows follow upstream: Working reads in the Mac's sky tint, a Mac with several accounts shows which one a session runs on beside the Claude mark, and settle, snooze and pin move the row as one transition.

@@ -129,10 +129,11 @@ final class MachineModel: ObservableObject {
 
             let liveSessionIds = Set(records.map(\.sessionId))
             let hookRegs = HookInventory.scan(home: home, projectDirs: cwds)
+            let children = HookInventory.childrenByParent(rows)
             let hooks = hookRegs.map { reg in
                 MachineReport.Hook(registration: reg,
                                    spawnsPerHour: HookInventory.spawnsPerHour(event: reg.event, liveSessions: sessionPids.count),
-                                   live: HookInventory.live(of: reg, rows: rows))
+                                   live: HookInventory.live(of: reg, rows: rows, children: children))
             }
             let runaways = Runaways.flagged(rows: rows, sessionPids: sessionPids)
 
