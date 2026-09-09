@@ -225,6 +225,9 @@ public struct TeamPublisher {
         public var skipped = 0
         /// Plaintext copies deleted to stay under `Sources.copiesCapBytes`.
         public var prunedCopies = 0
+        /// Pre-split chunks (`m/<kid>/transcripts/…`, #414) deleted from
+        /// the member branch's tree this pass.
+        public var legacyChunksRemoved = 0
         /// True when `Sources.shouldStop` cut the pass short: what the
         /// report lists went out, the cursor is saved, the rest waits.
         public var stopped = false
@@ -508,9 +511,25 @@ public struct TeamPublisher {
 
         try flush()
         try state.save(teamDir: teamDir)
+        report.legacyChunksRemoved = try sweepLegacyChunks()
         report.remainingBytes = remaining()
         report.prunedCopies = pruneCopies(cap: sources.copiesCapBytes)
         return report
+    }
+
+    /// Transcripts moved to `t/<kid>` (#321) but a store from before the
+    /// split kept the old chunks in `m/<kid>`'s tree: 1.3 GB, 8,400
+    /// files, fetched by every new member with the routine `m/*` sync
+    /// (#414). One ordinary commit drops them from the tip — the
+    /// history behind it is #339's explicit compaction. A clean branch
+    /// costs one listing per pass.
+    func sweepLegacyChunks() throws -> Int {
+        let legacy = try client.store.list("m/\(client.identity.kid)/transcripts/")
+        guard !legacy.isEmpty else { return 0 }
+        var removals: [String: Data?] = [:]
+        for entry in legacy { removals.updateValue(nil, forKey: entry.path) }
+        try client.store.putAll(removals)
+        return legacy.count
     }
 
     /// Spec §6.5 / §7: re-wraps the local plaintext copies of the last

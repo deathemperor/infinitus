@@ -354,6 +354,8 @@ public final class TeamGit: TeamStore {
         defer { try? FileManager.default.removeItem(at: index) }
         let env = [ "GIT_INDEX_FILE": index.path ]
         if let parent { _ = try run(["read-tree", parent], env: env) }
+        var removals = Data()
+        var removed = 0
         for (rest, blob) in items {
             if let blob {
                 let sha: String
@@ -366,14 +368,21 @@ public final class TeamGit: TeamStore {
                 _ = try run(["update-index", "--add", "--cacheinfo", "100644,\(sha),\(rest)"], env: env)
             } else {
                 // Removal without a work tree: a zero-mode, null-sha entry
-                // through --index-info drops the path from the private index.
-                let line = Data("0 0000000000000000000000000000000000000000\t\(rest)\n".utf8)
-                _ = try run(["update-index", "--index-info"], stdin: line, env: env)
+                // through --index-info drops the path from the private
+                // index. One call for all of them: a legacy sweep (#414)
+                // drops thousands at once.
+                removals.append(Data("0 0000000000000000000000000000000000000000\t\(rest)\n".utf8))
+                removed += 1
             }
         }
+        if removed > 0 { _ = try run(["update-index", "--index-info"], stdin: removals, env: env) }
         let treeSha = String(decoding: try run(["write-tree"], env: env), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        var commitArgs = ["commit-tree", treeSha, "-m", items.map(\.0).sorted().joined(separator: "\n")]
+        // The message names what was written; removals are counted, not
+        // listed (the sweep's would be a 500 KB message).
+        var subject = items.compactMap { $0.1 == nil ? nil : $0.0 }.sorted()
+        if removed > 0 { subject.append("\(removed) removed") }
+        var commitArgs = ["commit-tree", treeSha, "-m", subject.joined(separator: "\n")]
         if let parent { commitArgs += ["-p", parent] }
         let commit = String(decoding: try run(commitArgs, env: [
             "GIT_AUTHOR_NAME": "Infinitus", "GIT_AUTHOR_EMAIL": "\(author)@infinitus.run",

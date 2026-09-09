@@ -33,6 +33,12 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   ACL'd to the old signature, so the proxy key is re-entered and the
   phone re-paired. Never change the id casually again — the 2026-08-29
   casual change cost a day of ControlCenter-ban debugging.
+- **Improvements ship by default** (user 2026-09-09: "all of these are
+  just experimental. any better improvements are by default valid"):
+  a measured, tested improvement merges without a per-PR go — no
+  holding PRs for approval, no AskUserQuestion for the obvious better
+  option. Still ask before destructive or irreversible actions (a
+  history rewrite, a force-push, deleting user data).
 - **Push nothing to any remote** unless explicitly asked. Commit locally.
 - **main takes commits only through pull requests** (GitHub ruleset
   "main via pull requests", user 2026-09-04): no direct push, no

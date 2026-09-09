@@ -96,7 +96,7 @@ final class StatusItemController {
     /// Last content size PinnedRoot reported — it fires during
     /// NSWindow(contentViewController:) itself, before `pinned` is set.
     private var pinnedIdeal: CGSize = .zero
-    private var settings: NSWindow?
+    private(set) var settings: NSWindow?
     private lazy var desktopCapture = DesktopCaptureController(model: model)
     private lazy var effects = MenuBarEffects(button: item.button)
     private let model: AppModel
