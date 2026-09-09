@@ -19,8 +19,8 @@ import InfinitusUI
 /// Not ported, each with its upstream line:
 /// - the file PREVIEW a click opens (`FilePreviewPanel.tsx:1340-1352`
 ///   `onOpenFile` → an editor with a save coordinator): a surface of its own, so
-///   a click selects the row and hands the file to the user's editor through
-///   `NSWorkspace`.
+///   a click selects the row; a double click hands the file to the user's
+///   editor through `NSWorkspace`.
 /// - drag-to-mention (`fileTreeDragMention.ts:83`'s `COMPOSER_MENTION_DRAG_TYPE`):
 ///   B's composer takes dropped file URLs as attachments (`T3ComposerView.swift:191`),
 ///   it has no mention drop type to tag a drag with.
@@ -222,6 +222,8 @@ private struct T3FilesBrowser: View {
                               expanded: expanded.contains(row.node.path),
                               selected: selected == row.node.path,
                               action: { open(row.node) })
+                        // The way out to an editor until the preview pane lands.
+                        .simultaneousGesture(TapGesture(count: 2).onEnded { reveal(row.node) })
                 }
             }
             // "paddingTop: 8, paddingBottom: 8" (`FileTreeBrowser.tsx:255`).
@@ -257,13 +259,20 @@ private struct T3FilesBrowser: View {
     /// A folder toggles (`FileTreeBrowser.tsx:63-66`), a file is selected —
     /// upstream then opens it in the preview pane it is embedded in
     /// (`FileBrowserPanel.tsx:240-242`, `FilePreviewPanel.tsx:1347`). That
-    /// surface is not ported, so the file goes to whatever app owns it.
+    /// surface is not ported, so a click only selects the row — never a jump
+    /// to another app, which upstream's click never causes either. A double
+    /// click hands the file to whatever app owns it (`NSWorkspace`), the one
+    /// deliberate way out until the preview lands.
     private func open(_ node: T3FileTree.Node) {
         guard node.kind == .file else {
             if expanded.contains(node.path) { expanded.remove(node.path) } else { expanded.insert(node.path) }
             return
         }
         selected = node.path
+    }
+
+    private func reveal(_ node: T3FileTree.Node) {
+        guard node.kind == .file else { return }
         NSWorkspace.shared.open(URL(fileURLWithPath: cwd).appendingPathComponent(node.path))
     }
 
