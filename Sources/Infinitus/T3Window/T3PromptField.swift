@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import InfinitusCore
 import InfinitusUI
 
 /// The prompt editor (`ComposerPromptEditor.tsx:1971-1990`) as an `NSTextView`.

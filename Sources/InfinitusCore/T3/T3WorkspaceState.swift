@@ -173,6 +173,13 @@ public struct T3WorkspaceState: Sendable, Equatable {
     /// has no title of its own (`Sidebar.tsx:689-786`); this is ours, for the
     /// places a thread must have a title (the top bar, the ⌘K switcher).
     public static let draftTitle = "New thread"
+    /// A draft row's title: the first line of its text, trimmed, or
+    /// `draftTitle` when there is none (`ThreadRow` for drafts).
+    public static func draftRowTitle(_ preview: String) -> String {
+        let line = preview.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? ""
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? draftTitle : trimmed
+    }
 
     /// A new draft in `projectId`, newest first. Returns its id.
     @discardableResult
