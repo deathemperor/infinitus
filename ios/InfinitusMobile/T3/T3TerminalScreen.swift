@@ -42,7 +42,7 @@ final class T3TerminalController: NSObject, ObservableObject, TerminalViewDelega
     var rows: Int { view.getTerminal().rows }
 
     /// `PIERRE_LIGHT_THEME` / `PIERRE_DARK_THEME` (`terminalTheme.ts`).
-    func apply(_ p: T3MobilePalette, dark: Bool) {
+    func apply(_ p: T3Theme.MobilePalette, dark: Bool) {
         let hex = dark
             ? ["141415", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8",
                "141415", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8"]
