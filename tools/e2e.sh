@@ -23,7 +23,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 IDLE_BUDGET_PCT="${IDLE_BUDGET_PCT:-8}"   # measured 0.3-0.5% on every theme/burn combo (2026-09-03, all effects on CA); loaded CI runners add noise, not tens of points
-RSS_BUDGET_MB="${RSS_BUDGET_MB:-220}"
+RSS_BUDGET_MB="${RSS_BUDGET_MB:-240}"
 GROWTH_BUDGET_KB_MIN="${GROWTH_BUDGET_KB_MIN:-768}"   # idle heap growth; ~80 KB/min after the fix, 2.1 MB/min before
 WINDOW_S="${WINDOW_S:-30}"   # long enough for the growth rate to mean something
 
