@@ -22,6 +22,11 @@ public struct SessionTail: @unchecked Sendable {
     /// re-read 2.3 MB of their tails on every move of its own (#346).
     private var agents: [String: SessionTail] = [:]
     private let scansAgents: Bool
+    /// An agent tail's own lapsed-sign-in reading, computed when it moves —
+    /// the detector runs `contains` over every recent tool result, and 18
+    /// agents re-detected on every move of the parent were most of what
+    /// was left of a progress read (#346).
+    private var need: SessionProgress.LoginNeeds = (nil, nil)
 
     public init(url: URL, maxBytes: Int = 512 * 1024) {
         self.init(url: url, maxBytes: maxBytes, scansAgents: true)
@@ -47,7 +52,10 @@ public struct SessionTail: @unchecked Sendable {
                 .flatMap(\.contentModificationDate),
                   now.timeIntervalSince(mtime) <= SessionProgress.subagentAwsLoginWindow else { continue }
             var tail = agents[file.path] ?? SessionTail(url: file, maxBytes: SessionProgress.subagentTailBytes, scansAgents: false)
-            if tail.advanceOwn() { moved = true }
+            if tail.advanceOwn() {
+                moved = true
+                tail.need = SessionProgress.loginNeeds(entries: tail.entries)
+            }
             kept[file.path] = tail
         }
         if Set(kept.keys) != Set(agents.keys) { moved = true }
@@ -89,6 +97,6 @@ public struct SessionTail: @unchecked Sendable {
 
     public func progress(name: String? = nil, now: Date = Date()) -> SessionProgress {
         SessionProgress.assemble(entries: entries, headGoal: headGoal, transcript: url, name: name, now: now,
-                                 agents: agents.values.map(\.entries))
+                                 subagents: SessionProgress.newest(agents.values.map(\.need)))
     }
 }
