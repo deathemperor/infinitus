@@ -42,6 +42,26 @@ final class TimelineCacheTests: XCTestCase {
         XCTAssertEqual(cache.parses, 2, "the wide slot answers a narrow ask")
     }
 
+    /// A wide (watched) slot keeps the reader's tail, so the rebuild after
+    /// an append decodes only the new lines — and still yields what a
+    /// fresh read of the whole transcript does (#346).
+    func testAWideSlotRebuildsIncrementallyAfterAnAppend() throws {
+        let url = try write([prompt, reply], sessionId: "s1")
+        let record = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "idle")
+        let cache = TimelineCache()
+        XCTAssertEqual(cache.timeline(record: record, claudeDir: root)?.turns.map(\.id), ["u1"])
+        let prompt2 = #"{"type":"user","uuid":"u2","timestamp":"2026-09-01T10:00:10.000Z","message":{"content":"more"}}"#
+        let reply2 = #"{"type":"assistant","uuid":"a2","timestamp":"2026-09-01T10:00:12.000Z","message":{"content":[{"type":"text","text":"sure"}]}}"#
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((prompt2 + "\n" + reply2 + "\n").utf8))
+        try handle.close()
+        let grown = cache.timeline(record: record, claudeDir: root)
+        XCTAssertEqual(grown?.turns.map(\.id), ["u1", "u2"])
+        XCTAssertEqual(cache.parses, 2)
+        XCTAssertEqual(grown, TimelineCache().timeline(record: record, claudeDir: root))
+    }
+
     func testChangedTranscriptOrStatusReparses() throws {
         let url = try write([prompt], sessionId: "s1")
         let busy = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")

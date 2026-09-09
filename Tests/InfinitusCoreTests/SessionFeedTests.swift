@@ -291,6 +291,71 @@ final class SessionFeedTests: XCTestCase {
         XCTAssertEqual(items.last?.text, "after")
     }
 
+    /// The incremental read (#346) yields what the full read does — before
+    /// and after the transcript grows — and its held tail sits at the end
+    /// of the file afterwards. Fixture lines are newline-terminated, as
+    /// Claude Code writes them: the tail waits for a line's newline.
+    func testIncrementalReadMatchesFullReadAcrossAppends() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("feed-inc-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let record = ClaudeSessionRecord(pid: 1, sessionId: "sid", cwd: "/tmp/x")
+        let claudeDir = root.appendingPathComponent("claude")
+        let url = Transcript.path(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        func line(_ n: Int) -> String {
+            n % 2 == 1
+                ? #"{"type":"user","uuid":"u\#(n)","timestamp":"2026-09-01T10:00:\#(String(format: "%02d", n)).000Z","message":{"content":"ask \#(n)"}}"#
+                : #"{"type":"assistant","uuid":"a\#(n)","timestamp":"2026-09-01T10:00:\#(String(format: "%02d", n)).000Z","message":{"content":[{"type":"text","text":"answer \#(n)"}]}}"#
+        }
+        try ((1...6).map(line).joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        var tail: SessionTail?
+        let full = SessionFeedReader.read(record: record, claudeDir: claudeDir)
+        let inc = SessionFeedReader.read(record: record, claudeDir: claudeDir, tail: &tail)
+        XCTAssertEqual(inc?.items.map(\.text), full?.items.map(\.text))
+        XCTAssertEqual(inc?.timeline, full?.timeline)
+        XCTAssertEqual(inc?.items.last?.text, "answer 6")
+
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(((7...8).map(line).joined(separator: "\n") + "\n").utf8))
+        try handle.close()
+        let full2 = SessionFeedReader.read(record: record, claudeDir: claudeDir)
+        let inc2 = SessionFeedReader.read(record: record, claudeDir: claudeDir, tail: &tail)
+        XCTAssertEqual(inc2?.items.map(\.text), full2?.items.map(\.text))
+        XCTAssertEqual(inc2?.timeline, full2?.timeline)
+        XCTAssertEqual(inc2?.items.last?.text, "answer 8")
+        XCTAssertEqual(inc2?.timeline?.turns.map(\.id), ["u1", "u3", "u5", "u7"])
+        let size = (try FileManager.default.attributesOfItem(atPath: url.path))[.size] as? UInt64
+        XCTAssertEqual(tail?.offset, size)
+        XCTAssertEqual(tail?.maxBytes, SessionFeedReader.tailBytes, "a small transcript never widens")
+    }
+
+    /// The incremental read grows its window past an oversized line the
+    /// way the full read does, and keeps the grown window.
+    func testIncrementalReadGrowsPastOversizedLines() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("feed-inc-big-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let record = ClaudeSessionRecord(pid: 1, sessionId: "sid", cwd: "/tmp/x")
+        let claudeDir = root.appendingPathComponent("claude")
+        let url = Transcript.path(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var lines = (1...5).map {
+            #"{"type":"user","timestamp":"2026-09-01T10:00:0\#($0).000Z","message":{"content":"older \#($0)"}}"#
+        }
+        let blob = String(repeating: "A", count: 400 * 1024)
+        lines.append(#"{"type":"user","timestamp":"2026-09-01T10:01:00.000Z","message":{"content":"\#(blob)"}}"#)
+        lines.append(#"{"type":"assistant","timestamp":"2026-09-01T10:01:01.000Z","message":{"content":[{"type":"text","text":"after"}]}}"#)
+        try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        var tail: SessionTail?
+        let items = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 30, tail: &tail)?.items ?? []
+        XCTAssertEqual(items.count, 7)
+        XCTAssertEqual(items.first?.text, "older 1")
+        XCTAssertEqual(items.last?.text, "after")
+        XCTAssertGreaterThan(tail?.maxBytes ?? 0, SessionFeedReader.tailBytes)
+        let again = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 30, tail: &tail)?.items ?? []
+        XCTAssertEqual(again.map(\.text), items.map(\.text), "the grown window is kept")
+    }
+
     func testImageDataServesAttachmentsByNameOnlyAndTranscriptBlocks() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("feed-images-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
