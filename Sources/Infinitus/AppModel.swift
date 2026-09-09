@@ -2765,14 +2765,17 @@ final class AppModel: ObservableObject {
     }
 
     private let pastSessionsMemo = PastSessionsMemo()
+    private let gitBranchMemo = GitBranchMemo()
 
     /// T3's project list for the window and the mirror (spec §2.1). Off
     /// the main actor (called from the exporter's detached tick) — takes
     /// `profiles` from the caller since a `nonisolated` func can't read
     /// the main-actor-isolated `sessionProfiles` itself.
-    nonisolated func projectSummaries(profiles: [SessionProfile]) -> [ProjectSummary] {
+    /// `live` is the caller's own `ClaudeSessions.list` when it has one
+    /// (the workspace window lists for its inputs anyway, #384); nil lists here.
+    nonisolated func projectSummaries(profiles: [SessionProfile], live: [ClaudeSessionRecord]? = nil) -> [ProjectSummary] {
         let claudeDir = ClaudeSessions.configHome()
-        let live = ClaudeSessions.list(claudeDir: claudeDir)
+        let live = live ?? ClaudeSessions.list(claudeDir: claudeDir)
         // `PastSessions.list` stats every transcript under the projects
         // dir (10k files, ~1 s of CPU here) and the export asked for it
         // on every refresh — 7% idle CPU on its own (#346). The walk is
@@ -2788,12 +2791,17 @@ final class AppModel: ObservableObject {
         // Only shell out for cwds worth the ~5ms git call: live ones and
         // the five most recent, so an idle tick stays under 50ms. `derive`
         // calls `branch` with its own standardized key, so match on a
-        // trailing-slash-stripped form here too.
+        // trailing-slash-stripped form here too. The answer is kept a
+        // minute per cwd (#384): the workspace window asks on every
+        // fleet pump, and a dozen git spawns per pump is the whole cost.
         func trimSlash(_ s: String) -> String { var s = s; while s.count > 1, s.hasSuffix("/") { s.removeLast() }; return s }
         let branchable = Set((live.map(\.cwd) + recentCwds.prefix(5)).map(trimSlash))
         return ProjectSummary.derive(live: live, past: past, profiles: profiles,
                                      recentCwds: recentCwds,
-                                     branch: { branchable.contains(trimSlash($0)) ? Self.gitBranch(cwd: $0) : nil })
+                                     branch: { cwd in
+                                         guard branchable.contains(trimSlash(cwd)) else { return nil }
+                                         return gitBranchMemo.value(cwd: cwd, maxAge: 60) { Self.gitBranch(cwd: cwd) }
+                                     })
     }
 
     nonisolated static func gitBranch(cwd: String) -> String? {
@@ -3003,6 +3011,25 @@ extension AppModel: FleetModel {
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }
+}
+
+/// `projectSummaries`' remembered branch per cwd (#384), a minute each;
+/// the same lock-and-stamp shape as `PastSessionsMemo` below, keyed.
+final class GitBranchMemo: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String: (branch: String?, at: Date)] = [:]
+
+    func value(cwd: String, maxAge: TimeInterval, now: Date = Date(),
+               compute: () -> String?) -> String? {
+        lock.lock()
+        if let hit = stored[cwd], now.timeIntervalSince(hit.at) < maxAge {
+            lock.unlock(); return hit.branch
+        }
+        lock.unlock()
+        let fresh = compute()
+        lock.lock(); stored[cwd] = (fresh, now); lock.unlock()
+        return fresh
+    }
 }
 
 /// One remembered `PastSessions.list` for `projectSummaries` (#346):
