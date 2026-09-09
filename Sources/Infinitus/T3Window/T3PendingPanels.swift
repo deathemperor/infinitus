@@ -7,9 +7,8 @@ import InfinitusUI
 /// (`components/chat/ComposerBannerStack.tsx` over `ComposerBanner.tsx`) and the
 /// top drawer that holds either a pending approval
 /// (`ComposerPendingApprovalPanel.tsx` + `ComposerPendingApprovalActions.tsx`),
-/// a pending question (`ComposerPendingUserInputPanel.tsx`) or the plan
-/// follow-up notice (`ComposerPlanFollowUpBanner.tsx`) — the three branches of
-/// `ChatComposer.tsx:4805-4846`, in that order.
+/// or a pending question (`ComposerPendingUserInputPanel.tsx`) — the first two
+/// branches of `ChatComposer.tsx:4805-4846`, in that order.
 ///
 /// Every verdict leaves through `T3ThreadActions`, which wraps
 /// `AppModel.deliverSessionInput(pid:_:from:)` exactly as the shipped Mac chat
@@ -24,7 +23,11 @@ import InfinitusUI
 /// (`:290-311`), the number-key shortcuts (`ComposerPendingUserInputPanel.tsx:141-166`
 /// guards on focus not being in an editable field — no SwiftUI equivalent, and
 /// Task 13's composer would lose its digits), and single-select auto-advance
-/// (`:126-132`, a 200 ms timer).
+/// (`:126-132`, a 200 ms timer). The drawer's third branch,
+/// `ComposerPlanFollowUpBanner` (`ChatComposer.tsx:4841-4845`), is not ported
+/// either: it needs an actionable proposed plan and B has no producer for one —
+/// a parked `ExitPlanMode` arrives as an `approval.requested`, so the first
+/// branch already claims the drawer.
 
 // MARK: - Delivery
 
@@ -500,8 +503,8 @@ extension T3BannerItem {
 ///
 /// The wire is the shipped Mac chat window's (SessionChatWindow.swift:300-316):
 /// Approve = key `1`, Decline = key `3`, "Always allow this session" =
-/// `.approve` carrying `ToolApproval.encode(tool:input:)`. Every one of those
-/// answers `pending(pid:).first` on an owned session (OwnedSessions.swift:421,
+/// `.approve` carrying `ToolApproval.encode(tool:input:)`. On an owned session
+/// each of those answers `pending(pid:).first` (OwnedSessions.swift:421,
 /// `:445`), which is the approval this panel renders — upstream shows the first
 /// of `pendingApprovals` too (`ComposerPendingApprovalPanel` gets
 /// `activePendingApproval`).
@@ -509,9 +512,9 @@ struct T3PendingApprovalPanel: View {
     let approval: T3PendingApprovalItem
     /// `pendingCount` (`:6`): the `1/N` marker when more than one waits.
     let pendingCount: Int
-    /// Owned-only controls: "Always allow this session" needs the CLI's own
-    /// permission suggestions (`OwnedWire.answerLine`, `:255-260`) and the deny
-    /// reason needs `Decision.deny(message:)`.
+    /// The one owned-only control is the deny reason: `Decision.deny(message:)`
+    /// has no `SessionInput.Request.Kind` to ride, so it can only reach a
+    /// session the app runs. Every other button works on any session.
     let owned: Bool
     let sending: Bool
     let onApprove: () -> Void
@@ -576,14 +579,21 @@ struct T3PendingApprovalPanel: View {
             T3BannerActionButton(title: "Decline", tint: t3.web.destructiveForeground.color) {
                 onDeny(reason)
             }
-            if owned {
-                // Plain ghost-muted, no glyph: the triangle and the warning
-                // tint are `option.warning`'s (`:48-49`, `:56`), and
-                // `DEFAULT_APPROVAL_OPTIONS` sets no warning on
-                // `acceptForSession` (`:22-27`).
-                T3BannerActionButton(title: "Always allow this session", action: onAllowSession)
-                    .accessibilityHint("Allows \(approval.rule.label) for the rest of this session")
-            }
+            // Plain ghost-muted, no glyph: the triangle and the warning tint
+            // are `option.warning`'s (`:48-49`, `:56`), and
+            // `DEFAULT_APPROVAL_OPTIONS` sets no warning on `acceptForSession`
+            // (`:22-27`).
+            //
+            // Ownership-independent, like the shipped chat window's own button
+            // (SessionChatWindow.swift:304-307): `deliverSessionInput` rewrites
+            // `.approve` into `.key "1"` before any owned path runs
+            // (AppModel.swift:1723-1728) and records the rule with
+            // `toolApprovals.add(rule, sessionId:)`. What enforces it is the
+            // plugin's PreToolUse hook, which asks the app per session id
+            // (ControlServer.swift:341) — the terminal path this feature was
+            // built for (#79, ToolApproval.swift:3-6).
+            T3BannerActionButton(title: "Always allow this session", action: onAllowSession)
+                .accessibilityHint("Allows \(approval.rule.label) for the rest of this session")
             T3BannerActionButton(title: "Approve", tint: t3.web.foreground.color, action: onApprove)
             if sending { T3Spinner(size: 12) }
         }
@@ -743,6 +753,11 @@ struct T3PendingUserInputPanel: View {
     private func option(_ question: T3PendingQuestionItem, index: Int) -> some View {
         let option = question.options[index]
         let on = picks[question.id]?.contains(option.label) == true
+        // A terminal session answers by menu key and `SessionInput.allowedKeys`
+        // stops at 9 (SessionInput.swift:141-143) — an option past that has no
+        // way to reach the session, so it reads as unavailable rather than
+        // picking into a Submit that never enables.
+        let unreachable = !owned && index >= 9
         return Button {
             var set = picks[question.id] ?? []
             if on { set.remove(option.label) }
@@ -754,7 +769,8 @@ struct T3PendingUserInputPanel: View {
                 VStack(alignment: .leading, spacing: 2) {   // `gap-0.5`
                     Text(option.label)
                         .font(T3Font.web(.sm, .medium))
-                        .foregroundStyle(on ? t3.web.foreground.color : t3.web.foreground.color.opacity(0.85))
+                        .foregroundStyle(unreachable ? t3.web.mutedForeground.color
+                                         : (on ? t3.web.foreground.color : t3.web.foreground.color.opacity(0.85)))
                         .fixedSize(horizontal: false, vertical: true)
                     if !option.description.isEmpty, option.description != option.label {
                         Text(option.description)
@@ -783,6 +799,7 @@ struct T3PendingUserInputPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(unreachable)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
@@ -816,37 +833,6 @@ struct T3PendingUserInputPanel: View {
         if sending { return "Submitting..." }
         if !isLastQuestion { return "Next question" }
         return questionIndex > 0 ? "Submit answers" : "Submit answer"
-    }
-}
-
-// MARK: - Plan follow-up
-
-/// `ComposerPlanFollowUpBanner` (`ComposerPlanFollowUpBanner.tsx:4-20`), the
-/// third branch of the top drawer (`ChatComposer.tsx:4841-4845`): "Plan ready"
-/// and the plan's title, no actions — approving the plan is the card's job
-/// (`T3ProposedPlanCard`) and refining it is the composer's.
-struct T3PlanFollowUpBanner: View {
-    let planTitle: String?
-    @Environment(\.t3) private var t3
-
-    var body: some View {
-        T3BannerRoot(variant: .info) {
-            T3BannerRow {
-                HStack(spacing: 4) {
-                    Text("Plan ready")
-                        .font(T3Font.web(.xs, .medium))
-                        .foregroundStyle(t3.web.mutedForeground.color)
-                    if let planTitle {
-                        Text(planTitle)
-                            .font(T3Font.web(.xs))
-                            .foregroundStyle(t3.web.foreground.color.opacity(0.85))
-                            .lineLimit(1)
-                    }
-                }
-            } actions: {
-                EmptyView()
-            }
-        }
     }
 }
 
@@ -892,7 +878,8 @@ struct T3ThreadPendingSlot: View {
     /// last delivery's failure, a session that has ended, and the usage limits.
     private var bannerItems: [T3BannerItem] {
         var items: [T3BannerItem] = []
-        if let note = actions.note, !dismissed.contains(key("note", note)) {
+        // Dismissing this one clears the note itself, so it needs no key.
+        if let note = actions.note {
             items.append(.error(id: "delivery", message: note) { actions.note = nil })
         }
         // `store.gone`: no record for this pid under this session id any more.
@@ -992,12 +979,9 @@ private enum T3PendingSamples {
         .preferredColorScheme(.dark)
 }
 
-#Preview("Banner stack and plan follow-up") {
-    VStack(spacing: 0) {
-        T3BannerStack(items: [.error(id: "gone", message: "This session has ended.", dismiss: {}),
-                              .usageLimits(notes: [T3PendingSamples.limitNote]) {}])
-        T3PlanFollowUpBanner(planTitle: "Ship the workspace composer")
-    }
+#Preview("Banner stack") {
+    T3BannerStack(items: [.error(id: "gone", message: "This session has ended.", dismiss: {}),
+                          .usageLimits(notes: [T3PendingSamples.limitNote]) {}])
     .frame(width: 560)
     .padding(24)
     .t3(platform: .web, scheme: .dark)

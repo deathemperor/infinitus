@@ -72,7 +72,7 @@ struct T3ThreadView: View {
                             T3TimelineRowView(row: row,
                                               columnWidth: min(Self.columnMax, geo.size.width - 2 * Self.listInset),
                                               now: now,
-                                              planIsActionable: planIsActionable,
+                                              planIsActionable: planIsActionable && row.id == latestPlanRowId,
                                               onToggleTurn: { turnId in toggle(rowId: row.id) { model.toggleTurn(turnId) } },
                                               onToggleWorkGroup: { groupId in toggle(rowId: row.id) { model.toggleWorkGroup(groupId) } },
                                               onImplementPlan: implementPlan,
@@ -155,6 +155,16 @@ struct T3ThreadView: View {
     /// offer the button — it would approve the wrong tool.
     private var planIsActionable: Bool {
         store.pending.approvals.first?.toolName == "ExitPlanMode"
+    }
+
+    /// …and only on ONE card: the parked prompt belongs to the newest plan, so
+    /// an older card's Implement would approve someone else's `ExitPlanMode`.
+    /// Upstream picks the same single plan — `activeProposedPlan`
+    /// (`ChatView.tsx:2625-2633`) is `findLatestProposedPlan`
+    /// (`session-logic.ts:349-372`), the latest turn's newest plan — and only
+    /// that one drives the composer's Implement.
+    private var latestPlanRowId: String? {
+        store.rows.last(where: { $0.kind == "proposed-plan" })?.id
     }
 
     /// `ProposedPlanCard`'s Approve, upstream's "Implement"
