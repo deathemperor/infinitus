@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- Workspace: the thread's timestamp row, code-fence header, sidebar search and the git line under the composer now match the reference.
 - Settings › Devices lists every phone that has paired — name, route, last seen, what it holds on this Mac — across relaunches, any number of phones, each with Forget.
 - gcloud sign-in like AWS: a session whose `gcloud` credentials lapsed (user account or application default) shows the need, the phone or the Mac runs `gcloud auth login` and the session is told to continue (#367).
 - The workspace window no longer spawns a git call per project on every fleet tick: branch names are kept a minute per folder and the session list is read once per refresh (#384).

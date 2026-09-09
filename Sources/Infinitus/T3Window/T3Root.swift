@@ -58,7 +58,18 @@ struct T3Root: View {
     // yielding to the main content's own THREAD_MAIN_CONTENT_MIN_WIDTH
     // (640) floor as the window narrows (B-3 review).
     private static func sidebarWidth(windowWidth: Double) -> Double {
-        min(T3Theme.Metrics.sidebarWidth, max(208, windowWidth - 640))
+        min(preferredSidebarWidth, max(208, windowWidth - 640))
+    }
+
+    /// Upstream persists the user's drag as `--sidebar-width`; this window has
+    /// no resize handle yet, so the parity harness sets the same number in
+    /// `UserDefaults` (`workspace.sidebarWidth`) to shoot against a reference
+    /// whose sidebar was not at the default. Absent or out of range, the
+    /// default `Metrics.sidebarWidth` stands.
+    private static var preferredSidebarWidth: Double {
+        let stored = UserDefaults.standard.double(forKey: "workspace.sidebarWidth")
+        guard stored >= 208 else { return T3Theme.Metrics.sidebarWidth }
+        return min(stored, T3Theme.Metrics.sidebarWidth)
     }
 
     // `DiffPanelShell.tsx:33`: `w-[42vw] min-w-[360px] max-w-[560px]

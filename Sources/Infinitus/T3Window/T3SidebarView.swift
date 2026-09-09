@@ -14,6 +14,8 @@ struct T3SidebarView: View {
     @ObservedObject var app: AppModel
     @Environment(\.t3) private var t3
     @FocusState private var searchFocused: Bool
+    @State private var searchHovered = false
+    @State private var newThreadHovered = false
     // `Sidebar.tsx`'s SNOOZED_SHELF_EXPANDED_KEY/SETTLED_SHELF_EXPANDED_KEY
     // default both shelves collapsed ("Fresh keys deliberately reset both
     // shelves to collapsed for existing users") — session-local here, no
@@ -55,7 +57,12 @@ struct T3SidebarView: View {
     private var brandRow: some View {
         HStack(spacing: 8) {
             T3ProviderIcon(size: 20)
+            // The slot is what the sidebar's width leaves after the
+            // traffic-light inset: at a narrowed sidebar the wordmark truncates
+            // on one line rather than wrapping onto a second.
             T3Wordmark()
+                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.leading, 130)
@@ -65,11 +72,72 @@ struct T3SidebarView: View {
 
     // MARK: - Search
 
+    // `Sidebar.tsx:4252-4275`: not an `<Input>` — a borderless sidebar row
+    // (`flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5
+    // text-sm font-medium text-sidebar-muted-foreground
+    // hover:bg-sidebar-row-hover`) holding an `unstyled` field, with the
+    // new-thread button beside it on the same `flex items-center gap-1` line.
+    // The row and the scope row share one `SidebarGroup`
+    // (`p-[var(--sidebar-content-inset)] gap-1`, `:4250`), which is where the
+    // 8 above and the 4 below come from.
     private var searchRow: some View {
-        T3Input(text: Binding(get: { model.state.search }, set: model.setSearch),
-                placeholder: "Search", leading: .search, focus: $searchFocused)
-            .padding(.horizontal, T3Theme.Metrics.sidebarContentInset)
-            .padding(.bottom, 8)
+        HStack(spacing: 4) {
+            HStack(spacing: 8) {
+                LucideIcon(.search, size: 16)
+                    .foregroundStyle(t3.web.sidebarMutedForeground.color.opacity(0.8))
+                TextField("", text: Binding(get: { model.state.search }, set: model.setSearch),
+                          prompt: Text("Search").foregroundStyle(t3.web.sidebarMutedForeground.color))
+                    .textFieldStyle(.plain)
+                    .font(T3Font.web(.sm, .medium))
+                    .foregroundStyle(t3.web.sidebarForeground.color)
+                    .focused($searchFocused)
+                // `isSearchingThreads ? <XIcon className="size-3" /> : null`
+                // in an `icon-micro` ghost button (`size-5`).
+                if !model.state.search.isEmpty {
+                    Button {
+                        model.setSearch("")
+                        searchFocused = true
+                    } label: {
+                        LucideIcon(.x, size: 12)
+                            .foregroundStyle(t3.web.sidebarMutedForeground.color)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear thread search")
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity)
+            .background(searchHovered ? t3.web.sidebarRowHover.color : .clear,
+                        in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+            .onHover { searchHovered = $0 }
+            newThreadButton
+        }
+        .padding(.horizontal, T3Theme.Metrics.sidebarContentInset)
+        .padding(.top, T3Theme.Metrics.sidebarContentInset)
+        .padding(.bottom, 4)
+    }
+
+    // `Sidebar.tsx:4276-4318`: a `SidebarMenuButton size="icon"` (`size-8`,
+    // `--control-radius`) carrying `SquarePenIcon` at `size-4`. Upstream's
+    // multi-project setup routes ⌘N through the palette's "New thread in…"
+    // picker (`:4210-4229`); B resolves the project directly
+    // (`T3WindowModel.currentProjectId`), so the button and ⌘N do the same
+    // thing here. Disabled with no project — a draft has nowhere to start.
+    private var newThreadButton: some View {
+        T3Tooltip("New thread ⌘N") {
+            Button(action: { model.startNewThread() }) {
+                LucideIcon(.squarePen, size: 16)
+                    .foregroundStyle(t3.web.sidebarMutedForeground.color.opacity(0.8))
+                    .frame(width: 32, height: 32)
+                    .background(newThreadHovered ? t3.web.sidebarRowHover.color : .clear,
+                                in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.state.projects.isEmpty)
+            .onHover { newThreadHovered = $0 }
+        }
     }
 
     // MARK: - Scope
@@ -91,19 +159,6 @@ struct T3SidebarView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             Spacer(minLength: 0)
-            // `Sidebar.tsx:4300-4338`'s new-thread button (its `SquarePenIcon`
-            // sits in the search row upstream; Task 7 put this port's control in
-            // the scope row and it stays there). Upstream's multi-project setup
-            // routes ⌘N through the palette's "New thread in…" picker
-            // (`:4210-4229`); B resolves the project directly
-            // (`T3WindowModel.currentProjectId`), so the button and ⌘N do the
-            // same thing here. Disabled with no project — a draft has nowhere
-            // to start.
-            T3Tooltip("New thread ⌘N") {
-                Button(action: { model.startNewThread() }) { LucideIcon(.plus, size: 16) }
-                    .buttonStyle(.plain)
-                    .disabled(model.state.projects.isEmpty)
-            }
         }
         .padding(.horizontal, T3Theme.Metrics.sidebarRowContentInset)
         // `Sidebar.tsx:4451`'s project-select trigger: "h-8 min-h-8" = 32 pt.

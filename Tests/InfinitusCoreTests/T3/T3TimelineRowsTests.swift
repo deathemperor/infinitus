@@ -865,4 +865,52 @@ final class T3TimelineRowsTests: XCTestCase {
         let w2 = rows([.work(id: "w", createdAt: at(2), entry)])
         XCTAssertEqual(T3TimelineRows.stable(previous: w1, next: w2), w1)
     }
+
+    // MARK: - The Mac parity fixture (`T3FIX_MAC_REF=1 tools/t3ref/fixture.sh`)
+
+    /// The reference thread as `SessionTimelineBuilder` yields it: one "Hi",
+    /// one settled reply, the session idle — so `latestTurn` is `.completed`
+    /// with a `completedAt` and nothing is running.
+    ///
+    /// The terminal reply keeps its metadata (`showAssistantMeta`), which is
+    /// what draws the `5:38 PM` stamp and the copy button. It rides on the
+    /// message row, NOT on a standalone `.assistantMeta` row: upstream only
+    /// splits the meta out when trailing tool groups follow the text
+    /// (`attachTrailingToolGroupsToAssistant`), and only that split row is
+    /// `alwaysVisible` — the row footer here is
+    /// `opacity-0 group-hover/assistant:opacity-100`
+    /// (`MessagesTimeline.tsx:1625-1660`), i.e. hover-only, in T3 as here.
+    func testFixtureThreadKeepsTheSettledReplyMetadata() {
+        let entries = [user("u1", 0), assistant("a1", turn: "u1", 21, updated: 21)]
+        let r = rows(entries) {
+            $0.latestTurn = .init(turnId: "u1", state: .completed, startedAt: self.at(0),
+                                  completedAt: self.at(21))
+        }
+        XCTAssertEqual(r.map(\.id), ["u1-entry", "a1-entry"])
+        guard case let .message(_, _, message, _, meta, copy, copyStreaming, _, _) = r[1] else {
+            return XCTFail("the reply is not a message row")
+        }
+        XCTAssertEqual(message.id, "a1")
+        XCTAssertTrue(meta, "the settled terminal reply carries its timestamp/copy footer")
+        XCTAssertTrue(copy)
+        XCTAssertFalse(copyStreaming)
+        XCTAssertFalse(r.contains { if case .assistantMeta = $0 { return true } else { return false } },
+                       "no trailing tool group, so the meta stays on the message row")
+    }
+
+    /// The same thread while the turn is still running: the reply is only
+    /// provisionally terminal, so the footer is withheld.
+    func testRunningTurnWithholdsTheReplyMetadata() {
+        let entries = [user("u1", 0), assistant("a1", turn: "u1", 21, updated: 21)]
+        let r = rows(entries, working: true, startedAt: 0) {
+            $0.latestTurn = .init(turnId: "u1", state: .running, startedAt: self.at(0), completedAt: nil)
+            $0.runningTurnId = "u1"
+        }
+        guard let reply = r.first(where: { $0.id == "a1-entry" }),
+              case let .message(_, _, _, _, meta, copy, _, _, _) = reply else {
+            return XCTFail("the reply is not a message row")
+        }
+        XCTAssertFalse(meta)
+        XCTAssertFalse(copy)
+    }
 }

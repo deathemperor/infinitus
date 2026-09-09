@@ -4,18 +4,18 @@ ArrowDown
 ArrowLeft
 ArrowRight
 ArrowUp
-Bookmark
 BookOpen
+Bookmark
 Bot
 Braces
 Check
 ChevronDown
 ChevronLeft
 ChevronRight
+ChevronUp
 ChevronsDownUp
 ChevronsLeftRightEllipsis
 ChevronsUpDown
-ChevronUp
 Circle
 CircleAlert
 CircleCheck
@@ -77,8 +77,8 @@ PanelLeft
 PanelLeftClose
 PanelRight
 Paperclip
-Pencil
 PenLine
+Pencil
 PictureInPicture2
 Pipette
 Play
@@ -98,6 +98,7 @@ ShoppingBag
 Smartphone
 SmilePlus
 Sparkles
+SquarePen
 Star
 Sun
 Tag
@@ -111,6 +112,7 @@ Undo2
 Unlink2
 UserPlus
 Video
+WrapText
 X
 XCircle
 Zap
