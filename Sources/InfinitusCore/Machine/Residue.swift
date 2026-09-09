@@ -93,13 +93,19 @@ public enum Residue {
         }
     }
 
-    /// Bytes under a directory, shallow-summed (for the sizes the tab
-    /// reports: transcripts, plugin cache, claude-mem).
+    /// Bytes of the regular files under a directory (for the sizes the
+    /// tab reports: transcripts, plugin cache, claude-mem). The URL
+    /// enumerator with just the size key: `attributesOfItem` built a
+    /// full attribute dictionary per file, ~150 µs each, and the plugin
+    /// cache alone is 200k files — every launch and every hourly sample
+    /// spent ~40 CPU-s here (#346).
     public static func size(of dir: String, fm: FileManager = .default) -> Int {
-        guard let walk = fm.enumerator(atPath: dir) else { return 0 }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey]
+        guard let walk = fm.enumerator(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: Array(keys)) else { return 0 }
         var total = 0
-        for case let rel as String in walk {
-            if let size = (try? fm.attributesOfItem(atPath: dir + "/" + rel))?[.size] as? Int { total += size }
+        for case let url as URL in walk {
+            guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { continue }
+            total += values.fileSize ?? 0
         }
         return total
     }
