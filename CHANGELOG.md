@@ -14,6 +14,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
 - A debug or fixture instance keeps its mirror snapshot in its own state dir instead of overwriting the app's (INFINITUS_MIRROR_SNAPSHOT).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).

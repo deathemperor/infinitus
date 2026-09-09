@@ -58,6 +58,8 @@ public actor CswapSupervisor {
     }
 
     private let binaryPath: String
+    private let arguments: [String]
+    private let environmentFlag: String
     private let onLine: @Sendable (EventLine) -> Void
     private let onState: @Sendable (State) -> Void
     private var process: Process?
@@ -67,12 +69,19 @@ public actor CswapSupervisor {
     /// dying child's mutex not yet released, not a foreign holder.
     private var lastOwnExit: Date = .distantPast
 
+    /// `arguments` and `environmentFlag` default to cswap's; swapd speaks
+    /// the same NDJSON stream under `SWAPD_SUPERVISED=1`, so it needs this
+    /// supervisor, not a second one.
     public init(
         binaryPath: String,
+        arguments: [String] = ["auto", "--json"],
+        environmentFlag: String = "CSWAP_SUPERVISED",
         onLine: @escaping @Sendable (EventLine) -> Void,
         onState: @escaping @Sendable (State) -> Void
     ) {
         self.binaryPath = binaryPath
+        self.arguments = arguments
+        self.environmentFlag = environmentFlag
         self.onLine = onLine
         self.onState = onState
     }
@@ -93,12 +102,12 @@ public actor CswapSupervisor {
         guard !stopping else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: binaryPath)
-        p.arguments = ["auto", "--json"]
+        p.arguments = arguments
         // The supervised-engine contract: the child watches its stdin pipe
         // and exits on EOF, but only under this flag (never in tests, cron
         // pipes, or an interactive terminal).
         var env = ProcessInfo.processInfo.environment
-        env["CSWAP_SUPERVISED"] = "1"
+        env[environmentFlag] = "1"
         p.environment = env
         p.standardInput = Pipe()   // held open for the child's lifetime
         let pipe = Pipe()

@@ -142,6 +142,13 @@ public struct Account: Codable, Sendable {
     public let active: Bool
     public let usageStatus: String
     public let usage: Usage?
+    /// Every usage window the engine reported, in its own order and with
+    /// its own names — swapd's `windows` verbatim (`usage` above is the
+    /// derived view today's UI and the phone's decoder read). Additive:
+    /// nil from cswap and from an older Mac. Spend's money (`used`,
+    /// `limit`, `currency`) has no place on a `UsageWindow` and stays on
+    /// `usage.spend`.
+    public let windows: [UsageWindow]?
     public let alias: String?
     /// One-emoji display icon (`cswap icon`); additive field, may be absent.
     public let icon: String?
@@ -164,7 +171,8 @@ public struct Account: Codable, Sendable {
     public init(number: Int, email: String, organizationName: String = "",
                 organizationUuid: String = "", isOrganization: Bool = false,
                 active: Bool = false, usageStatus: String = "ok",
-                usage: Usage? = nil, alias: String? = nil, icon: String? = nil,
+                usage: Usage? = nil, windows: [UsageWindow]? = nil,
+                alias: String? = nil, icon: String? = nil,
                 plan: String? = nil, disabled: Bool? = nil, preferred: Bool? = nil,
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
@@ -177,6 +185,7 @@ public struct Account: Codable, Sendable {
         self.active = active
         self.usageStatus = usageStatus
         self.usage = usage
+        self.windows = windows
         self.alias = alias
         self.icon = icon
         self.plan = plan
@@ -194,8 +203,8 @@ public struct Account: Codable, Sendable {
     public func preferring(_ preferred: Bool?) -> Account {
         Account(number: number, email: email, organizationName: organizationName,
                 organizationUuid: organizationUuid, isOrganization: isOrganization,
-                active: active, usageStatus: usageStatus, usage: usage, alias: alias,
-                icon: icon, plan: plan, disabled: disabled, preferred: preferred,
+                active: active, usageStatus: usageStatus, usage: usage, windows: windows,
+                alias: alias, icon: icon, plan: plan, disabled: disabled, preferred: preferred,
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
                 lastGoodAgeSeconds: lastGoodAgeSeconds)

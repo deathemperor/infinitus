@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "provider": "claude",
+      "installed": true,
+      "activeSlot": 2,
+      "nextCandidate": 1,
+      "nextRecovery": {
+        "slot": 8,
+        "at": "2026-09-09T03:29:59Z"
+      },
+      "accounts": [
+        {
+          "slot": 1,
+          "email": "you@example.com",
+          "organizationName": "Example Org",
+          "organizationUuid": "org-0000",
+          "plan": "Max 20x",
+          "alias": "death2",
+          "icon": "🩸",
+          "active": false,
+          "disabled": false,
+          "preferred": false,
+          "usageStatus": "ok",
+          "fetchedAt": "2026-09-09T01:11:03Z",
+          "ageSeconds": 7.6,
+          "windows": [
+            {
+              "kind": "5h",
+              "pct": 0.0,
+              "resetsAt": "2026-09-09T05:59:59Z"
+            },
+            {
+              "kind": "7d",
+              "pct": 19.0,
+              "resetsAt": "2026-09-15T10:59:59Z",
+              "pace": {
+                "expectedPct": 20.3,
+                "ahead": true,
+                "lastsToReset": true
+              }
+            },
+            {
+              "kind": "scoped",
+              "name": "Fable",
+              "pct": 29.0,
+              "resetsAt": "2026-09-15T10:59:59Z"
+            }
+          ],
+          "lastGood": {
+            "fetchedAt": "2026-09-09T01:11:03Z",
+            "ageSeconds": 0.0,
+            "windows": []
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -450,7 +450,63 @@ struct EngineToggleNotes: View {
                  + "for the same accounts they fight. Run one per account set.")
                 .font(.caption).foregroundStyle(.orange)
         }
+        if model.cswapEnabled && model.swapdEnabled {
+            Text("cswap and swapd both keep Claude Code's login. Side by side they only "
+                 + "show the same accounts twice \u{2014} let one of them do the switching.")
+                .font(.caption).foregroundStyle(.orange)
+        }
         Text("Flipping an engine restarts the app.")
             .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// swapd pane (preview, #8): the multi-provider engine that will replace
+/// cswap. Off until asked for, and safe beside cswap during the
+/// transition — the app assumes neither exists.
+struct SwapdEnginePane: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Engine on (swaps the login under each provider's CLI)",
+                       isOn: $model.swapdEnabled)
+                    .disabled(model.swapd == nil && !model.swapdEnabled)
+                if model.swapd == nil {
+                    Text("Install the binary first \u{2014} the toggle turns on once it is found.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                EngineToggleNotes(model: model)
+            } header: {
+                Text("swapd engine (preview)")
+            } footer: {
+                Text("One binary per machine, several providers: it keeps your logins, "
+                     + "shows each one's usage windows and swaps the live login before a "
+                     + "limit binds \u{2014} what cswap does for Claude, for every CLI. "
+                     + "Igniting an account here refreshes it at once, so the row shows "
+                     + "the window that just started.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent("Binary") {
+                    Text(model.swapd?.binaryPath ?? "not found")
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .foregroundStyle(model.swapd == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                }
+                if let err = model.engineErrors[SwapdEngine.engineID] {
+                    Text(err).font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Binary")
+            } footer: {
+                Text("Looked for in /opt/homebrew/bin, /usr/local/bin, ~/.cargo/bin and "
+                     + "~/.local/bin, in that order; INFINITUS_SWAPD_CLI pins another path. "
+                     + "Infinitus only ever runs `swapd \u{2026} --json` \u{2014} it never reads "
+                     + "the engine's own files.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
