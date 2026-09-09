@@ -1335,7 +1335,7 @@ final class AppModel: ObservableObject {
                 result = IgniteResult(text: "\(name)'s window started — resets \(f.string(from: resets))", ok: true)
                 self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(f.string(from: resets))")
             } catch {
-                result = IgniteResult(text: "ignite \(name) failed: \(error.localizedDescription)", ok: false)
+                result = IgniteResult(text: "ignite \(name) failed: \((error as? CLIError)?.message ?? error.localizedDescription)", ok: false)
                 self?.logEvent("other", icon: "exclamationmark.triangle", result!.text)
             }
             self?.igniting = nil

@@ -228,10 +228,5 @@ public struct SwapdCLI: Sendable {
         return try await run(try arguments(verb, provider: provider))
     }
 
-    /// `{"schemaVersion":1,"version":"0.1.0"}` → "0.1.0".
-    public func version() async throws -> String {
-        struct VersionReply: Decodable { let version: String }
-        return try JSONDecoder().decode(VersionReply.self, from: await run(["version", "--json"])).version
-    }
 }
 #endif

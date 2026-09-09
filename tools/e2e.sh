@@ -67,7 +67,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in popout_shown popover_pinned gamification_style burn_style mock_mode; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }

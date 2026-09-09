@@ -497,9 +497,6 @@ struct SwapdEnginePane: View {
                 if let err = model.engineErrors[SwapdEngine.engineID] {
                     Text(err).font(.caption).foregroundStyle(.orange)
                 }
-                if let caveat = model.fleetCaveats[SwapdEngine.engineID] {
-                    Text(caveat).font(.caption).foregroundStyle(.orange)
-                }
             } header: {
                 Text("Binary")
             } footer: {
