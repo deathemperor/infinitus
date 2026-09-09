@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - Workspace: links in replies carry the reference's favicon slot.
 - Workspace: reply links take the reference's blue with no underline.
 - Workspace: inline code in replies wears the reference's chip.
