@@ -80,9 +80,9 @@ struct T3NoActiveThreadState: View {
     }
 }
 
-/// T3's `<DraftHeroHeadline>` (`DraftHeroHeadline.tsx:197-207`): the one `h1`
+/// T3's `<DraftHeroHeadline>` (`DraftHeroHeadline.tsx:204-214`): the one `h1`
 /// over an empty draft, whose project name is itself the project picker
-/// (`:110-186`). Upstream's three forms, verbatim from that ternary:
+/// (`:111-193`). Upstream's three forms, verbatim from that ternary:
 /// "What should we build in {project}?" once a project is resolved,
 /// "{picker} to start" when one can be chosen, and "Add a project to start"
 /// when there is none.
@@ -91,7 +91,7 @@ struct T3NoActiveThreadState: View {
 /// of the draft's project, which is why it needs no `draftId` hash to stay
 /// stable across captures.
 ///
-/// Not ported: the menu's "New project" item (`:187-190` opens the command
+/// Not ported: the menu's "New project" item (`:194-197` opens the command
 /// palette's add-project flow, which B has no host for) and the tooltip over a
 /// truncated name.
 struct T3DraftHeroHeadline: View {

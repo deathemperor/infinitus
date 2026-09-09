@@ -101,7 +101,7 @@ struct T3Root: View {
     }
 
     // `columnWidth` is the main column's own width — what
-    // `ChatHeader.tsx:318-320`'s `@container/header-actions` measures, since
+    // `ChatHeader.tsx:315-317`'s `@container/header-actions` measures, since
     // the header content div fills the column. `T3TopBar` can't read it with
     // its own `GeometryReader` (its children's widths depend on the answer),
     // so it is proposed from here.
@@ -116,7 +116,7 @@ struct T3Root: View {
                 T3NoProjectsHero(action: nil)
             } else if let store = model.timelineStore, let thread = model.state.selectedThread {
                 // `.id` per upstream's `key={activeThread.id}` on
-                // `<MessagesTimeline>` (`ChatView.tsx:7939`): a thread switch
+                // `<MessagesTimeline>` (`ChatView.tsx:8229`): a thread switch
                 // remounts the list, which is also what drops the outgoing
                 // thread's row geometry. A rebind (same thread, new pid) keeps
                 // the same store id and so keeps the scroll position.

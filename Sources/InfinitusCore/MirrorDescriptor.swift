@@ -29,12 +29,13 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         public var team: Bool?
         public var pastSessions: Bool?
         public var images: Bool?
+        public var files: Bool?
         public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
                     ownedSessions: Bool? = nil, checkpoints: Bool? = nil, team: Bool? = nil,
-                    pastSessions: Bool? = nil, images: Bool? = nil) {
+                    pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil) {
             self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
             self.ownedSessions = ownedSessions; self.checkpoints = checkpoints; self.team = team
-            self.pastSessions = pastSessions; self.images = images
+            self.pastSessions = pastSessions; self.images = images; self.files = files
         }
     }
     public let machineId: String
@@ -60,6 +61,6 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
                                 capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
                                                            ownedSessions: true, checkpoints: true, team: true,
-                                                           pastSessions: true, images: true))
+                                                           pastSessions: true, images: true, files: true))
     }
 }

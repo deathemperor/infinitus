@@ -3,7 +3,7 @@ import XCTest
 
 /// `detectComposerTrigger` (`packages/shared/src/composerTrigger.ts:50-116`)
 /// and the menu's highlight rules (`composerMenuHighlight.ts:1-20`,
-/// `nudgeComposerMenuHighlight`, `ChatComposer.tsx:2810-2824`).
+/// `nudgeComposerMenuHighlight`, `ChatComposer.tsx:2967-2981`).
 final class T3ComposerTriggerTests: XCTestCase {
 
     // MARK: - The `/` command trigger (line-anchored, `:56-60`)
@@ -133,7 +133,7 @@ final class T3ComposerTriggerTests: XCTestCase {
         XCTAssertEqual(result.caret, 12)
     }
 
-    /// `composerMenuSearchKey` (`ChatComposer.tsx:2024-2026`).
+    /// `composerMenuSearchKey` (`ChatComposer.tsx:2153-2155`).
     func testTheSearchKeyIsTheKindAndTheTrimmedLowercasedQuery() {
         XCTAssertEqual(T3ComposerTrigger.detect(text: "/Re", caret: 3)?.searchKey, "command:re")
         XCTAssertEqual(T3ComposerTrigger.detect(text: "@Sour", caret: 5)?.searchKey, "mention:sour")

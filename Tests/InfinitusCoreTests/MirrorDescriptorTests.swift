@@ -16,6 +16,8 @@ final class MirrorDescriptorTests: XCTestCase {
         XCTAssertTrue(text.contains(#""attention":true"#))
         XCTAssertTrue(text.contains(#""sequence":true"#))
         XCTAssertTrue(text.contains(#""leases":true"#))
+        // The phone gates its Files pill on this, never on the platform (#223).
+        XCTAssertTrue(text.contains(#""files":true"#))
         #if os(macOS)
         XCTAssertEqual(d.platform, "macos")
         #else
@@ -26,5 +28,6 @@ final class MirrorDescriptorTests: XCTestCase {
         let older = try JSONDecoder().decode(MirrorDescriptor.self, from: Data(
             #"{"machineId":"m","label":"l","platform":"macos","appVersion":"0","capabilities":{}}"#.utf8))
         XCTAssertNil(older.capabilities.timeline)
+        XCTAssertNil(older.capabilities.files)
     }
 }

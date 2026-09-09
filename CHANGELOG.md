@@ -14,7 +14,10 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Mac
+- swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
+- The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
+- A debug or fixture instance keeps its mirror snapshot in its own state dir instead of overwriting the app's (INFINITUS_MIRROR_SNAPSHOT).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
 - Workspace: a newly opened window no longer races the app's first refresh into an empty sidebar (#468).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
@@ -54,8 +57,11 @@ publishes the matching section as the GitHub release body.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
 - Workspace: a denial with a reason now shows in the activity log like every other answer.
+- A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
 - The lapsed-sign-in scan over tool results folds bytes instead of Unicode-lowercasing and Foundation-searching each one — 49× faster per result (#346).
+- The resume tick probes the last 64 KB of a transcript before reading 512 KB, and a sub-agent's meta file is decoded once, not on every feed read (#346).
+- The machine sample matches hook scripts to processes with a byte search instead of Foundation's `contains` (a second per sample on 70 hooks) (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
@@ -81,6 +87,7 @@ publishes the matching section as the GitHub release body.
 - Typing / at the start of a line in the thread composer lists the session's slash commands and skills to pick from, as the reference does (#223).
 - Team actions on the phone (join, invite, request, file) no longer need the app lock turned on.
 - Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
+- Settings → Appearance gains Text size: a slider from 11 to 22 pt that scales every session-screen font, 16 pt being the reference.
 
 ## 0.4.4-alpha.2
 

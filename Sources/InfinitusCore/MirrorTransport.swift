@@ -100,6 +100,19 @@ public enum MirrorTransport {
         guard parts.count == 3, parts[0] == "sessions", parts[2] == "commands" else { return nil }
         return Int32(parts[1])
     }
+    /// `GET /sessions/<pid>/files` and `GET /sessions/<pid>/file?path=<rel>`
+    /// (#223, the phone's file browser): the flat workspace listing and one
+    /// file's text — `T3ProjectFiles` builds the paths and the bodies.
+    public static func sessionFilesPid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "files" else { return nil }
+        return Int32(parts[1])
+    }
+    public static func sessionFilePid(_ path: String) -> Int32? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count == 3, parts[0] == "sessions", parts[2] == "file" else { return nil }
+        return Int32(parts[1])
+    }
     public static let timelineAfterQueryName = "afterSequence"
     public static let timelineEpochQueryName = "epoch"
     /// Query parameter carrying the item limit for the tail route.
@@ -306,6 +319,22 @@ public enum MirrorTransport {
     public static func imageResponse(_ body: Data, contentType: String) -> Data {
         response(status: 200, reason: "OK", contentType: contentType, body: body,
                  extraHeaders: ["Cache-Control": "private, max-age=86400"])
+    }
+
+    /// A refused route with a reason the phone can show: `{"error": "…"}`
+    /// under the status the route decided (#223's file browser answers 400,
+    /// 404, 415 and 500 this way).
+    public static func errorResponse(status: Int, message: String) -> Data {
+        let reason: String
+        switch status {
+        case 400: reason = "Bad Request"
+        case 404: reason = "Not Found"
+        case 415: reason = "Unsupported Media Type"
+        default: reason = "Internal Server Error"
+        }
+        let body = (try? JSONEncoder().encode(T3ProjectFiles.Failure(error: message)))
+            ?? Data(#"{"error":"failed"}"#.utf8)
+        return response(status: status, reason: reason, contentType: "application/json", body: body)
     }
 
     public static func notFoundResponse() -> Data {

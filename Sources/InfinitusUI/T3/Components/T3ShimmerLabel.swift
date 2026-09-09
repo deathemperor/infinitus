@@ -6,7 +6,7 @@ import UIKit
 import AppKit
 #endif
 
-/// T3's `<ActivityShimmerOverlay>` (`MessagesTimeline.tsx:1979-1990`) and the
+/// T3's `<ActivityShimmerOverlay>` (`MessagesTimeline.tsx:2073-2084`) and the
 /// `live-tool-shine` utility (`web-index.css:428-455`, `:463-537`): the label
 /// is drawn twice — once in `secondary-label`, once in `foreground` behind a
 /// 4.5 rem (72 pt) soft-edged window that sweeps left → right, linear, 2.2 s,

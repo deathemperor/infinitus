@@ -248,7 +248,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "hide", args: ["popout|workspace"], effect: .write,
                        summary: "Close the pinned pop-out (the e2e no-lease window) or the workspace.",
                        replyShape: "{hidden}"),
-        ControlCommand(name: "engine", args: ["cswap|cliproxy|9router", "on|off"], effect: .restart,
+        ControlCommand(name: "engine", args: ["cswap|swapd|cliproxy|9router", "on|off"], effect: .restart,
                        summary: "Turn an engine on or off. The app relaunches.",
                        replyShape: "{restarting:true}"),
         ControlCommand(name: "proxy", effect: .read,

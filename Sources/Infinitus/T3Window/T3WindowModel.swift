@@ -477,17 +477,17 @@ final class T3WindowModel: ObservableObject {
     let draftStart = T3DraftStart()
     func isStarting(_ draftId: String) -> Bool { draftStart.starting.contains(draftId) }
 
-    /// `startNewThreadFromContext` (`Sidebar.tsx:4210-4229`): a draft in the
+    /// `startNewThreadFromContext` (`Sidebar.tsx:4251-4270`): a draft in the
     /// project you are in. `projectId` forces one (⌘⇧N, upstream's
     /// `chat.newLocal`); nil resolves the selected thread's project, then the
     /// sidebar's scope, then the top project — the resolution order upstream's
-    /// `newThreadContext` uses (`:4206-4209`).
+    /// `newThreadContext` uses (`:4247-4250`).
     func startNewThread(projectId: String? = nil) {
         guard let project = projectId ?? currentProjectId else { return }
         // ⌘N twice in the same project reopens the empty draft it already made
         // rather than stacking another "New thread" row — upstream never
         // stacks empty ones either (its rows exist only for drafts that HAVE
-        // content, `Sidebar.tsx:797-800`).
+        // content, `Sidebar.tsx:781-784`).
         let draft = state.reusableDraftId(projectId: project, isUntouched: { self.draft(for: $0).isEmpty })
             ?? state.addDraft(projectId: project, now: now)
         select(draft)
@@ -502,7 +502,7 @@ final class T3WindowModel: ObservableObject {
         case .all: break
         }
         // `defaultProjectRef` upstream is the project at the TOP of the
-        // sidebar (`Sidebar.tsx:4206-4209` over `sortLogicalProjectsForSidebar`)
+        // sidebar (`Sidebar.tsx:4247-4250` over `sortLogicalProjectsForSidebar`)
         // — `state.groups`, which carries that order, not `state.projects`.
         return state.groups.first?.members.first?.id ?? state.projects.first?.id
     }
@@ -515,7 +515,7 @@ final class T3WindowModel: ObservableObject {
         if let draft = drafts[draftId] { commit(draft, for: draftId) }
     }
 
-    /// Upstream's "Discard draft" (`Sidebar.tsx:772`). The typed prompt goes
+    /// Upstream's "Discard draft" (`Sidebar.tsx:756`). The typed prompt goes
     /// with it, or `workspace.drafts` keeps an entry no row can reach again.
     func discardDraft(_ draftId: String) {
         state.removeDraft(draftId, now: now)

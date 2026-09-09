@@ -1,7 +1,7 @@
 import XCTest
 @testable import InfinitusCore
 
-/// `activeThreadModelDisplayName` (`ChatComposer.tsx:5566`).
+/// `activeThreadModelDisplayName` (`ChatComposer.tsx:5854`).
 final class T3ModelLabelTests: XCTestCase {
     func testDropsTheVendorPrefixAndTheBuildDate() {
         XCTAssertEqual(T3ModelLabel.display("claude-sonnet-4-5-20250929"), "Sonnet 4.5")

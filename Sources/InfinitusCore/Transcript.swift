@@ -94,22 +94,34 @@ public enum Transcript {
         return type == "system" && (entry["subtype"] as? String) == "api_error"
     }
 
-    /// The transcript's last `tailBytes`, newest line first; partial
-    /// first/last lines are skipped by the callers, never an error.
-    static func tailLines(at url: URL) -> [Data.SubSequence] {
+    /// The transcript's last `maxBytes` (default `tailBytes`), newest line
+    /// first; partial first/last lines are skipped by the callers, never
+    /// an error.
+    static func tailLines(at url: URL, maxBytes: Int = tailBytes) -> [Data.SubSequence] {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return [] }
-        let start = size > UInt64(tailBytes) ? size - UInt64(tailBytes) : 0
+        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
         guard (try? handle.seek(toOffset: start)) != nil,
               let blob = try? handle.readToEnd() else { return [] }
         return blob.split(separator: UInt8(ascii: "\n")).reversed()
     }
 
+    /// The first probe for `lastTurnEntry`: the deciding entry is nearly
+    /// always within the last few KB, and the resume tick asks for every
+    /// session's and every recent agent's (#346) — the full `tailBytes`
+    /// is read only when the short probe finds nothing.
+    static let probeBytes = 64 * 1024
+
     /// The last entry that decides whether work has stopped. Reads only
     /// the tail.
     public static func lastTurnEntry(at url: URL) -> [String: Any]? {
-        for line in tailLines(at: url) {
+        if let entry = lastTurnEntry(in: tailLines(at: url, maxBytes: probeBytes)) { return entry }
+        return lastTurnEntry(in: tailLines(at: url))
+    }
+
+    private static func lastTurnEntry(in lines: [Data.SubSequence]) -> [String: Any]? {
+        for line in lines {
             guard line.first == UInt8(ascii: "{"),
                   let entry = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any]
             else { continue }

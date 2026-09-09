@@ -63,6 +63,9 @@ the engine (`tools/demo-cswap` — fabricated fleet, no credentials, no
 network). The control socket is `/tmp/t3fix.sock`, **never** the real
 app's — running a debug instance without that would unlink the real
 socket and break `infinitusctl` and the phone until the bundle relaunches.
+`INFINITUS_MIRROR_SNAPSHOT` points `MirrorExporter` at
+`/tmp/t3fix/mirror-snapshot.json` too, so the fixture never overwrites
+the real app's mirror snapshot (#474).
 
 ```
 $ tools/t3ref/fixture.sh

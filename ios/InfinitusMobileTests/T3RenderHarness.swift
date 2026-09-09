@@ -276,6 +276,14 @@ import InfinitusUI
             .background(T3ThemeBackground())
             .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "composer-limits-dark", png: Self.render(limitsCard), dir: dir, test: self)
+        // Appearance → Text at 20 pt: every T3 mobile font follows the scale.
+        T3Font.mobileScale = 20.0 / 16.0
+        let large = NavigationStack {
+            T3ThreadScreen(model: model, session: paritySession, fixture: Self.parityThread())
+        }
+        .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "thread-text-20-dark", png: Self.render(large), dir: dir, test: self)
+        T3Font.mobileScale = 1
         let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
         for (name, state, scheme) in shots {

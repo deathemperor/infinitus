@@ -17,14 +17,20 @@ actor MirrorExporter {
         self.payload = payload
     }
 
+    // INFINITUS_MIRROR_SNAPSHOT: a debug/fixture instance's own file, so
+    // it never overwrites the real app's mirror snapshot (#474).
     static let url: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory,
-                                 in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/mirror-snapshot.json")
+        ProcessInfo.processInfo.environment["INFINITUS_MIRROR_SNAPSHOT"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.urls(for: .applicationSupportDirectory,
+                                        in: .userDomainMask)[0]
+                .appendingPathComponent("Infinitus/mirror-snapshot.json")
     }()
 
     /// The ⚡ gauge's scale: the highest tokens/minute seen lately.
     private var tokenPeak = 0
+    /// The six panel rows' transcripts, read incrementally (#346).
+    private var tails: [String: SessionTail] = [:]
+    private var tailProgress: [String: SessionProgress] = [:]
     /// Folders sessions have run in, newest first (#91's repository
     /// picker); kept across launches.
     private var recentCwds: [String] = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
@@ -81,13 +87,24 @@ actor MirrorExporter {
             recentCwds = recent
             UserDefaults.standard.set(recent, forKey: "recent_cwds")
         }
-        let sessions = sessionRecords.prefix(6).map { record -> SessionPanelRow in
-            let progress = SessionProgress.read(sessionId: record.sessionId,
-                                                cwd: record.cwd, claudeDir: claudeDir,
-                                                name: record.name)
+        let shown = Array(sessionRecords.prefix(6))
+        let sessions = shown.map { record -> SessionPanelRow in
+            let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+            var tail = tails[record.sessionId] ?? SessionTail(url: url)
+            let progress: SessionProgress
+            if !tail.advance(), let previous = tailProgress[record.sessionId] {
+                progress = previous
+            } else {
+                progress = tail.progress(name: record.name, now: now)
+            }
+            tails[record.sessionId] = tail
+            tailProgress[record.sessionId] = progress
             progressByPid[Int(record.pid)] = progress
             return SessionPanelRow.make(record: record, progress: progress, now: now)
         }
+        let shownIds = Set(shown.map(\.sessionId))
+        tails = tails.filter { shownIds.contains($0.key) }
+        tailProgress = tailProgress.filter { shownIds.contains($0.key) }
         // Cash column (#9 phase D1a): the cache UsagePane.swift's refresh
         // already writes, verbatim — no new subprocess, no engine call.
         let usageJSON = try? Data(contentsOf: UsageModel.cacheURL)

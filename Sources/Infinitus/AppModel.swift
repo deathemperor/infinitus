@@ -328,6 +328,10 @@ final class AppModel: ObservableObject {
     private var recentSamples: [UsageSample] = []
 
     let cswap: CswapCLI?
+    /// The swapd binary this Mac has, when it has one (preview, #8): the
+    /// engine is registered from it, and the pane shows where it is.
+    /// Never in the playground — that model is demo data only.
+    let swapd: SwapdCLI?
     /// True for the Animation Playground's private model: cswap is pinned
     /// to the bundled demo script and every outward side effect —
     /// snapshot cache, notifications, resume nudges, push, sync, power
@@ -440,6 +444,15 @@ final class AppModel: ObservableObject {
         didSet {
             guard cswapEnabled != oldValue else { return }
             defaults.set(cswapEnabled, forKey: "engine_cswap_enabled")
+            relaunchApp()
+        }
+    }
+    /// The swapd engine (preview): off until asked for, and it runs
+    /// BESIDE cswap during the transition — neither is assumed.
+    @Published var swapdEnabled: Bool {
+        didSet {
+            guard swapdEnabled != oldValue else { return }
+            defaults.set(swapdEnabled, forKey: "engine_swapd_enabled")
             relaunchApp()
         }
     }
@@ -1035,6 +1048,7 @@ final class AppModel: ObservableObject {
         let mock = defaults.bool(forKey: "mock_mode")
         mockMode = mock
         cswapEnabled = defaults.object(forKey: "engine_cswap_enabled") as? Bool ?? true
+        swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? false
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
@@ -1082,11 +1096,18 @@ final class AppModel: ObservableObject {
             cswap = nil
             lastError = "cswap not found — install it (uv tool install claude-swap)"
         }
+        swapd = playground ? nil : SwapdLocator.locate().map(SwapdCLI.init(binaryPath:))
         // A freshly minted token has to survive the launch that made it:
         // property initialisation doesn't run `didSet`.
         if storedToken.isEmpty { defaults.set(mirrorPairToken, forKey: "mirror_pair_token") }
         if !playground { sync.attach(model: self) }
         if let cswap, cswapEnabled || playground { registry.register(CswapEngine(cli: cswap)) }
+        // After cswap on purpose: while both are on, the Claude fleet the
+        // popup chrome reasons about stays the one cswap reports.
+        if let swapd, swapdEnabled { registry.register(SwapdEngine(cli: swapd)) }
+        else if swapdEnabled, !playground {
+            lastError = "swapd is enabled but no binary was found — install it (cargo install --path swapd)"
+        }
         // The proxy is never part of the playground (isolation contract)
         // and needs its key before it can be an engine at all.
         if !playground, cliproxyEnabled,
@@ -1298,6 +1319,29 @@ final class AppModel: ObservableObject {
 
     var canIgnite: Bool { capabilities.contains(.ignite) }
 
+    /// Ignite account n on that fleet's engine and publish what the engine
+    /// then says about it; the returned instant is when the window it
+    /// started ends, or nil when nothing could say.
+    ///
+    /// A `.refreshAccount` engine (swapd) fetches THAT account past its
+    /// serve floor and answers with the fleet, so the reset is the real
+    /// one; everything else waits for the next full snapshot, whose rows
+    /// may still carry the pre-ignite window.
+    @discardableResult
+    func igniteAndPublish(_ state: FleetState, number: Int) async throws -> Date? {
+        let engine = state.engine, provider = state.provider
+        try await engine.ignite(fleet: provider, number: number)
+        guard engine.capabilities.contains(.refreshAccount) else {
+            await refreshSnapshot()
+            return state.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
+                .flatMap(UsageHistory.parseISO)
+        }
+        let fleet = overlayingOwnedStatus(try await engine.refresh(fleet: provider, number: number))
+        _ = registry.state(for: fleet).apply(fleet)
+        return fleet.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
+            .flatMap(UsageHistory.parseISO)
+    }
+
     /// Manual ignition (#7 MVP step 3) through the primary fleet's engine
     /// (`AccountEngine.ignite`, capability-gated): one tiny request as
     /// account n so its 5h clock starts now; the fleet stays put. Outcome
@@ -1305,25 +1349,23 @@ final class AppModel: ObservableObject {
     func ignite(_ number: Int) {
         guard let primary, canIgnite, !isPlayground, igniting == nil else { return }
         igniting = number
-        let engine = primary.engine, provider = primary.provider
+        let fleet = primary
         let name = accounts.first { $0.number == number }
             .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(number)"
         logEvent("ignite", icon: "flag.checkered", "igniting \(name)'s 5h window")
         Task { [weak self] in
             var result: IgniteResult?
             do {
-                try await engine.ignite(fleet: provider, number: number)
-                // The row's reset only moves with the next poll; say when
-                // the window ends from the poll below, or now + 5 h until
-                // then (#338: "nothing happens" after a successful ignite).
-                await self?.refreshSnapshot()
-                let resets = self?.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
-                    .flatMap(UsageHistory.parseISO) ?? Date().addingTimeInterval(5 * 3_600)
+                // now + 5 h only when nothing knows better: an engine that
+                // refreshes one account answers with the window the run
+                // just opened (#338: "nothing happens" after an ignite).
+                let resets = try await self?.igniteAndPublish(fleet, number: number)
+                    ?? Date().addingTimeInterval(5 * 3_600)
                 let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short
                 result = IgniteResult(text: "\(name)'s window started — resets \(f.string(from: resets))", ok: true)
                 self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(f.string(from: resets))")
             } catch {
-                result = IgniteResult(text: "ignite \(name) failed: \(error.localizedDescription)", ok: false)
+                result = IgniteResult(text: "ignite \(name) failed: \((error as? CLIError)?.message ?? error.localizedDescription)", ok: false)
                 self?.logEvent("other", icon: "exclamationmark.triangle", result!.text)
             }
             self?.igniting = nil
@@ -1674,6 +1716,22 @@ final class AppModel: ObservableObject {
                 try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
             }
         }
+        // The phone's file browser (#223, spec E): the session's cwd is the
+        // workspace, and `T3ProjectFiles` decides every refusal — the route
+        // only maps its status.
+        mirrorServer.files.set(.init(
+            list: { pid in
+                let claudeDir = ClaudeSessions.configHome()
+                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
+                else { return nil }
+                return T3ProjectFiles.list(root: record.cwd)
+            },
+            read: { pid, path in
+                let claudeDir = ClaudeSessions.configHome()
+                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
+                else { return nil }
+                return T3ProjectFiles.read(root: record.cwd, path: path)
+            }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in
@@ -2317,6 +2375,7 @@ final class AppModel: ObservableObject {
     /// cswap is on and its binary was found — the only case the rail's
     /// auto-switch toggle and badge mean anything.
     var cswapRegistered: Bool { registry.engines.contains { $0.id == CswapEngine.engineID } }
+    var swapdRegistered: Bool { registry.engines.contains { $0.id == SwapdEngine.engineID } }
 
     // MARK: onboarding — machine detection (todo 2026-09-01)
 

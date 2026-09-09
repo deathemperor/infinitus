@@ -292,6 +292,29 @@ final class MirrorCommandsBox: @unchecked Sendable {
     }
 }
 
+/// The phone's file browser (#223): `GET /sessions/<pid>/files` and
+/// `GET /sessions/<pid>/file?path=<rel>`. Boxed with a `Handlers` struct like
+/// `checkpoints` because there are two of them; `nil` = no such pid (404),
+/// and every refusal past that is the Core error's own status. Both spawn
+/// `git` or walk a tree, so the routes call them off the serving queue.
+final class MirrorFilesBox: @unchecked Sendable {
+    struct Handlers: Sendable {
+        let list: @Sendable (Int32) -> Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>?
+        let read: @Sendable (Int32, String) -> Result<T3ProjectFiles.FileRead, T3ProjectFiles.ReadError>?
+    }
+    private let lock = NSLock()
+    private var handlers: Handlers?
+
+    func set(_ new: Handlers) {
+        lock.lock(); handlers = new; lock.unlock()
+    }
+
+    var current: Handlers? {
+        lock.lock(); defer { lock.unlock() }
+        return handlers
+    }
+}
+
 /// A few seconds of `/commands` replies per cwd: a popover reopening (or
 /// two phones) doesn't rescan the trees. Core's `SlashCommands` keeps no
 /// cache of its own here by design (B-5 adds one for the Mac composer).
@@ -544,6 +567,8 @@ final class MirrorServer: ObservableObject {
     let timeline = MirrorTimelineBox()
     /// Answers `GET /sessions/<pid>/commands` (#223); set by AppModel once at start.
     let commands = MirrorCommandsBox()
+    /// Answers the file-browser routes (#223); set by AppModel once at start.
+    let files = MirrorFilesBox()
     /// Answers `GET /.well-known/infinitus`; set by AppModel once at start.
     let descriptor = MirrorDescriptorBox()
     /// Command receipts for input / start / attention (#223 phase 4).
@@ -742,6 +767,7 @@ final class MirrorServer: ObservableObject {
         let attention = self.attention
         let timeline = self.timeline
         let commands = self.commands
+        let files = self.files
         let descriptor = self.descriptor
         let receipts = self.receipts
         let leases = self.leases
@@ -763,7 +789,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -843,6 +869,7 @@ final class MirrorServer: ObservableObject {
                                           attention: MirrorAttentionBox,
                                           timeline: MirrorTimelineBox,
                                           commands: MirrorCommandsBox,
+                                          files: MirrorFilesBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -855,7 +882,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -869,6 +896,7 @@ final class MirrorServer: ObservableObject {
                                           attention: MirrorAttentionBox,
                                           timeline: MirrorTimelineBox,
                                           commands: MirrorCommandsBox,
+                                          files: MirrorFilesBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -1002,6 +1030,47 @@ final class MirrorServer: ObservableObject {
                     DispatchQueue.global(qos: .utility).async {
                         let response = commands.call(pid).map(MirrorTransport.jsonResponse)
                             ?? MirrorTransport.notFoundResponse()
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                } else if request.method == "GET",
+                          let pid = MirrorTransport.sessionFilesPid(request.path) {
+                    // `git ls-files` or a tree walk over the whole cwd: off this queue.
+                    DispatchQueue.global(qos: .utility).async {
+                        let response: Data
+                        switch files.current?.list(pid) {
+                        case .success(let listing)?:
+                            response = (try? JSONEncoder().encode(listing)).map(MirrorTransport.jsonResponse)
+                                ?? MirrorTransport.errorResponse(status: 500, message: "cannot encode the listing")
+                        case .failure(let error)?:
+                            response = MirrorTransport.errorResponse(status: error.status, message: error.message)
+                        case nil:
+                            response = MirrorTransport.errorResponse(status: 404, message: "no such session")
+                        }
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                } else if request.method == "GET",
+                          let pid = MirrorTransport.sessionFilePid(request.path) {
+                    // A missing `path` is refused like any other path outside
+                    // the workspace — the Core read decides, not the route.
+                    let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
+                    // Up to 256 KiB read off disk: off this queue.
+                    DispatchQueue.global(qos: .utility).async {
+                        let response: Data
+                        switch files.current?.read(pid, path) {
+                        case .success(let file)?:
+                            response = (try? JSONEncoder().encode(file)).map(MirrorTransport.jsonResponse)
+                                ?? MirrorTransport.errorResponse(status: 500, message: "cannot encode the file")
+                        case .failure(let error)?:
+                            response = MirrorTransport.errorResponse(status: error.status, message: error.message)
+                        case nil:
+                            response = MirrorTransport.errorResponse(status: 404, message: "no such session")
+                        }
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })
@@ -1268,7 +1337,7 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
