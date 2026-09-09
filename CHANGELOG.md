@@ -84,6 +84,7 @@ publishes the matching section as the GitHub release body.
 - Typing / at the start of a line in the thread composer lists the session's slash commands and skills to pick from, as the reference does (#223).
 - Team actions on the phone (join, invite, request, file) no longer need the app lock turned on.
 - Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
+- Settings → Appearance gains Text size: a slider from 11 to 22 pt that scales every session-screen font, 16 pt being the reference.
 
 ## 0.4.4-alpha.2
 

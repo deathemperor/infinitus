@@ -234,6 +234,18 @@ final class MirrorModel: ObservableObject, FleetModel {
     @Published var macPopupView: Bool { didSet { defaults.set(macPopupView, forKey: "mac_popup_view") } }
     /// The T3 client clone's screens (#223 §5) in place of the phone's own; off until they are whole.
     @Published var t3Screens: Bool { didSet { defaults.set(t3Screens, forKey: "t3_screens") } }
+    /// Appearance → Text size (upstream `TextAppearanceSection`): the base
+    /// point size, 11…22 over T3's 16, applied to every T3 mobile font.
+    @Published var t3TextSize: Int {
+        didSet {
+            let clamped = Self.clampTextSize(t3TextSize)
+            if clamped != t3TextSize { t3TextSize = clamped; return }
+            defaults.set(t3TextSize, forKey: "t3_text_size")
+            T3Font.mobileScale = Double(t3TextSize) / Double(Self.defaultTextSize)
+        }
+    }
+    static let defaultTextSize = 16, minTextSize = 11, maxTextSize = 22
+    static func clampTextSize(_ n: Int) -> Int { min(maxTextSize, max(minTextSize, n)) }
 
     // MARK: LAN transport (#9)
 
@@ -283,6 +295,8 @@ final class MirrorModel: ObservableObject, FleetModel {
         // (spec §5.4: removal follows once the flag defaults on); the
         // toggle keeps the grouped list and feed reachable until then.
         t3Screens = defaults.object(forKey: "t3_screens") as? Bool ?? true
+        t3TextSize = Self.clampTextSize(defaults.object(forKey: "t3_text_size") as? Int ?? Self.defaultTextSize)
+        T3Font.mobileScale = Double(t3TextSize) / Double(Self.defaultTextSize)
         reachableAgain = { Task { await OutboxDelivery.flush() } }
         otherReachable = { id in
             Task {
