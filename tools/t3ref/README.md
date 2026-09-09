@@ -20,6 +20,7 @@ Reference versions (spec §0):
 |---|---|
 | `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. |
 | `fixture.sh` | A fake `CLAUDE_CONFIG_DIR` holding the parity fixture, plus the debug app on it. `fixture.sh --stop` tears it down. |
+| `winmove.swift` | `winmove <window-id> <x> <y>` moves that window's top-left corner to a CG point through its own process's accessibility tree (`capture-ours.sh` runs it when `T3REF_WINDOW_ORIGIN="x y"` is set). Not System Events: `process whose unix id is N` resolves by name there, and with two Infinitus processes it moves the other one's window. |
 | `winlist.swift` | `winlist <owner-substring> [title-substring\|WxH]` → `id width height` of that app's first matching normal-layer window. The filter picks the workspace out of an Infinitus that also has the pop-out open; `WxH` matches the bounds exactly (`kCGWindowName` is empty without Screen Recording permission). |
 | `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
 | `capture-ios.sh` | `capture-ios.sh <screen> <out.png>` — deep-links the T3 dev client in the booted simulator and screenshots it. |
@@ -220,10 +221,18 @@ the same frame:
 ```
 $ defaults write Infinitus "NSWindow Frame Workspace" "96 55 1378 823 0 0 1800 1169"
 $ T3FIX_MAC_REF=1 tools/t3ref/fixture.sh && sleep 12
-$ INFINITUS_CONTROL_SOCKET=/tmp/t3fix.sock tools/t3ref/capture-ours.sh mac composer /tmp/ours.png
+$ T3REF_WINDOW_ORIGIN="1900 1500" INFINITUS_CONTROL_SOCKET=/tmp/t3fix.sock \
+    tools/t3ref/capture-ours.sh mac composer /tmp/ours.png
 $ python3 tools/t3ref/compare.py tools/t3ref/refs/mac-thread.png /tmp/ours.png --out /tmp/diff.png
 $ tools/t3ref/fixture.sh --stop; rm -f /tmp/t3fix.sock
 ```
+
+The frame preset alone lands the window on the MAIN display (the controller
+clamps a restored frame onto `NSScreen.main`), so when the 2× panel is a
+secondary display `T3REF_WINDOW_ORIGIN` drags it there — the point is the
+panel's CG origin plus a margin (`/tmp/screens` prints the Cocoa frames; a
+panel at Cocoa y −1169 sits at CG y 1440 below a 1440-pt main display). Verify
+with `sips -g pixelWidth`: 2756, not 1378.
 
 | screen | over ΔE 6 (≤ 1.5 % passes) | max ΔE |
 |---|---|---|
