@@ -24,6 +24,9 @@ case "$screen" in
     ;;
   *) echo "unknown screen $screen" >&2; exit 2 ;;
 esac
-sleep 1
+# `open` returns as soon as the URL is handed over; the window still has to
+# route, load the thread and settle its animations. 1 s caught half-drawn
+# frames, so the settle is 3.
+sleep 3
 screencapture -x -o -l"$id" "$out"
 echo "window $id ${w}x${h} pt → $out ($(sips -g pixelWidth -g pixelHeight "$out" | awk '/pixel/{printf "%s ", $2}'))"

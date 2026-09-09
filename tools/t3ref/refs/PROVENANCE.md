@@ -107,5 +107,17 @@ are abbreviated and carry no username. `ios-files.png`, `ios-git.png` and
   tools/t3ref/capture-mac.sh thread tools/t3ref/refs/mac-thread.png
   ```
 
+  **B parity — 2026-09-09:** Mac numbers pending the reference captures
+  (`refs/mac-*.png` absent; fixture thread to be recreated in T3 Code).
+  Sub-project B's own side is ready — `capture-ours.sh mac <screen>`
+  drives the workspace over `infinitusctl show workspace` — so the run is
+  one capture session away, not one feature.
+
+- **`ios-thread.png` not re-captured 2026-09-09: Metro down.** The
+  `sleep 9` settle in `capture-ios.sh` was meant to be proved by re-shooting
+  this frame, but nothing is listening on :8081 and starting Metro spends a
+  device setup that is not this task's to spend. The committed file is
+  still the 2026-09-08 08:04 hand capture described above.
+
 - **`components/`** — the per-component crops spec §3.7 wants for the
   snapshot tests are cut from these captures when the components land.

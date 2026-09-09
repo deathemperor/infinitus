@@ -37,6 +37,9 @@ case "$screen" in
   *) echo "unknown screen $screen" >&2; exit 2 ;;
 esac
 xcrun simctl openurl booted "t3code-dev://$route"
-sleep 6
+# 3 s of settle for the route transition on top of the 6 s warm-app render
+# wait: `openurl` returns before the navigation starts, so the render wait
+# on its own could time the shot on the outgoing screen.
+sleep 9
 xcrun simctl io booted screenshot "$out" >/dev/null
 echo "→ $out"
