@@ -65,6 +65,11 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(Stats.dayKey(t, calendar: cal), "2026-09-04")
         XCTAssertEqual(Stats.hourSlot(t, calendar: cal), 4 * 24 + 0)   // Mon=0 … Fri=4
         XCTAssertEqual(Stats.date(fromDayKey: "2026-09-04", calendar: cal), date("2026-09-03T17:00:00Z"))
+        // A Buddhist-calendar Mac keys the same day the same way (#409).
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = cal.timeZone
+        XCTAssertEqual(Stats.dayKey(t, calendar: buddhist), "2026-09-04")
+        XCTAssertEqual(Stats.date(fromDayKey: "2026-09-04", calendar: buddhist), date("2026-09-03T17:00:00Z"))
     }
 
     func testFoldWeekSumsCurrentWeekAndPreviousAndStreak() {
