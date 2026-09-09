@@ -269,7 +269,13 @@ follow-ups, or attach images", which `ChatComposer.tsx:5432-5450` reaches only
 through `phase === "disconnected"`: the reference's thread was recreated by
 hand and never ran, while the fixture's session is `idle`, i.e. `ready`
 (`T3ComposerPlaceholder` ports the whole ladder). Future Mac references should
-be captured with the pointer off the content.
+be captured with the pointer off the content. Deliberate drift since the
+measurement, unmeasured: B-12's port of upstream 11601da84 runs an attached
+drawer's surface one point past its seam with the composer, which hides that
+surface's bottom border on the composer screen and makes its square bottom
+corners overhang the composer's rounded top by one point more (this port has
+never applied upstream's 22 pt `--chat-composer-drawer-inset` to the drawers,
+which is what keeps those corners covered upstream).
 
 **B-8 (inline code).** `.chat-markdown :not(pre) > code` (index.css:1792-1799)
 is ported: `--muted` behind a 12 pt mono run in full `foreground`, grown by a
