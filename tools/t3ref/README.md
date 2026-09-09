@@ -291,6 +291,13 @@ capture is the first taken with the harness fix (#442): before it,
 `capture-ours.sh mac` shot whichever Infinitus window the window server listed
 first, which with the pop-out open is not the workspace.
 
+**B-11** (the four upstream one-liners 577b6cc22 / 5ec6f77ec / 72d94087b /
+12f560444, acc0a219e → v0.0.40) changed no code — sidebar spacing already
+matched (card top y=138 at 1×, 276 at 2×), the other three have no B
+counterpart — so the same 1× proxy as B-8/B-9 (`refs/mac-thread.png`
+downscaled to 1378×823, PIL LANCZOS) reads **0.77 %** (max ΔE 108.5),
+unchanged.
+
 ### C parity — 2026-09-09
 
 From `compare-harness.sh` on the render harness's `parity-*` shots at
