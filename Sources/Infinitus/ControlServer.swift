@@ -447,11 +447,17 @@ final class ControlServer {
         case "aws-logins":
             return ControlReply(ok: true, result: try .of(["logins": model.awsLogins]))
 
-        case "aws-login":
-            guard let profile = r.args.first, !profile.isEmpty else { throw Fail("usage: aws-login <profile> [--pid n] [--local] [--remote] [--status]") }
+        case "aws-login", "gcloud-login":
+            // #367: the same login machinery for both CLIs; gcloud's
+            // <profile> is an account, "default" for the active one, or
+            // "application-default" for the library credentials.
+            let provider: AwsLogin.Provider = r.command == "gcloud-login" ? .gcloud : .aws
+            guard let profile = r.args.first, !profile.isEmpty else {
+                throw Fail("usage: \(r.command) <\(provider == .aws ? "profile" : "account|application-default")> [--pid n] [--local] [--remote] [--status]")
+            }
             let pid = r.options["pid"].flatMap(Int.init)
             // --status: the phone's flag-less poll — report, start nothing.
-            let reply = await model.startAwsLogin(profile: profile, pid: pid, local: r.options["local"] == "true",
+            let reply = await model.startAwsLogin(provider: provider, profile: profile, pid: pid, local: r.options["local"] == "true",
                                                   remote: r.options["status"] == "true" ? nil : r.options["remote"] == "true")
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "could not start") }
             return ControlReply(ok: true, result: try .of(["state": state]))
@@ -464,11 +470,12 @@ final class ControlServer {
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "not accepted") }
             return ControlReply(ok: true, result: try .of(["state": state]))
 
-        case "aws-login-code":
+        case "aws-login-code", "gcloud-login-code":
             guard let profile = r.args.first, let code = r.secret, !code.isEmpty else {
-                throw Fail("usage: aws-login-code <profile>  (code on stdin)")
+                throw Fail("usage: \(r.command) <profile>  (code on stdin)")
             }
-            let reply = await model.submitAwsLoginCode(profile: profile, code: code)
+            let reply = await model.submitAwsLoginCode(provider: r.command == "gcloud-login-code" ? .gcloud : .aws,
+                                                       profile: profile, code: code)
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "not accepted") }
             return ControlReply(ok: true, result: try .of(["state": state]))
 

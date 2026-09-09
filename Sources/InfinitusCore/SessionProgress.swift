@@ -70,12 +70,18 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// When that failing tool result was recorded — a login for the
     /// profile started after it clears the need.
     public let awsLoginFailedAt: Date?
+    /// The gcloud credential whose sign-in lapsed (#367): an account,
+    /// "default" for the CLI's active one, or `GcloudLogin.adcProfile`.
+    /// Same rules as the AWS pair. New optional field.
+    public let gcloudLoginProfile: String?
+    public let gcloudLoginFailedAt: Date?
 
     public init(lastActivityAt: Date? = nil, nowDoing: String? = nil, todos: Todos? = nil,
                 title: String? = nil, goal: String? = nil, phase: String? = nil,
                 name: String? = nil, gitBranch: String? = nil, model: String? = nil,
                 outputTokens: Int = 0, recentOutputTokens: Int? = nil, retrying: Bool = false,
-                awsLoginProfile: String? = nil, awsLoginFailedAt: Date? = nil) {
+                awsLoginProfile: String? = nil, awsLoginFailedAt: Date? = nil,
+                gcloudLoginProfile: String? = nil, gcloudLoginFailedAt: Date? = nil) {
         self.lastActivityAt = lastActivityAt
         self.nowDoing = nowDoing
         self.todos = todos
@@ -90,6 +96,16 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         self.retrying = retrying
         self.awsLoginProfile = awsLoginProfile
         self.awsLoginFailedAt = awsLoginFailedAt
+        self.gcloudLoginProfile = gcloudLoginProfile
+        self.gcloudLoginFailedAt = gcloudLoginFailedAt
+    }
+
+    /// The need for one provider (#367): the pair above it stands for.
+    public func loginProfile(_ provider: AwsLogin.Provider) -> String? {
+        provider == .aws ? awsLoginProfile : gcloudLoginProfile
+    }
+    public func loginFailedAt(_ provider: AwsLogin.Provider) -> Date? {
+        provider == .aws ? awsLoginFailedAt : gcloudLoginFailedAt
     }
 
     /// Parses a tail of JSONL lines (oldest→newest). Tolerant of a torn
@@ -182,13 +198,15 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         }
 
         let awsNeed = awsLoginNeed(entries: entries)
+        let gcloudNeed = gcloudLoginNeed(entries: entries)
 
         return SessionProgress(lastActivityAt: lastActivityAt, nowDoing: nowDoing, todos: todos,
                                 title: title, goal: goal(lines: lines), phase: phase(entries: entries),
                                 gitBranch: gitBranch, model: model,
                                 outputTokens: outputTokens, recentOutputTokens: recentOutputTokens,
                                 retrying: retrying, awsLoginProfile: awsNeed?.profile,
-                                awsLoginFailedAt: awsNeed?.failedAt)
+                                awsLoginFailedAt: awsNeed?.failedAt,
+                                gcloudLoginProfile: gcloudNeed?.profile, gcloudLoginFailedAt: gcloudNeed?.failedAt)
     }
 
     /// The AWS profile whose sign-in lapsed, off the newest tool results
@@ -201,6 +219,17 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     /// signal. When the error names no profile, the failed command's own
     /// --profile / AWS_PROFILE does (found by tool_use_id).
     static func awsLoginNeed(entries: [[String: Any]]) -> (profile: String, failedAt: Date?)? {
+        loginNeed(entries: entries, profile: AwsLogin.profile(in:), fromCommand: AwsLogin.profile(inCommand:))
+    }
+
+    /// The same scan for gcloud (#367): `GcloudLogin.profile(in:)` names
+    /// the ADC or "default", the failed command's `--account` the rest.
+    static func gcloudLoginNeed(entries: [[String: Any]]) -> (profile: String, failedAt: Date?)? {
+        loginNeed(entries: entries, profile: GcloudLogin.profile(in:), fromCommand: GcloudLogin.profile(inCommand:))
+    }
+
+    static func loginNeed(entries: [[String: Any]], profile detect: (String) -> String?,
+                          fromCommand: (String) -> String?) -> (profile: String, failedAt: Date?)? {
         // Tool calls only: attachments, hook summaries, turn stats and
         // thinking/text turns pad a transcript by ~8 lines per call, so
         // a raw-line window lost the failed call as soon as the session
@@ -231,10 +260,10 @@ public struct SessionProgress: Sendable, Equatable, Codable {
                 } else if let parts = block["content"] as? [[String: Any]] {
                     text = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
                 } else { continue }
-                guard let profile = AwsLogin.profile(in: text) else { continue }
+                guard let profile = detect(text) else { continue }
                 let failedAt = (entry["timestamp"] as? String).flatMap(UsageHistory.parseISO)
                 if profile == "default", let id = block["tool_use_id"] as? String,
-                   let cmd = command(forToolUse: id), let named = AwsLogin.profile(inCommand: cmd) {
+                   let cmd = command(forToolUse: id), let named = fromCommand(cmd) {
                     return (named, failedAt)
                 }
                 return (profile, failedAt)
@@ -252,18 +281,27 @@ public struct SessionProgress: Sendable, Equatable, Codable {
     static let subagentAwsLoginWindow: TimeInterval = 30 * 60
     static func subagentAwsLoginNeed(transcript: URL, now: Date = Date(),
                                      window: TimeInterval = subagentAwsLoginWindow) -> (profile: String, failedAt: Date?)? {
+        subagentLoginNeeds(transcript: transcript, now: now, window: window).aws
+    }
+
+    /// One walk of the agent files for both providers (#367): each tail
+    /// is read once and fed to both detectors.
+    static func subagentLoginNeeds(transcript: URL, now: Date = Date(), window: TimeInterval = subagentAwsLoginWindow)
+        -> (aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?) {
         let subagentsDir = transcript.deletingPathExtension().appendingPathComponent("subagents")
-        var newest: (profile: String, failedAt: Date?)?
+        var aws: (profile: String, failedAt: Date?)?, gcloud: (profile: String, failedAt: Date?)?
+        func newer(_ need: (profile: String, failedAt: Date?), than current: (profile: String, failedAt: Date?)?) -> Bool {
+            current == nil || (need.failedAt ?? .distantPast) > (current?.failedAt ?? .distantPast)
+        }
         for file in Transcript.agentFiles(under: subagentsDir) {
             guard let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))
                 .flatMap(\.contentModificationDate), now.timeIntervalSince(mtime) <= window else { continue }
-            guard let lines = tailLines(of: file, maxBytes: 128 * 1024),
-                  let need = awsLoginNeed(entries: jsonEntries(lines)) else { continue }
-            if newest == nil || (need.failedAt ?? .distantPast) > (newest?.failedAt ?? .distantPast) {
-                newest = need
-            }
+            guard let lines = tailLines(of: file, maxBytes: 128 * 1024) else { continue }
+            let entries = jsonEntries(lines)
+            if let need = awsLoginNeed(entries: entries), newer(need, than: aws) { aws = need }
+            if let need = gcloudLoginNeed(entries: entries), newer(need, than: gcloud) { gcloud = need }
         }
-        return newest
+        return (aws, gcloud)
     }
 
     static func jsonEntries(_ lines: [String]) -> [[String: Any]] {
@@ -414,15 +452,23 @@ public struct SessionProgress: Sendable, Equatable, Codable {
         let progress = parse(lines: tailLines(of: url, maxBytes: maxBytes) ?? [])
         // The session's own tail wins; a sub-agent's lapsed sign-in (#149)
         // fills in only when the parent shows none.
-        let aws = progress.awsLoginProfile.map { ($0, progress.awsLoginFailedAt) }
-            ?? subagentAwsLoginNeed(transcript: url)
+        // One agent-file walk, only when the parent's tail leaves a
+        // provider unanswered (the common case is no need at all).
+        var aws: (profile: String, failedAt: Date?)? = progress.awsLoginProfile.map { ($0, progress.awsLoginFailedAt) }
+        var gcloud: (profile: String, failedAt: Date?)? = progress.gcloudLoginProfile.map { ($0, progress.gcloudLoginFailedAt) }
+        if aws == nil || gcloud == nil {
+            let sub = subagentLoginNeeds(transcript: url)
+            if aws == nil { aws = sub.aws }
+            if gcloud == nil { gcloud = sub.gcloud }
+        }
         return SessionProgress(lastActivityAt: progress.lastActivityAt, nowDoing: progress.nowDoing,
                                todos: progress.todos, title: progress.title,
                                goal: headGoal ?? progress.goal, phase: progress.phase, name: name,
                                gitBranch: progress.gitBranch, model: progress.model,
                                outputTokens: progress.outputTokens,
                                recentOutputTokens: progress.recentOutputTokens, retrying: progress.retrying,
-                               awsLoginProfile: aws?.0, awsLoginFailedAt: aws?.1)
+                               awsLoginProfile: aws?.0, awsLoginFailedAt: aws?.1,
+                               gcloudLoginProfile: gcloud?.0, gcloudLoginFailedAt: gcloud?.1)
     }
 
     /// Reads only the FIRST `maxBytes` of the transcript — the goal lives at
@@ -496,11 +542,13 @@ public struct SessionPanelRow: Sendable, Equatable, Codable {
     /// Mac popup's key badge; the tray's "needs AWS login" line). New
     /// optional field.
     public let awsLoginProfile: String?
+    /// The gcloud credential that lapsed under this session (#367). New optional field.
+    public let gcloudLoginProfile: String?
 
     public init(repo: String, status: String, nowDoing: String? = nil, todosDone: Int? = nil,
                 todosTotal: Int? = nil, activeForm: String? = nil, retrying: Bool = false,
                 quietMinutes: Int? = nil, goal: String? = nil, phase: String? = nil,
-                awsLoginProfile: String? = nil) {
+                awsLoginProfile: String? = nil, gcloudLoginProfile: String? = nil) {
         self.repo = repo
         self.status = status
         self.nowDoing = nowDoing
@@ -512,6 +560,7 @@ public struct SessionPanelRow: Sendable, Equatable, Codable {
         self.goal = goal
         self.phase = phase
         self.awsLoginProfile = awsLoginProfile
+        self.gcloudLoginProfile = gcloudLoginProfile
     }
 
     /// `repo` is the last path component of the record's cwd. `quietMinutes`
@@ -534,7 +583,8 @@ public struct SessionPanelRow: Sendable, Equatable, Codable {
             quietMinutes: quietMinutes,
             goal: progress.goal,
             phase: progress.phase,
-            awsLoginProfile: progress.awsLoginProfile)
+            awsLoginProfile: progress.awsLoginProfile,
+            gcloudLoginProfile: progress.gcloudLoginProfile)
     }
 }
 

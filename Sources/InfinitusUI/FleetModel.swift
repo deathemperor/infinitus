@@ -78,6 +78,8 @@ public protocol FleetModel: ObservableObject {
     /// line offers this host's own browser flow.
     var awsLogins: [AwsLogin.Item] { get }
     func startAwsLogin(profile: String, pid: Int?, local: Bool)
+    /// The same for any provider (#367); the default keeps aws-only conformers as they are.
+    func startLogin(provider: AwsLogin.Provider, profile: String, pid: Int?, local: Bool)
     /// Open the full forecast (the Mac's Utilization pane, the phone's
     /// Outlook screen) — the "at this pace" line is a link to it.
     func openForecast()
@@ -151,6 +153,9 @@ public extension FleetModel {
     var forecast: UsageForecast? { nil }
     var awsLogins: [AwsLogin.Item] { [] }
     func startAwsLogin(profile: String, pid: Int?, local: Bool) {}
+    func startLogin(provider: AwsLogin.Provider, profile: String, pid: Int?, local: Bool) {
+        startAwsLogin(profile: profile, pid: pid, local: local)
+    }
     func openForecast() {}
     func ignite(_ number: Int) {}
     func addAccount() {}

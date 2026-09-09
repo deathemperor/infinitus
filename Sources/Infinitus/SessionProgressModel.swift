@@ -125,8 +125,10 @@ final class SessionProgressModel: SessionProgressSource {
     }
 
     private static func awsNeeds(_ byPid: [Int: SessionProgress]) -> Set<String> {
-        Set(byPid.compactMap { pid, p in
-            p.awsLoginProfile.map { "\(pid)|\($0)|\(p.awsLoginFailedAt?.timeIntervalSince1970 ?? 0)" } })
+        Set(byPid.flatMap { pid, p in [
+            p.awsLoginProfile.map { "\(pid)|\($0)|\(p.awsLoginFailedAt?.timeIntervalSince1970 ?? 0)" },
+            p.gcloudLoginProfile.map { "\(pid)|gcloud:\($0)|\(p.gcloudLoginFailedAt?.timeIntervalSince1970 ?? 0)" },
+        ].compactMap { $0 } })
     }
 
     /// Watches follow the matched set: a session that left drops its

@@ -1595,12 +1595,16 @@ final class AppModel: ObservableObject {
         mirrorServer.awsLogin.set(
             start: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                return await self.startAwsLogin(profile: request.profile, pid: request.pid,
+                let items = await MainActor.run { self.awsLogins }
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: request.pid, items: items)
+                return await self.startAwsLogin(provider: provider, profile: request.profile, pid: request.pid,
                                                 local: request.local ?? false, remote: request.remote)
             },
             code: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                return await self.submitAwsLoginCode(profile: request.profile, code: request.code)
+                let items = await MainActor.run { self.awsLogins }
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: nil, items: items)
+                return await self.submitAwsLoginCode(provider: provider, profile: request.profile, code: request.code)
             },
             callback: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
@@ -1760,35 +1764,41 @@ final class AppModel: ObservableObject {
     /// needs any more is dropped so the line clears itself.
     private func rebuildAwsLogins() {
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
-        let byProfile = Dictionary(awsLoginStates.map { ($0.profile, $0) }, uniquingKeysWith: { a, _ in a })
+        let byKey = Dictionary(awsLoginStates.map { ($0.runKey, $0) }, uniquingKeysWith: { a, _ in a })
         var items: [AwsLogin.Item] = []
         var needed = Set<String>()
         for (pid, progress) in sessionProgress.byPid.sorted(by: { $0.key < $1.key }) {
-            guard let profile = progress.awsLoginProfile else { continue }
-            // Signed in since the failure: the failing result stays in the
-            // transcript's window until the session moves on, but the
-            // need is met (the key badge outlived the login, 2026-09-03).
-            if let done = byProfile[profile], done.phase == .done,
-               let failedAt = progress.awsLoginFailedAt,
-               failedAt.timeIntervalSince1970 < done.startedAt { continue }
-            needed.insert(profile)
-            let label = progress.name ?? liveSessions?.sessions?.first { $0.pid == pid }
-                .map { URL(fileURLWithPath: $0.cwd).lastPathComponent }
-            items.append(AwsLogin.Item(profile: profile,
-                                       flow: AwsLogin.flow(profile: profile, configText: configText),
-                                       pid: pid, sessionLabel: label,
-                                       state: AwsLogin.current(byProfile[profile], needFailedAt: progress.awsLoginFailedAt),
-                                       failedAt: progress.awsLoginFailedAt,
-                                       account: AwsLogin.account(profile: profile, configText: configText)))
+            // Both CLIs can lapse under one session (#367); each need is its own item.
+            for provider in AwsLogin.Provider.allCases {
+                guard let profile = progress.loginProfile(provider) else { continue }
+                let failedAt = progress.loginFailedAt(provider)
+                let key = AwsLogin.runKey(provider: provider, profile: profile)
+                // Signed in since the failure: the failing result stays in the
+                // transcript's window until the session moves on, but the
+                // need is met (the key badge outlived the login, 2026-09-03).
+                if let done = byKey[key], done.phase == .done,
+                   let failedAt, failedAt.timeIntervalSince1970 < done.startedAt { continue }
+                needed.insert(key)
+                let label = progress.name ?? liveSessions?.sessions?.first { $0.pid == pid }
+                    .map { URL(fileURLWithPath: $0.cwd).lastPathComponent }
+                items.append(AwsLogin.Item(profile: profile,
+                                           flow: provider.flow(profile: profile, configText: configText),
+                                           pid: pid, sessionLabel: label,
+                                           state: AwsLogin.current(byKey[key], needFailedAt: failedAt),
+                                           failedAt: failedAt,
+                                           account: provider == .aws ? AwsLogin.account(profile: profile, configText: configText) : nil,
+                                           provider: provider == .aws ? nil : provider))
+            }
         }
         // Logins started by hand (no session asked) still show while they
         // run or after they fail; one a session asked for belongs with
         // that session's need and goes when the need does.
-        for state in awsLoginStates where !needed.contains(state.profile) && state.phase != .done
+        for state in awsLoginStates where !needed.contains(state.runKey) && state.phase != .done
             && state.pid == nil {
             items.append(AwsLogin.Item(profile: state.profile, flow: state.flow, pid: state.pid,
                                        sessionLabel: nil, state: state,
-                                       account: AwsLogin.account(profile: state.profile, configText: configText)))
+                                       account: state.providerOrAws == .aws ? AwsLogin.account(profile: state.profile, configText: configText) : nil,
+                                       provider: state.provider))
         }
         // A need that just appeared goes out now: the mirror snapshot and
         // the phone's alert ride the fleet poll, up to a minute away. The
@@ -1815,8 +1825,9 @@ final class AppModel: ObservableObject {
     /// session need shows unmet, the CLI is asked whether the profile
     /// works: on the need's arrival and every `awsProbeInterval` after.
     /// No nudge on a hit — the session may have moved on hours ago.
-    private var unmetAwsNeeds: Set<String> {
-        Set(awsLogins.filter { $0.pid != nil && ($0.state == nil || $0.state?.phase == .failed) }.map(\.profile))
+    private var unmetAwsNeeds: [AwsLogin.Item] {
+        var seen = Set<String>()
+        return awsLogins.filter { $0.pid != nil && ($0.state == nil || $0.state?.phase == .failed) && seen.insert($0.runKey).inserted }
     }
     private func probeAwsNeeds() {
         if unmetAwsNeeds.isEmpty { awsProbeTask?.cancel(); awsProbeTask = nil; return }
@@ -1824,10 +1835,11 @@ final class AppModel: ObservableObject {
         awsProbeTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                for profile in self.unmetAwsNeeds {
-                    guard await AwsLoginRunner.signedIn(profile: profile), !Task.isCancelled else { continue }
-                    await self.awsLoginRunner.markDone(profile: profile, via: "a sign-in outside the app")
-                    self.logMirrorInput("🔐", "aws login for \(profile) done outside the app")
+                for item in self.unmetAwsNeeds {
+                    let provider = item.providerOrAws, profile = item.profile
+                    guard await AwsLoginRunner.signedIn(provider: provider, profile: profile), !Task.isCancelled else { continue }
+                    await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: "a sign-in outside the app")
+                    self.logMirrorInput("🔐", "\(provider.cliName) login for \(profile) done outside the app")
                 }
                 try? await Task.sleep(for: .seconds(Self.awsProbeInterval))
             }
@@ -1840,58 +1852,64 @@ final class AppModel: ObservableObject {
     /// re-opened the sign-in the moment the code flow finished
     /// (2026-09-03). false = the profile's default flow, true = the code
     /// flow; either replaces a run of the other kind.
-    func startAwsLogin(profile: String, pid: Int?, local: Bool, remote: Bool? = nil) async -> AwsLogin.Reply {
-        // The e2e gate runs in mock mode against a stub CLI (INFINITUS_AWS_CLI).
-        guard !isPlayground, !mockMode || ProcessInfo.processInfo.environment["INFINITUS_AWS_CLI"] != nil
+    func startAwsLogin(provider: AwsLogin.Provider = .aws, profile: String, pid: Int?, local: Bool, remote: Bool? = nil) async -> AwsLogin.Reply {
+        // The e2e gate runs in mock mode against a stub CLI (INFINITUS_AWS_CLI / INFINITUS_GCLOUD_CLI).
+        guard !isPlayground, !mockMode || ProcessInfo.processInfo.environment[provider.cliOverrideEnv] != nil
         else { return AwsLogin.Reply(ok: false, error: "not in a demo instance") }
         if !local, remote == nil {
             // Against the profile's need, when a session has one: a login
             // finished before that need failed isn't this need's login.
-            let need = awsLogins.first { $0.profile == profile && $0.pid != nil }
-            let state = AwsLogin.current(await awsLoginRunner.state(profile: profile), needFailedAt: need?.failedAt)
+            let need = awsLogins.first { $0.providerOrAws == provider && $0.profile == profile && $0.pid != nil }
+            let state = AwsLogin.current(await awsLoginRunner.state(provider: provider, profile: profile), needFailedAt: need?.failedAt)
             return AwsLogin.Reply(ok: state != nil, state: state, error: state == nil ? "no login in flight for \(profile)" : nil)
         }
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
-        var flow: AwsLogin.Flow = local ? .local : AwsLogin.flow(profile: profile, configText: configText)
+        var flow: AwsLogin.Flow = local ? .local : provider.flow(profile: profile, configText: configText)
         if remote == true, flow == .relay { flow = .remote }
-        let reply = await awsLoginRunner.start(profile: profile, flow: flow, pid: pid)
+        let reply = await awsLoginRunner.start(provider: provider, profile: profile, flow: flow, pid: pid)
         logMirrorInput(reply.ok ? "🔐" : "⚠️",
-                       reply.ok ? "aws login started for \(profile) (\(flow.rawValue))"
-                                : "aws login for \(profile): \(reply.error ?? "failed")")
+                       reply.ok ? "\(provider.cliName) login started for \(profile) (\(flow.rawValue))"
+                                : "\(provider.cliName) login for \(profile): \(reply.error ?? "failed")")
         return reply
     }
 
-    /// FleetModel's fire-and-forget form (the popup button).
+    /// FleetModel's fire-and-forget forms (the popup button).
     func startAwsLogin(profile: String, pid: Int?, local: Bool) {
-        Task { _ = await startAwsLogin(profile: profile, pid: pid, local: local) }
+        startLogin(provider: .aws, profile: profile, pid: pid, local: local)
     }
 
-    func submitAwsLoginCode(profile: String, code: String) async -> AwsLogin.Reply {
-        await awsLoginRunner.submit(profile: profile, code: code)
+    func startLogin(provider: AwsLogin.Provider, profile: String, pid: Int?, local: Bool) {
+        Task { _ = await startAwsLogin(provider: provider, profile: profile, pid: pid, local: local) }
+    }
+
+    func submitAwsLoginCode(provider: AwsLogin.Provider = .aws, profile: String, code: String) async -> AwsLogin.Reply {
+        await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }
 
     /// The login landed: tell the session that needed it to carry on —
     /// the phone's own message path, so it works wherever replies do.
     private func awsLoginLanded(_ state: AwsLogin.State) {
-        logMirrorInput("🔐", "aws login for \(state.profile) signed in")
+        let provider = state.providerOrAws
+        logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) signed in")
         let fromPhone = state.flow != .local
         // Every session that needed this profile, not only the one the
         // login was started for (two sessions, one sign-in, 2026-09-04).
-        var pids = Set(sessionProgress.byPid.filter { $0.value.awsLoginProfile == state.profile }.map(\.key))
+        var pids = Set(sessionProgress.byPid.filter { $0.value.loginProfile(provider) == state.profile }.map(\.key))
         if let pid = state.pid { pids.insert(pid) }
-        for pid in pids { nudgeAfterAwsLogin(pid: pid, profile: state.profile, fromPhone: fromPhone) }
+        for pid in pids { nudgeAfterAwsLogin(pid: pid, provider: provider, profile: state.profile, fromPhone: fromPhone) }
         // A login often signs other profiles in underneath — a broker
         // profile over its anchor `aws login` profile, an SSO session
-        // several profiles share — and the config can't say which. Ask
-        // the CLI: whichever other outstanding profile works now is met.
-        let others = Set(sessionProgress.byPid.values.compactMap(\.awsLoginProfile)).subtracting([state.profile])
+        // several profiles share, gcloud's active account under a named
+        // one — and the config can't say which. Ask the CLI: whichever
+        // other outstanding profile works now is met.
+        let others = Set(sessionProgress.byPid.values.compactMap { $0.loginProfile(provider) }).subtracting([state.profile])
         for profile in others {
             Task { [weak self] in
-                guard await AwsLoginRunner.signedIn(profile: profile), let self else { return }
-                await self.awsLoginRunner.markDone(profile: profile, via: state.profile)
-                self.logMirrorInput("🔐", "aws login for \(state.profile) also signed \(profile) in")
-                for (pid, progress) in self.sessionProgress.byPid where progress.awsLoginProfile == profile {
-                    self.nudgeAfterAwsLogin(pid: pid, profile: profile, fromPhone: fromPhone)
+                guard await AwsLoginRunner.signedIn(provider: provider, profile: profile), let self else { return }
+                await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: state.profile)
+                self.logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) also signed \(profile) in")
+                for (pid, progress) in self.sessionProgress.byPid where progress.loginProfile(provider) == profile {
+                    self.nudgeAfterAwsLogin(pid: pid, provider: provider, profile: profile, fromPhone: fromPhone)
                 }
             }
         }
@@ -1951,7 +1969,7 @@ final class AppModel: ObservableObject {
         s.fleetRows = lastFleets.enumerated().map { i, fleet in
             TeamDocs.FleetDoc.row(fleet, tokensPerMinute: i == 0 ? rate : nil)
         }
-        s.blockers = awsLogins.map { "AWS login: \($0.profile)" }
+        s.blockers = awsLogins.map { "\($0.providerOrAws.loginLabel): \($0.profile)" }
             + lastFleets.filter { !$0.accounts.isEmpty && $0.activeNumber == nil && $0.nextCandidate == nil }
                 .map { "\($0.engineID): every account limited" }
         return s
@@ -2009,12 +2027,13 @@ final class AppModel: ObservableObject {
         return reply
     }
 
-    private func nudgeAfterAwsLogin(pid: Int, profile: String, fromPhone: Bool) {
+    private func nudgeAfterAwsLogin(pid: Int, provider: AwsLogin.Provider = .aws, profile: String, fromPhone: Bool) {
         Task.detached(priority: .utility) { [weak self] in
             // The session's own stuck `aws login` first (#275), so the
-            // nudge drains now instead of after its tool timeout.
-            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
-            let text = AwsLogin.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
+            // nudge drains now instead of after its tool timeout. gcloud's
+            // paste-back login has no callback to poke.
+            let released = provider == .aws ? await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid) : 0
+            let text = provider.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
             let request = SessionInput.Request(kind: .message, text: text)
             let claudeDir = ClaudeSessions.configHome()
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else { return }
@@ -2023,7 +2042,7 @@ final class AppModel: ObservableObject {
             await MainActor.run { [weak self] in
                 if released > 0 { self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released") }
                 self?.logMirrorInput(reply.outcome == "delivered" ? "📲" : "⚠️",
-                                     "session \(pid) nudged after aws login: \(reply.outcome)")
+                                     "session \(pid) nudged after \(provider.cliName) login: \(reply.outcome)")
             }
         }
     }

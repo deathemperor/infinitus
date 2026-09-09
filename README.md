@@ -122,7 +122,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Allow for this session** — the phone's permission card can allow a tool for the rest of the session; with the plugin, that prompt never comes back.
 - **Start a session from the phone** — a repository, the engine, a first prompt; the Mac opens cmux or Terminal and the chat follows. Siri too.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
-- **AWS sign-in from the phone** — an expired `aws login` shows up on both, the phone runs it with passkeys, and the session is told to continue.
+- **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
 - **Three engines** — cswap, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs.
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats** — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
@@ -161,7 +161,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **New phone screens (preview)** — Settings › Appearance › "New session screens": a flat thread list with shelves and search, a session as a chat thread with a task sheet under +, thread settings and a git pill.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the Activity log survives a relaunch.
 - **Nearby on its own** — a discoverable Mac or a team member keeps the LAN listener up without the phone switch.
-- **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS logins, stats, perf; plus an agent-setup guide.
+- **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf; plus an agent-setup guide.
 
 ## Privacy
 
