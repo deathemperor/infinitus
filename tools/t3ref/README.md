@@ -60,7 +60,9 @@ into the two activity kinds every T3 thread screen needs:
 Everything the app could otherwise reach into is redirected under
 `/tmp/t3fix`: the Claude config dir, the profiles list, the team dir and
 the engine (`tools/demo-cswap` — fabricated fleet, no credentials, no
-network). The control socket is `/tmp/t3fix.sock`, **never** the real
+network); `T3FIX_NAME=<short>` moves all of it to `/tmp/<short>*` so a second
+fixture can run beside the first (two rounds sharing one fixture stopped each
+other's app, 2026-09-10). The control socket is `/tmp/t3fix.sock`, **never** the real
 app's — running a debug instance without that would unlink the real
 socket and break `infinitusctl` and the phone until the bundle relaunches.
 `INFINITUS_MIRROR_SNAPSHOT` points `MirrorExporter` at
