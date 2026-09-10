@@ -91,9 +91,9 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     /// considered no rather than an older tray that predates the field.
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
-                         capabilities: Capabilities(timeline: true, sequence: true, attention: false, leases: false,
+                         capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: false,
                                                     ownedSessions: false, checkpoints: true, team: false,
-                                                    pastSessions: false, images: false, files: true, terminal: false,
+                                                    pastSessions: false, images: true, files: true, terminal: false,
                                                     prefs: false))
     }
 }

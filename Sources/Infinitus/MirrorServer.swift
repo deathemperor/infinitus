@@ -545,28 +545,6 @@ final class MirrorDescriptorBox: @unchecked Sendable {
     }
 }
 
-/// Wraps one POST handler in the receipt protocol (#223 phase 4): a known
-/// `commandId` replays its 200, conflicts (409), reports in-flight (409)
-/// or is gone (410); a fresh one runs `run` and caches a 200 reply. `run`
-/// returning nil is the route's 404.
-private func withReceipt(_ receipts: Receipts, commandId: String?, target: String, pid: Int32?,
-                         run: () -> Data?) -> Data {
-    guard let commandId else { return run() ?? MirrorTransport.notFoundResponse() }
-    switch receipts.begin(commandId: commandId, target: target, pid: pid) {
-    case .hit(let data): return data
-    case .conflict: return MirrorTransport.conflictResponse(Data(#"{"error":"commandId reused for another target"}"#.utf8))
-    case .inFlight: return MirrorTransport.conflictResponse(Data(#"{"error":"in-flight"}"#.utf8))
-    case .tombstoned:
-        return MirrorTransport.response(status: 410, reason: "Gone", contentType: "application/json",
-                                        body: Data(#"{"error":"tombstoned"}"#.utf8))
-    case .miss:
-        guard let data = run() else { receipts.abandon(commandId: commandId); return MirrorTransport.notFoundResponse() }
-        if data.starts(with: Data("HTTP/1.1 200".utf8)) { receipts.finish(commandId: commandId, reply: data) }
-        else { receipts.abandon(commandId: commandId) }
-        return data
-    }
-}
-
 /// Where `POST /sessions/<pid>/input` deliveries run, one at a time.
 private let mirrorInputQueue = DispatchQueue(label: "run.infinitus.mirror-input", qos: .userInitiated)
 
@@ -1385,8 +1363,8 @@ final class MirrorServer: ObservableObject {
                         // A stop tombstones this pid's receipts first: the
                         // interrupted input must not come back on a retry.
                         if decoded.kind == .key, decoded.text == "esc" { receipts.tombstone(pid: pid) }
-                        let response = withReceipt(receipts, commandId: decoded.commandId,
-                                                   target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
+                        let response = receipts.serve(commandId: decoded.commandId,
+                                                      target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
                             sessionInput.call(pid, decoded)
                                 .flatMap { try? JSONEncoder().encode($0) }
                                 .map(MirrorTransport.jsonResponse)
@@ -1409,7 +1387,7 @@ final class MirrorServer: ObservableObject {
                     DispatchQueue.global(qos: .utility).async {
                         let encoder = JSONEncoder()
                         encoder.dateEncodingStrategy = .iso8601
-                        let response = withReceipt(receipts, commandId: decoded.commandId, target: request.path, pid: pid) {
+                        let response = receipts.serve(commandId: decoded.commandId, target: request.path, pid: pid) {
                             switch attention.call(pid, decoded) {
                             case .applied(let facts)?:
                                 return (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse)
@@ -1491,7 +1469,7 @@ final class MirrorServer: ObservableObject {
                     // and not on the input queue either (a send while a
                     // start waits must not queue behind it).
                     DispatchQueue.global(qos: .userInitiated).async {
-                        let response = withReceipt(receipts, commandId: decoded.commandId, target: request.path, pid: nil) {
+                        let response = receipts.serve(commandId: decoded.commandId, target: request.path, pid: nil) {
                             sessionStart.call(decoded)
                                 .flatMap { try? JSONEncoder().encode($0) }
                                 .map(MirrorTransport.jsonResponse)
