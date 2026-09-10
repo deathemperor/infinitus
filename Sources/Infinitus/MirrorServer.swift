@@ -505,22 +505,6 @@ final class MirrorTerminalStream: @unchecked Sendable {
     }
 }
 
-/// A few seconds of `/commands` replies per cwd: a popover reopening (or
-/// two phones) doesn't rescan the trees. Core's `SlashCommands` keeps no
-/// cache of its own here by design (B-5 adds one for the Mac composer).
-final class MirrorCommandsCache: @unchecked Sendable {
-    static let ttl: TimeInterval = 5
-    private let lock = NSLock()
-    private var entries: [String: (at: Date, data: Data)] = [:]
-    func data(cwd: String, now: Date = Date(), make: () -> Data?) -> Data? {
-        lock.lock(); let hit = entries[cwd]; lock.unlock()
-        if let hit, now.timeIntervalSince(hit.at) < Self.ttl { return hit.data }
-        guard let fresh = make() else { return nil }
-        lock.lock(); entries[cwd] = (now, fresh); lock.unlock()
-        return fresh
-    }
-}
-
 /// `GET /.well-known/infinitus` (#223 phase 4): the descriptor, no token.
 final class MirrorDescriptorBox: @unchecked Sendable {
     private let lock = NSLock()
