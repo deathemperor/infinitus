@@ -2023,8 +2023,10 @@ final class AppModel: ObservableObject {
         // A headless child's lapsed sign-in comes off its stream (#402),
         // ahead of the transcript scan; the newer failure wins per
         // (session, provider). `existing`: never construct the actor here.
+        // An exited child (status nil) is published a beat before it
+        // leaves the registry; its need goes with it either way.
         if let owned = ownedBox.existing {
-            for pid in owned.ownedPids {
+            for pid in owned.ownedPids where owned.status(pid: pid) != nil {
                 for need in owned.loginNeeds(pid: pid) {
                     let pid = Int(pid)
                     if let i = needs.firstIndex(where: { $0.pid == pid && $0.provider == need.provider }) {
