@@ -17,7 +17,11 @@ publishes the matching section as the GitHub release body.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 
 ### Mac
+- swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
+- Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
+- Workspace: clicking a file in the Files tab previews it.
 - Workspace: the right panel's Files tab browses the thread's project.
+- Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
@@ -70,7 +74,10 @@ publishes the matching section as the GitHub release body.
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 - The phone's session feed poll decodes only the transcript lines appended since its last poll, so a busy thread costs the delta instead of a fresh window every 5 s (#380).
+- A session's sub-agent files are listed with their mtimes in one call instead of one stat per file, a third off every walk of a session with hundreds of agents (#346).
+- A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 
+- The transcript stats cache is per Claude config home, so a fixture or dev instance no longer replaces the real one and the next launch re-reads nothing (#346).
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
 - Usage gains its cost tab: the engine's raw token cost for the period, a daily chart, per-account and per-model shares and the token totals, across every paired Mac.
@@ -97,6 +104,9 @@ publishes the matching section as the GitHub release body.
 - Typing /usage-limits in a thread's composer shows the session's account and its Session, Weekly and per-model limits above the composer, answered on the phone without a turn.
 - Settings → Appearance gains Text size: a slider from 11 to 22 pt that scales every session-screen font, 16 pt being the reference.
 - A thread's Files pill opens the session's workspace: a searchable folder tree, a file's source with line numbers or its markdown rendered, and Add to message drops @path into the composer (#223).
+- The Files tree is built off the main thread and a search re-derives its rows once per keystroke instead of once per redraw.
+- A Files image (png, jpg, gif, webp, heic) shows as a picture with its size, tap for full-screen, once the Mac serves image bytes (#223).
+- A file's source on the phone splits lines and words its limit strip the way the Mac's Files tab does (CRLF files no longer render as one line).
 
 ## 0.4.4-alpha.2
 

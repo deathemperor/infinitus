@@ -58,6 +58,12 @@ public struct T3ChatMarkdown: View {
         T3TypeScale.lineSpacing(step) / 2
     }
 
+    /// The fenced block's mono face (`CodeFence.body_`, `pre code` at
+    /// `index.css:1836-1840`). Public because the Files tab's preview pane
+    /// draws the same code with it — one definition, not a second literal.
+    public static let codeFontSize: Double = 13
+    public static let codeFont: Font = .system(size: codeFontSize, design: .monospaced)
+
     public var body: some View {
         // `margin: 0.65rem 0` on every block (index.css:1652-1658); adjacent
         // margins collapse to one gap.
@@ -299,7 +305,7 @@ public struct T3ChatMarkdown: View {
 
         private var body_: some View {
             Text(code)
-                .font(.system(size: 13, design: .monospaced))
+                .font(T3ChatMarkdown.codeFont)
                 .foregroundStyle(palette.codeForeground.color)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: !wrapped, vertical: true)

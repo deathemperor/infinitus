@@ -15,8 +15,14 @@
 # Infinitus.app is untouched.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../.." && pwd)
-state=/tmp/t3fix
-sock=${1:-/tmp/t3fix.sock}
+# T3FIX_NAME=<short> gives a second fixture its own state dir, socket and log
+# (/tmp/<short>, /tmp/<short>.sock, /tmp/<short>.log) so two rounds can run
+# side by side; the default is the one the README's recipes name. Unix socket
+# paths cap at ~104 bytes, so the name stays short. The defaults domain below
+# is still shared: two fixtures see one set of window frames.
+name=${T3FIX_NAME:-t3fix}
+state=/tmp/$name
+sock=${1:-/tmp/$name.sock}
 domain=Infinitus   # the unbundled debug binary's defaults domain, never run.infinitus
 
 stop() {
@@ -36,6 +42,7 @@ stop() {
     fi
     [ -f "$state/pid" ] && kill "$(cat "$state/pid")" 2>/dev/null || true
     for k in mirror_lan_enabled popout_shown mock_mode workspace.sidebarWidth \
+             workspace.filesExplorerOpen \
              migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2 mirror_pair_token; do
         defaults delete "$domain" "$k" >/dev/null 2>&1 || true
     done
@@ -113,6 +120,6 @@ INFINITUS_DEMO_STATE=$state/demo-state.json \
 INFINITUS_PROFILES=$state/profiles.json \
 INFINITUS_TEAM_DIR=$state/team \
 INFINITUS_WORKSPACE_NO_START=1 \
-    "$root/.build/debug/Infinitus" -mock_mode NO >/tmp/t3fix.log 2>&1 &
+    "$root/.build/debug/Infinitus" -mock_mode NO >"/tmp/$name.log" 2>&1 &
 echo $! > "$state/app.pid"
-echo "app on $sock (log /tmp/t3fix.log)"
+echo "app on $sock (log /tmp/$name.log)"
