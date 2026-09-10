@@ -395,6 +395,46 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(second.days["2026-09-04"]?.inputTokens, 10)
     }
 
+    /// #499: a held handle sums again only the days a changed file
+    /// covers; the answer must match a scan that sums everything.
+    func testAHeldHandleResumsOnlyTheChangedDaysAndMatchesAFullScan() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("stats-delta-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = root.appendingPathComponent("-r-a")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        func turn(_ stamp: String, _ id: String, out: Int) -> String {
+            #"{"type":"assistant","timestamp":"\#(stamp)","message":{"id":"\#(id)","model":"claude-opus-5","usage":{"input_tokens":10,"output_tokens":\#(out)},"content":[{"type":"text","text":"a"}]}}"#
+        }
+        let a = project.appendingPathComponent("s1.jsonl"), b = project.appendingPathComponent("s2.jsonl")
+        try [turn("2026-09-03T01:00:05.000Z", "a1", out: 700), turn("2026-09-04T01:00:05.000Z", "a2", out: 300)]
+            .joined(separator: "\n").appending("\n").write(to: a, atomically: true, encoding: .utf8)
+        try [turn("2026-09-04T01:00:20.000Z", "b1", out: 500)]
+            .joined(separator: "\n").appending("\n").write(to: b, atomically: true, encoding: .utf8)
+        let now = date("2026-09-05T02:00:00Z")
+        let handle = StatsScanner.CacheHandle()
+        let cacheURL = root.appendingPathComponent("cache.json")
+        let first = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now, handle: handle)
+        XCTAssertEqual(first.days["2026-09-04"]?.peakTokensPerMinute, 800)
+        XCTAssertEqual(first.days["2026-09-03"]?.outputTokens, 700)
+
+        // Append to one file: only the day it touches is summed again.
+        let fh = try FileHandle(forWritingTo: a); try fh.seekToEnd()
+        try fh.write(contentsOf: Data((turn("2026-09-04T01:00:40.000Z", "a3", out: 100) + "\n").utf8)); try fh.close()
+        let second = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now, handle: handle)
+        let full = StatsScanner.scan(projectsDir: root, cacheURL: nil, calendar: cal, now: now)
+        XCTAssertEqual(second.days["2026-09-04"]?.peakTokensPerMinute, 900)
+        XCTAssertEqual(second.days, full.days)
+
+        // A file gone: its days lose its share.
+        try FileManager.default.removeItem(at: b)
+        let third = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now, handle: handle)
+        XCTAssertEqual(third.days["2026-09-04"]?.peakTokensPerMinute, 400)
+        XCTAssertEqual(third.days, StatsScanner.scan(projectsDir: root, cacheURL: nil, calendar: cal, now: now).days)
+        // Nothing changed: the sums stand as they are.
+        let fourth = StatsScanner.scan(projectsDir: root, cacheURL: cacheURL, calendar: cal, now: now, handle: handle)
+        XCTAssertEqual(fourth.days, third.days)
+    }
+
     func testCacheVersionIsNine() {
         XCTAssertEqual(StatsScanner.Cache().version, 9)
     }

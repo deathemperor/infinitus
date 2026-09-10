@@ -393,6 +393,10 @@ public enum StatsScanner {
         var caughtUp = false
         /// The held cache moved since it last reached disk.
         var dirty = false
+        /// The last pass's `Result.days` (#499): a pass touches a handful
+        /// of files, so only the days those files cover are summed again;
+        /// every other day is this, as it was.
+        var sums: [String: Stats.Day]?
         public init() {}
     }
     public static let checkpointInterval: TimeInterval = 30
@@ -553,6 +557,9 @@ public enum StatsScanner {
         var budgetLeft = byteBudget
         var budgetSpent = false
         var filesTouched = 0
+        // Paths whose entry differs from the last pass's — parsed, new,
+        // or gone — the only ones whose days need summing again.
+        var changed: Set<String> = []
 
         for (i, c) in candidates.enumerated() {
             let cached = cache.files[c.url.path]
@@ -566,7 +573,6 @@ public enum StatsScanner {
                 if let cached { live[c.url.path] = cached }
                 result.files += 1
                 if let cwd = cached?.cwd { result.cwds.insert(cwd) }
-                for (key, day) in cached?.daysWithOpenStretch() ?? [:] { result.days[key] = (result.days[key] ?? Stats.Day()) + day }
                 if dirty {
                     result.remaining += 1
                     result.bytesRemaining += owed(size: c.size, offset: cached?.offset ?? 0)
@@ -613,9 +619,9 @@ public enum StatsScanner {
                 }
             }
             live[c.url.path] = entry
+            if dirty { changed.insert(c.url.path) }
             result.files += 1
             if let cwd = entry.cwd { result.cwds.insert(cwd) }
-            for (key, day) in entry.daysWithOpenStretch() { result.days[key] = (result.days[key] ?? Stats.Day()) + day }
             if entry.size != c.size {
                 result.remaining += 1
                 result.bytesRemaining += owed(size: c.size, offset: entry.offset)
@@ -625,9 +631,34 @@ public enum StatsScanner {
         // says exactly this, and rewriting the whole corpus's JSON on
         // every 5-minute refresh is pure IO. The checkpoint writes
         // inside a backfill above are untouched.
-        // Every file's share of a day is in: the day's peak minute is
-        // the sum across sessions, not any one file's.
-        for key in result.days.keys { result.days[key]!.finalizePeak() }
+        for path in cache.files.keys where live[path] == nil { changed.insert(path) }
+        // Every file's share of a day is in before the day's peak is
+        // taken: the peak minute is the sum across sessions, not any one
+        // file's. With a handle, the last pass's sums stand for every day
+        // no changed file covers (#499: a five-minute pass re-summed
+        // 24,000 file-days for one live session's few); a first pass, or
+        // one without a handle, sums everything.
+        var affected: Set<String>
+        if let previous = handle?.sums, handle?.cache != nil {
+            affected = []
+            for path in changed {
+                if let e = cache.files[path] { affected.formUnion(e.daysWithOpenStretch().keys) }
+                if let e = live[path] { affected.formUnion(e.daysWithOpenStretch().keys) }
+            }
+            result.days = previous
+            for key in affected { result.days[key] = nil }
+        } else {
+            affected = Set(live.values.flatMap { $0.daysWithOpenStretch().keys })
+        }
+        if !affected.isEmpty {
+            for entry in live.values {
+                for (key, day) in entry.daysWithOpenStretch() where affected.contains(key) {
+                    result.days[key] = (result.days[key] ?? Stats.Day()) + day
+                }
+            }
+            for key in affected where result.days[key] != nil { result.days[key]!.finalizePeak() }
+        }
+        handle?.sums = result.days
         let unchanged = filesTouched == 0 && live.count == cache.files.count && handle?.dirty != true
         cache.files = live
         handle?.cache = cache
