@@ -205,10 +205,10 @@ final class ControlServer {
             let account = model.activeAccountName
             let iso = ISO8601DateFormatter()
             return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
-                let progress = model.sessionProgress.byPid[row.pid]
-                var needs: [String] = []
-                if let profile = progress?.awsLoginProfile { needs.append("aws-login:" + profile) }
-                if let profile = progress?.gcloudLoginProfile { needs.append("gcloud-login:" + profile) }
+                // The merged list (#402): a headless child's need off its
+                // stream, and a need a finished login already met is gone.
+                let needs = model.awsLogins.filter { $0.pid == row.pid }
+                    .map { $0.providerOrAws.rawValue + "-login:" + $0.profile }
                 return .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
                                 "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
                                 "kind": .string(row.kind),

@@ -116,6 +116,23 @@ final class OwnedWireTests: XCTestCase {
         guard case .other = OwnedWire.decode(line: "garbage") else { return XCTFail("garbage") }
     }
 
+    func testToolFramesBecomeTranscriptEntriesAndTheRestAreNil() throws {
+        let use = #"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"aws s3 ls --profile e2e"}}]}}"#
+        let result = #"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"aws: [error] the sso session has expired\n  fix: aws login"}]}}"#
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let entry = try XCTUnwrap(OwnedWire.toolEntry(line: use, now: now))
+        XCTAssertEqual(entry["type"] as? String, "assistant")
+        XCTAssertEqual(entry["timestamp"] as? String, "2027-01-15T08:00:00.000Z")
+        let blocks = try XCTUnwrap((entry["message"] as? [String: Any])?["content"] as? [[String: Any]])
+        XCTAssertEqual((blocks.first?["input"] as? [String: Any])?["command"] as? String, "aws s3 ls --profile e2e")
+        XCTAssertNotNil(OwnedWire.toolEntry(line: result))
+        // Text turns, partial deltas that mention a tool, and everything else.
+        XCTAssertNil(OwnedWire.toolEntry(line: #"{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}"#))
+        XCTAssertNil(OwnedWire.toolEntry(line: #"{"type":"stream_event","event":{"type":"content_block_start","content_block":{"type":"tool_use"}}}"#))
+        XCTAssertNil(OwnedWire.toolEntry(line: #"{"type":"result","subtype":"success"}"#))
+        XCTAssertNil(OwnedWire.toolEntry(line: "not json tool_use"))
+    }
+
     func testManualModeReachesArgvSoAClientCanForceAskEveryTime() {
         // The step-0 probe got its can_use_tool under `--permission-mode
         // manual`; a Mac whose settings default to "auto" needs it forced.

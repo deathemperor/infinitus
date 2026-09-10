@@ -18,6 +18,14 @@ import WinSDK
 public actor OwnedSessions {
     public enum State: Sendable, Equatable { case busy, idle, waiting, exited }
 
+    /// A lapsed CLI sign-in read off the child's stream (#402): the
+    /// transcript scan's finding, minus the wait for the transcript.
+    public struct LoginNeed: Sendable, Equatable {
+        public let provider: AwsLogin.Provider
+        public let profile: String
+        public let failedAt: Date?
+    }
+
     /// One child: its stdin, its parked prompts, its last state. Written
     /// from the pipe-reader thread and the callers' threads; the lock
     /// keeps every mutation whole.
@@ -47,6 +55,10 @@ public actor OwnedSessions {
         /// The interrupt whose `result` is still awaited, for the soft
         /// fallback: nil once a result lands or a new turn starts.
         private var interruptStamp: Date?
+        /// The last tool calls and results as transcript entries — the
+        /// window `SessionProgress.loginNeeds` scans — and what it found.
+        private var toolEntries: [[String: Any]] = []
+        private var needList: [LoginNeed] = []
 
         init(pid: Int32, cwd: String, stdin: FileHandle) {
             self.pid = pid; self.cwd = cwd; self.stdin = stdin
@@ -109,6 +121,20 @@ public actor OwnedSessions {
             get { lock.lock(); defer { lock.unlock() }; return interruptStamp }
             set { lock.lock(); interruptStamp = newValue; lock.unlock() }
         }
+        var loginNeeds: [LoginNeed] { lock.lock(); defer { lock.unlock() }; return needList }
+        /// True when the entry changed what the child needs.
+        func observe(toolEntry: [String: Any]) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            toolEntries.append(toolEntry)
+            if toolEntries.count > SessionProgress.awsLoginScanEntries * 2 { toolEntries.removeFirst() }
+            let found = SessionProgress.loginNeeds(entries: toolEntries)
+            var needs: [LoginNeed] = []
+            if let aws = found.aws { needs.append(LoginNeed(provider: .aws, profile: aws.profile, failedAt: aws.failedAt)) }
+            if let gcloud = found.gcloud { needs.append(LoginNeed(provider: .gcloud, profile: gcloud.profile, failedAt: gcloud.failedAt)) }
+            guard needs != needList else { return false }
+            needList = needs
+            return true
+        }
     }
 
     final class Registry: @unchecked Sendable {
@@ -129,6 +155,8 @@ public actor OwnedSessions {
     public nonisolated let wake = NSCondition()
     private let binaryPath: String
     private let onState: @Sendable (Int32, State) -> Void
+    /// A child's sign-in need appeared, changed or cleared (#402).
+    private let onLoginNeed: @Sendable (Int32) -> Void
     /// The orphan ledger (#151 follow-up): nil in tests that don't care.
     private let ledger: OwnedLedger?
     /// How long an `interrupt` control request gets to produce its
@@ -140,11 +168,13 @@ public actor OwnedSessions {
     private var loginShellPath: String?
 
     public init(binaryPath: String, ledger: OwnedLedger? = nil, interruptGrace: TimeInterval = 5,
-                onState: @escaping @Sendable (Int32, State) -> Void) {
+                onState: @escaping @Sendable (Int32, State) -> Void,
+                onLoginNeed: @escaping @Sendable (Int32) -> Void = { _ in }) {
         self.binaryPath = binaryPath
         self.ledger = ledger
         self.interruptGrace = interruptGrace
         self.onState = onState
+        self.onLoginNeed = onLoginNeed
     }
 
     /// Pids of the children alive right now — the session card's "owned" tell.
@@ -277,7 +307,11 @@ public actor OwnedSessions {
                     if child.set(child.pending.isEmpty ? .idle : .waiting) { self?.publish(child.pid, child.state) }
                 case .rateLimit(let note):
                     if child.note(note) { self?.poke() }
-                case .controlResponse, .other:
+                case .other:
+                    if let entry = OwnedWire.toolEntry(line: line), child.observe(toolEntry: entry) {
+                        self?.onLoginNeed(child.pid)
+                    }
+                case .controlResponse:
                     break
                 }
             }
@@ -405,6 +439,9 @@ public actor OwnedSessions {
 
     /// The current turn's rejected rate-limit notes, for the feed.
     public nonisolated func limits(pid: Int32) -> [LimitNote] { registry[pid]?.limits ?? [] }
+    /// The sign-ins a child's stream says have lapsed, newest failure
+    /// per provider; empty for a pid that isn't ours (#402).
+    public nonisolated func loginNeeds(pid: Int32) -> [LoginNeed] { registry[pid]?.loginNeeds ?? [] }
 
     /// `set_permission_mode`, Claude Code's own mode names only.
     public nonisolated func setPermissionMode(pid: Int32, mode: String) -> Bool {

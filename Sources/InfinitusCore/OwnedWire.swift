@@ -353,6 +353,28 @@ public enum OwnedWire {
         }
     }
 
+    /// An `assistant` or `user` frame carrying a tool_use / tool_result,
+    /// reshaped as the transcript entry `SessionProgress.loginNeeds`
+    /// reads (`message.content` blocks plus a `timestamp`) — so a
+    /// headless child's lapsed sign-in is read off its stream the way
+    /// a terminal session's is read off its jsonl (#402). Nil for every
+    /// other frame, the partial-message deltas included.
+    public static func toolEntry(line: String, now: Date = Date()) -> [String: Any]? {
+        guard line.contains("tool_use") || line.contains("tool_result"),
+              let obj = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+              let type = obj["type"] as? String, type == "assistant" || type == "user",
+              let content = (obj["message"] as? [String: Any])?["content"] as? [[String: Any]],
+              content.contains(where: { ($0["type"] as? String) == "tool_use" || ($0["type"] as? String) == "tool_result" })
+        else { return nil }
+        return ["type": type, "message": ["content": content], "timestamp": stamp.string(from: now)]
+    }
+
+    private static let stamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     private static func jsonText(_ value: Any) -> String {
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value) else { return "{}" }

@@ -2011,28 +2011,49 @@ final class AppModel: ObservableObject {
         let byKey = Dictionary(awsLoginStates.map { ($0.runKey, $0) }, uniquingKeysWith: { a, _ in a })
         var items: [AwsLogin.Item] = []
         var needed = Set<String>()
-        for (pid, progress) in sessionProgress.byPid.sorted(by: { $0.key < $1.key }) {
+        typealias Need = (pid: Int, provider: AwsLogin.Provider, profile: String, failedAt: Date?, name: String?)
+        var needs: [Need] = []
+        for (pid, progress) in sessionProgress.byPid {
             // Both CLIs can lapse under one session (#367); each need is its own item.
             for provider in AwsLogin.Provider.allCases {
                 guard let profile = progress.loginProfile(provider) else { continue }
-                let failedAt = progress.loginFailedAt(provider)
-                let key = AwsLogin.runKey(provider: provider, profile: profile)
-                // Signed in since the failure: the failing result stays in the
-                // transcript's window until the session moves on, but the
-                // need is met (the key badge outlived the login, 2026-09-03).
-                if let done = byKey[key], done.phase == .done,
-                   let failedAt, failedAt.timeIntervalSince1970 < done.startedAt { continue }
-                needed.insert(key)
-                let label = progress.name ?? liveSessions?.sessions?.first { $0.pid == pid }
-                    .map { URL(fileURLWithPath: $0.cwd).lastPathComponent }
-                items.append(AwsLogin.Item(profile: profile,
-                                           flow: provider.flow(profile: profile, configText: configText),
-                                           pid: pid, sessionLabel: label,
-                                           state: AwsLogin.current(byKey[key], needFailedAt: failedAt),
-                                           failedAt: failedAt,
-                                           account: provider == .aws ? AwsLogin.account(profile: profile, configText: configText) : nil,
-                                           provider: provider == .aws ? nil : provider))
+                needs.append((pid, provider, profile, progress.loginFailedAt(provider), progress.name))
             }
+        }
+        // A headless child's lapsed sign-in comes off its stream (#402),
+        // ahead of the transcript scan; the newer failure wins per
+        // (session, provider). `existing`: never construct the actor here.
+        if let owned = ownedBox.existing {
+            for pid in owned.ownedPids {
+                for need in owned.loginNeeds(pid: pid) {
+                    let pid = Int(pid)
+                    if let i = needs.firstIndex(where: { $0.pid == pid && $0.provider == need.provider }) {
+                        if let wire = need.failedAt, let file = needs[i].failedAt, wire <= file { continue }
+                        needs[i] = (pid, need.provider, need.profile, need.failedAt ?? needs[i].failedAt, needs[i].name)
+                    } else {
+                        needs.append((pid, need.provider, need.profile, need.failedAt, sessionProgress.byPid[pid]?.name))
+                    }
+                }
+            }
+        }
+        needs.sort { ($0.pid, $0.provider.rawValue) < ($1.pid, $1.provider.rawValue) }
+        for (pid, provider, profile, failedAt, name) in needs {
+            let key = AwsLogin.runKey(provider: provider, profile: profile)
+            // Signed in since the failure: the failing result stays in the
+            // transcript's window until the session moves on, but the
+            // need is met (the key badge outlived the login, 2026-09-03).
+            if let done = byKey[key], done.phase == .done,
+               let failedAt, failedAt.timeIntervalSince1970 < done.startedAt { continue }
+            needed.insert(key)
+            let label = name ?? liveSessions?.sessions?.first { $0.pid == pid }
+                .map { URL(fileURLWithPath: $0.cwd).lastPathComponent }
+            items.append(AwsLogin.Item(profile: profile,
+                                       flow: provider.flow(profile: profile, configText: configText),
+                                       pid: pid, sessionLabel: label,
+                                       state: AwsLogin.current(byKey[key], needFailedAt: failedAt),
+                                       failedAt: failedAt,
+                                       account: provider == .aws ? AwsLogin.account(profile: profile, configText: configText) : nil,
+                                       provider: provider == .aws ? nil : provider))
         }
         // Logins started by hand (no session asked) still show while they
         // run or after they fail; one a session asked for belongs with
@@ -3174,9 +3195,11 @@ final class AppModel: ObservableObject {
     nonisolated func ownedSessions() -> OwnedSessions? {
         ownedBox.get { [weak self] in
             guard let path = ClaudeLocator.locate() else { return nil }
-            return OwnedSessions(binaryPath: path, ledger: OwnedLedger(url: Self.ownedLedgerURL)) { pid, state in
-                Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
-            }
+            return OwnedSessions(binaryPath: path, ledger: OwnedLedger(url: Self.ownedLedgerURL),
+                                 onState: { pid, state in
+                                     Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
+                                 },
+                                 onLoginNeed: { _ in Task { @MainActor in self?.rebuildAwsLogins() } })
         }
     }
 
@@ -3224,7 +3247,9 @@ final class AppModel: ObservableObject {
 
     private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {
         switch state {
-        case .exited: logEvent("other", icon: "terminal", "headless session \(pid) ended")
+        case .exited:
+            logEvent("other", icon: "terminal", "headless session \(pid) ended")
+            rebuildAwsLogins()   // its stream's need goes with it (#402)
         case .waiting: logEvent("other", icon: "hand.raised", "headless session \(pid) is waiting for an answer")
         default: break
         }
