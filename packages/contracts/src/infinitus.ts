@@ -294,19 +294,24 @@ export const InfinitusAwsLogins = Schema.Struct({
 export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
 
 /** One row of the `events` reply — the app's event log as the Activity pane
-    shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Native
-    encodes neither its `kind` nor its id (#615); until it does, a client
-    classifies by icon and text. */
+    shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Since
+    native #630 (#615) a row also carries `id`, the app's own UUID for the
+    entry (stable per app run), and `kind`, the durable log's vocabulary
+    (switch, limit, revival, resume, nudge, team, team-control, hook, pairing,
+    other). Both are absent on older builds, where a client falls back to the
+    icon and text. */
 export const InfinitusEventRow = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
   at: Schema.String,
+  kind: Schema.optionalKey(Schema.String),
   icon: Schema.String,
   text: Schema.String,
 });
 export type InfinitusEventRow = typeof InfinitusEventRow.Type;
 
-/** One event as the snapshot carries it: the row plus an id the server
-    assigns (`<at>#<sequence>`), stable for as long as that server runs, which
-    is what a client dedupes on. */
+/** One event as the snapshot carries it: the row with an id a client can
+    dedupe on — the app's own when the row carries one, else one the server
+    assigns (`<at>#<sequence>`), stable for as long as that server runs. */
 export const InfinitusEvent = Schema.Struct({
   ...InfinitusEventRow.fields,
   id: Schema.String,

@@ -77,6 +77,11 @@ const decodeAwsLogins = Schema.decodeUnknownEffect(InfinitusAwsLogins);
 const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(InfinitusEventRow));
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
+/** See `eventCursor`. */
+type EventCursor =
+  | { readonly kind: "ids"; readonly ids: ReadonlySet<string> }
+  | { readonly kind: "at"; readonly at: string; readonly seen: ReadonlySet<string> };
+
 const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
   available: false,
   unavailableReason: reason,
@@ -115,14 +120,14 @@ const makeInfinitus = Effect.gen(function* () {
       manifest, because the app that came back may not be the one that left. */
   const manifestStale = yield* Ref.make(true);
   const nextSlowAtMillis = yield* Ref.make(0);
-  /** Where the event log was last read to: the newest `at` seen and every
-      `icon|text` at that second, so the next reply's tail past it is what is
-      new. `None` until the first reply seeds it (after the app is sighted), so
-      history is never published. `ISO8601DateFormatter` output is fixed-width,
-      which is what makes the string comparison safe. */
-  const eventCursor = yield* Ref.make<
-    Option.Option<{ readonly at: string; readonly seen: ReadonlySet<string> }>
-  >(Option.none());
+  /** Where the event log was last read to. On a build whose rows carry ids
+      (native #630): every id in the previous reply, so the next reply's rows
+      outside it are the new ones. On an older build: the newest `at` seen and
+      every `icon|text` at that second, so the tail past it is what is new
+      (`ISO8601DateFormatter` output is fixed-width, which is what makes the
+      string comparison safe). `None` until the first reply seeds it (after the
+      app is sighted), so history is never published. */
+  const eventCursor = yield* Ref.make<Option.Option<EventCursor>>(Option.none());
   /** Counts every event published; with `at` it makes the id. */
   const eventSequence = yield* Ref.make(0);
   const nextLeaseAtMillis = yield* Ref.make(0);
@@ -202,33 +207,43 @@ const makeInfinitus = Effect.gen(function* () {
     return UNAVAILABLE_PROBE_INTERVAL;
   });
 
-  /** The rows past the cursor, given ids, and the cursor moved to the reply's
-      newest row. A `None` cursor takes the whole reply as already seen. */
+  /** The rows past the cursor, each with an id, and the cursor moved to this
+      reply. A `None` cursor takes the whole reply as already seen; so does a
+      reply whose id-lessness disagrees with an id cursor (a different build
+      answered), which reseeds rather than replays. */
   const newEvents = Effect.fn("newEvents")(function* (
     rows: ReadonlyArray<InfinitusEventRow>,
   ): Effect.fn.Return<ReadonlyArray<InfinitusEvent>> {
     const cursor = yield* Ref.get(eventCursor);
-    const fresh = Option.isNone(cursor)
-      ? []
-      : rows.filter(
+    const ids = rows.flatMap((row) => (typeof row.id === "string" ? [row.id] : []));
+    const carriesIds = ids.length === rows.length;
+    let fresh: ReadonlyArray<InfinitusEventRow> = [];
+    if (Option.isSome(cursor)) {
+      const known = cursor.value;
+      if (known.kind === "ids" && carriesIds) {
+        fresh = rows.filter((row) => row.id !== undefined && !known.ids.has(row.id));
+      } else if (known.kind === "at") {
+        fresh = rows.filter(
           (row) =>
-            row.at > cursor.value.at ||
-            (row.at === cursor.value.at && !cursor.value.seen.has(`${row.icon}|${row.text}`)),
+            row.at > known.at ||
+            (row.at === known.at && !known.seen.has(`${row.icon}|${row.text}`)),
         );
-    const newest = rows.reduce<string | null>(
-      (latest, row) => (latest === null || row.at > latest ? row.at : latest),
-      null,
-    );
-    if (newest !== null) {
+      }
+    }
+    if (carriesIds) {
+      yield* Ref.set(eventCursor, Option.some({ kind: "ids", ids: new Set(ids) }));
+    } else {
+      const newest = rows.reduce<string | null>(
+        (latest, row) => (latest === null || row.at > latest ? row.at : latest),
+        null,
+      );
       const seen = new Set(
         rows.filter((row) => row.at === newest).map((row) => `${row.icon}|${row.text}`),
       );
-      yield* Ref.set(eventCursor, Option.some({ at: newest, seen }));
-    } else if (Option.isNone(cursor)) {
-      yield* Ref.set(eventCursor, Option.some({ at: "", seen: new Set<string>() }));
+      yield* Ref.set(eventCursor, Option.some({ kind: "at", at: newest ?? "", seen }));
     }
     const first = yield* Ref.getAndUpdate(eventSequence, (n) => n + fresh.length);
-    return fresh.map((row, index) => ({ ...row, id: `${row.at}#${first + index}` }));
+    return fresh.map((row, index) => ({ ...row, id: row.id ?? `${row.at}#${first + index}` }));
   });
 
   /** One pass over the socket. Answers with how long to wait before the next
