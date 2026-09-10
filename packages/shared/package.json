@@ -251,6 +251,10 @@
       "types": "./src/devHome.ts",
       "import": "./src/devHome.ts"
     },
+    "./productName": {
+      "types": "./src/productName.ts",
+      "import": "./src/productName.ts"
+    },
     "./devProxy": {
       "types": "./src/devProxy.ts",
       "import": "./src/devProxy.ts"

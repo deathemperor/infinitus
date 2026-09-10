@@ -10,6 +10,7 @@ import { defineConfig, type Connect, type Plugin } from "vite-plus";
 import pkg from "./package.json" with { type: "json" };
 
 import { DEV_PROXIED_PATH_PREFIXES } from "@t3tools/shared/devProxy";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { tailwindPlugins } from "./vite/tailwind";
@@ -129,6 +130,15 @@ const devProxyTarget = resolveDevProxyTarget(process.env.T3CODE_PORT, configured
 // both machines sit idle. Compressing turns it into a few seconds of CPU.
 // Brotli quality 5 keeps encode time in the hundreds of ms; the default
 // (quality 11) would trade the transfer stall for an equally long encode stall.
+/** index.html can't import a constant: the boot-shell title and splash
+ *  labels take the fork's product name here (INFINITUS.md). */
+function productNamePlugin(): Plugin {
+  return {
+    name: "infinitus-product-name",
+    transformIndexHtml: (html) => html.replaceAll("T3 Code", PRODUCT_NAME),
+  };
+}
+
 function devCompressionPlugin(): Plugin {
   return {
     name: "t3code:dev-compression",
@@ -159,6 +169,7 @@ export default defineConfig(() => {
   return {
     assetsInclude: ["**/*.wasm"],
     plugins: [
+      productNamePlugin(),
       devCompressionPlugin(),
       // Route components load as split chunks so settings, pull-request, and
       // usage code stay out of the cold-start payload; the router prefetches
