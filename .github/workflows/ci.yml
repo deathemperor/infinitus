@@ -4,7 +4,7 @@ name: CI
 # sized down for a single-platform menu bar app.
 on:
   push:
-    branches: [main]
+    branches: [native]
   pull_request:
 concurrency:
   group: ci-${{ github.ref }}
