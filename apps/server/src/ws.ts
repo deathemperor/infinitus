@@ -81,6 +81,7 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
+import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import {
@@ -528,6 +529,7 @@ const makeWsRpcLayer = (
       const keybindings = yield* Keybindings.Keybindings;
       const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
+      const infinitus = yield* InfinitusService;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
@@ -2976,6 +2978,22 @@ const makeWsRpcLayer = (
               ),
             ),
             { "rpc.aggregate": "server" },
+          ),
+        // The stream itself is what makes the server poll the control socket,
+        // so this must stay the only way a client reads Infinitus.
+        [WS_METHODS.subscribeInfinitus]: (_input) =>
+          observeRpcStreamEffect(WS_METHODS.subscribeInfinitus, Effect.succeed(infinitus.changes), {
+            "rpc.aggregate": "infinitus",
+          }),
+        [WS_METHODS.infinitusCommand]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusCommand,
+            infinitus
+              .command(input)
+              // `result` is an optional key: a command that answers with no
+              // payload sends no key rather than an explicit undefined.
+              .pipe(Effect.map((result) => (result === undefined ? {} : { result }))),
+            { "rpc.aggregate": "infinitus" },
           ),
       });
     }),
