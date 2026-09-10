@@ -369,6 +369,10 @@ final class AppModel: ObservableObject {
     /// The one BrewUpdater instance the About pane's button and the
     /// phone's `POST /app/update` route both drive; set by InfinitusApp.
     var brewUpdater: BrewUpdater?
+    /// The About pane's update checker: `update_auto_*` writes from the
+    /// socket, the mirror or iCloud sync reach it through `reloadPrefs`
+    /// (it reads the defaults once, at init); set by InfinitusApp.
+    weak var updateModel: UpdateModel?
     private let launchExecutableDate = AppModel.executableDate()
     private var supervisor: CswapSupervisor?
     private var refreshTask: Task<Void, Never>?
@@ -1277,6 +1281,12 @@ final class AppModel: ObservableObject {
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
         set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
+        if let update = updateModel {
+            let check = defaults.object(forKey: "update_auto_check") as? Bool ?? true
+            if update.autoCheck != check { update.autoCheck = check }
+            let install = defaults.object(forKey: "update_auto_install") as? Bool ?? false
+            if update.autoInstall != install { update.autoInstall = install }
+        }
     }
 
     /// Playground reset (user 2026-08-31): wipe the sandbox suite so
