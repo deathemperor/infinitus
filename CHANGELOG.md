@@ -115,6 +115,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl sessions` rows carry the session id, the account alias they run on, the start time and any pending sign-in need (`aws-login:<profile>`), for the fork's sessions list (#612).
 - `infinitusctl show session <pid>` opens that session's chat window, and `nudge <pid>` sends it the resume nudge by hand, answering with the reason when it is not resumable (#612).
 - `infinitusctl events` rows carry the event's kind (switch, limit, revival, nudge, team…) and an id, so the fork's toasts classify and dedupe without reading icons or text (#615).
+- The stats cache holds each transcript-day's hour histogram as the few hours it covers instead of a full week of slots, trimming ~17 MB from the app's resident memory on a year of transcripts (#499).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

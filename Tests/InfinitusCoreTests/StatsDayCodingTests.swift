@@ -60,11 +60,11 @@ final class StatsDayCodingTests: XCTestCase {
         let back = try roundTrip(d)
         XCTAssertEqual(back, d)
         let stored = Mirror(reflecting: d).children.compactMap(\.label)
-        for name in stored where name != "hours" {
+        for name in stored {
             XCTAssertTrue(try keys(d).contains(name), "\(name) is encoded")
         }
         let coded = Set(Stats.Day.CodingKeys.allCases.map(\.stringValue))
-        XCTAssertEqual(coded, Set(stored + ["hourSlots"]), "every stored property has a coding key")
+        XCTAssertEqual(coded, Set(stored + ["hours"]), "every stored property has a coding key (`hours` is the computed view of `hourSlots`)")
         // A field left at its default in a mostly-filled day is still left out.
         var partial = d
         partial.usd = 0
@@ -100,5 +100,31 @@ final class StatsDayCodingTests: XCTestCase {
         // A slot outside the histogram is ignored, not a crash.
         let odd = try JSONSerialization.data(withJSONObject: ["hourSlots": [400, 1, 7, 3]])
         XCTAssertEqual(try JSONDecoder().decode(Stats.Day.self, from: odd).hours[7], 3)
+    }
+
+    /// #499: the window behind `hours` — one histogram decoded dense,
+    /// decoded as pairs or written slot by slot compares equal, a fold
+    /// across two weekdays reads as the dense sum, and a compacted side
+    /// yields to the other.
+    func testHourWindowIsTheSameHistogramHoweverItWasBuilt() throws {
+        var written = Stats.Day()
+        written.hourSlots[3] = 2; written.hourSlots[100] = 1
+        let dense = try JSONDecoder().decode(Stats.Day.self, from: JSONSerialization.data(withJSONObject: ["hours": written.hours]))
+        let pairs = try JSONDecoder().decode(Stats.Day.self, from: JSONSerialization.data(withJSONObject: ["hourSlots": [3, 2, 100, 1]]))
+        XCTAssertEqual(dense, written)
+        XCTAssertEqual(pairs, written)
+        XCTAssertEqual(written.hours.count, 168)
+        XCTAssertEqual(written.hours[3], 2)
+        XCTAssertEqual(written.hours[100], 1)
+        XCTAssertEqual(Stats.Day().hours, Array(repeating: 0, count: 168), "an untouched day still reads 168 zeros")
+
+        var monday = Stats.Day(); monday.hourSlots[9] = 4
+        var sunday = Stats.Day(); sunday.hourSlots[160] = 5; sunday.hourSlots[9] = 1
+        var expected = Array(repeating: 0, count: 168); expected[9] = 5; expected[160] = 5
+        XCTAssertEqual((monday + sunday).hours, expected)
+        XCTAssertEqual((sunday + monday).hours, expected)
+        XCTAssertEqual((monday.compacted() + sunday).hours, sunday.hours)
+        XCTAssertEqual((sunday + monday.compacted()).hours, sunday.hours)
+        XCTAssertEqual((monday.compacted() + sunday.compacted()).hours, [])
     }
 }

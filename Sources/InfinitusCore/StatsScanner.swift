@@ -55,7 +55,7 @@ public enum StatsScanner {
     static func noteSession(_ day: inout Stats.Day, key: String, at t: Double, sessionID: String,
                             into entry: inout FileEntry, calendar: Calendar) {
         day.sessions.insert(sessionID)
-        day.hours[Stats.hourSlot(Date(timeIntervalSince1970: t), calendar: calendar)] += 1
+        day.hourSlots[Stats.hourSlot(Date(timeIntervalSince1970: t), calendar: calendar)] += 1
         if entry.state.firstAt[key] == nil { entry.state.firstAt[key] = t }
         entry.state.lastAt[key] = t
         day.sessionSeconds = entry.state.lastAt[key]! - entry.state.firstAt[key]!

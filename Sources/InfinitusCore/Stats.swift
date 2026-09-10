@@ -90,6 +90,70 @@ public enum Stats {
         }
     }
 
+    /// `Day.hours` as held in memory (#499): the per-hour histogram as
+    /// one contiguous run of slots — `offset` is the first slot held,
+    /// `counts` the run from there — so a file-day's one weekday costs a
+    /// few Ints instead of 168. `dense` is the full 168-slot array (`[]`
+    /// when `dropped`: `compacted()` removed the histogram, and the
+    /// travelling form keeps that emptiness). Equality is slot-wise, so
+    /// a histogram decoded dense, decoded as pairs, grown by writes or
+    /// folded compares the same however it was built.
+    public struct HourSlots: Equatable, Sendable {
+        public static let slotCount = 168
+        public private(set) var offset = 0
+        public private(set) var counts: [Int] = []
+        public private(set) var dropped = false
+        public init() {}
+        public init(dense: [Int]) {
+            dropped = dense.isEmpty
+            guard let first = dense.firstIndex(where: { $0 != 0 }),
+                  let last = dense.lastIndex(where: { $0 != 0 }) else { return }
+            offset = first
+            counts = Array(dense[first...last])
+        }
+        /// Slots outside 0..<168 read 0 and ignore writes (a stray pair
+        /// in a cache file was skipped by the dense decoder too).
+        public subscript(slot: Int) -> Int {
+            get {
+                let i = slot - offset
+                return counts.indices.contains(i) ? counts[i] : 0
+            }
+            set {
+                guard (0..<Self.slotCount).contains(slot) else { return }
+                if counts.isEmpty {
+                    offset = slot; counts = [newValue]
+                } else if slot < offset {
+                    counts.insert(contentsOf: repeatElement(0, count: offset - slot), at: 0); offset = slot
+                } else if slot >= offset + counts.count {
+                    counts.append(contentsOf: repeatElement(0, count: slot - offset - counts.count + 1))
+                }
+                counts[slot - offset] = newValue
+            }
+        }
+        public var dense: [Int] {
+            if dropped { return [] }
+            var out = Array(repeating: 0, count: Self.slotCount)
+            for (i, v) in counts.enumerated() { out[offset + i] = v }
+            return out
+        }
+        /// The non-zero slots in slot order.
+        public var set: [(slot: Int, count: Int)] {
+            counts.enumerated().compactMap { $0.element == 0 ? nil : (offset + $0.offset, $0.element) }
+        }
+        /// `summed` for windows: a dropped side yields to the other, two
+        /// dropped sides stay dropped, otherwise slot-wise.
+        public static func + (a: HourSlots, b: HourSlots) -> HourSlots {
+            if a.dropped { return b }
+            if b.dropped { return a }
+            var out = a
+            for (i, v) in b.counts.enumerated() where v != 0 { out[b.offset + i] += v }
+            return out
+        }
+        public static func == (a: HourSlots, b: HourSlots) -> Bool {
+            a.dropped == b.dropped && a.set.elementsEqual(b.set, by: { $0.slot == $1.slot && $0.count == $1.count })
+        }
+    }
+
     public struct Day: Codable, Equatable, Sendable {
         // Messages
         public var humanMessages = 0      // typed at the keyboard
@@ -142,7 +206,15 @@ public enum Stats {
         public var sessionTally = 0       // compact form for the phone: set emptied, count kept
         public var sessionSeconds = 0.0
         public var sessionBuckets = [0, 0, 0, 0]   // <15m, 15-60m, 1-4h, >4h; one session per file-day
-        public var hours: [Int] = Array(repeating: 0, count: 168)   // weekday(Mon=0)*24 + hour
+        /// weekday(Mon=0)*24 + hour. Held as a window (#499): a file-day
+        /// fills one weekday's hours, and 16k dense 168-slot arrays were
+        /// 19 MB of the resident cache. `hours` is the dense view the
+        /// heatmap reads — `[]` once `compacted()` dropped the histogram.
+        public var hourSlots = HourSlots()
+        public var hours: [Int] {
+            get { hourSlots.dense }
+            set { hourSlots = HourSlots(dense: newValue) }
+        }
         // Git
         public var commits = 0
         public var linesAdded = 0
@@ -202,7 +274,7 @@ public enum Stats {
             c.sessionTally += b.sessionTally
             c.sessionSeconds += b.sessionSeconds
             c.sessionBuckets = summed(a.sessionBuckets, b.sessionBuckets)
-            c.hours = summed(a.hours, b.hours)
+            c.hourSlots = a.hourSlots + b.hourSlots
             c.commits += b.commits
             c.linesAdded += b.linesAdded
             c.linesRemoved += b.linesRemoved
@@ -327,13 +399,13 @@ public enum Stats {
             sessionSeconds = try c.decodeIfPresent(Double.self, forKey: .sessionSeconds) ?? d.sessionSeconds
             sessionBuckets = try c.decodeIfPresent([Int].self, forKey: .sessionBuckets) ?? d.sessionBuckets
             if let slots = try c.decodeIfPresent([Int].self, forKey: .hourSlots) {
-                var dense = d.hours
-                for i in stride(from: 0, to: slots.count - 1, by: 2) where dense.indices.contains(slots[i]) {
-                    dense[slots[i]] = slots[i + 1]
-                }
-                hours = dense
+                var window = HourSlots()   // out-of-range slots are ignored, as before
+                for i in stride(from: 0, to: slots.count - 1, by: 2) { window[slots[i]] = slots[i + 1] }
+                hourSlots = window
+            } else if let dense = try c.decodeIfPresent([Int].self, forKey: .hours) {
+                hourSlots = HourSlots(dense: dense)
             } else {
-                hours = try c.decodeIfPresent([Int].self, forKey: .hours) ?? d.hours
+                hourSlots = d.hourSlots
             }
             commits = try c.decodeIfPresent(Int.self, forKey: .commits) ?? d.commits
             linesAdded = try c.decodeIfPresent(Int.self, forKey: .linesAdded) ?? d.linesAdded
@@ -411,12 +483,12 @@ public enum Stats {
             if sessionTally != d.sessionTally { try c.encode(sessionTally, forKey: .sessionTally) }
             if sessionSeconds != d.sessionSeconds { try c.encode(sessionSeconds, forKey: .sessionSeconds) }
             if sessionBuckets != d.sessionBuckets { try c.encode(sessionBuckets, forKey: .sessionBuckets) }
-            if !lean || hours.isEmpty {
+            if !lean || hourSlots.dropped {
                 try c.encode(hours, forKey: .hours)
             } else {
-                let set = hours.enumerated().filter { $0.element != 0 }
+                let set = hourSlots.set
                 if set.count > 24 { try c.encode(hours, forKey: .hours) }
-                else if !set.isEmpty { try c.encode(set.flatMap { [$0.offset, $0.element] }, forKey: .hourSlots) }
+                else if !set.isEmpty { try c.encode(set.flatMap { [$0.slot, $0.count] }, forKey: .hourSlots) }
             }
             if commits != d.commits { try c.encode(commits, forKey: .commits) }
             if linesAdded != d.linesAdded { try c.encode(linesAdded, forKey: .linesAdded) }
