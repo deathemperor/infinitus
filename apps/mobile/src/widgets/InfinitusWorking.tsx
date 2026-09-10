@@ -34,13 +34,15 @@ export function InfinitusWorking(
   const isLight = environment.colorScheme === "light";
   // A window's bar reads by how full it is, not by the theme's colour name
   // (which the widget cannot resolve): sky, amber past 70 %, red past 90 %.
+  // `pct` is 0–100, the Mac's UsageWindow scale (the Accounts route's too).
   const barTint = (pct: number): string => {
     if (environment.isLuminanceReduced) return secondary;
-    if (pct >= 0.9) return isLight ? "#dc2626" : "#fca5a5";
-    if (pct >= 0.7) return isLight ? "#d97706" : "#fcd34d";
+    if (pct >= 90) return isLight ? "#dc2626" : "#fca5a5";
+    if (pct >= 70) return isLight ? "#d97706" : "#fcd34d";
     return isLight ? "#0284c7" : "#7dd3fc";
   };
-  const percent = (pct: number): string => `${Math.round(Math.min(1, Math.max(0, pct)) * 100)}%`;
+  const fraction = (pct: number): number => Math.min(1, Math.max(0, pct / 100));
+  const percent = (pct: number): string => `${Math.round(fraction(pct) * 100)}%`;
 
   const windows = props.windows;
   const binding =
@@ -71,10 +73,7 @@ export function InfinitusWorking(
       >
         {window.label}
       </Text>
-      <ProgressView
-        value={Math.min(1, Math.max(0, window.pct))}
-        modifiers={[tint(barTint(window.pct))]}
-      />
+      <ProgressView value={fraction(window.pct)} modifiers={[tint(barTint(window.pct))]} />
       <Text
         modifiers={[
           font({ weight: "semibold", size: 11 }),

@@ -47,8 +47,8 @@ const working: InfinitusWorkingActivityState = {
   plan: "Max 20×",
   cash: null,
   windows: [
-    { label: "5h", color: "green", pct: 0.42, reset: "1h10m·13:00" },
-    { label: "7d", color: "amber", pct: 0.93, reset: null },
+    { label: "5h", color: "green", pct: 42, reset: "1h10m·13:00" },
+    { label: "7d", color: "amber", pct: 93, reset: null },
   ],
   binding: 1,
   busy: 2,
