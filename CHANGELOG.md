@@ -76,6 +76,7 @@ publishes the matching section as the GitHub release body.
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 
 - The transcript stats cache is per Claude config home, so a fixture or dev instance no longer replaces the real one and the next launch re-reads nothing (#346).
+- One `INFINITUS_APP_SUPPORT` variable moves every file the app writes, so a dev or fixture instance never touches the real Application Support/Infinitus (#506).
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
 - Usage gains its cost tab: the engine's raw token cost for the period, a daily chart, per-account and per-model shares and the token totals, across every paired Mac.

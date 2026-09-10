@@ -82,8 +82,7 @@ final class UtilizationModel: ObservableObject {
     }
 
     nonisolated static let ratesCacheURL: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/token-rates-cache.json")
+        AppSupport.root().appendingPathComponent("token-rates-cache.json")
     }()
 
     func refreshRates() {
