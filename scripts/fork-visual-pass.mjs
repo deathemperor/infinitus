@@ -134,6 +134,8 @@ const shutdown = async () => {
   if (ownsProfile) NodeFS.rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
 };
 process.on("SIGINT", () => void shutdown().then(() => process.exit(130)));
+// An uncaught error still takes Chrome down (the temp profile is left for inspection).
+process.on("exit", () => chrome.child.kill());
 
 const { ws, send, evaluate, ready } = connect(chrome.wsUrl);
 await ready;
