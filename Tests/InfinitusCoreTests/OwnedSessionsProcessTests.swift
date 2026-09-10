@@ -201,6 +201,34 @@ final class OwnedSessionsProcessTests: XCTestCase {
         XCTAssertFalse(ClaudeSessions.isAlive(pid))
     }
 
+    /// #510's sibling: a child waited on through its termination handler
+    /// alone is never freed on Linux, and each kept its two pipe ends.
+    func testAnExitedChildLeavesNoDescriptorBehind() async throws {
+        #if os(Windows)
+        throw XCTSkip("no /dev/fd to count")
+        #endif
+        try writeExitingFake()
+        let states = States()
+        let owned = OwnedSessions(binaryPath: scriptURL.path, onState: { pid, s in states.add(pid, s) })
+        func exits() -> Int { states.all.filter { $0 == .exited }.count }
+        func openDescriptors() throws -> Int { try FileManager.default.contentsOfDirectory(atPath: "/dev/fd").count }
+        _ = try await startedPid(owned, request())
+        waitFor("first exit") { exits() == 1 }
+        // `forget` (the Process's release) hops through a Task after the
+        // handler; give it a beat before counting, both times.
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let before = try openDescriptors()
+        for i in 2...9 {
+            _ = try await startedPid(owned, request())
+            waitFor("exit \(i)") { exits() == i }
+        }
+        // The handler's own cleanup (`forget`) hops through a Task.
+        waitFor("cleared") { owned.ownedPids.isEmpty }
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let after = try openDescriptors()
+        XCTAssertLessThanOrEqual(after, before + 2, "8 exited children left \(after - before) descriptors open")
+    }
+
     func testTheLedgerHoldsThePidWithItsSessionIdAndClearsOnStop() async throws {
         try writeFake()
         let ledgerURL = cwd.appendingPathComponent("ledger.json")

@@ -223,7 +223,11 @@ public actor OwnedSessions {
         // sessionId there means "skip", never "match anything").
         ledger?.record(pid: child.pid, sessionId: "")
         attach(stdout.fileHandleForReading, to: child, ledger: ledger)
-        p.terminationHandler = { [weak self, registry] _ in
+        p.terminationHandler = { [weak self, registry] proc in
+            // Instant once the child is gone; on Linux it is what frees the
+            // Process (corelibs keeps a handler-waited one in a run-loop
+            // source cycle), and with it the stdin/stdout pipe ends (#510).
+            proc.waitUntilExit()
             stdout.fileHandleForReading.readabilityHandler = nil
             if child.set(.exited) { self?.publish(child.pid, .exited) }
             // The child is already gone — any blocked write has failed with
