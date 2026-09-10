@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   PREF_COPY,
   buildPrefSections,
+  defaultValue,
   displayValue,
   initialPrefWriteState,
   parseControlInput,
@@ -345,6 +346,34 @@ describe("reducePrefWrite", () => {
       snapshot(catalog([], []), true),
     );
     expect(restart.relaunching).toBe(true);
+  });
+
+  it("stops waiting for a relaunch the app refused to start", () => {
+    const refused = run([
+      submit("engine_cswap_enabled", false, true),
+      { type: "failed", key: "engine_cswap_enabled", error: "cswap is not installed" },
+      { type: "relaunchAborted" },
+    ]);
+
+    expect(refused.relaunching).toBe(false);
+    expect(refused.sawUnavailable).toBe(false);
+    expect(refused.pending.size).toBe(0);
+    // The refusal itself still has to be readable under the row.
+    expect(refused.errors.get("engine_cswap_enabled")).toBe("cswap is not installed");
+  });
+});
+
+describe("defaultValue", () => {
+  it("reads the fallback in the pref's own type", () => {
+    expect(defaultValue(flag)).toBe(false);
+    expect(defaultValue(lead)).toBe(10);
+    expect(defaultValue(glass)).toBe(0.7);
+    expect(defaultValue(layout)).toBe("wide");
+  });
+
+  it("falls back the way the catalog does when the default is the wrong type", () => {
+    expect(defaultValue(pref({ key: "compact_rows", type: "bool", default: "yes" }))).toBe(false);
+    expect(defaultValue(pref({ key: "revive_lead_minutes", type: "int", default: null }))).toBe(0);
   });
 });
 

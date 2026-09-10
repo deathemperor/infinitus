@@ -369,6 +369,9 @@ export const initialPrefWriteState: PrefWriteState = {
 export type PrefWriteEvent =
   | { type: "submit"; key: string; value: boolean | number | string; requiresRestart: boolean }
   | { type: "failed"; key: string; error: string }
+  /** The restart-effect write was refused, so the app never quit and nothing is
+      waiting for the socket to come back. */
+  | { type: "relaunchAborted" }
   | { type: "snapshot"; prefs?: InfinitusPrefs | undefined; available: boolean };
 
 function confirmPending(
@@ -405,6 +408,9 @@ export function reducePrefWrite(state: PrefWriteState, event: PrefWriteEvent): P
       errors.set(event.key, event.error);
       return { ...state, pending, errors };
     }
+    case "relaunchAborted": {
+      return { ...state, relaunching: false, sawUnavailable: false };
+    }
     case "snapshot": {
       const sawUnavailable = state.relaunching && !event.available ? true : state.sawUnavailable;
       const relaunching = state.relaunching && !(sawUnavailable && event.available);
@@ -416,6 +422,12 @@ export function reducePrefWrite(state: PrefWriteState, event: PrefWriteEvent): P
       };
     }
   }
+}
+
+/** The value the pref falls back to, in the pref's own type: what a reset
+    writes and what the "Default" hint names. */
+export function defaultValue(pref: InfinitusPref): boolean | number | string {
+  return typedValue(pref, pref.default);
 }
 
 /** What a row shows: the value an in-flight write set, else the snapshot's.
