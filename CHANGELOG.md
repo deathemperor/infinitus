@@ -98,6 +98,8 @@ publishes the matching section as the GitHub release body.
 - One `INFINITUS_APP_SUPPORT` variable moves every file the app writes, so a dev or fixture instance never touches the real Application Support/Infinitus (#506).
 - Settings › Display › Sort rows by gains Candidates: the active account first, then the rest in the order the engine would switch to them (#542).
 - The Mac's session chat window decodes only the transcript lines appended since its last refresh instead of a fresh window of 200 items on every change (#346).
+- The five-minute stats refresh sums again only the days a changed transcript touches instead of every file's, a second of CPU less per pass (#499).
+
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
 - Usage gains its cost tab: the engine's raw token cost for the period, a daily chart, per-account and per-model shares and the token totals, across every paired Mac.
