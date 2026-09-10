@@ -247,4 +247,86 @@ describe("AccountsPage", () => {
     });
     renderer.unmount();
   });
+
+  it("leaves the sign-ins section out when nothing lapsed", () => {
+    testState.snapshot = readySnapshot;
+
+    expect(renderToStaticMarkup(<AccountsPage />)).not.toContain("Sign-ins");
+  });
+
+  it("lists every lapsed profile under the fleets, even on a host with no fleets", () => {
+    const awsLogins: NonNullable<InfinitusSnapshot["awsLogins"]> = [
+      {
+        profile: "dev",
+        flow: "deviceCode",
+        pid: 101,
+        sessionLabel: "api · feature/login",
+        failedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+      },
+      {
+        profile: "me@example.com",
+        provider: "gcloud",
+        flow: "relay",
+        pid: 202,
+        sessionLabel: "web",
+        failedAt: null,
+        state: {
+          profile: "me@example.com",
+          flow: "local",
+          phase: "waitingForBrowser",
+          startedAt: 1,
+        },
+      },
+    ];
+    testState.snapshot = { ...readySnapshot, awsLogins };
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup.indexOf("Sign-ins")).toBeGreaterThan(markup.indexOf("OpenAI (cliproxy)"));
+    expect(markup).toContain("dev");
+    expect(markup).toContain("Lapsed 2h ago");
+    expect(markup).toContain("Waiting: api · feature/login");
+    expect(markup).toContain("Sign in: AWS dev");
+    expect(markup).toContain("me@example.com");
+    expect(markup).toContain("Waiting for the Mac&#x27;s browser…");
+    expect(markup).not.toContain("Sign in: gcloud me@example.com");
+
+    testState.snapshot = { available: true, fleets: [], sessions: [], commands: [], awsLogins };
+    const empty = renderToStaticMarkup(<AccountsPage />);
+    expect(empty).toContain("No engines report accounts on this host.");
+    expect(empty).toContain("Sign in: AWS dev");
+  });
+
+  it("starts a lapsed profile's sign-in scoped to its session", async () => {
+    testState.snapshot = {
+      ...readySnapshot,
+      awsLogins: [
+        { profile: "dev", flow: "deviceCode", pid: 101, failedAt: null },
+        { profile: "legacy", flow: "relay", pid: 303, failedAt: null },
+      ],
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0]!;
+
+    await act(async () => {
+      button("Sign in: AWS dev").props.onClick();
+    });
+    await act(async () => {
+      button("Sign in: AWS legacy").props.onClick();
+    });
+
+    expect(testState.command).toHaveBeenNthCalledWith(1, {
+      environmentId,
+      input: { command: "aws-login", args: ["dev"], options: { pid: "101" } },
+    });
+    expect(testState.command).toHaveBeenNthCalledWith(2, {
+      environmentId,
+      input: { command: "aws-login", args: ["legacy"], options: { local: "true", pid: "303" } },
+    });
+    renderer.unmount();
+  });
 });

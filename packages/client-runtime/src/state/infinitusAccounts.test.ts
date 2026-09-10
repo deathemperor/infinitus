@@ -1,5 +1,6 @@
 import type {
   InfinitusAccount,
+  InfinitusAwsLogin,
   InfinitusFleet,
   InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
@@ -10,11 +11,14 @@ import {
   accountsPageState,
   buildFleetSection,
   buildForecast,
+  buildSignInRows,
+  signInCommandArgs,
   type AccountAction,
   type AccountRowModel,
   type AccountsPageState,
   type FleetSectionModel,
   type ForecastModel,
+  type SignInRowModel,
   type UsageWindowBar,
 } from "./infinitusAccounts.ts";
 
@@ -290,5 +294,142 @@ describe("page state", () => {
     expect(state({ capability: true, snapshot: snapshot({ fleets: [twoAccounts] }) })).toBe(
       "ready",
     );
+  });
+});
+
+describe("sign-in rows", () => {
+  function login(overrides: Partial<InfinitusAwsLogin> = {}): InfinitusAwsLogin {
+    return {
+      profile: "dev",
+      flow: "deviceCode",
+      pid: 101,
+      sessionLabel: "api · feature/login",
+      failedAt: "2026-09-10T08:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("is empty without the aws-logins field, offline, or with nothing lapsed", () => {
+    expect(buildSignInRows(snapshot())).toEqual([]);
+    expect(buildSignInRows(snapshot({ available: false, awsLogins: [login()] }))).toEqual([]);
+    expect(buildSignInRows(snapshot({ awsLogins: [] }))).toEqual([]);
+  });
+
+  it("builds one idle row per tool and profile", () => {
+    const rows = buildSignInRows(
+      snapshot({
+        awsLogins: [
+          login(),
+          login({ profile: "me@example.com", provider: "gcloud", flow: "relay", pid: 202 }),
+        ],
+      }),
+    );
+    const expected: ReadonlyArray<SignInRowModel> = [
+      {
+        key: "aws:dev",
+        tool: "aws",
+        toolLabel: "AWS",
+        profile: "dev",
+        failedAt: "2026-09-10T08:00:00Z",
+        sessions: ["api · feature/login"],
+        pid: 101,
+        deviceCode: true,
+        phase: "idle",
+        url: null,
+        userCode: null,
+        message: null,
+      },
+      {
+        key: "gcloud:me@example.com",
+        tool: "gcloud",
+        toolLabel: "gcloud",
+        profile: "me@example.com",
+        failedAt: "2026-09-10T08:00:00Z",
+        sessions: ["api · feature/login"],
+        pid: 202,
+        deviceCode: false,
+        phase: "idle",
+        url: null,
+        userCode: null,
+        message: null,
+      },
+    ];
+    expect(rows).toEqual(expected);
+  });
+
+  it("folds every session waiting on one profile into its row, latest lapse first", () => {
+    const rows = buildSignInRows(
+      snapshot({
+        sessions: [{ pid: 303, name: "web", cwd: "/w", kind: "claude" }],
+        awsLogins: [
+          login({ pid: 101, failedAt: "2026-09-10T08:00:00Z" }),
+          login({ pid: 303, sessionLabel: null, failedAt: "2026-09-10T09:30:00Z" }),
+          login({ pid: 404, sessionLabel: null, failedAt: null }),
+          login({ pid: 101, failedAt: "2026-09-10T08:00:00Z" }),
+        ],
+      }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      key: "aws:dev",
+      failedAt: "2026-09-10T09:30:00Z",
+      pid: 303,
+      sessions: ["api · feature/login", "web", "pid 404"],
+    });
+  });
+
+  it("carries the running login's phase, page and code", () => {
+    const at = (phase: string, extra: Partial<NonNullable<InfinitusAwsLogin["state"]>> = {}) =>
+      buildSignInRows(
+        snapshot({
+          awsLogins: [
+            login({
+              state: { profile: "dev", flow: "deviceCode", phase, startedAt: 1, ...extra },
+            }),
+          ],
+        }),
+      )[0]!;
+    expect(at("starting")).toMatchObject({ phase: "starting", url: null, userCode: null });
+    expect(
+      at("waitingForCode", { url: "https://device.sso.example/", userCode: "ABCD-EFGH" }),
+    ).toMatchObject({
+      phase: "waiting",
+      url: "https://device.sso.example/",
+      userCode: "ABCD-EFGH",
+    });
+    expect(at("waitingForBrowser")).toMatchObject({ phase: "waiting" });
+    expect(at("somethingNewer")).toMatchObject({ phase: "waiting" });
+    expect(at("done")).toMatchObject({ phase: "done" });
+    expect(at("failed", { message: "token endpoint refused" })).toMatchObject({
+      phase: "failed",
+      message: "token endpoint refused",
+    });
+  });
+
+  it("starts a device-code profile flag-less and every other flow on the Mac's browser", () => {
+    const [aws, gcloud, relay] = buildSignInRows(
+      snapshot({
+        awsLogins: [
+          login(),
+          login({ profile: "me@example.com", provider: "gcloud", flow: "relay", pid: null }),
+          login({ profile: "legacy", flow: "relay", pid: 505 }),
+        ],
+      }),
+    );
+    expect(signInCommandArgs(aws!)).toEqual({
+      command: "aws-login",
+      args: ["dev"],
+      options: { pid: "101" },
+    });
+    expect(signInCommandArgs(gcloud!)).toEqual({
+      command: "gcloud-login",
+      args: ["me@example.com"],
+      options: { local: "true" },
+    });
+    expect(signInCommandArgs(relay!)).toEqual({
+      command: "aws-login",
+      args: ["legacy"],
+      options: { local: "true", pid: "505" },
+    });
   });
 });
