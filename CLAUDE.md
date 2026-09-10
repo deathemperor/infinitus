@@ -40,11 +40,17 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   option. Still ask before destructive or irreversible actions (a
   history rewrite, a force-push, deleting user data).
 - **Push nothing to any remote** unless explicitly asked. Commit locally.
-- **main takes commits only through pull requests** (GitHub ruleset
-  "main via pull requests", user 2026-09-04): no direct push, no
+- **Branch layout since 2026-09-10 (#555):** this repo's `main` is the
+  T3 Code fork (TypeScript, never an upstream PR); the native Swift app
+  lives on `native`. Base native work on `origin/native`; never `git
+  pull`/merge `main` into a native branch (unrelated history). Fork
+  releases are GitHub prereleases with their own tags — `releases/latest`
+  and the `nightly` tag stay native (AboutPane polls them).
+- **`native` takes commits only through pull requests** (GitHub ruleset
+  "native via pull requests", user 2026-09-04): no direct push, no
   force-push, no deletion; 0 required approvals (solo repo); required
   checks test, e2e, linux, ios green on the PR head (never windows,
-  2026-09-06, #206). Work on a branch, `gh pr create`, merge with
+  2026-09-06, #206). Work on a branch, `gh pr create --base native`, merge with
   `gh pr merge --squash` (or `--merge` when the branch history matters)
   once tests pass; `--auto` queues the merge behind the checks. PRs get
   `size:*` and `vouch:*` labels automatically.
@@ -142,9 +148,9 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   (one `cd` there; separate `.build`). Main (`~/death/limitless`) is
   merge-only and owned by the first session, which also owns
   `Infinitus.app` rebuild/relaunch (always from a clean worktree at a
-  main sha) and the PRs. Ship flow: e2 commits → "merge e2 at <sha>" →
-  push `e2` → `gh pr create --base main --head e2` → tests → `gh pr
-  merge --merge` → `git pull` main → rebuild → relaunch. Never edit the
+  native sha) and the PRs. Ship flow: e2 commits → "merge e2 at <sha>" →
+  push `e2` → `gh pr create --base native --head e2` → tests → `gh pr
+  merge --merge` → `git pull` native → rebuild → relaunch. Never edit the
   other session's tree; in either tree stage by explicit path.
 - Linux corelibs `Process`: one waited on through its `terminationHandler`
   alone is never freed — its run-loop source retains it back and
