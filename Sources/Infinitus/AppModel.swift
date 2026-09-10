@@ -825,7 +825,18 @@ final class AppModel: ObservableObject {
         }
     }
 
-    struct SessionRow { let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String }
+    struct SessionRow {
+        let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
+        let sessionId: String; let startedAt: Date?
+    }
+
+    /// The alias every live session runs on right now — one active
+    /// account per engine, so it is the fleet's, not the session's (#612).
+    var activeAccountName: String? {
+        guard let fleet = primary, let n = fleet.activeNumber,
+              let account = fleet.accounts.first(where: { $0.number == n }) else { return nil }
+        return account.alias ?? String(account.email.prefix(while: { $0 != "@" }))
+    }
 
     /// The live sessions as the control socket lists them (#79): the
     /// record plus the name the popup shows.
@@ -835,7 +846,8 @@ final class AppModel: ObservableObject {
             let progress = sessionProgress.byPid[pid]
             let shown = SessionNaming.displayName(name: progress?.name ?? record.name,
                                                   autoName: progress?.autoName, cwd: record.cwd)
-            return SessionRow(pid: pid, name: shown, cwd: record.cwd, status: record.status, kind: record.kind)
+            return SessionRow(pid: pid, name: shown, cwd: record.cwd, status: record.status, kind: record.kind,
+                              sessionId: record.sessionId, startedAt: record.startedAt)
         }
     }
 

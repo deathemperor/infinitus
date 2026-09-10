@@ -112,6 +112,8 @@ publishes the matching section as the GitHub release body.
 - Team publish: a transcript line runs a redaction regex only when it carries that rule's telltale text, so the per-publish redaction pass costs a fifteenth of what it did (#346).
 - Resume: a session held by the gate is no longer marked as nudged when a tick resumes its neighbours, so later ticks still resume it once a fresh usage poll allows (#621).
 - The project list's past-sessions walk (10k transcripts, ~1 s of CPU every minute) now runs only when a project directory or the live set actually changed, on a hundred-stat fingerprint (#346).
+- `infinitusctl sessions` rows carry the session id, the account alias they run on, the start time and any pending sign-in need (`aws-login:<profile>`), for the fork's sessions list (#612).
+- `infinitusctl show session <pid>` opens that session's chat window, and `nudge <pid>` sends it the resume nudge by hand, answering with the reason when it is not resumable (#612).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

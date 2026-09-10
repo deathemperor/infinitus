@@ -15,6 +15,9 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
     /// When `status` last changed (the record's `statusUpdatedAt`, epoch
     /// ms); nil on older builds.
     public let statusUpdatedAt: Date?
+    /// When the session started (the record's `startedAt`, epoch ms);
+    /// nil from records that predate it.
+    public let startedAt: Date?
     /// Unix socket the session listens on for cross-session messages;
     /// empty when the record carries none (older builds, non-messaging
     /// sessions). Never derived from the pid — a stale socket file outlives
@@ -30,7 +33,8 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
 
     public init(pid: Int32, sessionId: String, cwd: String, kind: String = "interactive",
                 status: String? = nil, messagingSocketPath: String = "", peerProtocol: Int = 0,
-                name: String? = nil, statusUpdatedAt: Date? = nil, entrypoint: String? = nil) {
+                name: String? = nil, statusUpdatedAt: Date? = nil, entrypoint: String? = nil,
+                startedAt: Date? = nil) {
         self.pid = pid
         self.sessionId = sessionId
         self.cwd = cwd
@@ -40,6 +44,7 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
         self.peerProtocol = peerProtocol
         self.name = name
         self.statusUpdatedAt = statusUpdatedAt
+        self.startedAt = startedAt
         self.entrypoint = entrypoint
     }
 
@@ -47,7 +52,7 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
     public func with(status: String?) -> ClaudeSessionRecord {
         ClaudeSessionRecord(pid: pid, sessionId: sessionId, cwd: cwd, kind: kind, status: status,
                             messagingSocketPath: messagingSocketPath, peerProtocol: peerProtocol,
-                            name: name, statusUpdatedAt: statusUpdatedAt, entrypoint: entrypoint)
+                            name: name, statusUpdatedAt: statusUpdatedAt, entrypoint: entrypoint, startedAt: startedAt)
     }
 }
 
@@ -117,7 +122,9 @@ public enum ClaudeSessions {
                 name: (obj["name"] as? String).flatMap { $0.isEmpty ? nil : $0 },
                 statusUpdatedAt: (obj["statusUpdatedAt"] as? NSNumber)
                     .flatMap { isBool($0) ? nil : Date(timeIntervalSince1970: $0.doubleValue / 1000) },
-                entrypoint: obj["entrypoint"] as? String))
+                entrypoint: obj["entrypoint"] as? String,
+                startedAt: (obj["startedAt"] as? NSNumber)
+                    .flatMap { isBool($0) ? nil : Date(timeIntervalSince1970: $0.doubleValue / 1000) }))
         }
         return out.sorted { $0.pid < $1.pid }
     }
