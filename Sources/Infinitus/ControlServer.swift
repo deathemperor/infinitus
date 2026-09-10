@@ -660,6 +660,21 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
+        case "prefs":
+            // `prefs` lists every entry; `prefs get k…` only those keys.
+            var keys: [String]? = nil
+            if r.args.first == "get" {
+                keys = Array(r.args.dropFirst())
+                if keys!.isEmpty { throw Fail("usage: prefs [get <key>...]") }
+            } else if !r.args.isEmpty {
+                throw Fail("usage: prefs [get <key>...]")
+            }
+            do {
+                return ControlReply(ok: true, result: try .of(model.prefsReply(keys: keys)))
+            } catch let unknown as PrefCatalog.UnknownKey {
+                throw Fail("unknown pref \(unknown.key)")
+            }
+
         case "hide":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {
                 throw Fail("no status item yet")

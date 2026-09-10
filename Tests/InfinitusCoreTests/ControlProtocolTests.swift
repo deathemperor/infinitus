@@ -68,6 +68,8 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("team-code")?.effect, .write, "fetches the store and (--invite) writes the nonce book")
         XCTAssertEqual(ControlCommand.named("show")?.args, ["popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]"])
         XCTAssertEqual(ControlCommand.named("hide")?.args, ["popout|settings|workspace"])
+        XCTAssertEqual(ControlCommand.named("prefs")?.effect, .read)
+        XCTAssertEqual(ControlCommand.named("prefs")?.args, ["[get <key>...]"])
         XCTAssertNotNil(ControlCommand.named("team-code")); XCTAssertNotNil(ControlCommand.named("team-fetch")); XCTAssertNotNil(ControlCommand.named("team-decline"))
         XCTAssertNil(ControlCommand.named("nope"))
     }

@@ -35,12 +35,16 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         /// host is portable there but not wired yet — so a phone sees a
         /// considered no rather than a build that predates the field.
         public var terminal: Bool?
+        /// `GET /prefs` (#558): the preference catalog with values.
+        public var prefs: Bool?
         public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
                     ownedSessions: Bool? = nil, checkpoints: Bool? = nil, team: Bool? = nil,
-                    pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil, terminal: Bool? = nil) {
+                    pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil, terminal: Bool? = nil,
+                    prefs: Bool? = nil) {
             self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
             self.ownedSessions = ownedSessions; self.checkpoints = checkpoints; self.team = team
             self.pastSessions = pastSessions; self.images = images; self.files = files; self.terminal = terminal
+            self.prefs = prefs
         }
     }
     public let machineId: String
@@ -70,7 +74,8 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
                                 capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
                                                            ownedSessions: true, checkpoints: true, team: true,
-                                                           pastSessions: true, images: true, files: true, terminal: terminal))
+                                                           pastSessions: true, images: true, files: true, terminal: terminal,
+                                                           prefs: true))
     }
 
     /// The Linux tray's truth (#486 slice 2, `infinitus-tray serve`):
@@ -88,6 +93,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
                          capabilities: Capabilities(timeline: true, sequence: true, attention: false, leases: false,
                                                     ownedSessions: false, checkpoints: true, team: false,
-                                                    pastSessions: false, images: false, files: true, terminal: false))
+                                                    pastSessions: false, images: false, files: true, terminal: false,
+                                                    prefs: false))
     }
 }

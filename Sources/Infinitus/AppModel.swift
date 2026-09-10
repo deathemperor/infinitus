@@ -1175,6 +1175,12 @@ final class AppModel: ObservableObject {
     /// Re-read the persisted display prefs after an iCloud sync pull — the
     /// @Published values were initialized once at launch and would
     /// otherwise never see the imported defaults.
+    /// The preference catalog with this install's values (#558): what
+    /// `infinitusctl prefs` and the mirror's `GET /prefs` answer.
+    func prefsReply(keys: [String]? = nil) throws -> PrefCatalog.Reply {
+        try PrefCatalog.reply(from: defaults, keys: keys)
+    }
+
     func reloadPrefs() {
         showAccountName = defaults.object(forKey: "show_account_name") as? Bool ?? true
         let pct = defaults.string(forKey: "title_pct") ?? "both"
@@ -1481,6 +1487,9 @@ final class AppModel: ObservableObject {
             if let mode = birth.hookMode { toolApprovals.setMode(mode, sessionId: record.sessionId) }
             for rule in profileAllowRules(birth) { toolApprovals.add(rule, sessionId: record.sessionId) }
         }
+        // UserDefaults is thread-safe; the closure only reads it.
+        nonisolated(unsafe) let prefDefaults = defaults
+        mirrorServer.prefs.set { try PrefCatalog.reply(from: prefDefaults) }
         mirrorServer.pastSessions.set { limit, search in
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                                            limit: limit, search: search))
