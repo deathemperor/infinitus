@@ -299,22 +299,39 @@ public struct TeamPublisher {
     /// copies only: the day, session, now and crash copies are kilobytes
     /// and `reshare` needs every one of them. Returns how many went.
     @discardableResult
-    func pruneCopies(cap: Int) -> Int {
+    func pruneCopies(cap: Int) -> Int { Self.pruneCopies(in: copiesDir, cap: cap) }
+
+    /// One enumerator pass with the three keys it needs, not
+    /// `subpathsOfDirectory` plus an `attributesOfItem` per file: that
+    /// built a full attribute dictionary for each of a 5,000-copy store's
+    /// files on every publish, ~0.8 s of the pass's CPU (#346). The keys
+    /// used are the ones corelibs-foundation implements too (the Linux
+    /// tests walk the same way in `Residue.size` and `Transcript.agentFiles`).
+    static func pruneCopies(in copiesDir: URL, cap: Int) -> Int {
         let fm = FileManager.default
-        guard let subpaths = try? fm.subpathsOfDirectory(atPath: copiesDir.path) else { return 0 }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
+        // The enumerator yields canonical paths (a temp dir's /var is
+        // /private/var), and `resolvingSymlinksInPath` leaves /var alone
+        // — so the root is canonicalised the same way for the prefix test.
+        #if os(Windows)
+        let root = copiesDir.standardizedFileURL
+        #else
+        var root = copiesDir
+        if let real = realpath(copiesDir.path, nil) {
+            root = URL(fileURLWithPath: String(cString: real), isDirectory: true)
+            free(real)
+        }
+        #endif
+        guard let walk = fm.enumerator(at: root, includingPropertiesForKeys: Array(keys)) else { return 0 }
+        let transcripts = root.appendingPathComponent("transcripts").path + "/"
         var total = 0
         var candidates: [(url: URL, size: Int, at: Date)] = []
-        for path in subpaths {
-            let url = copiesDir.appendingPathComponent(path)
-            // `attributesOfItem`, not `resourceValues(forKeys: [.fileSizeKey…])`:
-            // InfinitusCore's tests run on Linux too, and corelibs-foundation
-            // implements only a subset of the URL resource keys.
-            guard let attrs = try? fm.attributesOfItem(atPath: url.path),
-                  (attrs[.type] as? FileAttributeType) == .typeRegular else { continue }
-            let size = (attrs[.size] as? NSNumber)?.intValue ?? 0
+        for case let url as URL in walk {
+            guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { continue }
+            let size = values.fileSize ?? 0
             total += size
-            if path.hasPrefix("transcripts/") {
-                candidates.append((url, size, (attrs[.modificationDate] as? Date) ?? .distantPast))
+            if url.path.hasPrefix(transcripts) {
+                candidates.append((url, size, values.contentModificationDate ?? .distantPast))
             }
         }
         guard total > cap else { return 0 }
