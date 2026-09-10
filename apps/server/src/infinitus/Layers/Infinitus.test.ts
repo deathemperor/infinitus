@@ -79,6 +79,10 @@ interface ControlStubShape {
   readonly request: InfinitusControlClientShape["request"];
   /** Every command the service asked for, in order. */
   readonly calls: Effect.Effect<ReadonlyArray<string>>;
+  /** The same, with the options each carried (the lease body rides `--body`). */
+  readonly requests: Effect.Effect<
+    ReadonlyArray<{ readonly command: string; readonly options: Readonly<Record<string, string>> }>
+  >;
   readonly resetCalls: Effect.Effect<void>;
   readonly setResult: (command: string, result: unknown) => Effect.Effect<void>;
   /** A non-null cause makes every command answer `InfinitusUnavailable`. */
@@ -95,10 +99,20 @@ const ControlStubLive = Layer.effect(
     const results = yield* Ref.make<Record<string, unknown>>(defaultResults());
     const unavailable = yield* Ref.make<string | null>(null);
     const calls = yield* Ref.make<ReadonlyArray<string>>([]);
+    const requests = yield* Ref.make<
+      ReadonlyArray<{
+        readonly command: string;
+        readonly options: Readonly<Record<string, string>>;
+      }>
+    >([]);
 
     const request: InfinitusControlClientShape["request"] = (input) =>
       Effect.gen(function* () {
         yield* Ref.update(calls, (previous) => [...previous, input.command]);
+        yield* Ref.update(requests, (previous) => [
+          ...previous,
+          { command: input.command, options: input.options ?? {} },
+        ]);
         const cause = yield* Ref.get(unavailable);
         if (cause !== null) {
           return yield* new InfinitusUnavailable({ path: STUB_SOCKET, cause });
@@ -117,7 +131,8 @@ const ControlStubLive = Layer.effect(
     return {
       request,
       calls: Ref.get(calls),
-      resetCalls: Ref.set(calls, []),
+      requests: Ref.get(requests),
+      resetCalls: Effect.all([Ref.set(calls, []), Ref.set(requests, [])]).pipe(Effect.asVoid),
       setResult: (command, result) =>
         Ref.update(results, (previous) => ({ ...previous, [command]: result })),
       setUnavailable: (cause) => Ref.set(unavailable, cause),
@@ -441,5 +456,125 @@ describe("InfinitusService", () => {
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(AsyncTestLayer)),
+  );
+});
+
+describe("the lease", () => {
+  const manifestWithLease = () => {
+    const manifest = defaultResults().manifest as { commands: ReadonlyArray<unknown> };
+    return {
+      ...manifest,
+      commands: [...manifest.commands, manifestCommand("client-activity", "write")],
+    };
+  };
+  const leaseBodies = (stub: ControlStub["Service"]) =>
+    stub.requests.pipe(
+      Effect.map((requests) =>
+        requests
+          .filter((request) => request.command === "client-activity")
+          .map(
+            (request) =>
+              JSON.parse(request.options.body ?? "{}") as {
+                ttlMs: number;
+                scopes: unknown;
+                clientId: string;
+              },
+          ),
+      ),
+    );
+
+  effectIt.effect("holds sessions, fleets and stats every 25 s while somebody subscribes", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithLease());
+      yield* stub.setResult("client-activity", { clientId: "t3-server-x" });
+      const infinitus = yield* InfinitusService;
+      const { fiber } = yield* subscribe(infinitus);
+
+      let bodies = yield* leaseBodies(stub);
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]?.ttlMs).toBe(45_000);
+      expect(bodies[0]?.scopes).toEqual([
+        { type: "sessions" },
+        { type: "fleets" },
+        { type: "stats" },
+      ]);
+      expect(bodies[0]?.clientId).toMatch(/^t3-server-/);
+
+      // 5 s ticks: t = 5, 10, 15, 20 carry no lease, t = 25 does, t = 50 again.
+      yield* TestClock.adjust(Duration.seconds(20));
+      expect(yield* leaseBodies(stub)).toHaveLength(1);
+      yield* TestClock.adjust(FAST);
+      expect(yield* leaseBodies(stub)).toHaveLength(2);
+      yield* TestClock.adjust(Duration.seconds(25));
+      bodies = yield* leaseBodies(stub);
+      expect(bodies).toHaveLength(3);
+      expect(bodies.every((body) => body.ttlMs === 45_000)).toBe(true);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect(
+    "releases the lease when the last subscriber leaves, and leases again for the next",
+    () =>
+      Effect.gen(function* () {
+        const stub = yield* ControlStub;
+        yield* stub.setResult("manifest", manifestWithLease());
+        yield* stub.setResult("client-activity", { clientId: "t3-server-x" });
+        const infinitus = yield* InfinitusService;
+        const { fiber } = yield* subscribe(infinitus);
+        expect(yield* leaseBodies(stub)).toHaveLength(1);
+
+        yield* Fiber.interrupt(fiber);
+        // The release is detached from the unsubscribe; one scheduler turn lands it.
+        yield* TestClock.adjust(Duration.millis(1));
+        const afterRelease = yield* leaseBodies(stub);
+        expect(afterRelease).toHaveLength(2);
+        expect(afterRelease[1]?.ttlMs).toBe(0);
+
+        yield* TestClock.adjust(Duration.minutes(5));
+        expect(yield* leaseBodies(stub)).toHaveLength(2);
+
+        const second = yield* subscribe(infinitus);
+        const again = yield* leaseBodies(stub);
+        expect(again).toHaveLength(3);
+        expect(again[2]?.ttlMs).toBe(45_000);
+        yield* Fiber.interrupt(second.fiber);
+      }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("sends nothing to a build whose manifest lacks the verb", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+      const { fiber } = yield* subscribe(infinitus);
+      yield* TestClock.adjust(Duration.minutes(2));
+      expect((yield* stub.calls).filter((call) => call === "client-activity")).toEqual([]);
+      yield* Fiber.interrupt(fiber);
+      yield* TestClock.adjust(Duration.millis(1));
+      expect((yield* stub.calls).filter((call) => call === "client-activity")).toEqual([]);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("keeps publishing snapshots when the app refuses the lease", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      // Listed in the manifest, but the stub has no scripted reply: every lease
+      // fails as an unknown command.
+      yield* stub.setResult("manifest", manifestWithLease());
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.available).toBe(true);
+      expect((yield* stub.calls).filter((call) => call === "client-activity")).toHaveLength(1);
+
+      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* TestClock.adjust(FAST);
+      const next = yield* Queue.take(queue);
+      expect(next.available).toBe(true);
+      expect(next.fleets.map((entry) => entry.key)).toEqual(["cswap/codex"]);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
   );
 });
