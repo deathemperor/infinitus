@@ -157,6 +157,16 @@ final class TerminalHost: @unchecked Sendable {
             return .failure(.spawnFailed("\(error)"))
         }
         return .success(queue.sync {
+            // A concurrent open for the same pid can win the race between
+            // the check above and here — both saw no entry and both
+            // spawned (#507 follow-up). The insert is the single point of
+            // truth: whoever gets here first with `terminals[key] == nil`
+            // owns the pid, and a later loser kills the shell it just
+            // forked instead of orphaning it.
+            if let existing = terminals[key] {
+                killOrphan(master: spawned.master, child: spawned.child)
+                return OpenOutcome(reply: existing.reply, created: false)
+            }
             let terminal = Terminal(sessionPid: pid, id: key.id, cwd: cwd, child: spawned.child,
                                     fd: spawned.master, cols: request.cols, rows: request.rows)
             terminals[key] = terminal
@@ -173,6 +183,29 @@ final class TerminalHost: @unchecked Sendable {
             armIdleTimer(terminal)
             return OpenOutcome(reply: terminal.reply, created: true)
         })
+    }
+
+    /// Kills and reaps a shell a losing concurrent `open` just spawned
+    /// (#507 follow-up): the winner already owns `terminals[key]`, so this
+    /// one only has to not leak a fork or a zombie. `SIGHUP` then close the
+    /// master fd the way the read source's cancel handler does; if the
+    /// shell hasn't died by the time a normal close would give up, follow
+    /// with `SIGKILL` and a blocking reap.
+    private func killOrphan(master: Int32, child: pid_t) {
+        kill(child, SIGHUP)
+        fdQueue.async { Darwin.close(master) }
+        var status: Int32 = 0
+        if waitpid(child, &status, WNOHANG) != 0 { return }   // reaped, or ECHILD: already gone
+        // `asyncAfter`, not a `DispatchSourceTimer`: nothing here owns a
+        // `Terminal` to hang a retained timer off, and a purely local one
+        // would be deallocated (and so cancelled) the moment this function
+        // returns — the SIGKILL follow-up would silently never fire.
+        queue.asyncAfter(deadline: .now() + Self.killGrace) {
+            killpg(child, SIGKILL)
+            kill(child, SIGKILL)
+            var status: Int32 = 0
+            _ = waitpid(child, &status, 0)
+        }
     }
 
     // MARK: - Attach / detach
@@ -401,7 +434,11 @@ final class TerminalHost: @unchecked Sendable {
         frames.append(.closed(T3Terminal.ClosedPayload(reason: terminal.closeReason)))
         fan(terminal, frames)
         terminal.attachments.removeAll()
-        terminals[Key(pid: terminal.sessionPid, id: terminal.id)] = nil
+        // Only drop the map entry if it's still this terminal's — an
+        // orphaned loser of the open race (#507 follow-up) must not wipe
+        // out the winner that replaced it.
+        let key = Key(pid: terminal.sessionPid, id: terminal.id)
+        if terminals[key] === terminal { terminals[key] = nil }
     }
 
     /// Non-blocking reap: true once the child's status is known (or it was
