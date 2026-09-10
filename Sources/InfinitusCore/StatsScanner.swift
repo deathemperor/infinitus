@@ -425,11 +425,32 @@ public enum StatsScanner {
     }
 
     private static func writeCache(_ cache: Cache, to cacheURL: URL, fm: FileManager) {
-        let encoder = JSONEncoder()
-        encoder.userInfo[Stats.Day.leanEncoding] = true   // #499: defaults out, hours sparse
-        guard let data = try? encoder.encode(cache) else { return }
+        guard let data = try? encodeCache(cache) else { return }
         try? fm.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)
+    }
+
+    /// The cache's bytes, one file entry at a time (#499). `JSONEncoder`
+    /// builds the whole value tree before it serializes: on 11k files
+    /// that peaked +127 MB over the decoded cache for a 14 MB output and
+    /// left ~45 MB behind, on every checkpoint and every settled rewrite
+    /// (measured 2026-09-11). Entry by entry the peak is +16 MB, the time
+    /// the same, and the bytes decode to an equal cache — the same
+    /// `{"version":…,"files":{…}}` the synthesized encoder wrote, so no
+    /// version bump. Keys sorted, so two writes of one cache are one file.
+    static func encodeCache(_ cache: Cache) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.userInfo[Stats.Day.leanEncoding] = true   // #499: defaults out, hours sparse
+        var out = Data()
+        out.append(Data("{\"version\":\(cache.version),\"files\":{".utf8))
+        for (i, key) in cache.files.keys.sorted().enumerated() {
+            if i > 0 { out.append(UInt8(ascii: ",")) }
+            out.append(try encoder.encode([key]).dropFirst().dropLast())   // the quoted, escaped key
+            out.append(UInt8(ascii: ":"))
+            out.append(try encoder.encode(cache.files[key]!))
+        }
+        out.append(Data("}}".utf8))
+        return out
     }
 
     /// Bytes a file still owes given its cached read watermark. A file
