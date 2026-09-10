@@ -424,7 +424,7 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs set fork_server_port 3773 >/dev/null || fail "prefs set fork_server_port back"
 "$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
 "$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
-pgrep -f "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3773" >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
+pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
 echo "prefs: ok"
 
 # --- scenarios: all-dead (every window maxed, no candidate) --------------
