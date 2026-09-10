@@ -53,6 +53,7 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("resume-session")?.args, ["<sessionId>"])
         XCTAssertEqual(ControlCommand.named("profile-set")?.args, ["<name>"])
         XCTAssertEqual(ControlCommand.named("profile-remove")?.effect, .write)
+        XCTAssertTrue(ControlCommand.named("status")?.replyShape.contains("forkTunnel:{enabled, port, state, url?, hostname?}") ?? false)
         XCTAssertEqual(ControlCommand.named("checkpoint-restore")?.effect, .destructive)
         XCTAssertEqual(ControlCommand.named("checkpoint-diff")?.args, ["<pid|name>", "<n>", "[m]"])
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")

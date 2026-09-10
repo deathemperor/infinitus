@@ -44,6 +44,16 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(reply.prefs.first { $0.key == "engine_swapd_enabled" }?.effect, .restart)
     }
 
+    /// The fork server's tunnel (#572) is a Devices pref pair: off, on T3's port.
+    func testTheForkTunnelPrefsSitUnderDevicesWithT3sDefaultPort() throws {
+        let reply = try PrefCatalog.reply(from: defaults, keys: ["fork_tunnel_enabled", "fork_server_port"])
+        XCTAssertEqual(reply.prefs.map(\.section), ["devices", "devices"])
+        XCTAssertEqual(reply.prefs.map(\.effect), [.live, .live])
+        XCTAssertEqual(reply.prefs.map(\.value), [.bool(false), .number(3773)])
+        XCTAssertEqual(try PrefCatalog.write(.number(3774), key: "fork_server_port", to: defaults).value, .number(3774))
+        XCTAssertEqual(defaults.object(forKey: "fork_server_port") as? Int, 3774)
+    }
+
     func testStoredValuesReadBackTypedAndAnInvalidChoiceIsTheDefault() throws {
         defaults.set(false, forKey: "show_account_name")
         defaults.set(300, forKey: "refresh_interval")

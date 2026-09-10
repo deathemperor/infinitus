@@ -114,10 +114,17 @@ final class QuickTunnel: ObservableObject {
     private var process: Process?
     /// The child's pid, remembered across launches: a hard kill of the
     /// app (crash, SIGKILL) can't run any cleanup, and a public tunnel
-    /// left running afterwards is exactly what nobody asked for.
-    private static let pidKey = "mirror_tunnel_pid"
+    /// left running afterwards is exactly what nobody asked for. One
+    /// key per instance — the mirror's tunnel and the fork server's
+    /// (#572) each remember their own child.
+    private let pidKey: String
+    /// The port the running child fronts.
+    private(set) var port: UInt16?
 
-    init() {
+    var isRunning: Bool { process != nil }
+
+    init(pidKey: String = "mirror_tunnel_pid") {
+        self.pidKey = pidKey
         reapOrphan()
         // A child process must not outlive the app that opened a public
         // door with it — the menu's Quit calls stop() through
@@ -173,7 +180,8 @@ final class QuickTunnel: ObservableObject {
             return
         }
         self.process = process
-        UserDefaults.standard.set(Int(process.processIdentifier), forKey: Self.pidKey)
+        self.port = port
+        UserDefaults.standard.set(Int(process.processIdentifier), forKey: pidKey)
         status = "starting a quick tunnel…"
     }
 
@@ -181,8 +189,8 @@ final class QuickTunnel: ObservableObject {
     /// the command line has to still look like ours before anything dies.
     private func reapOrphan() {
         let defaults = UserDefaults.standard
-        let pid = defaults.integer(forKey: Self.pidKey)
-        defaults.removeObject(forKey: Self.pidKey)
+        let pid = defaults.integer(forKey: pidKey)
+        defaults.removeObject(forKey: pidKey)
         guard pid > 1, let command = Self.commandLine(of: pid),
               command.contains("cloudflared"), command.contains("--url") else { return }
         kill(pid_t(pid), SIGTERM)
@@ -208,7 +216,8 @@ final class QuickTunnel: ObservableObject {
         (process.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         process.terminationHandler = nil
         self.process = nil
-        UserDefaults.standard.removeObject(forKey: Self.pidKey)
+        port = nil
+        UserDefaults.standard.removeObject(forKey: pidKey)
         if process.isRunning { process.terminate() }
         url = nil
         status = nil
@@ -225,7 +234,8 @@ final class QuickTunnel: ObservableObject {
     private func ended() {
         guard process != nil else { return }
         process = nil
-        UserDefaults.standard.removeObject(forKey: Self.pidKey)
+        port = nil
+        UserDefaults.standard.removeObject(forKey: pidKey)
         url = nil
         status = "the quick tunnel stopped"
         log?("⚠️", "quick tunnel stopped")
