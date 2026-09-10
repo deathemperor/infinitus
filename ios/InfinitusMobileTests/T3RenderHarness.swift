@@ -339,6 +339,16 @@ import InfinitusUI
         try Self.attach(name: "image-file-dark", png: Self.render(imagePage), dir: dir, test: self)
         let git = T3GitSheet(branch: "t3-c5", session: session).t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "git-sheet-dark", png: Self.render(git), dir: dir, test: self)
+        // A canned attach stream (#507): the snapshot's scrollback, then one
+        // output frame — no username, as the reference's redaction demands.
+        let terminalHistory = "limitless % ls\r\nCHANGELOG.md   Package.swift  Sources  Tests  ios  tools\r\nlimitless % git status --short\r\n M ios/project.yml\r\nlimitless % "
+        let terminalFrames: [T3Terminal.Frame] = [
+            .snapshot(.init(history: terminalHistory, status: .running, sequence: terminalHistory.utf8.count)),
+            .output(.init(data: "swift test", sequence: terminalHistory.utf8.count + 10)),
+        ]
+        let terminal = NavigationStack { T3TerminalScreen(model: model, session: session, fixture: terminalFrames) }
+            .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
+        try Self.attach(name: "terminal-dark", png: Self.render(terminal), dir: dir, test: self)
         // refs/ios-files.png: the fixture project's dotfolders, top level open.
         let parityFiles = NavigationStack {
             T3FilesScreen(model: model, session: paritySession, fixture: Self.parityListing)

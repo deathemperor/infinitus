@@ -117,6 +117,7 @@ publishes the matching section as the GitHub release body.
 - The Files tree is built off the main thread and a search re-derives its rows once per keystroke instead of once per redraw.
 - A Files image (png, jpg, gif, webp, heic) shows as a picture with its size, tap for full-screen, once the Mac serves image bytes (#223).
 - A file's source on the phone splits lines and words its limit strip the way the Mac's Files tab does (CRLF files no longer render as one line).
+- The thread header's Terminal pill opens the session's shell once the Mac hosts terminals (#507): SwiftTerm, a keys row (ctrl, esc, tab, arrows, paste), a stream that reconnects where it left off.
 
 ## 0.4.4-alpha.2
 

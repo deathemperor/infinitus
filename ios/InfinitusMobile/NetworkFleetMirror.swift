@@ -403,6 +403,35 @@ actor NetworkFleetMirror: FleetMirror {
         return data
     }
 
+    /// A POST/DELETE with a JSON body (or none) — same endpoint order as
+    /// `getData`; the reply body, empty on a 204.
+    func sendData(_ path: String, method: String, body: Data?) async throws -> Data {
+        let token = pairToken()
+        if let stored = try await fetchFromStored(path: path, token: token, timeout: Self.candidateTimeout,
+                                                  method: method, body: body) {
+            return stored
+        }
+        let discovered = try await discover()
+        let (data, _) = try await fetch(discovered, path: path, hostHeader: "infinitus", useTLS: false,
+                                        token: token, timeout: Self.candidateTimeout, method: method, body: body)
+        return data
+    }
+
+    /// A long-lived GET the caller reads with `URLSession.bytes` (the
+    /// terminal stream, #507): the last-good endpoint, and the pairing
+    /// token as `?t=` because `bytes(for:)` sets no header per chunk (#507
+    /// ruling 7) — the URL must never reach a log line.
+    func streamRequest(path: String) -> URLRequest? {
+        guard let text = candidateEndpoints().first, let manual = MirrorTransport.parseEndpoint(text),
+              var components = URLComponents(string: "\(manual.useTLS ? "https" : "http")://\(manual.host):\(manual.port)\(path)")
+        else { return nil }
+        components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "t", value: pairToken())]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 86_400)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        return request
+    }
+
     /// The session timeline (#223 phase 4): a snapshot on the first ask,
     /// then the events past `after` while `epoch` still matches, else a
     /// fresh snapshot — the Mac holds a `wait` long-poll until something

@@ -38,7 +38,7 @@ OUT=ios/build/archive
 ARCHIVE="$OUT/InfinitusMobile.xcarchive"
 rm -rf "$ARCHIVE" "$OUT/export"
 (cd ios && xcodegen generate -q)
-xcodebuild -quiet -project ios/InfinitusMobile.xcodeproj -scheme InfinitusMobile \
+xcodebuild -quiet -skipPackagePluginValidation -project ios/InfinitusMobile.xcodeproj -scheme InfinitusMobile \
   -configuration Release -destination 'generic/platform=iOS' \
   -derivedDataPath ios/build -archivePath "$ARCHIVE" \
   ${BUILD:+CURRENT_PROJECT_VERSION="$BUILD"} "${PROVISION[@]+"${PROVISION[@]}"}" archive
