@@ -48,6 +48,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `WsRpcGroup`.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
   `ExecutionEnvironmentCapabilities`.
+- `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` in
+  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts it.
 - `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
   and answers the two Infinitus methods.
 - `apps/server/src/auth/RpcAuthorization.ts` — a scope for each of them; the
