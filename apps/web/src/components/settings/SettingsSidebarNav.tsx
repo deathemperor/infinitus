@@ -11,19 +11,26 @@ import {
 } from "react";
 import {
   ArchiveIcon,
+  BellIcon,
   BlocksIcon,
   BotIcon,
+  CpuIcon,
   createLucideIcon,
   GitBranchIcon,
+  IdCardIcon,
+  InfinityIcon,
   PanelsTopLeftIcon,
   KeyboardIcon,
   Link2Icon,
   PaletteIcon,
   SearchIcon,
   Settings2Icon,
+  SmartphoneIcon,
   XIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
+
+import { useEnvironments } from "~/state/environments";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -40,6 +47,7 @@ import {
 import { SidebarUtilityMenu } from "../sidebar/SidebarChrome";
 import { scrollToSettingsTarget } from "./settingsLayout";
 import {
+  isSettingsSectionActive,
   searchSettings,
   SETTINGS_SECTION_LABELS,
   type SettingsPath,
@@ -82,8 +90,22 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/integrations": BlocksIcon,
   "/settings/source-control": GitBranchIcon,
   "/settings/connections": Link2Icon,
+  "/settings/infinitus": InfinityIcon,
+  "/settings/infinitus/notifications": BellIcon,
+  "/settings/infinitus/devices": SmartphoneIcon,
+  "/settings/infinitus/engines": CpuIcon,
+  "/settings/infinitus/profiles": IdCardIcon,
   "/settings/archived": ArchiveIcon,
 };
+
+/** The pages that only exist where a connected server drives an Infinitus app. */
+const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
+  "/settings/infinitus",
+  "/settings/infinitus/notifications",
+  "/settings/infinitus/devices",
+  "/settings/infinitus/engines",
+  "/settings/infinitus/profiles",
+]);
 
 const SETTINGS_NAV_ITEMS: ReadonlyArray<{
   label: string;
@@ -108,6 +130,19 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
+  const { environments } = useEnvironments();
+  // One connected Infinitus is enough: the pages read the primary environment
+  // but the nav only decides whether they lead anywhere at all.
+  const infinitusSupported = environments.some(
+    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
+  );
+  const navItems = useMemo(
+    () =>
+      SETTINGS_NAV_ITEMS.filter(
+        (item) => infinitusSupported || !INFINITUS_SETTINGS_PATHS.has(item.to),
+      ),
+    [infinitusSupported],
+  );
   const results = useMemo(() => searchSettings(query, searchableItems), [query, searchableItems]);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
@@ -319,9 +354,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             </SidebarMenu>
           ) : (
             <SidebarMenu className="ps-px">
-              {SETTINGS_NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                const isActive = isSettingsSectionActive(pathname, item.to);
                 return (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   filterAvailableSettingsSearchItems,
+  isSettingsSectionActive,
   searchableSetting,
   searchSettings,
   SETTINGS_SEARCH_ITEMS,
@@ -148,6 +149,7 @@ describe("searchSettings", () => {
       canManageLocalBackend: false,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: false,
+      hasInfinitusEnvironment: false,
     });
 
     const gatedIds = new Set<string>([
@@ -164,6 +166,11 @@ describe("searchSettings", () => {
       "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
       "days-before-auto-settle",
+      "infinitus-preferences",
+      "infinitus-push",
+      "infinitus-devices",
+      "infinitus-engines",
+      "infinitus-profiles",
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });
@@ -176,6 +183,7 @@ describe("searchSettings", () => {
       canManageLocalBackend: false,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: true,
+      hasInfinitusEnvironment: false,
     });
 
     expect(searchSettings("auto-settle", available).map((item) => item.id)).toEqual([
@@ -183,6 +191,38 @@ describe("searchSettings", () => {
       "auto-settle-merged-threads",
       "days-before-auto-settle",
     ]);
+  });
+
+  it("shows the Infinitus pages once a server drives the app", () => {
+    const available = filterAvailableSettingsSearchItems({
+      hasCloudPublicConfig: false,
+      hasPrimaryEnvironment: false,
+      hasProviderSettingsEnvironment: false,
+      canManageLocalBackend: false,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasInfinitusEnvironment: true,
+    });
+
+    expect(searchSettings("infinitus", available).map((item) => item.id)).toEqual([
+      "infinitus-preferences",
+      "infinitus-push",
+      "infinitus-devices",
+      "infinitus-engines",
+      "infinitus-profiles",
+    ]);
+  });
+
+  it("lights up the deepest Infinitus nav item only", () => {
+    expect(isSettingsSectionActive("/settings/infinitus", "/settings/infinitus")).toBe(true);
+    expect(isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus")).toBe(
+      false,
+    );
+    expect(
+      isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus/devices"),
+    ).toBe(true);
+    // A path no nav item owns still belongs to its parent section.
+    expect(isSettingsSectionActive("/settings/projects/acme", "/settings/projects")).toBe(true);
   });
 
   it("keeps catalog result ids unique", () => {
