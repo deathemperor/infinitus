@@ -5,8 +5,8 @@
 name: Native nightly dispatch
 on:
   schedule:
-    - cron: "0 16 * * *"   # linux-sanitize.yml on native (16:00 UTC)
-    - cron: "0 17 * * *"   # nightly.yml on native (17:00 UTC = midnight GMT+7)
+    - cron: "0 16 * * *" # linux-sanitize.yml on native (16:00 UTC)
+    - cron: "0 17 * * *" # nightly.yml on native (17:00 UTC = midnight GMT+7)
   workflow_dispatch:
 permissions:
   actions: write

@@ -5,6 +5,7 @@ drives the Infinitus engine. AGENTS.md (upstream's guide) applies in full;
 this file adds the fork's own rules. Plan and history: issue #555.
 
 ## Non-negotiables
+
 - **Never an upstream PR.** Upstream is merged in, not contributed to. Do not
   open pull requests, issues or discussions on `pingdotgg/t3code` from this
   work.
@@ -15,7 +16,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
 - **Upstream merges daily, our history never rebased.** `git fetch upstream
-  && git merge upstream/main` on a branch, PR to `main`. Our code lives in
+&& git merge upstream/main` on a branch, PR to `main`. Our code lives in
   new files, new routes, new settings sections; edits to upstream files stay
   at registration points so merges stay small. The list of upstream files we
   edit on purpose is in "Registration points" below — keep it current.
@@ -38,6 +39,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - Todos and research notes go to GitHub issues, never to files in the tree.
 
 ## Registration points (upstream files we edit on purpose)
+
 - `CLAUDE.md` — adds `@INFINITUS.md`.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
@@ -51,6 +53,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Actions settings, not deleted, so merges stay clean.
 
 ## Fork-only files
+
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
   branch).
