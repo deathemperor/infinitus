@@ -37,6 +37,10 @@ final class OwnedSessionsProcessTests: XCTestCase {
                 *'"initialize"'*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"1","response":{}}}'
                                   echo '{"type":"system","subtype":"init","session_id":"S-FAKE","permissionMode":"default"}';;
                 *'hang'*) echo "$line" >> "\(dir.path)/users";;
+                *'aws please'*) echo "$line" >> "\(dir.path)/users"
+                                  echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"aws s3 ls --profile e2e"}}]}}'
+                                  echo '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"aws: [error] the sso session has expired, fix: aws login"}]}}'
+                                  echo '{"type":"result","subtype":"success","session_id":"S-FAKE"}';;
                 *'limit please'*) echo "$line" >> "\(dir.path)/users"
                                   echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1800008100,"rateLimitType":"five_hour"}}'
                                   echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1800008100,"rateLimitType":"five_hour"}}';;
@@ -101,11 +105,12 @@ final class OwnedSessionsProcessTests: XCTestCase {
         var all: [OwnedSessions.State] { lock.lock(); defer { lock.unlock() }; return list.map(\.1) }
     }
 
-    private func make(swallowInterrupt: Bool = false, interruptGrace: TimeInterval = 5) async throws -> (OwnedSessions, States) {
+    private func make(swallowInterrupt: Bool = false, interruptGrace: TimeInterval = 5,
+                      onLoginNeed: @escaping @Sendable (Int32) -> Void = { _ in }) async throws -> (OwnedSessions, States) {
         try writeFake(swallowInterrupt: swallowInterrupt)
         let states = States()
         let owned = OwnedSessions(binaryPath: scriptURL.path, interruptGrace: interruptGrace,
-                                  onState: { pid, s in states.add(pid, s) })
+                                  onState: { pid, s in states.add(pid, s) }, onLoginNeed: onLoginNeed)
         return (owned, states)
     }
 
@@ -305,6 +310,26 @@ final class OwnedSessionsProcessTests: XCTestCase {
         XCTAssertEqual(owned.limits(pid: pid).first?.rateLimitType, "five_hour")
         XCTAssertTrue(owned.send(pid: pid, text: "next turn"))
         XCTAssertTrue(owned.limits(pid: pid).isEmpty)
+        await owned.stop(pid: pid)
+    }
+
+    /// The CLI's error names no profile; the failed command does (#402).
+    func testAnExpiredSignInOnTheStreamIsANeedNamedByTheFailedCommand() async throws {
+        let fired = States()
+        let (owned, states) = try await make(onLoginNeed: { fired.add($0, .busy) })
+        let pid = try await startedPid(owned, request())
+        waitFor("init") { states.all.contains(.idle) }
+        XCTAssertTrue(owned.loginNeeds(pid: pid).isEmpty)
+        let before = Date()
+        XCTAssertTrue(owned.send(pid: pid, text: "aws please"))
+        waitFor("need") { !owned.loginNeeds(pid: pid).isEmpty }
+        let need = try XCTUnwrap(owned.loginNeeds(pid: pid).first)
+        XCTAssertEqual(need.provider, .aws)
+        XCTAssertEqual(need.profile, "e2e")
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(need.failedAt).timeIntervalSince1970, before.timeIntervalSince1970 - 1)
+        waitFor("turn") { states.all.filter { $0 == .idle }.count >= 2 }
+        XCTAssertEqual(fired.all.count, 1, "tool_use, tool_result and result: one change")
+        XCTAssertEqual(owned.loginNeeds(pid: 1).count, 0, "not our pid")
         await owned.stop(pid: pid)
     }
 
