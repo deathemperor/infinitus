@@ -411,7 +411,9 @@ public enum StatsScanner {
     }
 
     private static func writeCache(_ cache: Cache, to cacheURL: URL, fm: FileManager) {
-        guard let data = try? JSONEncoder().encode(cache) else { return }
+        let encoder = JSONEncoder()
+        encoder.userInfo[Stats.Day.leanEncoding] = true   // #499: defaults out, hours sparse
+        guard let data = try? encoder.encode(cache) else { return }
         try? fm.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)
     }

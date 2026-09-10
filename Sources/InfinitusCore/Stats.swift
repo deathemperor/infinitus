@@ -366,18 +366,26 @@ public enum Stats {
             cacheSavingsUSD = try c.decodeIfPresent(Double.self, forKey: .cacheSavingsUSD) ?? d.cacheSavingsUSD
         }
 
-        /// Hand-written too (#499): a field at its default is left out —
-        /// every reader's decoder above takes a missing key as that
-        /// default, so nothing older breaks — and `hours` travels as
-        /// `hourSlots` (slot, count pairs, sorted) when at most 24 of its
-        /// 168 slots are set, dense otherwise: a per-file day has one or
-        /// two hours in it and 7 in 10 have none, and the 168 zeros were
-        /// the cache's single biggest field (a folded period keeps the
-        /// dense form, which an older reader still understands). An
-        /// emptied `hours` (`compacted()`) round-trips as `[]`.
+        /// Set on a `JSONEncoder`'s `userInfo` to write the lean form
+        /// below. Only the transcript cache asks for it: the CLI's
+        /// `stats` JSON, the phone's snapshot and the team's docs keep
+        /// every key (scripts and older readers expect them; the e2e's
+        /// stats verb checks for `commits`, 2026-09-10).
+        public static let leanEncoding = CodingUserInfoKey(rawValue: "run.infinitus.stats.lean")!
+
+        /// Hand-written too (#499). Lean (`leanEncoding`): a field at its
+        /// default is left out — the decoder above takes a missing key as
+        /// that default — and `hours` travels as `hourSlots` (slot, count
+        /// pairs, sorted) when at most 24 of its 168 slots are set: a
+        /// per-file day has one or two hours in it and 7 in 10 have none,
+        /// and the 168 zeros were the cache's single biggest field. An
+        /// emptied `hours` (`compacted()`) round-trips as `[]`. Otherwise
+        /// every field goes out as the synthesized encoder wrote it.
         public func encode(to encoder: Encoder) throws {
             var c = encoder.container(keyedBy: CodingKeys.self)
-            let d = Day()
+            let lean = encoder.userInfo[Self.leanEncoding] as? Bool ?? false
+            // Not lean: compare against nothing, so every field is written.
+            let d = lean ? Day() : Day.everything
             if humanMessages != d.humanMessages { try c.encode(humanMessages, forKey: .humanMessages) }
             if phoneMessages != d.phoneMessages { try c.encode(phoneMessages, forKey: .phoneMessages) }
             if agentMessages != d.agentMessages { try c.encode(agentMessages, forKey: .agentMessages) }
@@ -403,7 +411,7 @@ public enum Stats {
             if sessionTally != d.sessionTally { try c.encode(sessionTally, forKey: .sessionTally) }
             if sessionSeconds != d.sessionSeconds { try c.encode(sessionSeconds, forKey: .sessionSeconds) }
             if sessionBuckets != d.sessionBuckets { try c.encode(sessionBuckets, forKey: .sessionBuckets) }
-            if hours.isEmpty {
+            if !lean || hours.isEmpty {
                 try c.encode(hours, forKey: .hours)
             } else {
                 let set = hours.enumerated().filter { $0.element != 0 }
@@ -430,11 +438,29 @@ public enum Stats {
             if minutesLostToLimits != d.minutesLostToLimits { try c.encode(minutesLostToLimits, forKey: .minutesLostToLimits) }
             if minuteTokens != d.minuteTokens { try c.encode(minuteTokens, forKey: .minuteTokens) }
             if peakTokensPerMinute != d.peakTokensPerMinute { try c.encode(peakTokensPerMinute, forKey: .peakTokensPerMinute) }
-            if peakMinute != d.peakMinute { try c.encode(peakMinute, forKey: .peakMinute) }
+            try c.encodeIfPresent(peakMinute, forKey: .peakMinute)   // nil is left out either way, as synthesized
             if cacheReadTokens != d.cacheReadTokens { try c.encode(cacheReadTokens, forKey: .cacheReadTokens) }
             if cacheWriteTokens != d.cacheWriteTokens { try c.encode(cacheWriteTokens, forKey: .cacheWriteTokens) }
             if cacheSavingsUSD != d.cacheSavingsUSD { try c.encode(cacheSavingsUSD, forKey: .cacheSavingsUSD) }
         }
+
+        /// A day no real day equals in any field — the non-lean encoder's
+        /// comparison target, so every field is written.
+        private static let everything: Day = {
+            var d = Day()
+            d.humanMessages = -1; d.phoneMessages = -1; d.agentMessages = -1; d.nudges = -1; d.turns = -1
+            d.toolCalls = ["": -1]; d.toolErrors = -1; d.questions = -1; d.denials = -1; d.waitingSeconds = -1
+            d.subagents = -1; d.compactions = -1; d.retries = -1; d.longestUnattended = -1
+            d.inputTokens = -1; d.outputTokens = -1; d.usd = -1; d.cacheReadTokens = -1; d.cacheWriteTokens = -1; d.cacheSavingsUSD = -1
+            d.minuteTokens = [-1: -1]; d.peakTokensPerMinute = -1; d.peakMinute = -1
+            var t = ActivityTally(); t.stretches = -1
+            d.activities = ["": t]; d.byModel = ["": t]; d.byEngine = ["": t]; d.byEffort = ["": t]
+            d.sessions = [""]; d.sessionTally = -1; d.sessionSeconds = -1; d.sessionBuckets = [-1]; d.hours = [-1]
+            d.commits = -1; d.linesAdded = -1; d.linesRemoved = -1; d.filesTouched = -1; d.coAuthoredByClaude = -1; d.reverts = -1
+            d.repos = [""]; d.repoTally = -1; d.prsOpened = -1; d.prsMerged = -1; d.mergeHoursTotal = -1; d.mergeCount = -1
+            d.switches = -1; d.limitStops = -1; d.revivals = -1; d.ignites = -1; d.resumes = -1; d.minutesLostToLimits = -1
+            return d
+        }()
 
         // Derived — nil when the denominator is zero (tiles show "—").
         public var messages: Int { humanMessages + phoneMessages }

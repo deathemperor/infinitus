@@ -4,17 +4,40 @@ import XCTest
 /// `Stats.Day`'s hand-written encoder (#499): defaults left out, sparse
 /// hours, and nothing lost on the way round.
 final class StatsDayCodingTests: XCTestCase {
+    private let lean: JSONEncoder = {
+        let e = JSONEncoder()
+        e.userInfo[Stats.Day.leanEncoding] = true
+        return e
+    }()
     private func roundTrip(_ day: Stats.Day) throws -> Stats.Day {
-        try JSONDecoder().decode(Stats.Day.self, from: JSONEncoder().encode(day))
+        try JSONDecoder().decode(Stats.Day.self, from: lean.encode(day))
     }
-    private func keys(_ day: Stats.Day) throws -> Set<String> {
-        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(day)) as? [String: Any]
+    private func keys(_ day: Stats.Day, encoder: JSONEncoder? = nil) throws -> Set<String> {
+        let object = try JSONSerialization.jsonObject(with: (encoder ?? lean).encode(day)) as? [String: Any]
         return Set(object?.keys ?? [:].keys)
     }
 
-    func testADefaultDayEncodesToNothing() throws {
+    func testADefaultDayEncodesToNothingWhenLean() throws {
         XCTAssertEqual(try keys(Stats.Day()), [])
         XCTAssertEqual(try roundTrip(Stats.Day()), Stats.Day())
+    }
+
+    /// The plain encoder — the CLI's stats JSON, the phone's snapshot,
+    /// team docs — still writes every key, dense hours included.
+    func testThePlainEncoderWritesEveryField() throws {
+        let plain = JSONEncoder()
+        // `peakMinute` is optional and nil by default: left out, as synthesized.
+        let all = Set(Stats.Day.CodingKeys.allCases.map(\.stringValue)).subtracting(["hourSlots", "peakMinute"])
+        XCTAssertEqual(try keys(Stats.Day(), encoder: plain), all)
+        var peaked = Stats.Day()
+        peaked.peakMinute = 5
+        XCTAssertTrue(try keys(peaked, encoder: plain).contains("peakMinute"))
+        var few = Stats.Day()
+        few.hours[3] = 2
+        let object = try JSONSerialization.jsonObject(with: plain.encode(few)) as? [String: Any]
+        XCTAssertEqual((object?["hours"] as? [Int])?.count, 168)
+        XCTAssertNil(object?["hourSlots"])
+        XCTAssertEqual(try JSONDecoder().decode(Stats.Day.self, from: plain.encode(few)), few)
     }
 
     /// Every stored field, set away from its default, survives the round
@@ -52,7 +75,7 @@ final class StatsDayCodingTests: XCTestCase {
         var few = Stats.Day()
         few.hours[3] = 2; few.hours[100] = 1
         XCTAssertEqual(try keys(few), ["hourSlots"])
-        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(few)) as? [String: Any]
+        let object = try JSONSerialization.jsonObject(with: lean.encode(few)) as? [String: Any]
         XCTAssertEqual(object?["hourSlots"] as? [Int], [3, 2, 100, 1], "slot, count pairs in slot order")
         XCTAssertEqual(try roundTrip(few), few)
 
