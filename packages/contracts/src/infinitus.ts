@@ -379,7 +379,7 @@ export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
  */
 
 /** One usage window, themed: its label ("MP", "× Dragon"), colour name, the
-    fraction used and the dense reset label ("4h20m·17:49"). */
+    percentage used (0–100) and the dense reset label ("4h20m·17:49"). */
 export const InfinitusActivityWindow = Schema.Struct({
   label: Schema.String,
   color: Schema.String,
