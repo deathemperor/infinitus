@@ -70,6 +70,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the Accounts
   row in the General section.
+- `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
+  (active account + fullest window of the Mac the list follows) before the
+  filter button.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the

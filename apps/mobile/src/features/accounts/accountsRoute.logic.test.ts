@@ -5,7 +5,9 @@ import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  chipEnvironment,
   commandFailureMessage,
+  homeChip,
   infinitusMacs,
   macAccountsModel,
   rowBadges,
@@ -174,5 +176,68 @@ describe("commandFailureMessage", () => {
     expect(commandFailureMessage(Cause.fail(new Error("   ")))).toBe(
       "The command did not reach the Mac.",
     );
+  });
+});
+
+describe("homeChip", () => {
+  it("is silent while loading and muted when the app is unavailable", () => {
+    expect(homeChip(null)).toBeNull();
+    expect(homeChip({ available: false, fleets: [], sessions: [], commands: [] })).toEqual({
+      label: "Infinitus",
+      pct: null,
+      tone: "off",
+    });
+  });
+
+  it("names the active account and grades its fullest window", () => {
+    const snapshot: InfinitusSnapshot = {
+      ...readySnapshot,
+      fleets: [
+        {
+          ...readySnapshot.fleets[0]!,
+          activeNumber: 2,
+          accounts: [
+            {
+              number: 1,
+              email: "one@example.com",
+              isOrganization: false,
+              active: false,
+              usageStatus: "ok",
+            },
+            {
+              number: 2,
+              alias: "death2",
+              email: "two@example.com",
+              isOrganization: false,
+              active: true,
+              usageStatus: "ok",
+              usage: { fiveHour: { pct: 42 }, sevenDay: { pct: 91 } },
+            },
+          ],
+        },
+      ],
+    };
+    expect(homeChip(snapshot)).toEqual({ label: "death2", pct: 91, tone: "hot" });
+  });
+
+  it("has nothing to say for a fleet with no active account, and no pct without usage", () => {
+    expect(
+      homeChip({ ...readySnapshot, fleets: [{ ...readySnapshot.fleets[0]!, accounts: [] }] }),
+    ).toBeNull();
+    expect(homeChip(readySnapshot)).toEqual({ label: "one@example.com", pct: null, tone: "calm" });
+  });
+});
+
+describe("chipEnvironment", () => {
+  const macs = [
+    { environmentId: macId, label: "Studio", connected: true },
+    { environmentId: plainId, label: "Mini", connected: true },
+  ];
+
+  it("follows the selected environment when it is a Mac, else the first Mac", () => {
+    expect(chipEnvironment(plainId, macs)?.label).toBe("Mini");
+    expect(chipEnvironment(EnvironmentId.make("other"), macs)?.label).toBe("Studio");
+    expect(chipEnvironment(null, macs)?.label).toBe("Studio");
+    expect(chipEnvironment(null, [])).toBeNull();
   });
 });
