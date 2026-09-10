@@ -74,6 +74,7 @@ publishes the matching section as the GitHub release body.
 - The lapsed-sign-in scan over tool results folds bytes instead of Unicode-lowercasing and Foundation-searching each one — 49× faster per result (#346).
 - The stats refresh keeps its decoded transcript cache for the app's lifetime and rewrites a caught-up corpus at most every 10 minutes — no more re-decoding 24 MB of JSON every 5 minutes (#346).
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
+- The stats cache leaves out every field still at its default and writes a day's hour histogram sparse, so the file is ~40% smaller and decodes faster at launch (#499).
 - A session's sub-agent files are listed with their mtimes in one call instead of one stat per file, a third off every walk of a session with hundreds of agents (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 
