@@ -18,6 +18,7 @@ final class MirrorDescriptorTests: XCTestCase {
         XCTAssertTrue(text.contains(#""leases":true"#))
         // The phone gates its Files pill on this, never on the platform (#223).
         XCTAssertTrue(text.contains(#""files":true"#))
+        XCTAssertTrue(text.contains(#""prefs":true"#))
         #if os(macOS)
         XCTAssertEqual(d.platform, "macos")
         // The PTY host is the Mac app's (#507 step 3); a Core build on Linux
@@ -33,6 +34,7 @@ final class MirrorDescriptorTests: XCTestCase {
             #"{"machineId":"m","label":"l","platform":"macos","appVersion":"0","capabilities":{}}"#.utf8))
         XCTAssertNil(older.capabilities.timeline)
         XCTAssertNil(older.capabilities.files)
+        XCTAssertNil(older.capabilities.prefs)
     }
 
     /// #486 slice 2 gave the tray timeline and sequence; slice 3 the
@@ -48,7 +50,7 @@ final class MirrorDescriptorTests: XCTestCase {
         }
         for other in [d.capabilities.attention, d.capabilities.leases, d.capabilities.ownedSessions,
                      d.capabilities.team, d.capabilities.pastSessions, d.capabilities.images,
-                     d.capabilities.terminal] {
+                     d.capabilities.terminal, d.capabilities.prefs] {
             XCTAssertEqual(other, false)
         }
         let text = String(decoding: try JSONEncoder().encode(d), as: UTF8.self)

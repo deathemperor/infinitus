@@ -140,6 +140,23 @@ final class MirrorPastSessionsBox: @unchecked Sendable {
     }
 }
 
+/// Answers `GET /prefs` (#558): the preference catalog with the
+/// install's current values, for a client rendering settings without
+/// the Mac's panes.
+final class MirrorPrefsBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable () throws -> PrefCatalog.Reply)?
+
+    func set(_ new: @escaping @Sendable () throws -> PrefCatalog.Reply) {
+        lock.lock(); handler = new; lock.unlock()
+    }
+
+    func call() -> PrefCatalog.Reply? {
+        lock.lock(); let current = handler; lock.unlock()
+        return try? current?()
+    }
+}
+
 /// Answers a session's checkpoint routes (#167 phase 2): the timeline,
 /// one checkpoint's diff, a restore.
 final class MirrorCheckpointsBox: @unchecked Sendable {
@@ -767,6 +784,7 @@ final class MirrorServer: ObservableObject {
     let sessionStart = MirrorSessionStartBox()
     /// Answers `GET /sessions/past` (#164); set by AppModel once at start.
     let pastSessions = MirrorPastSessionsBox()
+    let prefs = MirrorPrefsBox()
     /// Answers `GET /sessions/<pid>/checkpoints` and friends (#167); set by AppModel once at start.
     let checkpoints = MirrorCheckpointsBox()
     /// Answers `POST /app/update` (#121); set by AppModel once at start.
@@ -936,6 +954,7 @@ final class MirrorServer: ObservableObject {
         let sessionFeed = self.sessionFeed
         let sessionStart = self.sessionStart
         let pastSessions = self.pastSessions
+        let prefs = self.prefs
         let checkpoints = self.checkpoints
         let appUpdate = self.appUpdate
         let accountAction = self.accountAction
@@ -966,7 +985,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -1052,7 +1071,7 @@ final class MirrorServer: ObservableObject {
                                           receipts: Receipts,
                                           leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
-                                          activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
+                                          activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, prefs: MirrorPrefsBox, checkpoints: MirrorCheckpointsBox,
                                           team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
                                           awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                           teamMirror: MirrorTeamMirrorBox,
@@ -1061,7 +1080,7 @@ final class MirrorServer: ObservableObject {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
                sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
-               activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+               activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
 
@@ -1080,7 +1099,7 @@ final class MirrorServer: ObservableObject {
                                           receipts: Receipts,
                                           leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
-                                            activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, checkpoints: MirrorCheckpointsBox,
+                                            activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, prefs: MirrorPrefsBox, checkpoints: MirrorCheckpointsBox,
                                             team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
                                             awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                             teamMirror: MirrorTeamMirrorBox,
@@ -1237,6 +1256,16 @@ final class MirrorServer: ObservableObject {
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })
                     }
+                    return
+                } else if request.method == "GET", request.path == PrefCatalog.path {
+                    // A defaults read: answered here, like the descriptor.
+                    let response = prefs.call()
+                        .flatMap { try? JSONEncoder().encode($0) }
+                        .map(MirrorTransport.jsonResponse)
+                        ?? MirrorTransport.notFoundResponse()
+                    onServed(request)
+                    connection.send(content: response,
+                                    completion: .contentProcessed { _ in connection.cancel() })
                     return
                 } else if request.method == "GET", request.path == PastSessions.path {
                     let limit = request.query(PastSessions.limitQueryName).flatMap(Int.init) ?? 50
@@ -1508,7 +1537,7 @@ final class MirrorServer: ObservableObject {
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
                    sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
-                   activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, checkpoints: checkpoints,
+                   activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
     }

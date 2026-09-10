@@ -404,6 +404,11 @@ sleep 1
 settings_visible && fail "Settings still visible after hide"
 echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 
+# The preference catalog (#558): the table with values, and `get` narrowed.
+"$CTL" prefs | expect "any(s['slug']=='display' and s['name']=='Display' for s in d['sections']) and any(p['key']=='popup_layout' and p['section']=='display' and p['effect']=='live' for p in d['prefs'])" || fail "prefs"
+"$CTL" prefs get popup_layout engine_cswap_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_cswap_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
+echo "prefs: ok"
+
 # --- scenarios: all-dead (every window maxed, no candidate) --------------
 "$INFINITUS_CSWAP" simulate alldead >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is None and d[0].get('nextRecovery') is not None" \
