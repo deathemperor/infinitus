@@ -14,18 +14,43 @@ public enum ControlProtocol {
     /// to talk to a newer app so an agent never misreads a field.
     public static let schemaVersion = 1
 
-    /// `~/Library/Application Support/Infinitus/control/control.sock` —
-    /// the directory is 0700 (the app creates it before binding).
-    /// `INFINITUS_CONTROL_SOCKET` overrides it on both ends, so a dev
-    /// instance (playground / shots) and `infinitusctl` can meet on a
-    /// private socket instead of the real app's.
+    /// macOS: `~/Library/Application Support/Infinitus/control/control.sock`
+    /// — the directory is 0700 (the app creates it before binding).
+    /// Linux (#486 slice 3): `$XDG_RUNTIME_DIR/infinitus/control.sock`,
+    /// where the tray binds it and `infinitusctl` finds it.
+    /// `INFINITUS_CONTROL_SOCKET` overrides both, so a dev instance
+    /// (playground / shots) and `infinitusctl` can meet on a private
+    /// socket instead of the real app's.
     public static func socketURL(home: String = NSHomeDirectory(),
                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         if let override = environment["INFINITUS_CONTROL_SOCKET"], !override.isEmpty {
             return URL(fileURLWithPath: override)
         }
+        #if os(Linux)
+        return URL(fileURLWithPath: linuxSocketPath(home: home, environment: environment))
+        #else
+        return URL(fileURLWithPath: macSocketPath(home: home))
+        #endif
+    }
+
+    /// Each platform's rule as a plain function, so both are tested from
+    /// either one (`socketURL` above only picks between them).
+    static func macSocketPath(home: String) -> String {
+        URL(fileURLWithPath: home)
+            .appendingPathComponent("Library/Application Support/Infinitus/control/control.sock").path
+    }
+
+    /// The runtime dir is where a per-user socket belongs on Linux (tmpfs,
+    /// 0700, cleared at logout). Without one — a bare `ssh` session, a
+    /// systemd-less box — the state dir is the stable stand-in, the same
+    /// `~/.local/state/infinitus` the tray already keeps its history in.
+    static func linuxSocketPath(home: String, environment: [String: String]) -> String {
+        if let runtime = environment["XDG_RUNTIME_DIR"], !runtime.isEmpty {
+            return URL(fileURLWithPath: runtime)
+                .appendingPathComponent("infinitus/control.sock").path
+        }
         return URL(fileURLWithPath: home)
-            .appendingPathComponent("Library/Application Support/Infinitus/control/control.sock")
+            .appendingPathComponent(".local/state/infinitus/control.sock").path
     }
 }
 

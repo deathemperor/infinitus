@@ -119,6 +119,44 @@ if reply.restarting {
     }
 }
 exit(reply.ok ? 0 : 1)
+#elseif canImport(Glibc)
+// Byte-for-byte the Darwin branch above (the e2e's round-trips lean
+// on that text, so it does not move): the wire, the exit codes and
+// the restart wait are the protocol's, not a platform's. The socket
+// is `infinitus-tray serve`'s on Linux, and only `event`/`status`
+// answer there — every other command replies "not available on
+// Linux yet" and this exits 1 (#486 slice 3).
+let path = ControlProtocol.socketURL().path
+guard let reply = ControlClient.roundTripRetrying(request, path: path) else {
+    let why = ControlClient.lastConnectErrno == 0 ? "no reply at" : "\(String(cString: strerror(ControlClient.lastConnectErrno))) at"
+    FileHandle.standardError.write(Data("Infinitus is not running (\(why) \(path))\n".utf8))
+    exit(3)
+}
+if reply.schemaVersion > ControlProtocol.schemaVersion {
+    FileHandle.standardError.write(Data("app speaks control schema \(reply.schemaVersion), this CLI \(ControlProtocol.schemaVersion): update the CLI\n".utf8))
+    exit(4)
+}
+
+let pretty = JSONEncoder()
+pretty.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+if let result = reply.result, let data = try? pretty.encode(result) {
+    print(String(decoding: data, as: UTF8.self))
+}
+if let error = reply.error {
+    FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+}
+
+if reply.restarting {
+    // The app is relaunching; wait for the socket to answer `status`
+    // again so the next agent command lands on the new registry.
+    let deadline = Date().addingTimeInterval(30)
+    Thread.sleep(forTimeInterval: 2)
+    while Date() < deadline {
+        if ControlClient.roundTrip(ControlRequest(command: "status"), path: path) != nil { break }
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+}
+exit(reply.ok ? 0 : 1)
 #else
 FileHandle.standardError.write(Data("\(command) needs the Infinitus Mac app (control socket); only `team` runs here\n".utf8))
 exit(3)

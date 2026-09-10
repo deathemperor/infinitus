@@ -80,11 +80,37 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertTrue(text.contains("\"effect\":\"human\""), "add is flagged as needing a human")
     }
 
-    func testSocketPathIsUnderAppSupport() {
+    func testSocketPathFollowsThisPlatformsRule() {
+        #if os(Linux)
+        XCTAssertEqual(ControlProtocol.socketURL(home: "/home/x",
+                                                 environment: ["XDG_RUNTIME_DIR": "/run/user/1000"]).path,
+                       "/run/user/1000/infinitus/control.sock")
+        XCTAssertEqual(ControlProtocol.socketURL(home: "/home/x", environment: [:]).path,
+                       "/home/x/.local/state/infinitus/control.sock")
+        #else
         XCTAssertEqual(ControlProtocol.socketURL(home: "/Users/x", environment: [:]).path,
                        "/Users/x/Library/Application Support/Infinitus/control/control.sock")
+        #endif
+        // The override comes first on every platform — a dev instance and
+        // its infinitusctl meet there instead of the real app's socket.
         XCTAssertEqual(ControlProtocol.socketURL(home: "/Users/x",
-                                                 environment: ["INFINITUS_CONTROL_SOCKET": "/tmp/dev.sock"]).path,
+                                                 environment: ["INFINITUS_CONTROL_SOCKET": "/tmp/dev.sock",
+                                                               "XDG_RUNTIME_DIR": "/run/user/1000"]).path,
                        "/tmp/dev.sock")
+    }
+
+    /// Both platforms' rules, checked from either one (#486 slice 3): the
+    /// Linux tray's socket lives in the runtime dir, with the state dir as
+    /// the stand-in when there is none — an empty variable counts as none.
+    func testBothPlatformsSocketRules() {
+        XCTAssertEqual(ControlProtocol.macSocketPath(home: "/Users/x"),
+                       "/Users/x/Library/Application Support/Infinitus/control/control.sock")
+        XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x",
+                                                       environment: ["XDG_RUNTIME_DIR": "/run/user/1000"]),
+                       "/run/user/1000/infinitus/control.sock")
+        XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x", environment: [:]),
+                       "/home/x/.local/state/infinitus/control.sock")
+        XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x", environment: ["XDG_RUNTIME_DIR": ""]),
+                       "/home/x/.local/state/infinitus/control.sock")
     }
 }
