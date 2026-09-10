@@ -660,6 +660,23 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
+        case "activities-token":
+            // The mirror's `POST /activities/token`, for a client on the
+            // socket (#572 N1): the same decode, the same registration.
+            let registration = try ControlBody.decode(ActivityPushRegistration.self, from: r)
+            model.liveActivityPusher.register(registration)
+            return ControlReply(ok: true, result: .object(["slot": .string(registration.slot)]))
+
+        case "client-activity":
+            let report = try ControlBody.decode(ClientActivity.Report.self, from: r)
+            model.mirrorServer.leases.report(report)
+            return ControlReply(ok: true, result: .object(["clientId": .string(report.clientId)]))
+
+        case "crash-report":
+            let report = try ControlBody.decode(CrashReport.self, from: r, cap: 2 * CrashReport.rawCap)
+            model.ingestCrash(report, announce: true)
+            return ControlReply(ok: true, result: .object(["id": .string(report.id)]))
+
         case "prefs", "prefs-set":
             // `prefs` lists every entry; `prefs get k…` only those keys;
             // `prefs set k v` (= `prefs-set k v`) writes one.
