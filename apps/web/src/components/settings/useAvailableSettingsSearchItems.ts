@@ -43,6 +43,9 @@ export function useAvailableSettingsSearchItems() {
         }),
         hasThreadAutoSettlement:
           primaryServerConfig?.environment.capabilities.threadAutoSettlement === true,
+        hasInfinitusEnvironment: environments.some(
+          (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
+        ),
       }),
     [
       canManageLocalBackend,

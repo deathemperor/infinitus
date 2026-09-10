@@ -31,6 +31,11 @@ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appear
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ConnectCallbackRouteImport } from './routes/connect_.callback'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
+import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
+import { Route as SettingsInfinitusProfilesRouteImport } from './routes/settings.infinitus.profiles'
+import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
+import { Route as SettingsInfinitusEnginesRouteImport } from './routes/settings.infinitus.engines'
+import { Route as SettingsInfinitusDevicesRouteImport } from './routes/settings.infinitus.devices'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
 
@@ -143,6 +148,35 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
   path: '/pull-requests',
   getParentRoute: () => ChatRoute,
 } as any)
+const SettingsInfinitusIndexRoute = SettingsInfinitusIndexRouteImport.update({
+  id: '/infinitus/',
+  path: '/infinitus/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsInfinitusProfilesRoute =
+  SettingsInfinitusProfilesRouteImport.update({
+    id: '/infinitus/profiles',
+    path: '/infinitus/profiles',
+    getParentRoute: () => SettingsRoute,
+  } as any)
+const SettingsInfinitusNotificationsRoute =
+  SettingsInfinitusNotificationsRouteImport.update({
+    id: '/infinitus/notifications',
+    path: '/infinitus/notifications',
+    getParentRoute: () => SettingsRoute,
+  } as any)
+const SettingsInfinitusEnginesRoute =
+  SettingsInfinitusEnginesRouteImport.update({
+    id: '/infinitus/engines',
+    path: '/infinitus/engines',
+    getParentRoute: () => SettingsRoute,
+  } as any)
+const SettingsInfinitusDevicesRoute =
+  SettingsInfinitusDevicesRouteImport.update({
+    id: '/infinitus/devices',
+    path: '/infinitus/devices',
+    getParentRoute: () => SettingsRoute,
+  } as any)
 const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
   id: '/draft/$draftId',
   path: '/draft/$draftId',
@@ -179,6 +213,11 @@ export interface FileRoutesByFullPath {
   '/settings/source-control': typeof SettingsSourceControlRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
+  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
+  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
+  '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
+  '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
@@ -204,6 +243,11 @@ export interface FileRoutesByTo {
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
+  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
+  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
+  '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
+  '/settings/infinitus': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -231,6 +275,11 @@ export interface FileRoutesById {
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
+  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
+  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
+  '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
+  '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -258,6 +307,11 @@ export interface FileRouteTypes {
     | '/settings/source-control'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
+    | '/settings/infinitus/devices'
+    | '/settings/infinitus/engines'
+    | '/settings/infinitus/notifications'
+    | '/settings/infinitus/profiles'
+    | '/settings/infinitus/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
@@ -283,6 +337,11 @@ export interface FileRouteTypes {
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
+    | '/settings/infinitus/devices'
+    | '/settings/infinitus/engines'
+    | '/settings/infinitus/notifications'
+    | '/settings/infinitus/profiles'
+    | '/settings/infinitus'
   id:
     | '__root__'
     | '/_chat'
@@ -309,6 +368,11 @@ export interface FileRouteTypes {
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
+    | '/settings/infinitus/devices'
+    | '/settings/infinitus/engines'
+    | '/settings/infinitus/notifications'
+    | '/settings/infinitus/profiles'
+    | '/settings/infinitus/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -479,6 +543,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatPullRequestsRouteImport
       parentRoute: typeof ChatRoute
     }
+    '/settings/infinitus/': {
+      id: '/settings/infinitus/'
+      path: '/infinitus'
+      fullPath: '/settings/infinitus/'
+      preLoaderRoute: typeof SettingsInfinitusIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/infinitus/profiles': {
+      id: '/settings/infinitus/profiles'
+      path: '/infinitus/profiles'
+      fullPath: '/settings/infinitus/profiles'
+      preLoaderRoute: typeof SettingsInfinitusProfilesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/infinitus/notifications': {
+      id: '/settings/infinitus/notifications'
+      path: '/infinitus/notifications'
+      fullPath: '/settings/infinitus/notifications'
+      preLoaderRoute: typeof SettingsInfinitusNotificationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/infinitus/engines': {
+      id: '/settings/infinitus/engines'
+      path: '/infinitus/engines'
+      fullPath: '/settings/infinitus/engines'
+      preLoaderRoute: typeof SettingsInfinitusEnginesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/infinitus/devices': {
+      id: '/settings/infinitus/devices'
+      path: '/infinitus/devices'
+      fullPath: '/settings/infinitus/devices'
+      preLoaderRoute: typeof SettingsInfinitusDevicesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/_chat/draft/$draftId': {
       id: '/_chat/draft/$draftId'
       path: '/draft/$draftId'
@@ -524,6 +623,11 @@ interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsSnapShotRoute: typeof SettingsSnapShotRoute
   SettingsSourceControlRoute: typeof SettingsSourceControlRoute
+  SettingsInfinitusDevicesRoute: typeof SettingsInfinitusDevicesRoute
+  SettingsInfinitusEnginesRoute: typeof SettingsInfinitusEnginesRoute
+  SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
+  SettingsInfinitusProfilesRoute: typeof SettingsInfinitusProfilesRoute
+  SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -538,6 +642,11 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsProvidersRoute: SettingsProvidersRoute,
   SettingsSnapShotRoute: SettingsSnapShotRoute,
   SettingsSourceControlRoute: SettingsSourceControlRoute,
+  SettingsInfinitusDevicesRoute: SettingsInfinitusDevicesRoute,
+  SettingsInfinitusEnginesRoute: SettingsInfinitusEnginesRoute,
+  SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
+  SettingsInfinitusProfilesRoute: SettingsInfinitusProfilesRoute,
+  SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(

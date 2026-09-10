@@ -73,6 +73,20 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
   (active account + fullest window of the Mac the list follows) before the
   filter button.
+- `apps/web/src/components/settings/settingsSearch.ts` — the five Infinitus
+  `SettingsPath`s and their labels, the `infinitusOnly` search flag with the
+  `hasInfinitusEnvironment` availability it reads, and
+  `isSettingsSectionActive` so a nested page's nav item is the only one lit.
+- `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
+  Infinitus path and the capability filter that hides all five where no
+  connected server reaches an Infinitus app.
+- `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
+  fills `hasInfinitusEnvironment` from the environments' capabilities.
+- `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
+  records it builds gained that field.
+- `apps/web/src/routes/settings.infinitus*.tsx` (five new files in upstream's
+  routes directory) and `apps/web/src/routeTree.gen.ts` — regenerated with
+  `@tanstack/router-generator`, never edited by hand.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
@@ -85,6 +99,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Actions settings, not deleted, so merges stay clean.
 
 ## Fork-only files
+
+- `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
+  (preferences, Engines, Profiles) and their pure logic.
+- `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
+  snapshot and command atoms.
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).

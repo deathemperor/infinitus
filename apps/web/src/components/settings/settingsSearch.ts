@@ -11,6 +11,11 @@ export type SettingsPath =
   | "/settings/integrations"
   | "/settings/source-control"
   | "/settings/connections"
+  | "/settings/infinitus"
+  | "/settings/infinitus/notifications"
+  | "/settings/infinitus/devices"
+  | "/settings/infinitus/engines"
+  | "/settings/infinitus/profiles"
   | "/settings/archived";
 
 export interface SettingsSearchItem {
@@ -33,6 +38,8 @@ export interface SettingsSearchItem {
   readonly localBackendManagementOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
+  // Its section only exists where a connected server drives an Infinitus app.
+  readonly infinitusOnly?: boolean;
 }
 
 export interface SettingsSearchAvailability {
@@ -42,6 +49,7 @@ export interface SettingsSearchAvailability {
   readonly canManageLocalBackend: boolean;
   readonly isWslSettingsRowVisible: boolean;
   readonly hasThreadAutoSettlement: boolean;
+  readonly hasInfinitusEnvironment: boolean;
 }
 
 /**
@@ -58,6 +66,13 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/integrations": "Integrations",
   "/settings/source-control": "Source Control",
   "/settings/connections": "Connections",
+  // The nav is flat, so every Infinitus page carries the prefix that would
+  // otherwise be a group header.
+  "/settings/infinitus": "Infinitus",
+  "/settings/infinitus/notifications": "Infinitus Notifications",
+  "/settings/infinitus/devices": "Infinitus Devices",
+  "/settings/infinitus/engines": "Infinitus Engines",
+  "/settings/infinitus/profiles": "Infinitus Profiles",
   "/settings/archived": "Archive",
 };
 
@@ -568,6 +583,49 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    // The Infinitus panes are drawn from the native app's own preference
+    // catalog, so each page is indexed once by its destination rather than
+    // row by row; `targetId` is the first section the page renders.
+    id: "infinitus-preferences",
+    title: "Infinitus preferences",
+    to: "/settings/infinitus",
+    targetId: "infinitus-display",
+    infinitusOnly: true,
+    searchTerms: ["menu bar popup theme sessions startup about updates gamification"],
+  },
+  {
+    id: "infinitus-push",
+    title: "Infinitus notifications",
+    to: "/settings/infinitus/notifications",
+    targetId: "infinitus-push",
+    infinitusOnly: true,
+    searchTerms: ["push phone alerts waiting exhausted revived aws sign-in"],
+  },
+  {
+    id: "infinitus-devices",
+    title: "Infinitus devices",
+    to: "/settings/infinitus/devices",
+    targetId: "infinitus-devices",
+    infinitusOnly: true,
+    searchTerms: ["phone mirror lan tunnel cloudflare rendezvous live activity"],
+  },
+  {
+    id: "infinitus-engines",
+    title: "Infinitus engines",
+    to: "/settings/infinitus/engines",
+    targetId: "infinitus-engines",
+    infinitusOnly: true,
+    searchTerms: ["cswap swapd cliproxy 9router proxy accounts registered key"],
+  },
+  {
+    id: "infinitus-profiles",
+    title: "Infinitus session profiles",
+    to: "/settings/infinitus/profiles",
+    targetId: "infinitus-profiles",
+    infinitusOnly: true,
+    searchTerms: ["profile folder engine permission mode model system prompt tools"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",
@@ -603,8 +661,23 @@ export function filterAvailableSettingsSearchItems(
       (!item.providerSettingsOnly || availability.hasProviderSettingsEnvironment) &&
       (!item.localBackendManagementOnly || availability.canManageLocalBackend) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
-      (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement),
+      (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
+      (!item.infinitusOnly || availability.hasInfinitusEnvironment),
   );
+}
+
+const SETTINGS_SECTION_PATHS = new Set<string>(Object.keys(SETTINGS_SECTION_LABELS));
+
+/**
+ * Whether a nav item is the one the current path belongs to. A section that
+ * nests under another (Infinitus and its pages) would otherwise light both up,
+ * so a prefix match only counts while the deeper path owns no nav item itself.
+ */
+export function isSettingsSectionActive(pathname: string, to: SettingsPath): boolean {
+  const normalized = pathname.replace(/\/+$/, "") || "/";
+  if (normalized === to) return true;
+  if (!normalized.startsWith(`${to}/`)) return false;
+  return !SETTINGS_SECTION_PATHS.has(normalized);
 }
 
 export function searchSettings(
