@@ -22,6 +22,7 @@ publishes the matching section as the GitHub release body.
 - Workspace and phone: image files in the Files tab preview as images, over the mirror wire too.
 - Workspace: clicking a file in the Files tab previews it.
 - Workspace: the right panel's Pull request tab lists the project's open pull requests through gh.
+- The phone can open a terminal in a session's project over the mirror wire (terminal capability).
 - Workspace: the right panel's Files tab browses the thread's project.
 - Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
