@@ -106,6 +106,7 @@ import {
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
+import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -502,6 +503,7 @@ const buildAppUnderTest = (options?: {
   layers?: {
     keybindings?: Partial<Keybindings.Keybindings["Service"]>;
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
+    infinitus?: Partial<InfinitusService["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     usageLimitSources?: Partial<UsageLimitSources.UsageLimitSources["Service"]>;
     providerService?: Partial<ProviderService.ProviderService["Service"]>;
@@ -759,6 +761,19 @@ const buildAppUnderTest = (options?: {
             current: Effect.succeed([]),
             streamChanges: Stream.empty,
             ...options?.layers?.environmentTheme,
+          }),
+          // No control socket in a test: an Infinitus that is simply not there
+          // is exactly what the real service reports off this machine.
+          Layer.mock(InfinitusService)({
+            snapshot: Effect.succeed({
+              available: false,
+              unavailableReason: "no Infinitus in tests",
+              fleets: [],
+              sessions: [],
+              commands: [],
+            }),
+            changes: Stream.empty,
+            ...options?.layers?.infinitus,
           }),
           Layer.mock(UsageLimitSources.UsageLimitSources)({
             current: Effect.succeed([]),

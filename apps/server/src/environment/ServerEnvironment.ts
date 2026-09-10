@@ -1,9 +1,16 @@
+import * as NodeOS from "node:os";
+
 import {
   EnvironmentId,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   type ExecutionEnvironmentDescriptor,
 } from "@t3tools/contracts";
-import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import {
+  HostProcessArchitecture,
+  HostProcessEnvironment,
+  HostProcessPlatform,
+} from "@t3tools/shared/hostProcess";
+import { resolveInfinitusControlSocketPath } from "@t3tools/shared/infinitusControl";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -187,6 +194,7 @@ export const make = Effect.gen(function* () {
   const identity = yield* ServerEnvironmentIdentity;
   const hostPlatform = yield* HostProcessPlatform;
   const hostArchitecture = yield* HostProcessArchitecture;
+  const hostEnvironment = yield* HostProcessEnvironment;
   const environmentId = yield* identity.getEnvironmentId;
   const cwdBaseName = path.basename(serverConfig.cwd).trim();
   const label = yield* resolveServerEnvironmentLabel({ cwdBaseName });
@@ -202,6 +210,15 @@ export const make = Effect.gen(function* () {
   // the fd and correctly do not advertise.
   const desktopAppUpdate =
     serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
+
+  // Computed from the same pure resolver the client layer uses rather than by
+  // pulling `InfinitusControlClient` in: the descriptor is built where no
+  // Infinitus service is reachable, and the references it needs are here.
+  const infinitusSocketPath = resolveInfinitusControlSocketPath({
+    platform: hostPlatform,
+    env: hostEnvironment,
+    homeDir: NodeOS.homedir(),
+  });
 
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
@@ -242,6 +259,7 @@ export const make = Effect.gen(function* () {
           }
         : {}),
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
+      infinitus: infinitusSocketPath !== null,
     },
   };
 

@@ -148,6 +148,10 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.subscribeServerLifecycle]: AuthOrchestrationReadScope,
   [WS_METHODS.subscribeAuthAccess]: AuthAccessReadScope,
   [WS_METHODS.subscribeBackgroundPolicy]: AuthOrchestrationReadScope,
+  [WS_METHODS.subscribeInfinitus]: AuthOrchestrationReadScope,
+  // Every Infinitus command that is not a read is a switch, a rename or a
+  // relaunch of the account engine, so the whole method takes operate.
+  [WS_METHODS.infinitusCommand]: AuthOrchestrationOperateScope,
 } as const satisfies Readonly<Record<WsRpcMethod, AuthEnvironmentScope>>;
 
 export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope {

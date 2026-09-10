@@ -43,6 +43,22 @@ this file adds the fork's own rules. Plan and history: issue #555.
 ## Registration points (upstream files we edit on purpose)
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
+  `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
+  `WsRpcGroup`.
+- `packages/contracts/src/environment.ts` — the `infinitus` capability on
+  `ExecutionEnvironmentCapabilities`.
+- `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
+  and answers the two Infinitus methods.
+- `apps/server/src/auth/RpcAuthorization.ts` — a scope for each of them; the
+  table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
+  type error.
+- `apps/server/src/server.ts` — `InfinitusLayerLive` in
+  `RuntimeDependenciesLive`.
+- `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
+  harness's stub stack, since the routes layer now needs the service.
+- `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
+  capability from `resolveInfinitusControlSocketPath`.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
