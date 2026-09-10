@@ -96,7 +96,10 @@ async function scheduleInfinitusAlarms(environmentId: string, alarms: ReadonlyAr
         content: {
           title: alarm.title,
           body: alarm.body,
-          data: { infinitus: "accounts", fireAt: alarm.fireAt },
+          data: {
+            infinitus: "accounts",
+            ...(alarm.fireAt === null ? {} : { fireAt: alarm.fireAt }),
+          },
         },
         trigger:
           alarm.fireAt === null
