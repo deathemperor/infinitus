@@ -623,10 +623,14 @@ public final class TeamClient {
     }
 
     public typealias ReadableHeader = (entry: StoreEntry, header: Envelope.Header)
-    /// The store's branches and their commits (`TeamGit.refsFingerprint`):
-    /// while it holds, `readableHeaders` and the reader folded from them
-    /// would come out the same.
-    public func storeFingerprint() throws -> String { try store.refsFingerprint() }
+    /// The store's branches and their commits (`TeamGit.refsFingerprint`)
+    /// plus the roster this client currently filters by: while it holds,
+    /// `readableHeaders` and the reader folded from them would come out
+    /// the same. The roster is named separately because it can lag the
+    /// refs — a fetch that synced a new roster but failed to read it
+    /// still scans under the old one, and the next fetch's roster reload
+    /// moves no ref.
+    public func storeFingerprint() throws -> String { try store.refsFingerprint() + "\n" + (roster?.sig ?? "") }
     /// The readable headers by store fingerprint (#499): one loop pass
     /// asked for them three times — `fetch` (whose transcripts to sync),
     /// the grantor pass and the reload — and each listed every branch
@@ -656,7 +660,7 @@ public final class TeamClient {
     public var headerMemo: HeaderMemo?
 
     public func readableHeaders() throws -> [ReadableHeader] {
-        guard let memo = headerMemo, let fingerprint = try? store.refsFingerprint() else { return try readableScan().headers }
+        guard let memo = headerMemo, let fingerprint = try? storeFingerprint() else { return try readableScan().headers }
         if let hit = memo.lookup(fingerprint) { return hit }
         let headers = try readableScan().headers
         memo.store(fingerprint, headers: headers)

@@ -261,6 +261,9 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(memo.hits, 2, "the publish moved m/<kid>: listed again")
         _ = try leader.readableHeaders()
         XCTAssertEqual(memo.hits, 3)
+        // The roster in memory is part of the key: a client filtering by a
+        // different roster under the same refs lists again.
+        XCTAssertNotEqual(try leader.storeFingerprint(), try leader.store.refsFingerprint() + "\n")
     }
 
     func testAForgedFirstRosterIsRefusedAndNothingIsPersisted() throws {
