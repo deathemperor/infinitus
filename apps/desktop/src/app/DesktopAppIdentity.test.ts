@@ -170,7 +170,7 @@ describe("DesktopAppIdentity", () => {
 
         // "T3 Code (Alpha)" exists on this machine — it is the app the user
         // runs every day, lock and cookies included. The fork keeps its own.
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/infinitus");
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/infinitus-desktop");
       }),
       { legacyPathExists: true },
     ),
@@ -182,7 +182,10 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         const userDataPath = yield* identity.resolveUserDataPath;
 
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/infinitus-dev");
+        assert.equal(
+          userDataPath,
+          "/Users/alice/Library/Application Support/infinitus-desktop-dev",
+        );
       }),
       {
         environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },

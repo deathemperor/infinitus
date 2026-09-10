@@ -74,7 +74,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
-  `@t3tools/shared/desktopIdentity` (`infinitus` / `infinitus-dev`), plus the
+  `@t3tools/shared/desktopIdentity` (`infinitus-desktop` / `infinitus-desktop-dev`), plus the
   `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
@@ -194,7 +194,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/shared/src/homeDir.ts` — `DEFAULT_HOME_DIR_NAME`, the fork's
   default state directory (`~/.infinitus`, never the real T3 Code's `~/.t3`).
 - `packages/shared/src/desktopIdentity.ts` — the desktop URL scheme
-  (`infinitus` / `infinitus-dev`), the Electron `userData` directory names, and
+  (`infinitus` / `infinitus-dev`), the Electron `userData` directory names
+  (`infinitus-desktop` / `infinitus-desktop-dev` — never `infinitus`, which is
+  the native app's `Application Support/Infinitus` on case-insensitive APFS), and
   `adoptsLegacyDesktopUserDataDir` (empty list: the fork adopts no legacy
   directory, least of all the installed app's `T3 Code (Alpha)`).
 - `packages/shared/src/infinitusControl.ts` — the control-socket path rule
