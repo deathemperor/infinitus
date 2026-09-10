@@ -60,6 +60,7 @@ import { useSavedRemoteConnections } from "../../state/use-remote-environment-re
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
+import { SettingsInfinitusSection } from "./SettingsInfinitusSection";
 import { resolveAgentAwarenessPlatformPresentation } from "./SettingsRouteScreen.logic";
 
 type NotificationStatus = "checking" | "enabled" | "disabled" | "unsupported";
@@ -140,6 +141,8 @@ function LocalSettingsRouteScreen() {
         </SettingsSection>
 
         <GeneralSettingsSection />
+
+        <SettingsInfinitusSection />
 
         <SettingsSection title="Appearance">
           <SettingsRow icon="paintbrush" label="Appearance" target="SettingsAppearance" />
@@ -561,6 +564,8 @@ function ConfiguredSettingsRouteScreen() {
 
         <GeneralSettingsSection />
 
+        <SettingsInfinitusSection />
+
         <SettingsSection title="Appearance">
           <SettingsRow icon="paintbrush" label="Appearance" target="SettingsAppearance" />
         </SettingsSection>
@@ -581,7 +586,6 @@ function GeneralSettingsSection() {
       <SettingsRow icon="folder" label="Project Grouping" target="SettingsProjectGrouping" />
       <AutoSettleSettingsRows />
       <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
-      <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
     </SettingsSection>
   );
 }

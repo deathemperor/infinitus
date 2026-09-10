@@ -45,6 +45,10 @@ export interface Preferences {
   /** Fresh keys reset both shelves to collapsed when users update. */
   readonly threadListSettledShelfExpanded?: boolean;
   readonly threadListSnoozedShelfExpanded?: boolean;
+  /** Infinitus (fork): whether a paired Mac drives this phone's Live Activity
+      cards over push, and which Mac (an environment id) when several run it. */
+  readonly infinitusLiveActivityEnabled?: boolean;
+  readonly infinitusLiveActivityMac?: string;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -105,6 +109,8 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     planModeEnabled?: boolean;
     threadListSettledShelfExpanded?: boolean;
     threadListSnoozedShelfExpanded?: boolean;
+    infinitusLiveActivityEnabled?: boolean;
+    infinitusLiveActivityMac?: string;
   } = {};
 
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
@@ -180,6 +186,12 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.threadListSnoozedShelfExpanded === "boolean") {
     preferences.threadListSnoozedShelfExpanded = parsed.threadListSnoozedShelfExpanded;
+  }
+  if (typeof parsed.infinitusLiveActivityEnabled === "boolean") {
+    preferences.infinitusLiveActivityEnabled = parsed.infinitusLiveActivityEnabled;
+  }
+  if (typeof parsed.infinitusLiveActivityMac === "string") {
+    preferences.infinitusLiveActivityMac = parsed.infinitusLiveActivityMac;
   }
   return preferences;
 }
