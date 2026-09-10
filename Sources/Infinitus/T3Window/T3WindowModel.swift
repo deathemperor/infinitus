@@ -23,8 +23,6 @@ final class T3WindowModel: ObservableObject {
     private(set) weak var model: AppModel?
     private var sink: AnyCancellable?
     private var refreshing = false
-    /// Task 13's composer focuses its field when this flips true, then clears it.
-    @Published var composerFocusRequested = false
     /// ⌘K's thread switcher sheet (Task 15). On the model, not in `T3Root`'s
     /// `@State`, so `show workspace switcher` can raise it the way
     /// `show workspace draft` makes a draft.
@@ -74,7 +72,7 @@ final class T3WindowModel: ObservableObject {
         if state.selectedThreadId == nil, let first = state.sidebarSections(now: now).first?.threads.first {
             state.select(first.id, now: now)
         }
-        if screen == "composer" { composerFocusRequested = true }
+        if screen == "composer" { composerInbox.send(.focus) }
     }
 
     /// Runs `applyFocusedScreen` immediately against the current state (Task A/E5):
@@ -724,13 +722,15 @@ final class T3WindowModel: ObservableObject {
     /// Every one-shot delivery into the open composer: the Files tab's "Add
     /// to chat" mention (upstream's composer ref, `useComposerHandleContext`,
     /// `FileBrowserPanel.tsx:106`, used at `:175-192`), the plan card's
-    /// Refine (`ComposerPrimaryActions.tsx:166-181`), and a sidebar drop onto
-    /// the already-open thread (`bde39d4d7`). Its own tiny observable rather
-    /// than `@Published` fields on this model, and for a load-bearing
-    /// reason: the composer holds the model as a plain `let` so a fleet tick
-    /// never re-runs its body (T3ComposerView.swift:44-47), which also means
-    /// a publish HERE would never reach it (#528). `T3DraftStart` above is
-    /// passed for the same reason.
+    /// Refine (`ComposerPrimaryActions.tsx:166-181`), a sidebar drop onto
+    /// the already-open thread (`bde39d4d7`), and a request to take the
+    /// caret — `show workspace composer` and a new draft (B-38, #528's last
+    /// channel). Its own tiny observable rather than `@Published` fields on
+    /// this model, and for a load-bearing reason: the composer holds the
+    /// model as a plain `let` so a fleet tick never re-runs its body
+    /// (T3ComposerView.swift:44-47), which also means a publish HERE would
+    /// never reach it (#528). `T3DraftStart` above is passed for the same
+    /// reason.
     let composerInbox = T3ComposerInbox()
 
     /// `startNewThreadFromContext` (`Sidebar.tsx:4251-4270`): a draft in the
@@ -747,7 +747,7 @@ final class T3WindowModel: ObservableObject {
         let draft = state.reusableDraftId(projectId: project, isUntouched: { self.draft(for: $0).isEmpty })
             ?? state.addDraft(projectId: project, now: now)
         select(draft)
-        composerFocusRequested = true
+        composerInbox.send(.focus)
     }
 
     var currentProjectId: String? {
@@ -918,8 +918,9 @@ final class T3WindowModel: ObservableObject {
 /// the mention is a direct call on the composer's handle
 /// (`composer.insertTextAtEnd`, `FileBrowserPanel.tsx:184`); a SwiftUI view
 /// has no handle to call, so the value waits here for the frame the composer
-/// reads it in. The plan card's Refine and a sidebar file drop (#528) ride
-/// the same slot — three producers, one observed object.
+/// reads it in. The plan card's Refine, a sidebar file drop (#528) and a
+/// focus request (B-38) ride the same slot — four producers, one observed
+/// object.
 @MainActor
 final class T3ComposerInbox: ObservableObject {
     @Published private(set) var delivery: T3ComposerDelivery?

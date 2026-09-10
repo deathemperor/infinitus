@@ -34,4 +34,20 @@ final class T3ComposerDeliveryTests: XCTestCase {
         XCTAssertNil(slot)
         XCTAssertNil(T3ComposerDelivery.take(&slot))
     }
+
+    /// The last #528 channel (B-38): a focus request rides the same slot,
+    /// so back-to-back requests (⌘K to the same thread twice) still need
+    /// distinct seqs, and a take still drains it.
+    func testTwoFocusDeliveriesInARowDifferBySeqAndTakeDrainsIt() {
+        let first = T3ComposerDelivery.next(.focus, after: 0)
+        let second = T3ComposerDelivery.next(.focus, after: first.seq)
+        XCTAssertNotEqual(first, second)
+        XCTAssertEqual(first.seq, 1)
+        XCTAssertEqual(second.seq, 2)
+
+        var slot: T3ComposerDelivery? = second
+        XCTAssertEqual(T3ComposerDelivery.take(&slot), .focus)
+        XCTAssertNil(slot)
+        XCTAssertNil(T3ComposerDelivery.take(&slot))
+    }
 }
