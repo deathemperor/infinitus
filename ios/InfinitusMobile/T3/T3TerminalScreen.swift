@@ -190,29 +190,7 @@ struct T3TerminalScreen: View {
     private var project: String { URL(fileURLWithPath: session.cwd).lastPathComponent }
 
     var body: some View {
-        let p = t3.mobile
-        VStack(spacing: 0) {
-            switch controller.phase {
-            case .unavailable(let message):
-                T3EmptyState(title: "Terminal unavailable", message: message)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .opening, .idle where fixture == nil:
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            default:
-                T3TerminalSurface(controller: controller)
-                    .background(T3TerminalController.background(dark: scheme == .dark))
-                if let strip = statusStrip {
-                    HStack(spacing: 12) {
-                        Text(strip).font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color)
-                        Spacer()
-                        if fixture == nil {
-                            Button("Restart") { Task { await restart() } }.font(T3Font.mobile(.xs, .semibold)).foregroundStyle(p.accent.color)
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 8).background(p.card.color)
-                }
-            }
-        }
+        VStack(spacing: 0) { content }
         .background(T3TerminalController.background(dark: scheme == .dark).ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .background(InteractivePopGesture())
@@ -230,6 +208,35 @@ struct T3TerminalScreen: View {
         }
         .onChange(of: scheme) { _, new in controller.apply(dark: new == .dark) }
         .onDisappear { stream?.cancel() }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch controller.phase {
+        case .unavailable(let message):
+            T3EmptyState(title: "Terminal unavailable", message: message)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .opening, .idle where fixture == nil:
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        default:
+            T3TerminalSurface(controller: controller)
+                .background(T3TerminalController.background(dark: scheme == .dark))
+            if let strip = statusStrip { stripRow(strip) }
+        }
+    }
+
+    private func stripRow(_ text: String) -> some View {
+        let p = t3.mobile
+        return HStack(spacing: 12) {
+            Text(text).font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color)
+            Spacer()
+            if fixture == nil {
+                Button { Task { await restart() } } label: {
+                    Text("Restart").font(T3Font.mobile(.xs, .bold)).foregroundStyle(p.primary.color)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8).background(p.card.color)
     }
 
     private var statusStrip: String? {
@@ -291,10 +298,10 @@ struct T3TerminalScreen: View {
                     ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                         let armed = key.label == "CTRL" && controller.ctrlArmed
                         Button { key.action() } label: {
-                            Text(key.label).font(T3Font.mobile(.xs, .semibold))
-                                .foregroundStyle(armed ? p.accentForeground.color : p.foreground.color)
+                            Text(key.label).font(T3Font.mobile(.xs, .medium))
+                                .foregroundStyle(armed ? p.primaryForeground.color : p.foreground.color)
                                 .frame(minWidth: key.label.count > 1 ? 56 : 44, minHeight: 34)
-                                .background(armed ? p.accent.color : p.subtleStrong.color, in: Capsule())
+                                .background(armed ? p.primary.color : p.subtleStrong.color, in: Capsule())
                         }
                         .buttonStyle(.plain)
                     }
