@@ -143,6 +143,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `routes/settings.infinitus.devices.tsx`; no route of its own.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms.
+- `apps/web/src/hooks/useInfinitusEventToasts.ts`,
+  `apps/web/src/hooks/infinitusEventToasts.logic.ts`,
+  `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events
+  (an account switch, every account exhausted, a session waiting for an
+  answer) as the app's toasts; nothing from the first snapshot, deduped by
+  the server's event id. Mounted once from `apps/web/src/routes/__root.tsx`
+  (an upstream file: that one line is the fork's only edit there).
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
