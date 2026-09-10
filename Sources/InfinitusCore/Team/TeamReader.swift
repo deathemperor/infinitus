@@ -175,11 +175,23 @@ public struct TeamReader {
     public static func scan(client: TeamClient, docs: DocCache, scans: ScanCache)
         -> (headers: [TeamClient.ReadableHeader], reader: TeamReader?) {
         guard client.roster != nil else { return ([], nil) }
-        let fingerprint = try? client.storeFingerprint()
+        return scan(fingerprint: try? client.storeFingerprint(), scans: scans,
+                    headers: { try client.readableHeaders() },
+                    fold: { try load(client: client, headers: $0, cache: docs) })
+    }
+
+    /// The cache rule on its own: a pass is stored only when both the
+    /// scan and the fold succeeded. A quiet team moves no ref for hours,
+    /// so one transient git or decrypt failure cached under the
+    /// fingerprint would show an empty roster until someone pushed.
+    static func scan(fingerprint: String?, scans: ScanCache,
+                     headers: () throws -> [TeamClient.ReadableHeader],
+                     fold: ([TeamClient.ReadableHeader]) throws -> TeamReader)
+        -> (headers: [TeamClient.ReadableHeader], reader: TeamReader?) {
         if let fingerprint, let hit = scans.lookup(fingerprint) { return hit }
-        let headers = (try? client.readableHeaders()) ?? []
-        let reader = try? load(client: client, headers: headers, cache: docs)
-        if let fingerprint { scans.store(fingerprint, headers: headers, reader: reader) }
+        guard let headers = try? headers() else { return ([], nil) }
+        let reader = try? fold(headers)
+        if let fingerprint, let reader { scans.store(fingerprint, headers: headers, reader: reader) }
         return (headers, reader)
     }
 

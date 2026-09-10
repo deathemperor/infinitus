@@ -217,6 +217,26 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(scans.hits, 2)
     }
 
+    /// A pass whose scan or fold failed is never the cached answer: the
+    /// next pass runs the scan again instead of a hit on an empty roster.
+    func testAFailedScanIsNotCachedUnderTheFingerprint() throws {
+        struct Broken: Error {}
+        let scans = TeamReader.ScanCache()
+        let failed = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { throw Broken() }, fold: { _ in TeamReader() })
+        XCTAssertTrue(failed.headers.isEmpty); XCTAssertNil(failed.reader)
+        let unfolded = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { [] }, fold: { _ in throw Broken() })
+        XCTAssertTrue(unfolded.headers.isEmpty); XCTAssertNil(unfolded.reader)
+        XCTAssertEqual(scans.hits, 0)
+        var scanned = 0
+        let good = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertNotNil(good.reader); XCTAssertEqual(scanned, 1)
+        _ = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertEqual(scanned, 1); XCTAssertEqual(scans.hits, 1)
+        // No fingerprint (the store could not be read): scanned, never stored.
+        _ = TeamReader.scan(fingerprint: nil, scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertEqual(scanned, 2); XCTAssertEqual(scans.hits, 1)
+    }
+
     func testAForgedFirstRosterIsRefusedAndNothingIsPersisted() throws {
         let remote = try makeRemote()
         let (lp, ls) = machine("leader")
