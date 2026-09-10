@@ -237,6 +237,32 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(scanned, 2); XCTAssertEqual(scans.hits, 1)
     }
 
+    /// #499: with a memo attached, the headers are listed once per store
+    /// state — a publish moves a ref and lists again; without one, never memoised.
+    func testReadableHeadersAreMemoisedWhileTheStoreRefsHold() throws {
+        let remote = try makeRemote()
+        let (lp, ls) = machine("leader")
+        let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
+        _ = try leader.publish(kind: "now", path: "now.json", plaintext: Data("{\"busy\":1}".utf8), audience: .team, now: 1_005)
+        let plain = try leader.readableHeaders()
+        XCTAssertEqual(plain.map(\.entry.path), ["m/\(leader.identity.kid)/now.json"])
+        let memo = TeamClient.HeaderMemo()
+        leader.headerMemo = memo
+        XCTAssertEqual(try leader.readableHeaders().map(\.entry.path), plain.map(\.entry.path))
+        XCTAssertEqual(memo.hits, 0)
+        // A fetch that brought nothing: its own senders lookup is a hit, and so is the next read.
+        _ = try leader.fetch()
+        XCTAssertEqual(memo.hits, 1)
+        XCTAssertEqual(try leader.readableHeaders().map(\.entry.path), plain.map(\.entry.path))
+        XCTAssertEqual(memo.hits, 2)
+        _ = try leader.publish(kind: "sessions", path: "sessions/index.json", plaintext: Data("{\"sessions\":[]}".utf8), audience: .team, now: 1_010)
+        XCTAssertEqual(try leader.readableHeaders().map(\.entry.path).sorted(),
+                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/sessions/index.json"])
+        XCTAssertEqual(memo.hits, 2, "the publish moved m/<kid>: listed again")
+        _ = try leader.readableHeaders()
+        XCTAssertEqual(memo.hits, 3)
+    }
+
     func testAForgedFirstRosterIsRefusedAndNothingIsPersisted() throws {
         let remote = try makeRemote()
         let (lp, ls) = machine("leader")

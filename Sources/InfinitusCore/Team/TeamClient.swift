@@ -627,8 +627,40 @@ public final class TeamClient {
     /// while it holds, `readableHeaders` and the reader folded from them
     /// would come out the same.
     public func storeFingerprint() throws -> String { try store.refsFingerprint() }
+    /// The readable headers by store fingerprint (#499): one loop pass
+    /// asked for them three times — `fetch` (whose transcripts to sync),
+    /// the grantor pass and the reload — and each listed every branch
+    /// again. With a memo attached the scan repeats only after a ref
+    /// moved; `TeamModel` attaches one to its loop and reload clients.
+    public final class HeaderMemo: @unchecked Sendable {
+        private let lock = NSLock()
+        private var key: String?
+        private var headers: [ReadableHeader] = []
+        private var count = 0
+        public init() {}
+
+        func lookup(_ fingerprint: String) -> [ReadableHeader]? {
+            lock.lock(); defer { lock.unlock() }
+            guard key == fingerprint else { return nil }
+            count += 1
+            return headers
+        }
+
+        func store(_ fingerprint: String, headers: [ReadableHeader]) {
+            lock.lock(); key = fingerprint; self.headers = headers; lock.unlock()
+        }
+
+        /// How often `readableHeaders` answered from the memo.
+        public var hits: Int { lock.lock(); defer { lock.unlock() }; return count }
+    }
+    public var headerMemo: HeaderMemo?
+
     public func readableHeaders() throws -> [ReadableHeader] {
-        try readableScan().headers
+        guard let memo = headerMemo, let fingerprint = try? store.refsFingerprint() else { return try readableScan().headers }
+        if let hit = memo.lookup(fingerprint) { return hit }
+        let headers = try readableScan().headers
+        memo.store(fingerprint, headers: headers)
+        return headers
     }
 
     /// `<team dir>/headers.json`: envelope headers by store path and blob version.
