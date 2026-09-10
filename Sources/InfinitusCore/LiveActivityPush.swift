@@ -40,9 +40,17 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
     /// into the right Mac's slot even when two Macs share a name. nil
     /// from a phone before the field: the card is matched by name.
     public var macId: String?
+    /// How the phone hosts its Live Activities (#572 N3): nil or
+    /// "native" for the native app's own ActivityKit types; "expo" for
+    /// the fork's expo-widgets host, which wants every activity as one
+    /// shared attributes type with a `{name, props}` content state. A
+    /// String, not an enum, so a value this build does not know decodes
+    /// (as native) instead of dropping the registration.
+    public var layout: String?
 
     public init(kind: Kind, token: String, deviceId: String, deviceName: String,
-                environment: String, themeID: String?, registeredAt: Date = Date(), macId: String? = nil) {
+                environment: String, themeID: String?, registeredAt: Date = Date(), macId: String? = nil,
+                layout: String? = nil) {
         self.kind = kind
         self.token = token
         self.deviceId = deviceId
@@ -51,7 +59,10 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
         self.themeID = themeID
         self.registeredAt = registeredAt
         self.macId = macId
+        self.layout = layout
     }
+
+    public var isExpo: Bool { layout == LiveActivityPush.expoLayout }
 
     public var isSandbox: Bool { environment == "sandbox" }
     /// One slot per device+kind: a new token for the same replaces it.
@@ -73,6 +84,24 @@ public enum LiveActivityPush {
     public static let workingAttributesType = "WorkingActivity"
     public static let revivalAttributesType = "RevivalActivity"
 
+    /// The expo-widgets envelope (#572 N3): one attributes type for every
+    /// activity, the layout named in the content state, the state itself
+    /// as a JSON STRING under `props`, and the deep link the card opens in
+    /// `attributes.url`. The JSON inside `props` is the same
+    /// WorkingActivityState / RevivalActivityState the native card gets.
+    public static let expoLayout = "expo"
+    public static let expoAttributesType = "LiveActivityAttributes"
+    public static let expoWorkingName = "InfinitusWorking"
+    public static let expoRevivalName = "InfinitusRevival"
+    /// Provisional until the fork contract names it (Infi3, #572).
+    public static func expoDeepLink(macId: String?) -> String {
+        var url = "t3code://settings/accounts"
+        if let macId, let escaped = macId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            url += "?mac=" + escaped
+        }
+        return url
+    }
+
     public static func host(sandbox: Bool) -> String {
         sandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com"
     }
@@ -82,18 +111,22 @@ public enum LiveActivityPush {
     }
 
     /// `event: update` — new content for a running activity.
-    public static func updatePayload<S: Encodable>(state: S, staleDate: Date?, now: Date = Date()) -> Data {
+    /// `expo`: the expo-widgets layout name, when the registration's
+    /// `layout` is "expo"; nil sends the native content state.
+    public static func updatePayload<S: Encodable>(state: S, staleDate: Date?, expo: String? = nil,
+                                                   now: Date = Date()) -> Data {
         var aps: [String: Any] = ["timestamp": Int(now.timeIntervalSince1970), "event": "update",
-                                  "content-state": json(state)]
+                                  "content-state": contentState(state, expo: expo)]
         if let staleDate { aps["stale-date"] = Int(staleDate.timeIntervalSince1970) }
         return data(["aps": aps])
     }
 
     /// `event: end` — final content, gone after `dismissalDate` (nil =
     /// the system default, a few hours).
-    public static func endPayload<S: Encodable>(state: S, dismissalDate: Date?, now: Date = Date()) -> Data {
+    public static func endPayload<S: Encodable>(state: S, dismissalDate: Date?, expo: String? = nil,
+                                                now: Date = Date()) -> Data {
         var aps: [String: Any] = ["timestamp": Int(now.timeIntervalSince1970), "event": "end",
-                                  "content-state": json(state)]
+                                  "content-state": contentState(state, expo: expo)]
         if let dismissalDate { aps["dismissal-date"] = Int(dismissalDate.timeIntervalSince1970) }
         return data(["aps": aps])
     }
@@ -102,15 +135,20 @@ public enum LiveActivityPush {
     /// its first content, and — when given — the alert iOS shows as it
     /// appears; without one the activity lands silently. `macId` is the
     /// registration's, echoed so the phone files the card under its Mac.
+    /// With `expo`, the attributes type and attributes are the
+    /// expo-widgets host's (`expoAttributesType`, `{url}`) whatever
+    /// `attributesType` says — that name is the native app's type.
     public static func startPayload<S: Encodable>(attributesType: String, machine: String, macId: String? = nil,
                                                   state: S, staleDate: Date?, alertTitle: String? = nil,
-                                                  alertBody: String? = nil, now: Date = Date()) -> Data {
+                                                  alertBody: String? = nil, expo: String? = nil,
+                                                  now: Date = Date()) -> Data {
         var attributes: [String: Any] = ["machine": machine]
         if let macId { attributes["macId"] = macId }
+        if expo != nil { attributes = ["url": expoDeepLink(macId: macId)] }
         var aps: [String: Any] = [
             "timestamp": Int(now.timeIntervalSince1970), "event": "start",
-            "content-state": json(state),
-            "attributes-type": attributesType,
+            "content-state": contentState(state, expo: expo),
+            "attributes-type": expo == nil ? attributesType : expoAttributesType,
             "attributes": attributes,
         ]
         if let alertTitle, let alertBody { aps["alert"] = ["title": alertTitle, "body": alertBody] }
@@ -135,6 +173,17 @@ public enum LiveActivityPush {
         guard let data = try? encoder.encode(state),
               let object = try? JSONSerialization.jsonObject(with: data) else { return [:] }
         return object
+    }
+
+    /// The native content state, or expo-widgets' `{name, props}` with the
+    /// same JSON serialised into `props` (sorted keys, so two equal states
+    /// are the same string).
+    static func contentState<S: Encodable>(_ state: S, expo name: String?) -> Any {
+        guard let name else { return json(state) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let props = (try? encoder.encode(state)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        return ["name": name, "props": props]
     }
 
     private static func data(_ object: [String: Any]) -> Data {

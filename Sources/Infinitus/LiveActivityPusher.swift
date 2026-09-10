@@ -138,7 +138,8 @@ final class LiveActivityPusher: ObservableObject {
                 send(LiveActivityPush.startPayload(
                         attributesType: LiveActivityPush.workingAttributesType, machine: machine,
                         macId: registration.macId, state: state,
-                        staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale)),
+                        staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale),
+                        expo: Self.expoName(.working, registration)),
                      to: registration, what: "start working")
             case .revivalStart:
                 guard !hasLive(.revival, device: registration.deviceId),
@@ -150,7 +151,8 @@ final class LiveActivityPusher: ObservableObject {
                         macId: registration.macId, state: state,
                         staleDate: state.revivesAt.addingTimeInterval(60),
                         alertTitle: "All accounts limited",
-                        alertBody: "\(state.reviver) \(state.reviveWord) at \(state.revivesAt.formatted(date: .omitted, time: .shortened))"),
+                        alertBody: "\(state.reviver) \(state.reviveWord) at \(state.revivesAt.formatted(date: .omitted, time: .shortened))",
+                        expo: Self.expoName(.revival, registration)),
                      to: registration, what: "start revival")
             }
         }
@@ -191,20 +193,28 @@ final class LiveActivityPusher: ObservableObject {
         return Date().timeIntervalSince(live.registeredAt) < 8 * 3600
     }
 
+    /// The expo-widgets layout name for an expo registration, nil for a native one (#572 N3).
+    private static func expoName(_ kind: ActivityPushRegistration.Kind, _ registration: ActivityPushRegistration) -> String? {
+        guard registration.isExpo else { return nil }
+        return kind == .revival ? LiveActivityPush.expoRevivalName : LiveActivityPush.expoWorkingName
+    }
+
     private func pushWorking(_ state: WorkingActivityState?, to registration: ActivityPushRegistration) {
         let slot = registration.slot
         if let state {
             if let previous = lastWorking[slot], !LiveActivityBuilder.differs(previous, state) { return }
             lastWorking[slot] = state
             send(LiveActivityPush.updatePayload(state: state,
-                                                staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale)),
+                                                staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale),
+                                                expo: Self.expoName(.working, registration)),
                  to: registration, what: "update working")
         } else if let previous = lastWorking[slot] {
             // Nothing working any more: end it, and forget the token —
             // the next activity brings a new one.
             lastWorking[slot] = nil
-            send(LiveActivityPush.endPayload(state: previous, dismissalDate: Date()), to: registration,
-                 what: "end working")
+            send(LiveActivityPush.endPayload(state: previous, dismissalDate: Date(),
+                                             expo: Self.expoName(.working, registration)),
+                 to: registration, what: "end working")
             registrations[slot] = nil
             persist()
         }
@@ -215,12 +225,14 @@ final class LiveActivityPusher: ObservableObject {
         if let state {
             if lastRevival[slot] == state { return }
             lastRevival[slot] = state
-            send(LiveActivityPush.updatePayload(state: state, staleDate: state.revivesAt.addingTimeInterval(60)),
+            send(LiveActivityPush.updatePayload(state: state, staleDate: state.revivesAt.addingTimeInterval(60),
+                                                expo: Self.expoName(.revival, registration)),
                  to: registration, what: "update revival")
         } else if var previous = lastRevival[slot] {
             previous.revived = true
             lastRevival[slot] = nil
-            send(LiveActivityPush.endPayload(state: previous, dismissalDate: Date().addingTimeInterval(120)),
+            send(LiveActivityPush.endPayload(state: previous, dismissalDate: Date().addingTimeInterval(120),
+                                             expo: Self.expoName(.revival, registration)),
                  to: registration, what: "end revival")
             registrations[slot] = nil
             persist()
