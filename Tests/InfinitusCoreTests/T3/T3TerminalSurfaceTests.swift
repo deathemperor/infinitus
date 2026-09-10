@@ -71,6 +71,133 @@ final class T3TerminalSurfaceTests: XCTestCase {
         XCTAssertNil(T3TerminalSurface.activeAfterClose(ids: ["term-1"], closing: "term-1", active: "term-1"))
     }
 
+    // MARK: - SplitGroup (terminalUiStateStore.ts:254-348, :409-452)
+
+    private typealias Split = T3TerminalSurface.SplitGroup
+
+    /// `MAX_TERMINALS_PER_GROUP` (`apps/web/src/types.ts:30`) — and it is NOT
+    /// the per-session cap, which is larger.
+    func testMaxPerGroupIsFour() {
+        XCTAssertEqual(Split.maxPerGroup, 4)
+        XCTAssertLessThan(Split.maxPerGroup, T3Terminal.maxTerminalsPerSession)
+    }
+
+    /// A group of one is horizontal, not split, and named "Single"
+    /// (`ThreadTerminalDrawer.tsx:1637-1642`); its id is `group-<first id>`
+    /// (`terminalUiStateStore.ts:284`).
+    func testAFreshGroupIsALoneHorizontalTerminal() {
+        let group = Split(terminalId: "term-1")
+        XCTAssertEqual(group.id, "group-term-1")
+        XCTAssertEqual(group.terminalIds, ["term-1"])
+        XCTAssertEqual(group.orientation, .horizontal)
+        XCTAssertFalse(group.isSplit)
+        XCTAssertTrue(group.canSplit)
+        XCTAssertEqual(group.label, "Single")
+    }
+
+    /// Splitting to two, three and four, each time from the newest member — the
+    /// grid upstream draws as `repeat(n, minmax(0, 1fr))` (`:1500-1507`).
+    func testSplitGrowsToFourMembers() {
+        var group = Split(terminalId: "term-1")
+        XCTAssertTrue(group.split(active: "term-1", orientation: .horizontal, newId: "term-2"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-2"])
+        XCTAssertEqual(group.label, "Side by side")
+        XCTAssertTrue(group.split(active: "term-2", orientation: .horizontal, newId: "term-3"))
+        XCTAssertTrue(group.split(active: "term-3", orientation: .horizontal, newId: "term-4"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-2", "term-3", "term-4"])
+        XCTAssertFalse(group.canSplit)
+    }
+
+    /// The fifth is refused and changes nothing at all — not the members, not
+    /// the orientation (`terminalUiStateStore.ts:318-324` returns the state
+    /// untouched).
+    func testSplitRefusesTheFifthMember() {
+        var group = Split(id: "group-term-1",
+                          terminalIds: ["term-1", "term-2", "term-3", "term-4"],
+                          orientation: .horizontal)
+        XCTAssertFalse(group.canSplit)
+        XCTAssertFalse(group.split(active: "term-1", orientation: .vertical, newId: "term-5"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-2", "term-3", "term-4"])
+        XCTAssertEqual(group.orientation, .horizontal)
+    }
+
+    /// `:326-333`: the new member lands directly after the ACTIVE one, not at
+    /// the end — a split of the left pane of a pair puts the new pane between.
+    func testSplitInsertsAfterTheActiveMember() {
+        var group = Split(id: "group-term-1", terminalIds: ["term-1", "term-2"])
+        XCTAssertTrue(group.split(active: "term-1", orientation: .horizontal, newId: "term-3"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-3", "term-2"])
+        // An active id that is not a member appends (`:330-332`).
+        XCTAssertTrue(group.split(active: "term-9", orientation: .horizontal, newId: "term-4"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-3", "term-2", "term-4"])
+    }
+
+    /// One orientation per group, the last split wins (`:334-338`): a vertical
+    /// split of a side-by-side pair STACKS all three. No nesting.
+    func testTheLastSplitSetsTheWholeGroupsOrientation() {
+        var group = Split(terminalId: "term-1")
+        group.split(active: "term-1", orientation: .horizontal, newId: "term-2")
+        XCTAssertEqual(group.label, "Side by side")
+        group.split(active: "term-2", orientation: .vertical, newId: "term-3")
+        XCTAssertEqual(group.orientation, .vertical)
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-2", "term-3"])
+        XCTAssertEqual(group.label, "Stacked")
+        // And back: a horizontal split of a stack puts all four in columns.
+        group.split(active: "term-3", orientation: .horizontal, newId: "term-4")
+        XCTAssertEqual(group.orientation, .horizontal)
+        XCTAssertEqual(group.label, "Side by side")
+    }
+
+    /// A member already in the group is not added twice
+    /// (`destinationTerminalIdSet`, `:316-333`).
+    func testSplitIgnoresAMemberItAlreadyHolds() {
+        var group = Split(id: "group-term-1", terminalIds: ["term-1", "term-2"])
+        XCTAssertFalse(group.split(active: "term-1", orientation: .vertical, newId: "term-2"))
+        XCTAssertEqual(group.terminalIds, ["term-1", "term-2"])
+    }
+
+    /// The middle pane closes: the grid collapses to the two around it and the
+    /// one that took its slot is active (`activeAfterClose`).
+    func testRemovingTheMiddleMemberCollapsesTheGroup() {
+        let group = Split(id: "group-term-1", terminalIds: ["term-1", "term-2", "term-3"],
+                          orientation: .vertical)
+        let result = group.removing("term-2", active: "term-2")
+        XCTAssertEqual(result.group?.terminalIds, ["term-1", "term-3"])
+        XCTAssertEqual(result.group?.id, "group-term-1", "the id survives a removal")
+        XCTAssertEqual(result.group?.orientation, .vertical, "so does the orientation")
+        XCTAssertEqual(result.active, "term-3")
+    }
+
+    /// The last pane of a group: clamped back onto the one before it, and a
+    /// group that still holds two of three is no longer a stack of three.
+    func testRemovingTheLastMemberClampsBack() {
+        let group = Split(id: "group-term-1", terminalIds: ["term-1", "term-2", "term-3"])
+        let result = group.removing("term-3", active: "term-3")
+        XCTAssertEqual(result.group?.terminalIds, ["term-1", "term-2"])
+        XCTAssertEqual(result.active, "term-2")
+        XCTAssertEqual(result.group?.label, "Side by side")
+    }
+
+    /// A pane other than the active one closing leaves the selection alone; the
+    /// group's only member closing takes the group with it.
+    func testRemovingLeavesAnUnrelatedActiveAloneAndEmptiesToNil() {
+        let pair = Split(id: "group-term-1", terminalIds: ["term-1", "term-2"])
+        let stillTermOne = pair.removing("term-2", active: "term-1")
+        XCTAssertEqual(stillTermOne.group?.terminalIds, ["term-1"])
+        XCTAssertEqual(stillTermOne.active, "term-1")
+        XCTAssertEqual(stillTermOne.group?.label, "Single", "a collapsed pair is a lone terminal again")
+
+        let lone = Split(terminalId: "term-1")
+        let gone = lone.removing("term-1", active: "term-1")
+        XCTAssertNil(gone.group)
+        XCTAssertNil(gone.active)
+
+        // A terminal from another group changes nothing here.
+        let untouched = pair.removing("term-7", active: "term-1")
+        XCTAssertEqual(untouched.group, pair)
+        XCTAssertEqual(untouched.active, "term-1")
+    }
+
     // MARK: - Attachment: reset vs append
 
     func testFirstSnapshotResetsAndLaterChunksAppend() {
