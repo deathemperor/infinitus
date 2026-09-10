@@ -76,6 +76,24 @@ public enum PastSessions {
     /// Every top-level transcript under projects/, newest first, from
     /// directory listings alone. Sub-agent transcripts live in
     /// `<sessionId>/subagents/`, a directory, so they fall out.
+    /// A cheap stamp of what `files` would find: every project dir's
+    /// name and mtime. A directory's mtime moves when a transcript is
+    /// created, removed or renamed in it; a transcript that only grows
+    /// belongs to a live session, which `projectSummaries` keys on
+    /// separately. About a hundred stats against the walk's ten
+    /// thousand (#346: the per-minute walk was ~1 s of CPU at idle).
+    public static func fingerprint(claudeDir: URL) -> String {
+        let fm = FileManager.default
+        let projects = claudeDir.appendingPathComponent("projects")
+        let key: Set<URLResourceKey> = [.contentModificationDateKey]
+        guard let slugs = try? fm.contentsOfDirectory(at: projects, includingPropertiesForKeys: Array(key),
+                                                      options: [.skipsHiddenFiles]) else { return "" }
+        return slugs.map { url in
+            let mtime = (try? url.resourceValues(forKeys: key))?.contentModificationDate?.timeIntervalSince1970 ?? 0
+            return "\(url.lastPathComponent)@\(Int(mtime * 1000))"
+        }.sorted().joined(separator: ",")
+    }
+
     static func files(claudeDir: URL) -> [File] {
         let fm = FileManager.default
         let projects = claudeDir.appendingPathComponent("projects")
