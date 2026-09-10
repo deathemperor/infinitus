@@ -64,6 +64,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
+- `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
+  Accounts, the Infinitus fleet per paired Mac).
+- `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
+  `SettingsAccounts` in the settings target union.
+- `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the Accounts
+  row in the General section.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
@@ -79,6 +85,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
+  the Infinitus atoms and the Accounts screen (row model imported from
+  `@t3tools/client-runtime/state/infinitusAccounts`).
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
