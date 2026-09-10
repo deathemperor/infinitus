@@ -623,6 +623,10 @@ public final class TeamClient {
     }
 
     public typealias ReadableHeader = (entry: StoreEntry, header: Envelope.Header)
+    /// The store's branches and their commits (`TeamGit.refsFingerprint`):
+    /// while it holds, `readableHeaders` and the reader folded from them
+    /// would come out the same.
+    public func storeFingerprint() throws -> String { try store.refsFingerprint() }
     public func readableHeaders() throws -> [ReadableHeader] {
         try readableScan().headers
     }
