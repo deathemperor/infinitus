@@ -291,6 +291,13 @@ describe("resolveDesktopUpdateTrackRow", () => {
     expect(row.switchable).toBe(false);
   });
 
+  it("offers no switch before the desktop bridge reports a track", () => {
+    const row = resolveDesktopUpdateTrackRow(null);
+
+    expect(row.switchable).toBe(false);
+    expect(row.label).not.toBe("Stable");
+  });
+
   it("keeps upstream's two switchable tracks", () => {
     expect(resolveDesktopUpdateTrackRow("latest")).toMatchObject({
       label: "Stable",
