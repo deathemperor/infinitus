@@ -52,6 +52,7 @@ import {
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
+  UsersIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -428,6 +429,13 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       ? selectActiveRightPanel(state.byThreadKey, routeThreadRef) === "preview"
       : false,
   );
+  const navigate = useNavigate();
+  const { environments } = useEnvironments();
+  // Same gate as the sidebar item: one connected server running Infinitus is
+  // enough, because the page picks the environment itself.
+  const accountsSupported = environments.some(
+    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
+  );
 
   useEffect(() => {
     if (!state.open || state.mode === "command") return;
@@ -475,6 +483,29 @@ export function CommandPalette({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [keybindings, previewOpen, resolvedTheme, terminalOpen, theme, themeHalves, toggleMode]);
+
+  // Its own listener: the overlay one above answers only commands that open an
+  // overlay, and this one is off entirely on a server without Infinitus.
+  useEffect(() => {
+    if (!accountsSupported) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const command = resolveShortcutCommand(event, keybindings, {
+        context: {
+          terminalFocus: isTerminalFocused(),
+          terminalOpen,
+          previewFocus: isPreviewFocused(),
+          previewOpen,
+        },
+      });
+      if (command !== "accounts.open") return;
+      event.preventDefault();
+      event.stopPropagation();
+      void navigate({ to: "/accounts" });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [accountsSupported, keybindings, navigate, previewOpen, terminalOpen]);
 
   useEffect(
     () =>
@@ -602,6 +633,11 @@ function OpenCommandPaletteDialog(props: {
     reportFailure: false,
   });
   const { environments } = useEnvironments();
+  // Same gate as the sidebar item: one connected server running Infinitus is
+  // enough, because the page picks the environment itself.
+  const accountsSupported = environments.some(
+    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
+  );
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const availableSettingsSearchItems = useAvailableSettingsSearchItems();
@@ -1737,6 +1773,20 @@ function OpenCommandPaletteDialog(props: {
       });
     },
   });
+
+  if (accountsSupported) {
+    actionItems.push({
+      kind: "action",
+      value: "accounts.open",
+      searchTerms: ["accounts", "infinitus", "fleet", "usage", "switch account", "quota"],
+      title: "Open accounts",
+      icon: <UsersIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "accounts.open",
+      run: async () => {
+        await navigate({ to: "/accounts" });
+      },
+    });
+  }
 
   actionItems.push({
     kind: "action",

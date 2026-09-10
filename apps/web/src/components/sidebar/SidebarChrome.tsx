@@ -3,6 +3,7 @@ import {
   ChartNoAxesColumnIcon,
   GitPullRequestIcon,
   SettingsIcon,
+  UsersIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
@@ -31,6 +32,7 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { SidebarAccountsPill } from "./SidebarAccountsPill";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
 
@@ -145,13 +147,20 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             ? "usage"
             : location.pathname === "/pull-requests"
               ? "pull-requests"
-              : null,
+              : location.pathname === "/accounts"
+                ? "accounts"
+                : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
   // the link to lead somewhere.
   const pullRequestsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
+  );
+  // Any connected server running Infinitus is enough: the page picks the
+  // environment itself, the same way the pull requests page does.
+  const accountsSupported = environments.some(
+    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
   );
   const closeMobileSidebar = useCallback(() => {
     if (isMobile) {
@@ -168,6 +177,11 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleSettingsClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/settings" });
+  }, [closeMobileSidebar, navigate]);
+
+  const handleAccountsClick = useCallback(() => {
+    closeMobileSidebar();
+    void navigate({ to: "/accounts" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUsageClick = useCallback(() => {
@@ -209,6 +223,13 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handlePullRequestsClick}
             />
           ) : null}
+          {accountsSupported ? (
+            <SidebarUtilityItem
+              icon={<UsersIcon />}
+              label="Accounts"
+              onClick={handleAccountsClick}
+            />
+          ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label="Usage"
@@ -226,6 +247,7 @@ export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
     <SidebarFooter className="p-[var(--sidebar-content-inset)]">
       <SidebarProviderUpdatePill />
       <SidebarUpdateArchitectureWarning />
+      <SidebarAccountsPill />
       <SidebarUtilityMenu />
     </SidebarFooter>
   );
