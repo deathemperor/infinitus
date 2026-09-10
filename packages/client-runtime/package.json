@@ -119,6 +119,10 @@
       "types": "./src/state/git.ts",
       "default": "./src/state/git.ts"
     },
+    "./state/infinitus": {
+      "types": "./src/state/infinitus.ts",
+      "default": "./src/state/infinitus.ts"
+    },
     "./state/models": {
       "types": "./src/state/models.ts",
       "default": "./src/state/models.ts"
