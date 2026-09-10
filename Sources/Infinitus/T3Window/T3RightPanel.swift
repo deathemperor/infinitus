@@ -37,6 +37,15 @@ struct T3RightPanel: View {
                 // itself; `model` only publishes when the store is swapped.
                 if entry.id == "agents", let store = model.timelineStore {
                     T3RightPanelAgentsTab(store: store, selected: tab == entry.id) { tab = entry.id }
+                } else if entry.id == "terminal", let group = terminalGroup {
+                    // A terminal surface's tab is titled by its ACTIVE
+                    // terminal's label (`RightPanelTabs.tsx:598-602`) — so this
+                    // one observes the group the same way the Agents tab
+                    // observes the timeline store. Until a terminal exists the
+                    // strip has nothing to name and keeps the surface's own
+                    // word, this panel's tabs being fixed rather than one per
+                    // open surface (a stated deviation).
+                    T3RightPanelTerminalTab(group: group, selected: tab == entry.id) { tab = entry.id }
                 } else {
                     T3RightPanelTabButton(title: entry.title, selected: tab == entry.id, badge: 0) { tab = entry.id }
                 }
@@ -46,6 +55,13 @@ struct T3RightPanel: View {
         .padding(.leading, 8)
         .padding(.trailing, 12)
         .frame(height: T3Theme.Metrics.topbarHeight)
+    }
+
+    /// The live terminals of the thread the panel is on, without creating any:
+    /// drawing a tab title must never fork a shell.
+    private var terminalGroup: T3TerminalGroup? {
+        guard let target = T3TerminalPanel.target(in: model.state) else { return nil }
+        return model.terminals?.existingGroup(for: target)
     }
 
     @ViewBuilder private var content: some View {
@@ -68,6 +84,18 @@ private struct T3RightPanelAgentsTab: View {
     var body: some View {
         T3RightPanelTabButton(title: "Agents", selected: selected,
                               badge: store.agents.liveCount, action: action)
+    }
+}
+
+/// The Terminal tab, titled by the surface's active terminal
+/// (`surfaceTitle`, `RightPanelTabs.tsx:598-602`).
+private struct T3RightPanelTerminalTab: View {
+    @ObservedObject var group: T3TerminalGroup
+    let selected: Bool
+    let action: () -> Void
+    var body: some View {
+        T3RightPanelTabButton(title: group.terminalIds.isEmpty ? "Terminal" : group.activeLabel,
+                              selected: selected, badge: 0, action: action)
     }
 }
 
