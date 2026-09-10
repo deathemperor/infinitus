@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useMemo } from "react";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
@@ -11,6 +11,7 @@ import { infinitusEnvironment } from "../../state/infinitus";
 import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
+import { waitingSessionCount } from "../infinitus/sessions.logic";
 import { chipEnvironment, homeChip, infinitusMacs } from "./accountsRoute.logic";
 
 const PCT_CLASS = {
@@ -21,7 +22,8 @@ const PCT_CLASS = {
 } as const;
 
 /** The home header's Infinitus chip: the active account of the Mac the list
-    follows and its fullest usage window; tap → Settings › Accounts. Renders
+    follows, its fullest usage window, and how many of its sessions wait on a
+    person; tap → Settings › Accounts. Renders
     nothing when no paired Mac runs Infinitus. */
 export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: EnvironmentId | null }) {
   const navigation = useNavigation();
@@ -37,6 +39,7 @@ export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: Envir
       : infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
   const model = homeChip(mac === null ? null : view.data);
+  const waiting = waitingSessionCount(mac === null ? null : view.data);
   if (mac === null || model === null) return null;
   return (
     <Pressable
@@ -63,6 +66,13 @@ export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: Envir
         <Text className={cn("text-sm font-t3-bold tabular-nums", PCT_CLASS[model.tone])}>
           {model.pct}%
         </Text>
+      ) : null}
+      {waiting > 0 ? (
+        <View className="rounded-full bg-warning px-1.5">
+          <Text className="text-xs font-t3-bold tabular-nums text-warning-foreground">
+            {waiting}
+          </Text>
+        </View>
       ) : null}
     </Pressable>
   );

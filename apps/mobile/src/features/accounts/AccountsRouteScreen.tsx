@@ -14,6 +14,8 @@ import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { InfinitusSignIns } from "../infinitus/InfinitusSignIns";
+import { InfinitusSessions } from "../infinitus/InfinitusSessions";
+import { macSessionsView } from "../infinitus/sessions.logic";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { AccountRow } from "./AccountRow";
 import { type InfinitusMac, infinitusMacs, macAccountsModel } from "./accountsRoute.logic";
@@ -68,6 +70,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
     infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
   const model = macAccountsModel(view.data);
+  const sessions = macSessionsView(view.data);
   return (
     <View className="gap-3">
       {props.titled ? (
@@ -108,6 +111,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         </SettingsSection>
       ))}
       {model.forecast ? <ForecastStrip forecast={model.forecast} /> : null}
+      {sessions ? <InfinitusSessions environmentId={mac.environmentId} view={sessions} /> : null}
     </View>
   );
 }
