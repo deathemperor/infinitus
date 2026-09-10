@@ -108,6 +108,7 @@ final class AppModel: ObservableObject {
     struct EventEntry: Identifiable {
         let id = UUID()
         var at = Date()
+        let kind: String
         let icon: String
         let text: String
     }
@@ -163,7 +164,7 @@ final class AppModel: ObservableObject {
     /// durable log Stats reads. `kind` is StatsEvents' vocabulary
     /// (switch/death/limit/revival/ignite/resume/nudge/pairing/other).
     func logEvent(_ kind: String, icon: String, _ text: String) {
-        eventLog.append(EventEntry(icon: icon, text: text))
+        eventLog.append(EventEntry(kind: kind, icon: icon, text: text))
         if eventLog.count > 100 { eventLog.removeFirst(eventLog.count - 100) }
         // The durable log belongs to the real instance alone. A mock,
         // playground or e2e instance shares the same App Support path
@@ -1408,7 +1409,7 @@ final class AppModel: ObservableObject {
             let past = await eventStore.load().filter { $0.at < launchedAt }.suffix(100)
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.eventLog = past.map { EventEntry(at: $0.at, icon: $0.icon, text: $0.text) } + self.eventLog
+                self.eventLog = past.map { EventEntry(at: $0.at, kind: $0.kind, icon: $0.icon, text: $0.text) } + self.eventLog
                 if self.eventLog.count > 100 { self.eventLog.removeFirst(self.eventLog.count - 100) }
             }
         }

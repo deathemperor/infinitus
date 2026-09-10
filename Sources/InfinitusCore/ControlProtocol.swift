@@ -235,7 +235,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "[{number, title, class, visible, occluded, level, size:[w,h], content}]"),
         ControlCommand(name: "events", options: ["limit"], effect: .read,
                        summary: "The app's event log (switches, deaths, revivals, nudges…), oldest first — what the Activity pane shows. Last 100 kept.",
-                       replyShape: "[{at, icon, text}]"),
+                       replyShape: "[{id, at, kind, icon, text}]"),
         ControlCommand(name: "stats", options: ["period"], effect: .read,
                        summary: "Engineering metrics for a period (day|week|month|year, default week): commits, lines, PRs, human/phone/agent messages, sessions, tool calls, waiting time, switches, cost — Stats tab data.",
                        replyShape: "{period, from, to, total:{humanMessages, phoneMessages, agentMessages, commits, linesAdded, linesRemoved, prsOpened, prsMerged, sessionTally, toolCalls:{name:n}, waitingSeconds, switches, limitStops, usd, …}, previous:{…}, daily:[{key, day}], streak}"),
