@@ -69,7 +69,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   upstream's (#601).
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
   boot-shell title and splash labels to `PRODUCT_NAME`.
-- `packages/shared/package.json` — the `./productName` export.
+- `packages/shared/package.json` — the `./productName` and `./homeDir` exports.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs` as a scripts entry (run by
   hand, nothing imports it).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
@@ -154,6 +154,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   under the fork's runner).
 - `packages/shared/src/productName.ts` — `PRODUCT_NAME`, the one constant the
   branded surfaces import.
+- `packages/shared/src/homeDir.ts` — `DEFAULT_HOME_DIR_NAME`, the fork's
+  default state directory (`~/.infinitus`, never the real T3 Code's `~/.t3`).
 - `packages/shared/src/infinitusControl.ts` — the control-socket path rule
   (`INFINITUS_CONTROL_SOCKET`, then the per-platform default).
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
