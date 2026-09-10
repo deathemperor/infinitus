@@ -19,13 +19,33 @@ import InfinitusUI
 /// ends too (#507: "SwiftTerm both ends"), wearing the same palette the phone's
 /// screen installs.
 ///
-/// **Several terminals per thread.** A thread holds up to
+/// **Several terminals per thread, in groups.** A thread holds up to
 /// `T3Terminal.maxTerminalsPerSession` shells: "+" opens the next free
-/// `term-N` (`nextTerminalId`, `terminalLabels.ts:32-40`) and the picker
-/// upstream draws as a 144 pt sidebar (`hasTerminalSidebar`, `:1586-1709`,
-/// shown only from the second terminal on, `:1228`) switches and closes them.
-/// With one terminal the controls float over the emulator instead
+/// `term-N` (`nextTerminalId`, `terminalLabels.ts:32-40`) in a group of its own
+/// and the picker upstream draws as a 144 pt sidebar (`hasTerminalSidebar`,
+/// `:1586-1709`, shown only from the second terminal on, `:1228`) switches and
+/// closes them. With one terminal the controls float over the emulator instead
 /// (`:1442-1486`, `!hasTerminalSidebar`).
+///
+/// **Splits.** The two split buttons (`:1444-1467` in the floating cluster,
+/// `:1590-1611` in the strip header) grow the ACTIVE group instead: up to
+/// `T3TerminalSurface.SplitGroup.maxPerGroup` = 4 shells
+/// (`MAX_TERMINALS_PER_GROUP`, `types.ts:30`) side by side or stacked, over
+/// `repeat(n, minmax(0, 1fr))` (`:1496-1556`). One orientation per group and no
+/// nesting — a vertical split of a side-by-side pair stacks all three
+/// (`terminalUiStateStore.ts:334-338`, the last split wins). Every member of
+/// the active group is mounted at once, upstream's own arrangement
+/// (`:1509-1555`, each gated by `visible`, `:468-471`); the other groups' stay
+/// attached but unmounted, as a hidden terminal already did. A click in a pane
+/// makes it active (`onMouseDown`, `:1523-1527`), the active pane takes the
+/// keyboard and the tab's title, and a member whose shell ends collapses the
+/// grid (`onSessionExited → onCloseTerminal`, `:1543`). The strip gains a header
+/// per group — "Single" / "Stacked" / "Side by side" and the member count
+/// (`:1638-1642`, `:1651-1667`) — from the moment there is more than one group,
+/// so two lone terminals now carry one each (`showGroupHeaders`, `:1230-1232`).
+/// Four idle panes measured 0.69% and 0.70% CPU over two 15 s windows against
+/// B-36's 0.58-0.62% for three hidden — and against 0.68%/0.90% for this same
+/// fixture with the tab switched away, i.e. inside its own noise.
 ///
 /// **What upstream does on a switch — and what this does.** Upstream keeps the
 /// SESSION alive server-side and remounts the client: outside a split group
@@ -52,12 +72,9 @@ import InfinitusUI
 /// - the drawer mode (`:989` `mode: "drawer" | "panel"`, the resize handle
 ///   `:1402-1410` and `clampDrawerHeight` `:100-104`): the right panel is the
 ///   only mount here.
-/// - the splits — the cluster's two split buttons (`:1444-1467`), the sidebar
-///   header's (`:1590-1611`), the split grid (`:1496-1556`), the group headers
-///   and their "Single"/"Stacked"/"Side by side" copy (`:1230-1232`,
-///   `:1651-1667`) and the per-group limit (`:1233`, `types.ts:30`'s
-///   `MAX_TERMINALS_PER_GROUP = 4`). Every terminal here is its own group of
-///   one, which is why no group header ever shows.
+/// - a split's keyboard shortcut (`splitShortcutLabel` /
+///   `splitVerticalShortcutLabel`, `:1253-1262`): the tab binds none, so the
+///   two labels are upstream's without the shortcut suffix.
 /// - the selection actions (`observeSelectionActions`, `:1-53`) and "add
 ///   selection to chat" (`onAddTerminalContext`): the composer here takes no
 ///   terminal-context mention.
@@ -206,17 +223,7 @@ private struct T3TerminalGroupView: View {
 
     var body: some View {
         HStack(spacing: group.showsStrip ? 6 : 0) {
-            if let entry = group.activeEntry {
-                // Keyed by the terminal, upstream's own switch
-                // (`:1561 key={resolvedActiveTerminalId}`): the pane remounts,
-                // which is what hands the keyboard to the terminal switched TO.
-                T3TerminalPane(group: group, entry: entry, confirming: $confirming)
-                    .id(entry.terminalId)
-            } else {
-                // Every terminal closed: the same skeleton the first open shows.
-                T3Spinner(size: 16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            surface
             if group.showsStrip {
                 T3TerminalStrip(group: group, confirming: $confirming)
             }
@@ -234,6 +241,87 @@ private struct T3TerminalGroupView: View {
             // `terminalCloseConfirm.ts:24-27`, the single-terminal wording.
             Text("Close terminal \"\(T3TerminalSurface.label(terminalId: confirming ?? ""))\"?\nThis stops the running process and clears its history.")
         }
+    }
+
+    /// `:1496-1583`: the active group's members together when it holds more than
+    /// one (`isSplitView`, `:1229`), the lone terminal keyed by its id
+    /// otherwise (`:1561`).
+    @ViewBuilder private var surface: some View {
+        if let split = group.activeGroup, split.isSplit {
+            // Keyed by the GROUP, not the active terminal: a click that moves
+            // focus inside the grid must not remount four emulators.
+            T3TerminalSplitGrid(group: group, split: split, confirming: $confirming)
+                .id(split.id)
+        } else if let entry = group.activeEntry {
+            // Keyed by the terminal, upstream's own switch
+            // (`:1561 key={resolvedActiveTerminalId}`): the pane remounts,
+            // which is what hands the keyboard to the terminal switched TO.
+            T3TerminalPane(group: group, entry: entry, confirming: $confirming)
+                .id(entry.terminalId)
+        } else {
+            // Every terminal closed: the same skeleton the first open shows.
+            T3Spinner(size: 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// The split grid (`:1496-1556`): the active group's members over
+/// `repeat(n, minmax(0, 1fr))` — columns when the group is `horizontal`, rows
+/// when it is `vertical` (`:1500-1507`) — with no gap between them and a 1 pt
+/// divider before every member but the first (`border-l first:border-l-0` /
+/// `border-t first:border-t-0`, `:1514-1517`), `border` under the active pane
+/// and `border/70` under the others (`:1519-1521`).
+///
+/// Every member is mounted at once, upstream's own arrangement for a split group
+/// (`:1509-1555`, each `TerminalViewport` gated by `visible`, `:468-471`); the
+/// other groups' terminals stay attached but unmounted, the way a hidden
+/// terminal already did.
+private struct T3TerminalSplitGrid: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
+    let split: T3TerminalSurface.SplitGroup
+    @Binding var confirming: String?
+
+    private var stacked: Bool { split.orientation == .vertical }
+
+    var body: some View {
+        Group {
+            if stacked {
+                VStack(spacing: 0) { panes }
+            } else {
+                HStack(spacing: 0) { panes }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { focusActive() }
+        // `autoFocus={terminalId === resolvedActiveTerminalId}` (`:1546`): the
+        // keyboard follows the active pane, and a click is what moves it.
+        .onChange(of: group.activeId) { _, _ in focusActive() }
+    }
+
+    private var panes: some View {
+        ForEach(Array(split.terminalIds.enumerated()), id: \.element) { index, id in
+            pane(id, first: index == 0)
+        }
+    }
+
+    @ViewBuilder private func pane(_ id: String, first: Bool) -> some View {
+        if let entry = group.entry(id: id) {
+            T3TerminalPane(group: group, entry: entry, confirming: $confirming)
+                .overlay(alignment: stacked ? .top : .leading) {
+                    if !first {
+                        Rectangle()
+                            .fill(t3.web.border.color.opacity(group.activeId == id ? 1 : 0.7))
+                            .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
+                    }
+                }
+        }
+    }
+
+    private func focusActive() {
+        guard let view = group.activeEntry?.view else { return }
+        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
     }
 }
 
@@ -259,26 +347,40 @@ private struct T3TerminalPane: View {
         .onAppear {
             // `autoFocus` (`:1114`, `terminal.focus()` at `:545-547`): the tab
             // — and, after a switch, the terminal switched TO — is useless
-            // until its emulator has the keyboard.
+            // until its emulator has the keyboard. In a split grid only the
+            // ACTIVE pane takes it (`:1546`), and the grid moves it on a click.
+            guard entry.terminalId == group.activeId else { return }
             DispatchQueue.main.async { entry.view.window?.makeFirstResponder(entry.view) }
         }
     }
 
     /// `:1443-1486`: an `inline-flex` of icon buttons in a rounded bordered box
-    /// over the emulator's top-right corner. Ours holds the two controls that
-    /// have a meaning without splits — `Plus`, "New Terminal" (`:1263-1265`),
-    /// and `Trash2`, "Close Terminal" (`:1266-1268`), the close confirmed first
-    /// like upstream's.
+    /// over the emulator's top-right corner, in upstream's order — split
+    /// horizontal (`SquareSplitHorizontal`, `:1445-1455`), split vertical
+    /// (`SquareSplitVertical`, `:1457-1467`), `Plus` "New Terminal"
+    /// (`:1263-1265`) and `Trash2` "Close Terminal" (`:1266-1268`), a `w-px`
+    /// `border/80` rule between each pair. A split at the limit wears
+    /// `opacity-45` and takes no click (`:1446-1450`, `:1270`).
     private var actions: some View {
         HStack(spacing: 0) {
+            T3FilesIconButton(help: group.splitHelp(.horizontal)) { group.split(.horizontal) } content: {
+                LucideIcon(.squareSplitHorizontal, size: 13)
+            }
+            .opacity(group.canSplit ? 1 : 0.45)
+            .allowsHitTesting(group.canSplit)
+            separator
+            T3FilesIconButton(help: group.splitHelp(.vertical)) { group.split(.vertical) } content: {
+                LucideIcon(.squareSplitVertical, size: 13)
+            }
+            .opacity(group.canSplit ? 1 : 0.45)
+            .allowsHitTesting(group.canSplit)
+            separator
             T3FilesIconButton(help: group.newTerminalHelp) { group.newTerminal() } content: {
                 LucideIcon(.plus, size: 13)
             }
             .opacity(group.canOpenMore ? 1 : 0.45)
             .allowsHitTesting(group.canOpenMore)
-            Rectangle()
-                .fill(t3.web.border.color.opacity(0.8))
-                .frame(width: 1, height: 16)
+            separator
             T3FilesIconButton(help: "Close Terminal") { confirming = entry.terminalId } content: {
                 LucideIcon(.trash2, size: 13)
             }
@@ -291,13 +393,20 @@ private struct T3TerminalPane: View {
         .opacity(entry.finished ? 0 : 1)
         .allowsHitTesting(!entry.finished)
     }
+
+    /// `<div className="h-4 w-px bg-border/80" />` (`:1456`).
+    private var separator: some View {
+        Rectangle()
+            .fill(t3.web.border.color.opacity(0.8))
+            .frame(width: 1, height: 16)
+    }
 }
 
 /// The terminal picker (`:1586-1709`): `w-36 min-w-36 flex-col border
 /// border-border/70 bg-muted/10`, a 22 pt header of right-aligned action
-/// buttons over one row per terminal. No group headers — `showGroupHeaders`
-/// (`:1230-1232`) is false while every group holds one terminal, which is
-/// always, splits being unported.
+/// buttons over one block per split group — its header (`showGroupHeaders`,
+/// `:1230-1232`) and one row per terminal in it, `pb-0.5` between blocks
+/// (`:1650`).
 private struct T3TerminalStrip: View {
     @Environment(\.t3) private var t3
     @ObservedObject var group: T3TerminalGroup
@@ -306,11 +415,23 @@ private struct T3TerminalStrip: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            // "min-h-0 flex-1 overflow-y-auto px-1 py-1" + "flex flex-col gap-0.5"
+            // "min-h-0 flex-1 overflow-y-auto px-1 py-1", one `pb-0.5` block per
+            // group (`:1650`), each a header over "flex flex-col gap-0.5".
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(group.terminalIds, id: \.self) { id in
-                        T3TerminalStripRow(group: group, terminalId: id, confirming: $confirming)
+                VStack(spacing: 0) {
+                    ForEach(group.groups) { split in
+                        VStack(spacing: 0) {
+                            if group.showsGroupHeaders {
+                                T3TerminalGroupHeader(group: group, split: split)
+                            }
+                            VStack(spacing: 2) {
+                                ForEach(split.terminalIds, id: \.self) { id in
+                                    T3TerminalStripRow(group: group, terminalId: id,
+                                                       confirming: $confirming)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 2)
                     }
                 }
                 .padding(4)
@@ -325,12 +446,25 @@ private struct T3TerminalStrip: View {
 
     /// `:1588-1627`: "flex h-[22px] items-stretch justify-end border-b
     /// border-border/70", each button "inline-flex h-full items-center px-1"
-    /// with a `border-l` between them.
+    /// with a `border-l` between them — split horizontal, split vertical, "+"
+    /// and the trash, upstream's order (`:1590-1625`).
     private var header: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
-            T3TerminalStripButton(help: group.newTerminalHelp, enabled: group.canOpenMore,
+            T3TerminalStripButton(help: group.splitHelp(.horizontal), enabled: group.canSplit,
                                   leadingBorder: false) {
+                group.split(.horizontal)
+            } content: {
+                LucideIcon(.squareSplitHorizontal, size: 13)
+            }
+            T3TerminalStripButton(help: group.splitHelp(.vertical), enabled: group.canSplit,
+                                  leadingBorder: true) {
+                group.split(.vertical)
+            } content: {
+                LucideIcon(.squareSplitVertical, size: 13)
+            }
+            T3TerminalStripButton(help: group.newTerminalHelp, enabled: group.canOpenMore,
+                                  leadingBorder: true) {
                 group.newTerminal()
             } content: {
                 LucideIcon(.plus, size: 13)
@@ -380,6 +514,55 @@ private struct T3TerminalStripButton<Content: View>: View {
         .allowsHitTesting(enabled)
         .onHover { hover = $0 }
         .help(help)
+    }
+}
+
+/// A split group's header in the picker (`:1651-1667`): a 22 pt row of the
+/// orientation's own glyph (`Square` / `SquareSplitVertical` /
+/// `SquareSplitHorizontal`, `:1643-1647`), the group's name — "Single",
+/// "Stacked", "Side by side" (`:1638-1642`) — and its member count in
+/// `tabular-nums`. The active group wears `bg-accent/50`; a click selects the
+/// group's own active terminal (`:1659`).
+private struct T3TerminalGroupHeader: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
+    let split: T3TerminalSurface.SplitGroup
+    @State private var hover = false
+
+    private var isActive: Bool { split.terminalIds.contains(group.activeId) }
+
+    var body: some View {
+        Button { group.activateGroup(split) } label: {
+            HStack(spacing: 4) {
+                LucideIcon(icon, size: 12)
+                Text(split.label)
+                    .font(T3Font.webLiteral(11))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(split.terminalIds.count)")
+                    .font(T3Font.webLiteral(10))
+                    .monospacedDigit()
+                    .foregroundStyle(t3.web.mutedForeground.color.opacity(0.7))
+            }
+            .padding(.horizontal, 6)
+            .frame(height: 22)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive || hover ? t3.web.foreground.color : t3.web.mutedForeground.color)
+        .background(background, in: RoundedRectangle(cornerRadius: 4))
+        .onHover { hover = $0 }
+    }
+
+    private var icon: Lucide {
+        guard split.isSplit else { return .square }
+        return split.orientation == .vertical ? .squareSplitVertical : .squareSplitHorizontal
+    }
+
+    private var background: SwiftUI.Color {
+        if isActive { return t3.web.accent.color.opacity(0.5) }
+        return hover ? t3.web.accent.color.opacity(0.4) : .clear
     }
 }
 
@@ -465,9 +648,11 @@ private struct T3TerminalEmulator: NSViewRepresentable {
 @MainActor
 final class T3TerminalGroup: ObservableObject {
     let target: T3TerminalTarget
-    /// Insertion order, which is what the strip shows (`:1200-1207` sorts
-    /// groups by it); the seed from the host is in `term-N` order.
-    @Published private(set) var terminalIds: [String] = []
+    /// The SPLIT groups, in the order the strip lists them — upstream's
+    /// `resolvedTerminalGroups` (`:1160-1210`), which is also its flat
+    /// `terminalIds` order (`:1200-1207` sorts the groups by it). One group per
+    /// terminal until a split joins two.
+    @Published private(set) var groups: [T3TerminalSurface.SplitGroup] = []
     @Published private(set) var activeId: String = T3Terminal.defaultTerminalId
 
     private let host: TerminalHost
@@ -481,11 +666,30 @@ final class T3TerminalGroup: ObservableObject {
         self.host = host
     }
 
+    /// Every terminal this session holds, in strip order — upstream's
+    /// `normalizedTerminalIds`, which its groups partition (`:1192-1207`).
+    var terminalIds: [String] { groups.flatMap(\.terminalIds) }
+
+    /// The group the active terminal is in (`resolvedActiveGroupIndex`,
+    /// `:1212-1221`).
+    var activeGroup: T3TerminalSurface.SplitGroup? {
+        groups.first { $0.terminalIds.contains(activeId) } ?? groups.first
+    }
+
     /// `hasTerminalSidebar` (`:1228`): the picker appears with the second
     /// terminal, and the floating cluster gives way to it (`:1442`).
     var showsStrip: Bool { terminalIds.count > 1 }
 
+    /// `showGroupHeaders` (`:1230-1232`): from the moment there is more than one
+    /// group, or any group holds more than one terminal — so two lone terminals
+    /// each get a "Single" header, exactly as upstream.
+    var showsGroupHeaders: Bool { groups.count > 1 || groups.contains(where: \.isSplit) }
+
     var activeEntry: T3TerminalEntry? { entries[activeId] }
+
+    /// A listed terminal's entry. Never creates one: the grid draws over ids
+    /// this group already opened (`appear`, `newTerminal`, `split`).
+    func entry(id: String) -> T3TerminalEntry? { entries[id] }
 
     /// The tab's own title (`RightPanelTabs.tsx:598-602`).
     var activeLabel: String { T3TerminalSurface.label(terminalId: activeId) }
@@ -499,6 +703,25 @@ final class T3TerminalGroup: ObservableObject {
                     : "New Terminal (max \(T3Terminal.maxTerminalsPerSession) per session)"
     }
 
+    /// `hasReachedSplitLimit` inverted (`:1233`) — plus this host's own
+    /// per-session cap, which a split spends a slot of just as "+" does.
+    var canSplit: Bool { canOpenMore && (activeGroup?.canSplit ?? false) }
+
+    /// `splitTerminalActionLabel` / `splitTerminalVerticalActionLabel`
+    /// (`:1253-1262`), verbatim — with the per-group limit named at the limit.
+    /// (Upstream's shortcut suffix has no equivalent here: the tab binds no
+    /// split shortcut.) At this host's own cap the sentence is
+    /// `newTerminalHelp`'s.
+    func splitHelp(_ orientation: T3TerminalSurface.SplitGroup.Orientation) -> String {
+        let name = orientation == .vertical ? "Split Terminal Vertically"
+                                           : "Split Terminal Horizontally"
+        if activeGroup?.canSplit == false {
+            return "\(name) (max \(T3TerminalSurface.SplitGroup.maxPerGroup) per group)"
+        }
+        if !canOpenMore { return "\(name) (max \(T3Terminal.maxTerminalsPerSession) per session)" }
+        return name
+    }
+
     // MARK: Lifecycle
 
     func appear() {
@@ -509,12 +732,14 @@ final class T3TerminalGroup: ObservableObject {
         var ids = held
         for id in terminalIds where !ids.contains(id) { ids.append(id) }
         if ids.isEmpty { ids = [T3Terminal.defaultTerminalId] }
-        terminalIds = ids
-        if !ids.contains(activeId) { activeId = ids[0] }
-        // Every terminal stays attached, not just the visible one: an
+        reconcile(ids)
+        let ordered = terminalIds
+        if !ordered.contains(activeId), let first = ordered.first { activeId = first }
+        // Every terminal stays attached, not just the visible ones: an
         // unattached terminal starts this host's 30-minute idle clock, and a
-        // shell the strip lists must not die because it was not on screen.
-        for id in ids { entry(for: id).appear() }
+        // shell the strip lists must not die because its group was not the one
+        // on screen.
+        for id in ordered { entry(for: id).appear() }
     }
 
     func disappear() {
@@ -527,17 +752,85 @@ final class T3TerminalGroup: ObservableObject {
         activeId = id
     }
 
+    /// A strip GROUP header (`:1631-1635`, `:1659`): the group's own active
+    /// terminal when it holds it, its first otherwise.
+    func activateGroup(_ group: T3TerminalSurface.SplitGroup) {
+        guard !group.terminalIds.contains(activeId), let first = group.terminalIds.first
+        else { return }
+        activate(first)
+    }
+
     /// "+" (`onNewTerminalAction`, `:1277-1279`): the lowest free `term-N` over
     /// the ids the HOST holds (the phone's included) and the ones this strip
     /// lists, opened and focused.
     func newTerminal() {
-        guard canOpenMore else { return }
-        let held = host.listTerminals(pid: target.pid).map(\.terminalId)
-        let id = T3TerminalSurface.nextTerminalId(held + terminalIds)
-        guard !terminalIds.contains(id) else { return }
-        terminalIds.append(id)
+        guard canOpenMore, let id = freeTerminalId() else { return }
+        // `"new"` mode (`terminalUiStateStore.ts:282-293`): its own group,
+        // which is why "+" never joins the grid the active terminal is in.
+        groups.append(Self.freshGroup(for: id, avoiding: groups))
         activeId = id
         entry(for: id).appear()
+    }
+
+    /// A split (`onSplitTerminalAction` / `onSplitTerminalVerticalAction`,
+    /// `:1269-1276`): the SAME host path as "+" — a new shell on the next free
+    /// id — joining the ACTIVE group right beside the active pane and setting
+    /// that group's orientation (`upsertTerminalIntoGroups` in `"split"` mode).
+    func split(_ orientation: T3TerminalSurface.SplitGroup.Orientation) {
+        guard canSplit,
+              let index = groups.firstIndex(where: { $0.terminalIds.contains(activeId) }),
+              let id = freeTerminalId()
+        else { return }
+        var group = groups[index]
+        guard group.split(active: activeId, orientation: orientation, newId: id) else { return }
+        groups[index] = group
+        activeId = id
+        entry(for: id).appear()
+    }
+
+    /// The lowest free `term-N` over the ids the HOST holds (the phone's
+    /// included) and the ones this surface lists (`nextTerminalId`,
+    /// `terminalLabels.ts:32-40`); `nil` when that id is somehow already listed.
+    private func freeTerminalId() -> String? {
+        let held = host.listTerminals(pid: target.pid).map(\.terminalId)
+        let id = T3TerminalSurface.nextTerminalId(held + terminalIds)
+        return terminalIds.contains(id) ? nil : id
+    }
+
+    /// The groups after the host's own list: a member the host no longer holds
+    /// leaves its group, an emptied group goes, and every id in no group becomes
+    /// a group of one — `normalizeTerminalGroups`
+    /// (`terminalUiStateStore.ts:99-140`, `:1192-1198`).
+    private func reconcile(_ ids: [String]) {
+        var next: [T3TerminalSurface.SplitGroup] = []
+        var assigned = Set<String>()
+        for group in groups {
+            var kept: T3TerminalSurface.SplitGroup? = group
+            for gone in group.terminalIds where !ids.contains(gone) {
+                kept = kept?.removing(gone, active: activeId).group
+            }
+            guard let kept else { continue }
+            next.append(kept)
+            assigned.formUnion(kept.terminalIds)
+        }
+        for id in ids where !assigned.contains(id) {
+            next.append(Self.freshGroup(for: id, avoiding: next))
+            assigned.insert(id)
+        }
+        if next != groups { groups = next }
+    }
+
+    /// A group of one under `assignUniqueGroupId`'s rule
+    /// (`terminalUiStateStore.ts:77-86`): `group-<id>`, and `-2`, `-3`… when
+    /// that is taken — a group outlives the terminal it was named after.
+    private static func freshGroup(for terminalId: String,
+                                   avoiding existing: [T3TerminalSurface.SplitGroup])
+        -> T3TerminalSurface.SplitGroup {
+        let fresh = T3TerminalSurface.SplitGroup(terminalId: terminalId)
+        guard existing.contains(where: { $0.id == fresh.id }) else { return fresh }
+        var index = 2
+        while existing.contains(where: { $0.id == "\(fresh.id)-\(index)" }) { index += 1 }
+        return .init(id: "\(fresh.id)-\(index)", terminalIds: [terminalId])
     }
 
     /// The trash and every row's X, once confirmed. The entry leaves the strip
@@ -552,6 +845,9 @@ final class T3TerminalGroup: ObservableObject {
         let entry = T3TerminalEntry(target: target, terminalId: id, host: host) { [weak self] id, message in
             self?.entryFinished(id, message: message)
         }
+        // `onMouseDown` (`:1523-1527`): a click anywhere in a pane makes that
+        // pane the active terminal.
+        entry.view.onMouseDown = { [weak self] in self?.activate(id) }
         entries[id] = entry
         return entry
     }
@@ -562,12 +858,22 @@ final class T3TerminalGroup: ObservableObject {
     /// The last one is the exception: it keeps its exited screen, and the next
     /// appear starts a fresh shell in it.
     private func entryFinished(_ id: String, message: String?) {
-        guard terminalIds.count > 1, terminalIds.contains(id) else { return }
-        let next = T3TerminalSurface.activeAfterClose(ids: terminalIds, closing: id, active: activeId)
-        terminalIds.removeAll { $0 == id }
+        guard terminalIds.count > 1,
+              let index = groups.firstIndex(where: { $0.terminalIds.contains(id) })
+        else { return }
+        // Over the whole strip, for the case where the group goes with it.
+        let acrossGroups = T3TerminalSurface.activeAfterClose(ids: terminalIds,
+                                                             closing: id, active: activeId)
+        // Inside the group: the grid collapses to the panes around it and the
+        // one that took its slot is active — upstream picks the flat-order
+        // neighbour instead (`terminalUiStateStore.ts:423-429`), which can land
+        // in a group that is not even on screen; staying in the visible grid is
+        // the one deliberate difference here.
+        let removal = groups[index].removing(id, active: activeId)
+        if let group = removal.group { groups[index] = group } else { groups.remove(at: index) }
         entries[id]?.disappear()
         entries[id] = nil
-        if let next { activeId = next }
+        if let next = removal.group == nil ? acrossGroups : removal.active { activeId = next }
         // An open that FAILED (the host is full, or the shell would not start)
         // takes its row with it — but never silently: the sentence lands on the
         // terminal the strip falls back to.
@@ -595,7 +901,7 @@ final class T3TerminalGroup: ObservableObject {
 final class T3TerminalEntry: ObservableObject {
     let target: T3TerminalTarget
     let terminalId: String
-    let view: TerminalView
+    let view: T3TerminalPaneView
     /// The shell is gone (`exited`/`closed`): the actions hide and the next
     /// appear starts a new one.
     @Published private(set) var finished = false
@@ -628,10 +934,10 @@ final class T3TerminalEntry: ObservableObject {
         // (#507 ruling 6, and the repo's own no-continuous-motion rule).
         var options = TerminalOptions(cursorStyle: .steadyBlock)
         options.scrollback = T3Terminal.ringBytes / 80   // ~3200 lines, the ring's own depth
-        view = TerminalView(frame: CGRect(x: 0, y: 0, width: 480, height: 320),
-                            font: NSFont.monospacedSystemFont(ofSize: T3ChatMarkdown.codeFontSize,
-                                                              weight: .regular),
-                            options: options)
+        view = T3TerminalPaneView(frame: CGRect(x: 0, y: 0, width: 480, height: 320),
+                                  font: NSFont.monospacedSystemFont(ofSize: T3ChatMarkdown.codeFontSize,
+                                                                    weight: .regular),
+                                  options: options)
         // The shell is a shell, not a mouse app: upstream's panel reports no
         // mouse either (the surface takes selection instead).
         view.allowMouseReporting = false
@@ -893,6 +1199,19 @@ final class T3TerminalEntry: ObservableObject {
         return SwiftTerm.Color(red8: UInt16((value >> 16) & 0xff),
                                green8: UInt16((value >> 8) & 0xff),
                                blue8: UInt16(value & 0xff))
+    }
+}
+
+/// SwiftTerm's view plus upstream's `onMouseDown` (`:1523-1527`): a click
+/// anywhere in a pane makes that pane the active terminal. A SwiftUI gesture
+/// over the representable would never see it — `TerminalView` takes `mouseDown`
+/// for its own selection.
+final class T3TerminalPaneView: TerminalView {
+    var onMouseDown: (() -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        onMouseDown?()
+        super.mouseDown(with: event)
     }
 }
 
