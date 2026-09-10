@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - Workspace: the right panel's Agents tab follows the thread's subagents and workflow runs.
+- Workspace: Files tab rows offer Copy mention and Add to chat, drag into the composer as a mention, and the listing re-reads after a turn.
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
 - Workspace: the right panel's Terminal tab opens a shell in the thread's project.
 - Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
