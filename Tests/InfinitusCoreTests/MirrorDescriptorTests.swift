@@ -35,24 +35,24 @@ final class MirrorDescriptorTests: XCTestCase {
         XCTAssertNil(older.capabilities.files)
     }
 
-    /// #486 slice 2: the tray now also answers timeline, sequence and
-    /// checkpoints — but only claims what `infinitus-tray serve` actually
-    /// serves (no restore, no team, no leases, …).
-    func testTrayDescriptorClaimsFilesTimelineSequenceAndCheckpoints() throws {
+    /// #486 slice 2: the tray now also answers timeline and sequence — and
+    /// only claims what a Linux session can actually deliver (the checkpoint
+    /// routes answer, but nothing writes checkpoints on Linux yet; no
+    /// restore, no team, no leases, …).
+    func testTrayDescriptorClaimsFilesTimelineAndSequence() throws {
         let d = MirrorDescriptor.tray(machineId: "m1", label: "omarchy-box", appVersion: "dev")
         XCTAssertEqual(d.platform, "linux")
-        for served in [d.capabilities.files, d.capabilities.timeline, d.capabilities.sequence,
-                      d.capabilities.checkpoints] {
+        for served in [d.capabilities.files, d.capabilities.timeline, d.capabilities.sequence] {
             XCTAssertEqual(served, true)
         }
         for other in [d.capabilities.attention, d.capabilities.leases, d.capabilities.ownedSessions,
                      d.capabilities.team, d.capabilities.pastSessions, d.capabilities.images,
-                     d.capabilities.terminal] {
+                     d.capabilities.terminal, d.capabilities.checkpoints] {
             XCTAssertEqual(other, false)
         }
         let text = String(decoding: try JSONEncoder().encode(d), as: UTF8.self)
         XCTAssertTrue(text.contains(#""timeline":true"#), text)
-        XCTAssertTrue(text.contains(#""checkpoints":true"#), text)
+        XCTAssertTrue(text.contains(#""checkpoints":false"#), text)
         XCTAssertTrue(text.contains(#""attention":false"#), text)
     }
 }
