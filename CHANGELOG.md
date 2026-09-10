@@ -14,6 +14,7 @@ publishes the matching section as the GitHub release body.
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
 
 ### Linux tray
+- The Linux companion listens on a control socket, so the plugin's hooks reach it and a Linux session's prompts record checkpoints for the phone.
 - The Linux companion answers the timeline and commands routes (and reads a checkpoint ladder), so a paired phone's thread and slash menu work against a Linux session.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 - The tray's session feed poll decodes only the transcript lines appended since the phone's last poll, as the Mac's does (#380).

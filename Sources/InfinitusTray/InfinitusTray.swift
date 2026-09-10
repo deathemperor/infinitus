@@ -711,6 +711,51 @@ struct InfinitusTray {
         return try? encoder.encode(reply)
     }
 
+    // MARK: #486 slice 3 — the control socket
+    //
+    // Same rule as the slice 2 routes above: the work lives in plain funcs
+    // out here (type-checked by a Mac build too), `serve` only binds the
+    // socket and hands `ControlDispatch` these handlers.
+
+    /// Sessions whose first checkpoint has been logged — touched only from
+    /// the serial checkpoint queue `controlHandlers` hands work to.
+    nonisolated(unsafe) static var checkpointedSessions: Set<String> = []
+
+    /// The tray's `AppModel.recordCheckpoint`: one `Checkpoints.snapshot`
+    /// per prompt, the first one per session announced, an error swallowed
+    /// to a log line — a hook must never be told a checkpoint failed.
+    /// Runs on the checkpoint queue, never on the accept thread: git in a
+    /// big repository takes its time.
+    static func recordCheckpoint(cwd: String, sessionId: String, subject: String) {
+        let first = checkpointedSessions.insert(sessionId).inserted
+        let repo = URL(fileURLWithPath: cwd).lastPathComponent
+        do {
+            guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
+            if first { logPhoneInput("🕐 checkpointing \(repo) — \(made.subject)") }
+        } catch {
+            if first { logPhoneInput("⚠️ checkpoint of \(repo) failed: \(error)") }
+        }
+    }
+
+    /// `infinitusctl status` against the tray: enough to prove whose
+    /// socket answered and that it can see this box's sessions. `version`
+    /// is the descriptor's "dev" placeholder — no build step stamps one
+    /// into this executable yet.
+    static func controlStatus(appVersion: String = "dev") -> JSONValue {
+        let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).count
+        return .object(["platform": .string("linux"),
+                        "version": .string(appVersion),
+                        "sessions": .number(Double(sessions))])
+    }
+
+    static func controlHandlers(queue: DispatchQueue) -> ControlDispatch.Handlers {
+        ControlDispatch.Handlers(
+            checkpoint: { cwd, sessionId, subject in
+                queue.async { recordCheckpoint(cwd: cwd, sessionId: sessionId, subject: subject) }
+            },
+            status: { controlStatus() })
+    }
+
     static func serve(port: UInt16, token: String?, tokenFile: String?, themeID: String,
                       interval: UInt64 = 30) async {
         #if canImport(Glibc)
@@ -884,6 +929,25 @@ struct InfinitusTray {
         }
         print("infinitus-tray serve: listening on 0.0.0.0:\(bound), "
             + "pairing token \(MirrorPairing.mask(resolved))")
+        // #486 slice 3: the control socket beside the HTTP listener, so the
+        // plugin's hooks reach this box (`infinitusctl event`) and a Linux
+        // session's prompts record checkpoints. `event` and `status` only —
+        // `ControlDispatch` answers everything else with a considered no.
+        // A bind that fails is logged, never fatal: the phone's mirror is
+        // this process's job, the socket is the extra.
+        let checkpointQueue = DispatchQueue(label: "infinitus.tray.checkpoints")
+        let handlers = controlHandlers(queue: checkpointQueue)
+        let controlPath = ControlProtocol.socketURL().path
+        let control = PosixControlSocket(path: controlPath) {
+            ControlDispatch.replyLine(to: $0, handlers: handlers)
+        }
+        do {
+            try control.start()
+            print("infinitus-tray serve: control socket at \(controlPath)")
+        } catch {
+            logPhoneInput("⚠️ control socket at \(controlPath) not bound: \(error) "
+                + "— hooks and infinitusctl won't reach this tray")
+        }
         while true {
             // MirrorWriter.shouldWrite needs a strict `>` on the interval
             // — sleep a touch over it so this loop's own tick never gets
@@ -956,7 +1020,8 @@ struct InfinitusTray {
     }
 
     /// The tray's stand-in for the Mac's event log (#17): every phone
-    /// input delivery/failure, timestamped, to stderr.
+    /// input delivery/failure — and, since #486 slice 3, the first
+    /// checkpoint of a session and any that fails — timestamped, to stderr.
     static func logPhoneInput(_ text: String) {
         let stamp = ISO8601DateFormatter().string(from: Date())
         FileHandle.standardError.write(Data("[\(stamp)] \(text)\n".utf8))

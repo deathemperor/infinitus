@@ -76,19 +76,18 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     /// The Linux tray's truth (#486 slice 2, `infinitus-tray serve`):
     /// everything `.current()` claims for the Mac, minus what the tray
     /// doesn't answer yet — `files`, `timeline` and `sequence` are true
-    /// (slice 1 gave the tray Files; this slice the timeline/sequence
-    /// route). The checkpoint ladder and diff ARE served, but `checkpoints`
-    /// stays false: nothing on Linux writes a checkpoint yet
-    /// (`Checkpoints.snapshot` runs off the Mac's hook path only), so the
-    /// ladder would be empty forever and the phone's empty-state copy would
-    /// blame the wrong thing — it flips when Linux records them. Explicit
-    /// `false` for the rest, not the nil the struct also accepts as
-    /// "unknown", so a phone comparing builds sees a considered no rather
-    /// than an older tray that predates the field.
+    /// (slice 1 gave the tray Files; slice 2 the timeline/sequence route).
+    /// `checkpoints` is true since slice 3: the tray listens on a control
+    /// socket, so the plugin's `UserPromptSubmit` hook writes a Linux
+    /// session's checkpoints through `Checkpoints.snapshot` the way the
+    /// Mac's hook path does, and the ladder the tray already served has
+    /// something in it. Explicit `false` for the rest, not the nil the
+    /// struct also accepts as "unknown", so a phone comparing builds sees a
+    /// considered no rather than an older tray that predates the field.
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
                          capabilities: Capabilities(timeline: true, sequence: true, attention: false, leases: false,
-                                                    ownedSessions: false, checkpoints: false, team: false,
+                                                    ownedSessions: false, checkpoints: true, team: false,
                                                     pastSessions: false, images: false, files: true, terminal: false))
     }
 }
