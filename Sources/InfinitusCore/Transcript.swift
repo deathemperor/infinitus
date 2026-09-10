@@ -369,4 +369,12 @@ public enum ResumeGate {
         // cannot make a stale verdict true.
         return false
     }
+
+    /// What a tick remembers as "nudged, still standing": only the stops
+    /// it attempted. A HELD neighbour still shows its stop after the
+    /// tick that resumed the others; marking it nudged too made every
+    /// later tick skip it (#621, peon stuck while five others resumed).
+    public static func standing(stillStopped: [String], attempted: Set<String>) -> [String] {
+        stillStopped.filter { !$0.isEmpty && attempted.contains($0) }
+    }
 }
