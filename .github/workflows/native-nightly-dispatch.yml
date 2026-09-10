@@ -1,0 +1,28 @@
+# GitHub runs scheduled workflows only from the default branch, and since
+# 2026-09-10 (#555) that branch holds the T3 Code fork while the native Swift
+# app lives on `native`. This dispatcher keeps native's two nightly jobs on
+# their old clocks without touching native's own workflows.
+name: Native nightly dispatch
+on:
+  schedule:
+    - cron: "0 16 * * *"   # linux-sanitize.yml on native (16:00 UTC)
+    - cron: "0 17 * * *"   # nightly.yml on native (17:00 UTC = midnight GMT+7)
+  workflow_dispatch:
+permissions:
+  actions: write
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch native's workflow for this hour
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          hour=$(date -u +%H)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hour" = "17" ]; then
+            gh workflow run nightly.yml --ref native
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hour" = "16" ]; then
+            gh workflow run linux-sanitize.yml --ref native -f iterations=8 -f filter=
+          fi
