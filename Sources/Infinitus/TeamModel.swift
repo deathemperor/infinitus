@@ -111,6 +111,7 @@ final class TeamModel: ObservableObject {
     /// Decrypted member docs, reused across loads while their blob version holds (#346).
     private let docCache = TeamReader.DocCache()
     private let scanCache = TeamReader.ScanCache()
+    private let headerMemo = TeamClient.HeaderMemo()
     /// Driving a teammate (#220 §5.3): the network lanes and tail polls
     /// never touch the team queue; only the store publish rides `run`.
     private let driveQueue = DispatchQueue(label: "run.infinitus.team-drive", qos: .userInitiated)
@@ -232,7 +233,7 @@ final class TeamModel: ObservableObject {
         guard enabled else { return Task {} }
         let fetch = lastFetchAt, publish = lastPublishAt, err = lastError
         let scan = appScan()
-        let docs = docCache, scans = scanCache
+        let docs = docCache, scans = scanCache, memo = headerMemo
         return Task {
             do {
                 let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker, TeamGrants, HostnameState) = try await run { paths, secrets in
@@ -242,6 +243,7 @@ final class TeamModel: ObservableObject {
                     let kid = secrets.read(TeamClient.identitySecretName).flatMap { try? TeamIdentity(secret: $0) }?.kid
                     let exclusions = TeamExclusions.load(paths: paths)
                     guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, [], TranscriptPicker(), TeamGrants(), HostnameState()) }
+                    client.headerMemo = memo
                     let dir = paths.teamDir(client.config.id)
                     let (snap, reader, headers) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err, docs: docs, scans: scans)
                     // Driver side of the store lane (#220): my acked or stale
@@ -323,9 +325,11 @@ final class TeamModel: ObservableObject {
         let yield = yieldRequested
         sources.shouldStop = { stop.withLock { $0 } || yield.withLock { $0 } }
         defer { progress = nil; storeActivity = nil }
+        let memo = headerMemo
         do {
             let (fetched, published, report, aggregated) = try await run { paths, secrets in
                 guard let client = try Self.openClient(paths, secrets) else { return (nil as Int?, nil as Int?, nil as TeamPublisher.Report?, false) }
+                client.headerMemo = memo
                 // Pending: roster and requests only, until the roster admits
                 // us — the member branches carry the transcripts (#321).
                 _ = try client.fetch(branches: client.isMember ? nil : TeamClient.joinBranches)
