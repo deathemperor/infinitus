@@ -67,6 +67,7 @@ import {
   InfinitusControlClientLive,
 } from "./infinitus/Layers/InfinitusControlClient.ts";
 import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
+import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import { OrchestrationReactorLive } from "./orchestration/Layers/OrchestrationReactor.ts";
@@ -207,9 +208,10 @@ const BackgroundLayerLive = BackgroundPolicy.layer.pipe(
 
 const UsageLayerLive = UsageService.layer.pipe(Layer.provide(ServerSettingsLayerLive));
 
-// The client is private to the service: everything else reaches Infinitus
-// through `InfinitusService`, which is the only thing that polls the socket.
-const InfinitusLayerLive = InfinitusLive.pipe(
+// The client is private to these two: everything else reaches Infinitus
+// through `InfinitusService`, which is the only thing that polls the socket;
+// the port layer writes one pref once the server is listening.
+const InfinitusLayerLive = Layer.mergeAll(InfinitusLive, InfinitusServerPortLive).pipe(
   Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
 );
 
