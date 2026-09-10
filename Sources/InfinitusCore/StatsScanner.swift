@@ -437,10 +437,12 @@ public enum StatsScanner {
     /// (measured 2026-09-11). Entry by entry the peak is +16 MB, the time
     /// the same, and the bytes decode to an equal cache — the same
     /// `{"version":…,"files":{…}}` the synthesized encoder wrote, so no
-    /// version bump. Keys sorted, so two writes of one cache are one file.
+    /// version bump. Every key sorted (the file keys here, the nested ones
+    /// by the encoder), so two writes of one cache are the same bytes.
     static func encodeCache(_ cache: Cache) throws -> Data {
         let encoder = JSONEncoder()
         encoder.userInfo[Stats.Day.leanEncoding] = true   // #499: defaults out, hours sparse
+        encoder.outputFormatting = [.sortedKeys]
         var out = Data()
         out.append(Data("{\"version\":\(cache.version),\"files\":{".utf8))
         for (i, key) in cache.files.keys.sorted().enumerated() {

@@ -446,8 +446,9 @@ final class StatsTests: XCTestCase {
     func testCacheEncodesEntryByEntryToTheSameDocument() throws {
         var cache = StatsScanner.Cache()
         var a = StatsScanner.FileEntry(); a.size = 10; a.offset = 10; a.cwd = "/r/a"
-        var day = Stats.Day(); day.outputTokens = 700; day.minuteTokens = [61: 700]; day.hourSlots[3] += 1
-        a.days["2026-09-04"] = day
+        var day = Stats.Day(); day.outputTokens = 700; day.minuteTokens = [61: 700, 62: 5, 63: 9]; day.hourSlots[3] += 1
+        day.toolCalls = ["Bash": 2, "Read": 1, "Edit": 3]
+        a.days["2026-09-04"] = day; a.days["2026-09-03"] = day; a.days["2026-09-05"] = day
         var b = StatsScanner.FileEntry(); b.subagent = true; b.engine = Stats.Engine.codex.rawValue
         cache.files["-r-a/s1.jsonl"] = a
         cache.files[#"-r-"quote"\back/s2.jsonl"#] = b
