@@ -33,50 +33,83 @@ public enum TeamRedaction {
     /// the front of every affected replacement so the escape survives.
     private static let B = #"(^|[^A-Za-z0-9_]|\\[nrt])"#
 
-    private static let rules: [(NSRegularExpression, String)] = [
-        (re(#"(?i)authorization:\s*[^\s"'\\]+(?:\s+[^\s"'\\]+)?"#), "Authorization: [redacted]"),
-        (re(#"(?i)"# + B + #"bearer\s+[A-Za-z0-9._~+/=-]{16,}"#), "$1Bearer [redacted]"),
-        (re(B + #"sk-[A-Za-z0-9_-]{16,}"#), "$1[redacted-key]"),
-        (re(B + #"(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"#), "$1[redacted-key]"),
-        (re(B + #"(?:AKIA|ASIA)[A-Z0-9]{16}\b"#), "$1[redacted-aws-key]"),
-        (re(#"(?i)(aws_secret_access_key|aws_session_token|secretaccesskey|sessiontoken)(\\?"?\s*[=:]\s*\\?"?)[A-Za-z0-9+/=]{16,}"#),
-         "$1$2[redacted]"),
-        (re(#"https://(?:hooks\.slack\.com|discord(?:app)?\.com/api/webhooks|outlook\.office\.com/webhook)/[^\s"'\\]+"#),
-         "[redacted-webhook]"),
-        (re(B + #"([A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD))=([^\s"'\\]+)"#), "$1$2=[redacted]"),
+    /// A rule runs its regex only on a line that carries one of its
+    /// needles (ASCII, matched case-folded): every pattern above needs a
+    /// literal — `authorization:`, `sk-`, `/Users/` — that a plain byte
+    /// scan finds in a fraction of the time ICU spends deciding the line
+    /// has nothing (#346: the publish spent ~7 s per pass in
+    /// `RegexMatcher` over lines that matched no rule). The needles are
+    /// looser than the regexes (`asia` also admits prose), never tighter.
+    private struct Rule {
+        let re: NSRegularExpression
+        let template: String
+        let needles: [[UInt8]]
+        init(_ re: NSRegularExpression, _ template: String, _ needles: [String]) {
+            self.re = re; self.template = template; self.needles = needles.map { Array($0.utf8) }
+        }
+    }
+
+    private static let rules: [Rule] = [
+        Rule(re(#"(?i)authorization:\s*[^\s"'\\]+(?:\s+[^\s"'\\]+)?"#), "Authorization: [redacted]", ["authorization:"]),
+        Rule(re(#"(?i)"# + B + #"bearer\s+[A-Za-z0-9._~+/=-]{16,}"#), "$1Bearer [redacted]", ["bearer"]),
+        Rule(re(B + #"sk-[A-Za-z0-9_-]{16,}"#), "$1[redacted-key]", ["sk-"]),
+        Rule(re(B + #"(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"#), "$1[redacted-key]",
+             ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]),
+        Rule(re(B + #"(?:AKIA|ASIA)[A-Z0-9]{16}\b"#), "$1[redacted-aws-key]", ["akia", "asia"]),
+        Rule(re(#"(?i)(aws_secret_access_key|aws_session_token|secretaccesskey|sessiontoken)(\\?"?\s*[=:]\s*\\?"?)[A-Za-z0-9+/=]{16,}"#),
+             "$1$2[redacted]", ["aws_secret_access_key", "aws_session_token", "secretaccesskey", "sessiontoken"]),
+        Rule(re(#"https://(?:hooks\.slack\.com|discord(?:app)?\.com/api/webhooks|outlook\.office\.com/webhook)/[^\s"'\\]+"#),
+             "[redacted-webhook]", ["hooks.slack.com/", "discord.com/api/webhooks/", "discordapp.com/api/webhooks/", "outlook.office.com/webhook/"]),
+        Rule(re(B + #"([A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD))=([^\s"'\\]+)"#), "$1$2=[redacted]",
+             ["key=", "secret=", "token=", "password=", "passwd="]),
         // Any user's home, this machine's included: /Users/<x>, /home/<x>, /root.
         // Zero-width lookbehind (not a capture) — no chars to replay.
-        (re(#"(?<=^|[^A-Za-z0-9~]|\\[nrt])(?:/(?:Users|home)/[^/\s"'\\]+|/root(?=/|["'\s\\]|$))"#), "~"),
+        Rule(re(#"(?<=^|[^A-Za-z0-9~]|\\[nrt])(?:/(?:Users|home)/[^/\s"'\\]+|/root(?=/|["'\s\\]|$))"#), "~",
+             ["/users/", "/home/", "/root"]),
     ]
 
     private static let image = re(#""data"\s*:\s*"[A-Za-z0-9+/=]{256,}""#)
+    private static let imageNeedle = Array(#""data""#.utf8)
 
-    private static func homeRegex(_ options: Options) -> NSRegularExpression? {
+    private struct Home {
+        let re: NSRegularExpression
+        let needle: [UInt8]
+    }
+
+    private static func homeRule(_ options: Options) -> Home? {
         guard options.home.count > 1 else { return nil }
-        return re(NSRegularExpression.escapedPattern(for: options.home) + #"(?=/|["'\s\\]|$)"#)
+        return Home(re: re(NSRegularExpression.escapedPattern(for: options.home) + #"(?=/|["'\s\\]|$)"#),
+                    needle: ASCIIScan.lowered(options.home))
     }
 
     public static func redact(_ line: String, options: Options) -> String {
-        redact(line, options: options, home: homeRegex(options))
+        redact(line, options: options, home: homeRule(options))
     }
 
     /// The per-line redactor with the home regex compiled once — what a
     /// publisher hands `TeamChunker`, which calls it for every line.
     public static func redactor(options: Options) -> (String) -> String {
-        let home = homeRegex(options)
+        let home = homeRule(options)
         return { redact($0, options: options, home: home) }
     }
 
-    private static func redact(_ line: String, options: Options, home: NSRegularExpression?) -> String {
+    private static func redact(_ line: String, options: Options, home: Home?) -> String {
         var out = line
-        if let home {
-            out = home.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "~")
+        // Folded once per line; again only after a rule rewrote the line,
+        // so a later rule's scan always sees what its regex would.
+        var lower = ASCIIScan.lowered(out)
+        func apply(_ re: NSRegularExpression, _ template: String) {
+            let next = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: template)
+            if next != out { out = next; lower = ASCIIScan.lowered(out) }
         }
-        for (rule, template) in rules {
-            out = rule.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: template)
+        if let home, ASCIIScan.contains(lower, home.needle) {
+            apply(home.re, "~")
         }
-        if !options.includeImages {
-            out = image.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "\"data\":\"\"")
+        for rule in rules where rule.needles.contains(where: { ASCIIScan.contains(lower, $0) }) {
+            apply(rule.re, rule.template)
+        }
+        if !options.includeImages, ASCIIScan.contains(lower, imageNeedle) {
+            apply(image, "\"data\":\"\"")
         }
         return out
     }

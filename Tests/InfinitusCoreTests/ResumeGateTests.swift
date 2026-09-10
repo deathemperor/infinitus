@@ -133,4 +133,18 @@ final class ResumeGateTests: XCTestCase {
             now: { now })
         XCTAssertEqual(plain.skippedIdle, 1)
     }
+
+    /// #621: two stops, one eligible and one held. After the tick that
+    /// resumed the eligible one, only ITS stop (still standing after a
+    /// best effort) is remembered as nudged; the held one stays out of
+    /// the set so the next tick gates it again with a fresh verdict.
+    func testAHeldStopIsNotMarkedNudgedByANeighboursResume() {
+        let attempted: Set<String> = ["eligible-stop"]
+        let stillStopped = ["eligible-stop", "held-stop", ""]
+        XCTAssertEqual(ResumeGate.standing(stillStopped: stillStopped, attempted: attempted), ["eligible-stop"])
+        // A fresh alive verdict after the stop lets the held one through.
+        XCTAssertTrue(ResumeGate.allows(
+            stoppedAt: stop, firstSeenActive: 2, currentActive: 2,
+            activeFetchedAt: Date(timeIntervalSince1970: 1500), lastNudge: nil, activeSince: nil))
+    }
 }

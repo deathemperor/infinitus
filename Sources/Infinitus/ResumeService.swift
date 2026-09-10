@@ -146,8 +146,9 @@ final class ResumeService: ObservableObject {
                     outcome = coordinator.resume(eligible)
                     // Whatever still shows a limit stop after our best
                     // effort is remembered so the next tick leaves it alone.
-                    standing = Transcript.findStopped(sessions: sessions, claudeDir: claudeDir)
-                        .map(\.stopUuid).filter { !$0.isEmpty }
+                    standing = ResumeGate.standing(
+                        stillStopped: Transcript.findStopped(sessions: sessions, claudeDir: claudeDir).map(\.stopUuid),
+                        attempted: Set(eligible.map(\.stopUuid)))
                 }
             }
             // Sub-agent limits (#117): the PARENT never stopped, so it's
