@@ -19,6 +19,8 @@ ChevronsUpDown
 Circle
 CircleAlert
 CircleCheck
+CircleDashed
+CircleDot
 CircuitBoard
 Cloud
 CloudCog
@@ -44,7 +46,10 @@ Gamepad2
 Gauge
 GitBranch
 GitCommit
+GitMerge
 GitPullRequest
+GitPullRequestClosed
+GitPullRequestDraft
 Globe
 Globe2
 History

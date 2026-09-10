@@ -21,6 +21,8 @@ public enum Lucide: String, CaseIterable, Sendable {
     case circle = "circle"
     case circleAlert = "circle-alert"
     case circleCheck = "circle-check"
+    case circleDashed = "circle-dashed"
+    case circleDot = "circle-dot"
     case circuitBoard = "circuit-board"
     case cloud = "cloud"
     case cloudCog = "cloud-cog"
@@ -46,7 +48,10 @@ public enum Lucide: String, CaseIterable, Sendable {
     case gauge = "gauge"
     case gitBranch = "git-branch"
     case gitCommit = "git-commit"
+    case gitMerge = "git-merge"
     case gitPullRequest = "git-pull-request"
+    case gitPullRequestClosed = "git-pull-request-closed"
+    case gitPullRequestDraft = "git-pull-request-draft"
     case globe = "globe"
     case globe2 = "globe-2"
     case history = "history"
@@ -143,6 +148,8 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .circle: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
         case .circleAlert: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12.0 8.0L12.0 12.0", "M12.0 16.0L12.01 16.0"]
         case .circleCheck: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "m9 12 2 2 4-4"]
+        case .circleDashed: return ["M10.1 2.182a10 10 0 0 1 3.8 0", "M13.9 21.818a10 10 0 0 1-3.8 0", "M17.609 3.721a10 10 0 0 1 2.69 2.7", "M2.182 13.9a10 10 0 0 1 0-3.8", "M20.279 17.609a10 10 0 0 1-2.7 2.69", "M21.818 10.1a10 10 0 0 1 0 3.8", "M3.721 6.391a10 10 0 0 1 2.7-2.69", "M6.391 20.279a10 10 0 0 1-2.69-2.7"]
+        case .circleDot: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M11.0 12.0a1.0 1.0 0 1 0 2.0 0a1.0 1.0 0 1 0 -2.0 0"]
         case .circuitBoard: return ["M5.0 3.0h14.0a2.0 2.0 0 0 1 2.0 2.0v14.0a2.0 2.0 0 0 1 -2.0 2.0h-14.0a2.0 2.0 0 0 1 -2.0 -2.0v-14.0a2.0 2.0 0 0 1 2.0 -2.0z", "M11 9h4a2 2 0 0 0 2-2V3", "M7.0 9.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0", "M7 21v-4a2 2 0 0 1 2-2h4", "M13.0 15.0a2.0 2.0 0 1 0 4.0 0a2.0 2.0 0 1 0 -4.0 0"]
         case .cloud: return ["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"]
         case .cloudCog: return ["m10.852 19.772-.383.924", "m13.148 14.228.383-.923", "M13.148 19.772a3 3 0 1 0-2.296-5.544l-.383-.923", "m13.53 20.696-.382-.924a3 3 0 1 1-2.296-5.544", "m14.772 15.852.923-.383", "m14.772 18.148.923.383", "M4.2 15.1a7 7 0 1 1 9.93-9.858A7 7 0 0 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.2", "m9.228 15.852-.923-.383", "m9.228 18.148-.923.383"]
@@ -168,7 +175,10 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .gauge: return ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"]
         case .gitBranch: return ["M15 6a9 9 0 0 0-9 9V3", "M15.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
         case .gitCommit: return ["M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 12.0L9.0 12.0", "M15.0 12.0L21.0 12.0"]
+        case .gitMerge: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M6 21V9a9 9 0 0 0 9 9"]
         case .gitPullRequest: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M13 6h3a2 2 0 0 1 2 2v7", "M6.0 9.0L6.0 21.0"]
+        case .gitPullRequestClosed: return ["M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M6 9v12", "m21 3-6 6", "m21 9-6-6", "M18 11.5V15", "M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"]
+        case .gitPullRequestDraft: return ["M15.0 18.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M3.0 6.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0", "M18 6V5", "M18 11v-1", "M6.0 9.0L6.0 21.0"]
         case .globe: return ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"]
         case .globe2: return ["M21.54 15H17a2 2 0 0 0-2 2v4.54", "M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17", "M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05", "M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0"]
         case .history: return ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5", "M12 7v5l4 2"]

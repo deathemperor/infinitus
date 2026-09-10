@@ -19,7 +19,10 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
 - Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
+- Workspace and phone: image files in the Files tab preview as images, over the mirror wire too.
 - Workspace: clicking a file in the Files tab previews it.
+- Workspace: the right panel's Pull request tab lists the project's open pull requests through gh.
+- The phone can open a terminal in a session's project over the mirror wire (terminal capability).
 - Workspace: the right panel's Files tab browses the thread's project.
 - Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
@@ -74,6 +77,7 @@ publishes the matching section as the GitHub release body.
 - A session's sub-agent folder is re-listed only when it changes or every 30 s, not on every refresh (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 - The phone's session feed poll decodes only the transcript lines appended since its last poll, so a busy thread costs the delta instead of a fresh window every 5 s (#380).
+- The stats cache leaves out every field still at its default and writes a day's hour histogram sparse, so the file is ~40% smaller and decodes faster at launch (#499).
 - A session's sub-agent files are listed with their mtimes in one call instead of one stat per file, a third off every walk of a session with hundreds of agents (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
 

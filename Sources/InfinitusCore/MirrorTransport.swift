@@ -102,7 +102,8 @@ public enum MirrorTransport {
     }
     /// `GET /sessions/<pid>/files` and `GET /sessions/<pid>/file?path=<rel>`
     /// (#223, the phone's file browser): the flat workspace listing and one
-    /// file's text — `T3ProjectFiles` builds the paths and the bodies.
+    /// file — its text, or an image's raw bytes — `T3ProjectFiles` builds the
+    /// paths and the bodies.
     public static func sessionFilesPid(_ path: String) -> Int32? {
         let parts = path.split(separator: "/", omittingEmptySubsequences: true)
         guard parts.count == 3, parts[0] == "sessions", parts[2] == "files" else { return nil }
@@ -148,6 +149,13 @@ public enum MirrorTransport {
     /// 20 MiB video and three 5 MiB images at most (#381) — base64-inflated,
     /// plus the JSON envelope (2026-09-03 "add features to allow attachments").
     public static let sessionInputBodyCap = 48 * 1024 * 1024
+    /// `POST /sessions/<pid>/terminal/<id>/write` (#507): a legal 64 KB
+    /// `data` string JSON-escapes past 64 KB, so the cap is twice
+    /// `T3Terminal.maxWriteBytes` plus the envelope — truncating the body
+    /// would turn a refusal `WriteRequest.validate()` owns (413) into a
+    /// decode failure (400). Not the input route's 48 MiB: this listener
+    /// may be tunnel-exposed and a keystroke is a keystroke.
+    public static let terminalWriteBodyCap = 2 * T3Terminal.maxWriteBytes + 4096
 
     // MARK: - Server side
 
@@ -236,7 +244,12 @@ public enum MirrorTransport {
     public static func bodyCap(method: String, path: String) -> Int {
         guard method == "POST" else { return defaultBodyCap }
         // A sealed team command carries a prompt (#220) — the input cap.
-        return sessionInputPid(path) != nil || path == TeamControlRoute.commandPath ? sessionInputBodyCap : defaultBodyCap
+        if sessionInputPid(path) != nil || path == TeamControlRoute.commandPath { return sessionInputBodyCap }
+        // A terminal write carries up to 64 KB of keystrokes or paste (#507).
+        if case .write? = T3Terminal.parse(method: method, request: Request(method: method, target: path, headers: [:])) {
+            return terminalWriteBodyCap
+        }
+        return defaultBodyCap
     }
 
     /// A whole request, body included: `nil` while the head or (when
@@ -329,6 +342,7 @@ public enum MirrorTransport {
         switch status {
         case 400: reason = "Bad Request"
         case 404: reason = "Not Found"
+        case 413: reason = "Payload Too Large"
         case 415: reason = "Unsupported Media Type"
         default: reason = "Internal Server Error"
         }
@@ -359,6 +373,24 @@ public enum MirrorTransport {
         case .success(let file)?:
             return (try? JSONEncoder().encode(file)).map(jsonResponse)
                 ?? errorResponse(status: 500, message: "cannot encode the file")
+        case .failure(let error)?:
+            return errorResponse(status: error.status, message: error.message)
+        case nil:
+            return errorResponse(status: 404, message: "no such session")
+        }
+    }
+
+    /// `GET /sessions/<pid>/file`'s answer → response. A text read is the JSON
+    /// envelope above; an image is its raw bytes under its own `Content-Type`,
+    /// no envelope (#223's image contract) and no `Cache-Control` — a workspace
+    /// file changes under the same path.
+    public static func fileAnswerResponse(
+        _ result: Result<T3ProjectFiles.FileAnswer, T3ProjectFiles.ReadError>?) -> Data {
+        switch result {
+        case .success(.text(let file))?:
+            return fileReadResponse(.success(file))
+        case .success(.image(let image))?:
+            return response(status: 200, reason: "OK", contentType: image.mime, body: image.bytes)
         case .failure(let error)?:
             return errorResponse(status: error.status, message: error.message)
         case nil:

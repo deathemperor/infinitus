@@ -155,6 +155,75 @@ final class T3ProjectFilesTests: XCTestCase {
         XCTAssertEqual(T3ProjectFiles.read(root: root.path, path: "dangling.txt").failure, .notFound)
     }
 
+    // MARK: - images (#223's image contract)
+
+    func testTheImageTableIsTheExtensionsBothSidesAgreedOn() {
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "a/logo.png"), "image/png")
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "shot.JPG"), "image/jpeg")
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "shot.jpeg"), "image/jpeg")
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "loop.gif"), "image/gif")
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "art.webp"), "image/webp")
+        XCTAssertEqual(T3ProjectFiles.imageMime(for: "photo.heic"), "image/heic")
+        // Text, and it stays on the text read.
+        XCTAssertNil(T3ProjectFiles.imageMime(for: "icon.svg"))
+        XCTAssertEqual(T3ProjectFiles.mime(for: "icon.svg"), "text/plain")
+        // Binaries with no agreed preview are not images either.
+        for path in ["clip.mp4", "doc.pdf", "old.bmp", "icon.icns", "Makefile", "a.swift"] {
+            XCTAssertNil(T3ProjectFiles.imageMime(for: path), path)
+        }
+        XCTAssertEqual(T3ProjectFiles.imageCap, 8 * 1024 * 1024)
+    }
+
+    func testAnImageUnderTheCapComesBackAsBytesUnderItsMime() throws {
+        let bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01])
+        let root = try tree(["assets/logo.png": bytes])
+        let image = try T3ProjectFiles.readImage(root: root.path, path: "assets/logo.png").get()
+        XCTAssertEqual(image.path, "assets/logo.png")
+        XCTAssertEqual(image.mime, "image/png")
+        XCTAssertEqual(image.bytes, bytes)
+        // The same file through the route's own branch.
+        guard case .image(let answered) = try T3ProjectFiles.answer(root: root.path,
+                                                                    path: "assets/logo.png").get() else {
+            return XCTFail("a png answers as an image")
+        }
+        XCTAssertEqual(answered.bytes, bytes)
+    }
+
+    func testAnImageOverTheCapIsRefusedWithoutReadingIt() throws {
+        let root = try tree(["big.png": Data(repeating: 0x89, count: 40)])
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "big.png", cap: 16).failure,
+                       .tooLarge)
+        XCTAssertEqual(T3ProjectFiles.answer(root: root.path, path: "big.png", imageCap: 16).failure,
+                       .tooLarge)
+        // Under the cap the same file is fine, so the cap is what refused it.
+        XCTAssertEqual(try T3ProjectFiles.readImage(root: root.path, path: "big.png", cap: 64).get().bytes.count, 40)
+    }
+
+    func testAnImageReadKeepsEveryGuardTheTextReadHas() throws {
+        let root = try tree(["assets/logo.png": Data([0x89, 0x50]), "notes.txt": Data("hi".utf8)])
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "../outside.png").failure, .outsideRoot)
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "/etc/logo.png").failure, .outsideRoot)
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "").failure, .outsideRoot)
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "gone.png").failure, .notFound)
+        // A directory is 404 here as it is on the text read.
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "assets").failure, .notFound)
+        // Not an image extension: the same 415 the text read answers a binary with.
+        XCTAssertEqual(T3ProjectFiles.readImage(root: root.path, path: "notes.txt").failure, .binary)
+        XCTAssertNil(T3ProjectFiles.readImage(root: root.path, path: "assets/logo.png").failure)
+    }
+
+    func testAnythingButAnImageExtensionStaysOnTheTextRead() throws {
+        let root = try tree(["notes.md": Data("# hi".utf8), "icon.svg": Data("<svg/>".utf8),
+                             "clip.mp4": Data([0x00, 0x01])])
+        guard case .text(let notes) = try T3ProjectFiles.answer(root: root.path, path: "notes.md").get(),
+              case .text(let svg) = try T3ProjectFiles.answer(root: root.path, path: "icon.svg").get() else {
+            return XCTFail("text files answer as text")
+        }
+        XCTAssertEqual(notes.contents, "# hi")
+        XCTAssertEqual(svg.contents, "<svg/>")
+        XCTAssertEqual(T3ProjectFiles.answer(root: root.path, path: "clip.mp4").failure, .binary)
+    }
+
     // MARK: - the wire
 
     func testTheRoutesAndTheJSONFieldNamesAreWhatThePhoneAsksFor() throws {
@@ -195,6 +264,8 @@ final class T3ProjectFilesTests: XCTestCase {
         XCTAssertEqual(T3ProjectFiles.ReadError.notFound.message, "no such file")
         XCTAssertEqual(T3ProjectFiles.ReadError.binary.status, 415)
         XCTAssertEqual(T3ProjectFiles.ReadError.binary.message, "binary file")
+        XCTAssertEqual(T3ProjectFiles.ReadError.tooLarge.status, 413)
+        XCTAssertEqual(T3ProjectFiles.ReadError.tooLarge.message, "file too large")
         XCTAssertEqual(T3ProjectFiles.ReadError.failed("io").status, 500)
     }
 
@@ -207,6 +278,12 @@ final class T3ProjectFilesTests: XCTestCase {
         XCTAssertEqual(listing?.cwd, root.path)
         let read = try T3ProjectFiles.read(pid: 111, path: "a.swift", sessions: sessions)?.get()
         XCTAssertEqual(read?.contents, "import Foundation")
+        XCTAssertNil(T3ProjectFiles.answer(pid: 222, path: "a.swift", sessions: sessions))
+        guard case .text(let answered)? = try T3ProjectFiles.answer(pid: 111, path: "a.swift",
+                                                                    sessions: sessions)?.get() else {
+            return XCTFail("a swift file answers as text")
+        }
+        XCTAssertEqual(answered.contents, "import Foundation")
     }
 
     func testListAndReadByPidAreNilForAnUnknownPid() {

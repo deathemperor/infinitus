@@ -397,11 +397,127 @@ final class T3WindowModel: ObservableObject {
         return read
     }
 
+    /// The image sibling of the read above (#223's image contract): the bytes
+    /// and mime `T3ProjectFiles.readImage` answers, keyed the same way. Three
+    /// slots, not the text read's eight — one image is up to
+    /// `T3ProjectFiles.imageCap` (8 MB) of bytes, and the pane holds the
+    /// decoded one on top of that.
+    private typealias ImageReadResult = Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError>
+    private var imageReadCache: [FileReadKey: ImageReadResult] = [:]
+    private var imageReadOrder: [FileReadKey] = []
+    private var imageReadLoads: [FileReadKey: Task<ImageReadResult, Never>] = [:]
+    private static let imageReadCacheLimit = 3
+
+    func cachedImageRead(cwd: String,
+                         path: String) -> Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError>? {
+        imageReadCache[FileReadKey(cwd: cwd, path: path)]
+    }
+
+    func imageRead(cwd: String,
+                   path: String) async -> Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError> {
+        let key = FileReadKey(cwd: cwd, path: path)
+        if let cached = imageReadCache[key] { return cached }
+        if let existing = imageReadLoads[key] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) { T3ProjectFiles.readImage(root: cwd, path: path) }
+        imageReadLoads[key] = task
+        let read = await task.value
+        imageReadLoads[key] = nil
+        imageReadCache[key] = read
+        imageReadOrder.removeAll { $0 == key }
+        imageReadOrder.append(key)
+        while imageReadOrder.count > Self.imageReadCacheLimit {
+            imageReadCache[imageReadOrder.removeFirst()] = nil
+        }
+        return read
+    }
+
     /// Every read under `cwd` forgotten — the listing moved on, so the file
     /// this pane is showing may have too.
     func invalidateFileReads(cwd: String) {
         for key in fileReadCache.keys where key.cwd == cwd { fileReadCache[key] = nil }
         fileReadOrder.removeAll { $0.cwd == cwd }
+        for key in imageReadCache.keys where key.cwd == cwd { imageReadCache[key] = nil }
+        imageReadOrder.removeAll { $0.cwd == cwd }
+    }
+
+    /// The right panel's Pull request tab reads its list here — one
+    /// `gh pr list` (plus one `gh pr view` for the checked-out branch's own)
+    /// per project cwd, on a detached task and cached exactly like the files
+    /// listing above. `reload` is the refresh button and the thread switch;
+    /// nothing polls, so an open tab costs nothing while it sits there.
+    struct PullRequestLoad: Sendable, Equatable {
+        var entries: [T3PullRequests.Entry] = []
+        /// The pull request for the checked-out branch, pinned at the top of
+        /// the list; nil where the branch has none.
+        var current: T3PullRequests.Entry?
+        /// Why there is nothing to show — gh missing, no GitHub remote, or
+        /// gh's own words (`T3PullRequests.LoadError.message`).
+        var failure: String?
+        /// The list failed because the tab cannot read pull requests here at
+        /// all, which reads as an unavailable surface rather than an error.
+        var unavailable = false
+
+        static func load(cwd: String) -> PullRequestLoad {
+            var load = PullRequestLoad()
+            switch T3PullRequests.list(cwd: cwd) {
+            case .success(let entries):
+                load.entries = entries
+            case .failure(let error):
+                load.failure = error.message
+                if case .unavailable = error { load.unavailable = true }
+                return load
+            }
+            // Only after the list answered: a failure here is the branch
+            // having no pull request, which is not an error to report.
+            if case .success(let entry) = T3PullRequests.current(cwd: cwd) { load.current = entry }
+            return load
+        }
+    }
+
+    private var pullRequestCache: [String: PullRequestLoad] = [:]
+    private var pullRequestLoads: [String: Task<PullRequestLoad, Never>] = [:]
+
+    /// The last list for `cwd`, to paint before a fresh one lands.
+    func cachedPullRequests(cwd: String) -> PullRequestLoad? { pullRequestCache[cwd] }
+
+    func pullRequests(cwd: String, reload: Bool = false) async -> PullRequestLoad {
+        if reload {
+            pullRequestCache[cwd] = nil
+            pullRequestBodies = pullRequestBodies.filter { $0.key.cwd != cwd }
+        }
+        if !reload, let cached = pullRequestCache[cwd] { return cached }
+        if let existing = pullRequestLoads[cwd] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) { PullRequestLoad.load(cwd: cwd) }
+        pullRequestLoads[cwd] = task
+        let load = await task.value
+        pullRequestLoads[cwd] = nil
+        pullRequestCache[cwd] = load
+        return load
+    }
+
+    /// One pull request's markdown body, read when the reader opens it — the
+    /// list does not carry the bodies (upstream's own detail is a read per
+    /// pull request, `PullRequestChecksPopover.tsx:24-27`).
+    struct PullRequestBodyKey: Hashable { let cwd: String; let number: Int }
+    private var pullRequestBodies: [PullRequestBodyKey: Result<String, T3PullRequests.LoadError>] = [:]
+    private var pullRequestBodyLoads: [PullRequestBodyKey: Task<Result<String, T3PullRequests.LoadError>, Never>] = [:]
+
+    func cachedPullRequestBody(cwd: String, number: Int) -> Result<String, T3PullRequests.LoadError>? {
+        pullRequestBodies[PullRequestBodyKey(cwd: cwd, number: number)]
+    }
+
+    func pullRequestBody(cwd: String, number: Int) async -> Result<String, T3PullRequests.LoadError> {
+        let key = PullRequestBodyKey(cwd: cwd, number: number)
+        if let cached = pullRequestBodies[key] { return cached }
+        if let existing = pullRequestBodyLoads[key] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) {
+            T3PullRequests.body(cwd: cwd, number: number)
+        }
+        pullRequestBodyLoads[key] = task
+        let body = await task.value
+        pullRequestBodyLoads[key] = nil
+        pullRequestBodies[key] = body
+        return body
     }
 
     /// The `@` menu's rows for one query. Ranking a monorepo's 20 000 paths is
