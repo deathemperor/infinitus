@@ -151,7 +151,13 @@ struct T3TerminalDrawerSlot: View {
                 if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
             }
             .gesture(
-                DragGesture(minimumDistance: 0)
+                // `.global`, and load-bearing: the handle MOVES with the edge
+                // it drags, so a translation measured in its own space is
+                // taken against a frame that has already shifted by the same
+                // amount — every drag came out at half its travel. Upstream's
+                // `event.clientY` (`:1327`) is the viewport's space for the
+                // same reason.
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
                         let start = dragStart ?? height
                         if dragStart == nil { dragStart = start }
