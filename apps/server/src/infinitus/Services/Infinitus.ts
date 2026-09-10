@@ -13,13 +13,19 @@ export interface InfinitusServiceShape {
   /**
    * The latest snapshot, whatever the socket's state. Never fails: an app that
    * cannot be reached is `available: false` with a reason, not an error.
-   * Answers from the last poll — reading this does not start one.
+   * Answers from the last poll — reading this does not start one, so before the
+   * first cycle it answers a placeholder that says as much.
    */
   readonly snapshot: Effect.Effect<InfinitusSnapshot>;
   /**
    * The current snapshot, then every change to it. Subscribing is what makes
    * the service poll: the first subscriber starts the loop and the last one to
    * leave stops it, so an idle server never touches the socket.
+   *
+   * The first emission is a polled snapshot, never the pre-poll placeholder:
+   * a subscriber waits for the first cycle rather than flashing an offline
+   * state, and an app that really is unreachable arrives as `available: false`
+   * once that cycle has probed for it.
    */
   readonly changes: Stream.Stream<InfinitusSnapshot>;
   /**

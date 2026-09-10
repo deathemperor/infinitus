@@ -17,6 +17,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -55,6 +56,11 @@ const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
   commands: [],
 });
 
+/** What the one-shot getter answers with before the first cycle has produced a
+    snapshot. `changes` never emits it — a subscriber waits for a real poll
+    instead of flashing an offline state. */
+const NOT_POLLED = unavailableSnapshot("the socket has not been polled yet");
+
 /**
  * One command's outcome as the poller cares about it: a value, nothing usable
  * (the reply failed or did not match the contract — that field goes absent for
@@ -68,9 +74,11 @@ type Fetched<A> =
 const makeInfinitus = Effect.gen(function* () {
   const client = yield* InfinitusControlClient;
 
-  const state = yield* SubscriptionRef.make<InfinitusSnapshot>(
-    unavailableSnapshot("the socket has not been polled yet"),
-  );
+  // `None` until the first cycle has published, available or not: that absence
+  // is what keeps the placeholder out of `changes`.
+  const state = yield* SubscriptionRef.make<Option.Option<InfinitusSnapshot>>(Option.none());
+  /** Every read that wants a snapshot no matter what, the getter included. */
+  const snapshot = SubscriptionRef.get(state).pipe(Effect.map(Option.getOrElse(() => NOT_POLLED)));
   /** The last manifest that decoded. Kept across unavailability so a command
       is still checked against a table while the app restarts. */
   const commands = yield* Ref.make<ReadonlyArray<InfinitusManifestCommand>>([]);
@@ -125,11 +133,11 @@ const makeInfinitus = Effect.gen(function* () {
     // The app that comes back may be a different build, so its replies get a
     // fresh set of warnings. Doing this here rather than on the way back keeps
     // a manifest that never decodes from re-warning on every cycle.
-    if ((yield* SubscriptionRef.get(state)).available) {
+    if ((yield* snapshot).available) {
       yield* Ref.update(generation, (previous) => previous + 1);
       yield* Ref.set(warnedCommands, new Set<string>());
     }
-    yield* SubscriptionRef.set(state, unavailableSnapshot(reason));
+    yield* SubscriptionRef.set(state, Option.some(unavailableSnapshot(reason)));
     return UNAVAILABLE_PROBE_INTERVAL;
   });
 
@@ -153,7 +161,7 @@ const makeInfinitus = Effect.gen(function* () {
     const sessions = yield* fetchCommand("sessions", decodeSessions);
     if (sessions.kind === "unavailable") return yield* goUnavailable(sessions.reason);
 
-    const previous = yield* SubscriptionRef.get(state);
+    const previous = yield* snapshot;
     const knownCommands = yield* Ref.get(commands);
     const now = yield* Clock.currentTimeMillis;
     const slowDue = now >= (yield* Ref.get(nextSlowAtMillis));
@@ -175,15 +183,18 @@ const makeInfinitus = Effect.gen(function* () {
       yield* Ref.set(nextSlowAtMillis, now + Duration.toMillis(SLOW_POLL_INTERVAL));
     }
 
-    yield* SubscriptionRef.set(state, {
-      available: true,
-      ...(status.kind === "value" ? { status: status.value } : {}),
-      fleets: fleets.kind === "value" ? fleets.value : [],
-      ...(forecast === undefined ? {} : { forecast }),
-      sessions: sessions.kind === "value" ? sessions.value : [],
-      ...(prefs === undefined ? {} : { prefs }),
-      commands: knownCommands,
-    });
+    yield* SubscriptionRef.set(
+      state,
+      Option.some({
+        available: true,
+        ...(status.kind === "value" ? { status: status.value } : {}),
+        fleets: fleets.kind === "value" ? fleets.value : [],
+        ...(forecast === undefined ? {} : { forecast }),
+        sessions: sessions.kind === "value" ? sessions.value : [],
+        ...(prefs === undefined ? {} : { prefs }),
+        commands: knownCommands,
+      }),
+    );
     return FAST_POLL_INTERVAL;
   });
 
@@ -215,11 +226,15 @@ const makeInfinitus = Effect.gen(function* () {
 
   const changes = Stream.unwrap(
     Effect.gen(function* () {
-      // Counting the subscriber first is what makes the loop's immediate cycle
-      // land before the subscription: a `SubscriptionRef` replays one value, so
-      // the current snapshot is the stream's first element either way.
+      // A `SubscriptionRef` replays its current value, which before the first
+      // cycle is `None` — dropped here. So whether the loop's immediate cycle
+      // beats the subscription or not, the first element is a polled snapshot.
       yield* Effect.acquireRelease(startPolling, () => stopPolling);
-      return SubscriptionRef.changes(state).pipe(Stream.changes);
+      return SubscriptionRef.changes(state).pipe(
+        Stream.filter(Option.isSome),
+        Stream.map((present) => present.value),
+        Stream.changes,
+      );
     }),
   );
 
@@ -256,7 +271,7 @@ const makeInfinitus = Effect.gen(function* () {
   });
 
   return {
-    snapshot: SubscriptionRef.get(state),
+    snapshot,
     changes,
     command,
   } satisfies InfinitusServiceShape;
