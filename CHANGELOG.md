@@ -109,6 +109,8 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl activities-token`, `client-activity` and `crash-report` take the JSON a phone posts to the mirror (`--body` or stdin), so a client on the control socket registers push tokens, leases and files crashes without the HTTP routes (#572).
 - A push registration can say `layout: "expo"`, and its Live Activities then arrive in the expo-widgets envelope (one attributes type, the state as `{name, props}`, a deep link on start) with the same content the native card gets (#572).
 - `prefs set update_auto_check` / `update_auto_install` (socket, mirror or iCloud sync) reach the running update checker at once instead of at the next relaunch (#558).
+- `infinitusctl sessions` rows carry the session id, the account alias they run on, the start time and any pending sign-in need (`aws-login:<profile>`), for the fork's sessions list (#612).
+- `infinitusctl show session <pid>` opens that session's chat window, and `nudge <pid>` sends it the resume nudge by hand, answering with the reason when it is not resumable (#612).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

@@ -43,6 +43,10 @@ final class ResumeService: ObservableObject {
     /// stopUuid, which is how the 2026-09-01 nudge loop escaped the set
     /// above (three nudges in one minute). ResumeGate.cooldown spaces them.
     private var lastNudge: [String: Date] = [:]
+    /// A nudge the control socket sent by hand (#612 `nudge <pid>`),
+    /// counted like the service's own so the cooldown spaces the next
+    /// automatic one from it.
+    func noteManualNudge(sessionId: String) { lastNudge[sessionId] = Date() }
     /// Active account number when each stop was first observed, so a
     /// later SWITCH is distinguishable from the same stale account.
     private var stopFirstActive: [String: Int] = [:]

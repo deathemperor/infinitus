@@ -233,7 +233,7 @@ export DEMO_SESSION_PID="$SESSION_PID" DEMO_SESSION_CWD="$SESSION_CWD"
 mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
 cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws"}
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
 EOF
 # Its transcript: an aws call that died on the expired session, stamped a
 # minute back so it is unmistakably older than any login started below.
@@ -504,6 +504,11 @@ until aws_login_item; do
     sleep 1
 done
 echo "aws: need surfaced after ${i}s"
+# #612: the row carries the id, the start and the need the fork's list shows;
+# the by-hand nudge is a no-op with its reason on a session that never stopped.
+"$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
+"$CTL" nudge "$SESSION_PID" | expect "d['pid']==$SESSION_PID and d['nudged']==False and d['reason'].startswith('not resumable')" || fail "nudge no-op"
+"$CTL" show session 999999 >/dev/null 2>&1 && fail "show session for a dead pid must be refused"
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).

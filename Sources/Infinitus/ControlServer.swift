@@ -200,13 +200,55 @@ final class ControlServer {
             return ControlReply(ok: true, result: try .of(fleetsPayload()))
 
         case "sessions":
+            // #612: the id, the account alias, the start and the pending
+            // sign-in needs ride along for the fork's sessions list.
+            let account = model.activeAccountName
+            let iso = ISO8601DateFormatter()
             return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
-                .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
-                         "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
-                         "kind": .string(row.kind),
-                         "profile": model.sessionBirths[row.pid]?.profile.map { .string($0) } ?? .null,
-                         "permissionMode": model.sessionBirths[row.pid]?.effectiveMode.map { .string($0) } ?? .null])
+                let progress = model.sessionProgress.byPid[row.pid]
+                var needs: [String] = []
+                if let profile = progress?.awsLoginProfile { needs.append("aws-login:" + profile) }
+                if let profile = progress?.gcloudLoginProfile { needs.append("gcloud-login:" + profile) }
+                return .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
+                                "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
+                                "kind": .string(row.kind),
+                                "profile": model.sessionBirths[row.pid]?.profile.map { .string($0) } ?? .null,
+                                "permissionMode": model.sessionBirths[row.pid]?.effectiveMode.map { .string($0) } ?? .null,
+                                "sessionId": .string(row.sessionId),
+                                "account": account.map { .string($0) } ?? .null,
+                                "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null,
+                                "needs": .array(needs.map { .string($0) })])
             }))
+
+        case "nudge":
+            // #612: the resume nudge for one session, by hand — what the
+            // service does on its tick for every limit-stopped session,
+            // without ResumeGate: the caller asked.
+            guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {
+                throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`")
+            }
+            let claudeDir = ClaudeSessions.configHome()
+            guard let record = model.ownedRoster(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else {
+                throw Fail("no live session \(pid)")
+            }
+            let outcome: (nudged: Bool, channel: String?, reason: String?) = await Task.detached(priority: .utility) {
+                guard let stop = Transcript.findStopped(sessions: [record], claudeDir: claudeDir).first else {
+                    return (false, nil, "not resumable: the transcript does not end in a limit stop")
+                }
+                let coordinator = ResumeCoordinator(hosts: PtyHosts.available(), claudeDir: claudeDir)
+                let result = coordinator.resume([stop])
+                if result.accepted.contains(where: { $0.sessionId == stop.sessionId }) {
+                    return (true, result.channel[stop.sessionId], nil)
+                }
+                return (false, nil, "unreachable: no terminal surface, no peer socket, or mid-turn")
+            }.value
+            if outcome.nudged {
+                model.resume.noteManualNudge(sessionId: record.sessionId)
+                model.logEvent("other", icon: "play.circle", "nudged \(record.sessionId.prefix(8)) by hand via \(outcome.channel ?? "?")")
+            }
+            return ControlReply(ok: true, result: .object(["pid": .number(Double(pid)), "nudged": .bool(outcome.nudged),
+                                                           "channel": outcome.channel.map { .string($0) } ?? .null,
+                                                           "reason": outcome.reason.map { .string($0) } ?? .null]))
 
         case "profiles":
             return ControlReply(ok: true, result: try .of(["profiles": model.sessionProfiles.profiles]))
@@ -656,7 +698,19 @@ final class ControlServer {
                     throw Fail("usage: show workspace [sidebar|thread|composer|draft|switcher]")
                 }
                 controller.showWorkspace(screen: screen)
-            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]")
+            case "session":
+                // What a popup row click opens (MacSessionsPopover): the
+                // session's chat window (#612).
+                let who = r.args.dropFirst().first
+                guard let who, let pid = model.sessionPid(matching: who),
+                      let record = model.ownedRoster(claudeDir: ClaudeSessions.configHome()).first(where: { Int($0.pid) == pid }) else {
+                    throw Fail("no live session matches \(who ?? "?"); see `infinitusctl sessions`")
+                }
+                model.openSessionChat?(SessionDetail(pid: pid, cwd: record.cwd, status: record.status ?? "idle", kind: record.kind,
+                                                     startedAt: (record.startedAt ?? Date()).timeIntervalSince1970 * 1000,
+                                                     sessionId: record.sessionId))
+                return ControlReply(ok: true, result: .object(["shown": .string("session"), "pid": .number(Double(pid))]))
+            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]|session <pid|name>")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
