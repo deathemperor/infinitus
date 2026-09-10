@@ -24,6 +24,7 @@ publishes the matching section as the GitHub release body.
 - An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
 
 ### Mac
+- A Cloudflare quick tunnel can front the T3 Code fork server's port (`fork_tunnel_enabled`, `fork_server_port` under Devices), and `infinitusctl status` reports its state and public URL for the fork's pairing QR (#572).
 - swapd engine: a Gemini CLI fleet shows beside the Claude one when swapd reports it, its per-model quota as named gauges.
 - Workspace: a terminal drawer under the thread, resizable, showing the same shells as the Terminal tab.
 - Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.

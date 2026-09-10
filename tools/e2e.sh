@@ -68,7 +68,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }
@@ -413,6 +413,18 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
 "$CTL" prefs set revive_lead_minutes 10 | expect "d['value']==10" || fail "prefs set back"
+# The fork server's tunnel (#572): off by default on T3's port; a mock
+# instance named Infinitus is `blocked`, so enabling it here never runs
+# cloudflared — the gate is what this checks.
+"$CTL" status | expect "d['forkTunnel']['state']=='off' and d['forkTunnel']['port']==3773 and d['forkTunnel']['enabled'] is False and d['forkTunnel'].get('url') is None" || fail "fork tunnel must default to off on 3773"
+"$CTL" prefs set fork_tunnel_enabled true | expect "d['value'] is True" || fail "prefs set fork_tunnel_enabled"
+"$CTL" status | expect "d['forkTunnel']['state']=='blocked'" || fail "a mock instance must report the fork tunnel blocked, not run it"
+"$CTL" prefs set fork_server_port 70000 | expect "d['value']==70000" || fail "prefs set fork_server_port"
+"$CTL" status | expect "d['forkTunnel']['state']=='invalidPort'" || fail "an out-of-range fork port must report invalidPort"
+"$CTL" prefs set fork_server_port 3773 >/dev/null || fail "prefs set fork_server_port back"
+"$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
+"$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
+pgrep -f "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3773" >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
 echo "prefs: ok"
 
 # --- scenarios: all-dead (every window maxed, no candidate) --------------
