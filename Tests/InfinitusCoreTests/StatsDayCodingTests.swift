@@ -117,6 +117,9 @@ final class StatsDayCodingTests: XCTestCase {
         XCTAssertEqual(written.hours[3], 2)
         XCTAssertEqual(written.hours[100], 1)
         XCTAssertEqual(Stats.Day().hours, Array(repeating: 0, count: 168), "an untouched day still reads 168 zeros")
+        let long = try JSONDecoder().decode(Stats.Day.self, from: JSONSerialization.data(withJSONObject: ["hours": Array(repeating: 1, count: 200)]))
+        XCTAssertEqual(long.hours.count, 168, "a longer foreign array is cut at 168, never indexed past it")
+        XCTAssertEqual(long.hours[167], 1)
 
         var monday = Stats.Day(); monday.hourSlots[9] = 4
         var sunday = Stats.Day(); sunday.hourSlots[160] = 5; sunday.hourSlots[9] = 1

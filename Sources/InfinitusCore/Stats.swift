@@ -104,8 +104,11 @@ public enum Stats {
         public private(set) var counts: [Int] = []
         public private(set) var dropped = false
         public init() {}
+        /// Slots past 168 in a foreign array (a teammate's doc, an older
+        /// snapshot) are cut, never indexed.
         public init(dense: [Int]) {
             dropped = dense.isEmpty
+            let dense = dense.prefix(Self.slotCount)
             guard let first = dense.firstIndex(where: { $0 != 0 }),
                   let last = dense.lastIndex(where: { $0 != 0 }) else { return }
             offset = first
