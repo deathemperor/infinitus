@@ -129,6 +129,7 @@ publishes the matching section as the GitHub release body.
 - A file's source on the phone splits lines and words its limit strip the way the Mac's Files tab does (CRLF files no longer render as one line).
 - The thread header's Terminal pill opens the session's shell once the Mac hosts terminals (#507): SwiftTerm, a keys row (ctrl, esc, tab, arrows, paste), a stream that reconnects where it left off.
 - Follow Mac carries the popup's sort mode, so the phone lays rows out by candidates when the Mac does (#542).
+- The Terminal's keys row now rides the keyboard, as in T3: it appears with the keyboard and a round keyboard button bottom-right brings both back.
 
 ## 0.4.4-alpha.2
 
