@@ -332,6 +332,7 @@ main 9c7e7a9b, against `refs/ios-home.png` / `refs/ios-thread.png`
 | home | 1.44 % ✅ |
 | thread | 4.79 % |
 | files | 6.51 % |
+| terminal | 5.30 % |
 
 Thread's remainder is the header block: the reference frames the thread
 as a modal card (rounded top, dimmed parent, content ~19 pt lower) while
