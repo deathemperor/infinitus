@@ -83,10 +83,10 @@ publishes the matching section as the GitHub release body.
 - The stats cache leaves out every field still at its default and writes a day's hour histogram sparse, so the file is ~40% smaller and decodes faster at launch (#499).
 - A session's sub-agent files are listed with their mtimes in one call instead of one stat per file, a third off every walk of a session with hundreds of agents (#346).
 - A watched thread's timeline rebuild decodes only the transcript lines appended since the last one instead of re-reading its whole 4 MB window (#346).
-
 - The transcript stats cache is per Claude config home, so a fixture or dev instance no longer replaces the real one and the next launch re-reads nothing (#346).
 - A team publish walks its published copies in one enumerator pass instead of a stat per file, 0.9 s → 0.2 s of every five-minute pass on a 5,000-copy store (#346).
 - One `INFINITUS_APP_SUPPORT` variable moves every file the app writes, so a dev or fixture instance never touches the real Application Support/Infinitus (#506).
+- The Mac's session chat window decodes only the transcript lines appended since its last refresh instead of a fresh window of 200 items on every change (#346).
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
 - Usage gains its cost tab: the engine's raw token cost for the period, a daily chart, per-account and per-model shares and the token totals, across every paired Mac.
