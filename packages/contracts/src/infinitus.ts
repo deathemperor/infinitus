@@ -213,6 +213,146 @@ export const InfinitusSnapshot = Schema.Struct({
 });
 export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;
 
+/*
+ * Phone-only writes (#572). The native mirror's `POST /activities/token`,
+ * `POST /client-activity` and `POST /crashes` bodies, carried unchanged as the
+ * `--body` option of the `activities-token`, `client-activity` and
+ * `crash-report` control commands so a paired phone reaches them through
+ * `infinitus.command`. Every schema mirrors the Swift struct the native decoder
+ * reads (LiveActivityPush.swift, LeaseTable.swift, CrashReport.swift); dates are
+ * ISO 8601 strings because those decoders use `.iso8601`.
+ */
+
+/** Which Live Activity a token drives: a `*-start` token lets the Mac start
+    the activity while the app is closed (iOS 17.2 push-to-start), a plain one
+    belongs to a running activity, `alert` is an ordinary notification token. */
+export const InfinitusActivityPushKind = Schema.Literals([
+  "working-start",
+  "working",
+  "revival-start",
+  "revival",
+  "alert",
+]);
+export type InfinitusActivityPushKind = typeof InfinitusActivityPushKind.Type;
+
+/** One token registration: the Mac keeps one slot per device and kind, a new
+    token for the same pair replaces it. `environment` is `sandbox` for
+    development-signed builds, `production` otherwise (Apple routes them to
+    different gateways). `macId` is the key the phone files this Mac under — the
+    fork uses the environment id — echoed into a push-to-start's attributes so
+    the phone adopts the card into the right Mac's slot. */
+export const InfinitusActivityPushRegistration = Schema.Struct({
+  kind: InfinitusActivityPushKind,
+  token: Schema.String,
+  deviceId: Schema.String,
+  deviceName: Schema.String,
+  environment: Schema.String,
+  themeID: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  registeredAt: Schema.String,
+  macId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusActivityPushRegistration = typeof InfinitusActivityPushRegistration.Type;
+
+/** What a client is looking at: every session, one session by pid, the fleet,
+    or the stats. The Mac only does per-session work while some client holds a
+    lease on that scope. */
+export const InfinitusClientActivityScope = Schema.Struct({
+  type: Schema.Literals(["sessions", "session", "fleets", "stats"]),
+  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+});
+export type InfinitusClientActivityScope = typeof InfinitusClientActivityScope.Type;
+
+/** A lease report: the client's scopes with a TTL in milliseconds (the Mac caps
+    it at five minutes; zero releases). Sent on every scope change and while a
+    scope is held, so a crashed client never pins work for long. */
+export const InfinitusClientActivityReport = Schema.Struct({
+  clientId: Schema.String,
+  visible: Schema.Boolean,
+  focused: Schema.Boolean,
+  recentlyInteracted: Schema.Boolean,
+  scopes: Schema.Array(InfinitusClientActivityScope),
+  ttlMs: Schema.Number,
+});
+export type InfinitusClientActivityReport = typeof InfinitusClientActivityReport.Type;
+
+/** A crash or hang of the phone app as the Mac stores it: `platform` is `ios`
+    or `mac`, `kind` is `crash` or `hang`, `frames` are the faulting thread's
+    top frames, `raw` the diagnostic body (the Mac caps it at 512 KiB). */
+export const InfinitusCrashReport = Schema.Struct({
+  id: Schema.String,
+  platform: Schema.String,
+  device: Schema.String,
+  appVersion: Schema.String,
+  osVersion: Schema.String,
+  at: Schema.String,
+  kind: Schema.String,
+  reason: Schema.String,
+  frames: Schema.Array(Schema.String),
+  raw: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
+
+/*
+ * Live Activity content (LiveActivityState.swift). The Mac pushes these as the
+ * APNs `content-state` and the phone renders them; they arrive pre-themed
+ * (labels, glyphs, colour names, dense reset labels), the widget only draws.
+ * Encoded with Swift's default JSONEncoder, so the one date, `revivesAt`, is a
+ * number of seconds since 2001-01-01 UTC, not a string.
+ */
+
+/** One usage window, themed: its label ("MP", "× Dragon"), colour name, the
+    fraction used and the dense reset label ("4h20m·17:49"). */
+export const InfinitusActivityWindow = Schema.Struct({
+  label: Schema.String,
+  color: Schema.String,
+  pct: Schema.Number,
+  reset: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusActivityWindow = typeof InfinitusActivityWindow.Type;
+
+/** The working-sessions card: the active account as its themed row, session
+    counts, the tokens-per-minute gauge, the next candidate as a hint. `binding`
+    indexes the window closest to its limit. `rateIcon`/`rateLabel` are absent
+    on older Macs, which keep the bolt and "tok/min". */
+export const InfinitusWorkingActivityState = Schema.Struct({
+  active: Schema.String,
+  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  slot: Schema.String,
+  plan: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  cash: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  windows: Schema.Array(InfinitusActivityWindow),
+  binding: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  busy: Schema.Number,
+  total: Schema.Number,
+  waiting: Schema.Number,
+  next: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tokensPerMinute: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  tokenFraction: Schema.Number,
+  accent: Schema.String,
+  plain: Schema.Boolean,
+  rateIcon: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  rateLabel: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusWorkingActivityState = typeof InfinitusWorkingActivityState.Type;
+
+/** The all-dead revival countdown: who revives when (`revivesAt`, seconds since
+    2001), the live and waiting session counts, the accounts after the reviver
+    in recovery order, the theme's words and flash colour; `revived` is the
+    final state once the fleet came back. */
+export const InfinitusRevivalActivityState = Schema.Struct({
+  reviver: Schema.String,
+  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  revivesAt: Schema.Number,
+  sessions: Schema.Number,
+  waiting: Schema.Number,
+  later: Schema.Array(Schema.String),
+  reviveWord: Schema.String,
+  deadWord: Schema.String,
+  accent: Schema.String,
+  revived: Schema.Boolean,
+});
+export type InfinitusRevivalActivityState = typeof InfinitusRevivalActivityState.Type;
+
 /** One command call a client asks the server to forward. The same triple the
     control request carries, minus `secret`: material read from stdin never
     crosses the RPC boundary. */

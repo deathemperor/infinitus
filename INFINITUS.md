@@ -61,6 +61,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   harness's stub stack, since the routes layer now needs the service.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`.
+- `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
+  `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
+  `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
@@ -73,6 +76,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Actions settings, not deleted, so merges stay clean.
 
 ## Fork-only files
+
+- `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
+  (copied from the native phone's asset catalog).
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default

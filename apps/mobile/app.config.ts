@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 
-type AppVariant = "development" | "preview" | "production";
+type AppVariant = "development" | "preview" | "production" | "infinitus";
 
 const repoEnv = loadRepoEnv();
 Object.assign(process.env, repoEnv);
@@ -71,12 +71,32 @@ const RELEASE_ASSETS = {
   androidNotificationColor: "#FFFFFF",
 } as const;
 
+// The Infinitus phone (fork, #572): the native SwiftUI phone's bundle id, so
+// the Mac's Live Activity pushes (APNs topic keyed on it) reach this app and
+// installing it replaces the native phone on the device. Signed with the
+// Infinitus team; the icon is the native phone's.
+const INFINITUS_ASSETS = {
+  appIcon: "./assets/infinitus-ios-1024.png",
+  iosIcon: "./assets/infinitus-ios-1024.png",
+  splashIcon: "./assets/infinitus-ios-1024.png",
+  androidAdaptiveForeground,
+  androidAdaptiveBackgroundColor: "#000000",
+  androidAdaptiveBackgroundImage: undefined,
+  androidSplashIcon: "./assets/android-splash-icon-prod.png",
+  androidMonochromeIcon: "./assets/android-icon-mark.png",
+  androidNotificationIcon: "./assets/android-notification-icon.png",
+  androidNotificationColor: "#FFFFFF",
+} as const;
+
+const T3_APPLE_TEAM_ID = "ARK85ZXQ4Z";
+
 const VARIANT_CONFIG = {
   development: {
     appName: "T3 Code Dev",
     scheme: "t3code-dev",
     iosBundleIdentifier: "com.t3tools.t3code.dev",
     androidPackage: "com.t3tools.t3code.dev",
+    appleTeamId: T3_APPLE_TEAM_ID,
     relyingParty: "clerk.t3.codes",
     assets: DEVELOPMENT_ASSETS,
   },
@@ -85,6 +105,7 @@ const VARIANT_CONFIG = {
     scheme: "t3code-preview",
     iosBundleIdentifier: "com.t3tools.t3code.preview",
     androidPackage: "com.t3tools.t3code.preview",
+    appleTeamId: T3_APPLE_TEAM_ID,
     relyingParty: "clerk.t3.codes",
     assets: PREVIEW_ASSETS,
   },
@@ -93,8 +114,18 @@ const VARIANT_CONFIG = {
     scheme: "t3code",
     iosBundleIdentifier: "com.t3tools.t3code",
     androidPackage: "com.t3tools.t3code",
+    appleTeamId: T3_APPLE_TEAM_ID,
     relyingParty: "clerk.t3.codes",
     assets: RELEASE_ASSETS,
+  },
+  infinitus: {
+    appName: "Infinitus",
+    scheme: "t3code",
+    iosBundleIdentifier: "run.infinitus.mobile",
+    androidPackage: "run.infinitus.mobile",
+    appleTeamId: "Q783W6B4FA",
+    relyingParty: "clerk.t3.codes",
+    assets: INFINITUS_ASSETS,
   },
 } as const;
 
@@ -103,6 +134,7 @@ function resolveAppVariant(value: string | undefined): AppVariant {
     case "development":
     case "preview":
     case "production":
+    case "infinitus":
       return value;
     default:
       return "production";
@@ -198,10 +230,10 @@ const config: ExpoConfig = {
     // showcase capture build requires full screen (see infoPlist below).
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
-    // Pin code signing to the T3 Tools team so non-interactive `expo run:ios`
+    // Pin code signing to the variant's team so non-interactive `expo run:ios`
     // does not fall back to a personal team (which cannot sign app groups,
     // Sign in with Apple, or push notification entitlements).
-    appleTeamId: "ARK85ZXQ4Z",
+    appleTeamId: variant.appleTeamId,
     associatedDomains: [
       `applinks:${variant.relyingParty}`,
       `webcredentials:${variant.relyingParty}`,
