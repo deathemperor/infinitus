@@ -116,6 +116,47 @@ final class T3TerminalTests: XCTestCase {
         XCTAssertEqual(T3Terminal.OpenRequest(cols: 80, rows: 201).validate(), .rowsOutOfRange)
     }
 
+    /// The field several-terminals-per-thread added (`terminal.ts:33-37`) is
+    /// OPTIONAL on this wire: the body the phone's #513 build sends must keep
+    /// decoding, and it must still mean the first shell.
+    func testOpenRequestWithoutATerminalIdStillDecodesAsTheFirstShell() throws {
+        let body = Data(#"{"cols":80,"rows":24}"#.utf8)
+        let request = try JSONDecoder().decode(T3Terminal.OpenRequest.self, from: body)
+        XCTAssertEqual(request, T3Terminal.OpenRequest(cols: 80, rows: 24))
+        XCTAssertNil(request.terminalId)
+        XCTAssertEqual(request.resolvedTerminalId, T3Terminal.defaultTerminalId)
+        XCTAssertNil(request.validate())
+    }
+
+    func testOpenRequestTerminalIdRoundTrips() throws {
+        let body = Data(#"{"cols":80,"rows":24,"terminalId":"term-2"}"#.utf8)
+        let request = try JSONDecoder().decode(T3Terminal.OpenRequest.self, from: body)
+        XCTAssertEqual(request.terminalId, "term-2")
+        XCTAssertEqual(request.resolvedTerminalId, "term-2")
+        let reencoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any]
+        XCTAssertEqual(reencoded?["terminalId"] as? String, "term-2")
+        XCTAssertEqual(reencoded?["cols"] as? Int, 80)
+        XCTAssertEqual(try JSONDecoder().decode(T3Terminal.OpenRequest.self,
+                                                from: JSONEncoder().encode(request)), request)
+    }
+
+    /// `TerminalIdSchema` (`terminal.ts:19`): trimmed non-empty, ≤ 128. An
+    /// empty id would key a terminal no route could address.
+    func testOpenRequestRefusesABlankOrOversizedTerminalId() {
+        XCTAssertEqual(T3Terminal.OpenRequest(cols: 80, rows: 24, terminalId: "").validate(),
+                       .terminalIdInvalid)
+        XCTAssertEqual(T3Terminal.OpenRequest(cols: 80, rows: 24, terminalId: "   ").validate(),
+                       .terminalIdInvalid)
+        let long = String(repeating: "t", count: T3Terminal.maxTerminalIdLength + 1)
+        XCTAssertEqual(T3Terminal.OpenRequest(cols: 80, rows: 24, terminalId: long).validate(),
+                       .terminalIdInvalid)
+        let atCap = String(repeating: "t", count: T3Terminal.maxTerminalIdLength)
+        XCTAssertNil(T3Terminal.OpenRequest(cols: 80, rows: 24, terminalId: atCap).validate())
+        // Cols/rows are still checked with an id present.
+        XCTAssertEqual(T3Terminal.OpenRequest(cols: 0, rows: 24, terminalId: "term-2").validate(),
+                       .colsOutOfRange)
+    }
+
     func testResizeRequestSameCaps() {
         XCTAssertNil(T3Terminal.ResizeRequest(cols: 500, rows: 200).validate())
         XCTAssertEqual(T3Terminal.ResizeRequest(cols: 501, rows: 200).validate(), .colsOutOfRange)

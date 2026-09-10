@@ -1,11 +1,13 @@
 import Foundation
 
 /// The pure half of a terminal SURFACE — what an emulator view has to decide
-/// once it is holding Core's `T3Terminal` frames (#507). Two rules, both
-/// upstream's, both testable without a pty, an emulator or a window:
+/// once it is holding Core's `T3Terminal` frames (#507). All of it upstream's,
+/// all of it testable without a pty, an emulator or a window:
 ///
 /// - the tab's title, `getTerminalLabel` (`@t3tools/shared/terminalLabels`,
 ///   `packages/shared/src/terminalLabels.ts:4-11` at 6c583620f);
+/// - which id a new terminal takes and which one the strip selects after a
+///   close (`terminalLabels.ts:32-40`, `terminalUiStateStore.ts:409-429`);
 /// - the reset/append decision and the `since` byte offset a re-attach
 ///   resumes from — the bookkeeping that keeps a tab switch from either
 ///   wiping the screen or leaving a gap in it (#507 review ruling 1).
@@ -27,6 +29,31 @@ public enum T3TerminalSurface: Sendable {
         guard !digits.isEmpty, digits.allSatisfy(\.isASCII), digits.allSatisfy(\.isNumber)
         else { return terminalId }
         return "Terminal \(digits)"
+    }
+
+    /// `nextTerminalId` (`terminalLabels.ts:32-40`): the lowest unused
+    /// `term-N` starting at 1, skipping every id already in use. Ids are
+    /// ALWAYS the client's choice — the host never allocates one
+    /// (`terminalLabels.ts:26-31`), so "+" asks this over the ids the host
+    /// currently holds for the pid, phone-opened ones included.
+    public static func nextTerminalId(_ existing: some Sequence<String>) -> String {
+        let used = Set(existing.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        var index = 1
+        while used.contains("term-\(index)") { index += 1 }
+        return "term-\(index)"
+    }
+
+    /// Which terminal the strip selects once `closing` is gone
+    /// (`closeThreadTerminal`, `apps/web/src/terminalUiStateStore.ts:409-429`):
+    /// the one that took the closed slot, clamped to the last remaining, and
+    /// only when the closed one was the active one. `nil` = nothing left,
+    /// which is upstream's default (empty) state.
+    public static func activeAfterClose(ids: [String], closing: String, active: String) -> String? {
+        guard let closedIndex = ids.firstIndex(of: closing) else { return active }
+        let remaining = ids.filter { $0 != closing }
+        guard !remaining.isEmpty else { return nil }
+        guard active == closing else { return active }
+        return remaining[min(closedIndex, remaining.count - 1)]
     }
 
     /// What the view does with one frame's text.

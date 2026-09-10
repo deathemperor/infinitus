@@ -9,14 +9,62 @@ import InfinitusUI
 /// `:1425-1431`: full height, `bg-background`, no drag handle, the action
 /// cluster floating `absolute right-2 top-2` over the emulator). The tab
 /// itself is `RightPanelTabs.tsx:323-332` — label "Terminal", "Start a shell
-/// in this workspace.", shortcut T, `TerminalSquare`.
+/// in this workspace.", shortcut T, `TerminalSquare`; its TITLE follows the
+/// active terminal's label (`RightPanelTabs.tsx:598-602`).
 ///
 /// The shell is the Mac's own `TerminalHost` (#507 step 3), reached in-process:
-/// no HTTP hop, no mirror, the same host and the same terminal id the phone
-/// attaches to (`T3Terminal.defaultTerminalId`), so a session's terminal is ONE
-/// shell shared by both ends — upstream's per-thread semantics, for free.
-/// The emulator is SwiftTerm on both ends too (#507: "SwiftTerm both ends"),
-/// wearing the same palette the phone's screen installs.
+/// no HTTP hop, no mirror, the same host and the same terminal ids the phone
+/// attaches to, so a session's terminals are shells BOTH ends share —
+/// upstream's per-thread semantics, for free. The emulator is SwiftTerm on both
+/// ends too (#507: "SwiftTerm both ends"), wearing the same palette the phone's
+/// screen installs.
+///
+/// **Several terminals per thread.** A thread holds up to
+/// `T3Terminal.maxTerminalsPerSession` shells: "+" opens the next free
+/// `term-N` (`nextTerminalId`, `terminalLabels.ts:32-40`) and the picker
+/// upstream draws as a 144 pt sidebar (`hasTerminalSidebar`, `:1586-1709`,
+/// shown only from the second terminal on, `:1228`) switches and closes them.
+/// With one terminal the controls float over the emulator instead
+/// (`:1442-1486`, `!hasTerminalSidebar`).
+///
+/// **What upstream does on a switch — and what this does.** Upstream keeps the
+/// SESSION alive server-side and remounts the client: outside a split group
+/// exactly ONE `TerminalViewport` is mounted, keyed by the active id
+/// (`:1559-1561` `key={resolvedActiveTerminalId}`), and its unmount disposes
+/// the surface and drops the attach stream (`:890-894`, `:917-922`); only the
+/// terminals of one split group are mounted together, each gated by `visible`
+/// / `setVisible` (`:468-471`, `:1509-1555`). Ours mounts the active entry's
+/// `TerminalView` alone, exactly like that — but it does NOT drop the hidden
+/// terminals' ATTACHMENTS, because this host idle-closes an unattached
+/// terminal after 30 minutes (`TerminalHost.idleTimeout`, a thing upstream has
+/// no equivalent of: its only eviction is of already exited sessions,
+/// `Manager.ts:1957-1977`). Detaching on every switch would let a shell the
+/// strip still lists die under it. A hidden entry therefore keeps feeding its
+/// off-hierarchy `TerminalView`, which is parse-only work with no window to
+/// draw into — an idle shell emits nothing at all, so the tab with three
+/// terminals open idles where one did (#519/#526's number). Measured on a
+/// CHATTY hidden shell (`while :; do date; sleep 0.1; done`, ~10 lines/s):
+/// 1.7%/2.3% over two 15 s windows with it hidden against 7.1% with the same
+/// shell on screen — the ~4x gap is the repaint that a hidden entry does not
+/// do, and the remainder is the pty read plus the parse into its ring.
+///
+/// Not ported this round, each with its upstream line:
+/// - the drawer mode (`:989` `mode: "drawer" | "panel"`, the resize handle
+///   `:1402-1410` and `clampDrawerHeight` `:100-104`): the right panel is the
+///   only mount here.
+/// - the splits — the cluster's two split buttons (`:1444-1467`), the sidebar
+///   header's (`:1590-1611`), the split grid (`:1496-1556`), the group headers
+///   and their "Single"/"Stacked"/"Side by side" copy (`:1230-1232`,
+///   `:1651-1667`) and the per-group limit (`:1233`, `types.ts:30`'s
+///   `MAX_TERMINALS_PER_GROUP = 4`). Every terminal here is its own group of
+///   one, which is why no group header ever shows.
+/// - the selection actions (`observeSelectionActions`, `:1-53`) and "add
+///   selection to chat" (`onAddTerminalContext`): the composer here takes no
+///   terminal-context mention.
+/// - `advancedTypography` (`:1080-1084`) and the font-size preference — the
+///   kit's mono face at the code-block size is the one face.
+/// - link opening (`requestOpenLink`, `:789-800`) beyond handing the URL to
+///   the system opener, and the editor-preference resolution around it.
 ///
 /// **Availability — a stated deviation.** Upstream offers a terminal whenever
 /// a project is open, keyed by cwd. `TerminalHost` keys a terminal by the
@@ -27,47 +75,16 @@ import InfinitusUI
 /// tab shows the unavailable card with `RightPanelTabs.tsx:160`'s hint
 /// verbatim. A cwd-keyed open (a terminal on a project with no session running)
 /// is a later slice; it needs a second key in the host, not a change here.
-///
-/// Not ported this round, each with its upstream line — v1 is one terminal per
-/// thread, which is what the host holds (`TerminalHost.swift`'s "v1 is one
-/// terminal per session"):
-/// - the drawer mode (`:989` `mode: "drawer" | "panel"`, the resize handle
-///   `:1402-1410` and `clampDrawerHeight` `:100-104`): the right panel is the
-///   only mount here.
-/// - the split buttons (`:1444-1466`, `SquareSplitHorizontal` /
-///   `SquareSplitVertical`) and the split grid (`:1500-1552`).
-/// - "+" for a second terminal (`:1467-1473`, `nextTerminalId`
-///   `terminalLabels.ts:31-38`) and the terminal picker / tab sidebar
-///   (`hasTerminalSidebar`, `:1443`).
-/// - the selection actions (`observeSelectionActions`, `:1-53`) and "add
-///   selection to chat" (`onAddTerminalContext`): the composer here takes no
-///   terminal-context mention.
-/// - `advancedTypography` (`:1080-1084`) and the font-size preference — the
-///   kit's mono face at the code-block size is the one face.
-/// - link opening (`requestOpenLink`, `:789-800`) beyond handing the URL to
-///   the system opener, and the editor-preference resolution around it.
 struct T3TerminalPanel: View {
     @Environment(\.t3) private var t3
     @ObservedObject var model: T3WindowModel
 
-    /// The Diff tab's triple plus the live pid. A mirrored thread
-    /// (`id: "pid:…"`, `T3ThreadBridge.swift:54`) has no shell of ours to
-    /// open, and a thread whose session has ended has no pid to key one by.
-    private var target: T3TerminalTarget? {
-        guard let thread = model.state.selectedThread,
-              thread.environmentId == T3Thread.localEnvironmentId,
-              let cwd = model.state.projects.first(where: { $0.id == thread.projectId })?.cwd,
-              let pid = model.state.pid(of: thread.id)
-        else { return nil }
-        return T3TerminalTarget(cwd: cwd, pid: pid)
-    }
-
     var body: some View {
         Group {
-            if let target {
+            if let target = Self.target(in: model.state) {
                 // A new (cwd, pid) is a new surface, the way the Files tab
                 // keys on cwd (`ChatView.tsx:8078`). The registry behind it
-                // keeps the emulator alive across this, so a thread switched
+                // keeps the emulators alive across this, so a thread switched
                 // away from and back to still has its scrollback.
                 T3TerminalSurfaceView(model: model, target: target)
                     .id(target.key)
@@ -81,10 +98,25 @@ struct T3TerminalPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(t3.web.background.color)
     }
+
+    /// The Diff tab's triple plus the live pid. A mirrored thread
+    /// (`id: "pid:…"`, `T3ThreadBridge.swift:54`) has no shell of ours to
+    /// open, and a thread whose session has ended has no pid to key one by.
+    /// Static because the tab STRIP needs the same target to title itself with
+    /// the active terminal's label (`T3RightPanel`).
+    static func target(in state: T3WorkspaceState) -> T3TerminalTarget? {
+        guard let thread = state.selectedThread,
+              thread.environmentId == T3Thread.localEnvironmentId,
+              let cwd = state.projects.first(where: { $0.id == thread.projectId })?.cwd,
+              let pid = state.pid(of: thread.id)
+        else { return nil }
+        return T3TerminalTarget(cwd: cwd, pid: pid)
+    }
 }
 
-/// Which shell this tab is looking at. The pid is the CLAUDE session's, not the
-/// shell's — that is the host's key.
+/// Which session's terminals this tab is looking at. The pid is the CLAUDE
+/// session's, not a shell's — that is the host's key, and one pid holds
+/// several terminals.
 struct T3TerminalTarget: Hashable {
     let cwd: String
     let pid: Int32
@@ -128,76 +160,128 @@ private struct T3TerminalMessage: View {
 
 // MARK: - The surface
 
-/// The emulator over one target, plus the floating action cluster. The view is
-/// a shell around `T3TerminalEntry`: the entry (and with it the `TerminalView`,
-/// its scrollback and its attachment) lives on the window model, so switching
-/// to Files and back re-attaches instead of restarting
-/// (`ThreadTerminalDrawer.tsx` keeps its terminals mounted across tab
-/// switches; `visible` only stops it focusing them, `:1114`).
+/// The emulator over one target, plus the controls. The view is a shell around
+/// `T3TerminalGroup`: the group (and with it every `TerminalView`, its
+/// scrollback and its attachment) lives on the window model, so switching to
+/// Files and back re-attaches instead of restarting (`ThreadTerminalDrawer.tsx`
+/// keeps its terminals mounted across tab switches; `visible` only stops it
+/// focusing them, `:1114`).
 private struct T3TerminalSurfaceView: View {
     @ObservedObject var model: T3WindowModel
     let target: T3TerminalTarget
-    @State private var entry: T3TerminalEntry?
+    @State private var group: T3TerminalGroup?
 
     var body: some View {
         Group {
-            if let entry {
-                T3TerminalPane(entry: entry)
+            if let group {
+                T3TerminalGroupView(group: group)
             } else {
                 // `DiffPanelShell`'s skeleton stands in as everywhere else in
                 // this port. forkpty is a millisecond, so this only paints for
-                // the frame between appear and the entry — or, if the window
+                // the frame between appear and the group — or, if the window
                 // has already lost its `AppModel`, while the window closes.
                 T3Spinner(size: 16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onAppear {
-            let entry = model.terminals?.entry(for: target)
-            self.entry = entry
-            entry?.appear()
+            let group = model.terminals?.group(for: target)
+            self.group = group
+            group?.appear()
         }
-        .onDisappear { entry?.disappear() }
+        .onDisappear { group?.disappear() }
     }
 }
 
-/// The emulator and the floating action cluster over it.
+/// `:1488-1710`: the emulator on the left (`min-w-0 flex-1`), the terminal
+/// picker on the right when the thread holds more than one
+/// (`hasTerminalSidebar`, `:1228`), `gap-1.5` between them (`:1492`).
+private struct T3TerminalGroupView: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
+    /// The terminal a close is waiting on the user for — the trash and every
+    /// strip row go through the same confirm (`confirmCloseTerminal`,
+    /// `:1280-1288`).
+    @State private var confirming: String?
+
+    var body: some View {
+        HStack(spacing: group.showsStrip ? 6 : 0) {
+            if let entry = group.activeEntry {
+                // Keyed by the terminal, upstream's own switch
+                // (`:1561 key={resolvedActiveTerminalId}`): the pane remounts,
+                // which is what hands the keyboard to the terminal switched TO.
+                T3TerminalPane(group: group, entry: entry, confirming: $confirming)
+                    .id(entry.terminalId)
+            } else {
+                // Every terminal closed: the same skeleton the first open shows.
+                T3Spinner(size: 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if group.showsStrip {
+                T3TerminalStrip(group: group, confirming: $confirming)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(t3.web.terminalBackground.color)
+        .confirmationDialog("", isPresented: Binding(get: { confirming != nil },
+                                                     set: { if !$0 { confirming = nil } })) {
+            Button("Close Terminal", role: .destructive) {
+                if let id = confirming { group.close(id) }
+                confirming = nil
+            }
+            Button("Cancel", role: .cancel) { confirming = nil }
+        } message: {
+            // `terminalCloseConfirm.ts:24-27`, the single-terminal wording.
+            Text("Close terminal \"\(T3TerminalSurface.label(terminalId: confirming ?? ""))\"?\nThis stops the running process and clears its history.")
+        }
+    }
+}
+
+/// The active terminal's emulator, and — with only one terminal open — the
+/// floating action cluster over it (`:1442-1486`).
 private struct T3TerminalPane: View {
     @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
     @ObservedObject var entry: T3TerminalEntry
-    @State private var confirmingClose = false
+    @Binding var confirming: String?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             T3TerminalEmulator(entry: entry)
-            // `:1443-1487` — the cluster is only the trash this round.
-            actions
-                .padding(.top, 8)
-                .padding(.trailing, 8)
+            if !group.showsStrip {
+                actions
+                    .padding(.top, 8)
+                    .padding(.trailing, 8)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(t3.web.terminalBackground.color)
         .onAppear {
             // `autoFocus` (`:1114`, `terminal.focus()` at `:545-547`): the tab
-            // is useless until the emulator has the keyboard.
+            // — and, after a switch, the terminal switched TO — is useless
+            // until its emulator has the keyboard.
             DispatchQueue.main.async { entry.view.window?.makeFirstResponder(entry.view) }
-        }
-        .confirmationDialog("", isPresented: $confirmingClose) {
-            Button("Close Terminal", role: .destructive) { entry.closeShell() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            // `terminalCloseConfirm.ts:24-27`, the single-terminal wording.
-            Text("Close terminal \"\(T3TerminalSurface.label(terminalId: entry.terminalId))\"?\nThis stops the running process and clears its history.")
         }
     }
 
-    /// `:1443-1487`: an `inline-flex` of icon buttons in a rounded bordered box
-    /// over the emulator's top-right corner. Ours holds the one control v1 has
-    /// a meaning for — `Trash2`, "Close Terminal" (`:1266-1269`), confirmed
-    /// first like upstream's.
+    /// `:1443-1486`: an `inline-flex` of icon buttons in a rounded bordered box
+    /// over the emulator's top-right corner. Ours holds the two controls that
+    /// have a meaning without splits — `Plus`, "New Terminal" (`:1263-1265`),
+    /// and `Trash2`, "Close Terminal" (`:1266-1268`), the close confirmed first
+    /// like upstream's.
     private var actions: some View {
-        T3FilesIconButton(help: "Close Terminal") { confirmingClose = true } content: {
-            LucideIcon(.trash2, size: 13)
+        HStack(spacing: 0) {
+            T3FilesIconButton(help: group.newTerminalHelp) { group.newTerminal() } content: {
+                LucideIcon(.plus, size: 13)
+            }
+            .opacity(group.canOpenMore ? 1 : 0.45)
+            .allowsHitTesting(group.canOpenMore)
+            Rectangle()
+                .fill(t3.web.border.color.opacity(0.8))
+                .frame(width: 1, height: 16)
+            T3FilesIconButton(help: "Close Terminal") { confirming = entry.terminalId } content: {
+                LucideIcon(.trash2, size: 13)
+            }
         }
         .background(t3.web.background.color, in: RoundedRectangle(cornerRadius: 8))
         .overlay(
@@ -209,8 +293,150 @@ private struct T3TerminalPane: View {
     }
 }
 
+/// The terminal picker (`:1586-1709`): `w-36 min-w-36 flex-col border
+/// border-border/70 bg-muted/10`, a 22 pt header of right-aligned action
+/// buttons over one row per terminal. No group headers — `showGroupHeaders`
+/// (`:1230-1232`) is false while every group holds one terminal, which is
+/// always, splits being unported.
+private struct T3TerminalStrip: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
+    @Binding var confirming: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            // "min-h-0 flex-1 overflow-y-auto px-1 py-1" + "flex flex-col gap-0.5"
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(group.terminalIds, id: \.self) { id in
+                        T3TerminalStripRow(group: group, terminalId: id, confirming: $confirming)
+                    }
+                }
+                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(width: 144)
+        .background(t3.web.muted.color.opacity(0.1))
+        .overlay(Rectangle().stroke(t3.web.border.color.opacity(0.7), lineWidth: 1))
+    }
+
+    /// `:1588-1627`: "flex h-[22px] items-stretch justify-end border-b
+    /// border-border/70", each button "inline-flex h-full items-center px-1"
+    /// with a `border-l` between them.
+    private var header: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            T3TerminalStripButton(help: group.newTerminalHelp, enabled: group.canOpenMore,
+                                  leadingBorder: false) {
+                group.newTerminal()
+            } content: {
+                LucideIcon(.plus, size: 13)
+            }
+            T3TerminalStripButton(help: "Close Terminal", enabled: true, leadingBorder: true) {
+                confirming = group.activeId
+            } content: {
+                LucideIcon(.trash2, size: 13)
+            }
+        }
+        .frame(height: 22)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(t3.web.border.color.opacity(0.7)).frame(height: 1)
+        }
+    }
+}
+
+/// One header button: full height, `px-1`, `hover:bg-accent/70`, and the
+/// `border-l border-border/70` that separates it from the one before
+/// (`:1601-1611`). Disabled wears upstream's `opacity-45` and no hover
+/// (`:1592-1595`).
+private struct T3TerminalStripButton<Content: View>: View {
+    @Environment(\.t3) private var t3
+    @State private var hover = false
+    let help: String
+    let enabled: Bool
+    let leadingBorder: Bool
+    let action: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Button(action: action) {
+            content
+                .foregroundStyle(t3.web.foreground.color.opacity(0.9))
+                .padding(.horizontal, 4)
+                .frame(maxHeight: .infinity)
+                .background(hover && enabled ? t3.web.accent.color.opacity(0.7) : .clear)
+                .overlay(alignment: .leading) {
+                    if leadingBorder {
+                        Rectangle().fill(t3.web.border.color.opacity(0.7)).frame(width: 1)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(enabled ? 1 : 0.45)
+        .allowsHitTesting(enabled)
+        .onHover { hover = $0 }
+        .help(help)
+    }
+}
+
+/// One terminal in the picker (`:1676-1700`): "group/tab flex h-6 w-full
+/// items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs", active `bg-accent
+/// text-foreground`, inactive `text-muted-foreground hover:bg-accent/60
+/// hover:text-foreground`. The leading glyph IS the close button
+/// (`PanelTabCloseButton`, `panel-tab-close-button.tsx:19-31`): a `size-4`
+/// button whose `size-3` icon becomes an `X` while the row is hovered.
+private struct T3TerminalStripRow: View {
+    @Environment(\.t3) private var t3
+    @ObservedObject var group: T3TerminalGroup
+    let terminalId: String
+    @Binding var confirming: String?
+    @State private var hover = false
+
+    private var isActive: Bool { group.activeId == terminalId }
+    private var label: String { T3TerminalSurface.label(terminalId: terminalId) }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button { confirming = terminalId } label: {
+                // `TerminalSquare` has no vendored glyph in this kit (only
+                // lucide's bare `terminal`), so that one stands in for it.
+                LucideIcon(hover ? .x : .terminal, size: 12)
+                    .frame(width: 16, height: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Close \(label)")
+            Button { group.activate(terminalId) } label: {
+                Text(label)
+                    .font(T3Font.web(.xs))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundStyle(isActive || hover ? t3.web.foreground.color : t3.web.mutedForeground.color)
+        .padding(.leading, 6)
+        .padding(.trailing, 8)
+        .frame(height: 24)
+        .background(rowBackground, in: RoundedRectangle(cornerRadius: 8))
+        .onHover { hover = $0 }
+    }
+
+    private var rowBackground: SwiftUI.Color {
+        if isActive { return t3.web.accent.color }
+        return hover ? t3.web.accent.color.opacity(0.6) : .clear
+    }
+}
+
 /// SwiftTerm's view, handed straight through. Nothing is created here — the
-/// entry owns the view, which is what survives a tab switch.
+/// entry owns the view, which is what survives a tab switch and a switch to
+/// another terminal.
 private struct T3TerminalEmulator: NSViewRepresentable {
     @Environment(\.t3) private var t3
     let entry: T3TerminalEntry
@@ -223,9 +449,136 @@ private struct T3TerminalEmulator: NSViewRepresentable {
     }
 }
 
+// MARK: - The group: one session's terminals, its strip and its active one
+
+/// Every terminal one (cwd, pid) holds: the ordered ids the strip lists, which
+/// one is active, and one `T3TerminalEntry` each. Upstream's per-thread
+/// terminal UI state, minus the split groups
+/// (`apps/web/src/terminalUiStateStore.ts`).
+///
+/// The id list is SEEDED from the host on every appear (`listTerminals`), so a
+/// terminal the phone opened shows up here too; "+" then takes the lowest free
+/// id over that same list. An entry whose shell ends leaves the strip the way
+/// upstream's does (`onSessionExited → onCloseTerminal`, `:1543`/`:1573`),
+/// except for the last one — which stays on its exited screen, so the tab
+/// keeps the state it has always shown when a shell dies.
+@MainActor
+final class T3TerminalGroup: ObservableObject {
+    let target: T3TerminalTarget
+    /// Insertion order, which is what the strip shows (`:1200-1207` sorts
+    /// groups by it); the seed from the host is in `term-N` order.
+    @Published private(set) var terminalIds: [String] = []
+    @Published private(set) var activeId: String = T3Terminal.defaultTerminalId
+
+    private let host: TerminalHost
+    private var entries: [String: T3TerminalEntry] = [:]
+    /// The surface is on screen: `appear` attaches every terminal, `disappear`
+    /// detaches them all (the shells keep running).
+    private var visible = false
+
+    init(target: T3TerminalTarget, host: TerminalHost) {
+        self.target = target
+        self.host = host
+    }
+
+    /// `hasTerminalSidebar` (`:1228`): the picker appears with the second
+    /// terminal, and the floating cluster gives way to it (`:1442`).
+    var showsStrip: Bool { terminalIds.count > 1 }
+
+    var activeEntry: T3TerminalEntry? { entries[activeId] }
+
+    /// The tab's own title (`RightPanelTabs.tsx:598-602`).
+    var activeLabel: String { T3TerminalSurface.label(terminalId: activeId) }
+
+    var canOpenMore: Bool { terminalIds.count < T3Terminal.maxTerminalsPerSession }
+
+    /// `newTerminalActionLabel` (`:1263-1265`); at the cap it names the cap the
+    /// way upstream's split label does (`:1253-1254`).
+    var newTerminalHelp: String {
+        canOpenMore ? "New Terminal"
+                    : "New Terminal (max \(T3Terminal.maxTerminalsPerSession) per session)"
+    }
+
+    // MARK: Lifecycle
+
+    func appear() {
+        visible = true
+        // Whatever the host holds for this pid, plus whatever this group
+        // already listed (an entry mid-open is not on the host's map yet).
+        let held = host.listTerminals(pid: target.pid).map(\.terminalId)
+        var ids = held
+        for id in terminalIds where !ids.contains(id) { ids.append(id) }
+        if ids.isEmpty { ids = [T3Terminal.defaultTerminalId] }
+        terminalIds = ids
+        if !ids.contains(activeId) { activeId = ids[0] }
+        // Every terminal stays attached, not just the visible one: an
+        // unattached terminal starts this host's 30-minute idle clock, and a
+        // shell the strip lists must not die because it was not on screen.
+        for id in ids { entry(for: id).appear() }
+    }
+
+    func disappear() {
+        visible = false
+        for entry in entries.values { entry.disappear() }
+    }
+
+    func activate(_ id: String) {
+        guard terminalIds.contains(id) else { return }
+        activeId = id
+    }
+
+    /// "+" (`onNewTerminalAction`, `:1277-1279`): the lowest free `term-N` over
+    /// the ids the HOST holds (the phone's included) and the ones this strip
+    /// lists, opened and focused.
+    func newTerminal() {
+        guard canOpenMore else { return }
+        let held = host.listTerminals(pid: target.pid).map(\.terminalId)
+        let id = T3TerminalSurface.nextTerminalId(held + terminalIds)
+        guard !terminalIds.contains(id) else { return }
+        terminalIds.append(id)
+        activeId = id
+        entry(for: id).appear()
+    }
+
+    /// The trash and every row's X, once confirmed. The entry leaves the strip
+    /// when its shell reports `exited`/`closed`, not here — a close that the
+    /// host refuses must not make the strip lie.
+    func close(_ id: String) {
+        entries[id]?.closeShell()
+    }
+
+    private func entry(for id: String) -> T3TerminalEntry {
+        if let existing = entries[id] { return existing }
+        let entry = T3TerminalEntry(target: target, terminalId: id, host: host) { [weak self] id, message in
+            self?.entryFinished(id, message: message)
+        }
+        entries[id] = entry
+        return entry
+    }
+
+    /// A shell ended (or failed to start). Upstream drops the terminal from the
+    /// list (`onSessionExited → onCloseTerminal(terminalId)`, `:1543`/`:1573`)
+    /// and selects whoever took its slot (`terminalUiStateStore.ts:409-429`).
+    /// The last one is the exception: it keeps its exited screen, and the next
+    /// appear starts a fresh shell in it.
+    private func entryFinished(_ id: String, message: String?) {
+        guard terminalIds.count > 1, terminalIds.contains(id) else { return }
+        let next = T3TerminalSurface.activeAfterClose(ids: terminalIds, closing: id, active: activeId)
+        terminalIds.removeAll { $0 == id }
+        entries[id]?.disappear()
+        entries[id] = nil
+        if let next { activeId = next }
+        // An open that FAILED (the host is full, or the shell would not start)
+        // takes its row with it — but never silently: the sentence lands on the
+        // terminal the strip falls back to.
+        if let message, let entry = activeEntry { entry.note(message) }
+        if visible, let entry = activeEntry { entry.appear() }
+    }
+}
+
 // MARK: - The entry: one shell, one emulator, one attachment
 
-/// Everything about one target that must outlive the SwiftUI view: the
+/// Everything about one terminal that must outlive the SwiftUI view: the
 /// `TerminalView` (and with it the scrollback), the host attachment, and the
 /// `since` offset a re-attach resumes from (`T3TerminalSurface.Attachment`).
 ///
@@ -241,7 +594,7 @@ private struct T3TerminalEmulator: NSViewRepresentable {
 @MainActor
 final class T3TerminalEntry: ObservableObject {
     let target: T3TerminalTarget
-    let terminalId = T3Terminal.defaultTerminalId
+    let terminalId: String
     let view: TerminalView
     /// The shell is gone (`exited`/`closed`): the actions hide and the next
     /// appear starts a new one.
@@ -249,6 +602,9 @@ final class T3TerminalEntry: ObservableObject {
 
     private let host: TerminalHost
     private let io = DispatchQueue(label: "run.infinitus.terminal-tab")
+    /// The group's hook: this terminal's shell ended, with the sentence to say
+    /// out loud if it never started at all.
+    private let onFinish: (String, String?) -> Void
     private var attachment: T3TerminalSurface.Attachment = .init()
     private var handle: TerminalHost.Attachment?
     /// The tab is on screen. An `open`/`attach` still in flight when the tab
@@ -260,9 +616,12 @@ final class T3TerminalEntry: ObservableObject {
     private var lastSize: (cols: Int, rows: Int)?
     private var delegate: T3TerminalDelegate?
 
-    init(target: T3TerminalTarget, host: TerminalHost) {
+    init(target: T3TerminalTarget, terminalId: String, host: TerminalHost,
+         onFinish: @escaping (String, String?) -> Void) {
         self.target = target
+        self.terminalId = terminalId
         self.host = host
+        self.onFinish = onFinish
         // `cursorStyle: .steadyBlock` — SwiftTerm's default `.blinkBlock` runs
         // a `repeatCount: .infinity` opacity CABasicAnimation on the caret
         // layer (`MacCaretView.swift:92-105`), i.e. a timer in an idle tab
@@ -306,7 +665,8 @@ final class T3TerminalEntry: ObservableObject {
         let since = attachment.sequence
         Task.detached(priority: .userInitiated) { [weak self] in
             let outcome = host.open(pid: target.pid, cwd: target.cwd,
-                                    request: T3Terminal.OpenRequest(cols: size.cols, rows: size.rows))
+                                    request: T3Terminal.OpenRequest(cols: size.cols, rows: size.rows,
+                                                                    terminalId: id))
             if case .failure(let error) = outcome {
                 await MainActor.run { self?.openFailed(error) }
                 return
@@ -343,7 +703,7 @@ final class T3TerminalEntry: ObservableObject {
         guard let handle else {
             // The terminal went away between open and attach (a close that
             // raced us): nothing is running, so let the next appear re-open.
-            finished = true
+            markFinished(message: nil)
             return
         }
         guard wanted else {
@@ -358,24 +718,39 @@ final class T3TerminalEntry: ObservableObject {
     }
 
     /// The open failed: the sentence goes on the screen and there is no shell,
-    /// so the next appear tries again.
+    /// so the next appear tries again. With other terminals open the group
+    /// takes this row away and says the sentence in the one it falls back to.
     private func openFailed(_ error: TerminalHost.HostError) {
         opening = false
-        note(Self.sentence(error))
-        finished = true
+        let sentence = Self.sentence(error)
+        note(sentence)
+        markFinished(message: sentence)
     }
 
     /// A write that could not land — the pty's reader has stopped. Said out
     /// loud (never swallowed) but not fatal: the shell is still there.
-    private func note(_ message: String) {
+    func note(_ message: String) {
         view.feed(text: T3TerminalSurface.systemMessage(message))
     }
 
     private static func sentence(_ error: TerminalHost.HostError) -> String {
         switch error {
         case .spawnFailed(let reason): return reason
-        case .validation: return "the terminal size was refused"
+        case .validation(.tooManyTerminals):
+            return "this session already has \(T3Terminal.maxTerminalsPerSession) terminals"
+        case .validation(.terminalIdInvalid): return "the terminal id was refused"
+        case .validation(.colsOutOfRange), .validation(.rowsOutOfRange):
+            return "the terminal size was refused"
+        case .validation(.dataTooLarge): return "the input was too large"
         }
+    }
+
+    /// One exit per shell, and the group told once (`hasHandledExitRef`,
+    /// `:299-306`).
+    private func markFinished(message: String?) {
+        guard !finished else { return }
+        finished = true
+        onFinish(terminalId, message)
     }
 
     // MARK: Frames
@@ -397,13 +772,13 @@ final class T3TerminalEntry: ObservableObject {
             switch frame {
             case .exited:
                 if !finished {
-                    finished = true
                     note(T3TerminalSurface.exitedMessage)
+                    markFinished(message: nil)
                 }
             case .closed:
                 if !finished {
-                    finished = true
                     note(T3TerminalSurface.closedMessage)
+                    markFinished(message: nil)
                 }
                 // `finish()` dropped every attachment on its way out.
                 handle = nil
@@ -416,13 +791,13 @@ final class T3TerminalEntry: ObservableObject {
                 switch payload.status {
                 case .exited:
                     if !finished {
-                        finished = true
                         note(T3TerminalSurface.exitedMessage)
+                        markFinished(message: nil)
                     }
                 case .error:
                     if !finished {
-                        finished = true
                         note("the shell failed to start")
+                        markFinished(message: nil)
                     }
                 case .starting, .running:
                     break
@@ -554,30 +929,36 @@ private final class T3TerminalDelegate: NSObject, TerminalViewDelegate {
     }
 }
 
-/// The window's live terminals, one entry per (cwd, pid). On the window model
-/// so a tab switch, a thread switch and back, or a re-identified surface all
-/// find the same emulator and the same `since`.
+/// The window's live terminals, one group per (cwd, pid) and one emulator per
+/// terminal inside it. On the window model so a tab switch, a thread switch and
+/// back, or a re-identified surface all find the same emulators, the same strip
+/// and the same `since`.
 @MainActor
 final class T3TerminalRegistry {
     private weak var app: AppModel?
-    private var entries: [T3TerminalTarget: T3TerminalEntry] = [:]
+    private var groups: [T3TerminalTarget: T3TerminalGroup] = [:]
 
     init(app: AppModel?) { self.app = app }
 
     /// `nil` only once the window has outlived its `AppModel` — there is no
     /// host to open a shell on then, and nothing to show but the skeleton.
-    func entry(for target: T3TerminalTarget) -> T3TerminalEntry? {
-        if let existing = entries[target] { return existing }
+    func group(for target: T3TerminalTarget) -> T3TerminalGroup? {
+        if let existing = groups[target] { return existing }
         guard let app else { return nil }
-        let entry = T3TerminalEntry(target: target, host: app.terminalHost)
-        entries[target] = entry
-        return entry
+        let group = T3TerminalGroup(target: target, host: app.terminalHost)
+        groups[target] = group
+        return group
     }
 
-    /// The window closed (`T3WindowModel.stop`): detach every entry, never
+    /// The group this target already has, if any — the tab STRIP titles itself
+    /// from it (`RightPanelTabs.tsx:598-602`) and must never bring one into
+    /// existence just by drawing a title.
+    func existingGroup(for target: T3TerminalTarget) -> T3TerminalGroup? { groups[target] }
+
+    /// The window closed (`T3WindowModel.stop`): detach every terminal, never
     /// close — the shells outlive the window, exactly as they outlive a tab
     /// switch, and `AppModel.terminalHost.closeAll()` is what ends them.
     func detachAll() {
-        for entry in entries.values { entry.disappear() }
+        for group in groups.values { group.disappear() }
     }
 }

@@ -12,11 +12,16 @@ import InfinitusCore
 /// are all portable. Nothing here touches the main actor — output fan-out
 /// runs on `queue`, and a route's own dispatch is where the reply is framed.
 ///
-/// v1 is one terminal per session (`T3Terminal.defaultTerminalId`), so the
-/// map is keyed by session pid + terminal id and `open` on an already open
-/// terminal is an attach, the way upstream's `TerminalManager.open` reuses a
-/// session (`apps/server/src/terminal/Manager.ts:152`, `openOrAttachForStream`
-/// resizing the live PTY when the caller asks for a different size).
+/// One pid holds SEVERAL terminals, upstream's per-thread model: the map is
+/// keyed by session pid + terminal id, the id comes from the caller (the
+/// client always chooses it, `terminalLabels.ts:26-31`), and `open` on an
+/// already open terminal is an attach, the way upstream's
+/// `TerminalManager.open` reuses a session (`apps/server/src/terminal/Manager.ts:152`,
+/// `openOrAttachForStream` resizing the live PTY when the caller asks for a
+/// different size). Every terminal owns its own pty, read source, ring and fd
+/// queue, so one shell that stops reading its input cannot stall another's
+/// keystrokes. `T3Terminal.maxTerminalsPerSession` bounds how many a pid may
+/// hold — over it `open` refuses instead of forking.
 ///
 /// Timers: a terminal arms one 30-minute idle timer while nothing is
 /// attached, and one 2-second timer between `SIGHUP` and `SIGKILL` while it
@@ -78,9 +83,9 @@ final class TerminalHost: @unchecked Sendable {
         let id: String
     }
 
-    /// The master fd, mutated only on `fdQueue`: every syscall that takes
-    /// it (write, resize, close) runs there, so a closed fd number can
-    /// never be reused under a caller mid-write.
+    /// The master fd, mutated only on the terminal's own `fdQueue`: every syscall
+    /// that takes it (write, resize, close) runs there, so a closed fd number
+    /// can never be reused under a caller mid-write.
     private final class FdBox: @unchecked Sendable {
         var fd: Int32
         init(_ fd: Int32) { self.fd = fd }
@@ -109,10 +114,15 @@ final class TerminalHost: @unchecked Sendable {
         /// `exited` + `closed` have gone out; the terminal is off the map.
         var finished = false
         var readBuffer = [UInt8](repeating: 0, count: TerminalHost.readChunk)
+        /// Writes and resizes for THIS terminal: a write waits up to
+        /// `writeDeadline` on a shell that has stopped reading, so a queue
+        /// shared with the pid's other terminals would stall their typing.
+        let fdQueue: DispatchQueue
 
         init(sessionPid: Int32, id: String, cwd: String, child: pid_t, fd: Int32, cols: Int, rows: Int) {
             self.sessionPid = sessionPid
             self.id = id
+            self.fdQueue = DispatchQueue(label: "run.infinitus.terminal-fd.\(sessionPid).\(id)")
             self.cwd = cwd
             self.child = child
             self.fd = FdBox(fd)
@@ -126,27 +136,33 @@ final class TerminalHost: @unchecked Sendable {
     }
 
     private let queue = DispatchQueue(label: "run.infinitus.terminal")
-    /// Writes and resizes: a pty's input buffer is a few KB, so a 64 KB
-    /// paste has to wait for the shell to drain it — never on `queue`,
-    /// which output fan-out needs (#507 review ruling 4: a write must not
-    /// wait on the stream).
-    private let fdQueue = DispatchQueue(label: "run.infinitus.terminal-fd")
+    /// The one fd a losing concurrent `open` has to close (`killOrphan`) —
+    /// no `Terminal` owns it, so it cannot use a per-terminal queue. Every
+    /// live terminal's writes and resizes go through its OWN `fdQueue`.
+    private let orphanQueue = DispatchQueue(label: "run.infinitus.terminal-orphan")
     private var terminals: [Key: Terminal] = [:]
 
     // MARK: - Open
 
-    /// Opens (or re-attaches to) the session's terminal. `cwd` is the
-    /// session's own working directory — the caller resolves it, an unknown
-    /// pid never reaches here.
+    /// Opens (or re-attaches to) one of the session's terminals — the request
+    /// names which (`resolvedTerminalId`; absent means the first shell). `cwd`
+    /// is the session's own working directory — the caller resolves it, an
+    /// unknown pid never reaches here.
     func open(pid: Int32, cwd: String, request: T3Terminal.OpenRequest) -> Result<OpenOutcome, HostError> {
         if let invalid = request.validate() { return .failure(.validation(invalid)) }
-        let key = Key(pid: pid, id: T3Terminal.defaultTerminalId)
+        let key = Key(pid: pid, id: request.resolvedTerminalId)
         if let existing: Terminal = queue.sync(execute: { terminals[key] }) {
             // Upstream reuses the session and resizes it to what the new
-            // caller asked for; the reply is the running terminal's.
+            // caller asked for; the reply is the running terminal's. An
+            // already open terminal is an attach whatever the cap says.
             _ = resize(pid: pid, id: existing.id,
                        T3Terminal.ResizeRequest(cols: request.cols, rows: request.rows))
             return .success(OpenOutcome(reply: queue.sync { existing.reply }, created: false))
+        }
+        // The cheap refusal: a full pid never reaches forkpty at all. The
+        // authoritative one is inside the insert below.
+        if let refusal = queue.sync(execute: { capRefusal(pid: pid, id: key.id) }) {
+            return .failure(refusal)
         }
         let spawned: (master: Int32, child: pid_t)
         do {
@@ -156,33 +172,73 @@ final class TerminalHost: @unchecked Sendable {
         } catch {
             return .failure(.spawnFailed("\(error)"))
         }
-        return .success(queue.sync {
+        return queue.sync { () -> Result<OpenOutcome, HostError> in
             // A concurrent open for the same pid can win the race between
-            // the check above and here — both saw no entry and both
+            // the checks above and here — both saw no entry and both
             // spawned (#507 follow-up). The insert is the single point of
             // truth: whoever gets here first with `terminals[key] == nil`
-            // owns the pid, and a later loser kills the shell it just
+            // owns the id, and a later loser kills the shell it just
             // forked instead of orphaning it.
             if let existing = terminals[key] {
                 killOrphan(master: spawned.master, child: spawned.child)
-                return OpenOutcome(reply: existing.reply, created: false)
+                return .success(OpenOutcome(reply: existing.reply, created: false))
+            }
+            // Same race for the cap: eight concurrent opens of eight new ids
+            // all cleared the pre-check, so the count that decides is this one.
+            if let refusal = capRefusal(pid: pid, id: key.id) {
+                killOrphan(master: spawned.master, child: spawned.child)
+                return .failure(refusal)
             }
             let terminal = Terminal(sessionPid: pid, id: key.id, cwd: cwd, child: spawned.child,
                                     fd: spawned.master, cols: request.cols, rows: request.rows)
             terminals[key] = terminal
             let source = DispatchSource.makeReadSource(fileDescriptor: spawned.master, queue: queue)
             source.setEventHandler { [weak self] in self?.readAvailable(terminal) }
-            source.setCancelHandler { [fdQueue = self.fdQueue] in
+            source.setCancelHandler {
                 // The fd number stays reserved until every queued write and
-                // resize has run: those go through fdQueue too.
-                fdQueue.async { if terminal.fd.fd >= 0 { Darwin.close(terminal.fd.fd); terminal.fd.fd = -1 } }
+                // resize has run: those go through this terminal's fdQueue too.
+                terminal.fdQueue.async {
+                    if terminal.fd.fd >= 0 { Darwin.close(terminal.fd.fd); terminal.fd.fd = -1 }
+                }
             }
             terminal.readSource = source
             source.resume()
             // Nobody has attached yet — the idle clock starts at open.
             armIdleTimer(terminal)
-            return OpenOutcome(reply: terminal.reply, created: true)
-        })
+            return .success(OpenOutcome(reply: terminal.reply, created: true))
+        }
+    }
+
+    /// `.tooManyTerminals` once the pid already holds
+    /// `T3Terminal.maxTerminalsPerSession` live shells — `id` is the one being
+    /// opened, and an id already on the map is an attach, not a new terminal.
+    /// On `queue`.
+    private func capRefusal(pid: Int32, id: String) -> HostError? {
+        guard terminals[Key(pid: pid, id: id)] == nil else { return nil }
+        let live = terminals.values.filter { $0.sessionPid == pid && !$0.finished }.count
+        return live >= T3Terminal.maxTerminalsPerSession ? .validation(.tooManyTerminals) : nil
+    }
+
+    /// Every terminal this pid holds, for the surface's strip — ordered by the
+    /// `term-N` number so the strip reads 1, 2, 3 whoever opened them (the
+    /// phone's opens are in here too). There is no route for this: upstream's
+    /// contract has no `terminal.list` (its clients follow a metadata stream,
+    /// `terminal.ts:133-154`), so this is the Mac's in-process view only.
+    func listTerminals(pid: Int32) -> [T3Terminal.OpenReply] {
+        queue.sync {
+            terminals.values
+                .filter { $0.sessionPid == pid && !$0.finished }
+                .sorted { Self.order(of: $0.id) < Self.order(of: $1.id) }
+                .map(\.reply)
+        }
+    }
+
+    /// `term-2` sorts before `term-10`, and an id that isn't `term-N` sorts
+    /// after every one that is, alphabetically among its own kind.
+    private static func order(of id: String) -> (Int, String) {
+        let parts = id.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2, let number = Int(parts[1]) else { return (Int.max, id) }
+        return (number, id)
     }
 
     /// Kills and reaps a shell a losing concurrent `open` just spawned
@@ -193,7 +249,7 @@ final class TerminalHost: @unchecked Sendable {
     /// with `SIGKILL` and a blocking reap.
     private func killOrphan(master: Int32, child: pid_t) {
         kill(child, SIGHUP)
-        fdQueue.async { Darwin.close(master) }
+        orphanQueue.async { Darwin.close(master) }
         var status: Int32 = 0
         if waitpid(child, &status, WNOHANG) != 0 { return }   // reaped, or ECHILD: already gone
         // `asyncAfter`, not a `DispatchSourceTimer`: nothing here owns a
@@ -263,7 +319,7 @@ final class TerminalHost: @unchecked Sendable {
         if let invalid = request.validate() { return .failure(.validation(invalid)) }
         let bytes = [UInt8](request.data.utf8)
         guard !bytes.isEmpty else { return .success(()) }
-        return fdQueue.sync { () -> Result<Void, HostError>? in
+        return terminal.fdQueue.sync { () -> Result<Void, HostError>? in
             let fd = terminal.fd.fd
             guard fd >= 0 else { return nil }
             var written = 0
@@ -295,7 +351,7 @@ final class TerminalHost: @unchecked Sendable {
     func resize(pid: Int32, id: String, _ request: T3Terminal.ResizeRequest) -> Result<Void, HostError>? {
         guard let terminal: Terminal = queue.sync(execute: { live(pid: pid, id: id) }) else { return nil }
         if let invalid = request.validate() { return .failure(.validation(invalid)) }
-        let outcome: Result<Void, HostError>? = fdQueue.sync { () -> Result<Void, HostError>? in
+        let outcome: Result<Void, HostError>? = terminal.fdQueue.sync { () -> Result<Void, HostError>? in
             let fd = terminal.fd.fd
             guard fd >= 0 else { return nil }
             var size = winsize(ws_row: UInt16(request.rows), ws_col: UInt16(request.cols),

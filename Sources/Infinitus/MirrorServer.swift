@@ -1631,6 +1631,15 @@ final class MirrorServer: ObservableObject {
             let body = Data(#"{"error":"write over \#(T3Terminal.maxWriteBytes) bytes"}"#.utf8)
             return MirrorTransport.response(status: 413, reason: "Payload Too Large",
                                             contentType: "application/json", body: body)
+        case .validation(.terminalIdInvalid):
+            return MirrorTransport.errorResponse(status: 400,
+                                                 message: "terminalId must be non-blank and at most \(T3Terminal.maxTerminalIdLength) characters")
+        case .validation(.tooManyTerminals):
+            // The pid is full (`T3Terminal.maxTerminalsPerSession`): a
+            // conflict with the shells already open, not a bad request.
+            let body = Data(#"{"error":"too many terminals"}"#.utf8)
+            return MirrorTransport.response(status: 409, reason: "Conflict",
+                                            contentType: "application/json", body: body)
         case .spawnFailed(let detail):
             return MirrorTransport.errorResponse(status: 500, message: detail)
         }

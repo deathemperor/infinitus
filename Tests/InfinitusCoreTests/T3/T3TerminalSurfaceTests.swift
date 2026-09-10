@@ -27,6 +27,50 @@ final class T3TerminalSurfaceTests: XCTestCase {
         }
     }
 
+    // MARK: - nextTerminalId (terminalLabels.ts:32-40)
+
+    func testNextTerminalIdTakesTheLowestUnusedSlot() {
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId([]), T3Terminal.defaultTerminalId)
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId(["term-1"]), "term-2")
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId(["term-1", "term-2"]), "term-3")
+        // A gap is filled before the end — "lowest unused", not "one past the last".
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId(["term-1", "term-3"]), "term-2")
+        // Order is irrelevant, and an id that isn't `term-N` never blocks a slot.
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId(["term-3", "term-1", "build"]), "term-2")
+    }
+
+    /// `usedIds` filters blank ids out (`terminalLabels.ts:33`).
+    func testNextTerminalIdIgnoresBlankIds() {
+        XCTAssertEqual(T3TerminalSurface.nextTerminalId(["", "  ", "term-1"]), "term-2")
+    }
+
+    // MARK: - activeAfterClose (terminalUiStateStore.ts:409-429)
+
+    func testActiveAfterCloseTakesTheClosedSlot() {
+        let ids = ["term-1", "term-2", "term-3"]
+        // The closed one's index, i.e. whoever slid into its place.
+        XCTAssertEqual(T3TerminalSurface.activeAfterClose(ids: ids, closing: "term-2", active: "term-2"),
+                       "term-3")
+        // Clamped to the last remaining when the last one goes.
+        XCTAssertEqual(T3TerminalSurface.activeAfterClose(ids: ids, closing: "term-3", active: "term-3"),
+                       "term-2")
+    }
+
+    func testActiveAfterCloseLeavesAnUnrelatedActiveAlone() {
+        let ids = ["term-1", "term-2", "term-3"]
+        XCTAssertEqual(T3TerminalSurface.activeAfterClose(ids: ids, closing: "term-3", active: "term-1"),
+                       "term-1")
+        // An id that isn't in the strip changes nothing either.
+        XCTAssertEqual(T3TerminalSurface.activeAfterClose(ids: ids, closing: "term-9", active: "term-1"),
+                       "term-1")
+    }
+
+    /// Closing the last one leaves nothing selected — upstream returns the
+    /// default (empty) state (`:419-421`).
+    func testActiveAfterCloseOfTheLastTerminalIsNil() {
+        XCTAssertNil(T3TerminalSurface.activeAfterClose(ids: ["term-1"], closing: "term-1", active: "term-1"))
+    }
+
     // MARK: - Attachment: reset vs append
 
     func testFirstSnapshotResetsAndLaterChunksAppend() {
