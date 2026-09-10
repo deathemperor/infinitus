@@ -29,6 +29,13 @@ export interface InfinitusServiceShape {
    */
   readonly changes: Stream.Stream<InfinitusSnapshot>;
   /**
+   * Every change some subscriber's poll produces, and nothing else: reading
+   * this never starts a poll, so a server nobody is watching still never
+   * touches the socket. For work that reacts to the app coming or going only
+   * while a client is already looking.
+   */
+  readonly observed: Stream.Stream<InfinitusSnapshot>;
+  /**
    * Forwards one command from the manifest and answers with the reply's
    * `result`. A command the manifest does not list never reaches the socket.
    */
