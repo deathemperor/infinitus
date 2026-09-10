@@ -53,7 +53,9 @@ const EVENTS_COMMAND = "events";
 /**
  * The lease (#572 task 6). The app only computes session progress and scans
  * stats while some client holds a lease on them; this service is that client
- * for everyone subscribed through it. Re-sent every 25 s with a 45 s TTL — the
+ * for everyone subscribed through it. Only `sessions` and `fleets`: nothing in
+ * the fork reads stats, and a `stats` lease is what moves the app's transcript
+ * rescan from every 30 min to every 5 (#587). Re-sent every 25 s with a 45 s TTL — the
  * cadence and slack T3's own client-activity reporter uses — and released with
  * a zero TTL when the last subscriber leaves. Absent from the manifest on
  * builds before the verb: then nothing is sent.
@@ -61,7 +63,7 @@ const EVENTS_COMMAND = "events";
 const LEASE_COMMAND = "client-activity";
 const LEASE_INTERVAL = Duration.seconds(25);
 const LEASE_TTL_MS = 45_000;
-const LEASE_SCOPES = [{ type: "sessions" }, { type: "fleets" }, { type: "stats" }] as const;
+const LEASE_SCOPES = [{ type: "sessions" }, { type: "fleets" }] as const;
 /** Straight to the JSON string the `--body` option carries. */
 const encodeLeaseBody = Schema.encodeSync(Schema.fromJsonString(InfinitusClientActivityReport));
 

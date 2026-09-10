@@ -506,7 +506,7 @@ describe("the lease", () => {
       ),
     );
 
-  effectIt.effect("holds sessions, fleets and stats every 25 s while somebody subscribes", () =>
+  effectIt.effect("holds sessions and fleets every 25 s while somebody subscribes", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;
       yield* stub.setResult("manifest", manifestWithLease());
@@ -517,11 +517,7 @@ describe("the lease", () => {
       let bodies = yield* leaseBodies(stub);
       expect(bodies).toHaveLength(1);
       expect(bodies[0]?.ttlMs).toBe(45_000);
-      expect(bodies[0]?.scopes).toEqual([
-        { type: "sessions" },
-        { type: "fleets" },
-        { type: "stats" },
-      ]);
+      expect(bodies[0]?.scopes).toEqual([{ type: "sessions" }, { type: "fleets" }]);
       expect(bodies[0]?.clientId).toMatch(/^t3-server-/);
 
       // 5 s ticks: t = 5, 10, 15, 20 carry no lease, t = 25 does, t = 50 again.
