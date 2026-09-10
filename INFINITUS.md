@@ -10,8 +10,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   open pull requests, issues or discussions on `pingdotgg/t3code` from this
   work.
 - **One API.** The fork talks to Infinitus only over its control socket
-  (`ControlProtocol`: one JSON line each way, `infinitusctl manifest` lists
-  the commands) and the mirror HTTP routes — the same wire the phone and the
+  (`ControlProtocol`: one JSON line each way; `infinitusctl manifest` is the
+  runtime command table — its reply shapes are prose, so reply schemas are
+  hand-written in `packages/contracts` and validated at the boundary) and
+  the mirror HTTP routes — the same wire the phone and the
   Linux tray use (inventory: issue #553). Anything missing becomes a new
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
@@ -43,9 +45,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `CLAUDE.md` — adds `@INFINITUS.md`.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
-  GitHub-hosted ones, the Blacksmith apt-mirror line dropped, timeouts
-  widened. Re-apply after every upstream merge if the merge reintroduces
-  `blacksmith-`.
+  GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
+  upstream-sync workflow can start CI on its branch. The sync workflow
+  re-applies the runner swap after every merge.
 - Upstream workflows that deploy or publish (Release, Deploy T3 Connect
   relay, Forward to Cursor hygiene, Mobile EAS Preview/Production, Publish
   AUR, Issue Labels, Desktop macOS Preview, Web Preview, Mobile Showcase
