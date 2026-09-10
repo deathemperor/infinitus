@@ -32,6 +32,22 @@ final class TeamRedactionTests: XCTestCase {
         }
     }
 
+    /// The needle prefilter (#346) folds case before it looks: a rule
+    /// whose regex is case-insensitive must still fire on shouting
+    /// input, and a rule that fires must not hide a later rule's match
+    /// on the rewritten line.
+    func testPrefilterFoldsCaseAndRescansAfterARewrite() {
+        XCTAssertEqual(TeamRedaction.redact("AUTHORIZATION: Bearer abcdefghijklmnopqrstuvwxyz012345", options: options),
+                       "Authorization: [redacted]")
+        XCTAssertEqual(TeamRedaction.redact("BEARER eyJhbGciOiJIUzI1NiJ9.abc.def now", options: options), "Bearer [redacted] now")
+        XCTAssertEqual(TeamRedaction.redact("Aws_Session_Token=FQoGZXIvYXdzEBYaDDDDDDDDDDDDDDDDDD", options: options),
+                       "Aws_Session_Token=[redacted]")
+        XCTAssertEqual(TeamRedaction.redact("/Users/loc/x sk-ant-api03-abcdefghijklmnopqrstuvwxyz /home/bob/y", options: options),
+                       "~/x [redacted-key] ~/y")
+        XCTAssertEqual(TeamRedaction.redact("plain prose, an Asia trip, a key=value pair", options: options),
+                       "plain prose, an Asia trip, a key=value pair")
+    }
+
     func testImagesAreDroppedUnlessIncluded() {
         let data = String(repeating: "A", count: 300)
         let line = #"{"type":"image","source":{"type":"base64","media_type":"image/png","data":"\#(data)"}}"#
