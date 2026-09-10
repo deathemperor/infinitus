@@ -104,6 +104,7 @@ publishes the matching section as the GitHub release body.
 - A thread's Files pill opens the session's workspace: a searchable folder tree, a file's source with line numbers or its markdown rendered, and Add to message drops @path into the composer (#223).
 - The Files tree is built off the main thread and a search re-derives its rows once per keystroke instead of once per redraw.
 - A Files image (png, jpg, gif, webp, heic) shows as a picture with its size, tap for full-screen, once the Mac serves image bytes (#223).
+- A file's source on the phone splits lines and words its limit strip the way the Mac's Files tab does (CRLF files no longer render as one line).
 
 ## 0.4.4-alpha.2
 

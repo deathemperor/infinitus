@@ -306,20 +306,25 @@ struct T3SourceFileScreen: View {
         let p = t3.mobile
         Group {
             if let file {
+                // Core's `T3FilePreview` (shared with the Mac Files tab): the
+                // line split that reads CRLF as one break, and the limit strip
+                // (`FilePreviewPanel.tsx:1216-1220`).
+                let slice = file.mime == "text/markdown" ? nil : T3FilePreview.split(file.contents)
                 VStack(spacing: 0) {
-                    if file.truncated {
-                        Text("Showing the first \(Self.kb(file.contents.utf8.count)) of \(Self.kb(file.byteLength)).")
+                    if let notice = T3FilePreview.limitNotice(byteLength: file.byteLength, truncated: file.truncated,
+                                                              trimmed: slice?.trimmed ?? false) {
+                        Text(notice)
                             .font(T3Font.mobile(.xs)).foregroundStyle(p.warningForeground.color)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 8)
                             .background(p.warning.color)
                     }
-                    if file.mime == "text/markdown" {
+                    if let slice {
+                        source(slice.lines)
+                    } else {
                         ScrollView {
                             MarkdownText(text: file.contents).markdownStyle(.t3(p))
                                 .padding(16)
                         }
-                    } else {
-                        source(file.contents)
                     }
                 }
             } else if let image {
@@ -386,9 +391,8 @@ struct T3SourceFileScreen: View {
     }
 
     /// Line rows in a two-axis scroll: the gutter's width from the line count.
-    private func source(_ contents: String) -> some View {
+    private func source(_ lines: [String]) -> some View {
         let p = t3.mobile
-        let lines = contents.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false)
         let gutter = CGFloat(max(2, String(lines.count).count)) * 7.5 + 16
         return ScrollView([.horizontal, .vertical], showsIndicators: true) {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -396,7 +400,7 @@ struct T3SourceFileScreen: View {
                     HStack(spacing: 0) {
                         Text("\(index + 1)").font(Self.mono).foregroundStyle(p.foregroundTertiary.color)
                             .frame(width: gutter, alignment: .trailing).padding(.trailing, 12)
-                        Text(line.isEmpty ? " " : String(line)).font(Self.mono).foregroundStyle(p.foreground.color)
+                        Text(line.isEmpty ? " " : line).font(Self.mono).foregroundStyle(p.foreground.color)
                             .lineLimit(1).fixedSize()
                     }
                     .frame(height: Self.rowHeight)
