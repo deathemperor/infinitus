@@ -191,6 +191,29 @@ export const InfinitusPref = Schema.Struct({
 });
 export type InfinitusPref = typeof InfinitusPref.Type;
 
+/** One saved session profile from the `profiles` reply (native
+    `Sources/InfinitusCore/SessionProfiles.swift`): a named way to start a
+    session. Every field but the name is optional — the reply is a Swift
+    `Codable` encode, so a field the profile does not fill is simply absent —
+    and `profile-set` clears whatever it omits. */
+export const InfinitusProfile = Schema.Struct({
+  name: Schema.String,
+  cwd: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  engine: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  permissionMode: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  model: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  systemPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  prompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  allowTools: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.String))),
+});
+export type InfinitusProfile = typeof InfinitusProfile.Type;
+
+/** The `profiles` command's reply. */
+export const InfinitusProfiles = Schema.Struct({
+  profiles: Schema.Array(InfinitusProfile),
+});
+export type InfinitusProfiles = typeof InfinitusProfiles.Type;
+
 /** The `prefs` command's reply: the whole preference catalog with its current
     values. Absent from builds that predate the command. */
 export const InfinitusPrefs = Schema.Struct({
