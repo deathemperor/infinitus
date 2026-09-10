@@ -30,12 +30,17 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         public var pastSessions: Bool?
         public var images: Bool?
         public var files: Bool?
+        /// The PTY terminal (#507): true on the Mac since step 3's
+        /// `TerminalHost`. The tray answers an explicit `false` — the same
+        /// host is portable there but not wired yet — so a phone sees a
+        /// considered no rather than a build that predates the field.
+        public var terminal: Bool?
         public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
                     ownedSessions: Bool? = nil, checkpoints: Bool? = nil, team: Bool? = nil,
-                    pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil) {
+                    pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil, terminal: Bool? = nil) {
             self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
             self.ownedSessions = ownedSessions; self.checkpoints = checkpoints; self.team = team
-            self.pastSessions = pastSessions; self.images = images; self.files = files
+            self.pastSessions = pastSessions; self.images = images; self.files = files; self.terminal = terminal
         }
     }
     public let machineId: String
@@ -53,15 +58,19 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     public static func current(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         #if os(macOS)
         let platform = "macos"
+        // `TerminalHost` (#507 step 3) is in the Mac app target only.
+        let terminal = true
         #elseif os(Linux)
         let platform = "linux"
+        let terminal = false
         #else
         let platform = "other"
+        let terminal = false
         #endif
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
                                 capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
                                                            ownedSessions: true, checkpoints: true, team: true,
-                                                           pastSessions: true, images: true, files: true))
+                                                           pastSessions: true, images: true, files: true, terminal: terminal))
     }
 
     /// The Linux tray's truth (#486 first slice, `infinitus-tray serve`):
@@ -74,6 +83,6 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
                          capabilities: Capabilities(timeline: false, sequence: false, attention: false, leases: false,
                                                     ownedSessions: false, checkpoints: false, team: false,
-                                                    pastSessions: false, images: false, files: true))
+                                                    pastSessions: false, images: false, files: true, terminal: false))
     }
 }

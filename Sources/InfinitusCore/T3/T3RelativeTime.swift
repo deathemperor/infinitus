@@ -20,4 +20,17 @@ public enum T3RelativeTime {
         let days = hours / 24
         return "\(days)d"
     }
+
+    /// `formatRelativeTimeLabel` itself (`timestampFormat.ts:199-218`), which
+    /// is the same arithmetic with its suffix left on — what a pull request
+    /// row and its detail header show ("just now", "5m ago", "3h ago").
+    public static func agoLabel(from date: Date, now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
+        if seconds < 60 { return "just now" }          // negative (clock skew) too
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h ago" }
+        return "\(hours / 24)d ago"
+    }
 }

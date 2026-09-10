@@ -261,6 +261,8 @@ elif cmd == "usage":
     print(json.dumps({"schemaVersion": 1, "days": 7,
         "estimatedTotalUSD": round(sum(a[2] for a in accts), 2),
         "priceTable": {"source": "models.dev", "date": "2026-08-28"},
+        # `UsageReport.caveats` is required (the real CLI always sends it).
+        "caveats": ["Estimates at API list price from token counts; not a bill."],
         "accounts": [{"number": n, "email": f"{al}@example.com", "alias": al,
                       "estimatedUSD": usd, "messages": msg, "input": msg*300,
                       "output": msg*2200, "cacheRead": msg*140000, "cacheWrite": msg*9000,

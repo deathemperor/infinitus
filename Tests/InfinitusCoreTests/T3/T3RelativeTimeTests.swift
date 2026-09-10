@@ -38,4 +38,19 @@ final class T3RelativeTimeTests: XCTestCase {
             XCTAssertEqual(T3RelativeTime.label(from: date, now: now), c.expected, "seconds=\(c.seconds)")
         }
     }
+
+    /// `formatRelativeTimeLabel` (`timestampFormat.ts:214-218`): the same
+    /// arithmetic with the suffix left on, which is what a pull request row
+    /// shows where a sidebar row shows the compact form.
+    func testAgoLabelKeepsUpstreamsSuffix() {
+        let expected: [(TimeInterval, String)] = [
+            (-5, "just now"), (0, "just now"), (59, "just now"), (60, "1m ago"),
+            (3599, "59m ago"), (3600, "1h ago"), (86399, "23h ago"), (86400, "1d ago"),
+            (30 * 86400, "30d ago"),
+        ]
+        for c in expected {
+            XCTAssertEqual(T3RelativeTime.agoLabel(from: now.addingTimeInterval(-c.0), now: now),
+                           c.1, "seconds=\(c.0)")
+        }
+    }
 }

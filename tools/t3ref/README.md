@@ -20,6 +20,7 @@ Reference versions (spec §0):
 |---|---|
 | `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. |
 | `fixture.sh` | A fake `CLAUDE_CONFIG_DIR` holding the parity fixture, plus the debug app on it. `fixture.sh --stop` tears it down. |
+| `recite.py` | `tools/t3ref/recite.py [--dry] OLD NEW file.swift…` moves a Swift file's upstream `File.tsx:NN` citations from OLD's line numbers to NEW's (difflib over `git show`; only files that changed between the shas move). Run it over files whose citations are all at OLD — the T3 working tree sits at acc0a219e while the port pins 6c583620f, so a coder who read the tree cites the wrong lines. |
 | `winmove.swift` | `winmove <window-id> <x> <y> [w h]` moves that window's top-left corner to a CG point, then sizes it, through its own process's accessibility tree (`capture-ours.sh` runs it when `T3REF_WINDOW_ORIGIN="x y"` is set, with `T3REF_WINDOW_SIZE=WxH` or the preset's size). Not System Events: `process whose unix id is N` resolves by name there, and with two Infinitus processes it moves the other one's window. |
 | `winlist.swift` | `winlist <owner-substring> [title-substring\|WxH]` → `id width height` of that app's first matching normal-layer window. The filter picks the workspace out of an Infinitus that also has the pop-out open; `WxH` matches the bounds exactly (`kCGWindowName` is empty without Screen Recording permission). |
 | `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
@@ -60,7 +61,9 @@ into the two activity kinds every T3 thread screen needs:
 Everything the app could otherwise reach into is redirected under
 `/tmp/t3fix`: the Claude config dir, the profiles list, the team dir and
 the engine (`tools/demo-cswap` — fabricated fleet, no credentials, no
-network). The control socket is `/tmp/t3fix.sock`, **never** the real
+network); `T3FIX_NAME=<short>` moves all of it to `/tmp/<short>*` so a second
+fixture can run beside the first (two rounds sharing one fixture stopped each
+other's app, 2026-09-10). The control socket is `/tmp/t3fix.sock`, **never** the real
 app's — running a debug instance without that would unlink the real
 socket and break `infinitusctl` and the phone until the bundle relaunches.
 `INFINITUS_MIRROR_SNAPSHOT` points `MirrorExporter` at

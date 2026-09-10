@@ -190,6 +190,35 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertNil(accounts[1].usage, "no window left to show")
     }
 
+    /// Mapping alone, with no memory to carry from: `activeUnreadable`
+    /// without `activeSlot` says WHY it's missing, but that's not enough
+    /// on its own to say who was active.
+    func testAnUnreadableActiveWithoutMemoryStaysNil() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,
+          "activeUnreadable":"switch-in-progress","accounts":[
+          {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"",
+           "active":false,"disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fleet = SwapdMapping.fleets(from: list, now: now)[0]
+        XCTAssertNil(fleet.activeNumber)
+        XCTAssertFalse(fleet.accounts[0].active)
+    }
+
+    /// A stale memory pointing at a slot that no longer exists (removed,
+    /// or never real) must not resurrect it as active.
+    func testACarriedActiveMustStillExist() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,
+          "activeUnreadable":"switch-in-progress","accounts":[
+          {"slot":7,"email":"a@b.c","organizationName":"","organizationUuid":"",
+           "active":false,"disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fleet = SwapdMapping.fleets(from: list, now: now, carriedActive: { _ in 3 })[0]
+        XCTAssertNil(fleet.activeNumber)
+        XCTAssertFalse(fleet.accounts[0].active)
+    }
+
     static func account(slot: Int) -> String {
         """
         {"slot":\(slot),"email":"a\(slot)@b.c","organizationName":"","organizationUuid":"",
@@ -259,10 +288,107 @@ final class SwapdEngineTests: XCTestCase {
     /// The ignite path's second half: the reset the popup announces comes
     /// from the fetch this call forced, not from the next poll (#338).
     func testRefreshForcesTheSlotAndAnswersWithThatProvidersFleet() async throws {
-        let fleet = try await makeEngine().refresh(fleet: .claude, number: 1)
+        let engine = try makeEngine()
+        let fleet = try await engine.refresh(fleet: .claude, number: 1)
         XCTAssertEqual(try argv(), ["refresh --slot 1 --provider claude --json"])
         XCTAssertEqual(fleet.provider, .claude)
         XCTAssertEqual(fleet.accounts[0].usage?.fiveHour?.resetsAt, "2026-09-09T05:59:59Z")
+        // `refresh` remembers the active slot the same way `snapshot` does
+        // (#476) — the carry the popup relies on works down both paths.
+        XCTAssertEqual(engine.memory.last(.claude), 1)
+    }
+
+    /// A stub `swapd` that answers `list` with one payload per call, in
+    /// order (the last payload repeats past the end) — a switch's before,
+    /// during, and after across three consecutive polls.
+    func makeSequencedEngine(_ payloads: [String]) throws -> SwapdEngine {
+        for (index, payload) in payloads.enumerated() {
+            try payload.write(to: dir.appendingPathComponent("payload-\(index)"),
+                              atomically: true, encoding: .utf8)
+        }
+        let counter = dir.appendingPathComponent("count").path
+        let binary = dir.appendingPathComponent("swapd")
+        let body = """
+        #!/bin/sh
+        n=$(cat "\(counter)" 2>/dev/null || echo 0)
+        echo $((n+1)) > "\(counter)"
+        last=\(payloads.count - 1)
+        [ "$n" -gt "$last" ] && n=$last
+        cat "\(dir.path)/payload-$n"
+        """
+        try body.write(to: binary, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        return SwapdEngine(cli: SwapdCLI(binaryPath: binary.path))
+    }
+
+    /// One account view per poll: `activeSlot` when given, `activeUnreadable`
+    /// when given, two accounts (3 and 5) so `active` differs per slot.
+    func provider(activeSlot: Int?, unreadable: String? = nil) -> String {
+        let slotField = activeSlot.map { "\"activeSlot\":\($0)," } ?? ""
+        let unreadableField = unreadable.map { "\"activeUnreadable\":\"\($0)\"," } ?? ""
+        func account(_ slot: Int) -> String {
+            """
+            {"slot":\(slot),"email":"a\(slot)@b.c","organizationName":"","organizationUuid":"",
+             "active":\(activeSlot == slot),"disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}
+            """
+        }
+        return """
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,\
+        \(slotField)\(unreadableField)"accounts":[\(account(3)),\(account(5))]}]}
+        """
+    }
+
+    /// The scenario #476 fixes: a switch mid-flight (`activeUnreadable`,
+    /// no `activeSlot`) carries the previous poll's active slot forward
+    /// instead of flashing "no active account", and a later real slot
+    /// both wins and becomes the new memory.
+    func testASwitchInFlightCarriesThePreviousActiveForward() async throws {
+        let engine = try makeSequencedEngine([
+            provider(activeSlot: 3),
+            provider(activeSlot: nil, unreadable: "switch-in-progress"),
+            provider(activeSlot: 5),
+        ])
+        let f1 = try await engine.snapshot()
+        XCTAssertEqual(f1[0].activeNumber, 3)
+
+        let f2 = try await engine.snapshot()
+        XCTAssertEqual(f2[0].activeNumber, 3, "carried forward while unreadable")
+        XCTAssertEqual(f2[0].accounts.first(where: { $0.number == 3 })?.active, true)
+
+        let f3 = try await engine.snapshot()
+        XCTAssertEqual(f3[0].activeNumber, 5)
+        XCTAssertEqual(engine.memory.last(.claude), 5)
+    }
+
+    /// `refresh` reads the same memory `snapshot` writes: a switch caught
+    /// mid-flight by the forced fetch still answers with the previous
+    /// active slot instead of nil.
+    func testRefreshCarriesTheSameMemorySnapshotDoes() async throws {
+        let engine = try makeSequencedEngine([
+            provider(activeSlot: 3),
+            provider(activeSlot: nil, unreadable: "switch-in-progress"),
+        ])
+        _ = try await engine.snapshot()
+        let fleet = try await engine.refresh(fleet: .claude, number: 3)
+        XCTAssertEqual(fleet.activeNumber, 3, "refresh carries the same memory snapshot does")
+    }
+
+    /// A poll with neither field IS a genuine "no active account" — the
+    /// memory must forget, not keep serving the old slot forever.
+    func testAGenuineNoActiveForgetsTheMemory() async throws {
+        let engine = try makeSequencedEngine([
+            provider(activeSlot: 3),
+            provider(activeSlot: nil),
+            provider(activeSlot: nil, unreadable: "switch-in-progress"),
+        ])
+        let f1 = try await engine.snapshot()
+        XCTAssertEqual(f1[0].activeNumber, 3)
+
+        let f2 = try await engine.snapshot()
+        XCTAssertNil(f2[0].activeNumber, "genuinely no active account")
+
+        let f3 = try await engine.snapshot()
+        XCTAssertNil(f3[0].activeNumber, "memory was forgotten — nothing left to carry")
     }
 
     func testAFailedVerbThrowsTheEnginesOwnMessage() async throws {

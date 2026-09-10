@@ -405,13 +405,26 @@ public enum StatsScanner {
     /// re-reads those bytes.
     public static let settledWriteInterval: TimeInterval = 600
 
-    public static func defaultCacheURL() -> URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/stats/transcripts.json")
+    /// One cache per Claude config home: an instance pointed at another
+    /// `CLAUDE_CONFIG_DIR` (a fixture, a dev run) gets its own file,
+    /// named the way Claude names its project dirs, and never touches
+    /// the real corpus's — a nine-file fixture cache once replaced a
+    /// year's 20 MB one, and the next bundle launch re-read every
+    /// transcript (2026-09-10).
+    public static func defaultCacheURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Infinitus/stats")
+        if let home = environment["CLAUDE_CONFIG_DIR"], !home.isEmpty {
+            let tag = home.map { $0 == "/" ? "-" : $0 }.reduce(into: "") { $0.append($1) }
+            return dir.appendingPathComponent("transcripts-\(tag).json")
+        }
+        return dir.appendingPathComponent("transcripts.json")
     }
 
     private static func writeCache(_ cache: Cache, to cacheURL: URL, fm: FileManager) {
-        guard let data = try? JSONEncoder().encode(cache) else { return }
+        let encoder = JSONEncoder()
+        encoder.userInfo[Stats.Day.leanEncoding] = true   // #499: defaults out, hours sparse
+        guard let data = try? encoder.encode(cache) else { return }
         try? fm.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)
     }
