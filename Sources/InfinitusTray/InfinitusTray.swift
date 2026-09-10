@@ -1,6 +1,10 @@
 import Foundation
 import InfinitusCore
 
+/// The feed route's held tails (#380): one per polled pid, so a phone's
+/// poll decodes only what the transcript gained — same as the Mac's.
+private let feedTails = FeedTails()
+
 // The Omarchy/Linux face of Infinitus: a Waybar `custom` module
 // (`return-type: json`) over the same InfinitusCore the macOS app uses.
 // Everything engine-side stays behind `cswap … --json` subprocesses —
@@ -786,7 +790,7 @@ struct InfinitusTray {
                     since: request.query(MirrorTransport.tailSinceQueryName),
                     wait: request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0)
                 guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                      let feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
+                      let feed = feedTails.read(record: record, claudeDir: claudeDir, limit: limit)
                 else {
                     return MirrorTransport.notFoundResponse()
                 }
