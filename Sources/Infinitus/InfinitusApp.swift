@@ -124,6 +124,7 @@ struct InfinitusApp: App {
         _updateModel = StateObject(wrappedValue: update)
         update.restartEngine = { [weak model] in model?.restartEngine() }
         update.startAutoCheck()
+        model.updateModel = update
         let release = AppReleaseModel()
         _appRelease = StateObject(wrappedValue: release)
         release.onUpdate = { [weak model] in model?.appUpdateVersion = $0 }

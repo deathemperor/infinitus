@@ -108,6 +108,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl prefs set <key> <value>` (and `POST /prefs`) changes one preference, refuses a wrong type or an unlisted choice, takes it live at once, and relaunches for an engine toggle (#558).
 - `infinitusctl activities-token`, `client-activity` and `crash-report` take the JSON a phone posts to the mirror (`--body` or stdin), so a client on the control socket registers push tokens, leases and files crashes without the HTTP routes (#572).
 - A push registration can say `layout: "expo"`, and its Live Activities then arrive in the expo-widgets envelope (one attributes type, the state as `{name, props}`, a deep link on start) with the same content the native card gets (#572).
+- `prefs set update_auto_check` / `update_auto_install` (socket, mirror or iCloud sync) reach the running update checker at once instead of at the next relaunch (#558).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
