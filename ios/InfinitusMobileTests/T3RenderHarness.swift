@@ -349,6 +349,11 @@ import InfinitusUI
         let terminal = NavigationStack { T3TerminalScreen(model: model, session: session, fixture: terminalFrames) }
             .t3(platform: .mobile, scheme: .dark).preferredColorScheme(.dark)
         try Self.attach(name: "terminal-dark", png: Self.render(terminal), dir: dir, test: self)
+        // refs/ios-terminal.png: the shell's prompt lines in the light chrome,
+        // keyboard down (accessory hidden, the keyboard disc bottom-right).
+        let parityTerminal = NavigationStack { T3TerminalScreen(model: model, session: paritySession, fixture: terminalFrames) }
+            .t3(platform: .mobile, scheme: .light).preferredColorScheme(.light)
+        try Self.attach(name: "parity-terminal", png: Self.render(parityTerminal), dir: dir, test: self)
         // refs/ios-files.png: the fixture project's dotfolders, top level open.
         let parityFiles = NavigationStack {
             T3FilesScreen(model: model, session: paritySession, fixture: Self.parityListing)

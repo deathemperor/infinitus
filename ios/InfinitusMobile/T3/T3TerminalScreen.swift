@@ -153,10 +153,11 @@ struct T3TerminalSurface: UIViewRepresentable {
 
 /// T3's Terminal (`ThreadTerminalRouteScreen.tsx` at upstream 6c583620f;
 /// the emulator is SwiftTerm, spec decision): the session's shell on the
-/// Mac, streamed (#507). The keys row is upstream's toolbar — a ctrl
-/// modifier, esc, tab, paste, clear, arrows and the four shell characters
-/// a phone keyboard hides — always shown here rather than only with the
-/// keyboard up.
+/// Mac, streamed (#507). The keys row is upstream's keyboard accessory — a
+/// ctrl modifier, esc, tab, paste, clear, arrows and the four shell
+/// characters a phone keyboard hides — shown only while the keyboard is
+/// up; with it down a round glass keyboard button floats bottom-right to
+/// bring it back (`handleShowKeyboard`).
 struct T3TerminalScreen: View {
     @ObservedObject var model: MirrorModel
     let session: SessionDetail
@@ -169,6 +170,7 @@ struct T3TerminalScreen: View {
     @State private var sequence: Int?
     @State private var stream: Task<Void, Never>?
     @State private var reconnecting = false
+    @State private var keyboardUp = false
     private let fixture: [T3Terminal.Frame]?
 
     init(model: MirrorModel, session: SessionDetail, macId: String? = nil) {
@@ -195,7 +197,10 @@ struct T3TerminalScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .background(InteractivePopGesture())
         .safeAreaInset(edge: .top, spacing: 0) { header }
-        .safeAreaInset(edge: .bottom, spacing: 0) { keysRow }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if keyboardUp { keysRow } }
+        .overlay(alignment: .bottomTrailing) { if !keyboardUp { keyboardButton } }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         .task {
             controller.apply(dark: scheme == .dark)
             if let fixture {
@@ -270,7 +275,10 @@ struct T3TerminalScreen: View {
                     Button(role: .destructive) { Task { await close() } } label: { Label("Close terminal", systemImage: "xmark.circle") }
                 }
             } label: {
-                Image(systemName: "terminal").font(.system(size: 17)).foregroundStyle(p.icon.color).frame(width: 44, height: 44)
+                T3GlassSurface {
+                    Image(systemName: "terminal").font(.system(size: 17)).foregroundStyle(p.icon.color).frame(width: 44, height: 44)
+                }
+                .clipShape(Circle())
             }
             .accessibilityLabel("Terminal options")
         }
@@ -308,16 +316,27 @@ struct T3TerminalScreen: View {
                 }
                 .padding(.horizontal, 12)
             }
-            Button {
-                if controller.view.isFirstResponder { controller.view.resignFirstResponder() } else { controller.view.becomeFirstResponder() }
-            } label: {
-                Image(systemName: "keyboard").font(.system(size: 16)).foregroundStyle(p.icon.color)
+            Button { controller.view.resignFirstResponder() } label: {
+                Image(systemName: "keyboard.chevron.compact.down").font(.system(size: 16)).foregroundStyle(p.icon.color)
                     .frame(width: 44, height: 34).background(p.subtleStrong.color, in: Capsule())
             }
-            .buttonStyle(.plain).accessibilityLabel("Toggle keyboard").padding(.trailing, 12)
+            .buttonStyle(.plain).accessibilityLabel("Dismiss keyboard").padding(.trailing, 12)
         }
         .padding(.vertical, 8)
         .background(p.sheet.color)
+    }
+
+    /// Upstream's "Show keyboard" pressable: a 48 pt glass disc, 16 pt off
+    /// the corner, only while the keyboard is down.
+    private var keyboardButton: some View {
+        Button { controller.view.becomeFirstResponder() } label: {
+            T3GlassSurface {
+                Image(systemName: "keyboard").font(.system(size: 20)).foregroundStyle(t3.mobile.foreground.color)
+                    .frame(width: 48, height: 48)
+            }
+            .clipShape(Circle())
+        }
+        .buttonStyle(.plain).accessibilityLabel("Show keyboard").padding(16)
     }
 
     @MainActor
