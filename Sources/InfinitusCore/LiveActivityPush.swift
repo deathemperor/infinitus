@@ -93,7 +93,7 @@ public enum LiveActivityPush {
     public static let expoAttributesType = "LiveActivityAttributes"
     public static let expoWorkingName = "InfinitusWorking"
     public static let expoRevivalName = "InfinitusRevival"
-    /// Provisional until the fork contract names it (Infi3, #572).
+    /// The fork's settings → accounts screen, filed under this Mac (#572, confirmed with the fork contract).
     public static func expoDeepLink(macId: String?) -> String {
         var url = "t3code://settings/accounts"
         if let macId, let escaped = macId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
