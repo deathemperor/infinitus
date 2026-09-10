@@ -16,7 +16,7 @@ struct T3WebEmpty: View {
         // `NoActiveThreadState.tsx:26`).
         VStack(spacing: 8) {
             Text(title)
-                .font(T3Font.web(.xl, .bold))
+                .font(T3Font.web(.xl, .semibold))
                 .foregroundStyle(t3.web.foreground.color)
             if !message.isEmpty {
                 Text(message)
@@ -49,7 +49,7 @@ struct T3NoProjectsHero: View {
             // `T3TypeScale.Web` tops out at 24, short of the 30 the `sm:`
             // class needs, so this is `webLiteral`.
             Text("What should we work on?")
-                .font(T3Font.webLiteral(30, .bold))
+                .font(T3Font.webLiteral(30, .semibold))
                 .foregroundStyle(t3.web.foreground.color)
             Text("Add a project to start your first thread.")
                 .font(T3Font.web(.sm))

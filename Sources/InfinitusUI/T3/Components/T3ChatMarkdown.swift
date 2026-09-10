@@ -119,10 +119,8 @@ public struct T3ChatMarkdown: View {
     /// `.chat-markdown h1..h6` (index.css:1661-1683): weight 600 throughout;
     /// h1 1.25rem (`T3TypeScale.Web.xl`), h2 1.125rem (`.lg`), h3 1rem
     /// (`.base`), h4-h6 0.875rem (`.sm`, index.css:1680-1687).
-    /// `T3Font.Weight` has no semibold step, so this sets the system font
-    /// directly at the CSS weight.
     private func headingFont(_ level: Int) -> Font {
-        .system(size: headingStep(level).size, weight: .semibold)
+        T3Font.webLiteral(headingStep(level).size, .semibold)
     }
 
     private func headingStep(_ level: Int) -> T3TypeScale.Step {
