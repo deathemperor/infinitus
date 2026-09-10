@@ -111,6 +111,7 @@ publishes the matching section as the GitHub release body.
 - `prefs set update_auto_check` / `update_auto_install` (socket, mirror or iCloud sync) reach the running update checker at once instead of at the next relaunch (#558).
 - Team publish: a transcript line runs a redaction regex only when it carries that rule's telltale text, so the per-publish redaction pass costs a fifteenth of what it did (#346).
 - Resume: a session held by the gate is no longer marked as nudged when a tick resumes its neighbours, so later ticks still resume it once a fresh usage poll allows (#621).
+- The project list's past-sessions walk (10k transcripts, ~1 s of CPU every minute) now runs only when a project directory or the live set actually changed, on a hundred-stat fingerprint (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

@@ -3065,12 +3065,14 @@ final class AppModel: ObservableObject {
         // `PastSessions.list` stats every transcript under the projects
         // dir (10k files, ~1 s of CPU here) and the export asked for it
         // on every refresh — 7% idle CPU on its own (#346). The walk is
-        // reused for a minute while the live set holds; a session ending
-        // is what turns a transcript into a past one, so that key catches
-        // the change that matters and the project picker never lags by
-        // more than the minute otherwise.
+        // reused while the live set and the project dirs' fingerprint
+        // hold: a session ending is what turns a transcript into a past
+        // one, a new or removed transcript moves its project dir's
+        // mtime, and nothing else changes what the walk would find. The
+        // ten-minute backstop covers a clock or filesystem oddity.
         let liveKey = live.map(\.sessionId).sorted().joined(separator: ",")
-        let past = pastSessionsMemo.value(key: liveKey, maxAge: 60) {
+        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir)
+        let past = pastSessionsMemo.value(key: key, maxAge: 600) {
             PastSessions.list(claudeDir: claudeDir, limit: 200)
         }
         let recentCwds = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []

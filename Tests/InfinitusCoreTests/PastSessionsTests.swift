@@ -139,4 +139,22 @@ final class PastSessionsTests: XCTestCase {
     func testMissingProjectsDirIsEmpty() {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir.appendingPathComponent("none")), [])
     }
+
+    /// #346: the fingerprint moves when a transcript is created in a
+    /// project dir and holds while an existing one only grows.
+    func testFingerprintTracksCreationsNotAppends() throws {
+        XCTAssertEqual(PastSessions.fingerprint(claudeDir: dir), "")
+        let url = try write(cwd: "/w/a", id: "s1", lines: [user("hi")], age: 60)
+        let first = PastSessions.fingerprint(claudeDir: dir)
+        XCTAssertFalse(first.isEmpty)
+        try (user("more") + "\n").write(to: url, atomically: false, encoding: .utf8)
+        // A rewrite in place keeps the directory entry; an append would too.
+        XCTAssertEqual(PastSessions.fingerprint(claudeDir: dir), first)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-5)],
+                                              ofItemAtPath: url.deletingLastPathComponent().path)
+        let moved = PastSessions.fingerprint(claudeDir: dir)
+        XCTAssertNotEqual(moved, first)
+        try write(cwd: "/w/b", id: "s2", lines: [user("hey")], age: 10)
+        XCTAssertNotEqual(PastSessions.fingerprint(claudeDir: dir), moved)
+    }
 }
