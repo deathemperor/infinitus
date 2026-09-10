@@ -1,6 +1,22 @@
 # T3 Code
 
-> **Infinitus fork.** This repository's `main` is a fork of [T3 Code](https://github.com/pingdotgg/t3code) that drives the [Infinitus](https://infinitus.run) engine (accounts, usage, swapping, team). The native macOS app lives on the [`native`](https://github.com/deathemperor/infinitus/tree/native) branch. Fork rules: [INFINITUS.md](INFINITUS.md).
+## Infinitus fork
+
+This repository's `main` is a fork of [T3 Code](https://github.com/pingdotgg/t3code) that drives the [Infinitus](https://infinitus.run) engine: Claude Code accounts, usage windows, swapping and the sessions running on a Mac. The native macOS menu bar app lives on the [`native`](https://github.com/deathemperor/infinitus/tree/native) branch; this branch is the web, desktop and phone client for it. Everything below this section is upstream's README, untouched.
+
+What the fork adds over T3 Code:
+
+- **Accounts page** — every engine's fleet with per-account usage bars, the switch / hold / star / rename actions, the forecast of the next reset, and lapsed AWS and gcloud sign-ins with their device codes.
+- **Settings › Infinitus** — the app's preferences, notification routes, paired devices (the phone QR code and the tunnel), engines and profiles, edited from the browser.
+- **Sidebar** — an Accounts pill with the active account and its fullest window, and a Sessions group listing the Mac's Claude Code sessions, the ones waiting on you first, each row's permission mode settable in place.
+- **Command palette** — "Open accounts".
+- **Event toasts** — the engine's events (a swap, a reset, a session that needs you) surface as toasts in the app shell.
+- **Mobile** — Accounts and Sessions per paired Mac, and a Live Activity the Mac drives while an agent works.
+- **Desktop** — its own app id (`run.infinitus.desktop`), state under `~/.infinitus` instead of `~/.t3`, and an `infinitus` update channel fed by GitHub prereleases tagged `v<version>-infinitus.<date>.<run>`.
+
+How it talks to Infinitus: only through the app's control socket (`INFINITUS_CONTROL_SOCKET` overrides the per-platform default), one JSON line each way. The fork never reads the engine's files. Upstream's `main` is merged in daily by the [Upstream sync](.github/workflows/upstream-sync.yml) workflow as a pull request. Fork rules, registration points and the list of fork-only files: [INFINITUS.md](INFINITUS.md).
+
+---
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 
