@@ -110,6 +110,7 @@ final class TeamModel: ObservableObject {
     private let queue = DispatchQueue(label: "run.infinitus.team", qos: .utility)
     /// Decrypted member docs, reused across loads while their blob version holds (#346).
     private let docCache = TeamReader.DocCache()
+    private let scanCache = TeamReader.ScanCache()
     /// Driving a teammate (#220 §5.3): the network lanes and tail polls
     /// never touch the team queue; only the store publish rides `run`.
     private let driveQueue = DispatchQueue(label: "run.infinitus.team-drive", qos: .userInitiated)
@@ -212,12 +213,12 @@ final class TeamModel: ObservableObject {
     /// Rebuilds the snapshot from the local clone (no network): status +
     /// reader + (leaders) the request list.
     private nonisolated static func snapshot(_ client: TeamClient, lastFetch: Int?, lastPublish: Int?, lastError: String?,
-                                             docs: TeamReader.DocCache) throws -> (TeamSnapshot, TeamReader?, [TeamClient.ReadableHeader]) {
+                                             docs: TeamReader.DocCache, scans: TeamReader.ScanCache) throws -> (TeamSnapshot, TeamReader?, [TeamClient.ReadableHeader]) {
         let status = try client.status()
-        // One store scan per tick: the reader, the driver's reap and the
+        // One store scan per tick — none while the store's refs are what
+        // the last pass saw (#499): the reader, the driver's reap and the
         // hostname inbox all read these same headers.
-        let headers = client.roster == nil ? [] : (try? client.readableHeaders()) ?? []
-        let reader = client.roster == nil ? nil : try? TeamReader.load(client: client, headers: headers, cache: docs)
+        let (headers, reader) = TeamReader.scan(client: client, docs: docs, scans: scans)
         let requests = client.isLeader ? (try? client.requests()) ?? [] : []
         return (TeamSnapshot.make(status: status, roster: client.roster?.doc, reader: reader, requests: requests,
                                   today: today(), lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError), reader, headers)
@@ -231,7 +232,7 @@ final class TeamModel: ObservableObject {
         guard enabled else { return Task {} }
         let fetch = lastFetchAt, publish = lastPublishAt, err = lastError
         let scan = appScan()
-        let docs = docCache
+        let docs = docCache, scans = scanCache
         return Task {
             do {
                 let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker, TeamGrants, HostnameState) = try await run { paths, secrets in
@@ -242,7 +243,7 @@ final class TeamModel: ObservableObject {
                     let exclusions = TeamExclusions.load(paths: paths)
                     guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, [], TranscriptPicker(), TeamGrants(), HostnameState()) }
                     let dir = paths.teamDir(client.config.id)
-                    let (snap, reader, headers) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err, docs: docs)
+                    let (snap, reader, headers) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err, docs: docs, scans: scans)
                     // Driver side of the store lane (#220): my acked or stale
                     // commands go; a push-free scan when there are none.
                     if let reader { _ = try? TeamControl.Store.driverReap(client: client, acks: reader.ackIDs, headers: headers) }

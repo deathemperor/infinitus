@@ -179,6 +179,17 @@ public final class TeamGit: TeamStore {
         }.sorted()
     }
 
+    /// Every `refs/remotes/origin/*` with its commit, one per line — the
+    /// store as this mirror sees it. Equal fingerprints mean the same
+    /// branches at the same commits: a fetch that brought nothing and a
+    /// pass that pushed nothing leave it as it was, and `TeamReader.scan`
+    /// then reuses its last scan and fold instead of listing every branch
+    /// and decoding every document again (#499).
+    public func refsFingerprint() throws -> String {
+        guard opened else { throw GitError.notOpen }
+        return String(decoding: try run(["for-each-ref", "--format=%(refname) %(objectname)", "refs/remotes/origin/"]), as: UTF8.self)
+    }
+
     /// The mirror's `refs/remotes/origin/*` names, sorted.
     private func localHeads() throws -> [String] {
         let text = String(decoding: try run(["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"]), as: UTF8.self)

@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - A member's publish deletes the pre-split transcript chunks still sitting in its `m/<kid>` branch, so a new member's first fetch no longer downloads 1.3 GB of stale chunks (#414).
 - Leaders can compact their own branch on the store (Settings › Team, `infinitusctl team-compact`): one commit without the pre-split transcript history, the explicit force-push the spec reserves, so a new member's first fetch is megabytes instead of gigabytes (#339).
 - Nearby takes an address too: when a network keeps Macs from seeing each other's Bonjour, type the leader's host or host:port under Nearby (or `infinitusctl team request --address`) and the request goes over the LAN as if the Mac had been found (#355).
+- A five-minute pass that fetched nothing and pushed nothing reuses its last store scan instead of listing every branch and decoding every member's documents again (#499).
 
 ### Linux tray
 - The Linux companion listens on a control socket, so the plugin's hooks reach it and a Linux session's prompts record checkpoints for the phone.

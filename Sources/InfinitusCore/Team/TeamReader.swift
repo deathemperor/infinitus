@@ -136,6 +136,53 @@ public struct TeamReader {
         public var count: Int { lock.lock(); defer { lock.unlock() }; return docs.count }
     }
 
+    /// The last scan and fold, kept under the store fingerprint they came
+    /// from (#499): a loop pass whose fetch brought nothing and whose
+    /// publish pushed nothing listed every branch, checked every header
+    /// and decoded every member's documents again — about a second of CPU
+    /// every five minutes — for the same reader. In-memory state (the
+    /// transcript choices, pending nearby requests) is folded over the
+    /// reader by the caller on every pass, so it still shows on the next
+    /// tick.
+    public final class ScanCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var key: String?
+        private var headers: [TeamClient.ReadableHeader] = []
+        private var reader: TeamReader?
+        private var count = 0
+        public init() {}
+
+        /// The cached scan when `fingerprint` is the one it was stored under.
+        public func lookup(_ fingerprint: String) -> (headers: [TeamClient.ReadableHeader], reader: TeamReader?)? {
+            lock.lock(); defer { lock.unlock() }
+            guard key == fingerprint else { return nil }
+            count += 1
+            return (headers, reader)
+        }
+
+        public func store(_ fingerprint: String, headers: [TeamClient.ReadableHeader], reader: TeamReader?) {
+            lock.lock(); key = fingerprint; self.headers = headers; self.reader = reader; lock.unlock()
+        }
+
+        /// How often `lookup` answered from the cache.
+        public var hits: Int { lock.lock(); defer { lock.unlock() }; return count }
+    }
+
+    /// `client.readableHeaders()` and `load` over them, answered from
+    /// `scans` while the store fingerprint holds. The fingerprint is read
+    /// first: a ref that moves between it and the scan stores fresher data
+    /// under the older key, and the next pass simply scans again.
+    public static func scan(client: TeamClient, docs: DocCache, scans: ScanCache)
+        -> (headers: [TeamClient.ReadableHeader], reader: TeamReader?) {
+        guard client.roster != nil else { return ([], nil) }
+        let fingerprint = try? client.storeFingerprint()
+        if let fingerprint, let hit = scans.lookup(fingerprint) { return hit }
+        let headers = (try? client.readableHeaders()) ?? []
+        let reader = try? load(client: client, headers: headers, cache: docs)
+        if let fingerprint { scans.store(fingerprint, headers: headers, reader: reader) }
+        return (headers, reader)
+    }
+
     /// `headers`: a scan the caller already ran this tick (one per `load()`), else a fresh one.
     /// `cache`: decrypted docs reused while their blob version holds.
     public static func load(client: TeamClient, headers: [TeamClient.ReadableHeader]? = nil,

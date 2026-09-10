@@ -188,6 +188,35 @@ final class TeamClientTests: XCTestCase {
     /// C1: anyone holding the team code can write to the store, so the
     /// roster a joiner accepts first must carry the code leader's own
     /// signature — not merely list them.
+    /// #499: a pass whose fetch brought nothing and whose publish pushed
+    /// nothing answers from the last scan; anything that moves a ref (a
+    /// publish, a roster change) scans and folds again.
+    func testTheScanIsReusedWhileTheStoreRefsHoldAndRedoneWhenTheyMove() throws {
+        let remote = try makeRemote()
+        let (lp, ls) = machine("leader")
+        let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
+        _ = try leader.publish(kind: "now", path: "now.json", plaintext: Data("{\"busy\":1}".utf8), audience: .team, now: 1_005)
+        let docs = TeamReader.DocCache(), scans = TeamReader.ScanCache()
+        let first = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(first.headers.map(\.entry.path), ["m/\(leader.identity.kid)/now.json"])
+        XCTAssertEqual(scans.hits, 0)
+
+        _ = try leader.fetch()   // nothing new on the remote
+        let second = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 1)
+        XCTAssertEqual(second.headers.map(\.entry.path), first.headers.map(\.entry.path))
+        XCTAssertEqual(second.reader?.members[leader.identity.kid]?.now, first.reader?.members[leader.identity.kid]?.now)
+
+        _ = try leader.publish(kind: "sessions", path: "sessions/index.json", plaintext: Data("{\"sessions\":[]}".utf8), audience: .team, now: 1_010)
+        let third = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 1, "a publish moved m/<kid>, so the scan must run again")
+        XCTAssertEqual(third.headers.map(\.entry.path).sorted(),
+                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/sessions/index.json"])
+        // And the new fingerprint is the one reused next.
+        _ = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 2)
+    }
+
     func testAForgedFirstRosterIsRefusedAndNothingIsPersisted() throws {
         let remote = try makeRemote()
         let (lp, ls) = machine("leader")
