@@ -1,4 +1,5 @@
 import {
+  InfinitusAwsLogins,
   InfinitusClientActivityReport,
   InfinitusCommandFailed,
   InfinitusForecast,
@@ -41,6 +42,9 @@ const UNAVAILABLE_PROBE_INTERVAL = Duration.seconds(15);
 /** The command whose absence from the manifest means the running app predates
     the pref catalog. Polling it anyway would fail every slow cycle. */
 const PREFS_COMMAND = "prefs";
+/** Lapsed AWS / gcloud sign-ins (#572 task 7): cheap, so in the fast set, and
+    only on builds whose manifest lists it. */
+const AWS_LOGINS_COMMAND = "aws-logins";
 /**
  * The lease (#572 task 6). The app only computes session progress and scans
  * stats while some client holds a lease on them; this service is that client
@@ -62,6 +66,7 @@ const decodeFleets = Schema.decodeUnknownEffect(Schema.Array(InfinitusFleet));
 const decodeSessions = Schema.decodeUnknownEffect(Schema.Array(InfinitusSession));
 const decodeForecast = Schema.decodeUnknownEffect(InfinitusForecast);
 const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
+const decodeAwsLogins = Schema.decodeUnknownEffect(InfinitusAwsLogins);
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
 const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
@@ -200,6 +205,15 @@ const makeInfinitus = Effect.gen(function* () {
 
     const previous = yield* snapshot;
     const knownCommands = yield* Ref.get(commands);
+
+    // Absent on a build without the command, and on a cycle whose reply did
+    // not decode: a client shows no login prompts rather than stale ones.
+    let awsLogins: InfinitusSnapshot["awsLogins"];
+    if (knownCommands.some((entry) => entry.name === AWS_LOGINS_COMMAND)) {
+      const fetched = yield* fetchCommand(AWS_LOGINS_COMMAND, decodeAwsLogins);
+      if (fetched.kind === "unavailable") return yield* goUnavailable(fetched.reason);
+      if (fetched.kind === "value") awsLogins = fetched.value.logins;
+    }
     const now = yield* Clock.currentTimeMillis;
     const slowDue = now >= (yield* Ref.get(nextSlowAtMillis));
 
@@ -237,6 +251,7 @@ const makeInfinitus = Effect.gen(function* () {
         ...(forecast === undefined ? {} : { forecast }),
         sessions: sessions.kind === "value" ? sessions.value : [],
         ...(prefs === undefined ? {} : { prefs }),
+        ...(awsLogins === undefined ? {} : { awsLogins }),
         commands: knownCommands,
       }),
     );

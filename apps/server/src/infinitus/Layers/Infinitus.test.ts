@@ -578,3 +578,72 @@ describe("the lease", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 });
+
+describe("aws-logins", () => {
+  const manifestWithLogins = () => {
+    const manifest = defaultResults().manifest as { commands: ReadonlyArray<unknown> };
+    return {
+      ...manifest,
+      commands: [...manifest.commands, manifestCommand("aws-logins", "read")],
+    };
+  };
+  const login = {
+    profile: "papaya",
+    flow: "relay",
+    pid: 4243,
+    sessionLabel: "limitless",
+    state: null,
+  };
+
+  effectIt.effect("rides the fast cycle when the manifest lists it, and follows changes", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithLogins());
+      yield* stub.setResult("aws-logins", { logins: [login] });
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.awsLogins?.map((entry) => entry.profile)).toEqual(["papaya"]);
+
+      yield* stub.setResult("aws-logins", { logins: [] });
+      yield* TestClock.adjust(FAST);
+      const next = yield* Queue.take(queue);
+      expect(next.awsLogins).toEqual([]);
+      expect(
+        (yield* stub.calls).filter((call) => call === "aws-logins").length,
+      ).toBeGreaterThanOrEqual(2);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("is absent on a build whose manifest lacks the command", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+      const { fiber, first } = yield* subscribe(infinitus);
+      expect(first.available).toBe(true);
+      expect(first.awsLogins).toBeUndefined();
+      yield* TestClock.adjust(FAST);
+      expect((yield* stub.calls).filter((call) => call === "aws-logins")).toEqual([]);
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("is absent on a cycle whose reply does not decode, and back once it does", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithLogins());
+      yield* stub.setResult("aws-logins", { logins: "not a list" });
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.available).toBe(true);
+      expect(first.awsLogins).toBeUndefined();
+
+      yield* stub.setResult("aws-logins", { logins: [login] });
+      yield* TestClock.adjust(FAST);
+      const recovered = yield* Queue.take(queue);
+      expect(recovered.awsLogins?.map((entry) => entry.profile)).toEqual(["papaya"]);
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+});

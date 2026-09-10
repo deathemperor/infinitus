@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { ExecutionEnvironmentCapabilities } from "./environment.ts";
 import {
   InfinitusActivityPushRegistration,
+  InfinitusAwsLogins,
   InfinitusClientActivityReport,
   InfinitusCommandInput,
   InfinitusCommandResult,
@@ -597,5 +598,53 @@ describe("the Live Activity content states", () => {
         plain: true,
       }),
     ).toThrow();
+  });
+});
+
+describe("InfinitusAwsLogins", () => {
+  const decodeLogins = Schema.decodeUnknownSync(InfinitusAwsLogins);
+
+  it("decodes a lapsed sign-in with a login in flight and one with none", () => {
+    const decoded = decodeLogins({
+      logins: [
+        {
+          profile: "papaya",
+          flow: "relay",
+          pid: 4243,
+          sessionLabel: "limitless",
+          state: {
+            profile: "papaya",
+            flow: "relay",
+            phase: "waitingForBrowser",
+            url: "https://device.sso.example/?user_code=ABCD",
+            userCode: "ABCD-1234",
+            callbackPort: 51234,
+            message: null,
+            startedAt: 1_800_000_000,
+            pid: 4243,
+          },
+          account: { number: 1, email: "a@x.com" },
+        },
+        { profile: "default", provider: "gcloud", flow: "deviceCode", pid: null, state: null },
+      ],
+    });
+    expect(decoded.logins[0]?.state?.userCode).toBe("ABCD-1234");
+    expect(decoded.logins[1]?.provider).toBe("gcloud");
+    expect(decoded.logins[1]?.state).toBeNull();
+  });
+
+  it("keeps a flow or phase it has never heard of, and rejects a missing profile", () => {
+    expect(
+      decodeLogins({
+        logins: [
+          {
+            profile: "p",
+            flow: "teleport",
+            state: { profile: "p", flow: "teleport", phase: "levitating", startedAt: 1 },
+          },
+        ],
+      }).logins[0]?.state?.phase,
+    ).toBe("levitating");
+    expect(() => decodeLogins({ logins: [{ flow: "relay" }] })).toThrow();
   });
 });

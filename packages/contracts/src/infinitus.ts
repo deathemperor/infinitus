@@ -222,6 +222,53 @@ export const InfinitusPrefs = Schema.Struct({
 });
 export type InfinitusPrefs = typeof InfinitusPrefs.Type;
 
+/*
+ * `aws-logins` (#572 task 7): sessions whose AWS or gcloud sign-in lapsed, each
+ * with the flow the phone would start and any login in flight. Structs are open
+ * and their enums plain strings, so a flow or phase the app adds later still
+ * decodes. Native: `AwsLogin.Item` / `AwsLogin.State`.
+ */
+
+/** A login in flight: `flow` is `relay`, `deviceCode`, `remote` or `local`;
+    `phase` walks `starting` → `waitingForBrowser` / `waitingForCode` → `done`
+    / `failed`; `url` and `userCode` are what a person opens and types on
+    another device; `startedAt` is epoch seconds. */
+export const InfinitusAwsLoginState = Schema.Struct({
+  profile: Schema.String,
+  flow: Schema.String,
+  phase: Schema.String,
+  url: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  userCode: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  callbackPort: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  message: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  startedAt: Schema.Number,
+  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusAwsLoginState = typeof InfinitusAwsLoginState.Type;
+
+/** One lapsed sign-in: the profile (an account for gcloud), which CLI
+    (`provider` is `gcloud` for gcloud items and absent for AWS), the session
+    that hit it, and the login running for it, if any. `account` is the
+    engine's account record, opaque here. */
+export const InfinitusAwsLogin = Schema.Struct({
+  profile: Schema.String,
+  provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  flow: Schema.String,
+  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  sessionLabel: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  state: Schema.optionalKey(Schema.NullOr(InfinitusAwsLoginState)),
+  failedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  account: Schema.optionalKey(Schema.Unknown),
+});
+export type InfinitusAwsLogin = typeof InfinitusAwsLogin.Type;
+
+/** The `aws-logins` reply. */
+export const InfinitusAwsLogins = Schema.Struct({
+  logins: Schema.Array(InfinitusAwsLogin),
+});
+export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
+
 /** Everything one poll of the socket collects, assembled client-side from the
     `status`, `fleets`, `forecast`, `sessions`, `prefs` and `manifest`
     commands. `available: false` with an `unavailableReason` means the socket
@@ -235,6 +282,7 @@ export const InfinitusSnapshot = Schema.Struct({
   forecast: Schema.optionalKey(InfinitusForecast),
   sessions: Schema.Array(InfinitusSession),
   prefs: Schema.optionalKey(InfinitusPrefs),
+  awsLogins: Schema.optionalKey(Schema.Array(InfinitusAwsLogin)),
   commands: Schema.Array(InfinitusManifestCommand),
 });
 export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;
