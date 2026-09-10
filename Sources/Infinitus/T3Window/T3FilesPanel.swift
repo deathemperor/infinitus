@@ -17,11 +17,16 @@ import InfinitusUI
 /// `T3FileTree` (upstream's `fileTree.ts` — its web panel hands the same job to
 /// `@pierre/trees`, `FileBrowserPanel.tsx:7`).
 ///
+/// A row's right-click menu, its drag into the composer and the re-list after a
+/// turn are `T3FileRow`'s `.contextMenu` / `.onDrag`, `T3MentionDrag`
+/// (T3FileDrop.swift) and `T3FilesRefresh` (Core).
+///
 /// Not ported, each with its upstream line:
-/// - drag-to-mention (`fileTreeDragMention.ts:83`'s `COMPOSER_MENTION_DRAG_TYPE`):
-///   B's composer takes dropped file URLs as attachments (`T3ComposerView.swift:191`),
-///   it has no mention drop type to tag a drag with.
-/// - the row context menu's "Copy mention" / "Add to chat" (`:154-192`).
+/// - incremental path reconciliation (`buildFileTreePathUpdates`,
+///   `FileBrowserPanel.tsx:26,273-285`): a listing that lands replaces the tree
+///   whole here (`apply`), which is what `model.resetPaths` does on the first
+///   one (`:281`) — the diffed `model.batch` exists to keep `@pierre/trees`'
+///   per-row DOM state, and this tree has none to keep.
 /// - Pierre's colored per-extension sprite set (`pierre-icons.ts:48-64`): the
 ///   glyphs here are the kit's lucide ones, the phone's own choice for this tree
 ///   (`PierreEntryIcon.tsx:14-22` uses a folder glyph and a per-extension icon).
@@ -176,6 +181,9 @@ private struct T3FilesBrowser: View {
     @State private var query = ""
     @State private var failure: String?
     @State private var pending = true
+    /// `Listing.truncated`: the walk hit `T3ProjectFiles.entryCap` and this
+    /// tree is not the whole workspace.
+    @State private var truncated = false
     @FocusState private var searching: Bool
 
     /// The flatten's inputs — `.task(id:)` cancels the in-flight one when they
@@ -194,6 +202,22 @@ private struct T3FilesBrowser: View {
             await load(reload: true)
         }
         .task(id: Flow(query: query, expanded: expanded, revision: revision)) { await reflow() }
+        // `useWorkspaceMutationRefresh` (`FileBrowserPanel.tsx:267-271`): the
+        // watcher lives in its own leaf so the turn's ticking never re-renders
+        // this tree (see `T3FilesRelist`).
+        .background {
+            if let store = model.timelineStore {
+                T3FilesRelist(store: store, threadId: model.state.selectedThreadId,
+                              onRelist: relist)
+            }
+        }
+    }
+
+    /// A re-list is exactly the refresh button's work (`handleRefresh`,
+    /// `FileBrowserPanel.tsx:264-266`): the listing and the open file both.
+    private func relist() {
+        onRefresh()
+        Task { await load(reload: true) }
     }
 
     // MARK: - The subheader
@@ -288,21 +312,46 @@ private struct T3FilesBrowser: View {
     /// ("min-h-0 flex-1 overflow-hidden", `:420`; the phone's own `FlatList`,
     /// `FileTreeBrowser.tsx:239`).
     private var tree: some View {
-        T3ScrollArea {
-            LazyVStack(spacing: 0) {
-                ForEach(rows, id: \.node.path) { row in
-                    T3FileRow(row: row,
-                              expanded: expanded.contains(row.node.path),
-                              selected: selected == row.node.path,
-                              action: { open(row.node) })
-                        // The way out to the file's own app (the header's
-                        // editor picker upstream, `FilePreviewPanel.tsx:1140-1148`).
-                        .simultaneousGesture(TapGesture(count: 2).onEnded { reveal(row.node) })
+        VStack(spacing: 0) {
+            T3ScrollArea {
+                LazyVStack(spacing: 0) {
+                    ForEach(rows, id: \.node.path) { row in
+                        T3FileRow(row: row,
+                                  expanded: expanded.contains(row.node.path),
+                                  selected: selected == row.node.path,
+                                  action: { open(row.node) },
+                                  onCopyMention: copyMention, onAddToChat: addToChat)
+                            // The way out to the file's own app (the header's
+                            // editor picker upstream, `FilePreviewPanel.tsx:1140-1148`).
+                            .simultaneousGesture(TapGesture(count: 2).onEnded { reveal(row.node) })
+                    }
                 }
+                // "paddingTop: 8, paddingBottom: 8" (`FileTreeBrowser.tsx:255`).
+                .padding(.vertical, 8)
             }
-            // "paddingTop: 8, paddingBottom: 8" (`FileTreeBrowser.tsx:255`).
-            .padding(.vertical, 8)
+            if truncated { truncatedNotice }
         }
+    }
+
+    /// The listing hit its cap. Upstream words this once — a disabled entry
+    /// under a separator at the BOTTOM of the entry list
+    /// (`FileBreadcrumbs.tsx:187-192`; `FileBrowserPanel.tsx` shows no notice of
+    /// its own). A disabled `MenuItem` is the foreground at `opacity-64` over
+    /// `sm:text-sm px-2 py-1 sm:min-h-7` (`menu.tsx:89`), and the separator is
+    /// the same `border-border/60` rule the subheader wears. Outside the scroll
+    /// area: inside a lazy list of 20 000 rows it would never be reached.
+    private var truncatedNotice: some View {
+        Text(T3FilesRefresh.truncatedNotice)
+            .font(T3Font.web(.sm))
+            .foregroundStyle(t3.web.foreground.color.opacity(0.64))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .overlay(alignment: .top) {
+                Rectangle().fill(t3.web.border.color.opacity(0.6)).frame(height: 1)
+            }
     }
 
     /// The phone's empty state for this same tree
@@ -349,6 +398,25 @@ private struct T3FilesBrowser: View {
         NSWorkspace.shared.open(URL(fileURLWithPath: cwd).appendingPathComponent(node.path))
     }
 
+    /// "Copy mention" (`FileBrowserPanel.tsx:162-174`): the mention text, and
+    /// only it, on the pasteboard. Upstream follows the write with a
+    /// "Mention copied" toast; B has no toast manager, and its other copy actions
+    /// (a timeline row's Copy, T3TimelineRowViews.swift:310) confirm nothing
+    /// either — the pasteboard is the confirmation.
+    private func copyMention(_ mention: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(mention, forType: .string)
+    }
+
+    /// "Add to chat" (`:175-192`): the open composer appends the mention to its
+    /// draft. Upstream reaches that composer through a ref
+    /// (`useComposerHandleContext`, `:106`) and toasts when there is none; here
+    /// `T3ComposerInbox` is the ref, and the Files tab only exists while a
+    /// thread is selected — which is exactly when a composer is mounted on it.
+    private func addToChat(_ mention: String) {
+        model.composerInbox.mention = mention
+    }
+
     private func load(reload: Bool) async {
         pending = true
         defer { pending = false }
@@ -361,6 +429,7 @@ private struct T3FilesBrowser: View {
         case .success(let listing):
             onAvailability(true)
             failure = nil
+            truncated = listing.truncated
             let tree = await Task.detached(priority: .userInitiated) {
                 T3FileTree.build(listing.entries)
             }.value
@@ -378,6 +447,7 @@ private struct T3FilesBrowser: View {
                 nodes = []
                 rows = []
                 directories = []
+                truncated = false
             } else {
                 onAvailability(true)
                 failure = error.message
@@ -402,6 +472,41 @@ private struct T3FilesBrowser: View {
     }
 }
 
+/// The re-list watcher (`useWorkspaceMutationRefresh`,
+/// `FileBrowserPanel.tsx:267-271`), on the edges `T3FilesRefresh.shouldRelist`
+/// names. Nothing to draw: it exists to hold the observation.
+///
+/// Two things pin its shape. The turn's state comes from the TIMELINE STORE,
+/// not from `T3WindowModel.state`'s threads: those carry the fleet poll's
+/// `SessionFacts`, whose latest turn sits at `.completed` right through a
+/// running turn (measured on the fixture — the store's `.running` is what the
+/// composer's Stop button reads, T3ComposerView.swift:590). And the store is
+/// observed HERE rather than in the browser, because the store republishes on
+/// every transcript poll: observing it up there would re-render the whole tree
+/// a few times a second for a value only this edge cares about (#18).
+private struct T3FilesRelist: View {
+    @ObservedObject var store: T3TimelineStore
+    let threadId: String?
+    let onRelist: () -> Void
+
+    private var signal: T3FilesRefresh.Signal {
+        // `gone` is the session having exited (#400) — the turn it left behind
+        // is over, whatever the last transcript entry said.
+        let turn = store.gone ? nil : store.timeline?.latestTurn?.state
+        return T3FilesRefresh.Signal(threadId: threadId,
+                                     turnState: turn.map(T3Thread.Turn.State.init))
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: signal) { previous, current in
+                guard T3FilesRefresh.shouldRelist(from: previous, to: current) else { return }
+                onRelist()
+            }
+    }
+}
+
 /// One row. The tree's own theme overrides are the numbers here: 12 px text,
 /// a 5 px corner, the selected background `currentColor 12%` and the hover one
 /// `7%` (`pierre-tree-theme.ts:6-13`). Row height and indent live inside
@@ -415,6 +520,11 @@ private struct T3FileRow: View {
     let expanded: Bool
     let selected: Bool
     let action: () -> Void
+    let onCopyMention: (String) -> Void
+    let onAddToChat: (String) -> Void
+
+    /// `composerMentionFromTreePath` over this row's path (Core).
+    private var mention: String? { T3FileMention.mention(forTreePath: row.node.path) }
 
     var body: some View {
         Button(action: action) {
@@ -445,7 +555,28 @@ private struct T3FileRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+        // "Rows only need to be draggable so entries can be dropped into the
+        // chat composer; rearranging files inside the tree stays off"
+        // (`FileBrowserPanel.tsx:220-222`, `canDrop: () => false`) — so the row
+        // is a drag SOURCE only, and the tree takes no drops at all.
+        //
+        // Upstream also has to undo the selection its own tree applies to a
+        // dragged row (`fileTreeDragMention.ts:41-45, 85-93`); a SwiftUI drag
+        // never fires the Button's action, so there is nothing to undo.
+        .onDrag { T3MentionDrag.provider(mention: mention ?? "") }
+        // `contextMenu: { triggerMode: "right-click" }` (`:213-218`).
+        .contextMenu { menu }
         .padding(.horizontal, 4)
+    }
+
+    /// `:155-160`: two items, and the same two for a file and a folder alike —
+    /// upstream drops the tree path's trailing `/` (`:145`) and offers nothing
+    /// kind-specific at these lines.
+    @ViewBuilder private var menu: some View {
+        if let mention {
+            Button("Copy mention") { onCopyMention(mention) }
+            Button("Add to chat") { onAddToChat(mention) }
+        }
     }
 
     private var background: Color {

@@ -46,6 +46,10 @@ struct T3ComposerView: View {
     /// read for the session's birth (the permission floor) and its model.
     let model: T3WindowModel
     let app: AppModel
+    /// What the Files tab hands this composer. Observed — and the model is
+    /// not — precisely so a mention arrives without a fleet tick's worth of
+    /// re-renders behind it (`T3ComposerInbox`).
+    @ObservedObject var inbox: T3ComposerInbox
     @ObservedObject var store: T3TimelineStore
     /// Task 12's delivery, shared with the pending slot — one sender per
     /// thread, so a verdict and a message can never be in flight at once
@@ -188,7 +192,16 @@ struct T3ComposerView: View {
         // `onDropCapture` on the form (`:4762-4765`) — files from Finder or
         // any app that promises a URL, and bare image bytes from one that
         // promises no file (Photos, a browser drag).
-        .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
+        // The mention type rides the SAME drop target as the files, so it also
+        // gets the same highlight — upstream's mention handlers set the very
+        // `isDragOverComposer` its file drop does (`:4646`, `:2534`) and draw
+        // nothing of their own.
+        .onDrop(of: [T3MentionDrag.type, .fileURL, .image], isTargeted: $dropTargeted) { providers in
+            // A row dragged out of the Files tab is text, not an attachment:
+            // it goes into the draft, in draft mode too, so it never meets the
+            // refusal below (`makeComposerMentionDragHandlers`,
+            // `composerMentionDrag.ts:84-96`).
+            if T3MentionDrag.take(from: providers, into: { appendMention($0) }) { return true }
             // Draft mode has nothing to stage into (see `stage`): the drop is
             // refused rather than half-taken, so the Finder animates the file
             // back and `stage` says why.
@@ -224,6 +237,12 @@ struct T3ComposerView: View {
             guard let text, !text.isEmpty else { return }
             insert(text)
             model.pendingComposerInsert = nil
+        }
+        // The Files tab's "Add to chat" (`FileBrowserPanel.tsx:175-192`).
+        .onChange(of: inbox.mention) { _, mention in
+            guard let mention, !mention.isEmpty else { return }
+            appendMention(mention)
+            inbox.mention = nil
         }
         // A sidebar row's drop onto the thread that is ALREADY open: there is
         // no remount to carry it, so the queue itself is what wakes this
@@ -730,6 +749,22 @@ struct T3ComposerView: View {
         }
         recall = nil
         caretRequest = draft.text.utf16.count
+        focusRequest = true
+    }
+
+    /// A file mention from the Files tab — its row menu's "Add to chat" or a row
+    /// dropped on this card. `insertTextAtEnd(`${mention} `, { ensureLeadingBoundary:
+    /// true })` (`FileBrowserPanel.tsx:184`, `composerMentionDrag.ts:93`): at the
+    /// END of the draft, never at the caret, and never a paragraph of its own the
+    /// way `insert` above starts one — the rule is `T3ComposerDrafts.appendingAtEnd`.
+    private func appendMention(_ mention: String) {
+        draft.text = T3ComposerDrafts.appendingAtEnd("\(mention) ", to: draft.text)
+        recall = nil
+        caret = draft.text.utf16.count
+        caretRequest = caret
+        // Upstream focuses on the frame AFTER the insert, never during the drop
+        // (`composerMentionDrag.ts:35-41`); a `@State` write here is already
+        // that next frame.
         focusRequest = true
     }
 
