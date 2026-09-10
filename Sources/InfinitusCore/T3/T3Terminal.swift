@@ -42,10 +42,24 @@ public enum T3Terminal: Sendable {
     /// The host's history ring size (#507 Mac side, step 3) — Core only
     /// needs the number for `resumePlan`'s math.
     public static let ringBytes = 256 * 1024
-    /// Upstream's `DEFAULT_TERMINAL_ID`. #507's table shows the literal
+    /// Upstream's `DEFAULT_TERMINAL_ID` (`terminal.ts:10`) — "the client-side
+    /// id for the FIRST shell opened on a thread; ids are uniformly `term-N`,
+    /// there's no 'default' intrinsic". #507's table shows the literal
     /// `"default"`; using upstream's actual constant instead, per the
     /// brief's explicit instruction — flagged in the PR report.
     public static let defaultTerminalId = "term-1"
+    /// `TerminalIdSchema`'s cap (`terminal.ts:19`: a trimmed non-empty string,
+    /// max length 128). An id outside it is refused rather than keyed: an
+    /// empty one would make a map entry no route could ever address (the
+    /// path parser's `percentDecoded` returns nil for an empty component).
+    public static let maxTerminalIdLength = 128
+    /// How many terminals one session pid may hold at once. Upstream has NO
+    /// per-thread cap: `MAX_TERMINALS_PER_GROUP = 4` (`apps/web/src/types.ts:30`,
+    /// used at `ThreadTerminalDrawer.tsx:1233`) limits one SPLIT GROUP, and a
+    /// thread may hold several groups; the server's only limit evicts already
+    /// exited sessions (`Manager.ts:1957-1977`). 8 is this host's own number —
+    /// a forkpty each, so the refusal is a real one, not bookkeeping.
+    public static let maxTerminalsPerSession = 8
     /// The `closed` frame's `reason` when the host dropped the stream for
     /// backpressure (#507 review ruling 5) rather than the shell exiting —
     /// the phone matches this literal to know it may resume with `since`
@@ -201,14 +215,25 @@ public enum T3Terminal: Sendable {
 
     // MARK: - Request / reply bodies
 
+    /// `terminalId` is upstream's — every `terminal.open` names the shell it
+    /// wants and the SERVER never allocates one (`terminal.ts:33-37`,
+    /// `terminalLabels.ts:26-31`). It is optional on this wire only so the
+    /// phone's one-terminal build (#513) and every caller written before
+    /// several-per-thread keep working: absent means `defaultTerminalId`.
     public struct OpenRequest: Codable, Sendable, Equatable {
         public let cols: Int
         public let rows: Int
-        public init(cols: Int, rows: Int) {
-            self.cols = cols; self.rows = rows
+        public let terminalId: String?
+        public init(cols: Int, rows: Int, terminalId: String? = nil) {
+            self.cols = cols; self.rows = rows; self.terminalId = terminalId
         }
+        /// The terminal this open names — the id it sent, or the first shell's.
+        public var resolvedTerminalId: String { terminalId ?? defaultTerminalId }
         public func validate() -> ValidationError? {
-            T3Terminal.validate(cols: cols, rows: rows)
+            if let terminalId, T3Terminal.validate(terminalId: terminalId) != nil {
+                return .terminalIdInvalid
+            }
+            return T3Terminal.validate(cols: cols, rows: rows)
         }
     }
 
@@ -247,6 +272,11 @@ public enum T3Terminal: Sendable {
         case colsOutOfRange
         case rowsOutOfRange
         case dataTooLarge
+        /// Blank, whitespace-only or over `maxTerminalIdLength`
+        /// (`TerminalIdSchema`, `terminal.ts:19`).
+        case terminalIdInvalid
+        /// The pid already holds `maxTerminalsPerSession` shells.
+        case tooManyTerminals
     }
 
     static func validate(cols: Int, rows: Int) -> ValidationError? {
@@ -255,12 +285,21 @@ public enum T3Terminal: Sendable {
         return nil
     }
 
+    /// `TerminalIdSchema` (`terminal.ts:19`): trimmed, non-empty, ≤ 128.
+    public static func validate(terminalId: String) -> ValidationError? {
+        let trimmed = terminalId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, terminalId.count <= maxTerminalIdLength else {
+            return .terminalIdInvalid
+        }
+        return nil
+    }
+
     // MARK: - Routes
 
     /// One of the five mirror routes this contract defines, already parsed
-    /// out of a request's method, path and query. `id` is the terminal id
-    /// (`defaultTerminalId` for v1's one-terminal-per-session); `since` is
-    /// the stream's resume point, absent on a fresh attach.
+    /// out of a request's method, path and query. `id` is the terminal id —
+    /// one pid holds several (`defaultTerminalId` is only the first shell's);
+    /// `since` is the stream's resume point, absent on a fresh attach.
     public enum Route: Sendable, Equatable {
         case open(pid: Int32)
         case stream(pid: Int32, id: String, since: Int?)
