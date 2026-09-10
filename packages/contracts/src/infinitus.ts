@@ -284,6 +284,26 @@ export const InfinitusAwsLogins = Schema.Struct({
 });
 export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
 
+/** One row of the `events` reply — the app's event log as the Activity pane
+    shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Native
+    encodes neither its `kind` nor its id (#615); until it does, a client
+    classifies by icon and text. */
+export const InfinitusEventRow = Schema.Struct({
+  at: Schema.String,
+  icon: Schema.String,
+  text: Schema.String,
+});
+export type InfinitusEventRow = typeof InfinitusEventRow.Type;
+
+/** One event as the snapshot carries it: the row plus an id the server
+    assigns (`<at>#<sequence>`), stable for as long as that server runs, which
+    is what a client dedupes on. */
+export const InfinitusEvent = Schema.Struct({
+  ...InfinitusEventRow.fields,
+  id: Schema.String,
+});
+export type InfinitusEvent = typeof InfinitusEvent.Type;
+
 /** Everything one poll of the socket collects, assembled client-side from the
     `status`, `fleets`, `forecast`, `sessions`, `prefs` and `manifest`
     commands. `available: false` with an `unavailableReason` means the socket
@@ -298,6 +318,11 @@ export const InfinitusSnapshot = Schema.Struct({
   sessions: Schema.Array(InfinitusSession),
   prefs: Schema.optionalKey(InfinitusPrefs),
   awsLogins: Schema.optionalKey(Schema.Array(InfinitusAwsLogin)),
+  /** A message, not state: the events new since the previous poll, `[]` when
+      none. Absent on a build without the `events` command and on a cycle
+      whose reply did not decode. The first poll after the app is sighted only
+      seeds the cursor, so history is never replayed. */
+  events: Schema.optionalKey(Schema.Array(InfinitusEvent)),
   commands: Schema.Array(InfinitusManifestCommand),
 });
 export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;

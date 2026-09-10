@@ -670,3 +670,75 @@ describe("aws-logins", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 });
+
+describe("events", () => {
+  const manifestWithEvents = () => {
+    const manifest = defaultResults().manifest as { commands: ReadonlyArray<unknown> };
+    return {
+      ...manifest,
+      commands: [...manifest.commands, manifestCommand("events", "read")],
+    };
+  };
+  const poll = (at: string) => ({ at, icon: "clock.arrow.circlepath", text: "poll" });
+  const switched = (at: string) => ({
+    at,
+    icon: "arrow.triangle.2.circlepath",
+    text: "switched one@example.com → two@example.com",
+  });
+
+  effectIt.effect("publishes only what the log gained since the previous poll, with ids", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithEvents());
+      // The log the app already had: never replayed.
+      yield* stub.setResult("events", [poll("2026-09-10T08:00:00Z"), poll("2026-09-10T08:01:00Z")]);
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.events).toEqual([]);
+      expect((yield* stub.calls).filter((call) => call === "events")).toHaveLength(1);
+
+      // Two new rows, one sharing the newest second the cursor already holds.
+      yield* stub.setResult("events", [
+        poll("2026-09-10T08:01:00Z"),
+        switched("2026-09-10T08:01:00Z"),
+        poll("2026-09-10T08:02:00Z"),
+      ]);
+      yield* TestClock.adjust(FAST);
+      const next = yield* Queue.take(queue);
+      expect(next.events).toEqual([
+        { ...switched("2026-09-10T08:01:00Z"), id: "2026-09-10T08:01:00Z#0" },
+        { ...poll("2026-09-10T08:02:00Z"), id: "2026-09-10T08:02:00Z#1" },
+      ]);
+
+      // The same reply again gains nothing: the snapshot carries `[]`.
+      yield* TestClock.adjust(FAST);
+      const settled = yield* Queue.take(queue);
+      expect(settled.events).toEqual([]);
+
+      // After the app goes away and returns, its (re-seeded) log is history again.
+      yield* stub.setUnavailable("gone");
+      yield* TestClock.adjust(FAST);
+      expect((yield* Queue.take(queue)).available).toBe(false);
+      yield* stub.setUnavailable(null);
+      yield* stub.setResult("events", [switched("2026-09-10T08:05:00Z")]);
+      yield* TestClock.adjust(PROBE);
+      const back = yield* Queue.take(queue);
+      expect(back.available).toBe(true);
+      expect(back.events).toEqual([]);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("is absent on a build whose manifest lacks the command", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+      const { fiber, first } = yield* subscribe(infinitus);
+      expect(first.events).toBeUndefined();
+      yield* TestClock.adjust(FAST);
+      expect((yield* stub.calls).filter((call) => call === "events")).toEqual([]);
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+});

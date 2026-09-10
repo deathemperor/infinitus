@@ -1,5 +1,7 @@
 import {
   InfinitusAwsLogins,
+  type InfinitusEvent,
+  InfinitusEventRow,
   InfinitusClientActivityReport,
   InfinitusCommandFailed,
   InfinitusForecast,
@@ -45,6 +47,9 @@ const PREFS_COMMAND = "prefs";
 /** Lapsed AWS / gcloud sign-ins (#572 task 7): cheap, so in the fast set, and
     only on builds whose manifest lists it. */
 const AWS_LOGINS_COMMAND = "aws-logins";
+/** The app's event log: cheap, so in the fast set, behind the same manifest
+    gate. Only what is new since the previous poll reaches the snapshot. */
+const EVENTS_COMMAND = "events";
 /**
  * The lease (#572 task 6). The app only computes session progress and scans
  * stats while some client holds a lease on them; this service is that client
@@ -67,6 +72,7 @@ const decodeSessions = Schema.decodeUnknownEffect(Schema.Array(InfinitusSession)
 const decodeForecast = Schema.decodeUnknownEffect(InfinitusForecast);
 const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
 const decodeAwsLogins = Schema.decodeUnknownEffect(InfinitusAwsLogins);
+const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(InfinitusEventRow));
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
 const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
@@ -107,6 +113,16 @@ const makeInfinitus = Effect.gen(function* () {
       manifest, because the app that came back may not be the one that left. */
   const manifestStale = yield* Ref.make(true);
   const nextSlowAtMillis = yield* Ref.make(0);
+  /** Where the event log was last read to: the newest `at` seen and every
+      `icon|text` at that second, so the next reply's tail past it is what is
+      new. `None` until the first reply seeds it (after the app is sighted), so
+      history is never published. `ISO8601DateFormatter` output is fixed-width,
+      which is what makes the string comparison safe. */
+  const eventCursor = yield* Ref.make<
+    Option.Option<{ readonly at: string; readonly seen: ReadonlySet<string> }>
+  >(Option.none());
+  /** Counts every event published; with `at` it makes the id. */
+  const eventSequence = yield* Ref.make(0);
   const nextLeaseAtMillis = yield* Ref.make(0);
   /** Stable for the service's lifetime: the app files the lease under it. */
   const leaseClientId = `t3-server-${(yield* Random.nextIntBetween(0, 0xffff_ffff)).toString(16)}`;
@@ -179,8 +195,38 @@ const makeInfinitus = Effect.gen(function* () {
       yield* Ref.update(generation, (previous) => previous + 1);
       yield* Ref.set(warnedCommands, new Set<string>());
     }
+    yield* Ref.set(eventCursor, Option.none());
     yield* SubscriptionRef.set(state, Option.some(unavailableSnapshot(reason)));
     return UNAVAILABLE_PROBE_INTERVAL;
+  });
+
+  /** The rows past the cursor, given ids, and the cursor moved to the reply's
+      newest row. A `None` cursor takes the whole reply as already seen. */
+  const newEvents = Effect.fn("newEvents")(function* (
+    rows: ReadonlyArray<InfinitusEventRow>,
+  ): Effect.fn.Return<ReadonlyArray<InfinitusEvent>> {
+    const cursor = yield* Ref.get(eventCursor);
+    const fresh = Option.isNone(cursor)
+      ? []
+      : rows.filter(
+          (row) =>
+            row.at > cursor.value.at ||
+            (row.at === cursor.value.at && !cursor.value.seen.has(`${row.icon}|${row.text}`)),
+        );
+    const newest = rows.reduce<string | null>(
+      (latest, row) => (latest === null || row.at > latest ? row.at : latest),
+      null,
+    );
+    if (newest !== null) {
+      const seen = new Set(
+        rows.filter((row) => row.at === newest).map((row) => `${row.icon}|${row.text}`),
+      );
+      yield* Ref.set(eventCursor, Option.some({ at: newest, seen }));
+    } else if (Option.isNone(cursor)) {
+      yield* Ref.set(eventCursor, Option.some({ at: "", seen: new Set<string>() }));
+    }
+    const first = yield* Ref.getAndUpdate(eventSequence, (n) => n + fresh.length);
+    return fresh.map((row, index) => ({ ...row, id: `${row.at}#${first + index}` }));
   });
 
   /** One pass over the socket. Answers with how long to wait before the next
@@ -213,6 +259,14 @@ const makeInfinitus = Effect.gen(function* () {
       const fetched = yield* fetchCommand(AWS_LOGINS_COMMAND, decodeAwsLogins);
       if (fetched.kind === "unavailable") return yield* goUnavailable(fetched.reason);
       if (fetched.kind === "value") awsLogins = fetched.value.logins;
+    }
+    // Absent on a build without the command and on a cycle whose reply did
+    // not decode; otherwise only what the log gained since the previous poll.
+    let events: InfinitusSnapshot["events"];
+    if (knownCommands.some((entry) => entry.name === EVENTS_COMMAND)) {
+      const fetched = yield* fetchCommand(EVENTS_COMMAND, decodeEvents);
+      if (fetched.kind === "unavailable") return yield* goUnavailable(fetched.reason);
+      if (fetched.kind === "value") events = yield* newEvents(fetched.value);
     }
     const now = yield* Clock.currentTimeMillis;
     const slowDue = now >= (yield* Ref.get(nextSlowAtMillis));
@@ -252,6 +306,7 @@ const makeInfinitus = Effect.gen(function* () {
         sessions: sessions.kind === "value" ? sessions.value : [],
         ...(prefs === undefined ? {} : { prefs }),
         ...(awsLogins === undefined ? {} : { awsLogins }),
+        ...(events === undefined ? {} : { events }),
         commands: knownCommands,
       }),
     );
