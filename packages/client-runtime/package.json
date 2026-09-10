@@ -123,6 +123,10 @@
       "types": "./src/state/infinitus.ts",
       "default": "./src/state/infinitus.ts"
     },
+    "./state/infinitusAccounts": {
+      "types": "./src/state/infinitusAccounts.ts",
+      "default": "./src/state/infinitusAccounts.ts"
+    },
     "./state/models": {
       "types": "./src/state/models.ts",
       "default": "./src/state/models.ts"

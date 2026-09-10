@@ -89,13 +89,16 @@ export type InfinitusStatus = typeof InfinitusStatus.Type;
 /** One account inside a fleet from the `fleets` / `refresh` reply. `usage` is
     the engine's own usage payload, left opaque at this layer. Everything the
     native `Account` models as optional is optional here too: an engine that
-    has no alias, plan, preferred knob or fresh usage omits the key. */
+    has no alias, plan, hold or preferred knob or fresh usage omits the key. */
 export const InfinitusAccount = Schema.Struct({
   number: Schema.Number,
   alias: Schema.optionalKey(Schema.String),
   email: Schema.String,
   plan: Schema.optionalKey(Schema.String),
   active: Schema.Boolean,
+  /** Held: the engine is skipping this account until it is unheld (`hold` /
+      `unhold` write it). Absent from engines that have no hold knob. */
+  disabled: Schema.optionalKey(Schema.Boolean),
   preferred: Schema.optionalKey(Schema.Boolean),
   isOrganization: Schema.Boolean,
   organizationName: Schema.optionalKey(Schema.String),
