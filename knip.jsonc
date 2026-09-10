@@ -13,8 +13,9 @@
       "vitest": { "entry": [".github/**/*.test.cjs"] },
     },
     "scripts": {
-      // Knip loads its preprocessor through a CLI option, not a source import.
-      "entry": ["knip-schemas.ts"],
+      // Knip loads its preprocessor through a CLI option, not a source import;
+      // the fork's visual pass is run by hand (INFINITUS.md).
+      "entry": ["knip-schemas.ts", "fork-visual-pass.mjs"],
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.

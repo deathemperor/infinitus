@@ -70,6 +70,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
   boot-shell title and splash labels to `PRODUCT_NAME`.
 - `packages/shared/package.json` — the `./productName` export.
+- `knip.jsonc` — `scripts/fork-visual-pass.mjs` as a scripts entry (run by
+  hand, nothing imports it).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
@@ -170,6 +172,15 @@ this file adds the fork's own rules. Plan and history: issue #555.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
+
+- `scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over
+  CDP pairs with a running web app, clicks through the first-run wizard, then
+  screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Mint a
+  token with `node apps/server/src/bin.ts pair` (from the server's worktree),
+  then
+  `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/infinitus`
+  (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the
+  token is never printed). No dependencies; node ≥ 22.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
