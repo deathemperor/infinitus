@@ -1,0 +1,70 @@
+# Daily merge of upstream T3 Code into the fork's main, as a PR (main is
+# PR-only). Our history is never rebased; a conflicting merge leaves a PR
+# with the conflict markers listed in its body for a person to finish.
+# Needs `workflow_dispatch:` on ci.yml (a registration point, INFINITUS.md).
+name: Upstream sync
+on:
+  schedule:
+    - cron: "30 1 * * *" # 01:30 UTC = 08:30 GMT+7, before the day's work
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Merge upstream/main onto a sync branch
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          git config user.name "infinitus-sync[bot]"
+          git config user.email "noreply@infinitus.run"
+          git remote add upstream https://github.com/pingdotgg/t3code.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "state=uptodate" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          branch="upstream-sync-$(date -u +%Y%m%d)"
+          git checkout -b "$branch"
+          if git merge --no-edit upstream/main; then
+            echo "state=clean" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > /tmp/conflicts.txt
+            git add -A && git -c core.editor=true commit --no-edit
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+          fi
+          # Fork rule: GitHub-hosted runners, never Blacksmith (INFINITUS.md).
+          if grep -rl "runs-on: blacksmith-" .github/workflows >/dev/null 2>&1; then
+            sed -i -E 's/runs-on: blacksmith-[0-9]+vcpu-ubuntu-2404/runs-on: ubuntu-24.04/; s/runs-on: blacksmith-[0-9]+vcpu-macos-26/runs-on: macos-latest/; s/runs-on: blacksmith-[0-9]+vcpu-windows-2025/runs-on: windows-2025/' .github/workflows/*.yml
+            git commit -am "ci: GitHub-hosted runners after the upstream merge" || true
+          fi
+          git push -u origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          # A push made with GITHUB_TOKEN starts no push/pull_request run, but
+          # workflow_dispatch is exempt: start CI on the head so the PR's
+          # required checks (they attach to the sha) can go green.
+          gh workflow run ci.yml --ref "$branch"
+      - name: Open the PR
+        if: steps.merge.outputs.state != 'uptodate'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha=$(git rev-parse --short upstream/main)
+          if [ "${{ steps.merge.outputs.state }}" = "clean" ]; then
+            gh pr create --base main --head "${{ steps.merge.outputs.branch }}" \
+              --title "chore: merge upstream T3 Code ($sha)" \
+              --body "Daily upstream sync, merged clean. Checks decide."
+            gh pr merge --squash --auto "${{ steps.merge.outputs.branch }}" || true
+          else
+            gh pr create --base main --head "${{ steps.merge.outputs.branch }}" \
+              --title "chore: merge upstream T3 Code ($sha) — CONFLICTS to resolve" \
+              --body "$(printf 'Daily upstream sync hit conflicts; the merge commit carries the markers. Files:\n\n```\n%s\n```\nResolve on this branch, then let the checks merge it.' "$(cat /tmp/conflicts.txt)")"
+          fi
