@@ -71,7 +71,33 @@ this file adds the fork's own rules. Plan and history: issue #555.
   upstream's (#601).
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
   boot-shell title and splash labels to `PRODUCT_NAME`.
-- `packages/shared/package.json` — the `./productName` and `./homeDir` exports.
+- `packages/shared/package.json` — the `./productName`, `./homeDir` and
+  `./desktopIdentity` exports.
+- `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
+  `@t3tools/shared/desktopIdentity` (`infinitus` / `infinitus-dev`), plus the
+  `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.
+- `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
+  the fork's directory without probing a legacy one unless the build adopts it
+  (it never does), so an installed `T3 Code (Alpha)` is left alone.
+- `apps/desktop/src/electron/ElectronProtocol.ts` — the production and
+  development schemes come from `@t3tools/shared/desktopIdentity`; everything
+  else (CSP, renderer origin, Clerk renderer, the Linux handler) follows
+  `getDesktopScheme`.
+- `apps/server/src/http.ts` — `DESKTOP_RENDERER_ORIGINS` built from the same
+  two scheme constants.
+- `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
+  (name `Infinitus`, schemes `infinitus` / `infinitus-dev`).
+- `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
+  mirrors the shared constants (a node script cannot import the workspace's
+  TypeScript); the dev-only bundle id stays `com.t3tools.*`.
+- `apps/web/src/components/settings/SettingsPanels.tsx` (+ `.logic.ts`) —
+  `resolveDesktopUpdateTrackRow`: an `infinitus` build shows its own track
+  read-only instead of "Stable" with a one-way switch to upstream's releases.
+- Upstream tests carrying the renderer origin or the userData directory
+  (`DesktopAppIdentity`, `DesktopClerk`, `ElectronProtocol`, `DesktopWindow`,
+  `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`, `server.test.ts`,
+  `build-desktop-artifact.test.ts`, and the web fixtures that stub a desktop
+  origin) use the fork's scheme.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs` as a scripts entry (run by
   hand, nothing imports it).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
@@ -165,6 +191,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   branded surfaces import.
 - `packages/shared/src/homeDir.ts` — `DEFAULT_HOME_DIR_NAME`, the fork's
   default state directory (`~/.infinitus`, never the real T3 Code's `~/.t3`).
+- `packages/shared/src/desktopIdentity.ts` — the desktop URL scheme
+  (`infinitus` / `infinitus-dev`), the Electron `userData` directory names, and
+  `adoptsLegacyDesktopUserDataDir` (empty list: the fork adopts no legacy
+  directory, least of all the installed app's `T3 Code (Alpha)`).
 - `packages/shared/src/infinitusControl.ts` — the control-socket path rule
   (`INFINITUS_CONTROL_SOCKET`, then the per-platform default).
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control

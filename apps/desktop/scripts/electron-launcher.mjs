@@ -19,7 +19,10 @@ const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
 const APP_BUNDLE_ID = isDevelopment
   ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
   : "com.t3tools.t3code";
-const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
+// Mirrors DESKTOP_URL_SCHEME / DESKTOP_DEV_URL_SCHEME in
+// packages/shared/src/desktopIdentity.ts — a plain node script cannot import
+// the workspace's TypeScript. Keep the two in step.
+const APP_PROTOCOL_SCHEMES = isDevelopment ? ["infinitus-dev"] : ["infinitus"];
 const LAUNCHER_VERSION = 19;
 const developmentMacIconPngPath = NodePath.join(
   repoRoot,

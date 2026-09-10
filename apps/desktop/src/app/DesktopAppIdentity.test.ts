@@ -80,9 +80,9 @@ const makeAssetsLayer = (png: Option.Option<string>) =>
     resolveResourcePath: () => Effect.succeed(Option.none()),
   } satisfies DesktopAssets.DesktopAssets["Service"]);
 
-const makeEnvironmentLayer = (overrides: TestEnvironmentInput = {}) => {
+const makeEnvironmentLayer = (overrides: TestEnvironmentInput = {}, adoptsLegacy = false) => {
   const { env, ...environmentOverrides } = overrides;
-  return DesktopEnvironment.layer({
+  const layer = DesktopEnvironment.layer({
     ...defaultEnvironmentInput,
     ...environmentOverrides,
   }).pipe(
@@ -96,6 +96,19 @@ const makeEnvironmentLayer = (overrides: TestEnvironmentInput = {}) => {
       ),
     ),
   );
+  if (!adoptsLegacy) return layer;
+  // The fork adopts no legacy directory, so only a patched environment can
+  // still exercise upstream's adoption branch.
+  return Layer.effect(
+    DesktopEnvironment.DesktopEnvironment,
+    Effect.gen(function* () {
+      const environment = yield* DesktopEnvironment.DesktopEnvironment;
+      return DesktopEnvironment.DesktopEnvironment.of({
+        ...environment,
+        adoptsLegacyUserDataDir: true,
+      });
+    }),
+  ).pipe(Layer.provide(layer));
 };
 
 const withIdentity = <A, E, R>(
@@ -110,6 +123,7 @@ const withIdentity = <A, E, R>(
   input: {
     readonly calls?: ElectronAppCalls;
     readonly environment?: TestEnvironmentInput;
+    readonly adoptsLegacyUserDataDir?: boolean;
     readonly legacyPathExists?: boolean;
     readonly legacyPathProbeError?: PlatformError.PlatformError;
     readonly packageJson?: string;
@@ -139,14 +153,45 @@ const withIdentity = <A, E, R>(
         ),
         Layer.provideMerge(makeAssetsLayer(input.pngIconPath ?? Option.none())),
         Layer.provideMerge(makeElectronAppLayer(calls)),
-        Layer.provideMerge(makeEnvironmentLayer(input.environment)),
+        Layer.provideMerge(
+          makeEnvironmentLayer(input.environment, input.adoptsLegacyUserDataDir === true),
+        ),
       ),
     ),
   );
 };
 
 describe("DesktopAppIdentity", () => {
-  it.effect("keeps using the legacy userData path when it already exists", () =>
+  it.effect("never adopts the installed T3 Code's userData directory", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        // "T3 Code (Alpha)" exists on this machine — it is the app the user
+        // runs every day, lock and cookies included. The fork keeps its own.
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/infinitus");
+      }),
+      { legacyPathExists: true },
+    ),
+  );
+
+  it.effect("keeps a development run in its own userData directory", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/infinitus-dev");
+      }),
+      {
+        environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
+        legacyPathExists: true,
+      },
+    ),
+  );
+
+  it.effect("still adopts a legacy directory a build does claim", () =>
     withIdentity(
       Effect.gen(function* () {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
@@ -154,7 +199,7 @@ describe("DesktopAppIdentity", () => {
 
         assert.equal(userDataPath, "/Users/alice/Library/Application Support/T3 Code (Alpha)");
       }),
-      { legacyPathExists: true },
+      { adoptsLegacyUserDataDir: true, legacyPathExists: true },
     ),
   );
 
@@ -181,7 +226,7 @@ describe("DesktopAppIdentity", () => {
           `Failed to inspect legacy desktop user-data path at "${legacyPath}".`,
         );
       }),
-      { legacyPathProbeError: cause },
+      { adoptsLegacyUserDataDir: true, legacyPathProbeError: cause },
     );
   });
 
