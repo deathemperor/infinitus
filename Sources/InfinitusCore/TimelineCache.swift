@@ -85,13 +85,21 @@ public final class TimelineCache: @unchecked Sendable {
             out[Int(record.pid)] = facts
             _ = log?.record(pid: record.pid, facts: facts)
         }
-        let keep = Set((roster ?? records).map(\.sessionId))
+        evict(keeping: roster ?? records)
+        return out
+    }
+
+    /// Drops the slots of sessions absent from `roster` — they have
+    /// left — and their rings from the log. `facts` does this on every
+    /// pass; the Linux tray, which serves timelines without `facts`,
+    /// calls it from its export tick (#486).
+    public func evict(keeping roster: [ClaudeSessionRecord]) {
+        let keep = Set(roster.map(\.sessionId))
         lock.lock()
         let gone = slots.filter { !keep.contains($0.key) }
         slots = slots.filter { keep.contains($0.key) }
         for (_, slot) in gone { sessionByPid[slot.pid] = nil }
         lock.unlock()
         for (_, slot) in gone { log?.drop(pid: slot.pid) }
-        return out
     }
 }

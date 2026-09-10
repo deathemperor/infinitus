@@ -145,6 +145,13 @@ jobs:
     container: swift:6.1
     steps:
       - uses: actions/checkout@v4
+      # A tag build reports its number (#486); a dispatch dry run stays "dev".
+      - run: |
+          case "$GITHUB_REF_NAME" in
+            v*) V="$(printf '%s' "${GITHUB_REF_NAME#v}" | tr -cd '0-9A-Za-z.-')"
+                sed -i "s/static let string = \"dev\"/static let string = \"$V\"/" Sources/InfinitusTray/BuiltVersion.swift
+                grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift;;
+          esac
       - run: swift build -c release -Xswiftc -static-stdlib
       - run: swift test
       - name: Stage artifacts

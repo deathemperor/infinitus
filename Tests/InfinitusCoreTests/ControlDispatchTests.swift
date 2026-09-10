@@ -8,6 +8,8 @@ final class ControlDispatchTests: XCTestCase {
     private final class Recorder: @unchecked Sendable {
         var checkpoints: [(cwd: String, sessionId: String, subject: String)] = []
         var statusCalls = 0
+        var pids: [String: Int] = [:]
+        var hooks: [(name: String, pid: Int?)] = []
         var handlers: ControlDispatch.Handlers {
             ControlDispatch.Handlers(
                 checkpoint: { [self] cwd, sessionId, subject in
@@ -17,7 +19,9 @@ final class ControlDispatchTests: XCTestCase {
                     statusCalls += 1
                     return .object(["platform": .string("linux"), "version": .string("dev"),
                                     "sessions": .number(2)])
-                })
+                },
+                sessionPid: { [self] in pids[$0] },
+                hook: { [self] event, pid in hooks.append((event.name, pid)) })
         }
     }
 
@@ -27,7 +31,7 @@ final class ControlDispatchTests: XCTestCase {
         let reply = ControlDispatch.reply(to: ControlRequest(command: "event", secret: payload),
                                           handlers: recorder.handlers)
         XCTAssertTrue(reply.ok)
-        XCTAssertEqual(reply.result?["pid"], .null, "the tray does not map a session id to a pid yet")
+        XCTAssertEqual(reply.result?["pid"], .null, "no live session by that id")
         XCTAssertEqual(recorder.checkpoints.count, 1)
         XCTAssertEqual(recorder.checkpoints.first?.cwd, "/home/me/limitless")
         XCTAssertEqual(recorder.checkpoints.first?.sessionId, "s1")
@@ -53,6 +57,23 @@ final class ControlDispatchTests: XCTestCase {
                                               handlers: recorder.handlers)
             XCTAssertTrue(reply.ok, "a hook must never see a failure it would retry: \(name)")
         }
+        XCTAssertTrue(recorder.checkpoints.isEmpty)
+    }
+
+    /// The Mac's contract (#486): the hook's session id answers as the
+    /// live session's pid, and every hook reaches the caller with it —
+    /// a Notification is the tray's push, Stop is its business.
+    func testEventAnswersTheResolvedPidAndHandsEveryHookOver() {
+        let recorder = Recorder()
+        recorder.pids["s1"] = 4242
+        let note = #"{"session_id":"s1","cwd":"/r","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Allow Bash?"}"#
+        let reply = ControlDispatch.reply(to: ControlRequest(command: "event", secret: note), handlers: recorder.handlers)
+        XCTAssertEqual(reply.result?["pid"], .number(4242))
+        let stop = #"{"session_id":"s9","cwd":"/r","hook_event_name":"Stop"}"#
+        XCTAssertEqual(ControlDispatch.reply(to: ControlRequest(command: "event", secret: stop), handlers: recorder.handlers)
+                           .result?["pid"], .null)
+        XCTAssertEqual(recorder.hooks.map(\.name), ["Notification", "Stop"])
+        XCTAssertEqual(recorder.hooks.map(\.pid), [4242, nil])
         XCTAssertTrue(recorder.checkpoints.isEmpty)
     }
 
