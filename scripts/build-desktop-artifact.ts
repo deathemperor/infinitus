@@ -53,8 +53,14 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
+const DESKTOP_APP_ID = "run.infinitus.desktop";
+const DESKTOP_PRODUCT_NAME = "Infinitus";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
+
+// The fork publishes its desktop builds on their own updater channel so a
+// release never lands on `latest` (the native Infinitus app polls that) and
+// never on `nightly` (upstream's channel).
+type DesktopUpdateChannel = "latest" | "nightly" | "infinitus";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
@@ -1248,25 +1254,36 @@ function normalizePasskeyRpDomain(value: string): string {
   return parsed.hostname;
 }
 
+/**
+ * `undefined` when the build configures no passkey signing at all: no
+ * provisioning profile and no Clerk domain configuration. The signed build then
+ * proceeds with the hardened runtime and electron-builder's base entitlements,
+ * which is how the fork signs — it has a Developer ID certificate but no
+ * Associated Domains profile.
+ */
 export function resolveMacPasskeySigningConfiguration(
   env: Readonly<Record<string, string | undefined>>,
-): MacPasskeySigningConfiguration {
+): MacPasskeySigningConfiguration | undefined {
   const teamId = env.T3CODE_APPLE_TEAM_ID?.trim().toUpperCase() ?? "";
   if (!APPLE_TEAM_ID_PATTERN.test(teamId)) {
     throw new InvalidAppleTeamIdError({ teamId });
   }
 
+  const configuredRpDomains = env.T3CODE_CLERK_PASSKEY_RP_DOMAINS?.trim();
+  const configuredPublishableKey = env.T3CODE_CLERK_PUBLISHABLE_KEY?.trim();
   const provisioningProfilePath = env.T3CODE_MACOS_PROVISIONING_PROFILE?.trim() ?? "";
   if (provisioningProfilePath.length === 0) {
+    if (!configuredRpDomains && !configuredPublishableKey) {
+      return undefined;
+    }
     throw new MissingMacPasskeyProvisioningProfileError();
   }
 
-  const configuredRpDomains = env.T3CODE_CLERK_PASSKEY_RP_DOMAINS?.trim();
   let rpDomains: readonly string[];
   if (configuredRpDomains) {
     rpDomains = configuredRpDomains.split(",").map(normalizePasskeyRpDomain);
   } else {
-    const publishableKey = env.T3CODE_CLERK_PUBLISHABLE_KEY?.trim();
+    const publishableKey = configuredPublishableKey;
     if (!publishableKey) {
       throw new MissingMacPasskeyDomainConfigurationError();
     }
@@ -2407,14 +2424,21 @@ function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: bo
 
 export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(function* (
   stageResourcesDir: string,
-  channel: "latest" | "nightly",
+  channel: DesktopUpdateChannel,
   verbose: boolean,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
+  // The fork ships no artwork of its own; its DMG reuses the stable background,
+  // rasterized under the channel's own name because the build config asks for
+  // `dmg-background-<channel>.png`.
+  const sourceChannel = channel === "infinitus" ? "latest" : channel;
+  const sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${sourceChannel}.svg`);
   if (!(yield* fs.exists(sourcePath))) {
-    return yield* new DesktopDmgBackgroundSourceMissingError({ channel, sourcePath });
+    return yield* new DesktopDmgBackgroundSourceMissingError({
+      channel: sourceChannel,
+      sourcePath,
+    });
   }
 
   for (const output of [
@@ -2570,7 +2594,7 @@ export function resolveDesktopRuntimeDependencies(
 }
 
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
-  updateChannel: "latest" | "nightly",
+  updateChannel: DesktopUpdateChannel,
 ) {
   const env = yield* Config.all({
     updateRepository: Config.string("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
@@ -2590,12 +2614,15 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
     provider: "github",
     owner,
     repo,
-    releaseType: updateChannel === "nightly" ? "prerelease" : "release",
-    ...(updateChannel === "nightly" ? { channel: "nightly" as const } : {}),
+    releaseType: updateChannel === "latest" ? "release" : "prerelease",
+    ...(updateChannel === "latest" ? {} : { channel: updateChannel }),
   };
 });
 
-export function resolveDesktopUpdateChannel(version: string): "latest" | "nightly" {
+export function resolveDesktopUpdateChannel(version: string): DesktopUpdateChannel {
+  if (/-infinitus\.\d{8}\.\d+$/.test(version)) {
+    return "infinitus";
+  }
   return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
 }
 
@@ -2604,7 +2631,8 @@ function isDesktopPreviewVersion(version: string): boolean {
 }
 
 export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
-  return resolveWebAssetBrandForChannel(resolveDesktopUpdateChannel(version));
+  const channel = resolveDesktopUpdateChannel(version);
+  return resolveWebAssetBrandForChannel(channel === "nightly" ? "nightly" : "latest");
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
@@ -2642,8 +2670,8 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 
 export function resolveDesktopProductName(version: string): string {
   return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+    ? `${DESKTOP_PRODUCT_NAME} (Nightly)`
+    : DESKTOP_PRODUCT_NAME;
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2668,7 +2696,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const buildConfig: Record<string, unknown> = {
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: "Infinitus-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,

@@ -263,9 +263,16 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
   });
 
+  it("resolves the fork's own updater channel from infinitus versions", () => {
+    assert.equal(resolveDesktopUpdateChannel("0.0.40-infinitus.20260910.7"), "infinitus");
+    assert.equal(resolveDesktopUpdateChannel("0.0.40-infinitus.2026091.7"), "latest");
+    assert.equal(resolveDesktopUpdateChannel("0.0.40-alpha.2"), "latest");
+  });
+
   it("switches desktop packaging product names to nightly for nightly builds", () => {
-    assert.equal(resolveDesktopProductName("0.0.17"), "T3 Code (Alpha)");
-    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
+    assert.equal(resolveDesktopProductName("0.0.17"), "Infinitus");
+    assert.equal(resolveDesktopProductName("0.0.40-infinitus.20260910.7"), "Infinitus");
+    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "Infinitus (Nightly)");
   });
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
@@ -318,12 +325,31 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         repo: "t3code",
         releaseType: "release",
       });
+      const infinitusConfig = yield* resolveGitHubPublishConfig("infinitus").pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                GITHUB_REPOSITORY: "deathemperor/infinitus",
+              },
+            }),
+          ),
+        ),
+      );
+
       assert.deepStrictEqual(nightlyConfig, {
         provider: "github",
         owner: "pingdotgg",
         repo: "t3code",
         releaseType: "prerelease",
         channel: "nightly",
+      });
+      assert.deepStrictEqual(infinitusConfig, {
+        provider: "github",
+        owner: "deathemperor",
+        repo: "infinitus",
+        releaseType: "prerelease",
+        channel: "infinitus",
       });
     }),
   );
@@ -663,7 +689,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         "**/node_modules/.bin/**",
       ]);
       assert.deepStrictEqual(mac.dmg, {
-        title: "T3 Code (Alpha) 1.2.3 Installer",
+        title: "Infinitus 1.2.3 Installer",
         background: "dmg/dmg-background-latest.png",
         window: { width: 640, height: 432 },
         contents: [
@@ -1664,6 +1690,36 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it.effect("rasterizes the stable DMG background under the infinitus channel name", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const stageResourcesDir = yield* fs.makeTempDirectoryScoped({
+          prefix: "infinitus-dmg-background-",
+        });
+        const dmgDir = path.join(stageResourcesDir, "dmg");
+        yield* fs.makeDirectory(dmgDir, { recursive: true });
+        const sourcePath = path.join(dmgDir, "dmg-background-latest.svg");
+        yield* fs.writeFileString(sourcePath, '<svg xmlns="http://www.w3.org/2000/svg"/>');
+        const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> =
+          [];
+
+        yield* stageDesktopDmgBackground(stageResourcesDir, "infinitus", false).pipe(
+          Effect.provide(iconResizeSpawnerLayer(commands, [0, 0])),
+        );
+
+        assert.deepStrictEqual(
+          commands.map((command) => command.args.slice(-3)),
+          [
+            [sourcePath, "--out", path.join(dmgDir, "dmg-background-infinitus.png")],
+            [sourcePath, "--out", path.join(dmgDir, "dmg-background-infinitus@2x.png")],
+          ],
+        );
+      }),
+    ),
+  );
+
   it.effect("fails clearly when the selected DMG background source is missing", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1683,6 +1739,24 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it("skips macOS passkey signing when no profile and no Clerk configuration are set", () => {
+    assert.equal(
+      resolveMacPasskeySigningConfiguration({
+        T3CODE_APPLE_TEAM_ID: "ABC1234567",
+      }),
+      undefined,
+    );
+    assert.equal(
+      resolveMacPasskeySigningConfiguration({
+        T3CODE_APPLE_TEAM_ID: "ABC1234567",
+        T3CODE_MACOS_PROVISIONING_PROFILE: "  ",
+        T3CODE_CLERK_PUBLISHABLE_KEY: "",
+        T3CODE_CLERK_PASSKEY_RP_DOMAINS: "",
+      }),
+      undefined,
+    );
+  });
+
   it("derives macOS passkey signing configuration from the Clerk publishable key", () => {
     const configuration = resolveMacPasskeySigningConfiguration({
       T3CODE_APPLE_TEAM_ID: "abc1234567",
@@ -1691,7 +1765,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
 
     assert.deepStrictEqual(configuration, {
-      appId: "com.t3tools.t3code",
+      appId: "run.infinitus.desktop",
       teamId: "ABC1234567",
       rpDomains: ["example.clerk.accounts.dev"],
       provisioningProfilePath: "/tmp/t3code.provisionprofile",
@@ -1705,13 +1779,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       T3CODE_CLERK_PASSKEY_RP_DOMAINS:
         " Clerk.Example.com,example.clerk.accounts.dev,clerk.example.com ",
     });
+    assert.ok(configuration);
     const entitlements = renderMacPasskeyEntitlements(configuration);
 
     assert.deepStrictEqual(configuration.rpDomains, [
       "clerk.example.com",
       "example.clerk.accounts.dev",
     ]);
-    assert.include(entitlements, "<string>ABC1234567.com.t3tools.t3code</string>");
+    assert.include(entitlements, "<string>ABC1234567.run.infinitus.desktop</string>");
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
@@ -1806,7 +1881,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       });
 
       const mac = config.mac as Record<string, unknown>;
-      assert.equal(config.appId, "com.t3tools.t3code");
+      assert.equal(config.appId, "run.infinitus.desktop");
       assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
       assert.equal(mac.provisioningProfile, "/tmp/t3code.provisionprofile");
       assert.match(String(mac.sign), /[\\/]scripts[\\/]sign-macos\.ts$/);
