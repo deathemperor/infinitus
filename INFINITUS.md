@@ -141,7 +141,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   snapshot and command atoms.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
-  strip, the unavailable state); row/section models come from
+  strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
+  credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
+  nothing lapsed); row/section/sign-in models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`.
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
   — the five Settings › Infinitus routes, thin shells over the panes above.

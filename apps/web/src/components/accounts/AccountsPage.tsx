@@ -4,8 +4,11 @@ import {
   accountsPageState,
   buildFleetSection,
   buildForecast,
+  buildSignInRows,
+  signInCommandArgs,
   type AccountAction,
   type AccountRowModel,
+  type SignInRowModel,
 } from "@t3tools/client-runtime/state/infinitusAccounts";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
@@ -36,6 +39,7 @@ import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { AccountsUnavailable } from "./AccountsUnavailable";
 import { FleetSection } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
+import { SignInsSection } from "./SignInsSection";
 
 /** How long a command may hold its row's spinner when no snapshot follows it. */
 const COMMAND_SETTLE_TIMEOUT_MS = 10_000;
@@ -49,6 +53,13 @@ interface CommandTarget {
     against: any newer snapshot is the app's answer and retires the spinner. */
 interface PendingCommand extends CommandTarget {
   readonly action: AccountAction;
+  readonly snapshot: InfinitusSnapshot | null;
+}
+
+/** A sign-in just started, keyed by its row; the next snapshot carries the
+    login's own phase and takes over from the spinner. */
+interface PendingSignIn {
+  readonly key: string;
   readonly snapshot: InfinitusSnapshot | null;
 }
 
@@ -82,6 +93,8 @@ export function AccountsPage() {
   const [chosenEnvironmentId, setChosenEnvironmentId] = useState<EnvironmentId | null>(null);
   const [pending, setPending] = useState<PendingCommand | null>(null);
   const [failure, setFailure] = useState<(CommandTarget & { message: string }) | null>(null);
+  const [pendingSignIn, setPendingSignIn] = useState<PendingSignIn | null>(null);
+  const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const infinitusEnvironments = useMemo(
@@ -120,6 +133,13 @@ export function AccountsPage() {
     const timer = setTimeout(() => setPending(null), COMMAND_SETTLE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [pending]);
+  const signInInFlight =
+    pendingSignIn !== null && pendingSignIn.snapshot === snapshot ? pendingSignIn.key : null;
+  useEffect(() => {
+    if (pendingSignIn === null) return;
+    const timer = setTimeout(() => setPendingSignIn(null), COMMAND_SETTLE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingSignIn]);
 
   const dispatch = async (
     fleetKey: string,
@@ -140,6 +160,18 @@ export function AccountsPage() {
     }
     setPending(null);
     setFailure({ fleetKey, number: row.number, message: commandErrorMessage(result.cause) });
+  };
+
+  const signIn = async (row: SignInRowModel) => {
+    if (environmentId === null) return;
+    setPendingSignIn({ key: row.key, snapshot });
+    const result = await runCommand({ environmentId, input: signInCommandArgs(row) });
+    if (result._tag === "Success") {
+      setSignInFailure(null);
+      return;
+    }
+    setPendingSignIn(null);
+    setSignInFailure({ key: row.key, message: commandErrorMessage(result.cause) });
   };
 
   const refresh = async () => {
@@ -221,10 +253,13 @@ export function AccountsPage() {
               snapshot={snapshot}
               pending={inFlight}
               failure={failure}
+              pendingSignIn={signInInFlight}
+              signInFailure={signInFailure}
               onRetry={snapshotQuery.refresh}
               onAction={(fleetKey, row, action, alias) =>
                 void dispatch(fleetKey, row, action, alias)
               }
+              onSignIn={(row) => void signIn(row)}
             />
           </WorkspacePageContainer>
         </ScrollArea>
@@ -238,13 +273,18 @@ function AccountsBody({
   snapshot,
   pending,
   failure,
+  pendingSignIn,
+  signInFailure,
   onRetry,
   onAction,
+  onSignIn,
 }: {
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly pending: (CommandTarget & { action: AccountAction }) | null;
   readonly failure: (CommandTarget & { message: string }) | null;
+  readonly pendingSignIn: string | null;
+  readonly signInFailure: { readonly key: string; readonly message: string } | null;
   readonly onRetry: () => void;
   readonly onAction: (
     fleetKey: string,
@@ -252,6 +292,7 @@ function AccountsBody({
     action: AccountAction,
     alias?: string,
   ) => void;
+  readonly onSignIn: (row: SignInRowModel) => void;
 }) {
   if (state === "unsupported") {
     return (
@@ -272,9 +313,24 @@ function AccountsBody({
       />
     );
   }
+  // A lapsed sign-in is worth a section even on a host with no fleets; the
+  // section is left out entirely when nothing lapsed.
+  const signIns = buildSignInRows(snapshot);
+  const signInsSection =
+    signIns.length === 0 ? null : (
+      <SignInsSection
+        rows={signIns}
+        pendingKey={pendingSignIn}
+        failure={signInFailure}
+        onSignIn={onSignIn}
+      />
+    );
   if (state === "empty") {
     return (
-      <p className="text-muted-foreground text-sm">No engines report accounts on this host.</p>
+      <div className="flex flex-col gap-6">
+        <p className="text-muted-foreground text-sm">No engines report accounts on this host.</p>
+        {signInsSection}
+      </div>
     );
   }
 
@@ -302,6 +358,7 @@ function AccountsBody({
           />
         );
       })}
+      {signInsSection}
     </div>
   );
 }
