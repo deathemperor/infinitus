@@ -739,6 +739,9 @@ final class StatusItemController {
     /// the popup or the pop-out. A second `show workspace` just raises it.
     func showWorkspace(screen: String?) { model.lock.surfaceShown(); workspace.show(model: model, screen: screen) }
     func hideWorkspace() { workspace.close() }
+    /// The window is kept (`isReleasedWhenClosed = false`), so the next
+    /// `show settings` reopens it with its tabs built.
+    func hideSettingsWindow() { settings?.orderOut(nil) }
 
     /// The SwiftUI Settings scene's window: macOS 26 shows it by itself
     /// at launch, and SwiftUI keeps it non-resizable — it re-strips the

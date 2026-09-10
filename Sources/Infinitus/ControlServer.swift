@@ -666,8 +666,9 @@ final class ControlServer {
             }
             switch r.args.first {
             case "popout": controller.hidePinnedWindow()
+            case "settings": controller.hideSettingsWindow()
             case "workspace": controller.hideWorkspace()
-            default: throw Fail("usage: hide popout|workspace")
+            default: throw Fail("usage: hide popout|settings|workspace")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 
