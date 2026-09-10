@@ -22,6 +22,10 @@ publishes the matching section as the GitHub release body.
 - The tray's session feed poll decodes only the transcript lines appended since the phone's last poll, as the Mac's does (#380).
 - A git call no longer leaves its process and two pipe descriptors behind, which ran a long-lived tray out of descriptors and crashed the Linux test job (#510).
 - An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
+- The Linux companion answers a hook with the session's pid and pushes a "waiting on you" the moment a Notification lands, not on its next tick (#486).
+- A Linux session that exits no longer keeps its timeline slot for the companion's lifetime (#486).
+- The Linux companion reports its release number instead of "dev" (#486).
+- The Linux control socket follows `XDG_STATE_HOME` when there is no runtime dir (#486).
 
 ### Mac
 - A Cloudflare quick tunnel can front the T3 Code fork server's port (`fork_tunnel_enabled`, `fork_server_port` under Devices), and `infinitusctl status` reports its state and public URL for the fork's pairing QR (#572).

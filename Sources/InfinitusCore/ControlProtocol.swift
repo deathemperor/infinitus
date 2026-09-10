@@ -49,6 +49,10 @@ public enum ControlProtocol {
             return URL(fileURLWithPath: runtime)
                 .appendingPathComponent("infinitus/control.sock").path
         }
+        if let state = environment["XDG_STATE_HOME"], !state.isEmpty {
+            return URL(fileURLWithPath: state)
+                .appendingPathComponent("infinitus/control.sock").path
+        }
         return URL(fileURLWithPath: home)
             .appendingPathComponent(".local/state/infinitus/control.sock").path
     }

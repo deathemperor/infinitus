@@ -105,6 +105,22 @@ final class TimelineCacheTests: XCTestCase {
         XCTAssertEqual(cache.parses, 2)
     }
 
+    /// The tray's export tick has no `facts` pass; it evicts directly (#486).
+    func testEvictDropsTheSessionsOffTheRoster() throws {
+        _ = try write([prompt], sessionId: "s1")
+        _ = try write([prompt], sessionId: "s2")
+        let r1 = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")
+        let r2 = ClaudeSessionRecord(pid: 42, sessionId: "s2", cwd: "/Users/me/repo", status: "busy")
+        let cache = TimelineCache()
+        _ = cache.timeline(record: r1, claudeDir: root)
+        _ = cache.timeline(record: r2, claudeDir: root)
+        cache.evict(keeping: [r2])
+        _ = cache.timeline(record: r2, claudeDir: root)
+        XCTAssertEqual(cache.parses, 2, "the kept session's slot is intact")
+        _ = cache.timeline(record: r1, claudeDir: root)
+        XCTAssertEqual(cache.parses, 3, "the evicted one is parsed again")
+    }
+
     func testRebuildsAndFactsFlowIntoTheSequenceLog() throws {
         let url = try write([prompt], sessionId: "s1")
         let busy = ClaudeSessionRecord(pid: 41, sessionId: "s1", cwd: "/Users/me/repo", status: "busy")

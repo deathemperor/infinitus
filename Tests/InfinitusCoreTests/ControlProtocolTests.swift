@@ -117,5 +117,11 @@ final class ControlProtocolTests: XCTestCase {
                        "/home/x/.local/state/infinitus/control.sock")
         XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x", environment: ["XDG_RUNTIME_DIR": ""]),
                        "/home/x/.local/state/infinitus/control.sock")
+        // A relocated state dir moves the socket with the tray's history (#486).
+        XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x", environment: ["XDG_STATE_HOME": "/var/x/state"]),
+                       "/var/x/state/infinitus/control.sock")
+        XCTAssertEqual(ControlProtocol.linuxSocketPath(home: "/home/x",
+                                                       environment: ["XDG_RUNTIME_DIR": "/run/user/1000", "XDG_STATE_HOME": "/var/x/state"]),
+                       "/run/user/1000/infinitus/control.sock", "the runtime dir still wins")
     }
 }

@@ -591,7 +591,7 @@ struct InfinitusTray {
     /// one-shot waybar/quickshell execs with no state to carry a
     /// multi-tick episode (e.g. the two-quiet-ticks "sessions finished"
     /// rule) across.
-    static func tickPushes(list: AccountList?, pushTriggers: inout PushTriggers,
+    static func tickPushes(list: AccountList?, pushes box: PushBox,
                            flags: PushTriggers.Flags, bin: String?) async {
         let health = (list?.accounts ?? [])
             .filter { !($0.disabled ?? false) && $0.usage != nil }
@@ -600,21 +600,25 @@ struct InfinitusTray {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
-        let pushes = pushTriggers.tick(
+        let pushes = box.with { $0.tick(
             busy: list?.liveSessions?.busy, total: list?.liveSessions?.total,
-            accounts: health, flags: flags, sessions: list?.liveSessions?.sessions)
-        for msg in pushes {
-            logPhoneInput("🔔 \(msg)")
-            if let bin {
-                _ = try? await CswapCLI(binaryPath: bin).run(["notify", "push", "-"], stdin: msg)
-            }
-            if let notifySend = which("notify-send") {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: notifySend)
-                process.arguments = ["Infinitus", msg]
-                try? process.run()
-                process.waitUntilExit()
-            }
+            accounts: health, flags: flags, sessions: list?.liveSessions?.sessions) }
+        for msg in pushes { await deliverPush(msg, bin: bin) }
+    }
+
+    /// One push, every way this box can deliver it: the engine's phone
+    /// push and the desktop's notify-send.
+    static func deliverPush(_ msg: String, bin: String?) async {
+        logPhoneInput("🔔 \(msg)")
+        if let bin {
+            _ = try? await CswapCLI(binaryPath: bin).run(["notify", "push", "-"], stdin: msg)
+        }
+        if let notifySend = which("notify-send") {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: notifySend)
+            process.arguments = ["Infinitus", msg]
+            try? process.run()
+            process.waitUntilExit()
         }
     }
 
@@ -754,22 +758,46 @@ struct InfinitusTray {
     }
 
     /// `infinitusctl status` against the tray: enough to prove whose
-    /// socket answered and that it can see this box's sessions. `version`
-    /// is the descriptor's "dev" placeholder — no build step stamps one
-    /// into this executable yet.
-    static func controlStatus(appVersion: String = "dev") -> JSONValue {
+    /// socket answered and that it can see this box's sessions.
+    static func controlStatus(appVersion: String = BuiltVersion.string) -> JSONValue {
         let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).count
         return .object(["platform": .string("linux"),
                         "version": .string(appVersion),
                         "sessions": .number(Double(sessions))])
     }
 
-    static func controlHandlers(queue: DispatchQueue) -> ControlDispatch.Handlers {
+    static func controlHandlers(queue: DispatchQueue, pushes box: PushBox,
+                                flags: PushTriggers.Flags) -> ControlDispatch.Handlers {
         ControlDispatch.Handlers(
             checkpoint: { cwd, sessionId, subject in
                 queue.async { recordCheckpoint(cwd: cwd, sessionId: sessionId, subject: subject) }
             },
-            status: { controlStatus() })
+            status: { controlStatus() },
+            sessionPid: { sessionId in
+                ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                    .first { $0.sessionId == sessionId }.map { Int($0.pid) }
+            },
+            hook: { event, pid in
+                // A Notification that needs a human goes out now, not on
+                // the next tick — which then skips the same pid
+                // (announceWaiting, the Mac's rule). Detached: the hook
+                // gets its reply first, Claude Code times hooks out.
+                guard let line = event.pushLine, flags.waiting else { return }
+                if let pid { box.with { $0.announceWaiting(pid: pid) } }
+                Task { await deliverPush(line, bin: CswapLocator.locate()) }
+            })
+    }
+
+    /// `serve`'s push state, shared between its tick and the control
+    /// socket's thread (a hook's push, #486): mutations run under the
+    /// lock, delivery outside it.
+    final class PushBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var triggers = PushTriggers()
+        func with<T>(_ body: (inout PushTriggers) -> T) -> T {
+            lock.lock(); defer { lock.unlock() }
+            return body(&triggers)
+        }
     }
 
     static func serve(port: UInt16, token: String?, tokenFile: String?, themeID: String,
@@ -787,14 +815,14 @@ struct InfinitusTray {
             resolved = PairingStore.loadOrCreate()
         }
         guard !resolved.isEmpty else { fail("serve: empty pairing token") }
-        var pushTriggers = PushTriggers()
+        let pushes = PushBox()
         let pushFlags = pushFlagsFromEnv()
         // The first request must not 503 while the first 30s tick is
         // still pending. This first tick also seeds PushTriggers: a
         // session already `waiting` at launch is not news (same rule
         // as the Mac — PushTriggers.seededWaiting).
         let firstList = await collectAndExport(themeID: themeID)
-        await tickPushes(list: firstList, pushTriggers: &pushTriggers,
+        await tickPushes(list: firstList, pushes: pushes,
                          flags: pushFlags, bin: CswapLocator.locate())
         // `GET /.well-known/infinitus` (#486 slice 1+2): what this tray
         // serves, read before pairing, same as the Mac's descriptor
@@ -804,23 +832,15 @@ struct InfinitusTray {
         // answers nothing else the Mac's newer routes (attention, leases,
         // team, …) cover.
         //
-        // `appVersion`: no build step embeds one for this executable (the
-        // Mac's comes from `Bundle.main`'s `CFBundleShortVersionString`,
-        // itself stamped from `VERSION` only at `make-app.sh` packaging
-        // time — the tray has no such packaging step yet), so this stays
-        // the "dev" placeholder until one exists.
         let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
-            machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: "dev")))
+            machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: BuiltVersion.string)))
             ?? Data()
         // #486 slice 2: one long-lived sequence log/timeline cache/
         // attention store/commands cache for this `serve` run — same
         // pattern as the Mac's AppModel (`sequenceLog`, `timelineCache`,
-        // `attentionStore`, `MirrorCommandsCache`), just without a
-        // roster-eviction tick: an exited session's slot lingers until
-        // this process exits rather than being pruned on export (the Mac
-        // prunes on its 30 s export tick, which the tray also runs, but
-        // nothing here calls `TimelineCache.facts(records:...)` to reuse
-        // it — fine at dev-box scale, worth a follow-up at fleet scale).
+        // `attentionStore`, `MirrorCommandsCache`); the export tick
+        // below evicts the slots of sessions that left, as the Mac's
+        // `facts` pass does.
         let sequenceLog = SequenceLog()
         let timelineCache = TimelineCache(log: sequenceLog)
         let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
@@ -961,7 +981,7 @@ struct InfinitusTray {
         // A bind that fails is logged, never fatal: the phone's mirror is
         // this process's job, the socket is the extra.
         let checkpointQueue = DispatchQueue(label: "infinitus.tray.checkpoints")
-        let handlers = controlHandlers(queue: checkpointQueue)
+        let handlers = controlHandlers(queue: checkpointQueue, pushes: pushes, flags: pushFlags)
         let controlPath = ControlProtocol.socketURL().path
         let control = PosixControlSocket(path: controlPath) {
             ControlDispatch.replyLine(to: $0, handlers: handlers)
@@ -979,7 +999,8 @@ struct InfinitusTray {
             // throttled away by itself.
             try? await Task.sleep(nanoseconds: (interval + 1) * 1_000_000_000)
             let list = await collectAndExport(themeID: themeID)
-            await tickPushes(list: list, pushTriggers: &pushTriggers,
+            timelineCache.evict(keeping: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
+            await tickPushes(list: list, pushes: pushes,
                              flags: pushFlags, bin: CswapLocator.locate())
         }
         #else
