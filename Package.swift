@@ -45,6 +45,9 @@ var products: [Product] = [
     .executable(name: "infinitusctl", targets: ["InfinitusCLI"]),
     .library(name: "InfinitusCore", targets: ["InfinitusCore"]),
 ]
+var dependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
+]
 #if os(macOS)
 // Shared SwiftUI components (gauges, burn effects, theme colors) the
 // phone app renders too — SwiftUI doesn't exist on Linux, so this stays
@@ -55,9 +58,24 @@ targets.append(.target(
     path: "Sources/InfinitusUI"
 ))
 products.append(.library(name: "InfinitusUI", targets: ["InfinitusUI"]))
+// The workspace's Terminal tab and the phone's terminal screen are the same
+// emulator (#507 "SwiftTerm both ends"). It lives on the app target ALONE:
+// InfinitusCore and InfinitusUI must stay linkable on Linux and from the
+// phone's own Xcode project, and neither may pull an AppKit/UIKit emulator
+// through Core. The dependency is fenced with the target that uses it so a
+// Linux `swift build` never fetches it at all.
+//
+// Needs Xcode's separately-downloaded Metal Toolchain on every Mac: SwiftTerm
+// ships `Apple/Metal/Shaders.metal` as a processed resource and SwiftPM's
+// default build system compiles it, so without the component `swift build`
+// stops at `CompileMetalFile … cannot execute tool 'metal'`. Once per Xcode:
+// `xcodebuild -downloadComponent MetalToolchain` (prefix with `DEVELOPER_DIR=`
+// for a beta).
+dependencies.append(.package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.20.0"))
 targets.append(.executableTarget(
     name: "Infinitus",
-    dependencies: ["InfinitusCore", "InfinitusUI"],
+    dependencies: ["InfinitusCore", "InfinitusUI",
+                   .product(name: "SwiftTerm", package: "SwiftTerm")],
     path: "Sources/Infinitus",
     // Debug only: lets InjectionIII swap top-level/struct functions
     // (docs/guides/hot-reload.md). Release links exactly as before.
@@ -69,8 +87,6 @@ let package = Package(
     name: "Infinitus",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: products,
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
-    ],
+    dependencies: dependencies,
     targets: targets
 )
