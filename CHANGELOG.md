@@ -17,6 +17,7 @@ publishes the matching section as the GitHub release body.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 
 ### Mac
+- Workspace: the right panel's Agents tab follows the thread's subagents and workflow runs.
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
 - Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
 - Workspace and phone: image files in the Files tab preview as images, over the mirror wire too.

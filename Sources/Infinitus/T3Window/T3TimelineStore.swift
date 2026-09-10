@@ -15,6 +15,11 @@ final class T3TimelineStore: ObservableObject {
     @Published private(set) var pending = PendingRequests.derive([])
     /// Owned usage limits (Task 12).
     @Published private(set) var limits: [LimitNote] = []
+    /// The right panel's Agents tab (B-31): the thread's sub-agents and
+    /// workflow runs, read off `subagents/` on the poll's own thread. Every
+    /// row's elapsed is frozen at `agents.derivedAt` — a new value only ever
+    /// arrives with a pump, so no row needs a ticker.
+    @Published private(set) var agents = T3Agents.Panel.empty()
     /// No record for the pid (under this thread's session id) any more.
     /// Reset on every successful record lookup, not just a stamp
     /// change — otherwise the banner is reachable only briefly today
@@ -34,6 +39,8 @@ final class T3TimelineStore: ObservableObject {
     private var loop: Task<Void, Never>?
     private var lastOwnedPending: [PendingRequest] = []
     private var lastFacts: SessionFacts?
+    private var lastAgentInputs: AgentInputs?
+    private var agentRefresh: Task<Void, Never>?
 
     init(threadId: String, pid: Int32, model: AppModel, window: T3WindowModel) {
         self.threadId = threadId
@@ -42,7 +49,7 @@ final class T3TimelineStore: ObservableObject {
         self.window = window
     }
 
-    deinit { loop?.cancel() }
+    deinit { loop?.cancel(); agentRefresh?.cancel() }
 
     func start() {
         guard loop == nil, let model else { return }
@@ -103,6 +110,8 @@ final class T3TimelineStore: ObservableObject {
                     let full = withLimits.appending(pending: ownedPending)
                     let facts = SessionFacts.derive(timeline: full, status: record.status,
                                                     attention: attentionStore.entry(sessionId: record.sessionId))
+                    let agentInputs = Self.agentInputs(record: record, timeline: full, claudeDir: claudeDir)
+                    let agents = agentInputs.map { Self.scanAgents($0) } ?? T3Agents.Panel.empty()
                     await MainActor.run { [pid] in
                         guard let self, self.pid == pid else { return }
                         self.timeline = withLimits
@@ -110,6 +119,8 @@ final class T3TimelineStore: ObservableObject {
                         self.pending = PendingRequests.derive(full.activities)
                         self.lastOwnedPending = ownedPending
                         self.lastFacts = facts
+                        self.lastAgentInputs = agentInputs
+                        self.agents = agents
                         self.applyRows(timeline: withLimits, ownedPending: ownedPending, facts: facts)
                     }
                 }
@@ -123,6 +134,8 @@ final class T3TimelineStore: ObservableObject {
     func stop() {
         loop?.cancel()
         loop = nil
+        agentRefresh?.cancel()
+        agentRefresh = nil
     }
 
     /// The session is gone (#400): the thread stays open with the banner, so
@@ -159,6 +172,51 @@ final class T3TimelineStore: ObservableObject {
                                          ended: gone)
         let next = T3TimelineRows.stable(previous: rows, next: T3TimelineRows.derive(input))
         if next != rows { rows = next }
+    }
+
+    // MARK: Agents (B-31)
+
+    /// What the Agents panel needs off the transcript: the session's
+    /// `subagents/` dir and the spawn rows the chat derives for it. `nil` when
+    /// the thread never spawned one, so a thread without sub-agents never
+    /// touches the directory or derives the rows a second time.
+    nonisolated struct AgentInputs: Sendable {
+        let subagentsDir: URL
+        let spawns: [AgentSpawn.Member]
+    }
+
+    nonisolated private static func agentInputs(record: ClaudeSessionRecord, timeline: SessionTimeline,
+                                    claudeDir: URL) -> AgentInputs? {
+        let transcript = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+        let dir = transcript.deletingPathExtension().appendingPathComponent("subagents")
+        guard FileManager.default.fileExists(atPath: dir.path) else { return nil }
+        // Expanded, so a spawn row inside a collapsed turn fold still counts.
+        let spawns = ThreadFeedPresentation.deriveExpanded(timeline).flatMap { row -> [AgentSpawn.Member] in
+            guard case .agentSpawn(let spawn) = row.kind else { return [] }
+            return spawn.members
+        }
+        return AgentInputs(subagentsDir: dir, spawns: spawns)
+    }
+
+    nonisolated private static func scanAgents(_ inputs: AgentInputs) -> T3Agents.Panel {
+        T3Agents.panel(subagentsDir: inputs.subagentsDir, spawns: inputs.spawns)
+    }
+
+    /// Re-read the roster from the last pump's inputs. The Agents tab asks on
+    /// open: a sub-agent's own writes never move the parent transcript's stamp,
+    /// so a pump may be minutes away. Not a ticker — one scan per open, and the
+    /// parsed logs are cached per path.
+    func refreshAgents() {
+        guard let inputs = lastAgentInputs, agentRefresh == nil else { return }
+        agentRefresh = Task.detached(priority: .userInitiated) { [weak self, pid] in
+            let panel = Self.scanAgents(inputs)
+            await MainActor.run {
+                guard let self else { return }
+                self.agentRefresh = nil
+                guard self.pid == pid, panel != self.agents else { return }
+                self.agents = panel
+            }
+        }
     }
 
     /// A prompt image, read the way the mirror's image route reads it.
