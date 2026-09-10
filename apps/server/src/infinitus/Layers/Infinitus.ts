@@ -296,17 +296,19 @@ const makeInfinitus = Effect.gen(function* () {
     }),
   );
 
+  // A `SubscriptionRef` replays its current value, which before the first
+  // cycle is `None` — dropped here. So whether the loop's immediate cycle
+  // beats a subscription or not, the first element is a polled snapshot.
+  const observed = SubscriptionRef.changes(state).pipe(
+    Stream.filter(Option.isSome),
+    Stream.map((present) => present.value),
+    Stream.changes,
+  );
+
   const changes = Stream.unwrap(
     Effect.gen(function* () {
-      // A `SubscriptionRef` replays its current value, which before the first
-      // cycle is `None` — dropped here. So whether the loop's immediate cycle
-      // beats the subscription or not, the first element is a polled snapshot.
       yield* Effect.acquireRelease(startPolling, () => stopPolling);
-      return SubscriptionRef.changes(state).pipe(
-        Stream.filter(Option.isSome),
-        Stream.map((present) => present.value),
-        Stream.changes,
-      );
+      return observed;
     }),
   );
 
@@ -345,6 +347,7 @@ const makeInfinitus = Effect.gen(function* () {
   return {
     snapshot,
     changes,
+    observed,
     command,
   } satisfies InfinitusServiceShape;
 });

@@ -210,8 +210,10 @@ const UsageLayerLive = UsageService.layer.pipe(Layer.provide(ServerSettingsLayer
 
 // The client is private to these two: everything else reaches Infinitus
 // through `InfinitusService`, which is the only thing that polls the socket;
-// the port layer writes one pref once the server is listening.
-const InfinitusLayerLive = Layer.mergeAll(InfinitusLive, InfinitusServerPortLive).pipe(
+// the port layer writes one pref once the server is listening and again when
+// a watched app comes back.
+const InfinitusLayerLive = InfinitusServerPortLive.pipe(
+  Layer.provideMerge(InfinitusLive),
   Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
 );
 
