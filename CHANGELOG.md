@@ -24,6 +24,7 @@ publishes the matching section as the GitHub release body.
 - An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
 
 ### Mac
+- swapd engine: a Gemini CLI fleet shows beside the Claude one when swapd reports it, its per-model quota as named gauges.
 - Workspace: a terminal drawer under the thread, resizable, showing the same shells as the Terminal tab.
 - Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.
 - Workspace: the Terminal tab holds several shells per thread — "+" opens another, the strip switches and closes them.
