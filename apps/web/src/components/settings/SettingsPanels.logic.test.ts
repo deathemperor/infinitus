@@ -18,6 +18,7 @@ import {
   isProjectGroupingEnabled,
   projectGroupingModeFromToggle,
   resolveBackgroundActivityProfileOption,
+  resolveDesktopUpdateTrackRow,
 } from "./SettingsPanels.logic";
 
 describe("typography settings restore", () => {
@@ -279,5 +280,25 @@ describe("getChangedBrowserSettingLabels", () => {
       "Open links in",
       "Floating preview",
     ]);
+  });
+});
+
+describe("resolveDesktopUpdateTrackRow", () => {
+  it("shows an Infinitus build its own track, with no switch away from it", () => {
+    const row = resolveDesktopUpdateTrackRow("infinitus");
+
+    expect(row.label).toBe("Infinitus");
+    expect(row.switchable).toBe(false);
+  });
+
+  it("keeps upstream's two switchable tracks", () => {
+    expect(resolveDesktopUpdateTrackRow("latest")).toMatchObject({
+      label: "Stable",
+      switchable: true,
+    });
+    expect(resolveDesktopUpdateTrackRow("nightly")).toMatchObject({
+      label: "Nightly",
+      switchable: true,
+    });
   });
 });

@@ -13,6 +13,7 @@ import {
   type DirectoryRecord,
 } from "@electron/asar";
 
+import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@t3tools/shared/desktopIdentity";
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
@@ -2747,8 +2748,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       },
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: DESKTOP_PRODUCT_NAME,
+          schemes: [DESKTOP_URL_SCHEME, DESKTOP_DEV_URL_SCHEME],
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
@@ -2791,11 +2792,11 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       category: "Development",
       // electron-builder turns these into MimeType=x-scheme-handler/<scheme>;
       // in the .desktop entry (Exec already gets %U), so browsers can hand
-      // t3code:// OAuth callbacks to the app.
+      // infinitus:// OAuth callbacks to the app.
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: DESKTOP_PRODUCT_NAME,
+          schemes: [DESKTOP_URL_SCHEME, DESKTOP_DEV_URL_SCHEME],
         },
       ],
       desktop: {

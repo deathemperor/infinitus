@@ -259,6 +259,10 @@
       "types": "./src/productName.ts",
       "import": "./src/productName.ts"
     },
+    "./desktopIdentity": {
+      "types": "./src/desktopIdentity.ts",
+      "import": "./src/desktopIdentity.ts"
+    },
     "./devProxy": {
       "types": "./src/devProxy.ts",
       "import": "./src/devProxy.ts"

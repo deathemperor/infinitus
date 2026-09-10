@@ -147,6 +147,7 @@ import {
   readLastEnabledProjectGroupingMode,
   rememberEnabledProjectGroupingMode,
   resolveBackgroundActivityProfileOption,
+  resolveDesktopUpdateTrackRow,
 } from "./SettingsPanels.logic";
 import {
   PolicyTooltip,
@@ -253,6 +254,7 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
+  const updateTrackRow = resolveDesktopUpdateTrackRow(selectedUpdateChannel);
   const selectedHostedAppChannel = hasDesktopBridge ? null : HOSTED_APP_CHANNEL;
 
   const handleUpdateChannelChange = useCallback(
@@ -416,33 +418,35 @@ function AboutVersionSection() {
       {hasDesktopBridge ? (
         <SettingsRow
           title="Update track"
-          description="Use stable releases or nightly builds. Switch back anytime."
+          description={updateTrackRow.description}
           control={
-            <Select
-              value={selectedUpdateChannel}
-              onValueChange={(value) => {
-                handleUpdateChannelChange(value as DesktopUpdateChannel);
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label="Update track"
-                disabled={isChangingUpdateChannel}
+            updateTrackRow.switchable ? (
+              <Select
+                value={selectedUpdateChannel}
+                onValueChange={(value) => {
+                  handleUpdateChannelChange(value as DesktopUpdateChannel);
+                }}
               >
-                <SelectValue>
-                  {selectedUpdateChannel === "nightly" ? "Nightly" : "Stable"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="latest">
-                  Stable
-                </SelectItem>
-                <SelectItem hideIndicator value="nightly">
-                  Nightly
-                </SelectItem>
-              </SelectPopup>
-            </Select>
+                <SelectTrigger
+                  size="sm"
+                  className="w-full sm:w-40"
+                  aria-label="Update track"
+                  disabled={isChangingUpdateChannel}
+                >
+                  <SelectValue>{updateTrackRow.label}</SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="end" alignItemWithTrigger={false}>
+                  <SelectItem hideIndicator value="latest">
+                    Stable
+                  </SelectItem>
+                  <SelectItem hideIndicator value="nightly">
+                    Nightly
+                  </SelectItem>
+                </SelectPopup>
+              </Select>
+            ) : (
+              <span className="text-sm text-muted-foreground">{updateTrackRow.label}</span>
+            )
           }
         />
       ) : selectedHostedAppChannel ? (

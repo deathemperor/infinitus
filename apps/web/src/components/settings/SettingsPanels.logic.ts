@@ -9,6 +9,7 @@ import type {
   SidebarProjectGroupingMode,
   UnifiedSettings,
 } from "@t3tools/contracts";
+import type { DesktopUpdateChannel } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import {
   getBackgroundActivityBaseProfile,
@@ -16,6 +17,7 @@ import {
   normalizeServerBackgroundActivitySettings,
   resolveServerBackgroundActivitySettings,
 } from "@t3tools/shared/backgroundActivitySettings";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 
@@ -337,5 +339,33 @@ export function backgroundActivityOverrideSettings(
       baseProfile: getBackgroundActivityBaseProfile(current),
       overrides: nextOverrides as BackgroundActivitySettings["overrides"],
     },
+  };
+}
+
+export interface DesktopUpdateTrackRow {
+  readonly label: string;
+  readonly description: string;
+  /** False keeps the track read-only: there is no track to switch to. */
+  readonly switchable: boolean;
+}
+
+/**
+ * The Update-track row of an installed desktop build. A fork build follows the
+ * `infinitus` channel, whose releases only this repository publishes; upstream's
+ * Stable and Nightly tracks would hand it the real T3 Code on the next update,
+ * with no way back. So the fork shows its own track and offers no switch.
+ */
+export function resolveDesktopUpdateTrackRow(channel: DesktopUpdateChannel): DesktopUpdateTrackRow {
+  if (channel === "infinitus") {
+    return {
+      label: PRODUCT_NAME,
+      description: `${PRODUCT_NAME} builds update from this fork's own releases.`,
+      switchable: false,
+    };
+  }
+  return {
+    label: channel === "nightly" ? "Nightly" : "Stable",
+    description: "Use stable releases or nightly builds. Switch back anytime.",
+    switchable: true,
   };
 }

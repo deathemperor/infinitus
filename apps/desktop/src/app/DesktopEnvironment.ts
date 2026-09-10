@@ -11,6 +11,12 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import {
+  adoptsLegacyDesktopUserDataDir,
+  DESKTOP_DEV_USER_DATA_DIR_NAME,
+  DESKTOP_USER_DATA_DIR_NAME,
+} from "@t3tools/shared/desktopIdentity";
+
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
@@ -79,6 +85,12 @@ export class DesktopEnvironment extends Context.Service<
     readonly appImagePath: Option.Option<string>;
     readonly userDataDirName: string;
     readonly legacyUserDataDirName: string;
+    /**
+     * Whether `legacyUserDataDirName` is a directory this build may adopt. The
+     * fork never adopts one: `T3 Code (Alpha)` is the installed app's live
+     * state, lock included (see @t3tools/shared/desktopIdentity).
+     */
+    readonly adoptsLegacyUserDataDir: boolean;
     readonly defaultDesktopSettings: DesktopAppSettings.DesktopSettings;
     readonly runtimeInfo: DesktopRuntimeInfo;
     readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
@@ -179,7 +191,9 @@ const make = Effect.fn("desktop.environment.make")(function* (
     joinPath: path.join,
     t3Home: config.t3Home,
   });
-  const userDataDirName = isDevelopment ? "t3code-dev" : "t3code";
+  const userDataDirName = isDevelopment
+    ? DESKTOP_DEV_USER_DATA_DIR_NAME
+    : DESKTOP_USER_DATA_DIR_NAME;
   const legacyUserDataDirName = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
   const linuxApplicationsDir = path.join(
     Option.getOrElse(config.xdgDataHome, () => path.join(homeDirectory, ".local", "share")),
@@ -233,6 +247,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     appImagePath: config.appImagePath,
     userDataDirName,
     legacyUserDataDirName,
+    adoptsLegacyUserDataDir: adoptsLegacyDesktopUserDataDir(legacyUserDataDirName),
     defaultDesktopSettings: DesktopAppSettings.resolveDefaultDesktopSettings(input.appVersion),
     runtimeInfo: resolveDesktopRuntimeInfo({
       platform: input.platform,

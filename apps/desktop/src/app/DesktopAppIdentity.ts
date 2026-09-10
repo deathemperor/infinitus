@@ -48,6 +48,15 @@ const normalizeCommitHash = (value: string): Option.Option<string> => {
 export const resolveUserDataPath = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
+  const userDataPath = environment.path.join(
+    environment.appDataDirectory,
+    environment.userDataDirName,
+  );
+  // The fork adopts no legacy directory, so it never even probes one: an
+  // existing "T3 Code (Alpha)" is the installed app's live state.
+  if (!environment.adoptsLegacyUserDataDir) {
+    return userDataPath;
+  }
   const legacyPath = environment.path.join(
     environment.appDataDirectory,
     environment.legacyUserDataDirName,
@@ -61,9 +70,7 @@ export const resolveUserDataPath = Effect.gen(function* () {
         }),
     ),
   );
-  return legacyPathExists
-    ? legacyPath
-    : environment.path.join(environment.appDataDirectory, environment.userDataDirName);
+  return legacyPathExists ? legacyPath : userDataPath;
 }).pipe(Effect.withSpan("desktop.appIdentity.resolveUserDataPath"));
 
 /** @public Service construction is part of the canonical Effect module API. */
