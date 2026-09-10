@@ -604,13 +604,20 @@ final class AppModel: ObservableObject {
         }
     }
     /// Hold a power assertion while any session is mid-turn (KeepAwake).
-    /// Display-only: rows sorted most-headroom-first with the active
-    /// account and the next candidate pinned on top (todo 2026-09-01).
-    /// Engine slots never move — nothing is written (the app-side
-    /// auto-order writer was removed 2026-09-03: pick-first is an engine
-    /// knob, see EngineCapabilities.prefer).
-    @Published var sortByHeadroom: Bool {
-        didSet { defaults.set(sortByHeadroom, forKey: "sort_headroom") }
+    /// Display-only row order (PopupSort): the engine's slots, headroom
+    /// with active + next pinned (todo 2026-09-01), or the engine's own
+    /// candidate ranking (#542). Engine slots never move — nothing is
+    /// written (the app-side auto-order writer was removed 2026-09-03:
+    /// pick-first is an engine knob, see EngineCapabilities.prefer).
+    /// `popup_sort`; a pre-#542 `sort_headroom` Bool seeds it once.
+    @Published var popupSort: PopupSort {
+        didSet { defaults.set(popupSort.rawValue, forKey: "popup_sort") }
+    }
+    static func popupSort(_ defaults: UserDefaults) -> PopupSort {
+        if let raw = defaults.string(forKey: "popup_sort"), let sort = PopupSort(rawValue: raw) {
+            return sort
+        }
+        return PopupSort(legacyHeadroom: defaults.object(forKey: "sort_headroom") as? Bool ?? true)
     }
     @Published var keepAwake: Bool {
         didSet {
@@ -1049,7 +1056,7 @@ final class AppModel: ObservableObject {
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
         keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
-        sortByHeadroom = defaults.object(forKey: "sort_headroom") as? Bool ?? true
+        popupSort = Self.popupSort(defaults)
         mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
         mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
         mirrorRendezvousEnabled = defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true
@@ -1187,7 +1194,7 @@ final class AppModel: ObservableObject {
         glassFocused = defaults.object(forKey: "glass_focused") as? Double ?? 0.7
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
         keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
-        sortByHeadroom = defaults.object(forKey: "sort_headroom") as? Bool ?? true
+        popupSort = Self.popupSort(defaults)
         pushSessionsDone = defaults.object(forKey: "push_sessions_done") as? Bool ?? true
         pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
         pushLastAlive = defaults.object(forKey: "push_last_alive") as? Bool ?? true
@@ -2686,6 +2693,7 @@ final class AppModel: ObservableObject {
         let list = AccountList(activeAccountNumber: fleet.activeNumber,
                                accounts: fleet.accounts,
                                nextCandidate: fleet.nextCandidate,
+                               candidateOrder: fleet.candidateOrder,
                                nextRecovery: fleet.nextRecovery,
                                liveSessions: fleet.liveSessions)
         let raw = fleet.raw ?? (try? JSONEncoder().encode(list)) ?? Data()
@@ -2728,8 +2736,8 @@ final class AppModel: ObservableObject {
                 popupLayout: popupLayout, burnStyle: burnStyle,
                 introStyle: introStyle, introTitle: introTitle,
                 introSpeed: introSpeed, customThemes: customThemes,
-                sortByHeadroom: sortByHeadroom, popupTextSize: popupTextSize,
-                reviveLeadMinutes: reviveLeadMinutes)
+                sortByHeadroom: popupSort != .engine, popupSort: popupSort.rawValue,
+                popupTextSize: popupTextSize, reviveLeadMinutes: reviveLeadMinutes)
             // Footer-chip state (#9 phase D2), captured here for the
             // same main-actor reason as the prefs above.
             let serviceStatus = ServiceStatusSummary(

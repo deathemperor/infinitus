@@ -20,6 +20,7 @@ final class FleetState: ObservableObject, Identifiable {
     @Published var accounts: [Account] = []
     @Published var activeNumber: Int?
     @Published var nextCandidate: Int?
+    @Published var candidateOrder: [Int]?
     @Published var nextRecovery: NextRecovery?
     @Published var liveSessions: LiveSessions?
     @Published var switchFlashTick = 0
@@ -79,6 +80,7 @@ final class FleetState: ObservableObject, Identifiable {
         accounts = fleet.accounts
         activeNumber = fleet.activeNumber
         nextCandidate = fleet.nextCandidate
+        candidateOrder = fleet.candidateOrder
         nextRecovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: fleet.accounts, activeNumber: fleet.activeNumber)
         liveSessions = fleet.liveSessions
         lastFleet = fleet
@@ -123,6 +125,7 @@ final class FleetState: ObservableObject, Identifiable {
             accounts = list
             if activeNumber != fleet.activeNumber { activeNumber = fleet.activeNumber }
             if nextCandidate != fleet.nextCandidate { nextCandidate = fleet.nextCandidate }
+            if candidateOrder != fleet.candidateOrder { candidateOrder = fleet.candidateOrder }
             let recovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: list, activeNumber: fleet.activeNumber)
             if nextRecovery != recovery { nextRecovery = recovery }
             if liveSessions != fleet.liveSessions { liveSessions = fleet.liveSessions }
@@ -358,10 +361,9 @@ extension FleetState: FleetModel {
     /// What the popup rows iterate: raw engine order, or the headroom
     /// sort with active + next pinned.
     var displayAccounts: [Account] {
-        host.sortByHeadroom
-            ? DisplayOrder.sort(accounts, active: activeNumber, next: nextCandidate,
-                                reviver: reviver?.number)
-            : accounts
+        DisplayOrder.arrange(accounts, sort: host.popupSort, active: activeNumber,
+                             next: nextCandidate, reviver: reviver?.number,
+                             order: candidateOrder)
     }
     var rowTheme: RowTheme { host.rowTheme }
     var compactRows: Bool { host.compactRows }

@@ -32,8 +32,8 @@ final class FleetMirrorTests: XCTestCase {
         let prefs = FleetPrefs(themeID: "rpg", compactRows: true, popupLayout: "stacked",
                                 burnStyle: "ash", introStyle: "fade", introTitle: "slide",
                                 introSpeed: 1.5, customThemes: [.off],
-                                sortByHeadroom: false, popupTextSize: "large",
-                                reviveLeadMinutes: 25)
+                                sortByHeadroom: false, popupSort: "candidates",
+                                popupTextSize: "large", reviveLeadMinutes: 25)
         let usageJSON = Data("{\"days\":7,\"totalCost\":1.5}".utf8)
         let snapshot = MirrorSnapshot(
             capturedAt: Date(),
@@ -85,8 +85,23 @@ final class FleetMirrorTests: XCTestCase {
         let read = try await FileFleetMirror(url: url).latest()
         let got = try XCTUnwrap(read?.prefs)
         XCTAssertEqual(got.sortByHeadroom, true)
+        XCTAssertEqual(got.popupSort, "headroom")
         XCTAssertEqual(got.popupTextSize, "default")
         XCTAssertEqual(got.reviveLeadMinutes, 10)
+    }
+
+    /// A pre-#542 Mac mirrors only the Bool: the phone reads it as the
+    /// matching mode.
+    func testPrefsWithOnlySortByHeadroomFalseDecodeToEngineOrder() throws {
+        let json = """
+        {"themeID":"off","compactRows":false,"popupLayout":"wide",
+         "burnStyle":"ember","introStyle":"top","introTitle":"zoom",
+         "introSpeed":1.0,"customThemes":[],"sortByHeadroom":false}
+        """
+        let got = try JSONDecoder().decode(FleetPrefs.self, from: Data(json.utf8))
+        XCTAssertEqual(got.popupSort, "engine")
+        XCTAssertEqual(FleetPrefs(sortByHeadroom: false).popupSort, "engine")
+        XCTAssertEqual(FleetPrefs().popupSort, "headroom")
     }
 
     func testRoundTripWithFooterChipStateAndProgress() async throws {

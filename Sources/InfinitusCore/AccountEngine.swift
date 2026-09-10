@@ -76,6 +76,9 @@ public struct EngineFleet: Codable, Sendable {
     public let accounts: [Account]
     public let activeNumber: Int?
     public let nextCandidate: Int?
+    /// The engine's whole advisory ranking (AccountList.candidateOrder);
+    /// nil from an engine that only names the next one.
+    public let candidateOrder: [Int]?
     public let nextRecovery: NextRecovery?
     public let liveSessions: LiveSessions?
     /// Verbatim engine bytes when the engine has a native JSON form
@@ -89,6 +92,7 @@ public struct EngineFleet: Codable, Sendable {
 
     public init(engineID: String, provider: Provider, accounts: [Account],
                 activeNumber: Int? = nil, nextCandidate: Int? = nil,
+                candidateOrder: [Int]? = nil,
                 nextRecovery: NextRecovery? = nil,
                 liveSessions: LiveSessions? = nil, raw: Data? = nil,
                 capabilities: EngineCapabilities? = nil) {
@@ -97,6 +101,7 @@ public struct EngineFleet: Codable, Sendable {
         self.accounts = accounts
         self.activeNumber = activeNumber
         self.nextCandidate = nextCandidate
+        self.candidateOrder = candidateOrder
         self.nextRecovery = nextRecovery
         self.liveSessions = liveSessions
         self.raw = raw
@@ -107,7 +112,7 @@ public struct EngineFleet: Codable, Sendable {
     public func with(capabilities: EngineCapabilities) -> EngineFleet {
         EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
                     activeNumber: activeNumber, nextCandidate: nextCandidate,
-                    nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
                     capabilities: capabilities)
     }
 
@@ -116,7 +121,7 @@ public struct EngineFleet: Codable, Sendable {
     public func with(liveSessions: LiveSessions?) -> EngineFleet {
         EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
                     activeNumber: activeNumber, nextCandidate: nextCandidate,
-                    nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
                     capabilities: capabilities)
     }
 

@@ -162,7 +162,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{version, sha, engines:{cswap:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground}"),
         ControlCommand(name: "fleets", effect: .read,
                        summary: "Every fleet with accounts, usage, active/next and the engine's capabilities.",
-                       replyShape: "[{key, engineID, provider, capabilities:[String], caveat?, activeNumber?, nextCandidate?, nextRecovery?, accounts:[Account]}]"),
+                       replyShape: "[{key, engineID, provider, capabilities:[String], caveat?, activeNumber?, nextCandidate?, candidateOrder?, nextRecovery?, accounts:[Account]}]"),
         ControlCommand(name: "plan", effect: .read,
                        summary: "The reset battle plan (#7) the planner proposes right now — ignite / switch / hold / reset steps with epoch instants — or null when there is nothing to plan.",
                        replyShape: "{plan: {bindAt, steps:[{at, action, number, why}]} | null}"),
