@@ -331,6 +331,9 @@ struct T3TerminalScreen: View {
             startStream()
         } catch MirrorTransportError.http(404) {
             controller.phase = .unavailable("This Mac doesn't host terminals yet — update Infinitus on the Mac.")
+        } catch MirrorTransportError.http(409) {
+            // B-36: the Mac caps live shells per session at 8.
+            controller.phase = .unavailable("The Mac already has its limit of shells open for this session — close one in its Terminal tab.")
         } catch {
             controller.phase = .unavailable(error.localizedDescription)
         }
