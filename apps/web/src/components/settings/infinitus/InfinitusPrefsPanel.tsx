@@ -202,11 +202,14 @@ export function InfinitusPrefsPanel({
   sectionSlugs,
   title,
   children,
+  footer,
 }: {
   readonly sectionSlugs: ReadonlyArray<string>;
   readonly title: string;
   /** The Engines pane's status list, drawn above the toggles. */
   readonly children?: ReactNode;
+  /** The Devices pane's pairing card, drawn under the prefs once they answer. */
+  readonly footer?: ReactNode;
 }) {
   const { environmentId, capability, snapshot } = useInfinitusEnvironment();
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
@@ -347,6 +350,7 @@ export function InfinitusPrefsPanel({
           })}
         </SettingsSection>
       ))}
+      {footer}
       <RestartConfirmDialog
         pending={pendingRestart}
         onCancel={() => setPendingRestart(null)}

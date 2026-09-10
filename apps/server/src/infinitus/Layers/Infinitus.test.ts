@@ -231,6 +231,29 @@ describe("InfinitusService", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
+  effectIt.effect("carries the status reply's fork tunnel into the snapshot", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+      yield* stub.setResult("status", {
+        ...status,
+        forkTunnel: {
+          enabled: true,
+          port: 3773,
+          state: "up",
+          url: "https://example-words.trycloudflare.com",
+        },
+      });
+
+      const { fiber, first } = yield* subscribe(infinitus);
+
+      expect(first.status?.forkTunnel?.state).toBe("up");
+      expect(first.status?.forkTunnel?.url).toBe("https://example-words.trycloudflare.com");
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
   effectIt.effect("emits a changed fleets reply and swallows an identical one", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;

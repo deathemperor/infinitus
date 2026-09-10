@@ -108,6 +108,39 @@ describe("InfinitusStatus", () => {
   it("rejects a status whose playground flag is not a boolean", () => {
     expect(() => decodeStatus({ ...status, playground: "yes" })).toThrow();
   });
+
+  it("leaves the fork tunnel absent on a build before it", () => {
+    expect(decodeStatus(status).forkTunnel).toBeUndefined();
+  });
+
+  it("decodes the fork tunnel, with its url only while up", () => {
+    const up = decodeStatus({
+      ...status,
+      forkTunnel: {
+        enabled: true,
+        port: 3773,
+        state: "up",
+        url: "https://example-words.trycloudflare.com",
+        hostname: "example-words.trycloudflare.com",
+      },
+    });
+    expect(up.forkTunnel?.url).toBe("https://example-words.trycloudflare.com");
+
+    const off = decodeStatus({
+      ...status,
+      forkTunnel: { enabled: false, port: 3773, state: "off" },
+    });
+    expect(off.forkTunnel?.state).toBe("off");
+    expect(off.forkTunnel?.url).toBeUndefined();
+  });
+
+  it("keeps a tunnel state a newer build adds rather than dropping the status", () => {
+    const decoded = decodeStatus({
+      ...status,
+      forkTunnel: { enabled: true, port: 3773, state: "reconnecting" },
+    });
+    expect(decoded.forkTunnel?.state).toBe("reconnecting");
+  });
 });
 
 describe("InfinitusFleet", () => {
