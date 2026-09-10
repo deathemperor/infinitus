@@ -49,6 +49,8 @@ export interface Preferences {
       cards over push, and which Mac (an environment id) when several run it. */
   readonly infinitusLiveActivityEnabled?: boolean;
   readonly infinitusLiveActivityMac?: string;
+  /** Infinitus (fork): local reset / swap alarms planned from the Mac's fleet. */
+  readonly infinitusAlarmsEnabled?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -111,6 +113,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     threadListSnoozedShelfExpanded?: boolean;
     infinitusLiveActivityEnabled?: boolean;
     infinitusLiveActivityMac?: string;
+    infinitusAlarmsEnabled?: boolean;
   } = {};
 
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
@@ -192,6 +195,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.infinitusLiveActivityMac === "string") {
     preferences.infinitusLiveActivityMac = parsed.infinitusLiveActivityMac;
+  }
+  if (typeof parsed.infinitusAlarmsEnabled === "boolean") {
+    preferences.infinitusAlarmsEnabled = parsed.infinitusAlarmsEnabled;
   }
   return preferences;
 }

@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
+import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useMemo } from "react";
 import { Platform } from "react-native";
@@ -9,12 +10,14 @@ import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
+import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
-/** Settings › Infinitus (fork, #572): the Live Activity toggle and, with
+/** Settings › Infinitus (fork, #572): the Live Activity toggle, the reset /
+    swap alarms toggle (which asks for the notification permission) and, with
     several Macs, which one drives the cards. Absent until a paired Mac runs
     Infinitus, so plain T3 users never see it. */
 export function SettingsInfinitusSection() {
@@ -25,6 +28,7 @@ export function SettingsInfinitusSection() {
   const macs = useMemo(() => infinitusMacs(configs, presentations), [configs, presentations]);
   const loaded = AsyncResult.isSuccess(preferences);
   const enabled = loaded && preferences.value.infinitusLiveActivityEnabled !== false;
+  const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
   const macActions = useMemo<MenuAction[]>(
     () =>
@@ -51,6 +55,18 @@ export function SettingsInfinitusSection() {
         disabled={Platform.OS !== "ios" || !loaded}
         value={enabled}
         onValueChange={(value) => savePreferences({ infinitusLiveActivityEnabled: value })}
+      />
+      <SettingsSwitchRow
+        icon="alarm"
+        label="Reset alarms"
+        subtitle="A banner before an exhausted account's limit lifts, and when the fleet swaps."
+        disabled={!loaded}
+        value={alarmsEnabled}
+        onValueChange={(value) => {
+          savePreferences({ infinitusAlarmsEnabled: value });
+          if (value)
+            void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
+        }}
       />
       {macs.length > 1 && pusher ? (
         <ControlPillMenu

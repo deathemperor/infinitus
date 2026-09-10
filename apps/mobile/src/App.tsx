@@ -11,6 +11,7 @@ import { createStaticNavigation } from "@react-navigation/native";
 import { RegistryContext } from "@effect/atom-react";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
+import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
 import { InfinitusLiveActivityBridge } from "./features/infinitus/InfinitusLiveActivityBridge";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
@@ -98,6 +99,7 @@ function AppContent() {
               <ConfirmDialogHost />
               <ThreadArrangementHost />
               <InfinitusLiveActivityBridge />
+              <InfinitusAlarmsBridge />
             </BlurTargetView>
             {/* Anchored-menu overlays render here — in-window, so the
                 keyboard stays up while a dropdown is open. */}
