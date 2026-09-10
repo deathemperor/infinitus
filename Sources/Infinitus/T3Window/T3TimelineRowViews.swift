@@ -838,7 +838,7 @@ private struct T3ProposedPlanCard: View {
     /// the plan there ("Refine", `:179`). B has no such composer yet (Task 13),
     /// so the two live on the card: Implement allows the parked `ExitPlanMode`,
     /// and Edit puts the plan's markdown in the composer's draft
-    /// (`T3WindowModel.pendingComposerInsert`) for the user to change first.
+    /// (`T3WindowModel.composerInbox`, `.insert`) for the user to change first.
     private var actions: some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)

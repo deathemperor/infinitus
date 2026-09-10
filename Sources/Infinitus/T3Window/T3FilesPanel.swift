@@ -414,7 +414,7 @@ private struct T3FilesBrowser: View {
     /// `T3ComposerInbox` is the ref, and the Files tab only exists while a
     /// thread is selected — which is exactly when a composer is mounted on it.
     private func addToChat(_ mention: String) {
-        model.composerInbox.mention = mention
+        model.composerInbox.send(.mention(mention))
     }
 
     private func load(reload: Bool) async {

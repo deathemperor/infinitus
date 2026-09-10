@@ -46,9 +46,11 @@ struct T3ComposerView: View {
     /// read for the session's birth (the permission floor) and its model.
     let model: T3WindowModel
     let app: AppModel
-    /// What the Files tab hands this composer. Observed — and the model is
-    /// not — precisely so a mention arrives without a fleet tick's worth of
-    /// re-renders behind it (`T3ComposerInbox`).
+    /// Every one-shot delivery another panel hands this composer — a Files
+    /// tab mention, the plan card's Refine, a sidebar file drop (#528).
+    /// Observed — and the model is not — precisely so a delivery arrives
+    /// without a fleet tick's worth of re-renders behind it
+    /// (`T3ComposerInbox`).
     @ObservedObject var inbox: T3ComposerInbox
     @ObservedObject var store: T3TimelineStore
     /// Task 12's delivery, shared with the pending slot — one sender per
@@ -231,24 +233,30 @@ struct T3ComposerView: View {
         .onChange(of: model.composerFocusRequested) { _, requested in
             if requested { consumeFocusRequest() }
         }
-        // `ComposerPrimaryActions.tsx:166-181`'s "Refine": a panel asked for
-        // its text in the draft (the plan card's Edit, Task 12).
-        .onChange(of: model.pendingComposerInsert) { _, text in
-            guard let text, !text.isEmpty else { return }
-            insert(text)
-            model.pendingComposerInsert = nil
+        // Three producers share this one slot (#528): the plan card's Edit —
+        // `ComposerPrimaryActions.tsx:166-181`'s "Refine" — the Files tab's
+        // "Add to chat" (`FileBrowserPanel.tsx:175-192`), and a sidebar row's
+        // drop onto the thread that is ALREADY open, which has no remount to
+        // carry it (upstream's own `pendingSidebarFileDrops` effect,
+        // `ChatView.tsx:7876-7918`). `model` is a plain `let` here
+        // (T3ThreadView.swift:37-41), so only `inbox` — its own tiny
+        // `ObservableObject` — can wake this view outside a re-render that
+        // was already happening for some other reason.
+        .onChange(of: inbox.delivery) { _, new in
+            // `new == nil` is `take()` clearing the slot below — skip it, or
+            // every delivery would re-run this closure twice.
+            guard new != nil, let kind = inbox.take() else { return }
+            switch kind {
+            case .insert(let text):
+                guard !text.isEmpty else { return }
+                insert(text)
+            case .mention(let mention):
+                guard !mention.isEmpty else { return }
+                appendMention(mention)
+            case .fileDrop:
+                consumeFileDrops()
+            }
         }
-        // The Files tab's "Add to chat" (`FileBrowserPanel.tsx:175-192`).
-        .onChange(of: inbox.mention) { _, mention in
-            guard let mention, !mention.isEmpty else { return }
-            appendMention(mention)
-            inbox.mention = nil
-        }
-        // A sidebar row's drop onto the thread that is ALREADY open: there is
-        // no remount to carry it, so the queue itself is what wakes this
-        // (upstream's own `pendingSidebarFileDrops` effect,
-        // `ChatView.tsx:7876-7918`).
-        .onChange(of: model.pendingFileDrops) { _, _ in consumeFileDrops() }
         .onChange(of: store.timeline) { _, timeline in drain(timeline) }
         // Opening a menu is what loads its rows — a keystroke inside one only
         // re-ranks what is already in hand.

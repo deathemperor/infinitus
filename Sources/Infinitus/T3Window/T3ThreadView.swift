@@ -159,7 +159,7 @@ struct T3ThreadView: View {
                                               onToggleTurn: { turnId in toggle(rowId: row.id) { model.toggleTurn(turnId) } },
                                               onToggleWorkGroup: { groupId in toggle(rowId: row.id) { model.toggleWorkGroup(groupId) } },
                                               onImplementPlan: implementPlan,
-                                              onEditPlan: { markdown in model.pendingComposerInsert = markdown })
+                                              onEditPlan: { markdown in model.composerInbox.send(.insert(markdown)) })
                                 .equatable()
                                 .frame(maxWidth: Self.columnMax)
                                 .frame(maxWidth: .infinity)   // `mx-auto`

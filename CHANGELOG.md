@@ -18,6 +18,7 @@ publishes the matching section as the GitHub release body.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 
 ### Mac
+- Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.
 - Workspace: the right panel's Agents tab follows the thread's subagents and workflow runs.
 - Workspace: Files tab rows offer Copy mention and Add to chat, drag into the composer as a mention, and the listing re-reads after a turn.
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
