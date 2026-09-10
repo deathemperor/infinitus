@@ -125,6 +125,21 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (preferences, Engines, Profiles) and their pure logic.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms.
+- `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
+  Accounts page (fleet sections, account rows and their actions, the forecast
+  strip, the unavailable state); row/section models come from
+  `packages/client-runtime/src/state/infinitusAccounts.ts`.
+- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
+  — the five Settings › Infinitus routes, thin shells over the panes above.
+- `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
+  registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
+  under the fork's runner).
+- `packages/shared/src/infinitusControl.ts` — the control-socket path rule
+  (`INFINITUS_CONTROL_SOCKET`, then the per-platform default).
+- `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
+  client (one connection per request, one JSON line each way), the
+  `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
+  and the fork-port publisher (`prefs set fork_server_port` at startup).
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
