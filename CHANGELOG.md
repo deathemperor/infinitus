@@ -20,6 +20,7 @@ publishes the matching section as the GitHub release body.
 - The Linux companion answers the descriptor and the Files wire, so a paired phone can browse a Linux session's project files.
 - The tray's session feed poll decodes only the transcript lines appended since the phone's last poll, as the Mac's does (#380).
 - A git call no longer leaves its process and two pipe descriptors behind, which ran a long-lived tray out of descriptors and crashed the Linux test job (#510).
+- An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
 
 ### Mac
 - Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.
