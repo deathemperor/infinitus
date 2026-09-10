@@ -251,6 +251,10 @@
       "types": "./src/devHome.ts",
       "import": "./src/devHome.ts"
     },
+    "./homeDir": {
+      "types": "./src/homeDir.ts",
+      "import": "./src/homeDir.ts"
+    },
     "./productName": {
       "types": "./src/productName.ts",
       "import": "./src/productName.ts"
