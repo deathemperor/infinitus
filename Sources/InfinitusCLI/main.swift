@@ -83,6 +83,13 @@ if ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "aws
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+// A JSON body verb (#572 N1) takes `--body <json>`; without it the JSON
+// comes from stdin, so `infinitusctl crash-report < report.json` works.
+if ["activities-token", "client-activity", "crash-report"].contains(command), options[ControlBody.option] == nil {
+    let data = FileHandle.standardInput.readDataToEndOfFile()
+    options[ControlBody.option] = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 let request = ControlRequest(command: command, args: positional, options: options, secret: secret)
 
 // MARK: socket round-trip (blocking; a CLI has no reason to be async)
