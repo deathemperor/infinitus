@@ -152,7 +152,14 @@ final class QuickTunnel: ObservableObject {
         guard process == nil, let binary = Self.binaryPath else { return }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
-        process.arguments = ["tunnel", "--no-autoupdate",
+        // --config /dev/null: cloudflared otherwise reads
+        // ~/.cloudflared/config.yml, and once the named mirror tunnel
+        // (NamedTunnel) has written an ingress there, the quick tunnel's
+        // *.trycloudflare.com hostname matches no rule — cloudflared
+        // answers its catch-all 404 itself and never contacts the origin
+        // (Infi3, fork pairing 2026-09-11). A quick tunnel is one --url
+        // and nothing else.
+        process.arguments = ["tunnel", "--no-autoupdate", "--config", "/dev/null",
                              "--url", "http://127.0.0.1:\(port)"]
         let pipe = Pipe()
         // cloudflared logs the hostname to stderr, in a box of asterisks.
