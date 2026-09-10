@@ -27,9 +27,7 @@ actor UsageHistoryRecorder {
     }
 
     static var localURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory,
-                                 in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/usage-history.\(machineID).jsonl")
+        AppSupport.root().appendingPathComponent("usage-history.\(machineID).jsonl")
     }
 
     static func iCloudURL() -> URL? {

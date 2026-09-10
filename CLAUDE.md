@@ -159,7 +159,11 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   the bundle relaunches (bit us 2026-09-03 08:21). Short path: unix
   sockets cap at ~104 bytes, so never the scratchpad dir. It also needs
   `INFINITUS_MIRROR_SNAPSHOT=<state-dir>/mirror-snapshot.json`, or
-  MirrorExporter overwrites the real app's mirror snapshot (#474).
+  MirrorExporter overwrites the real app's mirror snapshot (#474), and
+  `INFINITUS_APP_SUPPORT=<state-dir>/app-support`, or every other file
+  it writes (stats caches, births, the owned ledger, events…) lands in
+  the real Application Support/Infinitus (#506; the stats clobber cost
+  each relaunch a year's re-read, #346).
 
 ## Build / run / test
 `./make-app.sh && open Infinitus.app` · `swift test` · `./dev.sh` (entr)

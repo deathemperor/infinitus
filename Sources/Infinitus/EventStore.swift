@@ -7,9 +7,7 @@ import InfinitusCore
 /// actor: file IO.
 actor EventStore {
     static let retention: TimeInterval = 400 * 86_400
-    static let url: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Infinitus/events.jsonl")
+    static let url: URL = AppSupport.root().appendingPathComponent("events.jsonl")
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()

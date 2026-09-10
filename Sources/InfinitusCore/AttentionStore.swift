@@ -34,8 +34,7 @@ public final class AttentionStore: @unchecked Sendable {
         return MirrorWriter.linuxStateDir(env: ProcessInfo.processInfo.environment, home: NSHomeDirectory())
             .appendingPathComponent("attention.json")
         #else
-        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/attention.json")
+        return AppSupport.root().appendingPathComponent("attention.json")
         #endif
     }
 

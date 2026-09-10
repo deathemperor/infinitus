@@ -166,9 +166,7 @@ extension SessionInput {
                                           home: NSHomeDirectory())
             .appendingPathComponent("attachments")
         #else
-        return FileManager.default.urls(for: .applicationSupportDirectory,
-                                        in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/attachments")
+        return AppSupport.root().appendingPathComponent("attachments")
         #endif
     }
 

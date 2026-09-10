@@ -40,6 +40,7 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 # Its own directory: the server chmods the socket's parent to 0700.
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
+export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
 export INFINITUS_CSWAP="$PWD/tools/demo-cswap"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
 # Spec §11 e2e: the app is a team leader on a bare repo in $SOCKDIR with
