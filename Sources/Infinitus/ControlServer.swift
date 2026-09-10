@@ -660,19 +660,29 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
-        case "prefs":
-            // `prefs` lists every entry; `prefs get k…` only those keys.
-            var keys: [String]? = nil
-            if r.args.first == "get" {
-                keys = Array(r.args.dropFirst())
-                if keys!.isEmpty { throw Fail("usage: prefs [get <key>...]") }
-            } else if !r.args.isEmpty {
-                throw Fail("usage: prefs [get <key>...]")
-            }
+        case "prefs", "prefs-set":
+            // `prefs` lists every entry; `prefs get k…` only those keys;
+            // `prefs set k v` (= `prefs-set k v`) writes one.
+            var args = r.args
+            if r.command == "prefs-set" { args.insert("set", at: 0) }
             do {
+                if args.first == "set" {
+                    guard args.count == 3 else { throw Fail("usage: prefs set <key> <value>") }
+                    let (pref, restarting) = try model.setPref(key: args[1], value: PrefCatalog.parseValue(args[2]))
+                    return ControlReply(ok: true, result: try .of(pref), restarting: restarting)
+                }
+                var keys: [String]? = nil
+                if args.first == "get" {
+                    keys = Array(args.dropFirst())
+                    if keys!.isEmpty { throw Fail("usage: prefs [get <key>...|set <key> <value>]") }
+                } else if !args.isEmpty {
+                    throw Fail("usage: prefs [get <key>...|set <key> <value>]")
+                }
                 return ControlReply(ok: true, result: try .of(model.prefsReply(keys: keys)))
             } catch let unknown as PrefCatalog.UnknownKey {
                 throw Fail("unknown pref \(unknown.key)")
+            } catch let violation as PrefCatalog.Violation {
+                throw Fail(violation.message)
             }
 
         case "hide":
@@ -692,24 +702,10 @@ final class ControlServer {
                 throw Fail("usage: engine cswap|swapd|cliproxy|9router on|off")
             }
             let on = r.args[1] == "on"
-            switch r.args[0] {
-            case "cswap":
-                guard model.cswap != nil || !on else { throw Fail("cswap is not installed") }
-                guard model.cswapEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
-                model.cswapEnabled = on
-            case "swapd":
-                guard model.swapd != nil || !on else { throw Fail("swapd is not installed") }
-                guard model.swapdEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
-                model.swapdEnabled = on
-            case "cliproxy":
-                guard model.cliproxyKeyPresent || !on else { throw Fail("store a management key first (proxy-key)") }
-                guard model.cliproxyEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
-                model.cliproxyEnabled = on
-            case "9router":
-                guard model.nineRouterEnabled != on else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
-                model.nineRouterEnabled = on
-            default: throw Fail("unknown engine \(r.args[0])")
-            }
+            let changed: Bool
+            do { changed = try model.setEngineEnabled(r.args[0], on: on) }
+            catch let refused as PrefCatalog.Violation { throw Fail(refused.message) }
+            guard changed else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
         case "proxy":

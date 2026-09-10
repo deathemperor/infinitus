@@ -146,14 +146,26 @@ final class MirrorPastSessionsBox: @unchecked Sendable {
 final class MirrorPrefsBox: @unchecked Sendable {
     private let lock = NSLock()
     private var handler: (@Sendable () throws -> PrefCatalog.Reply)?
+    private var writer: (@Sendable (PrefCatalog.Write) throws -> PrefCatalog.Pref)?
 
     func set(_ new: @escaping @Sendable () throws -> PrefCatalog.Reply) {
         lock.lock(); handler = new; lock.unlock()
     }
 
+    func setWrite(_ new: @escaping @Sendable (PrefCatalog.Write) throws -> PrefCatalog.Pref) {
+        lock.lock(); writer = new; lock.unlock()
+    }
+
     func call() -> PrefCatalog.Reply? {
         lock.lock(); let current = handler; lock.unlock()
         return try? current?()
+    }
+
+    /// `POST /prefs`: nil when nothing answers; a refusal is thrown with
+    /// its message, so the response can carry it.
+    func write(_ request: PrefCatalog.Write) throws -> PrefCatalog.Pref? {
+        lock.lock(); let current = writer; lock.unlock()
+        return try current?(request)
     }
 }
 
@@ -1252,6 +1264,30 @@ final class MirrorServer: ObservableObject {
                     // off this queue.
                     DispatchQueue.global(qos: .utility).async {
                         let response = MirrorTransport.fileAnswerResponse(files.current?.read(pid, path))
+                        onServed(request)
+                        connection.send(content: response,
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                    return
+                } else if request.method == "POST", request.path == PrefCatalog.path {
+                    guard let write = try? JSONDecoder().decode(PrefCatalog.Write.self, from: request.body) else {
+                        connection.send(content: MirrorTransport.badRequestResponse(),
+                                        completion: .contentProcessed { _ in connection.cancel() })
+                        return
+                    }
+                    // Waits on the main actor for the write and reload: off this queue.
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let response: Data
+                        do {
+                            response = try prefs.write(write).flatMap { try? JSONEncoder().encode($0) }
+                                .map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
+                        } catch let unknown as PrefCatalog.UnknownKey {
+                            response = MirrorTransport.errorResponse(status: 404, message: "unknown pref \(unknown.key)")
+                        } catch let refused as PrefCatalog.Violation {
+                            response = MirrorTransport.errorResponse(status: 400, message: refused.message)
+                        } catch {
+                            response = MirrorTransport.errorResponse(status: 500, message: "\(error)")
+                        }
                         onServed(request)
                         connection.send(content: response,
                                         completion: .contentProcessed { _ in connection.cancel() })

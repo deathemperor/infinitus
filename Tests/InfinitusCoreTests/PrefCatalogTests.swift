@@ -80,6 +80,52 @@ final class PrefCatalogTests: XCTestCase {
         }
     }
 
+    func testAWriteStoresTheTypedValueAndAnswersTheUpdatedPref() throws {
+        let pref = try PrefCatalog.write(.string("stacked"), key: "popup_layout", to: defaults)
+        XCTAssertEqual(pref.value, .string("stacked"))
+        XCTAssertEqual(defaults.string(forKey: "popup_layout"), "stacked")
+        XCTAssertEqual(try PrefCatalog.write(.number(300), key: "refresh_interval", to: defaults).value, .number(300))
+        XCTAssertEqual(defaults.object(forKey: "refresh_interval") as? Int, 300)
+        XCTAssertEqual(try PrefCatalog.write(.bool(false), key: "show_account_name", to: defaults).value, .bool(false))
+        XCTAssertEqual(defaults.object(forKey: "show_account_name") as? Bool, false)
+        XCTAssertEqual(try PrefCatalog.write(.number(0.25), key: "glass_focused", to: defaults).value, .number(0.25))
+        XCTAssertEqual(try PrefCatalog.write(.string("dragon"), key: "gamification_style", to: defaults).value, .string("dragon"))
+    }
+
+    /// Every refusal names the key and what would do, and writes nothing.
+    func testAWriteIsRefusedForTheWrongTypeOrAnUnlistedChoice() {
+        func refused(_ value: JSONValue, _ key: String) -> String? {
+            do { try PrefCatalog.write(value, key: key, to: defaults) } catch let v as PrefCatalog.Violation { return v.message } catch { return "\(error)" }
+            return nil
+        }
+        XCTAssertEqual(refused(.string("true"), "show_account_name"), "show_account_name takes a bool, not \"true\"")
+        XCTAssertEqual(refused(.number(60.5), "refresh_interval"), "refresh_interval takes a int, not 60.5")
+        XCTAssertEqual(refused(.number(45), "refresh_interval"), "refresh_interval must be one of 30, 60, 300, not 45")
+        XCTAssertEqual(refused(.string("sideways"), "title_pct"), "title_pct must be one of \"off\", \"5h\", \"7d\", \"both\", not \"sideways\"")
+        XCTAssertEqual(refused(.bool(true), "gamification_style"), "gamification_style takes a string, not true")
+        XCTAssertThrowsError(try PrefCatalog.write(.bool(true), key: "mirror_pair_token", to: defaults)) {
+            XCTAssertEqual($0 as? PrefCatalog.UnknownKey, PrefCatalog.UnknownKey(key: "mirror_pair_token"))
+        }
+        XCTAssertNil(defaults.object(forKey: "show_account_name"))
+        XCTAssertNil(defaults.object(forKey: "refresh_interval"))
+        XCTAssertNil(defaults.object(forKey: "title_pct"))
+    }
+
+    func testACommandLineValueIsJSONOrABareString() {
+        XCTAssertEqual(PrefCatalog.parseValue("true"), .bool(true))
+        XCTAssertEqual(PrefCatalog.parseValue("60"), .number(60))
+        XCTAssertEqual(PrefCatalog.parseValue("0.5"), .number(0.5))
+        XCTAssertEqual(PrefCatalog.parseValue("\"wide\""), .string("wide"))
+        XCTAssertEqual(PrefCatalog.parseValue("wide"), .string("wide"))
+        XCTAssertEqual(PrefCatalog.parseValue("5h"), .string("5h"))
+    }
+
+    func testThePostBodyRoundTrips() throws {
+        let data = Data(#"{"key":"popup_layout","value":"stacked"}"#.utf8)
+        XCTAssertEqual(try JSONDecoder().decode(PrefCatalog.Write.self, from: data),
+                       PrefCatalog.Write(key: "popup_layout", value: .string("stacked")))
+    }
+
     func testTheReplyEncodesDefaultAndValueAsPlainJSON() throws {
         defaults.set("nightly", forKey: "update_channel")
         let data = try JSONEncoder().encode(try PrefCatalog.reply(from: defaults, keys: ["update_channel"]))

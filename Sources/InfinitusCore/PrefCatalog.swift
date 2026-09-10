@@ -158,16 +158,84 @@ public enum PrefCatalog {
 
     public struct UnknownKey: Error, Equatable { public let key: String }
 
+    public static func pref(_ entry: Entry, in defaults: UserDefaults) -> Pref {
+        Pref(key: entry.key, type: entry.type, default: entry.default, value: value(entry, in: defaults),
+             section: entry.section, effect: entry.effect, choices: entry.choices)
+    }
+
     /// The table with values, every entry or only `keys` (in table
     /// order); a key the table does not list is an error, not a silent
     /// omission, so a client typo shows.
     public static func reply(from defaults: UserDefaults, keys: [String]? = nil) throws -> Reply {
         if let keys, let unknown = keys.first(where: { entry($0) == nil }) { throw UnknownKey(key: unknown) }
         let wanted = keys.map(Set.init)
-        let prefs = entries.filter { wanted?.contains($0.key) ?? true }.map {
-            Pref(key: $0.key, type: $0.type, default: $0.default, value: value($0, in: defaults),
-                 section: $0.section, effect: $0.effect, choices: $0.choices)
+        return Reply(sections: sections, prefs: entries.filter { wanted?.contains($0.key) ?? true }.map { pref($0, in: defaults) })
+    }
+
+    /// A value refused by `validate`: the wrong type, or off a closed set.
+    public struct Violation: Error, Equatable {
+        public let key: String
+        public let message: String
+        public init(key: String, message: String) { self.key = key; self.message = message }
+    }
+
+    /// The entry `key` names when `value` is of its type and among its
+    /// choices; `UnknownKey` or a `Violation` otherwise. An int must be
+    /// whole (`60`, not `60.5`); a bool is never coerced from a string.
+    public static func validate(key: String, value: JSONValue) throws -> Entry {
+        guard let entry = entry(key) else { throw UnknownKey(key: key) }
+        switch (entry.type, value) {
+        case (.bool, .bool), (.double, .number), (.string, .string): break
+        case (.int, .number(let n)) where n == n.rounded(): break
+        default: throw Violation(key: key, message: "\(key) takes a \(entry.type.rawValue), not \(describe(value))")
         }
-        return Reply(sections: sections, prefs: prefs)
+        if let choices = entry.choices, !choices.contains(value) {
+            let listed = choices.map(describe).joined(separator: ", ")
+            throw Violation(key: key, message: "\(key) must be one of \(listed), not \(describe(value))")
+        }
+        return entry
+    }
+
+    /// `validate`, then the typed write; the updated pref as the caller
+    /// should show it. The write-side spec (#558): this does not decide
+    /// how the app takes the change live — the caller reloads or
+    /// relaunches by the entry's `effect`.
+    @discardableResult
+    public static func write(_ value: JSONValue, key: String, to defaults: UserDefaults) throws -> Pref {
+        let entry = try validate(key: key, value: value)
+        switch (entry.type, value) {
+        case (.bool, .bool(let b)): defaults.set(b, forKey: key)
+        case (.int, .number(let n)): defaults.set(Int(n), forKey: key)
+        case (.double, .number(let n)): defaults.set(n, forKey: key)
+        case (.string, .string(let s)): defaults.set(s, forKey: key)
+        default: break   // validate() admits nothing else
+        }
+        return pref(entry, in: defaults)
+    }
+
+    /// A value typed on a command line: JSON when it parses (`true`,
+    /// `60`, `"wide"`), else the bare word as a string, so
+    /// `prefs set popup_layout wide` needs no quoting.
+    public static func parseValue(_ text: String) -> JSONValue {
+        if let parsed = try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8)) { return parsed }
+        return .string(text)
+    }
+
+    static func describe(_ value: JSONValue) -> String {
+        switch value {
+        case .null: return "null"
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let n): return n == n.rounded() ? String(Int(n)) : String(n)
+        case .string(let s): return "\"\(s)\""
+        case .array: return "an array"
+        case .object: return "an object"
+        }
+    }
+
+    /// `POST /prefs` body (#558 write side): one key, one value.
+    public struct Write: Codable, Sendable, Equatable {
+        public let key: String
+        public let value: JSONValue
+        public init(key: String, value: JSONValue) { self.key = key; self.value = value }
     }
 }
