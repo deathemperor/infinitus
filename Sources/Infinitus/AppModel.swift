@@ -1634,6 +1634,7 @@ final class AppModel: ObservableObject {
         mirrorServer.start(machineName: machineName,
                            token: mirrorPairToken)
         let ownedBox = ownedBox
+        let feedTails = FeedTails()
         mirrorServer.sessionFeed.set { pid, limit, since, wait, rows in
             let claudeDir = ClaudeSessions.configHome()
             let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
@@ -1642,7 +1643,7 @@ final class AppModel: ObservableObject {
                                             wake: owned?.wake)
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
             else { return nil }
-            guard var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: limit)
+            guard var feed = feedTails.read(record: record, claudeDir: claudeDir, limit: limit)
             else { return nil }
             if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid), limits: owned.limits(pid: pid)) }
             let encoder = JSONEncoder()
