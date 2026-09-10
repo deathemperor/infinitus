@@ -48,6 +48,30 @@ final class ReceiptsTests: XCTestCase {
         XCTAssertEqual(r.begin(commandId: "c", target: "t", pid: 1, now: t0 + 64), .hit(Data()))
     }
 
+    func testServeRunsOnceReplaysA200AndForgetsTheRest() {
+        let r = Receipts()
+        let ok = MirrorTransport.jsonResponse(Data("{}".utf8))
+        var runs = 0
+        XCTAssertEqual(r.serve(commandId: "c1", target: "t", pid: 7) { runs += 1; return ok }, ok)
+        XCTAssertEqual(r.serve(commandId: "c1", target: "t", pid: 7) { runs += 1; return ok }, ok)
+        XCTAssertEqual(runs, 1)
+        XCTAssertEqual(r.serve(commandId: "c1", target: "u", pid: 7) { ok }.prefix(12), Data("HTTP/1.1 409".utf8))
+        // A non-200 reply is not kept: the retry runs again.
+        let refused = MirrorTransport.conflictResponse(Data())
+        XCTAssertEqual(r.serve(commandId: "c2", target: "t", pid: 7) { runs += 1; return refused }, refused)
+        XCTAssertEqual(r.serve(commandId: "c2", target: "t", pid: 7) { runs += 1; return refused }, refused)
+        XCTAssertEqual(runs, 3)
+        // Nil is the route's 404, and it is not kept either.
+        XCTAssertEqual(r.serve(commandId: "c3", target: "t", pid: 7) { nil }, MirrorTransport.notFoundResponse())
+        XCTAssertEqual(r.begin(commandId: "c3", target: "t", pid: 7), .miss)
+        // Without a commandId there is no receipt at all.
+        XCTAssertEqual(r.serve(commandId: nil, target: "t", pid: 7) { runs += 1; return ok }, ok)
+        XCTAssertEqual(r.serve(commandId: nil, target: "t", pid: 7) { runs += 1; return ok }, ok)
+        XCTAssertEqual(runs, 5)
+        r.tombstone(pid: 7)
+        XCTAssertEqual(r.serve(commandId: "c1", target: "t", pid: 7) { ok }.prefix(12), Data("HTTP/1.1 410".utf8))
+    }
+
     func testRequestsDecodeCommandId() throws {
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
         XCTAssertEqual(try dec.decode(SessionInput.Request.self, from: Data(#"{"kind":"message","text":"hi","commandId":"c1"}"#.utf8)).commandId, "c1")

@@ -24,6 +24,9 @@ publishes the matching section as the GitHub release body.
 - An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
 - The Linux companion answers a hook with the session's pid and pushes a "waiting on you" the moment a Notification lands, not on its next tick (#486).
 - A Linux session that exits no longer keeps its timeline slot for the companion's lifetime (#486).
+- The Linux companion answers the attention route, so settle, snooze and pin from the phone work against a Linux session (#486).
+- The Linux companion serves the images behind a session's feed entries, at full size (#486).
+- A phone outbox retry delivers once to a Linux session, under the same command receipts the Mac keeps (#486).
 - The Linux companion reports its release number instead of "dev" (#486).
 - The Linux control socket follows `XDG_STATE_HOME` when there is no runtime dir (#486).
 

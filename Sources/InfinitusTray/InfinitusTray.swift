@@ -731,6 +731,38 @@ struct InfinitusTray {
         return try? encoder.encode(reply)
     }
 
+    /// `POST /sessions/<pid>/attention` (#486 slice 4): the same
+    /// `SessionAttention.apply` the Mac's route calls, minus the owned
+    /// session's parked prompts (the tray owns none). The response bytes,
+    /// or nil for an unknown session (the route's 404).
+    static func answerAttention(pid: Int32, _ request: SessionAttention.Request, claudeDir: URL,
+                                cache: TimelineCache, attention: AttentionStore) -> Data? {
+        guard let record = ClaudeSessions.record(pid: pid, sessionId: request.sessionId,
+                                                 in: ClaudeSessions.list(claudeDir: claudeDir)),
+              let timeline = cache.timeline(record: record, claudeDir: claudeDir) else { return nil }
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        switch SessionAttention.apply(request, sessionId: record.sessionId, timeline: timeline,
+                                      status: record.status, store: attention) {
+        case .applied(let facts):
+            return (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse) ?? MirrorTransport.unavailableResponse()
+        case .refused(let reason):
+            return MirrorTransport.conflictResponse(Data(#"{"error":"\#(reason)"}"#.utf8))
+        case .badRequest:
+            return MirrorTransport.badRequestResponse()
+        }
+    }
+
+    /// `GET /sessions/<pid>/images/<id>` (#486 slice 4): the attachment or
+    /// transcript image Core resolves for the Mac, served at its original
+    /// size — the Mac's 640-px thumbnail is ImageIO, Mac-only.
+    static func answerImage(pid: Int32, id: String, claudeDir: URL) -> Data? {
+        guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+              let image = SessionFeedReader.imageData(record: record, id: id, claudeDir: claudeDir,
+                                                      attachmentsDir: SessionInput.defaultAttachmentsDir)
+        else { return nil }
+        return MirrorTransport.imageResponse(image.data, contentType: image.mime)
+    }
+
     // MARK: #486 slice 3 — the control socket
     //
     // Same rule as the slice 2 routes above: the work lives in plain funcs
@@ -828,9 +860,9 @@ struct InfinitusTray {
         // serves, read before pairing, same as the Mac's descriptor
         // (`MirrorServer.descriptor`, #223 phase 4) — unauthenticated by
         // design, so it never changes and is built once up front. `files`,
-        // `timeline`, `sequence` and `checkpoints` are true; the tray still
-        // answers nothing else the Mac's newer routes (attention, leases,
-        // team, …) cover.
+        // `timeline`, `sequence`, `checkpoints`, `attention` and `images`
+        // are true; the tray still answers nothing else the Mac's newer
+        // routes (leases, team, …) cover.
         //
         let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
             machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: BuiltVersion.string)))
@@ -845,6 +877,10 @@ struct InfinitusTray {
         let timelineCache = TimelineCache(log: sequenceLog)
         let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
         let commandsCache = MirrorCommandsCache()
+        // #486 slice 4: the same command receipts the Mac keeps (#223
+        // phase 4), so a phone outbox retry delivers once here too. In
+        // memory, bounded by its cap and TTL, as on the Mac.
+        let receipts = Receipts()
         let server = PosixHTTPServer(authorize: {
             $0.path == MirrorTransport.wellKnownPath || MirrorTransport.isAuthorized($0, token: resolved)
         }) { request in
@@ -892,17 +928,42 @@ struct InfinitusTray {
                     logPhoneInput("⚠️ phone input not delivered: unknown session")
                     return MirrorTransport.notFoundResponse()
                 }
-                let reply = SessionInput.deliver(request: decoded, record: record,
-                                                 hosts: PtyHosts.available(), claudeDir: claudeDir)
-                if reply.outcome == "delivered" {
-                    let label = URL(fileURLWithPath: record.cwd).lastPathComponent
-                    let preview = String(decoded.text.prefix(60))
-                    logPhoneInput("📲 phone → \(label): \"\(preview)\" (\(reply.channel ?? "?"))")
-                } else {
-                    logPhoneInput("⚠️ phone input not delivered: \(reply.outcome)")
+                // A stop tombstones this pid's receipts first: the
+                // interrupted input must not come back on a retry.
+                if decoded.kind == .key, decoded.text == "esc" { receipts.tombstone(pid: pid) }
+                return receipts.serve(commandId: decoded.commandId,
+                                      target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
+                    let reply = SessionInput.deliver(request: decoded, record: record,
+                                                     hosts: PtyHosts.available(), claudeDir: claudeDir)
+                    if reply.outcome == "delivered" {
+                        let label = URL(fileURLWithPath: record.cwd).lastPathComponent
+                        let preview = String(decoded.text.prefix(60))
+                        logPhoneInput("📲 phone → \(label): \"\(preview)\" (\(reply.channel ?? "?"))")
+                    } else {
+                        logPhoneInput("⚠️ phone input not delivered: \(reply.outcome)")
+                    }
+                    return (try? JSONEncoder().encode(reply)).map(MirrorTransport.jsonResponse)
                 }
-                guard let encoded = try? JSONEncoder().encode(reply) else { return MirrorTransport.notFoundResponse() }
-                return MirrorTransport.jsonResponse(encoded)
+            }
+            // #486 slice 4: POST /sessions/<pid>/attention — settle, snooze,
+            // pin: the same Core decider the Mac's route calls, under the
+            // same receipts.
+            if request.method == "POST", let pid = MirrorTransport.sessionAttentionPid(request.path) {
+                let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+                guard let decoded = try? decoder.decode(SessionAttention.Request.self, from: request.body)
+                else {
+                    return MirrorTransport.badRequestResponse()
+                }
+                return receipts.serve(commandId: decoded.commandId, target: request.path, pid: pid) {
+                    answerAttention(pid: pid, decoded, claudeDir: ClaudeSessions.configHome(),
+                                    cache: timelineCache, attention: attentionStore)
+                }
+            }
+            // #486 slice 4: GET /sessions/<pid>/images/<id> — the image
+            // behind a feed entry, full size.
+            if request.method == "GET", let ref = MirrorTransport.sessionImageRef(request.path) {
+                return answerImage(pid: ref.pid, id: ref.id, claudeDir: ClaudeSessions.configHome())
+                    ?? MirrorTransport.notFoundResponse()
             }
             // #486 first slice: GET /sessions/<pid>/files and .../file — the
             // same Core routes the Mac answers (T3ProjectFiles through

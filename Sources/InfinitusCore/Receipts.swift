@@ -63,6 +63,29 @@ public final class Receipts: @unchecked Sendable {
         for (id, e) in entries where e.pid == pid { entries[id]?.state = .tombstoned }
     }
 
+    /// Wraps one POST handler in the receipt protocol (#223 phase 4): a
+    /// known `commandId` replays its 200, conflicts (409), reports in-flight
+    /// (409) or is gone (410); a fresh one runs `run` and caches a 200
+    /// reply. `run` returning nil is the route's 404. The Mac's mirror and
+    /// the Linux tray (#486) share it, so a phone outbox retry delivers
+    /// once to either.
+    public func serve(commandId: String?, target: String, pid: Int32?, run: () -> Data?) -> Data {
+        guard let commandId else { return run() ?? MirrorTransport.notFoundResponse() }
+        switch begin(commandId: commandId, target: target, pid: pid) {
+        case .hit(let data): return data
+        case .conflict: return MirrorTransport.conflictResponse(Data(#"{"error":"commandId reused for another target"}"#.utf8))
+        case .inFlight: return MirrorTransport.conflictResponse(Data(#"{"error":"in-flight"}"#.utf8))
+        case .tombstoned:
+            return MirrorTransport.response(status: 410, reason: "Gone", contentType: "application/json",
+                                            body: Data(#"{"error":"tombstoned"}"#.utf8))
+        case .miss:
+            guard let data = run() else { abandon(commandId: commandId); return MirrorTransport.notFoundResponse() }
+            if data.starts(with: Data("HTTP/1.1 200".utf8)) { finish(commandId: commandId, reply: data) }
+            else { abandon(commandId: commandId) }
+            return data
+        }
+    }
+
     /// The session left the roster.
     public func drop(pid: Int32) {
         lock.lock(); defer { lock.unlock() }
