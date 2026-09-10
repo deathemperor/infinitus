@@ -402,7 +402,16 @@ final class AppModel: ObservableObject {
     // persist: every hidden action lives in the status item's right-click
     // menu, so Settings/Quit can never strand.
     @Published var footerActionsHidden: Bool { didSet { defaults.set(footerActionsHidden, forKey: "footer_actions_hidden") } }
-    @Published var popupLayout: String { didSet { defaults.set(popupLayout, forKey: "popup_layout") } }
+    @Published var popupLayout: String { didSet {
+        defaults.set(popupLayout, forKey: "popup_layout")
+        // Re-laying the pop-out frees ~20 MB of small blocks that the
+        // malloc zone keeps resident (#579: +45 MB RSS per wide↔stacked
+        // round trip, heap in use flat); once the swap has settled, hand
+        // the pages back.
+        if oldValue != popupLayout {
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) { malloc_zone_pressure_relief(nil, 0) }
+        }
+    } }
     @Published var popupTextSize: String { didSet { defaults.set(popupTextSize, forKey: "popup_text_size") } }
     // Popup transparency, 0 (full frost) … 1 (clearest). ONE dial for
     // every focus state: the backdrop-blur glass renders identically

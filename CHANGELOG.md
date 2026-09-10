@@ -110,6 +110,7 @@ publishes the matching section as the GitHub release body.
 - A push registration can say `layout: "expo"`, and its Live Activities then arrive in the expo-widgets envelope (one attributes type, the state as `{name, props}`, a deep link on start) with the same content the native card gets (#572).
 - `prefs set update_auto_check` / `update_auto_install` (socket, mirror or iCloud sync) reach the running update checker at once instead of at the next relaunch (#558).
 - Team publish: a transcript line runs a redaction regex only when it carries that rule's telltale text, so the per-publish redaction pass costs a fifteenth of what it did (#346).
+- Pop-out: a layout swap hands the freed small-block pages back to the system a few seconds later, so two wide↔stacked round trips leave ~19 MB resident instead of ~46 MB (#579).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
