@@ -1,12 +1,14 @@
-import type { InfinitusEventRow } from "@t3tools/contracts/infinitus";
+import type { InfinitusEventRow, InfinitusManifestCommand } from "@t3tools/contracts/infinitus";
 
 /** What one event becomes on screen. `action` names the one follow-up a
-    toast can offer: opening the app's pop-out on the Infinitus host. */
+    toast can offer: opening the waiting session's window on the Infinitus
+    host — `pid` is the session the event names, when its text carries one. */
 export interface EventToast {
   readonly type: "error" | "warning" | "info";
   readonly title: string;
   readonly description?: string;
   readonly action?: "show-popout";
+  readonly pid?: number;
 }
 
 /** The switch line the engine feed writes: "switched a → b". */
@@ -37,14 +39,28 @@ export function eventToast(event: Pick<InfinitusEventRow, "icon" | "text">): Eve
     event.text.startsWith(WAITING_PREFIX) &&
     event.text.endsWith(WAITING_SUFFIX)
   ) {
+    const pid = Number(event.text.slice(WAITING_PREFIX.length, -WAITING_SUFFIX.length));
     return {
       type: "warning",
       title: "A session is waiting for you",
       description: event.text,
       action: "show-popout",
+      ...(Number.isInteger(pid) && pid > 0 ? { pid } : {}),
     };
   }
   return null;
+}
+
+/** The Show action's command: the session's own window (`show session <pid>`,
+    #612) when the toast names a session and this build's `show` takes one, else
+    the pop-out. */
+export function showCommandArgs(
+  toast: Pick<EventToast, "pid">,
+  commands: ReadonlyArray<Pick<InfinitusManifestCommand, "name" | "args">>,
+): ReadonlyArray<string> {
+  const show = commands.find((command) => command.name === "show");
+  const hasSession = show !== undefined && show.args.some((arg) => arg.includes("session"));
+  return toast.pid !== undefined && hasSession ? ["session", String(toast.pid)] : ["popout"];
 }
 
 /** What makes two events the same news: an `all-exhausted` re-emitted every

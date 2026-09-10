@@ -255,6 +255,29 @@ describe("InfinitusSession", () => {
     expect(decoded.profile).toBe("review");
   });
 
+  it("decodes the #612 fields a newer app adds, and their absence on an older one", () => {
+    const decoded = decodeSession({
+      pid: 4244,
+      cwd: "/Users/dev/code/app",
+      kind: "claude",
+      sessionId: "e2e-aws",
+      account: "death4",
+      startedAt: "2023-11-14T22:13:20Z",
+      needs: ["aws-login:e2e-login"],
+    });
+    expect(decoded.sessionId).toBe("e2e-aws");
+    expect(decoded.account).toBe("death4");
+    expect(decoded.startedAt).toBe("2023-11-14T22:13:20Z");
+    expect(decoded.needs).toEqual(["aws-login:e2e-login"]);
+
+    const older = decodeSession({ pid: 4244, cwd: "/Users/dev/code/app", kind: "claude" });
+    expect(older.sessionId).toBeUndefined();
+    expect(older.needs).toBeUndefined();
+    expect(
+      decodeSession({ pid: 1, cwd: "/", kind: "claude", account: null, startedAt: null }).account,
+    ).toBeNull();
+  });
+
   it("rejects a session whose pid arrived as a string", () => {
     expect(() => decodeSession({ pid: "4242", cwd: "/Users/dev", kind: "claude" })).toThrow();
   });

@@ -6,7 +6,7 @@ import { usePrimaryEnvironment } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useAtomCommand } from "../state/use-atom-command";
-import { eventRepeatKey, eventToast } from "./infinitusEventToasts.logic";
+import { eventRepeatKey, eventToast, showCommandArgs } from "./infinitusEventToasts.logic";
 
 /** Ids remembered before the oldest are forgotten; the snapshot only ever
     carries a poll's worth, so this is far more than a page will meet. */
@@ -78,7 +78,11 @@ export function useInfinitusEventToasts(): void {
                   onClick: () => {
                     void runCommand({
                       environmentId,
-                      input: { command: "show", args: ["popout"], options: {} },
+                      input: {
+                        command: "show",
+                        args: [...showCommandArgs(toast, snapshot.commands)],
+                        options: {},
+                      },
                     });
                   },
                 },

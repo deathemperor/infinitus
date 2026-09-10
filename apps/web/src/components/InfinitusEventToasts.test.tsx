@@ -138,7 +138,7 @@ describe("InfinitusEventToasts", () => {
     renderer.unmount();
   });
 
-  it("offers Show on a waiting session, which opens the pop-out on the host", async () => {
+  it("offers Show on a waiting session, which opens the pop-out on a host without show session", async () => {
     testState.snapshot = snapshotWith([]);
     const renderer = await mount();
     await deliver(renderer, snapshotWith([waiting("w1")]));
@@ -154,6 +154,31 @@ describe("InfinitusEventToasts", () => {
     expect(testState.command).toHaveBeenCalledWith({
       environmentId,
       input: { command: "show", args: ["popout"], options: {} },
+    });
+    renderer.unmount();
+  });
+
+  it("Show opens the waiting session's own window when the host's show takes a session (#612)", async () => {
+    const showSession = {
+      name: "show",
+      args: [
+        "popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]|session <pid|name>",
+      ],
+      options: [],
+      effect: "write" as const,
+      summary: "",
+      replyShape: "{shown}",
+    };
+    testState.snapshot = { ...snapshotWith([]), commands: [showSession] };
+    const renderer = await mount();
+    await deliver(renderer, { ...snapshotWith([waiting("w1")]), commands: [showSession] });
+    const toast = testState.addToast.mock.calls[0]![0] as {
+      actionProps: { onClick: () => void };
+    };
+    toast.actionProps.onClick();
+    expect(testState.command).toHaveBeenCalledWith({
+      environmentId,
+      input: { command: "show", args: ["session", "4243"], options: {} },
     });
     renderer.unmount();
   });

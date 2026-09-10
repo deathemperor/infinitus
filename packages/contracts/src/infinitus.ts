@@ -171,6 +171,15 @@ export const InfinitusSession = Schema.Struct({
   kind: Schema.String,
   permissionMode: Schema.optionalKey(Schema.NullOr(Schema.String)),
   profile: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** Claude Code's session id (#612); absent on a build before it. */
+  sessionId: Schema.optionalKey(Schema.String),
+  /** The alias the session runs on — the fleet's active account stamped on
+      every row (one active account per engine), not a per-session fact. */
+  account: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** When the session started, ISO 8601; null from records that predate it. */
+  startedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** Pending sign-in needs: `aws-login:<profile>`, `gcloud-login:<account>`. */
+  needs: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type InfinitusSession = typeof InfinitusSession.Type;
 
