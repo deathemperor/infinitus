@@ -10,7 +10,7 @@ import AppKit
 /// (PostScript names below, agreed with Infi3); when it is missing —
 /// the Mac, a stripped build — the system face steps in.
 public enum T3Font {
-    public enum Weight: Sendable { case regular, medium, bold }
+    public enum Weight: Sendable { case regular, medium, semibold, bold }
 
     /// The phone's Appearance → Text size as a factor on every mobile step
     /// (upstream `appearancePreferences.ts`: `baseFontSize / DEFAULT_BASE_FONT_SIZE`,
@@ -35,11 +35,20 @@ public enum T3Font {
         if dmSansAvailable { return .custom(dmSansName(w), fixedSize: scaled) }
         return .system(size: scaled, weight: systemWeight(w))
     }
+    /// Only Regular/Medium/Bold DM Sans ttfs are bundled
+    /// (`ios/InfinitusMobile/Fonts/`) — no SemiBold face exists to name, so
+    /// `mobile`/`mobileLiteral` render `font-semibold` as Bold. This is the
+    /// one recorded instance of that deviation; `web`/`webLiteral` need none,
+    /// since the system face's own semibold (`systemWeight` below) is real.
     private static func dmSansName(_ w: Weight) -> String {
-        switch w { case .regular: return dmSansNames[0]; case .medium: return dmSansNames[1]; case .bold: return dmSansNames[2] }
+        switch w {
+        case .regular: return dmSansNames[0]
+        case .medium: return dmSansNames[1]
+        case .semibold, .bold: return dmSansNames[2]
+        }
     }
     static func systemWeight(_ w: Weight) -> Font.Weight {
-        switch w { case .regular: return .regular; case .medium: return .medium; case .bold: return .bold }
+        switch w { case .regular: return .regular; case .medium: return .medium; case .semibold: return .semibold; case .bold: return .bold }
     }
     static let dmSansAvailable: Bool = {
         #if canImport(UIKit)

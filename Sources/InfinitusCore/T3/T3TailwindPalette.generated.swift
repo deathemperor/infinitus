@@ -42,8 +42,11 @@ public enum T3Tailwind {
     public static let sky600 = T3ProjectIcon.RGB(0, 132, 209)
     public static let teal400 = T3ProjectIcon.RGB(0, 213, 190)
     public static let teal600 = T3ProjectIcon.RGB(0, 150, 137)
+    public static let violet300 = T3ProjectIcon.RGB(196, 180, 255)
     public static let violet400 = T3ProjectIcon.RGB(166, 132, 255)
     public static let violet600 = T3ProjectIcon.RGB(127, 34, 254)
     public static let yellow400 = T3ProjectIcon.RGB(253, 199, 0)
     public static let yellow600 = T3ProjectIcon.RGB(208, 135, 0)
+    public static let zinc400 = T3ProjectIcon.RGB(159, 159, 169)
+    public static let zinc500 = T3ProjectIcon.RGB(113, 113, 123)
 }
