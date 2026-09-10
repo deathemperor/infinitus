@@ -114,6 +114,7 @@ public enum Lucide: String, CaseIterable, Sendable {
     case sun = "sun"
     case tag = "tag"
     case terminal = "terminal"
+    case terminalSquare = "terminal-square"
     case ticket = "ticket"
     case trash2 = "trash-2"
     case trendingDown = "trending-down"
@@ -245,6 +246,7 @@ public enum Lucide: String, CaseIterable, Sendable {
         case .sun: return ["M8.0 12.0a4.0 4.0 0 1 0 8.0 0a4.0 4.0 0 1 0 -8.0 0", "M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41"]
         case .tag: return ["M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z", "M7.0 7.5a0.5 0.5 0 1 0 1.0 0a0.5 0.5 0 1 0 -1.0 0"]
         case .terminal: return ["M12 19h8", "m4 17 6-6-6-6"]
+        case .terminalSquare: return ["m7 11 2-2-2-2", "M11 13h4", "M5.0 3.0h14.0a2.0 2.0 0 0 1 2.0 2.0v14.0a2.0 2.0 0 0 1 -2.0 2.0h-14.0a2.0 2.0 0 0 1 -2.0 -2.0v-14.0a2.0 2.0 0 0 1 2.0 -2.0z"]
         case .ticket: return ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"]
         case .trash2: return ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"]
         case .trendingDown: return ["M16 17h6v-6", "m22 17-8.5-8.5-5 5L2 7"]
