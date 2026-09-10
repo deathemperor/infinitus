@@ -439,6 +439,29 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(StatsScanner.Cache().version, 9)
     }
 
+    /// #499: the cache is written one file entry at a time (the whole-tree
+    /// encode peaked +127 MB on 11k files). The bytes must be the same
+    /// document the synthesized encoder wrote — version and files at the
+    /// top, keys quoted and escaped — and decode to an equal cache.
+    func testCacheEncodesEntryByEntryToTheSameDocument() throws {
+        var cache = StatsScanner.Cache()
+        var a = StatsScanner.FileEntry(); a.size = 10; a.offset = 10; a.cwd = "/r/a"
+        var day = Stats.Day(); day.outputTokens = 700; day.minuteTokens = [61: 700, 62: 5, 63: 9]; day.hourSlots[3] += 1
+        day.toolCalls = ["Bash": 2, "Read": 1, "Edit": 3]
+        a.days["2026-09-04"] = day; a.days["2026-09-03"] = day; a.days["2026-09-05"] = day
+        var b = StatsScanner.FileEntry(); b.subagent = true; b.engine = Stats.Engine.codex.rawValue
+        cache.files["-r-a/s1.jsonl"] = a
+        cache.files[#"-r-"quote"\back/s2.jsonl"#] = b
+        let data = try StatsScanner.encodeCache(cache)
+        let top = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(top["version"] as? Int, 9)
+        XCTAssertEqual(Set((top["files"] as? [String: Any])?.keys.map { $0 } ?? []), Set(cache.files.keys))
+        let back = try JSONDecoder().decode(StatsScanner.Cache.self, from: data)
+        XCTAssertEqual(back.files, cache.files)
+        XCTAssertEqual(try StatsScanner.encodeCache(cache), data)   // sorted keys: the same bytes twice
+        XCTAssertEqual(try StatsScanner.encodeCache(StatsScanner.Cache()), Data(#"{"version":9,"files":{}}"#.utf8))
+    }
+
     /// The minute buckets and the peak survive a cache round trip: the
     /// hand-written Day decoder must read them (it didn't at first, so
     /// every scan showed only the last pass's fresh minutes, 2026-09-05).
