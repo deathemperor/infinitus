@@ -19,6 +19,7 @@ import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Random from "effect/Random";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -52,7 +53,8 @@ const LEASE_COMMAND = "client-activity";
 const LEASE_INTERVAL = Duration.seconds(25);
 const LEASE_TTL_MS = 45_000;
 const LEASE_SCOPES = [{ type: "sessions" }, { type: "fleets" }, { type: "stats" }] as const;
-const encodeLease = Schema.encodeSync(InfinitusClientActivityReport);
+/** Straight to the JSON string the `--body` option carries. */
+const encodeLeaseBody = Schema.encodeSync(Schema.fromJsonString(InfinitusClientActivityReport));
 
 const decodeStatus = Schema.decodeUnknownEffect(InfinitusStatus);
 // `fleets` and `sessions` answer with a bare JSON array; the rest wrap.
@@ -102,7 +104,7 @@ const makeInfinitus = Effect.gen(function* () {
   const nextSlowAtMillis = yield* Ref.make(0);
   const nextLeaseAtMillis = yield* Ref.make(0);
   /** Stable for the service's lifetime: the app files the lease under it. */
-  const leaseClientId = `t3-server-${globalThis.crypto.randomUUID().slice(0, 8)}`;
+  const leaseClientId = `t3-server-${(yield* Random.nextIntBetween(0, 0xffff_ffff)).toString(16)}`;
   /** Bumped every time the app is lost. Only used to scope the decode
       warnings, so one broken build does not log on every cycle forever. */
   const generation = yield* Ref.make(0);
@@ -147,7 +149,7 @@ const makeInfinitus = Effect.gen(function* () {
   /** One lease report. Never fails: a refused or unreachable lease leaves the
       snapshot alone and logs once per generation like any other bad reply. */
   const sendLease = Effect.fn("Infinitus.sendLease")(function* (ttlMs: number) {
-    const body = encodeLease({
+    const body = encodeLeaseBody({
       clientId: leaseClientId,
       visible: true,
       focused: true,
@@ -155,12 +157,10 @@ const makeInfinitus = Effect.gen(function* () {
       scopes: LEASE_SCOPES,
       ttlMs,
     });
-    yield* client
-      .request({ command: LEASE_COMMAND, args: [], options: { body: JSON.stringify(body) } })
-      .pipe(
-        Effect.asVoid,
-        Effect.catch((error) => warnOnce(LEASE_COMMAND, error)),
-      );
+    yield* client.request({ command: LEASE_COMMAND, args: [], options: { body } }).pipe(
+      Effect.asVoid,
+      Effect.catch((error) => warnOnce(LEASE_COMMAND, error)),
+    );
   });
 
   const goUnavailable = Effect.fn("Infinitus.goUnavailable")(function* (reason: string) {
