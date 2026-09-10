@@ -22,20 +22,34 @@ const HAND_ICON = "hand.raised";
 const WAITING_PREFIX = "headless session ";
 const WAITING_SUFFIX = " is waiting for an answer";
 
+/** The kind an older build's row would have carried, read off its icon
+    (native #630 sends `kind` itself; before it only the symbol told). */
+function kindFromIcon(icon: string): string | null {
+  if (icon === EXHAUSTED_ICON) return "limit";
+  if (icon === SWITCH_ICON) return "switch";
+  if (icon === HAND_ICON) return "other";
+  return null;
+}
+
 /**
  * The toast for one event, or null for the lines nobody needs interrupting
- * for. The reply carries no `kind` (#615), so this reads the SF Symbol and,
- * where one symbol serves two lines, the text.
+ * for. The row's `kind` decides (the engine's `all-exhausted` folds to
+ * `limit`); a row without one is classified by its SF Symbol. The waiting
+ * session is logged as `other`, so its text is what tells it from the
+ * per-minute "no switch" line under the same symbol.
  */
-export function eventToast(event: Pick<InfinitusEventRow, "icon" | "text">): EventToast | null {
-  if (event.icon === EXHAUSTED_ICON) {
+export function eventToast(
+  event: Pick<InfinitusEventRow, "icon" | "text" | "kind">,
+): EventToast | null {
+  const kind = event.kind ?? kindFromIcon(event.icon);
+  if (kind === "limit") {
     return { type: "error", title: "All accounts exhausted", description: event.text };
   }
-  if (event.icon === SWITCH_ICON) {
+  if (kind === "switch") {
     return { type: "info", title: "Switched accounts", description: event.text };
   }
   if (
-    event.icon === HAND_ICON &&
+    kind === "other" &&
     event.text.startsWith(WAITING_PREFIX) &&
     event.text.endsWith(WAITING_SUFFIX)
   ) {

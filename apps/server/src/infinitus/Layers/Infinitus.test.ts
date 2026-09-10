@@ -726,6 +726,43 @@ describe("events", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
+  effectIt.effect("dedupes by the app's own id and kind when the rows carry them (#630)", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithEvents());
+      const row = (id: string, at: string, kind: string) => ({ ...switched(at), id, kind });
+      // Seeded from the log the app already had.
+      yield* stub.setResult("events", [row("a", "2026-09-10T08:00:00Z", "switch")]);
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.events).toEqual([]);
+
+      // Two new rows, one of them at the same second as a known one, another
+      // out of order: the id decides, not the timestamp.
+      yield* stub.setResult("events", [
+        row("a", "2026-09-10T08:00:00Z", "switch"),
+        row("c", "2026-09-10T08:00:00Z", "limit"),
+        row("b", "2026-09-10T07:59:00Z", "other"),
+      ]);
+      yield* TestClock.adjust(FAST);
+      const next = yield* Queue.take(queue);
+      expect(next.events?.map((event) => [event.id, event.kind])).toEqual([
+        ["c", "limit"],
+        ["b", "other"],
+      ]);
+
+      // The ring dropping old rows changes nothing; a reordering neither.
+      yield* stub.setResult("events", [
+        row("b", "2026-09-10T07:59:00Z", "other"),
+        row("c", "2026-09-10T08:00:00Z", "limit"),
+      ]);
+      yield* TestClock.adjust(FAST);
+      expect((yield* Queue.take(queue)).events).toEqual([]);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
   effectIt.effect("is absent on a build whose manifest lacks the command", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;
