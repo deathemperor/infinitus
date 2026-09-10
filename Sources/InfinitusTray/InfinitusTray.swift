@@ -626,6 +626,87 @@ struct InfinitusTray {
         return ProcessInfo.processInfo.hostName
     }
 
+    // MARK: #486 slice 2 routes
+    //
+    // These are plain funcs outside `serve`'s `#if canImport(Glibc)` body
+    // (that body isn't type-checked on macOS, only compiled away — see
+    // `PosixHTTPServer`) so a mistake here still fails `swift build
+    // --product infinitus-tray` on the Mac; `serve` itself only dispatches.
+    // Every one shares the exact Core types the Mac's `AppModel`/
+    // `MirrorServer` boxes call, so the bytes match.
+
+    /// `GET /sessions/<pid>/commands` — same `SlashCommands.discover` the
+    /// Mac's `/commands` route answers, cached per cwd the same few
+    /// seconds (`MirrorCommandsCache`, shared with the Mac since this slice).
+    static func answerCommands(pid: Int32, sessions: [ClaudeSessionRecord], claudeDir: URL,
+                              cache: MirrorCommandsCache) -> Data? {
+        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
+        return cache.data(cwd: record.cwd) {
+            try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
+        }
+    }
+
+    /// `GET /sessions/<pid>/checkpoints` — the ladder, exactly as the
+    /// Mac's `checkpoints.list` handler answers it (no `enabled`/`inGit`:
+    /// the tray has no Display toggle to report).
+    static func answerCheckpointsList(pid: Int32, sessions: [ClaudeSessionRecord]) -> Data? {
+        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
+        let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        return try? encoder.encode(Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list))
+    }
+
+    /// `GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]` — the tray
+    /// answers the diff only. `POST …/restore` rewrites the worktree and
+    /// the Mac's handler also logs it to its own event log; this slice
+    /// doesn't give the tray either, so a restore from the phone against
+    /// a tray-served checkpoint 404s (#486 follow-up).
+    static func answerCheckpointDiff(pid: Int32, n: Int, to: Int?, sessions: [ClaudeSessionRecord]) -> Data? {
+        guard let record = sessions.first(where: { $0.pid == pid }),
+              let diff = try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: to)
+        else { return nil }
+        return try? JSONEncoder().encode(diff)
+    }
+
+    /// `GET /sessions/<pid>/timeline?afterSequence=&epoch=&wait=` — the
+    /// same sequence-resumable timeline the Mac serves (`TimelineCache` +
+    /// `SequenceLog` + `TimelineSync`, all Core already); `serve` keeps
+    /// one long-lived `cache`/`log`/`attention` for the process's life,
+    /// fed from the same transcript tail Core reads for Files. No
+    /// owned-session decoration (parked prompts, limits): the tray leases
+    /// nothing, so `leases` stays false in the descriptor.
+    ///
+    /// The `wait` long-poll costs one thread parked on
+    /// `SessionFeedReader.waitForChange` — bounded at `min(wait,
+    /// MirrorTransport.tailWaitMax)` seconds, woken early on a transcript
+    /// change, polling every 250 ms otherwise; never parked forever. N
+    /// phones long-polling costs N held threads for up to 25 s each.
+    static func answerTimeline(pid: Int32, after: Int?, epoch: String?, wait: TimeInterval,
+                               claudeDir: URL, cache: TimelineCache, log: SequenceLog,
+                               attention: AttentionStore) -> Data? {
+        guard var record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+              var timeline = cache.timeline(record: record, claudeDir: claudeDir) else { return nil }
+        // Rebuilt first, so a change since the client's last reply answers
+        // at once; the long-poll only when this pid has nothing after the
+        // cursor already.
+        if wait > 0, let after, log.events(pid: pid, after: after)?.isEmpty == true {
+            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
+                                            since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir),
+                                            wait: wait, poll: 0.25)
+            if let fresh = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
+               let rebuilt = cache.timeline(record: fresh, claudeDir: claudeDir) {
+                record = fresh; timeline = rebuilt
+            }
+        }
+        let facts = SessionFacts.derive(timeline: timeline, status: record.status,
+                                        attention: attention.entry(sessionId: record.sessionId))
+        _ = log.record(pid: pid, facts: facts)
+        let reply = TimelineSync.reply(log: log, pid: pid, afterSequence: after, epoch: epoch,
+                                       timeline: timeline, facts: facts)
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        return try? encoder.encode(reply)
+    }
+
     static func serve(port: UInt16, token: String?, tokenFile: String?, themeID: String,
                       interval: UInt64 = 30) async {
         #if canImport(Glibc)
@@ -650,15 +731,35 @@ struct InfinitusTray {
         let firstList = await collectAndExport(themeID: themeID)
         await tickPushes(list: firstList, pushTriggers: &pushTriggers,
                          flags: pushFlags, bin: CswapLocator.locate())
-        // `GET /.well-known/infinitus` (#486 first slice): what this tray
+        // `GET /.well-known/infinitus` (#486 slice 1+2): what this tray
         // serves, read before pairing, same as the Mac's descriptor
         // (`MirrorServer.descriptor`, #223 phase 4) — unauthenticated by
-        // design, so it never changes and is built once up front. Only
-        // `files` is true: the tray answers nothing else the Mac's newer
-        // routes (timeline, sequence, attention, leases, …) cover.
+        // design, so it never changes and is built once up front. `files`,
+        // `timeline`, `sequence` and `checkpoints` are true; the tray still
+        // answers nothing else the Mac's newer routes (attention, leases,
+        // team, …) cover.
+        //
+        // `appVersion`: no build step embeds one for this executable (the
+        // Mac's comes from `Bundle.main`'s `CFBundleShortVersionString`,
+        // itself stamped from `VERSION` only at `make-app.sh` packaging
+        // time — the tray has no such packaging step yet), so this stays
+        // the "dev" placeholder until one exists.
         let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
             machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: "dev")))
             ?? Data()
+        // #486 slice 2: one long-lived sequence log/timeline cache/
+        // attention store/commands cache for this `serve` run — same
+        // pattern as the Mac's AppModel (`sequenceLog`, `timelineCache`,
+        // `attentionStore`, `MirrorCommandsCache`), just without a
+        // roster-eviction tick: an exited session's slot lingers until
+        // this process exits rather than being pruned on export (the Mac
+        // prunes on its 30 s export tick, which the tray also runs, but
+        // nothing here calls `TimelineCache.facts(records:...)` to reuse
+        // it — fine at dev-box scale, worth a follow-up at fleet scale).
+        let sequenceLog = SequenceLog()
+        let timelineCache = TimelineCache(log: sequenceLog)
+        let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
+        let commandsCache = MirrorCommandsCache()
         let server = PosixHTTPServer(authorize: {
             $0.path == MirrorTransport.wellKnownPath || MirrorTransport.isAuthorized($0, token: resolved)
         }) { request in
@@ -731,6 +832,43 @@ struct InfinitusTray {
                 let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
                 return MirrorTransport.fileAnswerResponse(
                     T3ProjectFiles.answer(pid: pid, path: path, sessions: sessions))
+            }
+            // #486 slice 2: GET /sessions/<pid>/timeline — long-poll and
+            // all, same `TimelineCache`/`SequenceLog`/`TimelineSync` the
+            // Mac's `/timeline` route calls; one thread per connection, so
+            // the bounded wait inside `answerTimeline` blocking here is fine.
+            if request.method == "GET", let pid = MirrorTransport.sessionTimelinePid(request.path) {
+                let after = request.query(MirrorTransport.timelineAfterQueryName).flatMap(Int.init)
+                let epoch = request.query(MirrorTransport.timelineEpochQueryName)
+                let wait = request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0
+                let response = answerTimeline(pid: pid, after: after, epoch: epoch, wait: wait,
+                                              claudeDir: ClaudeSessions.configHome(), cache: timelineCache,
+                                              log: sequenceLog, attention: attentionStore)
+                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
+            }
+            // #486 slice 2: GET /sessions/<pid>/commands — same
+            // `SlashCommands.discover` the Mac's `/commands` route answers.
+            if request.method == "GET", let pid = MirrorTransport.sessionCommandsPid(request.path) {
+                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                let response = answerCommands(pid: pid, sessions: sessions, claudeDir: ClaudeSessions.configHome(),
+                                              cache: commandsCache)
+                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
+            }
+            // #486 slice 2: GET /sessions/<pid>/checkpoints — the ladder.
+            if request.method == "GET", let pid = MirrorTransport.sessionCheckpointsPid(request.path) {
+                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                let response = answerCheckpointsList(pid: pid, sessions: sessions)
+                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
+            }
+            // #486 slice 2: GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>].
+            // `POST …/restore` matches the same path shape but isn't
+            // answered yet (`answerCheckpointDiff`'s doc), so it falls
+            // through to the trailing 404 below.
+            if let ref = MirrorTransport.sessionCheckpointRef(request.path), ref.action == .diff, request.method == "GET" {
+                let to = request.query(MirrorTransport.checkpointToQueryName).flatMap(Int.init)
+                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                let response = answerCheckpointDiff(pid: ref.pid, n: ref.n, to: to, sessions: sessions)
+                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
             }
             return MirrorTransport.notFoundResponse()
         }

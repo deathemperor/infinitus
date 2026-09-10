@@ -73,16 +73,20 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
                                                            pastSessions: true, images: true, files: true, terminal: terminal))
     }
 
-    /// The Linux tray's truth (#486 first slice, `infinitus-tray serve`):
+    /// The Linux tray's truth (#486 slice 2, `infinitus-tray serve`):
     /// everything `.current()` claims for the Mac, minus what the tray
-    /// doesn't answer yet — only `files` (#223's file browser) is true.
-    /// Explicit `false`, not the nil the struct also accepts as "unknown",
-    /// so a phone comparing builds sees a considered no rather than an
-    /// older tray that predates the field.
+    /// doesn't answer yet — `files`, `timeline`, `sequence` and
+    /// `checkpoints` are true (slice 1 gave the tray Files; this slice
+    /// gives it the timeline/sequence route and the checkpoint ladder +
+    /// diff, but not a restore — see `sessionCheckpointRef` in
+    /// `InfinitusTray.swift`). Explicit `false` for the rest, not the nil
+    /// the struct also accepts as "unknown", so a phone comparing builds
+    /// sees a considered no rather than an older tray that predates the
+    /// field.
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
-                         capabilities: Capabilities(timeline: false, sequence: false, attention: false, leases: false,
-                                                    ownedSessions: false, checkpoints: false, team: false,
+                         capabilities: Capabilities(timeline: true, sequence: true, attention: false, leases: false,
+                                                    ownedSessions: false, checkpoints: true, team: false,
                                                     pastSessions: false, images: false, files: true, terminal: false))
     }
 }
