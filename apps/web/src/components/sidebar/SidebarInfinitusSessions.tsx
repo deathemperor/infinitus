@@ -26,8 +26,8 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "../ui/menu";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { sessionCommandErrorMessage, sidebarSessionsView } from "./sidebarInfinitusSessions.logic";
 
 const OPEN_KEY = "infinitus.sidebarSessionsOpen";
@@ -116,44 +116,39 @@ function SessionRow({
   canSetMode: boolean;
   onSetMode: (row: SessionRowModel, mode: SessionPermissionMode) => Promise<void>;
 }) {
-  const label = `${row.title} · ${row.stateLabel}`;
+  const detail = `${row.title} · ${row.stateLabel} · ${row.cwd}`;
   const body = (
     <>
       <span className={cn("size-2 shrink-0 rounded-full", STATE_DOT[row.state])} aria-hidden />
       <span className="min-w-0 flex-1 truncate text-sidebar-foreground">{row.title}</span>
-      <span className="max-w-[45%] shrink-0 truncate text-muted-foreground">
-        {row.title === row.folder ? row.stateLabel : row.folder}
-      </span>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="max-w-[45%] shrink-0 truncate text-muted-foreground">
+              {row.title === row.folder ? row.stateLabel : row.folder}
+            </span>
+          }
+        />
+        <TooltipPopup side="top">{detail}</TooltipPopup>
+      </Tooltip>
     </>
   );
   const className =
     "flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-sidebar-row-hover";
 
   if (!canSetMode) {
-    return (
-      <Tooltip>
-        <TooltipTrigger render={<div className={className}>{body}</div>} />
-        <TooltipPopup side="top">{`${label} · ${row.cwd}`}</TooltipPopup>
-      </Tooltip>
-    );
+    return <div className={className}>{body}</div>;
   }
 
   return (
     <Menu>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <MenuTrigger
-              render={
-                <button type="button" aria-label={label} className={className}>
-                  {body}
-                </button>
-              }
-            />
-          }
-        />
-        <TooltipPopup side="top">{`${label} · ${row.cwd}`}</TooltipPopup>
-      </Tooltip>
+      <MenuTrigger
+        render={
+          <button type="button" aria-label={detail} className={className}>
+            {body}
+          </button>
+        }
+      />
       <MenuPopup align="start" side="top" className="w-56">
         <MenuGroup>
           <MenuGroupLabel>Permission mode</MenuGroupLabel>
