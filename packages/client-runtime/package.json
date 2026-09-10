@@ -127,6 +127,10 @@
       "types": "./src/state/infinitusAccounts.ts",
       "default": "./src/state/infinitusAccounts.ts"
     },
+    "./state/infinitusSessions": {
+      "types": "./src/state/infinitusSessions.ts",
+      "default": "./src/state/infinitusSessions.ts"
+    },
     "./state/models": {
       "types": "./src/state/models.ts",
       "default": "./src/state/models.ts"

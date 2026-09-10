@@ -113,9 +113,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
   added; the upstream sync re-generates it.
 - `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
-  item and its `infinitus` capability gate, the footer's `SidebarAccountsPill`,
-  and `/accounts` in the `currentFooterPage` selector (so the Back button
-  appears on the page).
+  item and its `infinitus` capability gate, the footer's
+  `SidebarInfinitusSessions` group and `SidebarAccountsPill`, and `/accounts`
+  in the `currentFooterPage` selector (so the Back button appears on the page).
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
@@ -187,6 +187,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/infinitus`
   (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the
   token is never printed). No dependencies; node ≥ 22.
+
+- `apps/web/src/components/sidebar/SidebarInfinitusSessions.tsx` (+
+  `sidebarInfinitusSessions.logic.ts`) — the footer's collapsible Sessions
+  group: the Claude Code sessions the Mac tracks, a row's permission mode
+  settable through the manifest's `session-mode` verb. Its row model is
+  `packages/client-runtime/src/state/infinitusSessions.ts` (exported as
+  `@t3tools/client-runtime/state/infinitusSessions`) so mobile draws the same
+  rows.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
