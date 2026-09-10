@@ -58,11 +58,11 @@ extension NetworkFleetMirror {
 
     /// The attach stream: frames as they arrive, ending when the Mac ends
     /// the response; a non-2xx (404: no such terminal) throws `.http`.
-    func terminalStream(pid: Int32, id: String, since: Int?) -> AsyncThrowingStream<T3Terminal.Frame, Error> {
+    nonisolated func terminalStream(pid: Int32, id: String, since: Int?) -> AsyncThrowingStream<T3Terminal.Frame, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    guard let request = streamRequest(path: T3Terminal.terminalStreamPath(pid: pid, id: id, since: since))
+                    guard let request = await streamRequest(path: T3Terminal.terminalStreamPath(pid: pid, id: id, since: since))
                     else { throw MirrorTransportError.closed }
                     let (bytes, response) = try await URLSession.shared.bytes(for: request)
                     let status = (response as? HTTPURLResponse)?.statusCode ?? 0

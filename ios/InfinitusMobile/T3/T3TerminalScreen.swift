@@ -41,18 +41,22 @@ final class T3TerminalController: NSObject, ObservableObject, TerminalViewDelega
     var cols: Int { view.getTerminal().cols }
     var rows: Int { view.getTerminal().rows }
 
-    /// `PIERRE_LIGHT_THEME` / `PIERRE_DARK_THEME` (`terminalTheme.ts`).
-    func apply(_ p: T3Theme.MobilePalette, dark: Bool) {
+    /// `PIERRE_LIGHT_THEME` / `PIERRE_DARK_THEME` (`terminalTheme.ts`): the
+    /// phone's own terminal palette upstream, over the screen background —
+    /// not the web tokens' `terminal*` set.
+    static func background(dark: Bool) -> SwiftUI.Color { dark ? SwiftUI.Color(red: 0.039, green: 0.039, blue: 0.039) : SwiftUI.Color(red: 0.949, green: 0.949, blue: 0.969) }
+
+    func apply(dark: Bool) {
         let hex = dark
             ? ["141415", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8",
                "141415", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8"]
             : ["1F1F21", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8",
                "1F1F21", "ff2e3f", "0dbe4e", "ffca00", "009fff", "c635e4", "08c0ef", "c6c6c8"]
         view.installColors(hex.map { Self.color($0) })
-        view.nativeBackgroundColor = UIColor(p.terminalBackground.color)
-        view.nativeForegroundColor = UIColor(p.terminalForeground.color)
-        view.caretColor = UIColor(p.terminalCursor.color)
-        view.selectedTextBackgroundColor = UIColor(p.terminalSelectionBackground.color)
+        view.nativeBackgroundColor = UIColor(Self.background(dark: dark))
+        view.nativeForegroundColor = dark ? UIColor(red: 0.678, green: 0.678, blue: 0.694, alpha: 1) : UIColor(red: 0.424, green: 0.424, blue: 0.443, alpha: 1)
+        view.caretColor = UIColor(red: 0, green: 0.624, blue: 1, alpha: 1)
+        view.selectedTextBackgroundColor = UIColor(red: 0, green: 0.624, blue: 1, alpha: 0.25)
     }
 
     private static func color(_ hex: String) -> SwiftTerm.Color {
@@ -196,7 +200,7 @@ struct T3TerminalScreen: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             default:
                 T3TerminalSurface(controller: controller)
-                    .background(p.terminalBackground.color)
+                    .background(T3TerminalController.background(dark: scheme == .dark))
                 if let strip = statusStrip {
                     HStack(spacing: 12) {
                         Text(strip).font(T3Font.mobile(.xs)).foregroundStyle(p.foregroundMuted.color)
@@ -209,13 +213,13 @@ struct T3TerminalScreen: View {
                 }
             }
         }
-        .background(p.terminalBackground.color.ignoresSafeArea())
+        .background(T3TerminalController.background(dark: scheme == .dark).ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .background(InteractivePopGesture())
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) { keysRow }
         .task {
-            controller.apply(p, dark: scheme == .dark)
+            controller.apply(dark: scheme == .dark)
             if let fixture {
                 fixture.forEach(controller.feed)
             } else {
@@ -224,7 +228,7 @@ struct T3TerminalScreen: View {
                 await open()
             }
         }
-        .onChange(of: scheme) { _, new in controller.apply(p, dark: new == .dark) }
+        .onChange(of: scheme) { _, new in controller.apply(dark: new == .dark) }
         .onDisappear { stream?.cancel() }
     }
 
@@ -286,7 +290,7 @@ struct T3TerminalScreen: View {
                 HStack(spacing: 6) {
                     ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                         let armed = key.label == "CTRL" && controller.ctrlArmed
-                        Button(action: key.action) {
+                        Button { key.action() } label: {
                             Text(key.label).font(T3Font.mobile(.xs, .semibold))
                                 .foregroundStyle(armed ? p.accentForeground.color : p.foreground.color)
                                 .frame(minWidth: key.label.count > 1 ? 56 : 44, minHeight: 34)
