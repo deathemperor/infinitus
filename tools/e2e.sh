@@ -58,8 +58,12 @@ DOMAIN=Infinitus   # the unbundled debug binary's defaults domain
 cleanup() {
     pkill -f "$APP" 2>/dev/null || true
     # The supervised demo engine outlives its app (four orphans found
-    # sleeping from earlier runs, 2026-09-03).
-    pkill -f "$INFINITUS_CSWAP auto" 2>/dev/null || true
+    # sleeping from earlier runs, 2026-09-03). Foundation's Process spawns
+    # it with the path's /private prefix stripped (a /private/tmp
+    # worktree's demo-cswap runs as /tmp/…/demo-cswap), so the pattern is
+    # the stripped form — a substring of both (42 orphans from one day's
+    # scratchpad runs, 2026-09-11).
+    pkill -f "${INFINITUS_CSWAP#/private} auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
     pkill -f "nc -l 127.0.0.1 4[0-9]{4}$" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
