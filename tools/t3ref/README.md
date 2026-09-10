@@ -18,12 +18,13 @@ Reference versions (spec §0):
 
 | File | What it does |
 |---|---|
-| `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. |
+| `compare.py` | `compare.py a.png b.png [--out diff.png] [--threshold 1.5] [--crop x,y,w,h]` — pure-stdlib PNG decode, per-pixel CIE ΔE76, 1-px dilated luminance-edge mask. Prints `over: 0.83% max ΔE 41.2`, exits 1 above the threshold. `--crop` takes the same pixel rect out of both images first (a panel column, a tab strip), before the mask and before the size check. |
 | `fixture.sh` | A fake `CLAUDE_CONFIG_DIR` holding the parity fixture, plus the debug app on it. `fixture.sh --stop` tears it down. |
 | `recite.py` | `tools/t3ref/recite.py [--dry] OLD NEW file.swift…` moves a Swift file's upstream `File.tsx:NN` citations from OLD's line numbers to NEW's (difflib over `git show`; only files that changed between the shas move). Run it over files whose citations are all at OLD — the T3 working tree sits at acc0a219e while the port pins 6c583620f, so a coder who read the tree cites the wrong lines. |
 | `winmove.swift` | `winmove <window-id> <x> <y> [w h]` moves that window's top-left corner to a CG point, then sizes it, through its own process's accessibility tree (`capture-ours.sh` runs it when `T3REF_WINDOW_ORIGIN="x y"` is set, with `T3REF_WINDOW_SIZE=WxH` or the preset's size). Not System Events: `process whose unix id is N` resolves by name there, and with two Infinitus processes it moves the other one's window. |
 | `winlist.swift` | `winlist <owner-substring> [title-substring\|WxH]` → `id width height` of that app's first matching normal-layer window. The filter picks the workspace out of an Infinitus that also has the pop-out open; `WxH` matches the bounds exactly (`kCGWindowName` is empty without Screen Recording permission). |
-| `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer> <out.png>` — screenshots the running T3 Code window. |
+| `capture-mac.sh` | `capture-mac.sh <sidebar\|thread\|composer\|panel-{diff,files,pr,terminal,agents}> <out.png>` — screenshots the running T3 Code window; a `panel-*` screen presses the right-panel toggle and that tab first, and exits 5 rather than opening a surface the reference does not already have. |
+| `axpress.swift` | `axpress <dump\|win\|find\|press> <pid> [label] [--exact] [--in x,y,w,h] [--index N] [--no-front]` — the read-only UI driver: find one control (AXButton / AXCheckBox / AXRadioButton / AXTab) by title, description or help and `AXPress` it, but only once that pid is frontmost. `find` exits 4 when nothing matches, which is how a script tells an open right panel from a closed one; `win` lists that pid's windows as `id w h x y`, the way to pick a fixture's own window when two are on screen. `--no-front` is for a fixture we own that cannot take the front from the other fixture — never for the reference app. |
 | `capture-ios.sh` | `capture-ios.sh <screen> <out.png>` — deep-links the T3 dev client in the booted simulator and screenshots it. |
 | `capture-ours.sh` | `capture-ours.sh <mac\|ios> <screen> <out.png>` — the same screen in Infinitus. |
 | `compare-harness.sh` | `compare-harness.sh <thread\|home> [shots-dir]` — the phone's number from the render harness's `parity-*` shots (InfinitusMobile tests) against `refs/ios-<screen>.png`, the status bar masked. No fixture app or pairing needed. |
@@ -320,6 +321,125 @@ matched (card top y=138 at 1×, 276 at 2×), the other three have no B
 counterpart — so the same 1× proxy as B-8/B-9 (`refs/mac-thread.png`
 downscaled to 1378×823, PIL LANCZOS) reads **0.77 %** (max ΔE 108.5),
 unchanged.
+
+### B-41 — the right panel's tabs, 2026-09-10
+
+Five new Mac screens — `panel-diff`, `panel-files`, `panel-pr`,
+`panel-terminal`, `panel-agents`: the thread screen with the right panel open
+on that tab, at the same 1378×823 pt frame as `thread`/`composer` (2756×1646
+at 2×). `capture-mac.sh` drives the reference read-only — `open -a` to satisfy
+axpress's frontmost guard, the panel toggle if the panel is shut, the tab, the
+screenshot, nothing else. `capture-ours.sh mac panel-<tab>` asks
+`show workspace thread` (ControlServer knows no panel screen: the tab is
+`T3RightPanel`'s own `@State`) and presses the same two controls in the
+fixture app.
+
+| screen | full panel, toast in (≤ 1.5 % passes) | chrome (tab strip) | drift note |
+|---|---|---|---|
+| panel-agents | 4.55 % ❌ (max ΔE 97.3) — an update toast the harness may not dismiss covers ~9 % of this crop; below it the body reads 0.66 % | 2.76 % ❌ (max ΔE 93.8) | the only tab with a reference |
+| panel-diff | no reference | no reference | no Diff **surface** open in the reference; opening one is a write to the user's app |
+| panel-files | no reference | no reference | same |
+| panel-pr | no reference | no reference | same |
+| panel-terminal | no reference | no reference | same, and it would fork a real shell in the user's repo |
+
+**Why four rows have no number.** The reference's strip is not a fixed set of
+tabs: it renders ONE TAB PER OPEN SURFACE (`RightPanelTabs.tsx:1009`
+`props.surfaces.map`, each with its own `Close <title>` button) beside an
+`Add panel surface` launcher, and an empty panel shows the card launcher
+instead (`RightPanelEmptyState`, `:293`). The user's app had exactly one
+surface open — Agents — so that is the only tab a press can reach. Adding
+Diff/Files/Pull request/Terminal means pressing the launcher, which persists a
+surface in their app (and the only undo is the Close button the harness must
+not press); Terminal would also start a real shell in their repository. The
+harness therefore reports a missing tab and never creates one
+(`capture-mac.sh` exits 5). This is a **port deviation, not version drift**: the
+surface model is what the running build's own accessibility tree shows, and it
+is the model at `acc0a219e` and at the pinned `6c583620f` alike
+(`props.surfaces.map`, `RightPanelEmptyState`); all five surface labels are in
+the 0.0.40 asar on disk too. `T3RightPanel.swift` already states the fixed
+five-tab strip as a deviation.
+
+**Which build the reference is.** The bundle on disk is 0.0.40, but the
+process being captured is the one before it: started 7 Sep 14:03, holding an
+`app.asar` whose inode no longer matches the file at that path (the bundle was
+replaced 8 Sep 06:54), with `Update 0.0.40 downloaded. Click to restart and
+install.` in its own sidebar. That button was not pressed. Treat the panel
+reference as pre-0.0.40 until the user restarts the app and it is re-shot.
+
+**The crop.** Both panels are right-docked, so the crop is right-anchored:
+`--crop 1676,0,1080,1646` is the reference's whole panel (540 pt) and the
+matching column of ours, `--crop 1676,0,1080,104` is the tab strip — 52 pt,
+the `--workspace-topbar-height` the strip is built on
+(`RightPanelTabs.tsx:987`), measured on both sides (the tab strip group is 52
+pt tall in the reference's AX tree and the toggles are centred at 26). Our
+panel is 560 pt — `min(max(0.42 × 1378, 360), 560)`, the shell's
+`w-[42vw] min-w-[360px] max-w-[560px]` — against the reference's 540, because
+a surface persists the width the user dragged it to; the 20 pt shifts every
+row 40 px left in the crop and is reference state, not a port delta.
+
+A third number is the honest one for the body: the reference is showing a
+`Update Available: Codex v0.154.0` toast over its panel (360×116 pt, ~9 % of
+the crop) and its Dismiss button is a press the harness does not make, so
+below it — `--crop 1676,420,1080,1226` — the two read **0.66 %**. That number
+is mostly shared dark background: the reference's rows are the user's real
+subagents, the fixture's are two seeded ones, and the edge mask drops the
+glyph edges where they differ.
+
+**Top deltas per tab.** Only `panel-agents` is measured; the first two apply
+to every tab and are what the heatmap is made of.
+
+- **panel-agents.** (1) The strip: five fixed labels of ours against one
+  `Agents` pill carrying the bot icon, a close X and the `+` launcher
+  (`RightPanelTabs.tsx:1009-1060`, `:1106`). (2) The layout controls — maximize,
+  terminal drawer, right panel — sit INSIDE the panel's strip row upstream
+  (the reference's AX tree puts them at the window's right edge, x 3173/3205/3237
+  of a window ending at 3278, `props.layoutControls` at `:993-999`), while ours
+  keeps them in the chat top bar left of the panel and has no maximize at all.
+  (3) Row pitch: our agent rows step ~140 px at 2× against the reference's
+  ~122, though the first row's top (y≈190) and the `N settled · Σ tok` footer
+  land on the same y.
+- **panel-diff.** (1) and (2) above. (3) Unmeasured: our header is the
+  `Working tree ⌄` scope pill with `+2 −1` and three icon buttons; upstream's
+  `DiffPanel.tsx:564,748,782` has the same scope word, the same stat and an
+  `Expand/Collapse all files` toggle whose position cannot be checked without a
+  reference.
+- **panel-files.** (1) and (2). (3) Unmeasured: our tree is a search row over
+  `docs/ src/ config.toml`; the phone's Files reference (C) put the search in a
+  BOTTOM toolbar, so the Mac's row position is the first thing to check when a
+  reference exists.
+- **panel-pr.** (1) and (2). (3) Ours draws the unavailable card ("Pull
+  request / This project has no GitHub remote."); upstream has no card there at
+  all — an unavailable surface is a greyed LAUNCHER card with a one-line reason
+  (`RightPanelTabs.tsx:138-142`), which is the deviation the tab strip forces.
+- **panel-terminal.** (1) and (2). (3) Our tab renames itself `Terminal 1`
+  on the first shell, matching upstream's per-terminal title
+  (`surfaceTitle`, `:598-602`) — pass `T3REF_TAB_LABEL` to name it when
+  capturing — but the pane is still empty 3 s after the press, no prompt drawn.
+
+The recipe (the fixture seeds the tabs' content: a few files, a working-tree
+patch off one checkpoint, two settled sub-agents; the Pull request tab stays
+on its unavailable card, which is what the reference's launcher hint says too):
+
+```
+$ defaults write Infinitus "NSWindow Frame Workspace" "96 55 1378 823 0 0 1800 1169"
+$ T3FIX_NAME=t3b41 T3FIX_MAC_REF=1 T3FIX_PANELS=1 tools/t3ref/fixture.sh && sleep 12
+$ tools/t3ref/capture-mac.sh panel-agents tools/t3ref/refs/mac-panel-agents.png
+$ T3REF_WINDOW_ORIGIN="1900 1500" T3REF_WINDOW_SIZE=1378x823 \
+    INFINITUS_CONTROL_SOCKET=/tmp/t3b41.sock \
+    tools/t3ref/capture-ours.sh mac panel-agents /tmp/ours-agents.png
+$ python3 tools/t3ref/compare.py tools/t3ref/refs/mac-panel-agents.png /tmp/ours-agents.png \
+      --crop 1676,0,1080,104 --out /tmp/diff-chrome.png
+$ T3FIX_NAME=t3b41 tools/t3ref/fixture.sh --stop; rm -f /tmp/t3b41.sock
+```
+
+Two things the reference window needs and one it refuses: `winmove <id> x y w h`
+applies the size but NOT the position on an Electron window in one call — move
+it, then call `winmove <id> x y` again — and a size set while the window is on
+the smaller panel is clamped to that panel, so restoring the original frame
+takes a second `winmove` once it is back on the main display (the reference was
+returned to 1706×1319 @3414,31 with its panel shut, the state it was found in).
+`refs/mac-panel-*.png` and `refs/ours-panel-*.png` are git-ignored: they are
+the user's real repository on screen.
 
 ### C parity — 2026-09-09
 

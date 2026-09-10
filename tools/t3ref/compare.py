@@ -51,8 +51,22 @@ def edge_mask(px, w, h):
                         if 0 <= yy < h and 0 <= xx < w: mask[yy][xx] = True
     return mask
 
-def compare(a, b, out=None):
+def crop(w, h, px, rect):
+    """x,y,w,h in PIXELS of the capture — the same window-relative rect on both
+    sides, which is how a panel column is measured when the two panels are not
+    the same width (B-41: the reference's right panel is 540 pt, ours 560)."""
+    x, y, cw, ch = rect
+    if x < 0 or y < 0 or x + cw > w or y + ch > h:
+        raise SystemExit(f"crop {x},{y},{cw},{ch} outside {w}x{h}")
+    return cw, ch, [row[x:x + cw] for row in px[y:y + ch]]
+
+def compare(a, b, out=None, rect=None):
     wa, ha, pa = read_png(a); wb, hb, pb = read_png(b)
+    if rect:
+        # Cropped BEFORE the edge mask, so a crop edge is not read as a glyph
+        # edge, and before the size check, so two captures that differ outside
+        # the crop still compare.
+        wa, ha, pa = crop(wa, ha, pa, rect); wb, hb, pb = crop(wb, hb, pb, rect)
     if (wa, ha) != (wb, hb): raise SystemExit(f"size mismatch {wa}x{ha} vs {wb}x{hb}")
     mask = edge_mask(pa, wa, ha)
     over = total = 0; mx = 0.0; heat = []
@@ -90,13 +104,22 @@ def selftest():
     png(a, 20, 20, (250, 250, 250)); png(b, 20, 20, (250, 250, 250)); png(c, 20, 20, (200, 200, 200))
     same, _ = compare(a, b); assert same == 0, same
     diff, mx = compare(a, c); assert diff > 99, diff; assert mx > 15, mx
+    # --crop reads the same rect out of both, and refuses one off the image.
+    cropped, _ = compare(a, c, None, [2, 2, 5, 5]); assert cropped > 99, cropped
+    try: compare(a, c, None, [18, 18, 5, 5]); raise AssertionError("crop bounds unchecked")
+    except SystemExit: pass
     print("selftest ok")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("a", nargs="?"); ap.add_argument("b", nargs="?")
     ap.add_argument("--out"); ap.add_argument("--threshold", type=float, default=1.5); ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--crop", help="x,y,w,h in pixels — compare only that rect of both images")
     ns = ap.parse_args()
     if ns.selftest: selftest(); sys.exit(0)
-    over, mx = compare(ns.a, ns.b, ns.out)
+    rect = None
+    if ns.crop:
+        rect = [int(v) for v in ns.crop.split(",")]
+        if len(rect) != 4: raise SystemExit("--crop wants x,y,w,h")
+    over, mx = compare(ns.a, ns.b, ns.out, rect)
     print(f"over: {over:.2f}% max ΔE {mx:.1f}")
     sys.exit(1 if over > ns.threshold else 0)

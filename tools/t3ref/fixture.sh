@@ -88,6 +88,45 @@ cat > "$CLAUDE_CONFIG_DIR/projects/$slug/t3fix-hi.jsonl" <<EOF
 {"type":"assistant","uuid":"a3","parentUuid":"a2","timestamp":"$t2","sessionId":"t3fix-hi","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_w","name":"Write","input":{"file_path":"$cwd/PLAN.md","content":"# Plan\n"}}]}}
 EOF
 fi
+# T3FIX_PANELS=1 (B-41): what the right panel's tabs need — a few files and a
+# working-tree patch off one checkpoint (Files, Diff), two settled sub-agents
+# (Agents). The Pull request tab stays on its unavailable card: the fixture
+# repo has no remote for `gh` to answer about, which is the state the Mac
+# reference shows too.
+if [ "${T3FIX_PANELS:-}" = 1 ]; then
+    (
+        cd "$cwd"
+        mkdir -p src docs
+        printf 'export const greet = (name) => `Hi ${name}`;\n' > src/greet.js
+        printf '# Notes\n\nThe parity fixture.\n' > docs/notes.md
+        printf 'name = "t3fix"\n' > config.toml
+        git add -A && git commit -q -m "seed the panel fixture"
+        # `Checkpoints.list` reads `refs/infinitus/checkpoints/<sessionId>/<n>`,
+        # whose body line names the live root; the working tree then moves past
+        # it, which is exactly the "Working tree" scope's patch.
+        git commit -q --allow-empty -m "checkpoint 1" -m "root: $cwd"
+        git update-ref "refs/infinitus/checkpoints/t3fix-hi/1" HEAD
+        printf 'export const greet = (name) => `Hello, ${name}!`;\n' > src/greet.js
+        printf 'todo\n' > src/todo.txt
+    )
+    # `<transcript>/subagents/agent-<id>.jsonl` + `.meta.json`
+    # (`T3Agents.panel(subagentsDir:)`): a log whose last line is text and
+    # whose file is old is a SETTLED agent, so neither row spins.
+    sub="$CLAUDE_CONFIG_DIR/projects/$slug/t3fix-hi/subagents"
+    mkdir -p "$sub"
+    for a in "d1|coder|Port the Agents tab|Done: the tab is ported." \
+             "d2|general-purpose|Audit the diff panel|Done: three findings, all filed."; do
+        IFS='|' read -r id kind desc last <<<"$a"
+        cat > "$sub/agent-$id.jsonl" <<EOF
+{"type":"user","timestamp":"2026-09-09T10:38:22.000Z","message":{"role":"user","content":"go"}}
+{"type":"assistant","timestamp":"2026-09-09T10:38:30.000Z","message":{"role":"assistant","model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":1200,"output_tokens":340},"content":[{"type":"tool_use","name":"Read","input":{}}]}}
+{"type":"assistant","timestamp":"2026-09-09T10:39:05.000Z","message":{"role":"assistant","model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":2400,"output_tokens":180},"content":[{"type":"text","text":"$last"}]}}
+EOF
+        printf '{"agentType":"%s","description":"%s","toolUseId":"toolu_%s","spawnDepth":1}' "$kind" "$desc" "$id" \
+            > "$sub/agent-$id.meta.json"
+    done
+fi
+
 echo "fixture pid=$pid session=t3fix-hi cwd=$cwd"
 
 ( cd "$root" && swift build --product Infinitus -q )
