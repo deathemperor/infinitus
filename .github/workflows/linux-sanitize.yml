@@ -5,8 +5,13 @@ name: Linux sanitize
 # no Swift frames — while the same suites pass on aarch64. The same
 # `swift test` under AddressSanitizer, repeated, names the copy that
 # runs off the heap or into freed memory. Runs on a PR that touches
-# this file and on demand; never a required check.
+# this file, nightly on main, and on demand; never a required check.
 on:
+  # Nightly on main, before the nightly build: a leak or over-read that
+  # needs a long run to surface (#510 took ~1,300 descriptors) is found
+  # here, not on a random PR's linux job.
+  schedule:
+    - cron: "0 16 * * *"   # 16:00 UTC = 23:00 GMT+7, an hour before nightly.yml
   workflow_dispatch:
     inputs:
       iterations:
