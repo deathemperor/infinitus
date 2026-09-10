@@ -11,7 +11,7 @@ import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { type InfinitusMac, infinitusMacs } from "../accounts/accountsRoute.logic";
-import { type FleetAlarm, isInfinitusAlarmId, planAlarms } from "./alarms.logic";
+import { alarmIsScheduled, type FleetAlarm, isInfinitusAlarmId, planAlarms } from "./alarms.logic";
 
 export const INFINITUS_ALARM_DEEP_LINK = "t3code://settings/accounts";
 
@@ -82,13 +82,22 @@ async function scheduleInfinitusAlarms(environmentId: string, alarms: ReadonlyAr
         await Notifications.cancelScheduledNotificationAsync(request.identifier);
       }
     }
-    const existing = new Set(scheduled.map((request) => request.identifier));
+    // iOS hands a DATE trigger back as a time interval, so the fire time
+    // rides in `data` and a moved reset (or a changed lead) restamps the alarm;
+    // an unchanged one is left alone rather than rescheduled every poll.
+    const existing = new Map(
+      scheduled.map((request) => [request.identifier, request.content.data]),
+    );
     for (const alarm of alarms) {
       const identifier = prefix + alarm.id;
-      if (alarm.fireAt !== null && existing.has(identifier)) continue;
+      if (alarm.fireAt !== null && alarmIsScheduled(existing.get(identifier), alarm)) continue;
       await Notifications.scheduleNotificationAsync({
         identifier,
-        content: { title: alarm.title, body: alarm.body, data: { infinitus: "accounts" } },
+        content: {
+          title: alarm.title,
+          body: alarm.body,
+          data: { infinitus: "accounts", fireAt: alarm.fireAt },
+        },
         trigger:
           alarm.fireAt === null
             ? null
