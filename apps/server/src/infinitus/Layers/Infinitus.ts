@@ -1,4 +1,5 @@
 import {
+  InfinitusClientActivityReport,
   InfinitusCommandFailed,
   InfinitusForecast,
   InfinitusFleet,
@@ -18,6 +19,7 @@ import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Random from "effect/Random";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -39,6 +41,20 @@ const UNAVAILABLE_PROBE_INTERVAL = Duration.seconds(15);
 /** The command whose absence from the manifest means the running app predates
     the pref catalog. Polling it anyway would fail every slow cycle. */
 const PREFS_COMMAND = "prefs";
+/**
+ * The lease (#572 task 6). The app only computes session progress and scans
+ * stats while some client holds a lease on them; this service is that client
+ * for everyone subscribed through it. Re-sent every 25 s with a 45 s TTL — the
+ * cadence and slack T3's own client-activity reporter uses — and released with
+ * a zero TTL when the last subscriber leaves. Absent from the manifest on
+ * builds before the verb: then nothing is sent.
+ */
+const LEASE_COMMAND = "client-activity";
+const LEASE_INTERVAL = Duration.seconds(25);
+const LEASE_TTL_MS = 45_000;
+const LEASE_SCOPES = [{ type: "sessions" }, { type: "fleets" }, { type: "stats" }] as const;
+/** Straight to the JSON string the `--body` option carries. */
+const encodeLeaseBody = Schema.encodeSync(Schema.fromJsonString(InfinitusClientActivityReport));
 
 const decodeStatus = Schema.decodeUnknownEffect(InfinitusStatus);
 // `fleets` and `sessions` answer with a bare JSON array; the rest wrap.
@@ -86,6 +102,9 @@ const makeInfinitus = Effect.gen(function* () {
       manifest, because the app that came back may not be the one that left. */
   const manifestStale = yield* Ref.make(true);
   const nextSlowAtMillis = yield* Ref.make(0);
+  const nextLeaseAtMillis = yield* Ref.make(0);
+  /** Stable for the service's lifetime: the app files the lease under it. */
+  const leaseClientId = `t3-server-${(yield* Random.nextIntBetween(0, 0xffff_ffff)).toString(16)}`;
   /** Bumped every time the app is lost. Only used to scope the decode
       warnings, so one broken build does not log on every cycle forever. */
   const generation = yield* Ref.make(0);
@@ -127,9 +146,27 @@ const makeInfinitus = Effect.gen(function* () {
       ),
     );
 
+  /** One lease report. Never fails: a refused or unreachable lease leaves the
+      snapshot alone and logs once per generation like any other bad reply. */
+  const sendLease = Effect.fn("Infinitus.sendLease")(function* (ttlMs: number) {
+    const body = encodeLeaseBody({
+      clientId: leaseClientId,
+      visible: true,
+      focused: true,
+      recentlyInteracted: true,
+      scopes: LEASE_SCOPES,
+      ttlMs,
+    });
+    yield* client.request({ command: LEASE_COMMAND, args: [], options: { body } }).pipe(
+      Effect.asVoid,
+      Effect.catch((error) => warnOnce(LEASE_COMMAND, error)),
+    );
+  });
+
   const goUnavailable = Effect.fn("Infinitus.goUnavailable")(function* (reason: string) {
     yield* Ref.set(manifestStale, true);
     yield* Ref.set(nextSlowAtMillis, 0);
+    yield* Ref.set(nextLeaseAtMillis, 0);
     // The app that comes back may be a different build, so its replies get a
     // fresh set of warnings. Doing this here rather than on the way back keeps
     // a manifest that never decodes from re-warning on every cycle.
@@ -165,6 +202,14 @@ const makeInfinitus = Effect.gen(function* () {
     const knownCommands = yield* Ref.get(commands);
     const now = yield* Clock.currentTimeMillis;
     const slowDue = now >= (yield* Ref.get(nextSlowAtMillis));
+
+    if (
+      knownCommands.some((entry) => entry.name === LEASE_COMMAND) &&
+      now >= (yield* Ref.get(nextLeaseAtMillis))
+    ) {
+      yield* sendLease(LEASE_TTL_MS);
+      yield* Ref.set(nextLeaseAtMillis, now + Duration.toMillis(LEASE_INTERVAL));
+    }
 
     // Off a slow cycle the expensive fields ride along from the last one, so a
     // fast tick never blanks a forecast the client is already showing.
@@ -210,6 +255,9 @@ const makeInfinitus = Effect.gen(function* () {
     Effect.gen(function* () {
       const count = yield* Ref.updateAndGet(subscribers, (previous) => previous + 1);
       if (count > 1) return;
+      // A returning first subscriber leases at once, whatever the last cycle's
+      // schedule said before the release.
+      yield* Ref.set(nextLeaseAtMillis, 0);
       // `startImmediately` is what makes the first subscriber's poll immediate
       // rather than one scheduler turn away.
       yield* FiberHandle.run(pollHandle, pollLoop, { startImmediately: true });
@@ -221,6 +269,15 @@ const makeInfinitus = Effect.gen(function* () {
       const count = yield* Ref.updateAndGet(subscribers, (previous) => Math.max(0, previous - 1));
       if (count > 0) return;
       yield* FiberHandle.clear(pollHandle);
+      // Nobody is watching: hand the lease back rather than let it run out,
+      // detached so the last unsubscribe never waits on the socket.
+      const knownCommands = yield* Ref.get(commands);
+      if (
+        knownCommands.some((entry) => entry.name === LEASE_COMMAND) &&
+        (yield* snapshot).available
+      ) {
+        yield* Effect.forkDetach(sendLease(0));
+      }
     }),
   );
 
