@@ -184,8 +184,7 @@ final class AppModel: ObservableObject {
     /// What Infinitus started each live session as (#163/#165), by pid;
     /// kept across launches, pruned to the roster on every export.
     @Published private(set) var sessionBirths: [Int: SessionBirth] = SessionBirths.load(from: AppModel.birthsURL)
-    static let birthsURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Infinitus/session-births.json")
+    static let birthsURL = AppSupport.root().appendingPathComponent("session-births.json")
     func recordBirth(pid: Int, _ birth: SessionBirth) {
         let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
         let alive = Set(live.map { Int($0.pid) })
@@ -314,8 +313,7 @@ final class AppModel: ObservableObject {
             // INFINITUS_AWS_LEDGER: the e2e gate's own file, so its stub
             // logins never land in (or read) the real app's ledger.
             ledgerURL: ProcessInfo.processInfo.environment["INFINITUS_AWS_LEDGER"].map { URL(fileURLWithPath: $0) }
-                ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent("Infinitus/aws-logins.json"))
+                ?? AppSupport.root().appendingPathComponent("aws-logins.json"))
         // A CLI left behind at quit keeps its localhost listener alive.
         awsLoginQuitWatch = NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
             .sink { _ in runner.killAll() }
@@ -510,9 +508,7 @@ final class AppModel: ObservableObject {
     }
 
     static let cliproxyLedgerURL: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory,
-                                 in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/engines/cliproxy/usage.jsonl")
+        AppSupport.root().appendingPathComponent("engines/cliproxy/usage.jsonl")
     }()
 
     /// OAuth add / re-login for an engine that signs accounts in through
@@ -1145,9 +1141,7 @@ final class AppModel: ObservableObject {
         statsModel.leases = mirrorServer.leases
         statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
         if !isPlayground, !mockMode {
-            let namer = SessionNamer(appSupport: FileManager.default
-                .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Infinitus", isDirectory: true))
+            let namer = SessionNamer(appSupport: AppSupport.root())
             namer.enabled = sessionAutoNames
             sessionProgress.namer = namer
         }
@@ -1157,9 +1151,7 @@ final class AppModel: ObservableObject {
     /// App-side cache of our own subprocess output (never an engine
     /// internal file).
     static let snapshotCacheURL: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory,
-                                            in: .userDomainMask)[0]
-        return base.appendingPathComponent("Infinitus/snapshot-cache.json")
+        return AppSupport.root().appendingPathComponent("snapshot-cache.json")
     }()
 
     /// The popup just opened with data already on screen (cache or an
@@ -3004,8 +2996,7 @@ final class AppModel: ObservableObject {
     /// stdin. Made on first use, off the main actor — locating `claude`
     /// may run a login shell.
     let ownedBox = OwnedSessionsBox()
-    nonisolated static let ownedLedgerURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Infinitus/owned-sessions.json")
+    nonisolated static let ownedLedgerURL = AppSupport.root().appendingPathComponent("owned-sessions.json")
 
     nonisolated func ownedSessions() -> OwnedSessions? {
         ownedBox.get { [weak self] in

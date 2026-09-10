@@ -29,9 +29,7 @@ actor RepoStatsScanner {
         var prDays: [String: Stats.Day]
     }
 
-    private static let dir: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Infinitus/stats/repos")
+    private static let dir: URL = AppSupport.root().appendingPathComponent("stats/repos")
     private static let ghInterval: TimeInterval = 3600
     private static let branchNote = "commits on unmerged branches aren't counted"
 

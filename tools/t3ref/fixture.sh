@@ -113,6 +113,7 @@ defaults write "$domain" mirror_pair_token -string "t3fix-$(uuidgen | tr -d - | 
 defaults delete "$domain" team_discoverable >/dev/null 2>&1 || true
 
 INFINITUS_CONTROL_SOCKET=$sock \
+INFINITUS_APP_SUPPORT=$state/app-support \
 INFINITUS_MIRROR_SNAPSHOT=$state/mirror-snapshot.json \
 CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR \
 INFINITUS_CSWAP=$root/tools/demo-cswap \

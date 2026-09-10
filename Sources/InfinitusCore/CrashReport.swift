@@ -127,10 +127,9 @@ public struct CrashStore: Sendable {
         self.keep = keep
     }
 
-    public static func defaultDirectory(
-        appSupport: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    ) -> URL {
-        appSupport.appendingPathComponent("Infinitus/crashes")
+    /// `appSupport` is the app's own directory (`AppSupport.root()`).
+    public static func defaultDirectory(appSupport: URL = AppSupport.root()) -> URL {
+        appSupport.appendingPathComponent("crashes")
     }
 
     private static var encoder: JSONEncoder {
