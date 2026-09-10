@@ -139,6 +139,32 @@ const TestLayer = InfinitusLive.pipe(
 );
 
 /**
+ * The same stub with one scheduler turn in front of every reply, which is what
+ * the real socket does. The first subscriber's poll then cannot finish inline,
+ * so the subscription lands before any snapshot exists — the window in which
+ * the pre-poll placeholder used to reach clients (#561).
+ */
+const AsyncStubClientLive = Layer.effect(
+  InfinitusControlClient,
+  Effect.gen(function* () {
+    const stub = yield* ControlStub;
+    return {
+      socketPath: STUB_SOCKET,
+      request: (input) => Effect.yieldNow.pipe(Effect.flatMap(() => stub.request(input))),
+    } satisfies InfinitusControlClientShape;
+  }),
+);
+
+const AsyncTestLayer = InfinitusLive.pipe(
+  Layer.provide(AsyncStubClientLive),
+  Layer.provideMerge(ControlStubLive),
+);
+
+/** The reason the one-shot getter answers with before the first cycle. No
+    subscriber may ever see it. */
+const NOT_POLLED_REASON = "the socket has not been polled yet";
+
+/**
  * Subscribes and waits for the first emission. Taking from a queue rather than
  * adjusting a clock is what makes these tests deterministic: the take cannot
  * complete until the subscriber fiber has run and the poller has published.
@@ -385,5 +411,35 @@ describe("InfinitusService", () => {
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("hands the first subscriber a polled snapshot, never the placeholder", () =>
+    Effect.gen(function* () {
+      const infinitus = yield* InfinitusService;
+
+      const { fiber, first } = yield* subscribe(infinitus);
+
+      expect(first.unavailableReason).not.toBe(NOT_POLLED_REASON);
+      expect(first.available).toBe(true);
+      expect(first.fleets.map((entry) => entry.key)).toEqual(["cswap/claude"]);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(AsyncTestLayer)),
+  );
+
+  effectIt.effect("still reports an app that is not there once the first probe fails", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+
+      yield* stub.setUnavailable("ENOENT");
+      const { fiber, first } = yield* subscribe(infinitus);
+
+      expect(first.available).toBe(false);
+      expect(first.unavailableReason).toBe("ENOENT");
+      expect(first.fleets).toEqual([]);
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(AsyncTestLayer)),
   );
 });
