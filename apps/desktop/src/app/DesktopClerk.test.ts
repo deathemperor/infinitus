@@ -34,7 +34,7 @@ const makeDesktopClerkLayer = (isDevelopment = true, events: string[] = []) => {
     stateDir: "/tmp/t3-state",
     isDevelopment,
     appDataDirectory: "/tmp/app-data",
-    userDataDirName: isDevelopment ? "infinitus-dev" : "infinitus",
+    userDataDirName: isDevelopment ? "infinitus-desktop-dev" : "infinitus-desktop",
     legacyUserDataDirName: isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)",
     path: { join: (...parts: ReadonlyArray<string>) => parts.join("/") },
   } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
@@ -89,7 +89,7 @@ describe("DesktopClerk", () => {
       // the lock both lives in and creates the userData directory — so the
       // real path must be set before the bridge exists.
       assert.deepEqual(events, [
-        "setPath:userData:/tmp/app-data/infinitus-dev",
+        "setPath:userData:/tmp/app-data/infinitus-desktop-dev",
         "createClerkBridge",
       ]);
       storageMock.mockClear();
