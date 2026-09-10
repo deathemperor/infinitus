@@ -15,7 +15,12 @@ import {
   type InfinitusControlClientConfigShape,
   type InfinitusControlRequestInput,
 } from "../Services/InfinitusControlClient.ts";
-import { InfinitusControlClientLive } from "./InfinitusControlClient.ts";
+import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+
+import {
+  InfinitusControlClientConfigLive,
+  InfinitusControlClientLive,
+} from "./InfinitusControlClient.ts";
 
 interface ControlServerHandle {
   readonly socketPath: string;
@@ -314,5 +319,22 @@ describe("InfinitusControlClient", () => {
         cause: "unsupported platform",
       });
     }),
+  );
+
+  effectIt.effect(
+    "the live config honours INFINITUS_CONTROL_SOCKET over the platform default",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* InfinitusControlClientConfig;
+        expect(config.socketPath).toBe("/tmp/infinitus-test.sock");
+        expect(config.timeoutMs).toBe(10_000);
+        expect(config.maxReplyBytes).toBe(8 * 1024 * 1024);
+      }).pipe(
+        Effect.provide(InfinitusControlClientConfigLive),
+        Effect.provideService(HostProcessPlatform, "darwin"),
+        Effect.provideService(HostProcessEnvironment, {
+          INFINITUS_CONTROL_SOCKET: "/tmp/infinitus-test.sock",
+        }),
+      ),
   );
 });
