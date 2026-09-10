@@ -68,10 +68,10 @@ import InfinitusUI
 /// shell on screen — the ~4x gap is the repaint that a hidden entry does not
 /// do, and the remainder is the pty read plus the parse into its ring.
 ///
+/// The other mode (`:989` `mode: "drawer" | "panel"`) mounts the same
+/// `T3TerminalSurfaceView` from `T3TerminalDrawerView.swift`.
+///
 /// Not ported this round, each with its upstream line:
-/// - the drawer mode (`:989` `mode: "drawer" | "panel"`, the resize handle
-///   `:1402-1410` and `clampDrawerHeight` `:100-104`): the right panel is the
-///   only mount here.
 /// - a split's keyboard shortcut (`splitShortcutLabel` /
 ///   `splitVerticalShortcutLabel`, `:1253-1262`): the tab binds none, so the
 ///   two labels are upstream's without the shortcut suffix.

@@ -95,6 +95,10 @@ struct T3TerminalDrawerSlot: View {
     /// `window.innerHeight`). Never the timeline's: the drawer shrinks THAT, and
     /// feeding it back would make the drawer cap itself smaller as it grows.
     let viewport: Double
+    /// Called as the drawer's band is about to change, in the update pass
+    /// before the layout it causes — the timeline snapshots whether the reader
+    /// was at the end while that is still answerable (`T3ThreadView`).
+    var onWillResize: () -> Void = {}
 
     /// The height while a drag is in flight. Upstream keeps the same thing in
     /// component state and only tells the store on pointer-up (`:1086-1091`,
@@ -106,20 +110,33 @@ struct T3TerminalDrawerSlot: View {
         T3TerminalDrawer.clamp(dragging ?? drawer.state(threadId).height, viewport: viewport)
     }
 
+    /// The band this row takes out of the thread column: the height while
+    /// open, nothing while closed. `height` on its own is the stored 280 in
+    /// both states, so the toggle would not read as a change.
+    private var band: Double { drawer.isOpen(threadId) ? height : 0 }
+
     var body: some View {
-        if drawer.isOpen(threadId) {
-            surface
-                // `shrink-0` at a fixed height (`:1398-1400`).
-                .frame(maxWidth: .infinity)
-                .frame(height: height)
-                .background(t3.web.background.color)
-                // `border-t border-border/80` (`:1398`).
-                .overlay(alignment: .top) {
-                    Rectangle().fill(t3.web.border.color.opacity(0.8)).frame(height: 1)
-                }
-                // `absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize`
-                // (`:1432-1439`) — over the border, above the content.
-                .overlay(alignment: .top) { handle }
+        VStack(spacing: 0) {
+            // Zero-height and always mounted: the `onChange` has to fire on
+            // the pass that OPENS the drawer, which a view that exists only
+            // while it is open cannot do.
+            Color.clear
+                .frame(height: 0)
+                .onChange(of: band) { _, _ in onWillResize() }
+            if drawer.isOpen(threadId) {
+                surface
+                    // `shrink-0` at a fixed height (`:1398-1400`).
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .background(t3.web.background.color)
+                    // `border-t border-border/80` (`:1398`).
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(t3.web.border.color.opacity(0.8)).frame(height: 1)
+                    }
+                    // `absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize`
+                    // (`:1432-1439`) — over the border, above the content.
+                    .overlay(alignment: .top) { handle }
+            }
         }
     }
 

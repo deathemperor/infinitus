@@ -146,7 +146,10 @@ struct T3ThreadView: View {
         VStack(spacing: 0) {
             timelineBody
             T3TerminalDrawerSlot(model: model, drawer: model.terminalDrawer,
-                                 threadId: store.threadId, viewport: columnHeight)
+                                 threadId: store.threadId, viewport: columnHeight,
+                                 // Read while the reader is still where the
+                                 // resize found it (`T3Anchors.atEndBeforeDrawer`).
+                                 onWillResize: { anchors.atEndBeforeDrawer = anchors.atEnd })
                 // The drawer opening or growing moves the ScrollView's own
                 // bottom edge without touching `store.rows` — the same
                 // re-follow `composerHeight` gets below.
@@ -236,7 +239,11 @@ struct T3ThreadView: View {
                 // The terminal drawer takes its band out of the column, which
                 // moves the list's viewport the same way.
                 .onChange(of: drawerHeight) { _, _ in
-                    if anchors.atEnd, anchors.pinned == nil { proxy.scrollTo(Self.endId, anchor: .bottom) }
+                    // The pre-resize snapshot, not the live `atEnd`: see
+                    // `T3Anchors.atEndBeforeDrawer`.
+                    if anchors.atEndBeforeDrawer, anchors.pinned == nil {
+                        proxy.scrollTo(Self.endId, anchor: .bottom)
+                    }
                 }
                 .onAppear {
                     refreshMinimap(store.rows)
@@ -496,6 +503,14 @@ private struct T3DraftNoteSlot: View {
     var rows: [String: CGRect] = [:]
     var viewport: CGSize = .zero
     var atEnd = true
+    /// `atEnd` as it read BEFORE the terminal drawer's band changed. The
+    /// drawer's height reaches `T3ThreadView` from geometry, i.e. after the
+    /// layout that already shrank the ScrollView and pushed the footer
+    /// sentinel out of view — by then `atEnd` is false and the re-follow
+    /// below would decline to run. The drawer therefore snapshots this as it
+    /// resizes (`T3TerminalDrawerSlot.onWillResize`), which happens in the
+    /// same update pass, before that layout.
+    var atEndBeforeDrawer = true
     /// `(rowId, its viewport-relative top)` recorded before a disclosure toggle.
     var pinned: (String, Double)?
 
