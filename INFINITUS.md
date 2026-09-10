@@ -94,6 +94,18 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/web/src/routes/settings.infinitus*.tsx` (five new files in upstream's
   routes directory) and `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
+- `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
+  `@tanstack/router-generator`, never hand-edited) whenever a fork route is
+  added; the upstream sync re-generates it.
+- `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
+  item and its `infinitus` capability gate, the footer's `SidebarAccountsPill`,
+  and `/accounts` in the `currentFooterPage` selector (so the Back button
+  appears on the page).
+- `packages/contracts/src/keybindings.ts` — `accounts.open` in
+  `STATIC_KEYBINDING_COMMANDS`.
+- `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
+  the `keydown` listener that turns `accounts.open` into a navigation, both
+  behind the `infinitus` capability.
 - `README.md` — the fork notice at the top.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
@@ -122,6 +134,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
   Mac-driven Live Activity: layouts (content = native's activity states),
   token registration, settings.
+
+- `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
+  `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
