@@ -7,7 +7,7 @@ on:
     types: [created]
   push:
     branches:
-      - main
+      - native
     paths:
       - .github/VOUCHED.td
       - .github/workflows/pr-vouch.yml
