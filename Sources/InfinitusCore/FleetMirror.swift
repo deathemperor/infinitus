@@ -201,6 +201,9 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
     /// Popup sort + text scale (#9 phase D1a) — same defaults as AppModel's
     /// `sort_headroom` / `popup_text_size`.
     public let sortByHeadroom: Bool
+    /// PopupSort.rawValue (#542); `sortByHeadroom` stays encoded as
+    /// `popupSort != "engine"` so a pre-#542 phone still sorts.
+    public let popupSort: String
     public let popupTextSize: String
     /// Minutes before an account's reset that its countdown goes live and
     /// the phone's reset alarm fires (`revive_lead_minutes`, default 10).
@@ -210,7 +213,8 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
                 popupLayout: String = "wide", burnStyle: String = "ember",
                 introStyle: String = "top", introTitle: String = "zoom",
                 introSpeed: Double = 1.0, customThemes: [RowTheme] = [],
-                sortByHeadroom: Bool = true, popupTextSize: String = "default",
+                sortByHeadroom: Bool = true, popupSort: String? = nil,
+                popupTextSize: String = "default",
                 reviveLeadMinutes: Int = 10) {
         self.themeID = themeID
         self.compactRows = compactRows
@@ -221,6 +225,7 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
         self.introSpeed = introSpeed
         self.customThemes = customThemes
         self.sortByHeadroom = sortByHeadroom
+        self.popupSort = popupSort ?? PopupSort(legacyHeadroom: sortByHeadroom).rawValue
         self.popupTextSize = popupTextSize
         self.reviveLeadMinutes = reviveLeadMinutes
     }
@@ -230,8 +235,8 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
     // that lacks them. Encode stays synthesized (Codable = both halves).
     enum CodingKeys: String, CodingKey {
         case themeID, compactRows, popupLayout, burnStyle, introStyle,
-             introTitle, introSpeed, customThemes, sortByHeadroom, popupTextSize,
-             reviveLeadMinutes
+             introTitle, introSpeed, customThemes, sortByHeadroom, popupSort,
+             popupTextSize, reviveLeadMinutes
     }
 
     public init(from decoder: Decoder) throws {
@@ -245,6 +250,8 @@ public struct FleetPrefs: Codable, Sendable, Equatable {
         introSpeed = try c.decode(Double.self, forKey: .introSpeed)
         customThemes = try c.decode([RowTheme].self, forKey: .customThemes)
         sortByHeadroom = try c.decodeIfPresent(Bool.self, forKey: .sortByHeadroom) ?? true
+        popupSort = try c.decodeIfPresent(String.self, forKey: .popupSort)
+            ?? PopupSort(legacyHeadroom: sortByHeadroom).rawValue
         popupTextSize = try c.decodeIfPresent(String.self, forKey: .popupTextSize) ?? "default"
         reviveLeadMinutes = try c.decodeIfPresent(Int.self, forKey: .reviveLeadMinutes) ?? 10
     }

@@ -96,6 +96,22 @@ public enum AutoOrder {
     }
 }
 
+/// How the popup lays its rows out (`popup_sort`, mirrored to the phone
+/// as FleetPrefs.popupSort). Engine slot numbers never move either way.
+public enum PopupSort: String, CaseIterable, Sendable {
+    /// The engine's own slot order.
+    case engine
+    /// DisplayOrder.sort: active, next, then most headroom first.
+    case headroom
+    /// DisplayOrder.candidates: active, then the engine's advisory
+    /// ranking as it hands it over (cswap `candidateOrder`).
+    case candidates
+
+    /// The pre-#542 Bool pref (`sort_headroom`) and the mirrored
+    /// `sortByHeadroom` map onto the first two modes.
+    public init(legacyHeadroom: Bool) { self = legacyHeadroom ? .headroom : .engine }
+}
+
 /// Display-only ordering (todo 2026-09-01: "sorted by headroom but put
 /// active and first candidate on top"): the active account leads, the
 /// next candidate follows, then AutoOrder's ranking — most headroom
@@ -127,6 +143,36 @@ public enum DisplayOrder {
             default:
                 return l.number < r.number
             }
+        }
+    }
+
+    /// "Sort by candidates" (user 2026-09-10): the active account, then
+    /// the engine's advisory ranking exactly as it hands it over — under
+    /// cswap's consume-first that is soonest weekly reset first, which the
+    /// headroom sort contradicts — then everyone the engine did not rank
+    /// (dead, disabled, unknown) in slot order. Without a ranking (an
+    /// older engine, the proxy fleets) `next` / `reviver` alone are
+    /// pinned: a layout, never a second scoring of the rows.
+    public static func candidates(_ accounts: [Account], active: Int?,
+                                  order: [Int]?, next: Int?, reviver: Int? = nil) -> [Account] {
+        let ranking = order ?? [next ?? reviver].compactMap { $0 }
+        func slot(_ a: Account) -> Int {
+            if a.number == active { return -1 }
+            return ranking.firstIndex(of: a.number) ?? ranking.count
+        }
+        return accounts.enumerated().sorted { l, r in
+            let sl = slot(l.element), sr = slot(r.element)
+            return sl != sr ? sl < sr : l.offset < r.offset
+        }.map(\.element)
+    }
+
+    /// One entry point for the popup and the phone.
+    public static func arrange(_ accounts: [Account], sort: PopupSort, active: Int?,
+                               next: Int?, reviver: Int? = nil, order: [Int]? = nil) -> [Account] {
+        switch sort {
+        case .engine: return accounts
+        case .headroom: return self.sort(accounts, active: active, next: next, reviver: reviver)
+        case .candidates: return candidates(accounts, active: active, order: order, next: next, reviver: reviver)
         }
     }
 }

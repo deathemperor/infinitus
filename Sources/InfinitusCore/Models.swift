@@ -13,6 +13,10 @@ public struct AccountList: Codable, Sendable {
     public let accounts: [Account]
     /// Advisory: the account the auto-switcher would likely pick next.
     public let nextCandidate: Int?
+    /// Advisory, additive (cswap ≥ 0.26): the whole ranking behind
+    /// nextCandidate, most likely first — the engine's strategy applied
+    /// to every viable account. Absent from an older engine.
+    public let candidateOrder: [Int]?
     /// Advisory, only when nextCandidate is absent: every account is at
     /// a limit — this one's last maxed window resets soonest.
     public let nextRecovery: NextRecovery?
@@ -22,12 +26,14 @@ public struct AccountList: Codable, Sendable {
 
     public init(schemaVersion: Int = 1, activeAccountNumber: Int?,
                 accounts: [Account], nextCandidate: Int? = nil,
+                candidateOrder: [Int]? = nil,
                 nextRecovery: NextRecovery? = nil,
                 liveSessions: LiveSessions? = nil) {
         self.schemaVersion = schemaVersion
         self.activeAccountNumber = activeAccountNumber
         self.accounts = accounts
         self.nextCandidate = nextCandidate
+        self.candidateOrder = candidateOrder
         self.nextRecovery = nextRecovery
         self.liveSessions = liveSessions
     }

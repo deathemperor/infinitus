@@ -503,7 +503,8 @@ final class MirrorModel: ObservableObject, FleetModel {
         return [EngineFleet(
             engineID: MirrorFleetModel.cswapEngineID, provider: .claude,
             accounts: list.accounts, activeNumber: list.activeAccountNumber,
-            nextCandidate: list.nextCandidate, nextRecovery: list.nextRecovery,
+            nextCandidate: list.nextCandidate, candidateOrder: list.candidateOrder,
+            nextRecovery: list.nextRecovery,
             liveSessions: list.liveSessions, raw: snapshot.listJSON)]
     }
 
@@ -780,9 +781,11 @@ final class MirrorModel: ObservableObject, FleetModel {
     var displayAccounts: [Account] { primary?.displayAccounts ?? [] }
 
     /// What every fleet's `displayAccounts` sorts by (#9 phase D1a):
-    /// Follow Mac's mirrored `sortByHeadroom`, else always-on. No local
+    /// Follow Mac's mirrored `popupSort`, else headroom. No local
     /// override exists for this pref.
-    var sortByHeadroom: Bool { macPrefs?.sortByHeadroom ?? true }
+    var popupSort: PopupSort {
+        macPrefs.flatMap { PopupSort(rawValue: $0.popupSort) } ?? .headroom
+    }
     /// Seconds before a reset that a row's countdown goes live and the
     /// reset alarm fires — the Mac's knob, or its default when not mirrored.
     var reviveLead: TimeInterval { TimeInterval((macPrefs?.reviveLeadMinutes ?? 10) * 60) }

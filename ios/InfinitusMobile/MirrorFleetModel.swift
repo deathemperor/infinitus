@@ -24,6 +24,7 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
     @Published private(set) var accounts: [Account] = []
     @Published private(set) var activeNumber: Int?
     @Published private(set) var nextCandidate: Int?
+    @Published private(set) var candidateOrder: [Int]?
     @Published private(set) var nextRecovery: NextRecovery?
     @Published private(set) var liveSessions: LiveSessions?
     /// What the Mac's engine can do to these accounts (nil from an older
@@ -81,6 +82,7 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
             accounts = list
             activeNumber = fleet.activeNumber
             nextCandidate = fleet.nextCandidate
+            candidateOrder = fleet.candidateOrder
             nextRecovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: list, activeNumber: fleet.activeNumber)
             liveSessions = fleet.liveSessions
         }
@@ -124,14 +126,12 @@ final class MirrorFleetModel: ObservableObject, Identifiable {
 }
 
 extension MirrorFleetModel: FleetModel {
-    /// What the rows iterate: the headroom sort with active + next
-    /// pinned, unless Follow Mac carries a mirrored `sortByHeadroom ==
-    /// false` — same rule as before, now read off the shared host.
+    /// What the rows iterate: the Mac's mirrored `popupSort` (headroom
+    /// unless Follow Mac says otherwise) laid out the way the popup does.
     var displayAccounts: [Account] {
-        host.sortByHeadroom
-            ? DisplayOrder.sort(accounts, active: activeNumber, next: nextCandidate,
-                                reviver: reviver?.number)
-            : accounts
+        DisplayOrder.arrange(accounts, sort: host.popupSort, active: activeNumber,
+                             next: nextCandidate, reviver: reviver?.number,
+                             order: candidateOrder)
     }
     var rowTheme: RowTheme { host.rowTheme }
     var compactRows: Bool { host.compactRows }
@@ -175,6 +175,7 @@ extension MirrorModel {
         fleets.map {
             EngineFleet(engineID: $0.engineID, provider: $0.provider, accounts: $0.accounts,
                         activeNumber: $0.activeNumber, nextCandidate: $0.nextCandidate,
+                        candidateOrder: $0.candidateOrder,
                         nextRecovery: $0.nextRecovery, liveSessions: $0.liveSessions,
                         capabilities: $0.capabilities)
         }

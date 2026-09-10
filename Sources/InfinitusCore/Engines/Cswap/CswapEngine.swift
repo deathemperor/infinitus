@@ -50,6 +50,7 @@ public struct CswapEngine: AccountEngine {
                     accounts: accounts,
                     activeNumber: list.activeAccountNumber,
                     nextCandidate: list.nextCandidate,
+                    candidateOrder: list.candidateOrder,
                     nextRecovery: list.nextRecovery,
                     liveSessions: list.liveSessions,
                     raw: raw)

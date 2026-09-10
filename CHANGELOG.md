@@ -91,6 +91,7 @@ publishes the matching section as the GitHub release body.
 - The transcript stats cache is per Claude config home, so a fixture or dev instance no longer replaces the real one and the next launch re-reads nothing (#346).
 - A team publish walks its published copies in one enumerator pass instead of a stat per file, 0.9 s → 0.2 s of every five-minute pass on a 5,000-copy store (#346).
 - One `INFINITUS_APP_SUPPORT` variable moves every file the app writes, so a dev or fixture instance never touches the real Application Support/Infinitus (#506).
+- Settings › Display › Sort rows by gains Candidates: the active account first, then the rest in the order the engine would switch to them (#542).
 - The Mac's session chat window decodes only the transcript lines appended since its last refresh instead of a fresh window of 200 items on every change (#346).
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
@@ -122,6 +123,7 @@ publishes the matching section as the GitHub release body.
 - A Files image (png, jpg, gif, webp, heic) shows as a picture with its size, tap for full-screen, once the Mac serves image bytes (#223).
 - A file's source on the phone splits lines and words its limit strip the way the Mac's Files tab does (CRLF files no longer render as one line).
 - The thread header's Terminal pill opens the session's shell once the Mac hosts terminals (#507): SwiftTerm, a keys row (ctrl, esc, tab, arrows, paste), a stream that reconnects where it left off.
+- Follow Mac carries the popup's sort mode, so the phone lays rows out by candidates when the Mac does (#542).
 
 ## 0.4.4-alpha.2
 

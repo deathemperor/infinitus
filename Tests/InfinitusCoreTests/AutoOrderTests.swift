@@ -100,4 +100,33 @@ final class DisplayOrderTests: XCTestCase {
         XCTAssertEqual(DisplayOrder.sort(accounts, active: nil, next: nil)
                         .map(\.number), [2, 1])
     }
+
+    /// "Sort by candidates" lays out the engine's ranking verbatim — here
+    /// consume-first put the sooner-resetting, fuller P1 ahead of the
+    /// fresh P8 — then the unranked (dead, disabled) rows in slot order.
+    func testCandidatesFollowTheEngineRankingThenSlotOrder() {
+        let accounts = [acct(1, five: 63), acct(2, five: 100), acct(5, disabled: true),
+                        acct(8, five: 0), acct(9, five: 59), acct(10, five: 22)]
+        let sorted = DisplayOrder.candidates(accounts, active: 9, order: [10, 1, 8], next: 10)
+        XCTAssertEqual(sorted.map(\.number), [9, 10, 1, 8, 2, 5])
+    }
+
+    /// No ranking from the engine: only active and next are pinned, the
+    /// rest keep the engine's slot order — no scoring of our own.
+    func testCandidatesWithoutARankingPinActiveAndNextOnly() {
+        let accounts = [acct(1, five: 80), acct(2, five: 10), acct(3, five: 40), acct(4, five: 90)]
+        XCTAssertEqual(DisplayOrder.candidates(accounts, active: 4, order: nil, next: 3)
+                        .map(\.number), [4, 3, 1, 2])
+        XCTAssertEqual(DisplayOrder.candidates(accounts, active: nil, order: nil, next: nil, reviver: 2)
+                        .map(\.number), [2, 1, 3, 4])
+    }
+
+    func testArrangeDispatchesOnPopupSort() {
+        let accounts = [acct(1, five: 80), acct(2, five: 10)]
+        XCTAssertEqual(DisplayOrder.arrange(accounts, sort: .engine, active: nil, next: nil).map(\.number), [1, 2])
+        XCTAssertEqual(DisplayOrder.arrange(accounts, sort: .headroom, active: nil, next: nil).map(\.number), [2, 1])
+        XCTAssertEqual(DisplayOrder.arrange(accounts, sort: .candidates, active: nil, next: nil, order: [2, 1]).map(\.number), [2, 1])
+        XCTAssertEqual(PopupSort(legacyHeadroom: true), .headroom)
+        XCTAssertEqual(PopupSort(legacyHeadroom: false), .engine)
+    }
 }

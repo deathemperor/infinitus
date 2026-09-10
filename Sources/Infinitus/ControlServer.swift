@@ -762,6 +762,7 @@ final class ControlServer {
         let capabilities: [String]
         let caveat: String?
         let activeNumber: Int?, nextCandidate: Int?
+        let candidateOrder: [Int]?
         let nextRecovery: NextRecovery?
         let accounts: [Account]
     }
@@ -771,6 +772,7 @@ final class ControlServer {
                      capabilities: Self.names(f.capabilities),
                      caveat: model.fleetCaveats[f.engineID],
                      activeNumber: f.activeNumber, nextCandidate: f.nextCandidate,
+                     candidateOrder: f.candidateOrder,
                      nextRecovery: f.nextRecovery, accounts: f.accounts)
     }
 

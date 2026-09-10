@@ -140,7 +140,11 @@ struct DisplayPane: View {
             glassSlider("Transparency", value: $model.glassFocused)
             Toggle("Compact rows", isOn: $model.compactRows)
             Toggle("Hide the action buttons", isOn: $model.footerActionsHidden)
-            Toggle("Sort rows by headroom", isOn: $model.sortByHeadroom)
+            Picker("Sort rows by", selection: $model.popupSort) {
+                Text("Engine order").tag(PopupSort.engine)
+                Text("Headroom").tag(PopupSort.headroom)
+                Text("Candidates").tag(PopupSort.candidates)
+            }
             Toggle("Floating countdown when every account is out",
                    isOn: $model.revivalPanelShown)
         } header: {
@@ -154,9 +158,11 @@ struct DisplayPane: View {
                  + "controls. Hiding the action buttons leaves everything "
                  + "they did in the menu bar icon's right-click menu. "
                  + "Sorting by headroom puts the active account first, "
-                 + "then the next candidate, then the fullest — slot "
-                 + "numbers don't move, and Settings › Accounts keeps the "
-                 + "engine's own order. The floating countdown is a small "
+                 + "then the next candidate, then the fullest; sorting by "
+                 + "candidates puts the active account first and the rest "
+                 + "in the order the engine would switch to them — slot "
+                 + "numbers don't move either way, and Settings › Accounts "
+                 + "keeps the engine's own order. The floating countdown is a small "
                  + "always-on-top panel saying who recovers first and "
                  + "when.")
         }
