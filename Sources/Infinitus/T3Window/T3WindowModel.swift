@@ -29,16 +29,13 @@ final class T3WindowModel: ObservableObject {
     /// `@State`, so `show workspace switcher` can raise it the way
     /// `show workspace draft` makes a draft.
     @Published var switcherOpen = false
-    /// Text a panel wants in the composer's draft — the proposed plan's markdown
-    /// when the plan card's Edit is pressed (Task 12). Task 13's composer takes
-    /// it and clears it; upstream does the same thing by writing the composer's
-    /// own draft (`ComposerPrimaryActions.tsx:166-181`, the "Refine" branch).
-    @Published var pendingComposerInsert: String?
     /// Files a sidebar row's drop staged for a thread, keyed by thread id
     /// (`sidebarPendingFileDropStore.ts`): the composer takes them the moment
-    /// it is mounted on that thread and clears the entry. Published because
-    /// a drop onto the row of the thread already open has no remount to carry
-    /// it — a rare event, like `pendingComposerInsert` above.
+    /// it is mounted on that thread and clears the entry. Not `@Published` —
+    /// the composer holds this model as a plain `let` on purpose
+    /// (T3ThreadView.swift:37-41), so a publish here never reaches it; a
+    /// drop onto the row of the thread already open instead nudges
+    /// `composerInbox` below (#528).
     ///
     /// Ours: upstream carries a per-drop id so a FAILED `router.navigate` can
     /// retract just its own drop (`handleThreadFileDrop`,
@@ -47,7 +44,7 @@ final class T3WindowModel: ObservableObject {
     /// upstream's other three properties — drops accumulate rather than
     /// replace, other threads' drops survive one thread's consumption, and a
     /// thread that goes away drops its files (`pruneFileDrops`).
-    @Published var pendingFileDrops: [String: [URL]] = [:]
+    private var pendingFileDrops: [String: [URL]] = [:]
     /// The hidden ⌘W button in `T3Root` (E6c); the controller sets this to `close()`.
     var closeRequested: (() -> Void)?
 
@@ -671,8 +668,16 @@ final class T3WindowModel: ObservableObject {
         guard !urls.isEmpty else { return }
         pendingFileDrops[threadId, default: []] += urls
         // `landedBefore` (`:2795-2800`): the row of the open thread needs no
-        // navigation, and re-selecting would re-stamp its visit.
-        if state.selectedThreadId != threadId { select(threadId) }
+        // navigation, and re-selecting would re-stamp its visit — but with
+        // no remount to carry the drop, the mounted composer needs the
+        // inbox's nudge to see it (#528). The other branch's `select`
+        // remounts the composer on the new thread, whose own `onAppear`
+        // already takes the drop.
+        if state.selectedThreadId != threadId {
+            select(threadId)
+        } else {
+            composerInbox.send(.fileDrop)
+        }
     }
 
     /// The composer's side of it, oldest file first; the entry is gone
@@ -716,13 +721,16 @@ final class T3WindowModel: ObservableObject {
     let draftStart = T3DraftStart()
     func isStarting(_ draftId: String) -> Bool { draftStart.starting.contains(draftId) }
 
-    /// The Files tab's way into the open composer — upstream's composer ref
-    /// (`useComposerHandleContext`, `FileBrowserPanel.tsx:106`, used by "Add to
-    /// chat" at `:175-192`). Its own tiny observable rather than a `@Published`
-    /// on this model, and for a load-bearing reason: the composer holds the
-    /// model as a plain `let` so a fleet tick never re-runs its body
-    /// (T3ComposerView.swift:44-47), which also means a publish HERE would
-    /// never reach it. `T3DraftStart` above is passed for the same reason.
+    /// Every one-shot delivery into the open composer: the Files tab's "Add
+    /// to chat" mention (upstream's composer ref, `useComposerHandleContext`,
+    /// `FileBrowserPanel.tsx:106`, used at `:175-192`), the plan card's
+    /// Refine (`ComposerPrimaryActions.tsx:166-181`), and a sidebar drop onto
+    /// the already-open thread (`bde39d4d7`). Its own tiny observable rather
+    /// than `@Published` fields on this model, and for a load-bearing
+    /// reason: the composer holds the model as a plain `let` so a fleet tick
+    /// never re-runs its body (T3ComposerView.swift:44-47), which also means
+    /// a publish HERE would never reach it (#528). `T3DraftStart` above is
+    /// passed for the same reason.
     let composerInbox = T3ComposerInbox()
 
     /// `startNewThreadFromContext` (`Sidebar.tsx:4251-4270`): a draft in the
@@ -905,17 +913,30 @@ final class T3WindowModel: ObservableObject {
 /// `T3DraftStart` below: its own `ObservableObject`, so the composer observes
 /// exactly this and nothing that ticks.
 ///
-/// One slot, cleared as soon as the composer takes it. Upstream's equivalent is
-/// a direct call on the composer's handle
-/// (`composer.insertTextAtEnd`, `FileBrowserPanel.tsx:184`); a SwiftUI view has
-/// no handle to call, so the value waits here for the frame the composer reads
-/// it in.
+/// One slot, cleared as soon as the composer takes it (`T3ComposerDelivery`,
+/// InfinitusCore, carries the sequence/take rule). Upstream's equivalent for
+/// the mention is a direct call on the composer's handle
+/// (`composer.insertTextAtEnd`, `FileBrowserPanel.tsx:184`); a SwiftUI view
+/// has no handle to call, so the value waits here for the frame the composer
+/// reads it in. The plan card's Refine and a sidebar file drop (#528) ride
+/// the same slot — three producers, one observed object.
 @MainActor
 final class T3ComposerInbox: ObservableObject {
-    /// A file mention (`@<path>`) to append at the end of the draft.
-    @Published var mention: String?
+    @Published private(set) var delivery: T3ComposerDelivery?
+    private var seq = 0
 
     nonisolated init() {}
+
+    func send(_ kind: T3ComposerDelivery.Kind) {
+        let next = T3ComposerDelivery.next(kind, after: seq)
+        seq = next.seq
+        delivery = next
+    }
+
+    /// The composer's take: reads whatever is queued and empties the slot.
+    func take() -> T3ComposerDelivery.Kind? {
+        T3ComposerDelivery.take(&delivery)
+    }
 }
 
 /// The drafts' start state (fix 1): which starts are in flight and what the
