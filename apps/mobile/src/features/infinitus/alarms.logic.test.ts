@@ -5,7 +5,14 @@ import type {
 } from "@t3tools/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
-import { DEFAULT_LEAD_MS, leadMs, planAlarms, resetAlarms, swapAlarm } from "./alarms.logic";
+import {
+  DEFAULT_LEAD_MS,
+  alarmIsScheduled,
+  leadMs,
+  planAlarms,
+  resetAlarms,
+  swapAlarm,
+} from "./alarms.logic";
 
 const now = 1_800_000_000_000;
 const hour = 3_600_000;
@@ -160,5 +167,23 @@ describe("planAlarms / leadMs", () => {
     ]);
     expect(alarms[0]?.title).toMatch(/resets in 30 min$/);
     expect(planAlarms({ ...after, available: false }, before, now)).toEqual([]);
+  });
+});
+
+describe("alarmIsScheduled", () => {
+  const alarm = {
+    id: "infinitus-reset-f-1",
+    fireAt: "2027-01-01T10:00:00.000Z",
+    title: "",
+    body: "",
+  };
+
+  it("matches only a request stamped with the same fire time", () => {
+    expect(alarmIsScheduled({ infinitus: "accounts", fireAt: alarm.fireAt }, alarm)).toBe(true);
+    expect(
+      alarmIsScheduled({ infinitus: "accounts", fireAt: "2027-01-01T11:00:00.000Z" }, alarm),
+    ).toBe(false);
+    expect(alarmIsScheduled({ infinitus: "accounts" }, alarm)).toBe(false);
+    expect(alarmIsScheduled(undefined, alarm)).toBe(false);
   });
 });

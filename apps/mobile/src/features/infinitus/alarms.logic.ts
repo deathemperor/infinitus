@@ -141,3 +141,13 @@ export function planAlarms(
 export function isInfinitusAlarmId(id: string): boolean {
   return id.startsWith("infinitus-");
 }
+
+/** Whether a scheduled request's `content.data` already carries this alarm's
+    fire time — the only trigger echo that survives both platforms. */
+export function alarmIsScheduled(data: unknown, alarm: FleetAlarm): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { fireAt?: unknown }).fireAt === alarm.fireAt
+  );
+}
