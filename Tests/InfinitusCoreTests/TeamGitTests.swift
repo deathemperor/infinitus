@@ -169,6 +169,23 @@ final class TeamGitTests: XCTestCase {
         XCTAssertEqual(try b.list("m/kid-a/").map(\.path).sorted(), ["m/kid-a/now.json", "m/kid-a/x.json", "m/kid-a/y.json"])
     }
 
+    /// #510: on Linux a Process waited on through its termination handler
+    /// alone is never freed (corelibs' run-loop source retains it), and each
+    /// took its two pipe ends along — 1,300 descriptors into the Team
+    /// suites, Process.run's /proc/self/fd walk overran its buffer.
+    func testAGitCallLeavesNoDescriptorBehind() throws {
+        let remote = try makeRemote()
+        let g = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
+        try g.open()   // the first calls also start Process's monitor thread
+        func openDescriptors() throws -> Int {
+            try FileManager.default.contentsOfDirectory(atPath: "/dev/fd").count
+        }
+        let before = try openDescriptors()
+        for _ in 0..<30 { try g.sync() }
+        let after = try openDescriptors()
+        XCTAssertLessThanOrEqual(after, before + 2, "30 git calls left \(after - before) descriptors open")
+    }
+
     func testBadPathsAreRefused() throws {
         let g = TeamGit(dir: scratch.appendingPathComponent("g"), remote: try makeRemote(), token: nil, author: "k")
         try g.open()

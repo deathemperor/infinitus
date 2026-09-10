@@ -1,0 +1,56 @@
+name: Linux sanitize
+# Reproducer for #510: the linux job dies with signal 11 inside
+# TeamClientTests on x86_64 about one run in five — thread 0 in libc
+# (an AVX memcpy tail), the fault at a page boundary of the brk heap,
+# no Swift frames — while the same suites pass on aarch64. The same
+# `swift test` under AddressSanitizer, repeated, names the copy that
+# runs off the heap or into freed memory. Runs on a PR that touches
+# this file and on demand; never a required check. (run 2: the fix)
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: how many times to run the suite
+        default: "8"
+      filter:
+        description: swift test --filter (empty = every test)
+        default: ""
+  pull_request:
+    paths: [.github/workflows/linux-sanitize.yml]
+concurrency:
+  group: linux-sanitize-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  asan:
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    timeout-minutes: 60
+    env:
+      # LeakSanitizer needs ptrace, which the container's seccomp
+      # profile refuses — it would fail every run at exit. The Swift
+      # backtracer and ASan both claim SIGSEGV; ASan's report is the
+      # one that names the buffer.
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      SWIFT_BACKTRACE: enable=no
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build --build-tests --sanitize=address
+      - name: Run the suite under ASan
+        run: |
+          n="${{ github.event.inputs.iterations || '8' }}"
+          filter="${{ github.event.inputs.filter }}"
+          for i in $(seq 1 "$n"); do
+            echo "::group::iteration $i of $n"
+            status=0
+            if [ -n "$filter" ]; then
+              swift test --skip-build --sanitize=address --filter "$filter" || status=$?
+            else
+              swift test --skip-build --sanitize=address || status=$?
+            fi
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              echo "iteration $i of $n failed (exit $status)"
+              exit "$status"
+            fi
+          done
+          echo "$n iterations clean"

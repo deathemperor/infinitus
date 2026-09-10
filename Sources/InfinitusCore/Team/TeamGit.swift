@@ -702,6 +702,14 @@ public final class TeamGit: TeamStore {
         let (data, errData, stalled) = Self.drain(out: out.fileHandleForReading, err: err.fileHandleForReading, watch: watch)
         feeding.wait()
         exited.wait()
+        // The child is gone, so this returns at once — and on Linux it is
+        // what frees the Process: corelibs keeps it in a retain cycle with
+        // its run-loop source until waitUntilExit clears the source, so a
+        // handler-only wait leaked every Process with its two pipe ends.
+        // The Team suites reached 1,300 open descriptors that way, and
+        // Process.run's /proc/self/fd walk then read past its readdir
+        // buffer into the next page — the #510 signal 11.
+        p.waitUntilExit()
         let command = args.joined(separator: " ")
         if stalled { throw GitError.stalled(command: command, idle: watch?.idle ?? Self.stallTimeout) }
         guard p.terminationStatus == 0 else {
