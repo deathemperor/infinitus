@@ -100,9 +100,15 @@ public enum T3FilePreview: Sendable {
     ///   operation's raw message (`WorkspaceFileSystem.ts:53-55`), which names
     ///   a syscall and two absolute paths — the fallback is the same failure
     ///   said once.
+    /// - `tooLarge` → the port's own case: upstream streams a workspace image
+    ///   through its asset URL with no size ceiling at all, while this wire
+    ///   stops at `T3ProjectFiles.imageCap` (#223's agreed 8 MB), so the
+    ///   sentence is the binary one's shape with the cap in it — from `cap`,
+    ///   never repeated as a literal.
     /// - `failed` → the route's own message, as `{file.error}` does.
     public static func message(for error: T3ProjectFiles.ReadError,
-                               path: String, root: String) -> String {
+                               path: String, root: String,
+                               cap: Int = T3ProjectFiles.imageCap) -> String {
         switch error {
         case .binary:
             return "Workspace file '\(path)' in '\(root)' is binary and cannot be previewed as text."
@@ -110,6 +116,9 @@ public enum T3FilePreview: Sendable {
             return "Workspace file '\(path)' resolves outside workspace root '\(root)'."
         case .notFound:
             return "Failed to read workspace file '\(path)' in '\(root)'."
+        case .tooLarge:
+            return "Workspace image '\(path)' in '\(root)' is too large to preview "
+                + "(over \(cap / (1024 * 1024)) MB)."
         case .failed(let message):
             return message
         }

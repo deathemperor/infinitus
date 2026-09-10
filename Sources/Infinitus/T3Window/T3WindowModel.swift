@@ -397,11 +397,47 @@ final class T3WindowModel: ObservableObject {
         return read
     }
 
+    /// The image sibling of the read above (#223's image contract): the bytes
+    /// and mime `T3ProjectFiles.readImage` answers, keyed the same way. Three
+    /// slots, not the text read's eight — one image is up to
+    /// `T3ProjectFiles.imageCap` (8 MB) of bytes, and the pane holds the
+    /// decoded one on top of that.
+    private typealias ImageReadResult = Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError>
+    private var imageReadCache: [FileReadKey: ImageReadResult] = [:]
+    private var imageReadOrder: [FileReadKey] = []
+    private var imageReadLoads: [FileReadKey: Task<ImageReadResult, Never>] = [:]
+    private static let imageReadCacheLimit = 3
+
+    func cachedImageRead(cwd: String,
+                         path: String) -> Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError>? {
+        imageReadCache[FileReadKey(cwd: cwd, path: path)]
+    }
+
+    func imageRead(cwd: String,
+                   path: String) async -> Result<T3ProjectFiles.ImageRead, T3ProjectFiles.ReadError> {
+        let key = FileReadKey(cwd: cwd, path: path)
+        if let cached = imageReadCache[key] { return cached }
+        if let existing = imageReadLoads[key] { return await existing.value }
+        let task = Task.detached(priority: .userInitiated) { T3ProjectFiles.readImage(root: cwd, path: path) }
+        imageReadLoads[key] = task
+        let read = await task.value
+        imageReadLoads[key] = nil
+        imageReadCache[key] = read
+        imageReadOrder.removeAll { $0 == key }
+        imageReadOrder.append(key)
+        while imageReadOrder.count > Self.imageReadCacheLimit {
+            imageReadCache[imageReadOrder.removeFirst()] = nil
+        }
+        return read
+    }
+
     /// Every read under `cwd` forgotten — the listing moved on, so the file
     /// this pane is showing may have too.
     func invalidateFileReads(cwd: String) {
         for key in fileReadCache.keys where key.cwd == cwd { fileReadCache[key] = nil }
         fileReadOrder.removeAll { $0.cwd == cwd }
+        for key in imageReadCache.keys where key.cwd == cwd { imageReadCache[key] = nil }
+        imageReadOrder.removeAll { $0.cwd == cwd }
     }
 
     /// The right panel's Pull request tab reads its list here — one

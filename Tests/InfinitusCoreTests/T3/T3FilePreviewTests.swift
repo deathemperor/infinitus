@@ -98,6 +98,15 @@ final class T3FilePreviewTests: XCTestCase {
                        "Workspace file '../etc/passwd' resolves outside workspace root '/w'.")
     }
 
+    /// The image cap's copy carries the cap, and only the cap says the number.
+    func testTheTooLargeCopyNamesTheCapInMegabytes() {
+        XCTAssertEqual(T3FilePreview.message(for: .tooLarge, path: "shot.png", root: "/w"),
+                       "Workspace image 'shot.png' in '/w' is too large to preview (over 8 MB).")
+        XCTAssertEqual(T3FilePreview.message(for: .tooLarge, path: "shot.png", root: "/w",
+                                             cap: 2 * 1024 * 1024),
+                       "Workspace image 'shot.png' in '/w' is too large to preview (over 2 MB).")
+    }
+
     /// Anything else is the route's own message, as `{file.error}` renders it.
     func testAnyOtherFailureIsItsOwnMessage() {
         XCTAssertEqual(T3FilePreview.message(for: .failed("cannot open x"), path: "x", root: "/w"),

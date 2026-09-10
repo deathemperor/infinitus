@@ -24,6 +24,9 @@ public enum T3ProjectFiles: Sendable {
     public static let entryCap = 20_000
     /// 256 KiB of one file — enough for any source file the phone previews.
     public static let readCap = 256 * 1024
+    /// 8 MB of one image, agreed with the phone on #223: past it the read
+    /// route answers 413 rather than pushing a camera-sized file down the wire.
+    public static let imageCap = 8 * 1024 * 1024
     /// How much of the head decides "binary" (upstream's own sniff window).
     static let sniffBytes = 8 * 1024
 
@@ -62,6 +65,25 @@ public enum T3ProjectFiles: Sendable {
         }
     }
 
+    /// One image file, as the read route answers it: the raw bytes under
+    /// their own MIME type, no JSON envelope (#223's image contract).
+    public struct ImageRead: Sendable, Equatable {
+        public let path: String
+        public let bytes: Data
+        /// From `imageMime(for:)` — the one table both sides read.
+        public let mime: String
+        public init(path: String, bytes: Data, mime: String) {
+            self.path = path; self.bytes = bytes; self.mime = mime
+        }
+    }
+
+    /// What one read hands back: an image extension's bytes, or any other
+    /// file's text.
+    public enum FileAnswer: Sendable, Equatable {
+        case text(FileRead)
+        case image(ImageRead)
+    }
+
     /// Every non-200 body on the two routes: `{"error": "…"}`.
     public struct Failure: Codable, Sendable, Equatable {
         public let error: String
@@ -93,8 +115,11 @@ public enum T3ProjectFiles: Sendable {
         /// Missing, absolute, `..`, or a symlink leaving the workspace.
         case outsideRoot
         case notFound
-        /// A NUL in the head, or an image/video/pdf extension.
+        /// A NUL in the head, or a video/pdf extension (an image of a kind
+        /// `imageMime` doesn't know).
         case binary
+        /// An image over `imageCap`.
+        case tooLarge
         case failed(String)
 
         public var status: Int {
@@ -102,6 +127,7 @@ public enum T3ProjectFiles: Sendable {
             case .outsideRoot: return 400
             case .notFound: return 404
             case .binary: return 415
+            case .tooLarge: return 413
             case .failed: return 500
             }
         }
@@ -110,6 +136,7 @@ public enum T3ProjectFiles: Sendable {
             case .outsideRoot: return "path outside workspace"
             case .notFound: return "no such file"
             case .binary: return "binary file"
+            case .tooLarge: return "file too large"
             case .failed(let message): return message
             }
         }
@@ -174,21 +201,10 @@ public enum T3ProjectFiles: Sendable {
     /// resolved and anything outside `root` refused.
     public static func read(root: String, path: String, cap: Int = readCap,
                             fileManager: FileManager = .default) -> Result<FileRead, ReadError> {
-        guard let relative = normalized(path) else { return .failure(.outsideRoot) }
-        let rootURL = URL(fileURLWithPath: root, isDirectory: true)
-        let target = relative.split(separator: "/", omittingEmptySubsequences: true)
-            .reduce(rootURL) { $0.appendingPathComponent(String($1)) }
-        // `fileExists` follows symlinks, so a dangling one is missing, not
-        // an escape — 404 before the prefix check has anything to compare.
-        guard fileManager.fileExists(atPath: target.path) else { return .failure(.notFound) }
-        // The same canonicalizer on both sides: on macOS `/var` resolves to
-        // `/private/var`, so a root that skipped this would never match.
-        let resolvedRoot = rootURL.resolvingSymlinksInPath().path
-        let resolved = target.resolvingSymlinksInPath()
-        let prefix = resolvedRoot.hasSuffix("/") ? resolvedRoot : resolvedRoot + "/"
-        guard resolved.path.hasPrefix(prefix) else { return .failure(.outsideRoot) }
-        guard (try? resolved.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else {
-            return .failure(.notFound)
+        let relative: String, resolved: URL
+        switch resolve(root: root, path: path, fileManager: fileManager) {
+        case .failure(let error): return .failure(error)
+        case .success(let found): (relative, resolved) = found
         }
         let mime = self.mime(for: relative)
         if binaryExtensions.contains(extensionName(of: relative)) { return .failure(.binary) }
@@ -213,6 +229,74 @@ public enum T3ProjectFiles: Sendable {
                             cap: Int = readCap, fileManager: FileManager = .default) -> Result<FileRead, ReadError>? {
         guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
         return read(root: record.cwd, path: path, cap: cap, fileManager: fileManager)
+    }
+
+    /// One image file's bytes under `root` (#223's image contract), for the
+    /// read route and the Mac's own preview. `imageMime` alone decides what
+    /// counts as an image; any other extension is `.binary`, exactly as the
+    /// text read answers it. The same path/root/symlink guard as `read`.
+    public static func readImage(root: String, path: String, cap: Int = imageCap,
+                                 fileManager: FileManager = .default) -> Result<ImageRead, ReadError> {
+        let relative: String, resolved: URL
+        switch resolve(root: root, path: path, fileManager: fileManager) {
+        case .failure(let error): return .failure(error)
+        case .success(let found): (relative, resolved) = found
+        }
+        guard let mime = imageMime(for: relative) else { return .failure(.binary) }
+        // The size answers 413 before a byte is read: the cap must not cost
+        // the cap in memory first.
+        let byteLength = (try? resolved.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        guard byteLength <= cap else { return .failure(.tooLarge) }
+        guard let bytes = try? Data(contentsOf: resolved) else {
+            return .failure(.failed("cannot read \(relative)"))
+        }
+        return .success(ImageRead(path: relative, bytes: bytes, mime: mime))
+    }
+
+    /// What `GET /sessions/<pid>/file?path=` answers: an image extension takes
+    /// the raw-bytes read, everything else the text one. Both dispatchers (the
+    /// Mac's route and the Linux tray's) call this, so neither owns the branch.
+    public static func answer(root: String, path: String, cap: Int = readCap,
+                              imageCap: Int = T3ProjectFiles.imageCap,
+                              fileManager: FileManager = .default) -> Result<FileAnswer, ReadError> {
+        if imageMime(for: path) != nil {
+            return readImage(root: root, path: path, cap: imageCap,
+                             fileManager: fileManager).map(FileAnswer.image)
+        }
+        return read(root: root, path: path, cap: cap, fileManager: fileManager).map(FileAnswer.text)
+    }
+
+    /// The same pid → cwd hop as `read(pid:path:sessions:)`, for the branch above.
+    public static func answer(pid: Int32, path: String, sessions: [ClaudeSessionRecord],
+                              cap: Int = readCap, imageCap: Int = T3ProjectFiles.imageCap,
+                              fileManager: FileManager = .default) -> Result<FileAnswer, ReadError>? {
+        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
+        return answer(root: record.cwd, path: path, cap: cap, imageCap: imageCap,
+                      fileManager: fileManager)
+    }
+
+    /// The path/root/symlink guard both reads share: `path` as this module
+    /// accepts it, resolved, refused when it leaves `root` or is not a regular
+    /// file (a directory included — the route answers that 404).
+    static func resolve(root: String, path: String,
+                        fileManager: FileManager) -> Result<(relative: String, url: URL), ReadError> {
+        guard let relative = normalized(path) else { return .failure(.outsideRoot) }
+        let rootURL = URL(fileURLWithPath: root, isDirectory: true)
+        let target = relative.split(separator: "/", omittingEmptySubsequences: true)
+            .reduce(rootURL) { $0.appendingPathComponent(String($1)) }
+        // `fileExists` follows symlinks, so a dangling one is missing, not
+        // an escape — 404 before the prefix check has anything to compare.
+        guard fileManager.fileExists(atPath: target.path) else { return .failure(.notFound) }
+        // The same canonicalizer on both sides: on macOS `/var` resolves to
+        // `/private/var`, so a root that skipped this would never match.
+        let resolvedRoot = rootURL.resolvingSymlinksInPath().path
+        let resolved = target.resolvingSymlinksInPath()
+        let prefix = resolvedRoot.hasSuffix("/") ? resolvedRoot : resolvedRoot + "/"
+        guard resolved.path.hasPrefix(prefix) else { return .failure(.outsideRoot) }
+        guard (try? resolved.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else {
+            return .failure(.notFound)
+        }
+        return .success((relative, resolved))
     }
 
     /// The build and vendor trees the browser never lists (#223 names
@@ -291,8 +375,21 @@ public enum T3ProjectFiles: Sendable {
         "html": "text/html", "css": "text/css", "txt": "text/plain",
     ]
 
-    /// No preview on the phone, so the read route refuses them outright
-    /// (an image is served by the images route, not as text).
+    /// The one image table both sides read (#223's image contract): a hit
+    /// means the read route answers the raw bytes under this type and both
+    /// previews draw an image; `nil` is not an image. `svg` is deliberately
+    /// absent — it is text, and stays on the text read.
+    public static func imageMime(for path: String) -> String? {
+        imageMimeByExtension[extensionName(of: path)]
+    }
+
+    static let imageMimeByExtension: [String: String] = [
+        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "gif": "image/gif", "webp": "image/webp", "heic": "image/heic",
+    ]
+
+    /// No preview on either client, so the read route refuses them outright
+    /// (an image extension `imageMime` knows never reaches this set).
     static let binaryExtensions: Set<String> = [
         "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tiff", "tif", "ico", "icns",
         "pdf", "mp4", "mov", "m4v", "avi", "mkv", "webm",
