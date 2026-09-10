@@ -61,6 +61,15 @@ this file adds the fork's own rules. Plan and history: issue #555.
   harness's stub stack, since the routes layer now needs the service.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`.
+- `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
+  (window title, auth/pairing surfaces) instead of "T3 Code".
+- `apps/web/src/components/sidebar/SidebarChrome.tsx`,
+  `apps/web/src/components/onboarding/WelcomeWizard.tsx` — the brand mark and
+  the first-run heading read `PRODUCT_NAME`; in-copy "T3 Code" mentions stay
+  upstream's (#601).
+- `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
+  boot-shell title and splash labels to `PRODUCT_NAME`.
+- `packages/shared/package.json` — the `./productName` export.
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
@@ -134,6 +143,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
+- `packages/shared/src/productName.ts` — `PRODUCT_NAME`, the one constant the
+  branded surfaces import.
 - `packages/shared/src/infinitusControl.ts` — the control-socket path rule
   (`INFINITUS_CONTROL_SOCKET`, then the per-platform default).
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
