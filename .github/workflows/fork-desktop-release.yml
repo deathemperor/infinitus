@@ -96,6 +96,31 @@ jobs:
           printf '%s' "$NOTARY_KEY_BASE64" | base64 -D > "$key_path"
           chmod 600 "$key_path"
           echo "notary_key_path=$key_path" >> "$GITHUB_OUTPUT"
+
+          # Import the certificate into a keychain of our own and hand
+          # electron-builder that keychain (CSC_KEYCHAIN) instead of the p12
+          # (CSC_LINK): electron-builder 26.15's own import creates the
+          # keychain with a random password but then runs
+          # `set-key-partition-list -k <p12 password>` against it, which fails
+          # with "passphrase you entered is not correct" (run 34488667586).
+          # Same sequence as the native branch's release workflow.
+          keychain="$RUNNER_TEMP/fork-sign.keychain-db"
+          p12_path="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 -D > "$p12_path"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$p12_path" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '"')
+          rm -f "$p12_path"
+          if ! security find-identity -v -p codesigning "$keychain" | grep -q "Developer ID Application"; then
+            echo "The imported certificate carries no Developer ID Application identity." >&2
+            exit 1
+          fi
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
           echo "signed=true" >> "$GITHUB_OUTPUT"
           echo "macOS signing enabled (Developer ID + notarytool)." >> "$GITHUB_STEP_SUMMARY"
 
@@ -107,8 +132,7 @@ jobs:
           T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
           T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
           T3CODE_APPLE_TEAM_ID: Q783W6B4FA
-          CSC_LINK: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          CSC_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
           APPLE_API_KEY: ${{ steps.signing.outputs.notary_key_path }}
           APPLE_API_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
@@ -129,6 +153,11 @@ jobs:
           fi
 
           vp run dist:desktop:artifact "${args[@]}"
+
+      - name: Remove the signing keychain
+        if: ${{ always() && steps.signing.outputs.keychain != '' }}
+        shell: bash
+        run: security delete-keychain "${{ steps.signing.outputs.keychain }}" || true
 
       # The DMG installs the app; the zip and `infinitus-mac.yml` are what
       # electron-updater downloads for an in-place update on the `infinitus`
