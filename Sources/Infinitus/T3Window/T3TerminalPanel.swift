@@ -68,10 +68,10 @@ import InfinitusUI
 /// shell on screen — the ~4x gap is the repaint that a hidden entry does not
 /// do, and the remainder is the pty read plus the parse into its ring.
 ///
+/// The other mode (`:989` `mode: "drawer" | "panel"`) mounts the same
+/// `T3TerminalSurfaceView` from `T3TerminalDrawerView.swift`.
+///
 /// Not ported this round, each with its upstream line:
-/// - the drawer mode (`:989` `mode: "drawer" | "panel"`, the resize handle
-///   `:1402-1410` and `clampDrawerHeight` `:100-104`): the right panel is the
-///   only mount here.
 /// - a split's keyboard shortcut (`splitShortcutLabel` /
 ///   `splitVerticalShortcutLabel`, `:1253-1262`): the tab binds none, so the
 ///   two labels are upstream's without the shortcut suffix.
@@ -103,7 +103,7 @@ struct T3TerminalPanel: View {
                 // keys on cwd (`ChatView.tsx:8078`). The registry behind it
                 // keeps the emulators alive across this, so a thread switched
                 // away from and back to still has its scrollback.
-                T3TerminalSurfaceView(model: model, target: target)
+                T3TerminalSurfaceView(model: model, target: target, owner: .panel)
                     .id(target.key)
             } else if model.state.selectedThread == nil {
                 // The launcher's disabled reason, `RightPanelTabs.tsx:138`.
@@ -162,7 +162,7 @@ private struct T3TerminalUnavailable: View {
 }
 
 /// A centred one-liner, `T3DiffMessage`'s shape.
-private struct T3TerminalMessage: View {
+struct T3TerminalMessage: View {
     @Environment(\.t3) private var t3
     let text: String
     var body: some View {
@@ -177,21 +177,28 @@ private struct T3TerminalMessage: View {
 
 // MARK: - The surface
 
-/// The emulator over one target, plus the controls. The view is a shell around
-/// `T3TerminalGroup`: the group (and with it every `TerminalView`, its
-/// scrollback and its attachment) lives on the window model, so switching to
-/// Files and back re-attaches instead of restarting (`ThreadTerminalDrawer.tsx`
-/// keeps its terminals mounted across tab switches; `visible` only stops it
-/// focusing them, `:1114`).
-private struct T3TerminalSurfaceView: View {
+/// The emulator over one target, plus the controls — the piece BOTH of
+/// upstream's modes render (`ThreadTerminalDrawer.tsx:1425-1710`; `mode`
+/// decides only the container's sizing and the drag handle, `:1398-1440`). The
+/// right panel's tab mounts it as `.panel`, the thread's drawer as `.drawer`.
+///
+/// The view is a shell around `T3TerminalGroup`: the group (and with it every
+/// `TerminalView`, its scrollback and its attachment) lives on the window model,
+/// so switching to Files and back re-attaches instead of restarting
+/// (`ThreadTerminalDrawer.tsx` keeps its terminals mounted across tab switches;
+/// `visible` only stops it focusing them, `:1114`).
+struct T3TerminalSurfaceView: View {
     @ObservedObject var model: T3WindowModel
     let target: T3TerminalTarget
+    /// Which of the two surfaces this is. Both may be mounted at once, and only
+    /// one of them draws (`T3TerminalDrawer.Presenters`).
+    let owner: T3TerminalDrawer.Owner
     @State private var group: T3TerminalGroup?
 
     var body: some View {
         Group {
             if let group {
-                T3TerminalGroupView(group: group)
+                T3TerminalOwnedView(group: group, owner: owner)
             } else {
                 // `DiffPanelShell`'s skeleton stands in as everywhere else in
                 // this port. forkpty is a millisecond, so this only paints for
@@ -204,9 +211,30 @@ private struct T3TerminalSurfaceView: View {
         .onAppear {
             let group = model.terminals?.group(for: target)
             self.group = group
-            group?.appear()
+            group?.appear(as: owner)
         }
-        .onDisappear { group?.disappear() }
+        .onDisappear { group?.disappear(as: owner) }
+    }
+}
+
+/// The claim: this surface draws the shells only while it is the group's
+/// current presenter, and says where they are otherwise.
+///
+/// Upstream partitions the terminals themselves — a terminal a right-panel
+/// surface holds leaves the drawer's list (`ChatView.tsx:855-868`) — which
+/// needs a "move to the panel" affordance this port has none of. Here the
+/// partition is by surface, and it is not only a rule: one `TerminalView` is
+/// one NSView, and an NSView has one superview.
+private struct T3TerminalOwnedView: View {
+    @ObservedObject var group: T3TerminalGroup
+    let owner: T3TerminalDrawer.Owner
+
+    var body: some View {
+        if group.presenting == owner || group.presenting == nil {
+            T3TerminalGroupView(group: group)
+        } else if let other = group.presenting {
+            T3TerminalMessage(text: T3TerminalDrawer.Presenters.elsewhere(other))
+        }
     }
 }
 
@@ -617,18 +645,44 @@ private struct T3TerminalStripRow: View {
     }
 }
 
-/// SwiftTerm's view, handed straight through. Nothing is created here — the
-/// entry owns the view, which is what survives a tab switch and a switch to
+/// SwiftTerm's view, hosted in a container. Nothing is created here — the entry
+/// owns the `TerminalView`, which is what survives a tab switch and a switch to
 /// another terminal.
+///
+/// The container is what makes the drawer/tab handover safe: an NSView has ONE
+/// superview, and with two surfaces mounted over the same group SwiftUI runs
+/// their dismantle and their insert in an undefined order. Returning
+/// `entry.view` straight from `makeNSView` let the OUTGOING representable's
+/// teardown pull the view out of the incoming one; re-parenting into a
+/// per-representable container instead means the last insert always wins.
 private struct T3TerminalEmulator: NSViewRepresentable {
     @Environment(\.t3) private var t3
     let entry: T3TerminalEntry
 
-    func makeNSView(context: Context) -> TerminalView { entry.view }
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView(frame: CGRect(x: 0, y: 0, width: 480, height: 320))
+        container.autoresizesSubviews = true
+        return container
+    }
 
-    func updateNSView(_ view: TerminalView, context: Context) {
+    func updateNSView(_ container: NSView, context: Context) {
+        let view = entry.view
+        if view.superview !== container {
+            view.removeFromSuperview()
+            view.frame = container.bounds
+            view.autoresizingMask = [.width, .height]
+            container.addSubview(view)
+        }
         // Light/dark, and the first paint: the palette is idempotent.
         entry.applyTheme(t3)
+    }
+
+    static func dismantleNSView(_ container: NSView, coordinator: ()) {
+        // Only the view this container still holds: the other surface may
+        // already have taken it (`T3TerminalDrawer.Presenters`).
+        for subview in container.subviews where subview is TerminalView {
+            subview.removeFromSuperview()
+        }
     }
 }
 
@@ -654,12 +708,18 @@ final class T3TerminalGroup: ObservableObject {
     /// terminal until a split joins two.
     @Published private(set) var groups: [T3TerminalSurface.SplitGroup] = []
     @Published private(set) var activeId: String = T3Terminal.defaultTerminalId
+    /// Which surface is drawing these shells, of the ones currently mounted
+    /// (`T3TerminalDrawer.Presenters`). `nil` while neither is.
+    @Published private(set) var presenting: T3TerminalDrawer.Owner?
 
     private let host: TerminalHost
     private var entries: [String: T3TerminalEntry] = [:]
-    /// The surface is on screen: `appear` attaches every terminal, `disappear`
-    /// detaches them all (the shells keep running).
-    private var visible = false
+    /// The surfaces this group is mounted in. The FIRST claim attaches every
+    /// terminal and the LAST release detaches them all (the shells keep
+    /// running) — a group shown in the drawer must not go dead because the
+    /// right panel switched away from Terminal.
+    private var presenters = T3TerminalDrawer.Presenters()
+    private var visible: Bool { !presenters.isEmpty }
 
     init(target: T3TerminalTarget, host: TerminalHost) {
         self.target = target
@@ -724,8 +784,12 @@ final class T3TerminalGroup: ObservableObject {
 
     // MARK: Lifecycle
 
-    func appear() {
-        visible = true
+    /// A surface appeared. It takes the shells over (the newest claim draws) and
+    /// the ids are re-seeded from the host — a terminal the phone opened while
+    /// this group was off screen shows up on the way back in.
+    func appear(as owner: T3TerminalDrawer.Owner) {
+        presenters.claim(owner)
+        if presenting != presenters.current { presenting = presenters.current }
         // Whatever the host holds for this pid, plus whatever this group
         // already listed (an entry mid-open is not on the host's map yet).
         let held = host.listTerminals(pid: target.pid).map(\.terminalId)
@@ -742,8 +806,19 @@ final class T3TerminalGroup: ObservableObject {
         for id in ordered { entry(for: id).appear() }
     }
 
+    /// One surface went away. The other, if it is still mounted, takes the
+    /// shells back; only the LAST release detaches them.
+    func disappear(as owner: T3TerminalDrawer.Owner) {
+        presenters.release(owner)
+        if presenting != presenters.current { presenting = presenters.current }
+        guard presenters.isEmpty else { return }
+        for entry in entries.values { entry.disappear() }
+    }
+
+    /// The window closed: every surface at once (`T3TerminalRegistry.detachAll`).
     func disappear() {
-        visible = false
+        for owner in T3TerminalDrawer.Owner.allCases { presenters.release(owner) }
+        if presenting != nil { presenting = nil }
         for entry in entries.values { entry.disappear() }
     }
 
