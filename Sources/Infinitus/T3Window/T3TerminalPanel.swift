@@ -585,9 +585,9 @@ private struct T3TerminalStripRow: View {
     var body: some View {
         HStack(spacing: 2) {
             Button { confirming = terminalId } label: {
-                // `TerminalSquare` has no vendored glyph in this kit (only
-                // lucide's bare `terminal`), so that one stands in for it.
-                LucideIcon(hover ? .x : .terminal, size: 12)
+                // `TerminalSquare` (`ThreadTerminalDrawer.tsx:1691`) — a
+                // deprecated lucide-react alias of `square-terminal`.
+                LucideIcon(hover ? .x : .squareTerminal, size: 12)
                     .frame(width: 16, height: 16)
                     .contentShape(Rectangle())
             }

@@ -148,7 +148,7 @@ private struct T3RightPanelTabButton: View {
     /// launcher, so it rides the tab's own label.
     private var badgeBubble: some View {
         Text("\(badge)")
-            .font(T3Font.webLiteral(9, .bold))
+            .font(T3Font.webLiteral(9, .semibold))
             .monospacedDigit()
             .foregroundStyle(.white)
             .padding(.horizontal, 4)

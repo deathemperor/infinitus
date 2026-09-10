@@ -324,12 +324,12 @@ private struct T3PullRequestRowView: View {
         case .approved:
             Text("Approved")
                 .font(T3Font.web(.xs))
-                .foregroundStyle(T3PullRequestTone.approved.color(t3.scheme, muted: t3.web.mutedForeground.color))
+                .foregroundStyle(T3PullRequestTone.approved.color(t3.scheme))
                 .lineLimit(1)
         case .changesRequested:
             Text("Changes requested")
                 .font(T3Font.web(.xs))
-                .foregroundStyle(T3PullRequestTone.changesRequested.color(t3.scheme, muted: t3.web.mutedForeground.color))
+                .foregroundStyle(T3PullRequestTone.changesRequested.color(t3.scheme))
                 .lineLimit(1)
         case .reviewRequired, nil:
             EmptyView()
@@ -374,11 +374,9 @@ private struct T3PullRequestDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // "text-base font-semibold leading-snug" (`:1987-1990`) — the
-            // kit's heaviest DM Sans face is what `font-semibold` renders as
-            // everywhere in this port (`T3Font.Weight`).
+            // "text-base font-semibold leading-snug" (`:1987-1990`).
             Text(entry.title)
-                .font(T3Font.web(.base, .bold))
+                .font(T3Font.web(.base, .semibold))
                 .foregroundStyle(t3.web.foreground.color)
                 .fixedSize(horizontal: false, vertical: true)
             // "mt-2 flex items-center gap-2 text-xs text-muted-foreground"
@@ -420,7 +418,7 @@ private struct T3PullRequestDetailView: View {
                 LucideIcon(.externalLink, size: 10)
             }
             .foregroundStyle(T3PullRequestTone.state(entry.state, isDraft: entry.isDraft)
-                .color(t3.scheme, muted: t3.web.mutedForeground.color))
+                .color(t3.scheme))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -573,8 +571,8 @@ private struct T3PullRequestsGhost: View {
 
 /// `resolvePullRequestState` and `CHECK*_PRESENTATION`'s ink
 /// (`pullRequestPresentation.tsx:41-83`, `:118-181`), read from the generated
-/// tailwindcss stops — the light `-600` and the dark `-300`/`-400` of each
-/// pair, never hand-typed.
+/// tailwindcss stops — the light `-600`/`-500` and the dark `-300`/`-400` of
+/// each pair, never hand-typed.
 enum T3PullRequestTone {
     case open, merged, closed, draft, approved, changesRequested, failing, pending
 
@@ -586,20 +584,16 @@ enum T3PullRequestTone {
         }
     }
 
-    /// `muted` is the kit's muted foreground, which stands in for the one
-    /// stop the generated palette has no colour for (see `draft` below).
-    func color(_ scheme: ColorScheme, muted: Color) -> Color {
+    func color(_ scheme: ColorScheme) -> Color {
         let dark = scheme == .dark
         switch self {
         case .open, .approved: return (dark ? T3Tailwind.emerald300 : T3Tailwind.emerald600).color
-        // "text-violet-600 dark:text-violet-300/90": the palette carries no
-        // violet-300 stop, so the dark side takes the neighbouring 400.
-        case .merged: return (dark ? T3Tailwind.violet400 : T3Tailwind.violet600).color
+        // "text-violet-600 dark:text-violet-300/90":
+        case .merged: return (dark ? T3Tailwind.violet300 : T3Tailwind.violet600).color
         case .closed, .failing: return (dark ? T3Tailwind.red300 : T3Tailwind.red600).color
         case .changesRequested, .pending: return (dark ? T3Tailwind.amber400 : T3Tailwind.amber600).color
-        // "text-zinc-500 dark:text-zinc-400/80" — no zinc stop is generated
-        // either, and the kit's muted foreground is the same grey in words.
-        case .draft: return muted
+        // "text-zinc-500 dark:text-zinc-400/80":
+        case .draft: return (dark ? T3Tailwind.zinc400 : T3Tailwind.zinc500).color
         }
     }
 }
@@ -630,7 +624,7 @@ private struct T3PullRequestStateGlyph: View {
 
     private var tint: Color {
         T3PullRequestTone.state(state, isDraft: isDraft)
-            .color(t3.scheme, muted: t3.web.mutedForeground.color)
+            .color(t3.scheme)
     }
 }
 
@@ -643,7 +637,7 @@ private struct T3PullRequestChecksGlyph: View {
 
     var body: some View {
         LucideIcon(glyph, size: 14)
-            .foregroundStyle(tone.color(t3.scheme, muted: t3.web.mutedForeground.color))
+            .foregroundStyle(tone.color(t3.scheme))
             .help(T3PullRequests.checksStateLabel(state))
             .accessibilityLabel(T3PullRequests.checksStateLabel(state))
     }

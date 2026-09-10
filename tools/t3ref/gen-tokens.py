@@ -232,13 +232,18 @@ def swift(tokens):
 #   * T3ThreadRowView — `Sidebar.tsx:1127,1141,1147,1153,1165`'s topStatus
 #     classNames (sky-600/400, amber-700/300, indigo-600/300, red-700/300,
 #     emerald-700/300) and `:1608`'s snoozed wake label (blue-600/400).
+#   * T3PullRequestTone — `pullRequestPresentation.tsx:52,66`'s state tones
+#     (violet-600/300 merged, zinc-500/400 draft), the same pair
+#     `Sidebar.logic.ts:1016-1017` and `ThreadStatusIndicators.tsx:93,143`
+#     use for a thread's own pull-request badge.
 # Add a name here when Swift starts naming it; never hand-type a stop.
 ICON_HUES = ["amber", "blue", "cyan", "emerald", "fuchsia", "green", "indigo", "lime",
              "orange", "pink", "purple", "red", "rose", "sky", "teal", "violet", "yellow"]
 STOPS = sorted({(h, s) for h in ICON_HUES for s in (400, 600)}
                | {("sky", 600), ("sky", 400), ("amber", 700), ("amber", 300),
                   ("indigo", 600), ("indigo", 300), ("red", 700), ("red", 300),
-                  ("emerald", 700), ("emerald", 300)})
+                  ("emerald", 700), ("emerald", 300), ("violet", 300),
+                  ("zinc", 500), ("zinc", 400)})
 
 def tailwind():
     """The pinned tailwindcss@4.3.3 `@theme default` block's oklch stops,
