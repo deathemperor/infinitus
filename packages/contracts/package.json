@@ -18,6 +18,10 @@
     "./relay": {
       "types": "./src/relay.ts",
       "import": "./src/relay.ts"
+    },
+    "./infinitus": {
+      "types": "./src/infinitus.ts",
+      "import": "./src/infinitus.ts"
     }
   },
   "scripts": {
