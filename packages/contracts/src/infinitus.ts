@@ -156,10 +156,51 @@ export const InfinitusSession = Schema.Struct({
 });
 export type InfinitusSession = typeof InfinitusSession.Type;
 
+/** The value type a preference holds, which is what `default` and `value`
+    carry: `bool` a boolean, `int`/`double` a number, `string` a string. */
+export const InfinitusPrefKind = Schema.Literals(["bool", "int", "double", "string"]);
+export type InfinitusPrefKind = typeof InfinitusPrefKind.Type;
+
+/** When a write takes hold: `live` right away, `restart` on the next launch. */
+export const InfinitusPrefEffect = Schema.Literals(["live", "restart"]);
+export type InfinitusPrefEffect = typeof InfinitusPrefEffect.Type;
+
+/** One group in the preference catalog; `slug` is what a pref's `section`
+    names, `name` is the heading a settings pane shows. */
+export const InfinitusPrefSection = Schema.Struct({
+  slug: Schema.String,
+  name: Schema.String,
+});
+export type InfinitusPrefSection = typeof InfinitusPrefSection.Type;
+
+/** One row of the `prefs` command's catalog. `default` and `value` are JSON
+    scalars whose runtime type is the one `type` names, so they stay unknown
+    here; `choices` is the closed set a string pref accepts, absent or null on
+    a pref that takes any value. */
+export const InfinitusPref = Schema.Struct({
+  key: Schema.String,
+  type: InfinitusPrefKind,
+  default: Schema.Unknown,
+  value: Schema.Unknown,
+  section: Schema.String,
+  effect: InfinitusPrefEffect,
+  choices: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.Unknown))),
+});
+export type InfinitusPref = typeof InfinitusPref.Type;
+
+/** The `prefs` command's reply: the whole preference catalog with its current
+    values. Absent from builds that predate the command. */
+export const InfinitusPrefs = Schema.Struct({
+  sections: Schema.Array(InfinitusPrefSection),
+  prefs: Schema.Array(InfinitusPref),
+});
+export type InfinitusPrefs = typeof InfinitusPrefs.Type;
+
 /** Everything one poll of the socket collects, assembled client-side from the
-    `status`, `fleets`, `forecast`, `sessions` and `manifest` commands.
-    `available: false` with an `unavailableReason` means the socket never
-    answered — no Infinitus running, or a different machine. */
+    `status`, `fleets`, `forecast`, `sessions`, `prefs` and `manifest`
+    commands. `available: false` with an `unavailableReason` means the socket
+    never answered — no Infinitus running, or a different machine — and then
+    every collected field is absent and both lists are empty. */
 export const InfinitusSnapshot = Schema.Struct({
   available: Schema.Boolean,
   unavailableReason: Schema.optionalKey(Schema.String),
@@ -167,9 +208,27 @@ export const InfinitusSnapshot = Schema.Struct({
   fleets: Schema.Array(InfinitusFleet),
   forecast: Schema.optionalKey(InfinitusForecast),
   sessions: Schema.Array(InfinitusSession),
+  prefs: Schema.optionalKey(InfinitusPrefs),
   commands: Schema.Array(InfinitusManifestCommand),
 });
 export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;
+
+/** One command call a client asks the server to forward. The same triple the
+    control request carries, minus `secret`: material read from stdin never
+    crosses the RPC boundary. */
+export const InfinitusCommandInput = Schema.Struct({
+  command: Schema.String,
+  args: Schema.Array(Schema.String),
+  options: Schema.Record(Schema.String, Schema.String),
+});
+export type InfinitusCommandInput = typeof InfinitusCommandInput.Type;
+
+/** What a forwarded command answered with: the reply's own `result`, opaque
+    at this layer. Absent for the commands that answer with no payload. */
+export const InfinitusCommandResult = Schema.Struct({
+  result: Schema.optionalKey(Schema.Unknown),
+});
+export type InfinitusCommandResult = typeof InfinitusCommandResult.Type;
 
 /** The control socket could not be reached at `path`. */
 export class InfinitusUnavailable extends Schema.TaggedError<InfinitusUnavailable>()(

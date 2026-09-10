@@ -24,6 +24,14 @@ import {
   HostPowerSnapshot,
 } from "./background.ts";
 import {
+  InfinitusCommandFailed,
+  InfinitusCommandInput,
+  InfinitusCommandResult,
+  InfinitusProtocolError,
+  InfinitusSnapshot,
+  InfinitusUnavailable,
+} from "./infinitus.ts";
+import {
   FilesystemBrowseInput,
   FilesystemBrowseResult,
   FilesystemBrowseError,
@@ -383,6 +391,10 @@ export const WS_METHODS = {
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeBackgroundPolicy: "subscribeBackgroundPolicy",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
+  subscribeInfinitus: "subscribeInfinitus",
+
+  // Infinitus methods
+  infinitusCommand: "infinitus.command",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -1197,6 +1209,28 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
   stream: true,
 });
 
+/** The whole Infinitus view, seeded with the current snapshot and followed by
+    every change. Unreachability is a snapshot with `available: false`, never a
+    stream failure: the app comes and goes while a client stays subscribed. */
+const WsSubscribeInfinitusRpc = Rpc.make(WS_METHODS.subscribeInfinitus, {
+  payload: Schema.Struct({}),
+  success: InfinitusSnapshot,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
+/** Forwards one command from the manifest to the control socket. */
+const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
+  payload: InfinitusCommandInput,
+  success: InfinitusCommandResult,
+  error: Schema.Union([
+    InfinitusUnavailable,
+    InfinitusProtocolError,
+    InfinitusCommandFailed,
+    EnvironmentAuthorizationError,
+  ]),
+});
+
 export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
@@ -1313,6 +1347,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeAuthAccessRpc,
   WsSubscribeBackgroundPolicyRpc,
   WsSubscribeResourceTelemetryRpc,
+  WsSubscribeInfinitusRpc,
+  WsInfinitusCommandRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetWorkflowScriptRpc,
   WsOrchestrationGetTurnDiffRpc,

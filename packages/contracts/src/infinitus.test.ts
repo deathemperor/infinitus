@@ -1,12 +1,17 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
+import { ExecutionEnvironmentCapabilities } from "./environment.ts";
 import {
+  InfinitusCommandInput,
+  InfinitusCommandResult,
   InfinitusControlReply,
   InfinitusForecast,
   InfinitusFleet,
   InfinitusManifest,
+  InfinitusPrefs,
   InfinitusSession,
+  InfinitusSnapshot,
   InfinitusStatus,
 } from "./infinitus.ts";
 
@@ -16,6 +21,15 @@ const decodeFleet = Schema.decodeUnknownSync(InfinitusFleet);
 const decodeForecast = Schema.decodeUnknownSync(InfinitusForecast);
 const decodeSession = Schema.decodeUnknownSync(InfinitusSession);
 const decodeManifest = Schema.decodeUnknownSync(InfinitusManifest);
+const decodePrefs = Schema.decodeUnknownSync(InfinitusPrefs);
+const decodeSnapshot = Schema.decodeUnknownSync(InfinitusSnapshot);
+const encodeSnapshot = Schema.encodeUnknownSync(InfinitusSnapshot);
+const decodeEncodedSnapshot = Schema.decodeSync(InfinitusSnapshot);
+const decodeCommandInput = Schema.decodeUnknownSync(InfinitusCommandInput);
+const encodeCommandInput = Schema.encodeUnknownSync(InfinitusCommandInput);
+const decodeCommandResult = Schema.decodeUnknownSync(InfinitusCommandResult);
+const encodeCommandResult = Schema.encodeUnknownSync(InfinitusCommandResult);
+const decodeCapabilities = Schema.decodeUnknownSync(ExecutionEnvironmentCapabilities);
 
 const status = {
   version: "0.4.3",
@@ -283,5 +297,156 @@ describe("InfinitusControlReply", () => {
 
   it("rejects a reply whose ok flag is not a boolean", () => {
     expect(() => decodeReply({ schemaVersion: 1, ok: "true" })).toThrow();
+  });
+});
+
+describe("InfinitusPrefs", () => {
+  it("decodes a catalog whose values are the scalars their type names", () => {
+    const decoded = decodePrefs({
+      sections: [
+        { slug: "general", name: "General" },
+        { slug: "popup", name: "Pop-out" },
+      ],
+      prefs: [
+        {
+          key: "launchAtLogin",
+          type: "bool",
+          default: false,
+          value: true,
+          section: "general",
+          effect: "restart",
+        },
+        {
+          key: "popupScale",
+          type: "double",
+          default: 1,
+          value: 1.25,
+          section: "popup",
+          effect: "live",
+        },
+        {
+          key: "badgeStyle",
+          type: "string",
+          default: "count",
+          value: "dot",
+          section: "popup",
+          effect: "live",
+          choices: ["count", "dot", "none"],
+        },
+      ],
+    });
+
+    expect(decoded.sections.map((section) => section.slug)).toEqual(["general", "popup"]);
+    expect(decoded.prefs[0]?.value).toBe(true);
+    expect(decoded.prefs[1]?.default).toBe(1);
+    expect(decoded.prefs[2]?.choices).toEqual(["count", "dot", "none"]);
+    // A pref that takes any value omits the key rather than sending [].
+    expect(decoded.prefs[0]?.choices).toBeUndefined();
+  });
+
+  it("accepts a null choices list, which older builds send instead of omitting", () => {
+    const decoded = decodePrefs({
+      sections: [],
+      prefs: [
+        {
+          key: "pollSeconds",
+          type: "int",
+          default: 30,
+          value: 30,
+          section: "general",
+          effect: "live",
+          choices: null,
+        },
+      ],
+    });
+
+    expect(decoded.prefs[0]?.choices).toBeNull();
+  });
+
+  it("rejects a pref whose type is not one of the four kinds", () => {
+    expect(() =>
+      decodePrefs({
+        sections: [],
+        prefs: [
+          { key: "x", type: "date", default: 0, value: 0, section: "general", effect: "live" },
+        ],
+      }),
+    ).toThrow();
+  });
+});
+
+describe("InfinitusSnapshot", () => {
+  it("expresses an unreachable app: no fields, empty lists, a reason", () => {
+    const decoded = decodeSnapshot({
+      available: false,
+      unavailableReason: "ENOENT",
+      fleets: [],
+      sessions: [],
+      commands: [],
+    });
+
+    expect(decoded.available).toBe(false);
+    expect(decoded.unavailableReason).toBe("ENOENT");
+    expect(decoded.status).toBeUndefined();
+    expect(decoded.forecast).toBeUndefined();
+    expect(decoded.prefs).toBeUndefined();
+  });
+
+  it("round-trips a reachable snapshot with prefs through the wire", () => {
+    const snapshot = decodeSnapshot({
+      available: true,
+      status,
+      fleets: [fleet],
+      sessions: [],
+      prefs: { sections: [{ slug: "general", name: "General" }], prefs: [] },
+      commands: [],
+    });
+
+    expect(decodeEncodedSnapshot(encodeSnapshot(snapshot))).toEqual(snapshot);
+    expect(snapshot.prefs?.sections[0]?.name).toBe("General");
+  });
+});
+
+describe("the RPC payloads", () => {
+  it("round-trips a command input", () => {
+    const input = decodeCommandInput({
+      command: "switch",
+      args: ["cswap/claude", "2"],
+      options: { yes: "true" },
+    });
+
+    expect(encodeCommandInput(input)).toEqual({
+      command: "switch",
+      args: ["cswap/claude", "2"],
+      options: { yes: "true" },
+    });
+  });
+
+  it("rejects a command input whose options are not strings", () => {
+    expect(() =>
+      decodeCommandInput({ command: "switch", args: [], options: { yes: true } }),
+    ).toThrow();
+  });
+
+  it("carries any result shape, and none at all", () => {
+    expect(decodeCommandResult({ result: { fleet: "cswap/claude" } }).result).toEqual({
+      fleet: "cswap/claude",
+    });
+    expect(decodeCommandResult({}).result).toBeUndefined();
+    expect(encodeCommandResult(decodeCommandResult({}))).toEqual({});
+  });
+});
+
+describe("the infinitus capability", () => {
+  it("decodes present, absent and false", () => {
+    expect(decodeCapabilities({ repositoryIdentity: true, infinitus: true }).infinitus).toBe(true);
+    expect(decodeCapabilities({ repositoryIdentity: true, infinitus: false }).infinitus).toBe(
+      false,
+    );
+    expect(decodeCapabilities({ repositoryIdentity: true }).infinitus).toBeUndefined();
+  });
+
+  it("rejects a non-boolean capability", () => {
+    expect(() => decodeCapabilities({ repositoryIdentity: true, infinitus: "yes" })).toThrow();
   });
 });
