@@ -1,0 +1,181 @@
+# The fork's own desktop release: a macOS arm64 DMG of `main`, published as a
+# GitHub prerelease tagged `v<version>-infinitus.<date>.<run>` on the
+# `infinitus` updater channel. Upstream's release.yml stays untouched (it also
+# publishes npm, AUR, web and marketing, and is disabled in this repo), and the
+# native Infinitus app's channels — `releases/latest` and the `nightly` tag —
+# are never written here.
+name: Fork desktop release
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a prerelease (off = build only, DMG as a workflow artifact)"
+        type: boolean
+        default: true
+
+jobs:
+  build_mac_arm64:
+    name: Build macOS arm64
+    runs-on: macos-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      - name: Install desktop dependencies
+        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+
+      - name: Cache resource monitor
+        id: resource_monitor_cache
+        uses: actions/cache@v6
+        with:
+          path: native/resource-monitor/target/aarch64-apple-darwin/release/t3-resource-monitor
+          key: resource-monitor-aarch64-apple-darwin-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
+
+      - name: Setup Rust
+        if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Resolve fork release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(node -p "require('./apps/desktop/package.json').version")
+          version="${base}-infinitus.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Building Infinitus Desktop $version." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Align package versions to release version
+        run: node scripts/update-release-package-versions.ts "${{ steps.version.outputs.version }}"
+
+      # The certificate and its password reach electron-builder through the
+      # build step's own env; only the notary key needs a file on disk, and
+      # `security cms` never sees it — notarytool reads the .p8 directly.
+      - name: Prepare macOS signing
+        id: signing
+        shell: bash
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEVELOPER_ID_P12_BASE64" || -z "$DEVELOPER_ID_P12_PASSWORD" ]]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "macOS signing disabled (no Developer ID certificate secret); building unsigned." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ -z "$NOTARY_KEY_BASE64" || -z "$NOTARY_KEY_ID" || -z "$NOTARY_ISSUER_ID" ]]; then
+            echo "A Developer ID certificate is configured but the notary key secrets are not." >&2
+            exit 1
+          fi
+
+          key_path="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 -D > "$key_path"
+          chmod 600 "$key_path"
+          echo "notary_key_path=$key_path" >> "$GITHUB_OUTPUT"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "macOS signing enabled (Developer ID + notarytool)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build desktop artifact
+        shell: bash
+        env:
+          # The updater feed is this repo, so the published prerelease is the
+          # one an installed fork build finds on the `infinitus` channel.
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
+          T3CODE_APPLE_TEAM_ID: Q783W6B4FA
+          CSC_LINK: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_API_KEY: ${{ steps.signing.outputs.notary_key_path }}
+          APPLE_API_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          APPLE_TEAM_ID: Q783W6B4FA
+        run: |
+          set -euo pipefail
+          args=(
+            --platform mac
+            --target dmg
+            --arch arm64
+            --build-version "${{ steps.version.outputs.version }}"
+            --verbose
+          )
+          if [[ "${{ steps.signing.outputs.signed }}" == "true" ]]; then
+            args+=(--signed)
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+
+          vp run dist:desktop:artifact "${args[@]}"
+
+      # The DMG installs the app; the zip and `infinitus-mac.yml` are what
+      # electron-updater downloads for an in-place update on the `infinitus`
+      # channel. One arch, so no per-arch manifest renaming or merging.
+      - name: Collect release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-publish
+
+          shopt -s nullglob
+          for pattern in \
+            "release/*.dmg" \
+            "release/*.zip" \
+            "release/*.blockmap" \
+            "release/infinitus-mac.yml"; do
+            for file in $pattern; do
+              cp "$file" release-publish/
+            done
+          done
+
+          if [[ ! -f release-publish/infinitus-mac.yml ]]; then
+            echo "electron-builder wrote no infinitus-mac.yml; the update feed would be broken." >&2
+            ls -1 release >&2
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: infinitus-desktop-mac-arm64
+          path: release-publish/*
+          if-no-files-found: error
+
+      - name: Publish prerelease
+        if: ${{ inputs.publish }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Infinitus Desktop ${VERSION} (${GITHUB_SHA::7})" \
+            --notes "Fork desktop build of main at ${GITHUB_SHA::7}; installs beside T3 Code and auto-updates on the infinitus channel." \
+            release-publish/*
+          echo "Published prerelease $TAG." >> "$GITHUB_STEP_SUMMARY"

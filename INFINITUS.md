@@ -30,7 +30,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - **Fork releases are GitHub prereleases with their own tag scheme.**
   Installed native apps poll `releases/latest` and the `nightly` tag; those
   stay native forever. Never publish a fork release as latest, never tag
-  `nightly` from `main`.
+  `nightly` from `main`. The fork's desktop releases are prereleases tagged
+  `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
+  channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
@@ -187,3 +189,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
   branch).
+
+- `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
+  manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
+  prerelease (upstream's release.yml stays disabled and untouched).
