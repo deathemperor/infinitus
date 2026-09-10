@@ -1181,39 +1181,102 @@ final class AppModel: ObservableObject {
         try PrefCatalog.reply(from: defaults, keys: keys)
     }
 
+    /// One preference written and taken live (#558 write side): the
+    /// engine toggles go through their own setters, whose `didSet`
+    /// relaunches the app, with the `engine` command's guards; every
+    /// other key is stored and re-read by `reloadPrefs`, so its `didSet`
+    /// side effects (the LAN listener, keep-awake, the title) run as
+    /// they do from the panes. Returns the updated pref and whether the
+    /// app is relaunching behind the reply.
+    func setPref(key: String, value: JSONValue) throws -> (pref: PrefCatalog.Pref, restarting: Bool) {
+        let entry = try PrefCatalog.validate(key: key, value: value)
+        if entry.effect == .restart, case .bool(let on) = value,
+           let engine = Self.enginePrefs[key] {
+            let changed = try setEngineEnabled(engine, on: on)
+            return (PrefCatalog.pref(entry, in: defaults), changed)
+        }
+        let pref = try PrefCatalog.write(value, key: key, to: defaults)
+        reloadPrefs()
+        return (pref, false)
+    }
+
+    static let enginePrefs = ["engine_cswap_enabled": "cswap", "engine_swapd_enabled": "swapd",
+                              "engine_cliproxy_enabled": "cliproxy", "engine_9router_enabled": "9router"]
+
+    /// `engine <id> on|off` and `prefs set engine_<id>_enabled`: the
+    /// toggle behind the same guards; true when it changed (the setter's
+    /// `didSet` then relaunches), false when it already was so.
+    func setEngineEnabled(_ engine: String, on: Bool) throws -> Bool {
+        switch engine {
+        case "cswap":
+            guard cswap != nil || !on else { throw PrefCatalog.Violation(key: "engine_cswap_enabled", message: "cswap is not installed") }
+            guard cswapEnabled != on else { return false }
+            cswapEnabled = on
+        case "swapd":
+            guard swapd != nil || !on else { throw PrefCatalog.Violation(key: "engine_swapd_enabled", message: "swapd is not installed") }
+            guard swapdEnabled != on else { return false }
+            swapdEnabled = on
+        case "cliproxy":
+            guard cliproxyKeyPresent || !on else { throw PrefCatalog.Violation(key: "engine_cliproxy_enabled", message: "store a management key first (proxy-key)") }
+            guard cliproxyEnabled != on else { return false }
+            cliproxyEnabled = on
+        case "9router":
+            guard nineRouterEnabled != on else { return false }
+            nineRouterEnabled = on
+        default:
+            throw PrefCatalog.Violation(key: engine, message: "unknown engine \(engine)")
+        }
+        return true
+    }
+
+    /// Every pref re-read from defaults (an iCloud apply, `prefs set`).
+    /// Each property is assigned only when its value moved: a `didSet`
+    /// that re-applies its state — the LAN listener, the revival panel,
+    /// the theme's layers — must not run for the thirty-odd keys a
+    /// one-key write leaves alone (an e2e `prefs set popup_layout` cost
+    /// 40 MB of RSS through the untouched didSets, 2026-09-10).
     func reloadPrefs() {
-        showAccountName = defaults.object(forKey: "show_account_name") as? Bool ?? true
+        func set<T: Equatable>(_ path: ReferenceWritableKeyPath<AppModel, T>, _ value: T) {
+            if self[keyPath: path] != value { self[keyPath: path] = value }
+        }
+        set(\.showAccountName, defaults.object(forKey: "show_account_name") as? Bool ?? true)
         let pct = defaults.string(forKey: "title_pct") ?? "both"
-        titlePct = TitlePrefs.pctChoices.contains(pct) ? pct : "both"
-        titleScoped = defaults.object(forKey: "title_scoped") as? Bool ?? false
+        set(\.titlePct, TitlePrefs.pctChoices.contains(pct) ? pct : "both")
+        set(\.titleScoped, defaults.object(forKey: "title_scoped") as? Bool ?? false)
         let interval = defaults.object(forKey: "refresh_interval") as? Int ?? 60
-        refreshInterval = TitlePrefs.refreshChoices.contains(interval) ? interval : 60
-        gamification = defaults.string(forKey: "gamification_style") ?? "off"
-        compactRows = defaults.object(forKey: "compact_rows") as? Bool ?? false
-        footerActionsHidden = defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false
-        titleRemaining = defaults.object(forKey: "title_remaining") as? Bool ?? false
+        set(\.refreshInterval, TitlePrefs.refreshChoices.contains(interval) ? interval : 60)
+        set(\.gamification, defaults.string(forKey: "gamification_style") ?? "off")
+        set(\.compactRows, defaults.object(forKey: "compact_rows") as? Bool ?? false)
+        set(\.footerActionsHidden, defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false)
+        set(\.titleRemaining, defaults.object(forKey: "title_remaining") as? Bool ?? false)
         let reset = defaults.string(forKey: "title_reset") ?? "countdown"
-        titleReset = TitlePrefs.resetChoices.contains(reset) ? reset : "countdown"
-        titleIconOnly = defaults.object(forKey: "title_icon_only") as? Bool ?? false
-        popupLayout = defaults.string(forKey: "popup_layout") ?? "wide"
-        popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
-        glassFocused = defaults.object(forKey: "glass_focused") as? Double ?? 0.7
-        keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
-        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
-        popupSort = Self.popupSort(defaults)
-        pushSessionsDone = defaults.object(forKey: "push_sessions_done") as? Bool ?? true
-        pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
-        pushLastAlive = defaults.object(forKey: "push_last_alive") as? Bool ?? true
-        pushWaiting = defaults.object(forKey: "push_waiting") as? Bool ?? true
-        pushAwsLogin = defaults.object(forKey: "push_aws_login") as? Bool ?? true
-        pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
-        reviveLeadMinutes = defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10
-        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
-        machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
-        sessionHost = defaults.string(forKey: "session_host") ?? "auto"
-        checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
-        menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
-        menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
+        set(\.titleReset, TitlePrefs.resetChoices.contains(reset) ? reset : "countdown")
+        set(\.titleIconOnly, defaults.object(forKey: "title_icon_only") as? Bool ?? false)
+        set(\.popupLayout, defaults.string(forKey: "popup_layout") ?? "wide")
+        set(\.popupTextSize, defaults.string(forKey: "popup_text_size") ?? "default")
+        set(\.glassFocused, defaults.object(forKey: "glass_focused") as? Double ?? 0.7)
+        set(\.keepAwake, defaults.object(forKey: "keep_awake") as? Bool ?? false)
+        set(\.keepAwakeDisplay, defaults.object(forKey: "keep_awake_display") as? Bool ?? true)
+        set(\.popupSort, Self.popupSort(defaults))
+        set(\.pushSessionsDone, defaults.object(forKey: "push_sessions_done") as? Bool ?? true)
+        set(\.pushAllDead, defaults.object(forKey: "push_all_dead") as? Bool ?? true)
+        set(\.pushLastAlive, defaults.object(forKey: "push_last_alive") as? Bool ?? true)
+        set(\.pushWaiting, defaults.object(forKey: "push_waiting") as? Bool ?? true)
+        set(\.pushAwsLogin, defaults.object(forKey: "push_aws_login") as? Bool ?? true)
+        set(\.pushRevived, defaults.object(forKey: "push_revived") as? Bool ?? true)
+        set(\.reviveLeadMinutes, defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10)
+        set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
+        set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
+        set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
+        set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
+        set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
+        set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
+        set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
+        set(\.revivalPanelShown, defaults.object(forKey: "revival_panel") as? Bool ?? true)
+        set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)
+        set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
+        set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
+        set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
     }
 
     /// Playground reset (user 2026-08-31): wipe the sandbox suite so
@@ -1490,6 +1553,20 @@ final class AppModel: ObservableObject {
         // UserDefaults is thread-safe; the closure only reads it.
         nonisolated(unsafe) let prefDefaults = defaults
         mirrorServer.prefs.set { try PrefCatalog.reply(from: prefDefaults) }
+        mirrorServer.prefs.setWrite { [weak self] write in
+            // The box is synchronous and off-main; the write and its
+            // reload touch published state, so it hops to the main actor
+            // and waits (the session-start box does the same).
+            let done = DispatchSemaphore(value: 0)
+            nonisolated(unsafe) var outcome: Result<PrefCatalog.Pref, Error> =
+                .failure(PrefCatalog.Violation(key: write.key, message: "app gone"))
+            Task { @MainActor in
+                if let self { outcome = Result { try self.setPref(key: write.key, value: write.value).pref } }
+                done.signal()
+            }
+            done.wait()
+            return try outcome.get()
+        }
         mirrorServer.pastSessions.set { limit, search in
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                                            limit: limit, search: search))

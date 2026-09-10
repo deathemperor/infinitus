@@ -407,6 +407,12 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 # The preference catalog (#558): the table with values, and `get` narrowed.
 "$CTL" prefs | expect "any(s['slug']=='display' and s['name']=='Display' for s in d['sections']) and any(p['key']=='popup_layout' and p['section']=='display' and p['effect']=='live' for p in d['prefs'])" || fail "prefs"
 "$CTL" prefs get popup_layout engine_cswap_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_cswap_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
+# A key with no window behind it: a layout swap here would re-lay the
+# pop-out twice and leave ~45 MB resident before the RSS gate (2026-09-10).
+"$CTL" prefs set revive_lead_minutes 15 | expect "d['key']=='revive_lead_minutes' and d['value']==15" || fail "prefs set"
+"$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
+"$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
+"$CTL" prefs set revive_lead_minutes 10 | expect "d['value']==10" || fail "prefs set back"
 echo "prefs: ok"
 
 # --- scenarios: all-dead (every window maxed, no candidate) --------------

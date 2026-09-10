@@ -104,6 +104,7 @@ publishes the matching section as the GitHub release body.
 - The five-minute stats refresh sums again only the days a changed transcript touches instead of every file's, a second of CPU less per pass (#499).
 - `infinitusctl hide settings` closes the Settings window; the e2e gate measures idle CPU with Settings open.
 - `infinitusctl prefs` (and the phone route `GET /prefs`) lists every preference with its type, default, current value, Settings section and whether a change is live or needs a relaunch (#558).
+- `infinitusctl prefs set <key> <value>` (and `POST /prefs`) changes one preference, refuses a wrong type or an unlisted choice, takes it live at once, and relaunches for an engine toggle (#558).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

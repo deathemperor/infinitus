@@ -70,6 +70,8 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("hide")?.args, ["popout|settings|workspace"])
         XCTAssertEqual(ControlCommand.named("prefs")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("prefs")?.args, ["[get <key>...]"])
+        XCTAssertEqual(ControlCommand.named("prefs-set")?.effect, .write)
+        XCTAssertEqual(ControlCommand.named("prefs-set")?.args, ["<key>", "<value>"])
         XCTAssertNotNil(ControlCommand.named("team-code")); XCTAssertNotNil(ControlCommand.named("team-fetch")); XCTAssertNotNil(ControlCommand.named("team-decline"))
         XCTAssertNil(ControlCommand.named("nope"))
     }
