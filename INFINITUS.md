@@ -122,7 +122,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
 ## Fork-only files
 
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines, Profiles) and their pure logic.
+  (preferences, Engines, Profiles) and their pure logic, and the Devices
+  pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
+  a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
+  quick tunnel (`status.forkTunnel`, #572) while it is up, else the page's
+  LAN origin. It is mounted through the prefs panel's `footer` slot from
+  `routes/settings.infinitus.devices.tsx`; no route of its own.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
