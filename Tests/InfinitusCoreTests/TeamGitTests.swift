@@ -174,6 +174,9 @@ final class TeamGitTests: XCTestCase {
     /// took its two pipe ends along — 1,300 descriptors into the Team
     /// suites, Process.run's /proc/self/fd walk overran its buffer.
     func testAGitCallLeavesNoDescriptorBehind() throws {
+        #if os(Windows)
+        throw XCTSkip("no /dev/fd to count")
+        #endif
         let remote = try makeRemote()
         let g = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
         try g.open()   // the first calls also start Process's monitor thread

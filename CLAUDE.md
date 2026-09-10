@@ -146,6 +146,15 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   push `e2` → `gh pr create --base main --head e2` → tests → `gh pr
   merge --merge` → `git pull` main → rebuild → relaunch. Never edit the
   other session's tree; in either tree stage by explicit path.
+- Linux corelibs `Process`: one waited on through its `terminationHandler`
+  alone is never freed — its run-loop source retains it back and
+  `CFRunLoopSourceInvalidate` keeps that context on purpose; only
+  `waitUntilExit()` (instant once the child is gone) clears the source.
+  Every leaked child keeps two pipe ends, and at ~1,300 descriptors
+  `Process.run()`'s `/proc/self/fd` walk reads past its readdir buffer
+  (signal 11, #510; upstream fix not in any shipped toolchain). Darwin's
+  Foundation has neither problem. `.github/workflows/linux-sanitize.yml`
+  runs the suite under ASan on demand.
 
 ## Release
 - Every release updates **site/** (infinitus.run) and the **GitHub
