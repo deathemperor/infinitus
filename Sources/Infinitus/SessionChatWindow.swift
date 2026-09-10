@@ -96,6 +96,9 @@ final class SessionChatStore: ObservableObject {
         let box = model?.ownedBox
         loop = Task.detached(priority: .utility) { [pid, weak self] in
             var since: String?
+            // The held window (#346): each wake decodes only the lines the
+            // transcript gained, not a fresh 4 MB read for 200 items.
+            var tail: SessionTail?
             while !Task.isCancelled {
                 let claudeDir = ClaudeSessions.configHome()
                 // An owned session's prompts live in memory, not the
@@ -111,7 +114,7 @@ final class SessionChatStore: ObservableObject {
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     continue
                 }
-                var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 200)
+                var feed = SessionFeedReader.read(record: record, claudeDir: claudeDir, limit: 200, tail: &tail)
                 if let owned, let f = feed { feed = OwnedFeed.augment(f, pending: owned.pending(pid: pid), limits: owned.limits(pid: pid)) }
                 if let feed, feed.stamp != since || since == nil {
                     since = feed.stamp
