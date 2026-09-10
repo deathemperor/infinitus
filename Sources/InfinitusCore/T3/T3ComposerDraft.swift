@@ -117,6 +117,22 @@ public enum T3ComposerDrafts {
         return out
     }
 
+    // MARK: - Insertion at the end
+
+    /// `insertComposerText(text, "end", { ensureLeadingBoundary: true })`
+    /// (`ChatComposer.tsx:4594-4599`): the insertion goes after everything
+    /// typed, and one space is prepended unless the prompt already ends on
+    /// whitespace — so a mention never fuses onto the last word.
+    ///
+    /// Upstream also widens the replaced range over a space that FOLLOWS the
+    /// cursor (`extendReplacementRangeForTrailingSpace`, `:928-937`); at the
+    /// end of the prompt nothing follows it, so that step is a no-op here.
+    public static func appendingAtEnd(_ text: String, to prompt: String) -> String {
+        guard !text.isEmpty else { return prompt }
+        let needsLeadingSpace = prompt.last.map { !$0.isWhitespace } ?? false
+        return needsLeadingSpace ? prompt + " " + text : prompt + text
+    }
+
     // MARK: - Prompt recall
 
     /// The sent prompt at the front, newest first, one entry per distinct

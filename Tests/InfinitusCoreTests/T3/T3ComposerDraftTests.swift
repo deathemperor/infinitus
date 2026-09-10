@@ -184,6 +184,34 @@ final class T3ComposerDraftTests: XCTestCase {
         }
     }
 
+    // MARK: - appendingAtEnd
+
+    /// `ensureLeadingBoundary` (`ChatComposer.tsx:4596-4599`): a space goes in
+    /// only when the prompt ends on a non-blank, so the mention stands alone.
+    func testAppendingAtEndAddsOneLeadingSpaceAfterAWord() {
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("@a.swift ", to: "look at"),
+                       "look at @a.swift ")
+    }
+
+    func testAppendingAtEndAddsNothingToAnEmptyPromptOrAfterWhitespace() {
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("@a.swift ", to: ""), "@a.swift ")
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("@a.swift ", to: "look at "),
+                       "look at @a.swift ")
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("@a.swift ", to: "look at\n"),
+                       "look at\n@a.swift ")
+    }
+
+    /// Two mentions in a row each keep their own boundary.
+    func testAppendingAtEndTwiceSpacesTheMentionsApart() {
+        let once = T3ComposerDrafts.appendingAtEnd("@a.swift ", to: "diff")
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("@b.swift ", to: once),
+                       "diff @a.swift @b.swift ")
+    }
+
+    func testAppendingNothingLeavesThePromptAlone() {
+        XCTAssertEqual(T3ComposerDrafts.appendingAtEnd("", to: "typed"), "typed")
+    }
+
     // MARK: - Prompt recall
 
     func testStepHistoryBackwardFromAFreshComposer() {

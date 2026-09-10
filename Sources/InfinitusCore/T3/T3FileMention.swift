@@ -102,7 +102,25 @@ public enum T3FileMention: Sendable {
     /// (`serializeComposerFileLink`, `composerTrigger.ts:29-32`) because its
     /// composer renders one; the consumer here is Claude Code, whose mention
     /// syntax IS `@<path>`, so the bare path is what goes in.
+    ///
+    /// The trailing space is upstream's too — the file browser's "Add to chat"
+    /// and its mention drop both insert `` `${mention} ` ``
+    /// (`FileBrowserPanel.tsx:184`, `composerMentionDrag.ts:93`).
     public static func insertion(for path: String) -> String { "@\(path) " }
+
+    /// The mention text on its own, for a path out of the file tree —
+    /// `composerMentionFromTreePath` (`composerMentionDrag.ts:10-16`): a
+    /// directory's tree path ends in `/` and the mention never does, and a path
+    /// that is nothing but separators has no mention (`nil`). What the Files
+    /// tab's "Copy mention" puts on the pasteboard (`FileBrowserPanel.tsx:164`,
+    /// with no trailing space — unlike `insertion` above) and what a dragged
+    /// row carries (`fileTreeDragMention.ts:76-83`).
+    public static func mention(forTreePath treePath: String) -> String? {
+        var path = treePath
+        while path.hasSuffix("/") { path.removeLast() }
+        guard !path.isEmpty else { return nil }
+        return "@\(path)"
+    }
 
 
     // MARK: - Ranking

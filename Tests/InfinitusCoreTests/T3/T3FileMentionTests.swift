@@ -147,4 +147,23 @@ final class T3FileMentionTests: XCTestCase {
     func testTheInsertionIsTheAtPathAndASpace() {
         XCTAssertEqual(T3FileMention.insertion(for: "Sources/a.swift"), "@Sources/a.swift ")
     }
+
+    /// `composerMentionFromTreePath` (`composerMentionDrag.ts:10-16`): the
+    /// mention on its own, no trailing space — what "Copy mention" copies
+    /// (`FileBrowserPanel.tsx:164`).
+    func testTheMentionForAFilesTreePathHasNoTrailingSpace() {
+        XCTAssertEqual(T3FileMention.mention(forTreePath: "Sources/a.swift"), "@Sources/a.swift")
+    }
+
+    /// A folder's tree path ends in `/` upstream (`treePath`,
+    /// `FileBrowserPanel.tsx:42-44`) and its mention never does (`:145`).
+    func testAFoldersTrailingSlashesAreDropped() {
+        XCTAssertEqual(T3FileMention.mention(forTreePath: "Sources/"), "@Sources")
+        XCTAssertEqual(T3FileMention.mention(forTreePath: "Sources//"), "@Sources")
+    }
+
+    func testAPathOfNothingButSeparatorsHasNoMention() {
+        XCTAssertNil(T3FileMention.mention(forTreePath: ""))
+        XCTAssertNil(T3FileMention.mention(forTreePath: "/"))
+    }
 }

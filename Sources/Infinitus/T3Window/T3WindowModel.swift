@@ -716,6 +716,15 @@ final class T3WindowModel: ObservableObject {
     let draftStart = T3DraftStart()
     func isStarting(_ draftId: String) -> Bool { draftStart.starting.contains(draftId) }
 
+    /// The Files tab's way into the open composer — upstream's composer ref
+    /// (`useComposerHandleContext`, `FileBrowserPanel.tsx:106`, used by "Add to
+    /// chat" at `:175-192`). Its own tiny observable rather than a `@Published`
+    /// on this model, and for a load-bearing reason: the composer holds the
+    /// model as a plain `let` so a fleet tick never re-runs its body
+    /// (T3ComposerView.swift:44-47), which also means a publish HERE would
+    /// never reach it. `T3DraftStart` above is passed for the same reason.
+    let composerInbox = T3ComposerInbox()
+
     /// `startNewThreadFromContext` (`Sidebar.tsx:4251-4270`): a draft in the
     /// project you are in. `projectId` forces one (⌘⇧N, upstream's
     /// `chat.newLocal`); nil resolves the selected thread's project, then the
@@ -890,6 +899,23 @@ final class T3WindowModel: ObservableObject {
                                         attentionStore: attentionStore, ownedBox: ownedBox)
         }
     }
+}
+
+/// What another panel hands the open composer, on the same terms as
+/// `T3DraftStart` below: its own `ObservableObject`, so the composer observes
+/// exactly this and nothing that ticks.
+///
+/// One slot, cleared as soon as the composer takes it. Upstream's equivalent is
+/// a direct call on the composer's handle
+/// (`composer.insertTextAtEnd`, `FileBrowserPanel.tsx:184`); a SwiftUI view has
+/// no handle to call, so the value waits here for the frame the composer reads
+/// it in.
+@MainActor
+final class T3ComposerInbox: ObservableObject {
+    /// A file mention (`@<path>`) to append at the end of the draft.
+    @Published var mention: String?
+
+    nonisolated init() {}
 }
 
 /// The drafts' start state (fix 1): which starts are in flight and what the

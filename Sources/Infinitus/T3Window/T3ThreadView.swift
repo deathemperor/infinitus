@@ -104,7 +104,8 @@ struct T3ThreadView: View {
             }
             VStack(spacing: 0) {
                 T3DraftNoteSlot(draftStart: model.draftStart, draftId: target.draftId)
-                T3ComposerView(model: model, app: app, store: store, actions: actions,
+                T3ComposerView(model: model, app: app, inbox: model.composerInbox,
+                               store: store, actions: actions,
                                draftTarget: target, draftStart: model.draftStart)
                 branchLine
             }
@@ -278,7 +279,8 @@ struct T3ThreadView: View {
             // The composer under the drawers, sharing this view's `actions` —
             // one sender per thread (`T3ThreadActions`' `sending` guard), so a
             // verdict and a message can never race.
-            T3ComposerView(model: model, app: app, store: store, actions: actions,
+            T3ComposerView(model: model, app: app, inbox: model.composerInbox,
+                           store: store, actions: actions,
                            draftStart: model.draftStart)
                 // `[data-chat-composer-main-surface="true"]` (`:5313`).
                 .onGeometryChange(for: Double.self) { $0.frame(in: .named(t3TimelineSpace)).minY } action: {
