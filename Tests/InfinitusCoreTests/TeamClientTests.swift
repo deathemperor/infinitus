@@ -5,19 +5,6 @@ final class TeamClientTests: XCTestCase {
     var scratch: URL!
 
     override func setUpWithError() throws {
-        #if os(Linux)
-        // DIAGNOSTIC (linux-asan branch only): how many descriptors the test
-        // process holds, by kind, when each test starts.
-        let fds = (try? FileManager.default.contentsOfDirectory(atPath: "/proc/self/fd")) ?? []
-        var kinds: [String: Int] = [:]
-        for fd in fds {
-            let target = (try? FileManager.default.destinationOfSymbolicLink(atPath: "/proc/self/fd/\(fd)")) ?? "?"
-            let kind = target.hasPrefix("pipe:") ? "pipe" : target.hasPrefix("socket:") ? "socket"
-                : target.hasPrefix("anon_inode") ? target : target.hasPrefix("/dev") ? "dev" : "file"
-            kinds[kind, default: 0] += 1
-        }
-        print("FDCOUNT \(fds.count) \(kinds.sorted { $0.key < $1.key })")
-        #endif
         scratch = FileManager.default.temporaryDirectory.appendingPathComponent("teamclient-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
     }

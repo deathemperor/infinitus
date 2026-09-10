@@ -5,7 +5,7 @@ name: Linux sanitize
 # no Swift frames — while the same suites pass on aarch64. The same
 # `swift test` under AddressSanitizer, repeated, names the copy that
 # runs off the heap or into freed memory. Runs on a PR that touches
-# this file and on demand; never a required check. (diag run 1)
+# this file and on demand; never a required check. (run 2: the fix)
 on:
   workflow_dispatch:
     inputs:
