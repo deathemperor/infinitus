@@ -694,6 +694,7 @@ grep -q 'hello from Bo via the store' "$INBOX" \
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
     | expect "sorted(r['outcome'] for r in d)==['delivered','noGrant']" || fail "acks (got: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 300))"
 "$CTL" team revoke "$ANN_GRANT" | expect "d['removed']" || fail "ann revoke"
+"$CTL" events --limit 100 | expect "d and all(e['id'] and e['kind'] for e in d) and any(e['kind']=='team-control' and e['icon']=='person.2' for e in d)" || fail "events rows carry id and kind (#615)"
 echo "team control: ok (grantor + store-lane driver)"
 
 # --- performance --------------------------------------------------------

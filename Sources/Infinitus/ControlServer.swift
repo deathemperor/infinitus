@@ -587,8 +587,13 @@ final class ControlServer {
             // usage-history (2026-09-04 "auto switch hell").
             let limit = Int(r.options["limit"] ?? "") ?? 100
             let rows = model.eventLog.suffix(max(0, limit)).map { e in
-                ["at": JSONValue.string(ISO8601DateFormatter().string(from: e.at)),
-                 "icon": .string(e.icon), "text": .string(e.text)]
+                // `kind` is the durable log's vocabulary (switch, limit,
+                // revival, nudge, team…) and `id` holds for this app run,
+                // so a consumer classifies and dedupes without reading
+                // icons or text (#615).
+                ["id": JSONValue.string(e.id.uuidString),
+                 "at": .string(ISO8601DateFormatter().string(from: e.at)),
+                 "kind": .string(e.kind), "icon": .string(e.icon), "text": .string(e.text)]
             }
             return ControlReply(ok: true, result: .array(rows.map(JSONValue.object)))
 
