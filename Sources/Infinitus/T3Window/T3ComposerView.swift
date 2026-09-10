@@ -71,7 +71,7 @@ struct T3ComposerView: View {
     /// the sidebar and the top bar (the very cost T3ThreadView.swift:37-41
     /// avoids). `model.setDraft` debounces the persistence instead.
     @State private var draft = T3ComposerDraft()
-    /// A one-shot focus request handed to the field (`model.composerFocusRequested`).
+    /// A one-shot focus request handed to the field (`inbox`'s `.focus` delivery).
     @State private var focusRequest = false
     /// Messages this composer sent while a turn was running and has not yet
     /// seen come back as a user message — the badge's count. Ours: upstream
@@ -219,8 +219,11 @@ struct T3ComposerView: View {
             // A restored draft is typed-into at its end, not at its start.
             caretRequest = draft.text.utf16.count
             // The window was opened straight at the composer, or reopened
-            // while the request was still pending.
-            if model.composerFocusRequested { consumeFocusRequest() } else { focusRequest = true }
+            // while a `.focus` delivery was still pending — a remount
+            // always takes focus anyway (below), so this only takes the
+            // slot, the one-shot rule every other kind here follows too.
+            if inbox.delivery?.kind == .focus { _ = inbox.take() }
+            focusRequest = true
             // After the draft is in hand, never before: `stage` appends to it.
             consumeFileDrops()
         }
@@ -230,18 +233,18 @@ struct T3ComposerView: View {
             model.flushDraft(draft, for: store.threadId)
         }
         .onChange(of: draft) { _, new in model.setDraft(new, for: store.threadId) }
-        .onChange(of: model.composerFocusRequested) { _, requested in
-            if requested { consumeFocusRequest() }
-        }
-        // Three producers share this one slot (#528): the plan card's Edit —
-        // `ComposerPrimaryActions.tsx:166-181`'s "Refine" — the Files tab's
-        // "Add to chat" (`FileBrowserPanel.tsx:175-192`), and a sidebar row's
-        // drop onto the thread that is ALREADY open, which has no remount to
-        // carry it (upstream's own `pendingSidebarFileDrops` effect,
-        // `ChatView.tsx:7876-7918`). `model` is a plain `let` here
-        // (T3ThreadView.swift:37-41), so only `inbox` — its own tiny
-        // `ObservableObject` — can wake this view outside a re-render that
-        // was already happening for some other reason.
+        // Four producers share this one slot (#528, B-38): the plan card's
+        // Edit — `ComposerPrimaryActions.tsx:166-181`'s "Refine" — the Files
+        // tab's "Add to chat" (`FileBrowserPanel.tsx:175-192`), a sidebar
+        // row's drop onto the thread that is ALREADY open, which has no
+        // remount to carry it (upstream's own `pendingSidebarFileDrops`
+        // effect, `ChatView.tsx:7876-7918`), and a focus request that lands
+        // on a composer already mounted on the target thread (`show
+        // workspace composer`, ⌘N) — the last channel that used to read
+        // `model.composerFocusRequested` straight, unobserved. `model` is a
+        // plain `let` here (T3ThreadView.swift:37-41), so only `inbox` —
+        // its own tiny `ObservableObject` — can wake this view outside a
+        // re-render that was already happening for some other reason.
         .onChange(of: inbox.delivery) { _, new in
             // `new == nil` is `take()` clearing the slot below — skip it, or
             // every delivery would re-run this closure twice.
@@ -255,6 +258,8 @@ struct T3ComposerView: View {
                 appendMention(mention)
             case .fileDrop:
                 consumeFileDrops()
+            case .focus:
+                focusRequest = true
             }
         }
         .onChange(of: store.timeline) { _, timeline in drain(timeline) }
@@ -738,12 +743,6 @@ struct T3ComposerView: View {
     }
 
     // MARK: - Focus, insertion and recall
-
-    private func consumeFocusRequest() {
-        focusRequest = true
-        // One-shot (`T3WindowModel.applyFocusedScreen`, :48).
-        model.composerFocusRequested = false
-    }
 
     /// A panel's text into the draft: appended to whatever is already typed,
     /// the way upstream's "Refine" leaves the draft alone and adds to it.

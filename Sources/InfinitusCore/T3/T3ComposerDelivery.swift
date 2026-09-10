@@ -8,13 +8,17 @@ import Foundation
 /// fresh event, payload aside.
 public struct T3ComposerDelivery: Equatable, Sendable {
     /// What landed: the plan card's Refine text (Task 12), the Files tab's
-    /// "Add to chat" mention (B-32), or a sidebar drop's signal — the
+    /// "Add to chat" mention (B-32), a sidebar drop's signal — the
     /// drop's own files stay queued on `T3WindowModel.pendingFileDrops`
-    /// keyed by thread, so this case carries no payload of its own.
+    /// keyed by thread, so this case carries no payload of its own — or a
+    /// request to take the caret (#528's last channel, B-38): `show
+    /// workspace composer` and a new draft both used to flip an unobserved
+    /// model flag the composer only saw when something else redrew it.
     public enum Kind: Equatable, Sendable {
         case insert(String)
         case mention(String)
         case fileDrop
+        case focus
     }
 
     public let kind: Kind
