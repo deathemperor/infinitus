@@ -86,7 +86,9 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     /// socket, so the plugin's `UserPromptSubmit` hook writes a Linux
     /// session's checkpoints through `Checkpoints.snapshot` the way the
     /// Mac's hook path does, and the ladder the tray already served has
-    /// something in it. Explicit `false` for the rest, not the nil the
+    /// something in it. `attention` and `images` are true since slice 4:
+    /// the tray answers both routes through the same Core deciders.
+    /// Explicit `false` for the rest, not the nil the
     /// struct also accepts as "unknown", so a phone comparing builds sees a
     /// considered no rather than an older tray that predates the field.
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
