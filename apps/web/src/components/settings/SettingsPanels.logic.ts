@@ -355,7 +355,19 @@ export interface DesktopUpdateTrackRow {
  * Stable and Nightly tracks would hand it the real T3 Code on the next update,
  * with no way back. So the fork shows its own track and offers no switch.
  */
-export function resolveDesktopUpdateTrackRow(channel: DesktopUpdateChannel): DesktopUpdateTrackRow {
+export function resolveDesktopUpdateTrackRow(
+  channel: DesktopUpdateChannel | null,
+): DesktopUpdateTrackRow {
+  if (channel === null) {
+    // The bridge has not reported a track yet (or its read failed). Offering a
+    // switch here would let a fork build leave the `infinitus` channel before
+    // anything knows it is on it.
+    return {
+      label: "Checking…",
+      description: "Use stable releases or nightly builds. Switch back anytime.",
+      switchable: false,
+    };
+  }
   if (channel === "infinitus") {
     return {
       label: PRODUCT_NAME,

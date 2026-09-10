@@ -254,7 +254,7 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
-  const updateTrackRow = resolveDesktopUpdateTrackRow(selectedUpdateChannel);
+  const updateTrackRow = resolveDesktopUpdateTrackRow(updateState?.channel ?? null);
   const selectedHostedAppChannel = hasDesktopBridge ? null : HOSTED_APP_CHANNEL;
 
   const handleUpdateChannelChange = useCallback(
