@@ -24,6 +24,7 @@ publishes the matching section as the GitHub release body.
 - An owned session that exits no longer leaves its process and pipe ends behind on Linux, the same leak as the git one.
 
 ### Mac
+- A Cloudflare quick tunnel can front the T3 Code fork server's port (`fork_tunnel_enabled`, `fork_server_port` under Devices), and `infinitusctl status` reports its state and public URL for the fork's pairing QR (#572).
 - swapd engine: a Gemini CLI fleet shows beside the Claude one when swapd reports it, its per-model quota as named gauges.
 - Workspace: a terminal drawer under the thread, resizable, showing the same shells as the Terminal tab.
 - Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.
@@ -106,6 +107,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl prefs` (and the phone route `GET /prefs`) lists every preference with its type, default, current value, Settings section and whether a change is live or needs a relaunch (#558).
 - `infinitusctl prefs set <key> <value>` (and `POST /prefs`) changes one preference, refuses a wrong type or an unlisted choice, takes it live at once, and relaunches for an engine toggle (#558).
 - `infinitusctl activities-token`, `client-activity` and `crash-report` take the JSON a phone posts to the mirror (`--body` or stdin), so a client on the control socket registers push tokens, leases and files crashes without the HTTP routes (#572).
+- A push registration can say `layout: "expo"`, and its Live Activities then arrive in the expo-widgets envelope (one attributes type, the state as `{name, props}`, a deep link on start) with the same content the native card gets (#572).
 - `prefs set update_auto_check` / `update_auto_install` (socket, mirror or iCloud sync) reach the running update checker at once instead of at the next relaunch (#558).
 
 ### Phone

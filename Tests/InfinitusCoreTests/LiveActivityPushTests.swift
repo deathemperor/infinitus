@@ -91,6 +91,33 @@ final class LiveActivityPushTests: XCTestCase {
         XCTAssertEqual(ActivityPushRegistration.Kind.alert.rawValue, "alert")
     }
 
+    /// The expo-widgets envelope (#572 N3): one attributes type, the
+    /// layout named in the content state, the same state JSON as a string.
+    func testExpoLayoutWrapsTheSameStateAsNameAndProps() throws {
+        struct S: Encodable { let b = 2; let a = 1 }
+        let now = Date(timeIntervalSince1970: 100)
+        let start = try JSONSerialization.jsonObject(with: LiveActivityPush.startPayload(
+            attributesType: "WorkingActivity", machine: "Mac", macId: "3f9a", state: S(), staleDate: nil,
+            expo: LiveActivityPush.expoWorkingName, now: now)) as! [String: Any]
+        let aps = start["aps"] as! [String: Any]
+        XCTAssertEqual(aps["attributes-type"] as? String, "LiveActivityAttributes")
+        XCTAssertEqual(aps["attributes"] as! [String: String], ["url": "t3code://settings/accounts?mac=3f9a"])
+        let content = aps["content-state"] as! [String: Any]
+        XCTAssertEqual(content["name"] as? String, "InfinitusWorking")
+        XCTAssertEqual(content["props"] as? String, #"{"a":1,"b":2}"#)
+        // Update and end carry the same envelope; the native shape is untouched.
+        let update = try JSONSerialization.jsonObject(with: LiveActivityPush.updatePayload(
+            state: S(), staleDate: nil, expo: LiveActivityPush.expoRevivalName, now: now)) as! [String: Any]
+        XCTAssertEqual(((update["aps"] as! [String: Any])["content-state"] as! [String: Any])["name"] as? String, "InfinitusRevival")
+        let end = try JSONSerialization.jsonObject(with: LiveActivityPush.endPayload(
+            state: S(), dismissalDate: nil, expo: LiveActivityPush.expoWorkingName, now: now)) as! [String: Any]
+        XCTAssertEqual(((end["aps"] as! [String: Any])["content-state"] as! [String: Any])["props"] as? String, #"{"a":1,"b":2}"#)
+        let native = try JSONSerialization.jsonObject(with: LiveActivityPush.updatePayload(
+            state: S(), staleDate: nil, now: now)) as! [String: Any]
+        XCTAssertEqual(((native["aps"] as! [String: Any])["content-state"] as! [String: Any])["a"] as? Int, 1)
+        XCTAssertEqual(LiveActivityPush.expoDeepLink(macId: nil), "t3code://settings/accounts")
+    }
+
     func testHostsAndTopic() {
         XCTAssertEqual(LiveActivityPush.host(sandbox: true), "api.sandbox.push.apple.com")
         XCTAssertEqual(LiveActivityPush.url(token: "ab12", sandbox: false).absoluteString,
@@ -117,6 +144,17 @@ final class LiveActivityPushTests: XCTestCase {
         {"kind":"working","token":"ff","deviceId":"d1","deviceName":"Titan","environment":"sandbox","registeredAt":"2026-09-09T00:00:00Z"}
         """.utf8)
         XCTAssertNil(try decoder.decode(ActivityPushRegistration.self, from: legacy).macId)
+        // `layout` (#572 N3): absent or "native" is the native app; "expo" the
+        // fork's host; a value this build does not know is not a decode failure.
+        XCTAssertFalse(try decoder.decode(ActivityPushRegistration.self, from: legacy).isExpo)
+        let expo = ActivityPushRegistration(kind: .working, token: "ff", deviceId: "d1", deviceName: "Titan",
+                                            environment: "sandbox", themeID: nil, layout: "expo")
+        XCTAssertTrue(expo.isExpo)
+        XCTAssertTrue(try decoder.decode(ActivityPushRegistration.self, from: try encoder.encode(expo)).isExpo)
+        let odd = Data("""
+        {"kind":"working","token":"ff","deviceId":"d1","deviceName":"Titan","environment":"sandbox","registeredAt":"2026-09-09T00:00:00Z","layout":"flutter"}
+        """.utf8)
+        XCTAssertFalse(try decoder.decode(ActivityPushRegistration.self, from: odd).isExpo)
     }
 }
 

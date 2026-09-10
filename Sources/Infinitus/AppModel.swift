@@ -724,6 +724,22 @@ final class AppModel: ObservableObject {
             applyNamedTunnel()
         }
     }
+    /// The quick tunnel fronting the T3 Code fork server's port (#572):
+    /// off by default like the mirror's. The port is where the fork's
+    /// server bound (it scans up from 3773 when that one is taken, so
+    /// the server sets this pref on startup).
+    @Published var forkTunnelEnabled: Bool {
+        didSet {
+            defaults.set(forkTunnelEnabled, forKey: "fork_tunnel_enabled")
+            applyForkTunnel()
+        }
+    }
+    @Published var forkServerPort: Int {
+        didSet {
+            defaults.set(forkServerPort, forKey: "fork_server_port")
+            applyForkTunnel()
+        }
+    }
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
     let mirrorExporter = MirrorExporter()
@@ -792,6 +808,7 @@ final class AppModel: ObservableObject {
     }()
     let quickTunnel = QuickTunnel()
     let namedTunnel = NamedTunnel()
+    let forkTunnel = QuickTunnel(pidKey: "fork_tunnel_pid")
     /// Live Activity pushes to the phone (APNs), LiveActivityPusher.swift.
     let liveActivityPusher = LiveActivityPusher()
 
@@ -1066,6 +1083,8 @@ final class AppModel: ObservableObject {
         mirrorRendezvousEnabled = defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true
         mirrorNamedTunnelEnabled = defaults.bool(forKey: NamedTunnel.enabledKey)
         mirrorNamedTunnelHost = defaults.string(forKey: NamedTunnel.hostnameKey) ?? ""
+        forkTunnelEnabled = defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false
+        forkServerPort = defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort
         // One token per install, minted the first time anyone looks.
         let storedToken = defaults.string(forKey: "mirror_pair_token") ?? ""
         mirrorPairToken = storedToken.isEmpty ? MirrorPairing.generateToken() : storedToken
@@ -1281,6 +1300,8 @@ final class AppModel: ObservableObject {
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
         set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
+        set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
+        set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
         if let update = updateModel {
             let check = defaults.object(forKey: "update_auto_check") as? Bool ?? true
             if update.autoCheck != check { update.autoCheck = check }
@@ -1514,6 +1535,9 @@ final class AppModel: ObservableObject {
             self?.logEvent("other", icon: icon, text)
         }
         namedTunnel.log = quickTunnel.log
+        forkTunnel.log = { [weak self] icon, text in
+            self?.logEvent("other", icon: icon, "fork server: " + text)
+        }
         liveActivityPusher.log = quickTunnel.log
         mirrorServer.activityTokens.set { [weak self] registration in
             Task { @MainActor in self?.liveActivityPusher.register(registration) }
@@ -1706,15 +1730,7 @@ final class AppModel: ObservableObject {
     }
 
     private func applyMirrorLAN() {
-        // Mock mode only swaps the CLI — sessions/usage in the snapshot
-        // are still this machine's real ones, so a dev instance must
-        // never advertise them on the LAN. `mirror_lan_allow_mock` lifts
-        // that for a dev COPY of the binary only (the shipped process is
-        // named Infinitus), so the server can be exercised end to end.
-        let mockAllowed = mockMode
-            && ProcessInfo.processInfo.processName != "Infinitus"
-            && defaults.bool(forKey: "mirror_lan_allow_mock")
-        let allowed = !isPlayground && (!mockMode || mockAllowed)
+        let allowed = exposureAllowed
         // Team Nearby rides the same listener (#356): a discoverable Mac
         // or a team member keeps it up with the phone switch off, and the
         // phone routes then drop their connections. The tunnels stay the
@@ -1889,6 +1905,7 @@ final class AppModel: ObservableObject {
         }
         applyQuickTunnel()
         applyNamedTunnel()
+        applyForkTunnel()
     }
 
     /// One request into a live session, the way the phone's
@@ -2263,6 +2280,41 @@ final class AppModel: ObservableObject {
 
     private func logMirrorInput(_ icon: String, _ text: String) {
         logEvent("other", icon: icon, text)
+    }
+
+    /// Whether this instance may open a door onto this Mac at all — the
+    /// LAN listener and every tunnel. Mock mode only swaps the CLI —
+    /// sessions/usage in the snapshot are still this machine's real
+    /// ones, so a dev instance must never advertise them on the LAN.
+    /// `mirror_lan_allow_mock` lifts that for a dev COPY of the binary
+    /// only (the shipped process is named Infinitus), so the server can
+    /// be exercised end to end.
+    private var exposureAllowed: Bool {
+        let mockAllowed = mockMode
+            && ProcessInfo.processInfo.processName != "Infinitus"
+            && defaults.bool(forKey: "mirror_lan_allow_mock")
+        return !isPlayground && (!mockMode || mockAllowed)
+    }
+
+    /// Starts or stops the quick tunnel fronting the fork server's port
+    /// (#572). Independent of the mirror listener — the fork's server
+    /// binds its own port. A port change restarts it: cloudflared is
+    /// told the port on its command line.
+    private func applyForkTunnel() {
+        let port = forkServerPort
+        if forkTunnel.isRunning, forkTunnel.port.map(Int.init) != port { forkTunnel.stop() }
+        guard forkTunnelEnabled, exposureAllowed, ForkTunnelStatus.isValidPort(port) else {
+            forkTunnel.stop()
+            return
+        }
+        forkTunnel.start(port: UInt16(port))
+    }
+
+    /// `status`'s `forkTunnel`.
+    var forkTunnelStatus: ForkTunnelStatus {
+        ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
+                                available: forkTunnel.isAvailable, running: forkTunnel.isRunning,
+                                url: forkTunnel.url)
     }
 
     /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
@@ -3076,6 +3128,7 @@ final class AppModel: ObservableObject {
         // The tunnels are child processes: they must not outlive the app.
         quickTunnel.stop()
         namedTunnel.stop()
+        forkTunnel.stop()
         // So are the phone's terminals (#507): a login shell holding a pty
         // must not outlive the app either.
         terminalHost.closeAll()
