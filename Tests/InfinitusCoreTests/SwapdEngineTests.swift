@@ -89,6 +89,27 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(SwapdMapping.fleets(from: list, now: now).map(\.provider), [.other, .codex])
     }
 
+    /// swapd's Gemini driver reports one provider beside Claude; its usage
+    /// is only scoped per-model buckets (no 5h/7d window), which render as
+    /// named gauges. Nothing Gemini-specific lives in the adapter.
+    func testAGeminiProviderBecomesItsOwnFleetWithScopedGauges() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[
+          {"provider":"claude","installed":true,"activeSlot":1,"accounts":[\(Self.account(slot: 1))]},
+          {"provider":"gemini","installed":true,"activeSlot":2,"accounts":[
+            {"slot":2,"email":"g@example.com","organizationName":"","organizationUuid":"","active":true,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[
+               {"kind":"scoped","name":"gemini-2.5-pro","pct":75,"resetsAt":"2026-09-11T00:00:00Z"},
+               {"kind":"scoped","name":"gemini-2.5-flash","pct":10}]}]}]}
+        """)
+        let fleets = SwapdMapping.fleets(from: list, now: now)
+        XCTAssertEqual(fleets.map(\.provider), [.claude, .gemini])
+        XCTAssertEqual(fleets[1].activeNumber, 2)
+        XCTAssertEqual(fleets[1].accounts.map(\.email), ["g@example.com"])
+        XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.map(\.name), ["gemini-2.5-pro", "gemini-2.5-flash"])
+        XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.first?.pct, 75)
+    }
+
     /// The shape the engine ACTUALLY emits (`collect.rs account_view`:
     /// every non-`ok` status empties `windows` and moves the measurement
     /// into `lastGood`) — not the shape spec §4's prose describes. A
