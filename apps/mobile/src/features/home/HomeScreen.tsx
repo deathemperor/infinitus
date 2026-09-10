@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../../lib/cn";
 import { AppText as Text } from "../../components/AppText";
 import { EmptyState } from "../../components/EmptyState";
+import { InfinitusSignIns } from "../infinitus/InfinitusSignIns";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
 import { scopedProjectKey } from "../../lib/scopedEntities";
@@ -1115,7 +1116,14 @@ export function HomeScreen(props: HomeScreenProps) {
     );
   }
 
-  const listHeader = Platform.OS === "ios" ? null : <HomeTopContentSpacer />;
+  // Infinitus (fork, #572): a paired Mac's lapsed AWS / gcloud sign-ins sit
+  // above the list; the component renders nothing when there are none.
+  const listHeader = (
+    <>
+      {Platform.OS === "ios" ? null : <HomeTopContentSpacer />}
+      <InfinitusSignIns className="px-4 pb-3" />
+    </>
+  );
 
   // Project scoping lives in the header filter menu (no inline chip row on
   // mobile — the menu is the one filter surface).

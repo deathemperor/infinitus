@@ -13,6 +13,7 @@ import { infinitusEnvironment } from "../../state/infinitus";
 import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
+import { InfinitusSignIns } from "../infinitus/InfinitusSignIns";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { AccountRow } from "./AccountRow";
 import { type InfinitusMac, infinitusMacs, macAccountsModel } from "./accountsRoute.logic";
@@ -40,6 +41,7 @@ export function AccountsRouteScreen() {
         contentContainerClassName="gap-5 p-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
+        {macs.length > 0 ? <InfinitusSignIns /> : null}
         {macs.length === 0 ? (
           <EmptyState
             title="No Infinitus Mac"
