@@ -73,7 +73,7 @@ describe("sidebarSessionsView", () => {
 });
 
 describe("sessionRowDetail", () => {
-  it("shows the folder for a named row, the state for a folder-titled one, then account and age", () => {
+  it("shows the folder for a named row, the state for a folder-titled one, then the account", () => {
     const [named] = sidebarSessionsView({
       capability: true,
       snapshot: snapshot({
@@ -81,7 +81,8 @@ describe("sessionRowDetail", () => {
       }),
       now: NOW,
     })!.rows;
-    expect(sessionRowDetail(named!)).toBe("proj · death4 · 40m");
+    expect(sessionRowDetail(named!)).toBe("proj · death4");
+    expect(named!.age).toBe("40m");
     const [bare] = sidebarSessionsView({
       capability: true,
       snapshot: snapshot({ sessions: [session({ status: "busy" })] }),

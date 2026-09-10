@@ -39,12 +39,12 @@ export function sidebarSessionsView(input: {
   };
 }
 
-/** The row's second column: its folder when the title is a name, else its
-    state; the account and age trail when the build sends them. */
+/** The row's truncating middle column: its folder when the title is a name,
+    else its state; the account trails when the build sends it. The age is not
+    here — it gets its own fixed column so truncation never eats it. */
 export function sessionRowDetail(row: SessionRowModel): string {
   const parts = [row.title === row.folder ? row.stateLabel : row.folder];
   if (row.account !== null) parts.push(row.account);
-  if (row.age !== null) parts.push(row.age);
   return parts.join(" · ");
 }
 
