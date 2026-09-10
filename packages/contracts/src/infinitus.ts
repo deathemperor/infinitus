@@ -243,7 +243,10 @@ export type InfinitusActivityPushKind = typeof InfinitusActivityPushKind.Type;
     development-signed builds, `production` otherwise (Apple routes them to
     different gateways). `macId` is the key the phone files this Mac under — the
     fork uses the environment id — echoed into a push-to-start's attributes so
-    the phone adopts the card into the right Mac's slot. */
+    the phone adopts the card into the right Mac's slot. `registeredAt` may be
+    left to the Mac, which stamps it. `layout` names the push envelope the
+    phone's activity host expects: absent or `native` for the SwiftUI phone,
+    `expo` for this app (expo-widgets' `{name, props}` content state). */
 export const InfinitusActivityPushRegistration = Schema.Struct({
   kind: InfinitusActivityPushKind,
   token: Schema.String,
@@ -251,8 +254,9 @@ export const InfinitusActivityPushRegistration = Schema.Struct({
   deviceName: Schema.String,
   environment: Schema.String,
   themeID: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  registeredAt: Schema.String,
+  registeredAt: Schema.optionalKey(Schema.String),
   macId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  layout: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusActivityPushRegistration = typeof InfinitusActivityPushRegistration.Type;
 

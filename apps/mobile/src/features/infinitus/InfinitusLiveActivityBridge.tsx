@@ -1,0 +1,115 @@
+import { useAtomValue } from "@effect/atom-react";
+import Constants from "expo-constants";
+import { AsyncResult } from "effect/unstable/reactivity";
+import { addPushToStartTokenListener, type LiveActivityFactory } from "expo-widgets";
+import { useEffect, useMemo } from "react";
+import { AppState, Platform } from "react-native";
+
+import { loadOrCreateAgentAwarenessDeviceId } from "../../persistence/imperative";
+import { infinitusEnvironment } from "../../state/infinitus";
+import { mobilePreferencesAtom } from "../../state/preferences";
+import { environmentPresentations } from "../../state/presentation";
+import { environmentServerConfigsAtom } from "../../state/server";
+import { useAtomCommand } from "../../state/use-atom-command";
+import InfinitusRevival from "../../widgets/InfinitusRevival";
+import InfinitusWorking from "../../widgets/InfinitusWorking";
+import { infinitusMacs } from "../accounts/accountsRoute.logic";
+import {
+  type LiveActivityTokenKind,
+  pusherMac,
+  registrationBody,
+  registrationCommand,
+  type SentToken,
+  shouldSendToken,
+} from "./liveActivity.logic";
+
+const FACTORIES: ReadonlyArray<readonly [LiveActivityFactory<object>, LiveActivityTokenKind]> = [
+  [InfinitusWorking, "working"],
+  [InfinitusRevival, "revival"],
+];
+
+/** Headless. Hands this phone's Live Activity tokens to the Mac that drives
+    its cards (#572 task 4): the push-to-start token under both start kinds,
+    and each running card's update token, re-read on every foreground because
+    a Mac may have started a card while the app was closed. iOS only; nothing
+    runs until the preferences have loaded, and nothing when the toggle is off
+    or no paired Mac runs Infinitus. */
+export function InfinitusLiveActivityBridge() {
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const configs = useAtomValue(environmentServerConfigsAtom);
+  const presentations = useAtomValue(environmentPresentations.presentationsAtom);
+  const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const loaded = AsyncResult.isSuccess(preferences);
+  const enabled = loaded && preferences.value.infinitusLiveActivityEnabled !== false;
+  const preferred = loaded ? preferences.value.infinitusLiveActivityMac : undefined;
+  const mac = useMemo(
+    () => pusherMac(preferred, infinitusMacs(configs, presentations)),
+    [configs, preferred, presentations],
+  );
+  const environmentId = mac?.environmentId ?? null;
+
+  useEffect(() => {
+    if (Platform.OS !== "ios" || !enabled || environmentId === null) return;
+    let cancelled = false;
+    const sent = new Map<LiveActivityTokenKind, SentToken>();
+    const watched = new Set<string>();
+    const subscriptions: Array<{ remove(): void }> = [];
+
+    const send = async (kind: LiveActivityTokenKind, token: string) => {
+      const now = Date.now();
+      if (!shouldSendToken(sent, kind, token, now)) return;
+      sent.set(kind, { token, at: now });
+      try {
+        const deviceId = await loadOrCreateAgentAwarenessDeviceId();
+        if (cancelled) return;
+        const body = registrationBody({
+          kind,
+          token,
+          deviceId,
+          deviceName: Constants.deviceName?.trim() || "iPhone",
+          environmentId,
+          sandbox: __DEV__,
+          now: new Date(now),
+        });
+        const result = await run({ environmentId, input: registrationCommand(body) });
+        if (result._tag !== "Success") sent.delete(kind);
+      } catch {
+        sent.delete(kind);
+      }
+    };
+
+    const attach = () => {
+      for (const [factory, kind] of FACTORIES) {
+        for (const activity of factory.getInstances()) {
+          const id = activity.getId();
+          if (watched.has(id)) continue;
+          watched.add(id);
+          subscriptions.push(
+            activity.addPushTokenListener((event) => void send(kind, event.pushToken)),
+          );
+          void activity.getPushToken().then((token) => {
+            if (token && !cancelled) void send(kind, token);
+          });
+        }
+      }
+    };
+
+    subscriptions.push(
+      addPushToStartTokenListener((event) => {
+        void send("working-start", event.activityPushToStartToken);
+        void send("revival-start", event.activityPushToStartToken);
+      }),
+    );
+    attach();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") attach();
+    });
+    return () => {
+      cancelled = true;
+      appState.remove();
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, [enabled, environmentId, run]);
+
+  return null;
+}

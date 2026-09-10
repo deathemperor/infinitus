@@ -472,6 +472,7 @@ describe("the phone-only write bodies", () => {
     themeID: "rpg",
     registeredAt: "2026-09-10T10:00:00Z",
     macId: "env-7c2f",
+    layout: "expo",
   } as const;
 
   it("round-trips a token registration with every field", () => {
@@ -481,11 +482,13 @@ describe("the phone-only write bodies", () => {
     expect(encodeRegistration(decoded)).toEqual(registration);
   });
 
-  it("accepts the null theme and absent macId an older phone sends", () => {
-    const { macId: _macId, ...older } = registration;
+  it("accepts the null theme and the absent macId, layout and stamp an older phone sends", () => {
+    const { macId: _macId, layout: _layout, registeredAt: _at, ...older } = registration;
     const decoded = decodeRegistration({ ...older, kind: "alert", themeID: null });
     expect(decoded.themeID).toBeNull();
     expect(decoded.macId).toBeUndefined();
+    expect(decoded.layout).toBeUndefined();
+    expect(decoded.registeredAt).toBeUndefined();
   });
 
   it("rejects a token kind the Mac has no slot for", () => {

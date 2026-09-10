@@ -68,8 +68,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
-- `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the Accounts
-  row in the General section.
+- `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
+  `SettingsInfinitusSection` (Accounts row, Live Activity toggle, pusher Mac)
+  after General.
+- `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
+  Activity token registration with the Mac).
+- `apps/mobile/src/persistence/mobile-preferences.ts` — the
+  `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` keys (interface
+  and sanitizer).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
   (active account + fullest window of the Mac the list follows) before the
   filter button.
@@ -91,6 +97,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`).
+- `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
+  `apps/mobile/src/widgets/InfinitusRevival.tsx`,
+  `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
+  Mac-driven Live Activity: layouts (content = native's activity states),
+  token registration, settings.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
