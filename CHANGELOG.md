@@ -101,6 +101,7 @@ publishes the matching section as the GitHub release body.
 - Settings › Display › Sort rows by gains Candidates: the active account first, then the rest in the order the engine would switch to them (#542).
 - The Mac's session chat window decodes only the transcript lines appended since its last refresh instead of a fresh window of 200 items on every change (#346).
 - The five-minute stats refresh sums again only the days a changed transcript touches instead of every file's, a second of CPU less per pass (#499).
+- `infinitusctl hide settings` closes the Settings window; the e2e gate measures idle CPU with Settings open.
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

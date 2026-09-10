@@ -382,6 +382,28 @@ sleep 1
 workspace_visible && fail "workspace still visible after hide"
 echo "windows: ok (workspace beside pop-out, idle ${WPCT}%, hidden)"
 
+# --- windows: Settings open idles too ------------------------------------
+# The Settings-open case sat at 18% for a week (#346: transcript reads,
+# the past-sessions walk, the team publish and the machine sampler all
+# ran on behind it) while the pop-out gate read 0.5%; this is the gate
+# that would have caught it. Same settle as the workspace: the window
+# builds its tabs on the first open.
+settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
+"$CTL" show settings | expect "d['shown']=='settings'" || fail "show settings"
+sleep 3
+settings_visible || fail "Settings window not visible after show settings"
+sleep 9
+SA="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep 15
+SB="$("$CTL" perf | json "d['cpuSeconds']")"
+SPCT="$(python3 -c "print(round(($SB-$SA)/15*100,1))")"
+echo "idle CPU with Settings open: ${SPCT}%"
+python3 -c "import sys; sys.exit(0 if $SPCT <= $IDLE_BUDGET_PCT else 1)" || fail "Settings idle CPU ${SPCT}% over budget ${IDLE_BUDGET_PCT}%"
+"$CTL" hide settings | expect "d['hidden']=='settings'" || fail "hide settings"
+sleep 1
+settings_visible && fail "Settings still visible after hide"
+echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
+
 # --- scenarios: all-dead (every window maxed, no candidate) --------------
 "$INFINITUS_CSWAP" simulate alldead >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is None and d[0].get('nextRecovery') is not None" \
