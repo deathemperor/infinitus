@@ -148,7 +148,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events
   (an account switch, every account exhausted, a session waiting for an
   answer) as the app's toasts; nothing from the first snapshot, deduped by
-  the server's event id. Mounted once from `apps/web/src/routes/__root.tsx`
+  the server's event id. The waiting toast's Show opens the session's own
+  window (`show session <pid>`) when the manifest's `show` takes one, else
+  the pop-out (#612). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that one line is the fork's only edit there).
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
@@ -200,11 +202,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
 
 - `apps/web/src/components/sidebar/SidebarInfinitusSessions.tsx` (+
   `sidebarInfinitusSessions.logic.ts`) — the footer's collapsible Sessions
-  group: the Claude Code sessions the Mac tracks, a row's permission mode
-  settable through the manifest's `session-mode` verb. Its row model is
-  `packages/client-runtime/src/state/infinitusSessions.ts` (exported as
-  `@t3tools/client-runtime/state/infinitusSessions`) so mobile draws the same
-  rows.
+  group: the Claude Code sessions the Mac tracks, the ones needing a person
+  first. Per row, behind manifest checks: `show session <pid>` on click,
+  `nudge <pid>` and the `session-mode` radio in its menu (#612). Its row model
+  is `packages/client-runtime/src/state/infinitusSessions.ts` (exported as
+  `@t3tools/client-runtime/state/infinitusSessions`; account, age from
+  `startedAt`, `needs` chips) so mobile draws the same rows.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default

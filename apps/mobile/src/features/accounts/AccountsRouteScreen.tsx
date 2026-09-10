@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -64,13 +64,24 @@ export function AccountsRouteScreen() {
   );
 }
 
+/** A minute clock for the session ages: read once on mount, then each minute. */
+function useNowMinute(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boolean }) {
   const { mac } = props;
   const view = useEnvironmentQuery(
     infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
   const model = macAccountsModel(view.data);
-  const sessions = macSessionsView(view.data);
+  const now = useNowMinute();
+  const sessions = macSessionsView(view.data, now);
   return (
     <View className="gap-3">
       {props.titled ? (

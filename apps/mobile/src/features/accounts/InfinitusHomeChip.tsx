@@ -11,7 +11,7 @@ import { infinitusEnvironment } from "../../state/infinitus";
 import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
-import { waitingSessionCount } from "../infinitus/sessions.logic";
+import { attentionSessionCount } from "../infinitus/sessions.logic";
 import { chipEnvironment, homeChip, infinitusMacs } from "./accountsRoute.logic";
 
 const PCT_CLASS = {
@@ -39,7 +39,7 @@ export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: Envir
       : infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
   const model = homeChip(mac === null ? null : view.data);
-  const waiting = waitingSessionCount(mac === null ? null : view.data);
+  const waiting = attentionSessionCount(mac === null ? null : view.data);
   if (mac === null || model === null) return null;
   return (
     <Pressable

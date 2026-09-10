@@ -1,4 +1,7 @@
-import type { SessionRowModel } from "@t3tools/client-runtime/state/infinitusSessions";
+import {
+  nudgeOutcome,
+  type SessionRowModel,
+} from "@t3tools/client-runtime/state/infinitusSessions";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
@@ -13,10 +16,11 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { commandFailureMessage } from "../accounts/accountsRoute.logic";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import {
-  isSessionPermissionMode,
   type MacSessionsView,
-  sessionModeCommand,
-  sessionModeMenuActions,
+  sessionChoiceCommand,
+  sessionMenuActions,
+  sessionMenuChoice,
+  sessionRowDetail,
 } from "./sessions.logic";
 
 const STATE_DOT: Record<SessionRowModel["state"], string> = {
@@ -27,10 +31,11 @@ const STATE_DOT: Record<SessionRowModel["state"], string> = {
   unknown: "bg-subtle",
 };
 
-/** One Mac's live Claude Code sessions (the snapshot's `sessions`), waiting
-    ones first; a row's context menu sets its permission mode through the
-    manifest's `session-mode` verb, the one per-session write the app exposes
-    that is neither stdin text nor destructive. */
+/** One Mac's live Claude Code sessions (the snapshot's `sessions`), the ones
+    needing a person first. A row's context menu offers what this build's
+    manifest lists: open its chat window on the Mac (`show session <pid>`),
+    the resume nudge by hand (`nudge <pid>`), and its permission mode
+    (`session-mode`). */
 export function InfinitusSessions(props: {
   readonly environmentId: EnvironmentId;
   readonly view: MacSessionsView;
@@ -38,11 +43,11 @@ export function InfinitusSessions(props: {
   const { environmentId, view } = props;
   return (
     <SettingsSection title="Sessions" card>
-      {view.waitingCount > 0 ? (
+      {view.attentionCount > 0 ? (
         <View className="border-b border-separator px-4 py-2">
           <StatusPill
             size="compact"
-            label={`${view.waitingCount} waiting on you`}
+            label={`${view.attentionCount} need you`}
             pillClassName="bg-warning"
             textClassName="text-warning-foreground"
           />
@@ -53,7 +58,7 @@ export function InfinitusSessions(props: {
           key={row.pid}
           environmentId={environmentId}
           row={row}
-          canSetMode={view.canSetMode}
+          view={view}
           last={index === view.rows.length - 1}
         />
       ))}
@@ -64,25 +69,34 @@ export function InfinitusSessions(props: {
 function SessionRow(props: {
   readonly environmentId: EnvironmentId;
   readonly row: SessionRowModel;
-  readonly canSetMode: boolean;
+  readonly view: MacSessionsView;
   readonly last: boolean;
 }) {
   const { environmentId, row } = props;
   const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  const setMode = async (id: string) => {
-    if (!isSessionPermissionMode(id)) return;
-    const input = sessionModeCommand(row, id);
+  const choose = async (id: string) => {
+    const choice = sessionMenuChoice(id);
+    if (choice === null) return;
+    const input = sessionChoiceCommand(row, choice);
     if (input === null) return;
     setBusy(true);
-    setError(null);
+    setNote(null);
     const result = await run({ environmentId, input });
     setBusy(false);
-    if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
+    if (result._tag !== "Success") {
+      setNote(commandFailureMessage(result.cause));
+      return;
+    }
+    if (choice.kind === "nudge") {
+      const outcome = nudgeOutcome(result.value.result);
+      if (!outcome.nudged) setNote(outcome.reason ?? "The session was not nudged.");
+    }
   };
 
+  const actions = sessionMenuActions(row, props.view.actions);
   const content = (
     <View className={cn("gap-1 px-4 py-3", props.last ? null : "border-b border-separator")}>
       <View className="flex-row items-center gap-2">
@@ -93,7 +107,7 @@ function SessionRow(props: {
         <View className="flex-1" />
         {busy ? (
           <ActivityIndicator size="small" />
-        ) : props.canSetMode ? (
+        ) : actions.length > 0 ? (
           <SymbolView
             name="ellipsis.circle"
             size={18}
@@ -103,20 +117,25 @@ function SessionRow(props: {
         ) : null}
       </View>
       <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-        {row.title === row.folder ? row.stateLabel : `${row.stateLabel} · ${row.folder}`}
+        {sessionRowDetail(row)}
       </Text>
-      {error ? <Text className="text-xs text-danger-foreground">{error}</Text> : null}
+      {row.needs.map((need) => (
+        <Text key={need} className="text-xs text-warning-foreground">
+          {need}
+        </Text>
+      ))}
+      {note ? <Text className="text-xs text-danger-foreground">{note}</Text> : null}
     </View>
   );
 
-  if (!props.canSetMode) return content;
+  if (actions.length === 0) return content;
   return (
     <ControlPillMenu
-      title={`${row.title} · permission mode`}
-      actions={[...sessionModeMenuActions(row)]}
-      onPressAction={({ nativeEvent }) => void setMode(nativeEvent.event)}
+      title={row.title}
+      actions={[...actions]}
+      onPressAction={({ nativeEvent }) => void choose(nativeEvent.event)}
       accessibilityRole="button"
-      accessibilityLabel={`${row.title} permission mode`}
+      accessibilityLabel={`${row.title} actions`}
     >
       <Pressable className="active:opacity-70">{content}</Pressable>
     </ControlPillMenu>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { eventRepeatKey, eventToast } from "./infinitusEventToasts.logic";
+import { eventRepeatKey, eventToast, showCommandArgs } from "./infinitusEventToasts.logic";
 
 describe("eventToast", () => {
   it("maps the three kinds worth interrupting for", () => {
@@ -26,6 +26,7 @@ describe("eventToast", () => {
       title: "A session is waiting for you",
       description: "headless session 4243 is waiting for an answer",
       action: "show-popout",
+      pid: 4243,
     });
   });
 
@@ -47,5 +48,17 @@ describe("eventRepeatKey", () => {
     expect(eventRepeatKey({ icon: "battery.0percent", text: "all exhausted" })).not.toBe(
       eventRepeatKey({ icon: "hand.raised", text: "all exhausted" }),
     );
+  });
+});
+
+describe("showCommandArgs", () => {
+  const withSession = [{ name: "show", args: ["popout|settings|session <pid|name>"] }];
+  const without = [{ name: "show", args: ["popout|settings|wall"] }];
+
+  it("targets the session's window when the toast names one and the build's show takes it", () => {
+    expect(showCommandArgs({ pid: 4243 }, withSession)).toEqual(["session", "4243"]);
+    expect(showCommandArgs({ pid: 4243 }, without)).toEqual(["popout"]);
+    expect(showCommandArgs({}, withSession)).toEqual(["popout"]);
+    expect(showCommandArgs({ pid: 4243 }, [])).toEqual(["popout"]);
   });
 });
