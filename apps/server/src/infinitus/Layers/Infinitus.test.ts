@@ -730,7 +730,7 @@ describe("events", () => {
     Effect.gen(function* () {
       const stub = yield* ControlStub;
       yield* stub.setResult("manifest", manifestWithEvents());
-      const row = (id: string, at: string, kind: string) => ({ id, at, kind, ...switched(at) });
+      const row = (id: string, at: string, kind: string) => ({ ...switched(at), id, kind });
       // Seeded from the log the app already had.
       yield* stub.setResult("events", [row("a", "2026-09-10T08:00:00Z", "switch")]);
       const infinitus = yield* InfinitusService;
