@@ -595,9 +595,25 @@ final class T3WindowModel: ObservableObject {
         for task in mentionLoads.values { task.cancel() }
         commandLoads = [:]
         mentionLoads = [:]
+        // The Terminal tab's shells are DETACHED, never closed: a window
+        // reopened later re-attaches to the same shell, and
+        // `AppModel.terminalHost.closeAll()` (app quit) is what ends them.
+        terminalRegistry?.detachAll()
     }
 
     func tick() { now = Date() }
+
+    /// The right panel's Terminal tab, one live emulator per (cwd, pid)
+    /// (`T3TerminalPanel`). Made on first use and kept for the window's life —
+    /// with the tab never opened, nothing here exists and no pty is forked.
+    private var terminalRegistry: T3TerminalRegistry?
+    var terminals: T3TerminalRegistry? {
+        if let terminalRegistry { return terminalRegistry }
+        guard let model else { return nil }
+        let registry = T3TerminalRegistry(app: model)
+        terminalRegistry = registry
+        return registry
+    }
 
     private func refresh() {
         guard let model, !refreshing else { return }

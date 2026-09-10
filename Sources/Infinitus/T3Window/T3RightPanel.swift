@@ -3,10 +3,9 @@ import InfinitusCore
 import InfinitusUI
 
 /// T3's right panel (`RightPanelTabs.tsx:990-1035`): a tab strip over Diff,
-/// Files, Pull request, Terminal and Agents — each a "coming later" empty
-/// state until the matching surface ships (a later release) — Diff
-/// (`T3DiffPanel`), Files (`T3FilesPanel`), Pull request
-/// (`T3PullRequestPanel`) and Agents (`T3AgentsPanel`) are the real ones. The width
+/// Files, Pull request, Terminal and Agents — Diff (`T3DiffPanel`), Files
+/// (`T3FilesPanel`), Pull request (`T3PullRequestPanel`), Terminal
+/// (`T3TerminalPanel`) and Agents (`T3AgentsPanel`) are all real now. The width
 /// (42% of the window, clamped to [360, 560]) comes from the shell that
 /// wraps this component (`DiffPanelShell.tsx:33` `w-[42vw] min-w-[360px]
 /// max-w-[560px] border-l border-border`, applied by `T3Root`).
@@ -54,7 +53,7 @@ struct T3RightPanel: View {
         case "diff": T3DiffPanel(model: model)
         case "files": T3FilesPanel(model: model)
         case "pr": T3PullRequestPanel(model: model)
-        case "terminal": T3WebEmpty(title: "Terminal arrives with a later release", message: "")
+        case "terminal": T3TerminalPanel(model: model)
         default: T3AgentsPanel(model: model)
         }
     }
