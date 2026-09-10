@@ -9,6 +9,7 @@ import type { SearchBarCommands } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ControlPillMenu } from "../../components/ControlPill";
+import { InfinitusHomeChip } from "../accounts/InfinitusHomeChip";
 import { SymbolView } from "../../components/AppSymbol";
 import { T3Wordmark } from "../../components/T3Wordmark";
 import { HOME_HORIZONTAL_INSET } from "../../lib/layoutMetrics";
@@ -235,6 +236,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               }
             />
 
+            <InfinitusHomeChip selectedEnvironmentId={props.selectedEnvironmentId} />
             <ControlPillMenu
               actions={menuActions}
               isAnchoredToRight
