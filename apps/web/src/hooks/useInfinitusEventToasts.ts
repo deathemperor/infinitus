@@ -25,8 +25,9 @@ interface Watched {
  * Turns the Infinitus host's new events into the app's toasts: an account
  * switch, every account exhausted, a session waiting for an answer. Nothing
  * from the first snapshot after mount (no replay on reload), nothing twice
- * (by the server's id), and a line the app re-emits unchanged only once. The
- * primary environment's snapshot is the sidebar pill's, so this adds no poll.
+ * (by the server's id), and a line the app re-emits unchanged only once. It
+ * shares the sidebar accounts pill's subscription; on a page without the pill
+ * this hook is what keeps the fast poll and the client-activity lease running.
  */
 export function useInfinitusEventToasts(): void {
   const environment = usePrimaryEnvironment();
