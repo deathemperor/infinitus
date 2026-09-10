@@ -122,7 +122,7 @@ export const SidebarInfinitusSessions = memo(function SidebarInfinitusSessions()
         />
         <span className="min-w-0 flex-1 truncate">Sessions</span>
         {view.attentionCount > 0 ? (
-          <span className="rounded-full bg-warning px-1.5 text-[10px] font-semibold text-warning-foreground tabular-nums">
+          <span className="rounded-full bg-warning/16 px-1.5 text-[10px] font-semibold text-warning-foreground tabular-nums">
             {view.attentionCount}
           </span>
         ) : null}
@@ -178,13 +178,16 @@ function SessionRow({
       <Tooltip>
         <TooltipTrigger
           render={
-            <span className="max-w-[55%] shrink-0 truncate text-muted-foreground">
+            <span className="max-w-[50%] shrink-0 truncate text-muted-foreground">
               {sessionRowDetail(row)}
             </span>
           }
         />
         <TooltipPopup side="top">{detail}</TooltipPopup>
       </Tooltip>
+      {row.age !== null ? (
+        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{row.age}</span>
+      ) : null}
     </>
   );
   const className =
