@@ -59,6 +59,10 @@ struct T3ThreadView: View {
     /// held in `@State` so the per-scroll writes never republish the view.
     @State private var anchors = T3Anchors()
     @State private var composerHeight: CGFloat = 0
+    /// The terminal drawer's measured band and the column it is capped against
+    /// (`T3TerminalDrawerSlot`). 0 while the drawer is closed.
+    @State private var drawerHeight: Double = 0
+    @State private var columnHeight: Double = 0
     /// `minimapItems` (`MessagesTimeline.tsx:576`), derived once per rows
     /// publish rather than per body pass — `now` re-renders this view every
     /// second and compacting every turn's text that often would be waste.
@@ -133,7 +137,29 @@ struct T3ThreadView: View {
 
     // MARK: - The timeline
 
+    /// `ChatView.tsx:8129-8131`'s chat column is a `flex-col` of the top bar,
+    /// the main content area — the timeline with the composer overlaid on it —
+    /// and then the terminal drawers (`:8578-8597`). So the drawer is a sibling
+    /// ROW under the composer, and the composer's overlay height (and with it
+    /// the timeline's footer inset and the pill's clearance) is untouched by it.
     private var timeline: some View {
+        VStack(spacing: 0) {
+            timelineBody
+            T3TerminalDrawerSlot(model: model, drawer: model.terminalDrawer,
+                                 threadId: store.threadId, viewport: columnHeight)
+                // The drawer opening or growing moves the ScrollView's own
+                // bottom edge without touching `store.rows` — the same
+                // re-follow `composerHeight` gets below.
+                .onGeometryChange(for: Double.self) { $0.size.height } action: { drawerHeight = $0 }
+        }
+        // The clamp's viewport is the whole thread column
+        // (`maxDrawerHeight` reads `window.innerHeight`, `:96-99`): this box
+        // keeps its height whatever the drawer does, so the cap never chases
+        // the drawer that it caps.
+        .onGeometryChange(for: Double.self) { $0.size.height } action: { columnHeight = $0 }
+    }
+
+    private var timelineBody: some View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView {
@@ -205,6 +231,11 @@ struct T3ThreadView: View {
                 .onChange(of: composerHeight) { _, _ in
                     // Never over a pending disclosure pin — `anchor(old:new:)`
                     // owns that restore on the next rows publish.
+                    if anchors.atEnd, anchors.pinned == nil { proxy.scrollTo(Self.endId, anchor: .bottom) }
+                }
+                // The terminal drawer takes its band out of the column, which
+                // moves the list's viewport the same way.
+                .onChange(of: drawerHeight) { _, _ in
                     if anchors.atEnd, anchors.pinned == nil { proxy.scrollTo(Self.endId, anchor: .bottom) }
                 }
                 .onAppear {

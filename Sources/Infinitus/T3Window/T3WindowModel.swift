@@ -733,6 +733,12 @@ final class T3WindowModel: ObservableObject {
     /// reason.
     let composerInbox = T3ComposerInbox()
 
+    /// The terminal drawer's per-thread open flag and height (#507 v4), the same
+    /// kind of small observable and for the same reason: the thread view holds
+    /// this model as a plain `let`, so only the drawer's own slot and the top
+    /// bar's toggle observe it.
+    let terminalDrawer = T3TerminalDrawerModel()
+
     /// `startNewThreadFromContext` (`Sidebar.tsx:4251-4270`): a draft in the
     /// project you are in. `projectId` forces one (⌘⇧N, upstream's
     /// `chat.newLocal`); nil resolves the selected thread's project, then the

@@ -140,8 +140,17 @@ struct T3Root: View {
         Group {
             Button("") { withAnimation(.easeOut(duration: 0.2)) { model.toggleSidebar() } }
                 .keyboardShortcut("b", modifiers: .command)
+            // `keybindings.ts:23-24`: `mod+j` → `terminal.toggle` (the thread's
+            // terminal drawer), `mod+alt+b` → `rightPanel.toggle`. ⌘J was the
+            // right panel's here until the drawer landed (#507 v4).
+            Button("") {
+                guard let threadId = model.state.selectedThread?.id,
+                      T3TerminalPanel.target(in: model.state) != nil else { return }
+                withAnimation(.easeOut(duration: 0.2)) { model.terminalDrawer.toggle(threadId) }
+            }
+            .keyboardShortcut("j", modifiers: .command)
             Button("") { withAnimation(.easeOut(duration: 0.2)) { model.toggleRightPanel() } }
-                .keyboardShortcut("j", modifiers: .command)
+                .keyboardShortcut("b", modifiers: [.command, .option])
             // ⌘W closes the workspace window — an accessory app has no menu
             // bar to route the standard close item, so this is the only way
             // in (the ⌘⇧T pattern in PinnedRoot).

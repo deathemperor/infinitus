@@ -100,16 +100,14 @@ struct T3TopBar: View {
             Color.clear.frame(width: 12)
             // `PanelLayoutControls.tsx:47-60`'s terminal-drawer `Toggle`,
             // `PanelBottomIcon size-4`, first in the group's own `gap-1`
-            // (`:36`). B has no terminal drawer to open, and the reference's
-            // header keeps the control's width whether or not it can be
-            // pressed, so it renders in upstream's own `disabled` shape —
-            // never pressed — and says where the drawer is.
-            T3TopBarToggle(icon: .panelBottom, pressed: false,
-                            tooltip: "The bottom panel arrives with the terminal") {}
+            // (`:36`) — the thread's terminal drawer (#507 v4).
+            T3TerminalDrawerToggle(model: model, drawer: model.terminalDrawer)
             Color.clear.frame(width: 4)   // `PanelLayoutControls.tsx:36` gap-1
             // `PanelLayoutControls.tsx:61-80`'s right-panel `Toggle`.
+            // `keybindings.ts:24`: `mod+alt+b`, the shortcut ⌘J went back to
+            // `terminal.toggle` for (`:23`) when the drawer landed.
             T3TopBarToggle(icon: .panelRight, pressed: model.state.rightPanelOpen,
-                            tooltip: "Toggle right panel (\u{2318}J)") {
+                            tooltip: "Toggle right panel (\u{2325}\u{2318}B)") {
                 withAnimation(.easeOut(duration: 0.2)) { model.toggleRightPanel() }
             }
             Color.clear.frame(width: 12)   // `index.css:110` --workspace-controls-right
@@ -567,20 +565,31 @@ private final class MenuActionTarget: NSObject {
 struct T3TopBarToggle: View {
     @Environment(\.t3) private var t3
     @State private var hover = false
-    let icon: Lucide, pressed: Bool, tooltip: String, action: () -> Void
+    let icon: Lucide, pressed: Bool, tooltip: String
+    /// The ghost variant's `disabled` shape (`ui/toggle.tsx:29`): NOT dimmed
+    /// (`disabled:opacity-100`) but `disabled:text-muted-foreground`, and
+    /// `disabled:pointer-events-none` — so no hover and no press either.
+    var enabled = true
+    let action: () -> Void
 
     var body: some View {
         T3Tooltip(tooltip) {
             Button(action: action) {
                 LucideIcon(icon, size: 16)
-                    .foregroundStyle(active ? t3.web.accentForeground.color : t3.web.foreground.color)
+                    .foregroundStyle(foreground)
             }
             .buttonStyle(.plain)
             .frame(width: T3ButtonMetrics.height(.sm), height: T3ButtonMetrics.height(.sm))
             .background(active ? t3.web.accent.color : .clear, in: RoundedRectangle(cornerRadius: T3Theme.Metrics.controlRadius))
+            .allowsHitTesting(enabled)
             .onHover { hover = $0 }
         }
     }
 
-    private var active: Bool { pressed || hover }
+    private var active: Bool { enabled && (pressed || hover) }
+
+    private var foreground: SwiftUI.Color {
+        guard enabled else { return t3.web.mutedForeground.color }
+        return active ? t3.web.accentForeground.color : t3.web.foreground.color
+    }
 }
