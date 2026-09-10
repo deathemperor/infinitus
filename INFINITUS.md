@@ -93,8 +93,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — `InfinitusSignIns` in the
   thread list's header (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
-  (active account + fullest window of the Mac the list follows) before the
-  filter button.
+  (active account + fullest window of the Mac the list follows, plus its
+  waiting-session count) before the filter button.
 - `apps/web/src/components/settings/settingsSearch.ts` — the five Infinitus
   `SettingsPath`s and their labels, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
@@ -169,7 +169,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (copied from the native phone's asset catalog).
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@t3tools/client-runtime/state/infinitusAccounts`).
+  `@t3tools/client-runtime/state/infinitusAccounts`), which also carries each
+  Mac's Sessions card (`features/infinitus/InfinitusSessions.tsx` +
+  `sessions.logic.ts`, rows from
+  `@t3tools/client-runtime/state/infinitusSessions`; `session-mode` per row).
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
