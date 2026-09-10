@@ -547,11 +547,9 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
     /// the legacy `CswapBar/` dir as part of the one intentional
     /// bundle-id step (2026-08-30). A JSON array of RowTheme objects;
     /// only `id` and `name` are required.
-    public static func customThemesURL(
-        appSupport: URL = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    ) -> URL {
-        appSupport.appendingPathComponent("Infinitus/themes.json")
+    /// `appSupport` is the app's own directory (`AppSupport.root()`).
+    public static func customThemesURL(appSupport: URL = AppSupport.root()) -> URL {
+        appSupport.appendingPathComponent("themes.json")
     }
 
     /// Best-effort load; a broken file yields [] rather than a crash —

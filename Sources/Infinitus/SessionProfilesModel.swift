@@ -13,8 +13,7 @@ final class SessionProfilesModel: ObservableObject {
     /// `INFINITUS_PROFILES`: the e2e gate's own file, so its round-trips
     /// never touch the real list.
     init(url: URL = ProcessInfo.processInfo.environment["INFINITUS_PROFILES"].map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Infinitus/session-profiles.json")) {
+            ?? AppSupport.root().appendingPathComponent("session-profiles.json")) {
         self.url = url
         self.profiles = SessionProfiles.load(from: url)
     }

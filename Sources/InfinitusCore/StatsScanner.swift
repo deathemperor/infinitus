@@ -412,8 +412,7 @@ public enum StatsScanner {
     /// year's 20 MB one, and the next bundle launch re-read every
     /// transcript (2026-09-10).
     public static func defaultCacheURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Infinitus/stats")
+        let dir = AppSupport.root(environment: environment).appendingPathComponent("stats")
         if let home = environment["CLAUDE_CONFIG_DIR"], !home.isEmpty {
             let tag = home.map { $0 == "/" ? "-" : $0 }.reduce(into: "") { $0.append($1) }
             return dir.appendingPathComponent("transcripts-\(tag).json")
