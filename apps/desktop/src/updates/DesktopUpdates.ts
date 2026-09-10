@@ -32,7 +32,10 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
-import { resolveDefaultDesktopUpdateChannel } from "./updateChannels.ts";
+import {
+  resolveDefaultDesktopUpdateChannel,
+  resolveEffectiveDesktopUpdateChannel,
+} from "./updateChannels.ts";
 import {
   createInitialDesktopUpdateState,
   reduceDesktopUpdateStateOnCheckFailure,
@@ -376,7 +379,7 @@ export const make = Effect.gen(function* () {
     channel: DesktopUpdateChannel,
   ) {
     yield* Effect.annotateCurrentSpan({ channel });
-    const allowsPrerelease = channel === "nightly";
+    const allowsPrerelease = channel === "nightly" || channel === "infinitus";
     yield* electronUpdater.setChannel(channel);
     yield* electronUpdater.setAllowPrerelease(allowsPrerelease);
     yield* electronUpdater.setAllowDowngrade(allowsPrerelease);
@@ -877,8 +880,12 @@ export const make = Effect.gen(function* () {
       }
 
       const settings = yield* desktopSettings.get;
+      const channel = resolveEffectiveDesktopUpdateChannel(
+        environment.appVersion,
+        settings.updateChannel,
+      );
       const enabled = yield* shouldEnableAutoUpdates;
-      yield* setState(createBaseUpdateState(settings.updateChannel, enabled, environment));
+      yield* setState(createBaseUpdateState(channel, enabled, environment));
       if (!enabled) {
         return;
       }
@@ -886,7 +893,7 @@ export const make = Effect.gen(function* () {
 
       yield* electronUpdater.setAutoDownload(false);
       yield* electronUpdater.setAutoInstallOnAppQuit(false);
-      yield* applyAutoUpdaterChannel(settings.updateChannel);
+      yield* applyAutoUpdaterChannel(channel);
       yield* electronUpdater.setDisableDifferentialDownload(
         isArm64HostRunningIntelBuild(environment.runtimeInfo),
       );
