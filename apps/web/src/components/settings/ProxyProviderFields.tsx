@@ -81,7 +81,7 @@ export function ProxyProviderFields({
     placeholder: string,
     onValue: (next: string) => void,
   ) => (
-    <label className="grid gap-1.5">
+    <div key={label} className="grid gap-1.5">
       <span className="text-xs font-medium text-foreground">{label}</span>
       {models ? (
         <Select
@@ -110,7 +110,7 @@ export function ProxyProviderFields({
           onChange={(event) => onValue(event.target.value)}
         />
       )}
-    </label>
+    </div>
   );
 
   return (
@@ -132,7 +132,7 @@ export function ProxyProviderFields({
       {draft.enabled ? (
         <>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)]">
-            <label className="grid gap-1.5">
+            <div className="grid gap-1.5">
               <span className="text-xs font-medium text-foreground">Proxy</span>
               <Select
                 value={draft.preset}
@@ -154,7 +154,7 @@ export function ProxyProviderFields({
                   ))}
                 </SelectPopup>
               </Select>
-            </label>
+            </div>
             <label className="grid gap-1.5">
               <span className="text-xs font-medium text-foreground">Base URL</span>
               <Input

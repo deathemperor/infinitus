@@ -62,7 +62,7 @@ export function validateProxyDraft(draft: ProxyDraft): string | null {
   return null;
 }
 
-export function defaultProxyHomePath(instanceId: string): string {
+function defaultProxyHomePath(instanceId: string): string {
   return `~/.claude-proxy/${instanceId}`;
 }
 
