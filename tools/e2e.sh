@@ -415,6 +415,10 @@ echo "prefs: ok"
 
 # JSON-body verbs (#572 N1): the socket takes what the mirror routes take.
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
+# #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
+"$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
+"$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+"$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
 echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
 "$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a
