@@ -153,6 +153,7 @@ publishes the matching section as the GitHub release body.
 - The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
 - Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 - The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
+- Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
