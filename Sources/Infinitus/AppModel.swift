@@ -3206,13 +3206,27 @@ final class AppModel: ObservableObject {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
+        // #777: nested in the desktop, the fork's own threads (SDK-entered,
+        // #648) leave the "sessions done" and waiting counts — the desktop
+        // announces those itself; terminal sessions stay the helper's.
+        var live = list.liveSessions
+        if Nesting.isNested, let all = live, let details = all.sessions {
+            let forkPids = Set(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                .filter(\.resumedElsewhere).map { Int($0.pid) })
+            let fork = details.filter { forkPids.contains($0.pid) }
+            if !fork.isEmpty {
+                live = LiveSessions(busy: all.busy - fork.filter { $0.status == "busy" }.count,
+                                    total: all.total - fork.count,
+                                    sessions: details.filter { !forkPids.contains($0.pid) })
+            }
+        }
         let pushes = pushTriggers.tick(
-            busy: list.liveSessions?.busy, total: list.liveSessions?.total,
+            busy: live?.busy, total: live?.total,
             accounts: health,
             flags: .init(sessionsDone: pushSessionsDone,
                          allDead: pushAllDead, lastAlive: pushLastAlive,
                          waiting: pushWaiting, awsLogin: pushAwsLogin),
-            sessions: list.liveSessions?.sessions,
+            sessions: live?.sessions,
             awsLogins: awsLoginsScanned ? awsLogins : nil,
             now: Date())
         if pushTriggers.memory != persistedPushMemory {
