@@ -82,6 +82,7 @@ import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
+import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import {
@@ -531,6 +532,7 @@ const makeWsRpcLayer = (
       const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
       const infinitus = yield* InfinitusService;
+      const infinitusCompanion = yield* InfinitusCompanion;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
@@ -3035,6 +3037,10 @@ const makeWsRpcLayer = (
               .pipe(Effect.map((result) => (result === undefined ? {} : { result }))),
             { "rpc.aggregate": "infinitus" },
           ),
+        [WS_METHODS.infinitusLaunch]: (_input) =>
+          observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
+            "rpc.aggregate": "infinitus",
+          }),
       });
     }),
   );

@@ -161,6 +161,8 @@ export const RPC_REQUIRED_SCOPES = {
   // Every Infinitus command that is not a read is a switch, a rename or a
   // relaunch of the account engine, so the whole method takes operate.
   [WS_METHODS.infinitusCommand]: AuthOrchestrationOperateScope,
+  // Launching the app spawns a process on the host.
+  [WS_METHODS.infinitusLaunch]: AuthOrchestrationOperateScope,
 } as const satisfies Readonly<Record<WsRpcMethod, AuthEnvironmentScope>>;
 
 export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope {

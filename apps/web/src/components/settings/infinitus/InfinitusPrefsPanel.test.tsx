@@ -15,11 +15,20 @@ const { fake } = vi.hoisted(() => ({
 vi.mock("../../../state/environments", () => ({
   usePrimaryEnvironment: () => ({
     environmentId: "env-1",
-    serverConfig: { environment: { capabilities: { infinitus: fake.capability } } },
+    serverConfig: {
+      environment: {
+        capabilities: { infinitus: fake.capability },
+        platform: { os: "darwin", arch: "arm64" },
+      },
+    },
   }),
 }));
 vi.mock("../../../state/infinitus", () => ({
-  infinitusEnvironment: { snapshot: () => null, command: { label: "infinitus:command" } },
+  infinitusEnvironment: {
+    snapshot: () => null,
+    command: { label: "infinitus:command" },
+    launch: { label: "infinitus:launch" },
+  },
 }));
 vi.mock("../../../state/query", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../state/query")>()),
@@ -161,6 +170,14 @@ describe("InfinitusPrefsPanel states", () => {
     });
     await renderPanel();
     expect(rendered()).toContain("no socket at /tmp/infinitus.sock");
+    // A Mac server can be asked to open the app from here (#654).
+    expect(rendered()).toContain("Launch Infinitus");
+  });
+
+  it("offers no launch while the catalog is only loading", async () => {
+    fake.snapshot = null;
+    await renderPanel();
+    expect(rendered()).not.toContain("Launch Infinitus");
   });
 
   it("says which build a preference catalog needs", async () => {

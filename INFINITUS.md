@@ -237,6 +237,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   directory, least of all the installed app's `T3 Code (Alpha)`).
 - `packages/shared/src/infinitusControl.ts` — the control-socket path rule
   (`INFINITUS_CONTROL_SOCKET`, then the per-platform default).
+- `packages/shared/src/infinitusControlSocket.ts` — the control-socket wire
+  client itself (one connection per request, one JSON line each way, the
+  contract's request/reply schemas), shared by the server's control client
+  and the desktop shell's quit-with-app hook so the protocol exists once.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
@@ -244,6 +248,26 @@ this file adds the fork's own rules. Plan and history: issue #555.
   withheld, with one log line, from a dev-runner server or one whose home is
   a worktree-local `.t3`, so a dev run never takes the installed desktop's
   tunnel, #640).
+  `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
+  Mac whose socket is still quiet 3 s after the server starts it runs `open
+-g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
+  withheld from dev/worktree servers exactly like the port publish), and the
+  same body answers `infinitus.launch` (operate scope) for the web's "Launch
+  Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
+  error; the app coming up is the snapshot flipping.
+- `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
+  `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
+  (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
+  untouched), `InfinitusQuitWithApp.ts` listens to `before-quit` and, with
+  the knob on, sends the menu-bar app its `quit` verb over the socket — only
+  when the running app's manifest lists the verb, never by version; one send
+  per process, skipped for an updater-driven quit. Reached from the web over
+  the bridge's optional `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp`
+  (`ipc/methods/infinitus.ts`); the switch is the "This window" card on
+  Settings › Infinitus (`InfinitusDesktopCard.tsx`, hidden in a browser or
+  under an older shell). `InfinitusLaunchButton.tsx` is the launch button on
+  the Accounts offline card and every Infinitus pane's unavailable notice,
+  drawn only when the server's host is a Mac.
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).

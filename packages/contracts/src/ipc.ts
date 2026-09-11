@@ -98,6 +98,7 @@ import type {
 import { AuthAccessTokenResult, AuthSessionState, AuthWebSocketTicketResult } from "./auth.ts";
 import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
+import type { InfinitusDesktopPrefs } from "./infinitus.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
 import type { EditorId } from "./editor.ts";
 import type {
@@ -1281,6 +1282,12 @@ export interface DesktopBridge {
   setWslBackendEnabled: (enabled: boolean) => Promise<DesktopWslState>;
   setWslDistro: (distro: string | null) => Promise<DesktopWslState>;
   setWslOnly: (enabled: boolean) => Promise<DesktopWslState>;
+  /**
+   * Fork (#654): the desktop shell's own Infinitus knobs. Optional: a web
+   * client hosted by a shell without them hides the setting.
+   */
+  getInfinitusDesktopPrefs?: () => Promise<InfinitusDesktopPrefs>;
+  setInfinitusQuitWithApp?: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;

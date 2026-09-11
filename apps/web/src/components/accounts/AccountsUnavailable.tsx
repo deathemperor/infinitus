@@ -1,3 +1,4 @@
+import { InfinitusLaunchButton } from "../settings/infinitus/InfinitusLaunchButton";
 import { Button } from "../ui/button";
 
 /**
@@ -23,9 +24,12 @@ export function AccountsUnavailable({
       {socketPath === null ? null : (
         <p className="break-all font-mono text-muted-foreground text-xs">{socketPath}</p>
       )}
-      <Button size="sm" variant="outline" onClick={onRetry}>
-        Retry
-      </Button>
+      <div className="flex flex-wrap items-start gap-2">
+        <InfinitusLaunchButton />
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
     </section>
   );
 }

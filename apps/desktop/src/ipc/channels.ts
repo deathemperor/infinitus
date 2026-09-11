@@ -105,3 +105,6 @@ export const PREVIEW_RECORDING_SAVE_CHANNEL = "desktop:preview-recording-save";
 export const PREVIEW_RECORDING_FRAME_CHANNEL = "desktop:preview-recording-frame";
 export const PREVIEW_STATE_CHANGE_CHANNEL = "desktop:preview-state-change";
 export const PREVIEW_POINTER_EVENT_CHANNEL = "desktop:preview-pointer-event";
+// Fork: the desktop shell's Infinitus prefs (#654).
+export const GET_INFINITUS_DESKTOP_PREFS_CHANNEL = "desktop:infinitus-get-desktop-prefs";
+export const SET_INFINITUS_QUIT_WITH_APP_CHANNEL = "desktop:infinitus-set-quit-with-app";

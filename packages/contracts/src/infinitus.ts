@@ -341,6 +341,25 @@ export const InfinitusSnapshot = Schema.Struct({
 });
 export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;
 
+/** What `infinitus.launch` did: `launched` when it asked LaunchServices to
+    open the menu-bar app, otherwise the one-line reason it did not — the app
+    was already answering, the server is not on macOS, or `open` failed. The
+    app coming up is the snapshot flipping to `available`, never this. */
+export const InfinitusLaunchResult = Schema.Struct({
+  launched: Schema.Boolean,
+  reason: Schema.optionalKey(Schema.String),
+});
+export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
+
+/** The desktop shell's own Infinitus knobs (one-app feel, #654), kept by the
+    shell rather than the server because they describe this window.
+    `quitInfinitusWithApp`: quitting the desktop app also sends the menu-bar
+    app its `quit` verb. Off by default. */
+export const InfinitusDesktopPrefs = Schema.Struct({
+  quitInfinitusWithApp: Schema.Boolean,
+});
+export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
+
 /*
  * Phone-only writes (#572). The native mirror's `POST /activities/token`,
  * `POST /client-activity` and `POST /crashes` bodies, carried unchanged as the
