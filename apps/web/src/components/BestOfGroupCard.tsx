@@ -76,6 +76,9 @@ export function BestOfGroupCard({
   const { archiveThread } = useThreadActions();
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const removeWorktree = useAtomCommand(vcsEnvironment.removeWorktree, { reportFailure: false });
+  const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
+    reportFailure: false,
+  });
   const [keeping, setKeeping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,19 +113,35 @@ export function BestOfGroupCard({
             deleteBranch: false,
           },
         });
-        if (removed._tag === "Failure" && !isAtomCommandInterrupted(removed)) {
+        if (removed._tag === "Failure") {
+          if (isAtomCommandInterrupted(removed)) continue;
           const cause = squashAtomCommandFailure(removed);
           failures.push(
             cause instanceof Error
               ? cause.message
               : `Could not remove ${sibling.title}'s worktree.`,
           );
+          continue;
         }
+        // The path is gone; the archived thread stops counting as a worktree holder.
+        await updateThreadMetadata({
+          environmentId,
+          input: { threadId: sibling.id, worktreePath: null },
+        });
       }
     }
     setKeeping(false);
     if (failures.length > 0) setError(failures.join(" "));
-  }, [archiveThread, environmentId, interruptTurn, project, removeWorktree, siblings, threadId]);
+  }, [
+    archiveThread,
+    environmentId,
+    interruptTurn,
+    project,
+    removeWorktree,
+    siblings,
+    threadId,
+    updateThreadMetadata,
+  ]);
 
   if (siblings.length < 2) return null;
 

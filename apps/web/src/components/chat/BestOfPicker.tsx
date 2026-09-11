@@ -8,6 +8,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { BEST_OF_MAX, BEST_OF_MIN, type BestOfChip } from "./bestOf.logic";
 import { ComposerControl, ComposerControlIcon, type ComposerControlSize } from "./ComposerControl";
+import { composerFloatingLayerProps } from "./composerEventScope";
 import type { ModelEsque } from "./providerIconUtils";
 
 /**
@@ -72,7 +73,7 @@ export function BestOfPicker({
           then keep the result you like
         </TooltipPopup>
       </Tooltip>
-      <PopoverPopup side="top" align="start" className="w-64 p-2">
+      <PopoverPopup {...composerFloatingLayerProps} side="top" align="start" className="w-64 p-2">
         <div className="text-muted-foreground px-1 pb-1.5 text-xs">
           Pick {BEST_OF_MIN}–{BEST_OF_MAX} models. Each gets its own worktree; the prompt is sent as
           typed, text only.
