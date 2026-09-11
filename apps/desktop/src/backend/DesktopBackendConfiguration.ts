@@ -507,6 +507,18 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       env: {
         ...backendChildEnvPatch(),
         ELECTRON_RUN_AS_NODE: "1",
+        // The packaged macOS app names its own bundle so the server can open
+        // the menu-bar helper nested in it by path and reconcile a stale one
+        // after an update (#777). Dev and CLI servers never see it.
+        ...(environment.isPackaged && environment.platform === "darwin"
+          ? {
+              INFINITUS_DESKTOP_BUNDLE: environment.path.resolve(
+                environment.resourcesPath,
+                "..",
+                "..",
+              ),
+            }
+          : {}),
       },
       // Primary wants process.env (PATH, dev-runner's T3CODE_HOME, etc.).
       extendEnv: true,

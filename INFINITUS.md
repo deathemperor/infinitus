@@ -753,7 +753,21 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   opened over, `infinitus.companion.stale-socket`), and the
   same body answers `infinitus.launch` (operate scope) for the web's "Launch
   Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
-  error; the app coming up is the snapshot flipping.
+  error; the app coming up is the snapshot flipping. With the menu-bar app
+  nested in the desktop bundle (#777): the packaged macOS desktop sets
+  `INFINITUS_DESKTOP_BUNDLE` for its backend, the companion resolves the
+  helper at `Contents/Library/LoginItems/Infinitus Menu Bar.app` and its
+  version (PlistBuddy on its Info.plist), opens it by path first (`open -g
+-a`; a fresh DMG install is not in LaunchServices yet, and a brew-cask
+  copy may still carry the bundle id, #7) with the bundle id as the
+  fallback, and reconciles at startup: an answering helper whose
+  `status.bundlePath` is that nested path and whose `version` is not the
+  shipped one (the updater installs by moving bundles, so the old helper
+  keeps running) is sent `quit`, re-probed every 2 s until the socket stops
+  answering (never an `open` on top of a shutdown, #637), then reopened by
+  path. A standalone helper is left alone whatever its version; one that
+  reports no `bundlePath` only has its skew logged
+  (`infinitus.companion.skew-unarmed`).
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
