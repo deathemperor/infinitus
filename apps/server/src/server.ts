@@ -70,6 +70,7 @@ import {
 } from "./infinitus/Layers/InfinitusControlClient.ts";
 import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
 import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
+import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
@@ -305,6 +306,8 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(ThreadPullRequestReactor.layer),
   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(RuntimeReceiptBusLive),
+  // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
+  Layer.provideMerge(InfinitusResumeOnLimitLive),
 );
 
 const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(

@@ -58,7 +58,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
-  `RuntimeDependenciesLive`.
+  `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
+  (#648).
+- `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
+  `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
@@ -315,6 +318,19 @@ this file adds the fork's own rules. Plan and history: issue #555.
   withheld, with one log line, from a dev-runner server or one whose home is
   a worktree-local `.t3`, so a dev run never takes the installed desktop's
   tunnel, #640).
+  `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
+  resume-on-limit for the threads this server runs (#648), the fork's
+  counterpart to native's terminal nudge: the Claude adapter's parked-turn
+  warning (`rate_limit_info.status: "rejected"`) or a limit-failed
+  `turn.completed` records a stop; while any thread is stopped the layer
+  subscribes to the snapshot and waits for an active Claude account that
+  reads `ok` from a probe taken after the stop (native's ResumeGate); then
+  the parked turn is interrupted, a `infinitus.turn.resumed` work-log row
+  names the account, and the thread continues with upstream's continuation
+  prompt from its resume cursor. Once per stop, 2-min cooldown per thread,
+  a user turn cancels; off by the `infinitusResumeOnLimit` server setting
+  (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
+  Settings › Infinitus).
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
   Mac whose socket is still quiet 3 s after the server starts it runs `open
 -g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
