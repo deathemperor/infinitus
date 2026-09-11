@@ -312,9 +312,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
+- `apps/web/src/components/settings/settingsSearch.ts` — the nine Infinitus
   `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Sessions since #743), the `infinitusOnly` search flag with the
+  Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
@@ -332,7 +332,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   capture sound, and the `completion-sound` search item in
   `settingsSearch.ts`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all eight where no
+  Infinitus path and the capability filter that hides all nine where no
   connected server reaches an Infinitus app.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -341,13 +341,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
 - `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
   marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
   instead of the pairing form, so the browser does not spend a phone's token.
-- `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
+- `apps/web/src/routes/settings.infinitus*.tsx` (nine new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Sessions
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
   the Menu bar page keeps `display` + `about`; a section the build lacks
-  renders "no … settings yet") and `apps/web/src/routeTree.gen.ts` — regenerated with
+  renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3) and
+  `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
@@ -438,6 +439,19 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that line and `CaptureGestureCoordinator`'s are the
   fork's only edits there).
+- `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
+  `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
+  › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
+  `lock-status` / `lock on|off [--yes]|now|relock <arg>` / `unlock` (native
+  #788), each answering `{enabled, locked, relock}`. The switch turns the
+  lock on (the Mac's own prompt runs there; the row says "Confirm on the
+  Mac" while it waits) or off; a `lock off` refused inside a team ("this Mac
+  is in …; lock off --yes …") becomes a Keep on / Turn off confirm whose
+  Turn off sends `--yes`. Re-lock is a select over the four native labels
+  (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
+  Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
+  the app's text verbatim; the pane holds no secret. Gated on the manifest
+  carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
 - `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
   the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
   shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`

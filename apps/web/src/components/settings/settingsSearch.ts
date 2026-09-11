@@ -15,6 +15,7 @@ export type SettingsPath =
   | "/settings/infinitus/themes"
   | "/settings/infinitus/animations"
   | "/settings/infinitus/sessions"
+  | "/settings/infinitus/lock"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
@@ -75,6 +76,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/infinitus/themes": "Themes",
   "/settings/infinitus/animations": "Animations",
   "/settings/infinitus/sessions": "Sessions",
+  "/settings/infinitus/lock": "Lock",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
@@ -657,6 +659,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-sessions",
     infinitusOnly: true,
     searchTerms: ["session priority mode hold interrupt headroom low abundant pct background"],
+  },
+  {
+    id: "infinitus-lock",
+    title: "Infinitus lock",
+    to: "/settings/infinitus/lock",
+    targetId: "infinitus-lock",
+    infinitusOnly: true,
+    searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
   },
   {
     id: "infinitus-push",
