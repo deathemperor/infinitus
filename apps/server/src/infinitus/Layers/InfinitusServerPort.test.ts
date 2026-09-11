@@ -13,7 +13,7 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { describe, expect } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   InfinitusControlClient,
@@ -21,7 +21,11 @@ import {
 } from "../Services/InfinitusControlClient.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLive } from "./Infinitus.ts";
-import { keepServerPortPublished, publishServerPort } from "./InfinitusServerPort.ts";
+import {
+  keepServerPortPublished,
+  publishServerPort,
+  serverPortWithheldReason,
+} from "./InfinitusServerPort.ts";
 
 const STUB_SOCKET = "/tmp/infinitus-stub.sock";
 const FAST = Duration.seconds(5);
@@ -146,6 +150,31 @@ const watch = Effect.fn("watch")(function* () {
 
 /** Lets the republish fiber, which runs behind the snapshot, get its turn. */
 const settle = Effect.repeat(Effect.yieldNow, { times: 20 });
+
+describe("serverPortWithheldReason", () => {
+  it("withholds the pref from a dev-runner or worktree server and publishes for the installed one", () => {
+    const installed = { devUrl: undefined, baseDir: "/Users/me/.t3", worktreeT3Home: undefined };
+    expect(serverPortWithheldReason(installed)).toBeUndefined();
+    expect(
+      serverPortWithheldReason({ ...installed, devUrl: new URL("http://localhost:3000") }),
+    ).toMatch(/dev-runner/);
+    expect(
+      serverPortWithheldReason({
+        devUrl: undefined,
+        baseDir: "/Users/me/wt/.t3",
+        worktreeT3Home: "/Users/me/wt/.t3",
+      }),
+    ).toMatch(/worktree-local/);
+    // A worktree checkout run against the shared home is not a worktree server.
+    expect(
+      serverPortWithheldReason({
+        devUrl: undefined,
+        baseDir: "/Users/me/.t3",
+        worktreeT3Home: "/Users/me/wt/.t3",
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe("publishServerPort", () => {
   effectIt.effect("sets fork_server_port when the manifest lists prefs", () =>

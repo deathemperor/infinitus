@@ -1,10 +1,12 @@
 import { InfinitusManifest } from "@t3tools/contracts/infinitus";
+import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/unstable/http";
 
+import { ServerConfig } from "../../config.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
@@ -75,14 +77,45 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
   );
 });
 
+/**
+ * Why a server keeps its port to itself, or undefined for the installed one.
+ * The pref names the server the phone's tunnel fronts, and the installed
+ * desktop's bundled server is the one that should own it: a dev-runner server
+ * (it serves the web app from Vite, so it carries a dev URL) or any server
+ * whose home is a worktree-local `.t3` would otherwise take the tunnel with
+ * it, last writer wins (#640).
+ */
+export const serverPortWithheldReason = (input: {
+  readonly devUrl: URL | undefined;
+  readonly baseDir: string;
+  readonly worktreeT3Home: string | undefined;
+}): string | undefined => {
+  if (input.devUrl !== undefined) return "a dev-runner server serves the web app from a dev URL";
+  if (input.worktreeT3Home !== undefined && input.worktreeT3Home === input.baseDir) {
+    return "its home is a worktree-local .t3";
+  }
+  return undefined;
+};
+
 /** Publishes the bound port once the server is listening and activated, and
-    again whenever a watched Infinitus comes back. */
+    again whenever a watched Infinitus comes back — for the installed server
+    only; a development one says why it stays quiet and stops. */
 export const InfinitusServerPortLive = Layer.effectDiscard(
   forkParked(
     Effect.gen(function* () {
       const server = yield* HttpServer.HttpServer;
       const address = server.address;
       if (typeof address === "string" || !("port" in address)) return;
+      const config = yield* ServerConfig;
+      const reason = serverPortWithheldReason({
+        devUrl: config.devUrl,
+        baseDir: config.baseDir,
+        worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
+      });
+      if (reason !== undefined) {
+        yield* Effect.logInfo("infinitus.server-port.withheld", { port: address.port, reason });
+        return;
+      }
       yield* keepServerPortPublished(address.port);
     }),
   ),
