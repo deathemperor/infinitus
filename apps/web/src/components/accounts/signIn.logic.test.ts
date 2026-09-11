@@ -6,6 +6,8 @@ import {
   signInBridge,
   signInBusy,
   signInCancelCommandArgs,
+  signInCodeReply,
+  signInCodeSecretArgs,
   signInStatusCommandArgs,
   signInStatusReply,
   signInStatusText,
@@ -17,6 +19,7 @@ const flow = (over: Partial<SignInFlow>): SignInFlow => ({
   fleetKey: "swapd/claude",
   target: null,
   flowId: "f1",
+  url: null,
   pasteCode: true,
   phase: "starting",
   error: null,
@@ -106,5 +109,45 @@ describe("signInStatusText / signInBusy", () => {
     expect(signInBusy(flow({ phase: "waitingForCode" }))).toBe(true);
     expect(signInBusy(flow({ phase: "done" }))).toBe(false);
     expect(signInBusy(flow({ phase: "failed" }))).toBe(false);
+  });
+
+  it("hands the code to infinitus.secret as signin-code and reads the CLI's answer (#747)", () => {
+    expect(signInCodeSecretArgs("f1")).toEqual({ command: "signin-code", args: { flowId: "f1" } });
+    expect(signInCodeReply({ ok: true })).toEqual({ ok: true });
+    expect(signInCodeReply({ ok: false, error: "Invalid code" })).toEqual({
+      ok: false,
+      error: "Invalid code",
+    });
+    expect(signInCodeReply({ state: "done" })).toBeNull();
+    expect(signInCodeReply(undefined)).toBeNull();
+  });
+
+  it("says where to sign in: the shell's window, or the page this device opened", () => {
+    const flow = {
+      fleetKey: "claude",
+      target: null,
+      flowId: "f1",
+      url: null,
+      pasteCode: true,
+      phase: "waitingForCode" as const,
+      error: null,
+      account: null,
+      codeError: null,
+      codeBusy: false,
+    };
+    expect(signInStatusText(flow)).toBe(
+      "Sign in in the window, then paste the code from the success page here.",
+    );
+    expect(signInStatusText({ ...flow, url: "https://claude.ai/oauth" })).toBe(
+      "Sign in on the sign-in page, then paste the code from the success page here.",
+    );
+    expect(
+      signInStatusText({
+        ...flow,
+        url: "https://claude.ai/oauth",
+        pasteCode: false,
+        phase: "waitingForToken",
+      }),
+    ).toBe("Sign in on the sign-in page.");
   });
 });

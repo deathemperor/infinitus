@@ -4,6 +4,7 @@ import * as Cause from "effect/Cause";
 import type { ReactNode } from "react";
 import { act, cloneElement, isValidElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import * as Redacted from "effect/Redacted";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -44,6 +45,7 @@ vi.mock("../../state/infinitus", () => ({
     snapshot: () => ({ label: "snapshot-atom" }),
     command: { label: "command-atom" },
     launch: { label: "launch-atom" },
+    secret: { label: "secret-atom" },
   },
 }));
 vi.mock("../../state/query", () => ({
@@ -471,18 +473,83 @@ describe("AccountsPage", () => {
     submitInfinitusSignInCode: vi.fn().mockResolvedValue({ ok: true }),
   });
 
-  it("on a build with signin-begin, a client without the shell points at the Mac", () => {
+  it("without the shell, opens the page from a link and hands the code over infinitus.secret (#747)", async () => {
     const restore = installBridge(undefined);
     testState.snapshot = signInSnapshot;
+    const begun = {
+      flowId: "f1",
+      url: "https://claude.ai/oauth",
+      pasteCode: true,
+      label: "Add account",
+    };
+    // The poll keeps asking while the test looks at the page, so answer by verb:
+    // waiting for the code until it is submitted over the secret RPC, then done.
+    let codeSubmitted = false;
+    testState.command = vi.fn().mockImplementation(async (call: { input: { command: string } }) => {
+      switch (call.input.command) {
+        case "signin-begin":
+          return { _tag: "Success", value: { result: begun } };
+        case "signin-status":
+          return {
+            _tag: "Success",
+            value: {
+              result: codeSubmitted
+                ? { flowId: "f1", phase: "done", pasteCode: true, account: "two@example.com" }
+                : { flowId: "f1", phase: "waitingForCode", pasteCode: true },
+            },
+          };
+        case "signin-code":
+          codeSubmitted = true;
+          return { _tag: "Success", value: { result: { ok: true } } };
+        default:
+          return { _tag: "Success", value: {} };
+      }
+    });
     let renderer!: ReactTestRenderer;
-    act(() => {
+    await act(async () => {
       renderer = create(<AccountsPage />);
     });
-    const labels = renderer.root
-      .findAll((node) => typeof node.props["aria-label"] === "string")
-      .map((node) => node.props["aria-label"] as string);
-    expect(labels.some((label) => label.startsWith("Add account:"))).toBe(false);
-    expect(JSON.stringify(renderer.toJSON())).toContain("Sign in from the Mac.");
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    // No shell: the page is a link for this device to open.
+    const link = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Open the sign-in page: Claude (swapd)",
+    )[0]!;
+    expect(link.props.href).toBe("https://claude.ai/oauth");
+    expect(link.props.target).toBe("_blank");
+    const field = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Sign-in code: Claude (swapd)",
+    )[0]!;
+    expect(field.props.type).toBe("password");
+    expect(field.props.autoComplete).toBe("off");
+
+    const section = renderer.root.findAll(
+      (node) => node.props.signIn?.onSubmitCode !== undefined,
+    )[0]!;
+    await act(async () => {
+      section.props.signIn.onSubmitCode("the-code");
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const codeCall = testState.command.mock.calls.find(
+      (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
+    )![0] as { environmentId: string; input: { args: unknown; secret: Redacted.Redacted<string> } };
+    expect(codeCall.environmentId).toBe(environmentId);
+    expect(codeCall.input.args).toEqual({ flowId: "f1" });
+    expect(Redacted.value(codeCall.input.secret)).toBe("the-code");
+    // The value never lands in the rendered page.
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("the-code");
+    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
+    expect(status.children.join("")).toBe("Signed in as two@example.com.");
     renderer.unmount();
     restore();
   });
