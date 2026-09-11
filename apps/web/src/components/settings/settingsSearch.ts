@@ -382,6 +382,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "snap-shot-enabled",
   },
   {
+    // Fork (#270 H): the completion sound sits beside the capture sound.
+    id: "completion-sound",
+    title: "Completion sound",
+    to: "/settings/snap-shot",
+    targetId: "snap-shot-enabled",
+    searchTerms: ["turn finished done bell chime background window notification"],
+  },
+  {
     id: "snap-shot-flash",
     title: "Capture flash",
     to: "/settings/snap-shot",
