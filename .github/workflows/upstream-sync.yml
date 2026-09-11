@@ -16,12 +16,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          # A fine-grained PAT (contents + workflows + pull-requests: write) lets
+          # the sync push a branch that touches .github/workflows, which the
+          # default token refuses (#658). Without the secret the default token
+          # is used and such a sync fails at the push — then do it by hand.
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
           fetch-depth: 0
           ref: main
       - name: Merge upstream/main onto a sync branch
         id: merge
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+          HAS_PAT: ${{ secrets.UPSTREAM_SYNC_TOKEN != '' }}
         run: |
           set -e
           git config user.name "infinitus-sync[bot]"
@@ -49,12 +55,13 @@ jobs:
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           # A push made with GITHUB_TOKEN starts no push/pull_request run, but
           # workflow_dispatch is exempt: start CI on the head so the PR's
-          # required checks (they attach to the sha) can go green.
-          gh workflow run ci.yml --ref "$branch"
+          # required checks (they attach to the sha) can go green. A PAT push
+          # starts CI by itself, so skip the extra run then.
+          if [ "$HAS_PAT" != "true" ]; then gh workflow run ci.yml --ref "$branch"; fi
       - name: Open the PR
         if: steps.merge.outputs.state != 'uptodate'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           sha=$(git rev-parse --short upstream/main)
