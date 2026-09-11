@@ -27,6 +27,17 @@ export class PairingQrPayloadEmptyError extends Schema.TaggedError<PairingQrPayl
   }
 }
 
+/** What the add-connection form is missing before it can pair, as the
+    banner line, or null when it has both fields. The form pairs by URL
+    (`buildPairingUrl`), and a host without a code builds to a bare host,
+    which the resolver reads as an invalid URL (#669) — so the missing-code
+    message, `RemotePairingCodeMissingError`'s, is decided here. */
+export function missingPairingInput(host: string, code: string): string | null {
+  if (host.trim().length === 0) return "Enter a host.";
+  if (code.trim().length === 0) return "Enter a pairing code.";
+  return null;
+}
+
 export function buildPairingUrl(host: string, code: string): string {
   const h = host.trim();
   const c = code.trim();

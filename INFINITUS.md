@@ -374,7 +374,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `/.well-known/t3/environment` on the desktop server's port (3773), no
   Bonjour (that needs a native module the Expo build lacks); a tap fills
   Host, the code is still typed. `ConnectionsNewRouteScreen.tsx` only mounts
-  it above the Host field.
+  it above the Host field, and (#669) refuses to submit a host without a
+  code: `missingPairingInput` in `pairing.ts` names the missing field
+  ("Enter a pairing code.") in the banner, since a bare host built into a
+  pairing URL would otherwise read as "Pairing URL is invalid."
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
