@@ -46,11 +46,12 @@ before that the `native` branch). Split out of
   upstream PR). Before that (#555, 2026-09-10 → 2026-09-12) it was the
   `native` branch; that branch is frozen and read-only for a fallback
   window, then deleted. Base Mac work on `origin/main`; a Mac PR is an
-  ordinary main PR. The Mac app's releases are tagged `mac-v<version>`
-  (main's release.yml owns every `v*.*.*` tag, so the prefix keeps the
-  two pipelines apart until layer 3 unifies them; AboutPane strips it)
-  and keep `releases/latest` + the `nightly` tag (AboutPane polls them);
-  the desktop's are the `v*-infinitus.*` prereleases.
+  ordinary main PR. Since #823 layer 3 the Mac app ships inside the one
+  `v<version>` release (`.github/workflows/infinitus-release.yml`, the
+  root `VERSION` file, `apps/mac/docs/RELEASING.md`): both Mac zips, the
+  desktop DMG nesting the Menu Bar bundle, the Linux tray. `releases/latest`
+  and the `nightly` tag are what AboutPane polls; older Mac releases were
+  tagged `mac-v<version>` (AboutPane still strips that prefix).
 - **`main` takes commits only through pull requests** (GitHub ruleset
   "main via pull requests"; the native one retires with the branch):
   0 required approvals (solo repo); the Mac checks required on a PR head
@@ -156,8 +157,8 @@ before that the `native` branch). Split out of
   menu bar is the helper nested in Infinitus desktop
   (`/Applications/Infinitus.app/Contents/Library/LoginItems`), so nothing
   relaunches a local `Infinitus.app` on the real control socket: Mac
-  changes reach the user through a Mac release + the desktop's
-  `native-helper.json` pin (#777). Dev instances run on
+  changes reach the user through the one `v<version>` release, which
+  nests the Menu Bar bundle of the same sha (#777, #823). Dev instances run on
   `INFINITUS_CONTROL_SOCKET`. Never edit another session's tree; in any
   tree stage by explicit path.
 - Linux corelibs `Process`: one waited on through its `terminationHandler`

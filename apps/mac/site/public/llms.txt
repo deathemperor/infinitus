@@ -6,7 +6,7 @@
 - Source (MIT): https://github.com/deathemperor/infinitus
 - Releases: https://github.com/deathemperor/infinitus/releases
 - Issues / roadmap: https://github.com/deathemperor/infinitus/issues
-- Version: 0.4.5-alpha.1 (2026-09, alpha)
+- Version: 0.5.0-alpha.1 (2026-09, alpha)
 
 ## What it does
 

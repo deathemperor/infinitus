@@ -5,7 +5,10 @@ links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
 publishes the matching section as the GitHub release body.
 
-## Unreleased
+## 0.5.0-alpha.1
+
+### Release
+- One release: the desktop app, the menu bar app nested inside it, the Linux tray and the phone share one version number and ship from one `v<version>` tag (#823).
 
 ### Mac
 - The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).

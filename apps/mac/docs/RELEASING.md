@@ -1,17 +1,24 @@
 # Releasing Infinitus
 
 The version is the root `VERSION` file (one line, `0.5.0-alpha.N`; #823):
-`make-app.sh` stamps it into the bundle, the one release workflow (layer 3
-part B) passes it to the desktop build as `--build-version`, and the phone
-config carries it for Settings. Bump it in the release PR, nowhere else.
+`make-app.sh` stamps it into the bundle, the release workflow passes it to
+the desktop build as `--build-version`, and the phone config carries it
+for Settings. The release PR bumps it, renames the CHANGELOG's
+`## Unreleased` to `## <version>`, and updates the site and README; then
+`git tag v<version> && git push origin v<version>`.
 
-A `v*` tag push runs `.github/workflows/release.yml`: build on the
-macOS 26 runner, zip, GitHub release, tap cask bump. Nightly does the same
-from `main` daily. Since 0.4.5 a release carries two Mac assets (#777):
-`Infinitus-<v>.zip` (the standalone app, what the cask installs) and
-`Infinitus-Menu-Bar-<v>.zip` (the same build as `Infinitus Menu Bar.app`,
-no `infinitus://` URL type — what Infinitus desktop nests and pins by
-sha256 in its `apps/desktop/native-helper.json`).
+The tag runs `.github/workflows/infinitus-release.yml` on `main`: the Mac
+app on the macOS 26 runner (both bundles, signed, notarized, stapled),
+the desktop DMG with the Menu Bar bundle of the same run nested inside
+(#777), the Linux tray, then one GitHub release with all of it (a
+prerelease while the version has a `-alpha.N`/`-beta.N`/`-rc.N` tag) and
+the tap cask bump. The tag must match `VERSION` and the CHANGELOG must
+have the section, or the run fails before publishing. A
+`workflow_dispatch` is the dry run: artifacts, nothing published.
+Nightly (`mac-nightly.yml`) still builds the Mac app from `main` daily.
+The two Mac assets: `Infinitus-<v>.zip` (the standalone app, what the cask
+installs) and `Infinitus-Menu-Bar-<v>.zip` (the same build as `Infinitus
+Menu Bar.app`, no `infinitus://` URL type — what the desktop nests).
 
 ## Signing today
 
