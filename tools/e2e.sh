@@ -276,6 +276,13 @@ echo "aws: orphan login wrapper swept at launch"
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
 "$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='signin-code')['stdin']=='secret' and 'stdin' not in next(c for c in d['commands'] if c['name']=='status')" || fail "manifest: stdin flag (#747)"
 "$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
+# #747: the fork's Lock pane drives the setting through `lock`; `on` and
+# `unlock` need the biometric prompt (a human), so only the rest runs here.
+"$CTL" lock relock 5m | expect "d['relock']=='5 min'" || fail "lock relock 5m"
+"$CTL" lock relock 1h | expect "d['relock']=='1 h'" || fail "lock relock 1h"
+"$CTL" lock now | expect "d['locked'] is False" || fail "lock now must stay unlocked while the lock is off"
+"$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
+"$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
 sleep 4   # first demo snapshot
 N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
@@ -388,6 +395,11 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
 "$CTL" prefs set revive_lead_minutes 10 | expect "d['value']==10" || fail "prefs set back"
+# The reply keeps catalog order (themes before animations), not the order asked.
+"$CTL" prefs get intro_speed gamification_style | expect "(lambda p: p['intro_speed']['section']=='animations' and p['intro_speed']['min']==0.4 and p['intro_speed']['max']==2 and any(c['id']=='rpg' for c in p['gamification_style']['choices']))({x['key']:x for x in d['prefs']})" || fail "prefs: animations range / theme choices (#747)"
+"$CTL" prefs set intro_speed 3 >/dev/null 2>&1 && fail "prefs set accepted a value outside the range"
+"$CTL" prefs set intro_style fade | expect "d['value']=='fade'" || fail "prefs set intro_style"
+"$CTL" prefs set intro_style top >/dev/null || fail "prefs set intro_style back"
 # The fork server's tunnel (#572): off by default on T3's port; a mock
 # instance named Infinitus is `blocked`, so enabling it here never runs
 # cloudflared — the gate is what this checks.
@@ -639,6 +651,11 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts leaders \
 "$CTL" team-publish | expect "'published' in d" || fail "team-publish"
 "$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
 echo "team: ok (leader Ann, member Bo $KID)"
+# #747: the secret-carrying team verbs refuse an empty stdin by name.
+"$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
+"$CTL" team-hostname --zone example.com --label infi </dev/null 2>&1 | grep -q "needs the Cloudflare API token" || fail "team-hostname must ask for the token on stdin"
+"$CTL" team-hostname --zone example.com 2>&1 | grep -q "usage: team-hostname" || fail "team-hostname must want a label"
+"$CTL" team-hostname --clear </dev/null | expect "d['configured'] is False and d['zone'] is None" || fail "team-hostname --clear"
 
 # --- team control (#220, grantor) ------------------------------------------
 # Bo lets leaders send to one session; the hint rides Bo's now.json and
