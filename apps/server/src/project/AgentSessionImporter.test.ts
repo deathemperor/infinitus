@@ -35,6 +35,7 @@ import { OrchestrationEngineLive } from "../orchestration/Layers/OrchestrationEn
 import { OrchestrationProjectionPipelineLive } from "../orchestration/Layers/ProjectionPipeline.ts";
 import { OrchestrationProjectionSnapshotQueryLive } from "../orchestration/Layers/ProjectionSnapshotQuery.ts";
 import { ProviderCommandReactorLive } from "../orchestration/Layers/ProviderCommandReactor.ts";
+import { TurnStartGatePassthrough } from "../orchestration/Services/TurnStartGate.ts";
 import { OrchestrationCommandInvariantError } from "../orchestration/Errors.ts";
 import * as ThreadBackgroundLiveness from "../orchestration/ThreadBackgroundLiveness.ts";
 import * as ThreadPlanProgress from "../orchestration/ThreadPlanProgress.ts";
@@ -631,6 +632,7 @@ const integrationLayer = Layer.mergeAll(
   integrationRuntimeRepository,
   ProviderSessionDirectoryLive.pipe(Layer.provide(integrationRuntimeRepository)),
   Layer.succeed(AgentSessionScanner.AgentSessionScanner, integrationScanner),
+  TurnStartGatePassthrough,
 ).pipe(
   Layer.provide(ThreadBackgroundLiveness.layer),
   Layer.provide(ThreadPlanProgress.layer),

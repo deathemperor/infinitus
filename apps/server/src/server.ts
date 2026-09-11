@@ -80,6 +80,7 @@ import { OrchestrationReactorLive } from "./orchestration/Layers/OrchestrationRe
 import { RuntimeReceiptBusLive } from "./orchestration/Layers/RuntimeReceiptBus.ts";
 import { ProviderRuntimeIngestionLive } from "./orchestration/Layers/ProviderRuntimeIngestion.ts";
 import { ProviderCommandReactorLive } from "./orchestration/Layers/ProviderCommandReactor.ts";
+import { TurnStartGatePassthrough } from "./orchestration/Services/TurnStartGate.ts";
 import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.ts";
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
 import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
@@ -558,6 +559,9 @@ const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
   // The pairing-approval store (#710) mints through the same auth service the
   // QR flow uses; the phone reaches it over HTTP, the desktop over WebSocket.
   Layer.provideMerge(InfinitusPairingLive.pipe(Layer.provide(AuthLayerLive))),
+  // Fork (#616): every provider turn start passes this gate; passthrough until
+  // session priority mode's hold layer replaces it.
+  Layer.provideMerge(TurnStartGatePassthrough),
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(ExternalLauncher.layer),

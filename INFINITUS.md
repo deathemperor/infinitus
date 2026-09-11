@@ -84,7 +84,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
   (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
-  (#710).
+  (#710). `TurnStartGatePassthrough` in `RuntimeDependenciesLive` (#616).
+- `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
+  start's session start + send run through `TurnStartGate.start` (#616);
+  `serverRuntimeStartup.ts` — the post-update continuation's forked send does
+  the same. Their test harnesses (`ProviderCommandReactor.test.ts`,
+  `serverRuntimeStartup.reconcile.test.ts`, `AgentSessionImporter.test.ts`)
+  provide the passthrough gate, with a `turnStartGate` override in the first two.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
@@ -401,6 +407,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   client itself (one connection per request, one JSON line each way, the
   contract's request/reply schemas), shared by the server's control client
   and the desktop shell's quit-with-app hook so the protocol exists once.
+- `apps/server/src/orchestration/Services/TurnStartGate.ts` — the one seam a
+  provider turn start passes through (#616, session priority mode): `start({
+  threadId, run })` answers `started` (ran now) or `held` (kept for later; the
+  gate captures the caller's context and runs it under that later). The
+  passthrough layer is the server's default; the hold layer replaces it.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,

@@ -67,6 +67,11 @@ import {
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProviderCommandReactor } from "../Services/ProviderCommandReactor.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
+import {
+  TurnStartGate,
+  TurnStartGatePassthrough,
+  type TurnStartGateShape,
+} from "../Services/TurnStartGate.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Clock from "effect/Clock";
 import { ServerSettingsService } from "../../serverSettings.ts";
@@ -182,6 +187,8 @@ describe("ProviderCommandReactor", () => {
       session: ProviderSession,
     ) => Effect.Effect<ProviderSession, ProviderServiceError>;
     readonly tryHandlePromptCommandEffect?: ProviderAuthService["Service"]["tryHandlePromptCommand"];
+    /** Fork (#616): the gate a turn start passes through; passthrough by default. */
+    readonly turnStartGate?: TurnStartGateShape;
   }) {
     const now = "2026-01-01T00:00:00.000Z";
     const baseDir =
@@ -449,6 +456,11 @@ describe("ProviderCommandReactor", () => {
       Layer.provideMerge(reactorOrchestrationLayer),
       Layer.provideMerge(projectionSnapshotLayer),
       Layer.provideMerge(Layer.succeed(ProviderService, service)),
+      Layer.provideMerge(
+        input?.turnStartGate === undefined
+          ? TurnStartGatePassthrough
+          : Layer.succeed(TurnStartGate, input.turnStartGate),
+      ),
       Layer.provide(Layer.mock(ProviderAuthService, { tryHandlePromptCommand })),
       Layer.provideMerge(makeProviderRegistryLayer(providerSnapshots as never)),
       Layer.provideMerge(
@@ -829,6 +841,45 @@ describe("ProviderCommandReactor", () => {
       );
     }),
   );
+
+  it("hands a turn start to the TurnStartGate: a gate that holds starts no session and sends nothing (#616)", async () => {
+    const held: ThreadId[] = [];
+    const harness = await createHarness({
+      turnStartGate: {
+        start: ({ threadId }) =>
+          Effect.sync(() => {
+            held.push(threadId);
+            return "held" as const;
+          }),
+      },
+    });
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("cmd-turn-start-held"),
+        threadId: ThreadId.make("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-held"),
+          role: "user",
+          text: "hello, later",
+          attachments: [],
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    await waitFor(() => held.length === 1);
+    await harness.drain();
+    expect(held).toEqual([ThreadId.make("thread-1")]);
+    expect(harness.startSession).not.toHaveBeenCalled();
+    expect(harness.sendTurn).not.toHaveBeenCalled();
+    const readModel = await harness.readModel();
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
+    expect(thread?.session ?? null).toBeNull();
+  });
 
   it("reacts to thread.turn.start by ensuring session and sending provider turn", async () => {
     const harness = await createHarness();
