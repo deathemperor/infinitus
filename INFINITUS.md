@@ -60,7 +60,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding
   (#270 A). `VcsRemoveWorktreeInput` gains `keepWork` (commit whatever the
   worktree holds uncommitted to its branch, `wip: work saved when the thread
-  was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
+was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   after the remove, skipped whenever `keepWork` had to commit: that commit
   is the work's only copy), and answers `VcsRemoveWorktreeResult`
   `{branch, savedWorkCommit, branchDeleted}`. The thread delete flow always
@@ -69,7 +69,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   branch, and toasts the saved commit. `createWorktree` seeds the new tree
   with the parent's untracked files that `.worktreeinclude` at the project
   root names (gitignore syntax, matched by `git ls-files --others --ignored
-  --exclude-from`), or `.env*` when the file is absent; best-effort, logged,
+--exclude-from`), or `.env*` when the file is absent; best-effort, logged,
   never rolls back the worktree, and runs before the setup script.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
