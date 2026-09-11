@@ -136,7 +136,7 @@ import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
-import { heldSummaryFor } from "./sidebar/infinitusHeld.logic";
+import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
 import { onNextAttentionThreadRequest } from "./sidebar/nextAttentionBus";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
@@ -4278,8 +4278,10 @@ export default function Sidebar() {
           : null;
         holdsByEnvironment.set(thread.environmentId, holds);
       }
+      const heldEntry = heldEntryFor(holds, thread.id);
       const status = resolveSidebarThreadStatus(thread, {
-        held: heldSummaryFor(holds, thread.id) !== null,
+        held: heldEntry?.kind === "held",
+        limited: heldEntry?.kind === "limited",
       });
       const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt: lastVisitedAtById[key] });
       return { id: key, rank: resolveAttentionRank({ status, isUnread }) };
