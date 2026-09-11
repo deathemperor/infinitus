@@ -121,8 +121,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (the Captures guard also checks `!isPromptsMenuOpen`).
 - `apps/web/src/components/settings/ProjectSettingsPanel.tsx` —
   `ProjectPromptSnippetsSection` between the "Project" and "Checkout"
-  sections, fed the representative project and the panel's `reportFailure`
-  (#270 G).
+  sections, fed the group's checkouts (`promptSnippetTargets`, the
+  representative first) and the panel's `reportFailure` (#270 G).
 - `apps/web/src/components/CommandPalette.tsx` — the `accounts.open`
   listener and palette entry; an "Open captures" entry while a thread has
   a project (#433).
@@ -465,8 +465,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   Projects for the project; Escape or a pointer outside closes),
   `useProjectPromptSnippets` (the routed project's list plus its settings
   group key), and `ProjectPromptSnippetsSection` (Settings › Projects ›
-  Prompts: add / edit / remove, saved to the representative checkout's
-  server settings through `serverEnvironment.updateSettings`). Snippet text
+  Prompts: add / edit / remove, read from the representative checkout and
+  saved to every checkout of the group through
+  `serverEnvironment.updateSettings`, like the panel's overrides). Snippet text
   is user prose: toasts and labels show the name, never the body. The phone
   has no server-settings reader yet, so it does not show the list; a
   slash-style trigger in the composer's command menu is a follow-up (four

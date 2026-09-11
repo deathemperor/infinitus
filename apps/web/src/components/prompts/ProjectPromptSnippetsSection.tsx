@@ -31,23 +31,30 @@ import {
   upsertPromptSnippet,
 } from "./promptSnippets.logic";
 
+/** One checkout of the project group; a save writes every member. */
+export interface PromptSnippetTarget {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  /** The environment's label for the "connect and retry" toast. */
+  readonly label: string;
+  readonly connected: boolean;
+}
+
 /**
  * Settings › Projects › Prompts (#270 G): the project's saved snippets with
- * add, edit and remove, stored in the project's server settings under
- * `projectPromptSnippets`. A grouped project reads and writes its
- * representative checkout; the composer reads the checkout the thread runs
- * in, so siblings with a divergent list show their own.
+ * add, edit and remove, stored in server settings under
+ * `projectPromptSnippets`. The list is read from the representative checkout
+ * and every save fans out to each member of the group, like the panel's
+ * boolean overrides, so a thread on any checkout sees the same list.
  */
 export function ProjectPromptSnippetsSection(props: {
-  environmentId: EnvironmentId;
-  projectId: ProjectId;
-  /** Whether the environment is connected; edits are refused otherwise. */
-  connected: boolean;
+  representative: PromptSnippetTarget;
+  members: readonly PromptSnippetTarget[];
   reportFailure: (title: string, result: AtomCommandResult<void, unknown>) => void;
 }) {
-  const { environmentId, projectId, connected, reportFailure } = props;
-  const snippets = useEnvironmentSettings(environmentId, (settings) =>
-    snippetsForProject(settings, projectId),
+  const { representative, members, reportFailure } = props;
+  const snippets = useEnvironmentSettings(representative.environmentId, (settings) =>
+    snippetsForProject(settings, representative.projectId),
   );
   const updateServerSettings = useAtomCommand(serverEnvironment.updateSettings, "saved prompt");
   const [editing, setEditing] = useState<{ id: string | null; name: string; text: string } | null>(
@@ -56,26 +63,29 @@ export function ProjectPromptSnippetsSection(props: {
   const [saving, setSaving] = useState(false);
 
   const store = async (next: readonly PromptSnippet[]) => {
-    if (!connected) {
+    const offline = members.find((member) => !member.connected);
+    if (offline !== undefined) {
       toastManager.add({
         type: "warning",
         title: "Prompt not saved",
-        description: "Connect this machine and try again.",
+        description: `Connect ${offline.label} and try again.`,
       });
       return false;
     }
     setSaving(true);
     try {
-      const result = await updateServerSettings({
-        environmentId,
-        input: { patch: promptSnippetsPatch(projectId, next) },
-      });
-      if (result._tag === "Failure") {
-        reportFailure(
-          "Failed to save prompts",
-          mapAtomCommandResult(result, () => undefined),
-        );
-        return false;
+      for (const member of members) {
+        const result = await updateServerSettings({
+          environmentId: member.environmentId,
+          input: { patch: promptSnippetsPatch(member.projectId, next) },
+        });
+        if (result._tag === "Failure") {
+          reportFailure(
+            `Failed to save prompts on ${member.label}`,
+            mapAtomCommandResult(result, () => undefined),
+          );
+          return false;
+        }
       }
       return true;
     } finally {

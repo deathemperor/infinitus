@@ -521,6 +521,24 @@ function ProjectDetail({
     );
   }, []);
 
+  // Prompt snippets (#270 G, fork): the representative first, then the
+  // other checkouts; a save writes each one.
+  const promptSnippetTargets = useMemo(
+    () =>
+      [representative, ...group.memberProjects.filter((member) => member !== representative)].map(
+        (member) => {
+          const environment = environmentById.get(member.environmentId);
+          return {
+            environmentId: member.environmentId,
+            projectId: member.id,
+            label: environment?.label ?? "this machine",
+            connected: environment?.connection.phase === "connected",
+          };
+        },
+      ),
+    [environmentById, group.memberProjects, representative],
+  );
+
   // Group-shared fields live on each physical project record, so a
   // group-level edit fans out to every member.
   const updateAllMembers = useCallback(
@@ -1242,11 +1260,8 @@ function ProjectDetail({
         </SettingsSection>
 
         <ProjectPromptSnippetsSection
-          environmentId={representative.environmentId}
-          projectId={representative.id}
-          connected={
-            environmentById.get(representative.environmentId)?.connection.phase === "connected"
-          }
+          representative={promptSnippetTargets[0]!}
+          members={promptSnippetTargets}
           reportFailure={reportFailure}
         />
 
