@@ -1,7 +1,13 @@
 import { EventId, TurnId, type OrchestrationThreadActivity } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { HOLD_MARKER_KIND, RELEASE_MARKER_KIND, threadHold } from "./infinitusThreadHold.ts";
+import {
+  HOLD_MARKER_KIND,
+  PAUSE_MARKER_KIND,
+  RELEASE_MARKER_KIND,
+  RESUME_MARKER_KIND,
+  threadHold,
+} from "./infinitusThreadHold.ts";
 
 const marker = (
   kind: string,
@@ -11,7 +17,12 @@ const marker = (
   id: EventId.make(id),
   tone: "info",
   kind,
-  summary: kind === HOLD_MARKER_KIND ? "Held for headroom on claude, 5h window 84 %" : "Released",
+  summary:
+    kind === HOLD_MARKER_KIND
+      ? "Held for headroom on claude, 5h window 84 %"
+      : kind === PAUSE_MARKER_KIND
+        ? "Paused for headroom on claude, 5h window 92 %"
+        : "Released",
   payload: {},
   turnId: null,
   createdAt,
@@ -44,6 +55,7 @@ describe("threadHold", () => {
         latestTurn: turn("2026-09-11T09:30:00Z"),
       }),
     ).toEqual({
+      kind: "held",
       markerId: "h1",
       since: "2026-09-11T10:00:00Z",
       summary: "Held for headroom on claude, 5h window 84 %",
@@ -80,6 +92,58 @@ describe("threadHold", () => {
       threadHold({
         activities: [marker(HOLD_MARKER_KIND, "2026-09-11T10:00:00Z")],
         latestTurn: turn("2026-09-11T10:20:00Z"),
+      }),
+    ).toBeNull();
+  });
+
+  it("names a paused turn while no resumed row or later turn start follows it (#743)", () => {
+    // The paused turn itself started before the row: it does not end the pause.
+    expect(
+      threadHold({
+        activities: [marker(PAUSE_MARKER_KIND, "2026-09-11T10:00:00Z", "p1")],
+        latestTurn: turn("2026-09-11T09:30:00Z"),
+      }),
+    ).toEqual({
+      kind: "paused",
+      markerId: "p1",
+      since: "2026-09-11T10:00:00Z",
+      summary: "Paused for headroom on claude, 5h window 92 %",
+    });
+    expect(
+      threadHold({
+        activities: [
+          marker(PAUSE_MARKER_KIND, "2026-09-11T10:00:00Z"),
+          marker(RESUME_MARKER_KIND, "2026-09-11T10:05:00Z"),
+        ],
+        latestTurn: null,
+      }),
+    ).toBeNull();
+    expect(
+      threadHold({
+        activities: [marker(PAUSE_MARKER_KIND, "2026-09-11T10:00:00Z")],
+        latestTurn: turn("2026-09-11T10:20:00Z"),
+      }),
+    ).toBeNull();
+  });
+
+  it("lets a held start close a pause and a resume close a hold: one state per thread", () => {
+    // Paused, then the continuation was held by the gate: the newest row rules.
+    expect(
+      threadHold({
+        activities: [
+          marker(PAUSE_MARKER_KIND, "2026-09-11T10:00:00Z", "p1"),
+          marker(HOLD_MARKER_KIND, "2026-09-11T10:05:00Z", "h1"),
+        ],
+        latestTurn: turn("2026-09-11T09:30:00Z"),
+      })?.kind,
+    ).toBe("held");
+    expect(
+      threadHold({
+        activities: [
+          marker(HOLD_MARKER_KIND, "2026-09-11T10:00:00Z", "h1"),
+          marker(RESUME_MARKER_KIND, "2026-09-11T10:05:00Z"),
+        ],
+        latestTurn: null,
       }),
     ).toBeNull();
   });

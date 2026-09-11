@@ -11,6 +11,7 @@ import { Button } from "../ui/button";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import {
   holdBannerText,
+  holdBannerTitle,
   holdPhaseAfterRelease,
   runNowLabel,
   type HoldPhase,
@@ -20,7 +21,10 @@ import {
  * The composer banner for a thread session priority mode is holding (#616):
  * the held row's line, "Run now" (the `infinitus.releaseThread` RPC) and
  * "Pin" (pinning releases on the server). Null when the thread's rows say
- * nothing is held. Mounted from ChatView beside the snoozed/settled banners.
+ * nothing is held. A turn paused by interrupt mode (#743) gets the same
+ * banner as "Paused for headroom" with "Resume now": the RPC falls through
+ * to the interrupt layer. Mounted from ChatView beside the snoozed/settled
+ * banners.
  */
 export function useInfinitusHoldBanner(input: {
   readonly thread: Thread | null;
@@ -45,7 +49,7 @@ export function useInfinitusHoldBanner(input: {
 
   return useMemo<ComposerBannerStackItem | null>(() => {
     if (hold === null || threadRef === null) return null;
-    const { description, actionable } = holdBannerText(hold.summary, phase);
+    const { description, actionable } = holdBannerText(hold.summary, phase, hold.kind);
     const busy =
       phase.kind === "releasing" || phase.kind === "released" || phase.kind === "pinning";
     const settle = (next: HoldPhase) => setAnswered({ markerId: hold.markerId, phase: next });
@@ -53,7 +57,7 @@ export function useInfinitusHoldBanner(input: {
       id: `infinitus-held:${threadRef.threadId}:${hold.markerId}`,
       variant: "info",
       icon: <CirclePauseIcon />,
-      title: "Waiting for headroom",
+      title: holdBannerTitle(hold.kind),
       description,
       actions: actionable ? (
         <>
@@ -69,7 +73,7 @@ export function useInfinitusHoldBanner(input: {
               }).then((result) => settle(holdPhaseAfterRelease(result)));
             }}
           >
-            {runNowLabel(phase)}
+            {runNowLabel(phase, hold.kind)}
           </Button>
           {supportsPinning ? (
             <Button

@@ -7,12 +7,20 @@ import type { OrchestrationLatestTurn, OrchestrationThreadActivity } from "@t3to
  * held row has no released row after it and no turn started after it (a
  * restart forgets held starts; the next send starts a turn and ends the
  * stale row's reign). The same kinds as
- * `apps/server/src/infinitus/Layers/infinitusSessionHold.logic.ts`.
+ * `apps/server/src/infinitus/Layers/infinitusSessionHold.logic.ts`. Interrupt
+ * mode (#743) leaves the same pair for a running turn it paused
+ * (`infinitusSessionInterrupt.logic.ts`): a paused row opens, a resumed row
+ * or a later turn start closes, and `kind` says which the thread is in.
  */
 export const HOLD_MARKER_KIND = "infinitus.thread.held";
 export const RELEASE_MARKER_KIND = "infinitus.thread.released";
+export const PAUSE_MARKER_KIND = "infinitus.thread.paused";
+export const RESUME_MARKER_KIND = "infinitus.thread.resumed";
 
 export interface ThreadHold {
+  /** `held`: a start waits for headroom; `paused`: a running turn was
+      interrupted for it and waits to continue. */
+  readonly kind: "held" | "paused";
   /** The held row, so a page can remember what it answered for this hold. */
   readonly markerId: string;
   readonly since: string;
@@ -38,8 +46,10 @@ export function threadHold(thread: {
   let released: Placed | null = null;
   thread.activities.forEach((activity, index) => {
     const placed = { activity, index };
-    if (activity.kind === HOLD_MARKER_KIND && later(placed, held)) held = placed;
-    else if (activity.kind === RELEASE_MARKER_KIND && later(placed, released)) released = placed;
+    const opens = activity.kind === HOLD_MARKER_KIND || activity.kind === PAUSE_MARKER_KIND;
+    const closes = activity.kind === RELEASE_MARKER_KIND || activity.kind === RESUME_MARKER_KIND;
+    if (opens && later(placed, held)) held = placed;
+    else if (closes && later(placed, released)) released = placed;
   });
   if (held === null) return null;
   const hold: Placed = held;
@@ -47,6 +57,7 @@ export function threadHold(thread: {
   const startedAt = thread.latestTurn?.startedAt ?? null;
   if (startedAt !== null && startedAt >= hold.activity.createdAt) return null;
   return {
+    kind: hold.activity.kind === PAUSE_MARKER_KIND ? "paused" : "held",
     markerId: hold.activity.id,
     since: hold.activity.createdAt,
     summary: hold.activity.summary,
