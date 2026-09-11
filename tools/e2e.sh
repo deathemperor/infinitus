@@ -682,6 +682,7 @@ echo "team: ok (leader Ann, member Bo $KID)"
 "$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
 "$CTL" team-hostname --zone example.com --label infi </dev/null 2>&1 | grep -q "needs the Cloudflare API token" || fail "team-hostname must ask for the token on stdin"
 "$CTL" team-hostname --zone example.com 2>&1 | grep -q "usage: team-hostname" || fail "team-hostname must want a label"
+"$CTL" team-hostname --clear </dev/null | expect "d['configured'] is False and d['zone'] is None" || fail "team-hostname --clear"
 
 # --- team control (#220, grantor) ------------------------------------------
 # Bo lets leaders send to one session; the hint rides Bo's now.json and

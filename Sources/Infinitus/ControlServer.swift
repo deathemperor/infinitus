@@ -848,9 +848,16 @@ final class ControlServer {
         case "team-hostname":
             // Settings › Team › Hostnames: the Cloudflare zone, the label
             // and the API token (stdin) hostnames are minted under.
+            if r.options["clear"] != nil {
+                await model.team.forgetCloudflare()
+                if let err = model.team.lastError { throw Fail(err) }
+                return ControlReply(ok: true, result: .object([
+                    "zone": .null, "label": .null, "configured": .bool(model.team.cloudflareConfigured),
+                ]))
+            }
             guard let zone = r.options["zone"], zone != "true", !zone.isEmpty,
                   let label = r.options["label"], label != "true", !label.isEmpty else {
-                throw Fail("usage: team-hostname --zone <zone> --label <label>  (the Cloudflare API token on stdin)")
+                throw Fail("usage: team-hostname --zone <zone> --label <label>  (the Cloudflare API token on stdin) | team-hostname --clear")
             }
             guard let token = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {
                 throw Fail("team-hostname needs the Cloudflare API token on stdin")
