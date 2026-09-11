@@ -249,6 +249,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Mac's Sessions card (`features/infinitus/InfinitusSessions.tsx` +
   `sessions.logic.ts`, rows from
   `@t3tools/client-runtime/state/infinitusSessions`; `session-mode` per row).
+- `apps/mobile/src/features/infinitus/lanDiscovery.logic.ts` (+ `lanDiscovery.ts`,
+  `InfinitusNearbyServers.tsx`) — "Find Macs on this network" on the
+  add-connection form (#651): a sweep of the phone's private /24 for
+  `/.well-known/t3/environment` on the desktop server's port (3773), no
+  Bonjour (that needs a native module the Expo build lacks); a tap fills
+  Host, the code is still typed. `ConnectionsNewRouteScreen.tsx` only mounts
+  it above the Host field.
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
