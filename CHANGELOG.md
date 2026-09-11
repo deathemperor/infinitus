@@ -147,6 +147,7 @@ publishes the matching section as the GitHub release body.
 - With `priority_mode` set to `hold`, every fleet on `fleets` carries a `headroom` verdict (abundant/low with hysteresis on the active account's fullest window), so the fork can hold background threads while headroom is low (#616).
 - The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
+- The active account survives a swapd switch even on the app's first poll: swapd's own last-known slot carries it (#476).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

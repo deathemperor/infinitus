@@ -27,6 +27,10 @@ public struct SwapdProviderView: Decodable, Sendable {
     /// Absent alongside a missing `activeSlot` means genuinely no active
     /// account — the distinction `SwapdActiveMemory` carries forward on.
     public let activeUnreadable: String?
+    /// swapd's own memory of the active slot, emitted only beside
+    /// `activeUnreadable` (swapd #28) — fresher than the app's, and it
+    /// survives an app restart, so it wins over `carriedActive`.
+    public let lastKnownActiveSlot: Int?
     public let nextCandidate: Int?
     public let nextRecovery: SwapdRecovery?
     public let accounts: [SwapdAccountView]
@@ -136,10 +140,12 @@ public enum SwapdMapping {
         // busy) — but only when that slot still exists, so a removed
         // account never resurfaces as active from stale memory. Absent
         // with no reason given is genuinely no active account, and stays
-        // nil like before.
+        // nil like before. swapd's own `lastKnownActiveSlot` is the first
+        // choice; the app's memory covers older daemons that omit it.
         var carried: Int?
         if view.activeSlot == nil, view.activeUnreadable != nil,
-           let candidate = carriedActive, view.accounts.contains(where: { $0.slot == candidate }) {
+           let candidate = view.lastKnownActiveSlot ?? carriedActive,
+           view.accounts.contains(where: { $0.slot == candidate }) {
             carried = candidate
         }
         return EngineFleet(engineID: engineID,
