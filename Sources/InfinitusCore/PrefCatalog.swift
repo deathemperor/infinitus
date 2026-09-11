@@ -115,6 +115,7 @@ public enum PrefCatalog {
         // Devices: the tunnel fronting the T3 Code fork server's port (#572).
         Entry("fork_tunnel_enabled", .bool, .bool(false), devices),
         Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),
+        Entry("fork_tunnel_hostname", .string, .string(""), devices),
         // Engines: the `engine` command relaunches the app for these.
         Entry("engine_cswap_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_swapd_enabled", .bool, .bool(false), engines, effect: .restart),

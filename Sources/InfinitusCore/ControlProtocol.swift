@@ -162,7 +162,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "This table as JSON, plus schemaVersion.",
                        replyShape: "{schemaVersion, commands:[ControlCommand]}"),
         ControlCommand(name: "status", effect: .read,
-                       summary: "App version, which engines are on, engine badge, whether a sign-in is running, the fork server's tunnel (Mac only; state off|invalidPort|blocked|unavailable|starting|up|stopped, url while up).",
+                       summary: "App version, which engines are on, engine badge, whether a sign-in is running, the fork server's tunnel (Mac only; state off|invalidPort|blocked|unavailable|starting|up|stopped, url while up — the stable fork_tunnel_hostname on the named tunnel when set, else a quick tunnel).",
                        replyShape: "{version, sha, engines:{cswap:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground, forkTunnel:{enabled, port, state, url?, hostname?}}"),
         ControlCommand(name: "fleets", effect: .read,
                        summary: "Every fleet with accounts, usage, active/next and the engine's capabilities.",

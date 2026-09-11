@@ -69,6 +69,24 @@ final class NamedTunnel: ObservableObject {
         return text.lowercased().contains("hostname: \(hostname)")
     }
 
+    /// True when `~/.cloudflared/config.yml` has an ingress rule sending
+    /// `hostname` to `localhost:<port>` (#650: the fork's second rule on
+    /// the companion's tunnel). T3 scans up from 3773 when that port is
+    /// taken, so a rule baked to the wrong port is the realistic silent
+    /// break — the service line right after the hostname must name it.
+    static func localConfigRoutes(_ hostname: String, toPort port: Int,
+                                  home: String = NSHomeDirectory()) -> Bool {
+        guard !hostname.isEmpty,
+              let text = try? String(contentsOfFile: home + "/.cloudflared/config.yml",
+                                     encoding: .utf8) else { return false }
+        let lines = text.lowercased().split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard let i = lines.firstIndex(where: { $0.hasPrefix("- hostname: \(hostname)") || $0 == "hostname: \(hostname)" }),
+              i + 1 < lines.count else { return false }
+        let service = lines[i + 1]
+        return service.hasPrefix("service:")
+            && (service.hasSuffix("localhost:\(port)") || service.hasSuffix("127.0.0.1:\(port)"))
+    }
+
     static func token(for hostname: String) -> String? {
         Keychain.read(account: hostname, service: Keychain.tunnelService)
     }

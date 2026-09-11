@@ -741,6 +741,16 @@ final class AppModel: ObservableObject {
             applyForkTunnel()
         }
     }
+    /// The fork's stable hostname on the named tunnel (#650): when set
+    /// and the companion's named tunnel is running, the fork rides that
+    /// tunnel as a second ingress rule instead of minting a fresh
+    /// `*.trycloudflare.com` name every relaunch. Empty = quick tunnel.
+    @Published var forkTunnelHostname: String {
+        didSet {
+            defaults.set(forkTunnelHostname, forKey: "fork_tunnel_hostname")
+            applyForkTunnel()
+        }
+    }
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
     let mirrorExporter = MirrorExporter()
@@ -1097,6 +1107,7 @@ final class AppModel: ObservableObject {
         mirrorNamedTunnelEnabled = defaults.bool(forKey: NamedTunnel.enabledKey)
         mirrorNamedTunnelHost = defaults.string(forKey: NamedTunnel.hostnameKey) ?? ""
         forkTunnelEnabled = defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false
+        forkTunnelHostname = defaults.string(forKey: "fork_tunnel_hostname") ?? ""
         forkServerPort = defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort
         // One token per install, minted the first time anyone looks.
         let storedToken = defaults.string(forKey: "mirror_pair_token") ?? ""
@@ -1315,6 +1326,7 @@ final class AppModel: ObservableObject {
         set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
+        set(\.forkTunnelHostname, defaults.string(forKey: "fork_tunnel_hostname") ?? "")
         if let update = updateModel {
             let check = defaults.object(forKey: "update_auto_check") as? Bool ?? true
             if update.autoCheck != check { update.autoCheck = check }
@@ -2332,10 +2344,13 @@ final class AppModel: ObservableObject {
         return !isPlayground && (!mockMode || mockAllowed)
     }
 
-    /// Starts or stops the quick tunnel fronting the fork server's port
-    /// (#572). Independent of the mirror listener — the fork's server
-    /// binds its own port. A port change restarts it: cloudflared is
-    /// told the port on its command line.
+    /// Starts or stops the tunnel fronting the fork server's port (#572).
+    /// Independent of the mirror listener — the fork's server binds its
+    /// own port. With a stable hostname on the running named tunnel
+    /// (#650) nothing is started: the companion's connector carries the
+    /// fork as a second ingress rule. Otherwise a quick tunnel; a port
+    /// change restarts it, cloudflared is told the port on its command
+    /// line.
     private func applyForkTunnel() {
         let port = forkServerPort
         if forkTunnel.isRunning, forkTunnel.port.map(Int.init) != port { forkTunnel.stop() }
@@ -2343,14 +2358,43 @@ final class AppModel: ObservableObject {
             forkTunnel.stop()
             return
         }
+        if forkNamedHost != nil {
+            forkTunnel.stop()
+            return
+        }
         forkTunnel.start(port: UInt16(port))
     }
 
+    /// The fork's hostname on the named tunnel while that route applies:
+    /// a hostname is set and the companion's named tunnel is running. A
+    /// locally-managed tunnel (config.yml) is checked for the ingress
+    /// rule to the fork's port; a dashboard-managed one can't be, so the
+    /// pref is trusted. Logged once per change, not per refresh.
+    private var forkNamedHost: String? {
+        let host = NamedTunnel.normalizeHostname(forkTunnelHostname)
+        guard !host.isEmpty, namedTunnel.isRunning else { return nil }
+        let companion = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
+        if NamedTunnel.localConfigCovers(companion), !NamedTunnel.localConfigRoutes(host, toPort: forkServerPort) {
+            if forkNamedHostWarned != host {
+                forkNamedHostWarned = host
+                logMirrorInput("⚠️", "~/.cloudflared/config.yml has no ingress for \(host) → :\(forkServerPort); the fork uses a quick tunnel")
+            }
+            return nil
+        }
+        return host
+    }
+    private var forkNamedHostWarned = ""
+
     /// `status`'s `forkTunnel`.
     var forkTunnelStatus: ForkTunnelStatus {
-        ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
-                                available: forkTunnel.isAvailable, running: forkTunnel.isRunning,
-                                url: forkTunnel.url)
+        if let host = forkNamedHost {
+            return ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
+                                           available: forkTunnel.isAvailable, running: namedTunnel.isRunning,
+                                           url: namedTunnel.connected ? "https://\(host)" : nil)
+        }
+        return ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
+                                       available: forkTunnel.isAvailable, running: forkTunnel.isRunning,
+                                       url: forkTunnel.url)
     }
 
     /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
@@ -2373,6 +2417,7 @@ final class AppModel: ObservableObject {
         guard mirrorNamedTunnelEnabled, mirrorLANEnabled, mirrorServer.port != nil,
               !host.isEmpty else {
             namedTunnel.stop()
+            applyForkTunnel()
             return
         }
         // A local cloudflared config for this hostname wins over a token:
@@ -2384,6 +2429,7 @@ final class AppModel: ObservableObject {
         } else {
             namedTunnel.stop()
         }
+        applyForkTunnel()
     }
 
     var namedTunnelTokenPresent: Bool {

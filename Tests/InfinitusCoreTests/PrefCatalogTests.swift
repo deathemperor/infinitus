@@ -52,6 +52,14 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(reply.prefs.map(\.value), [.bool(false), .number(3773)])
         XCTAssertEqual(try PrefCatalog.write(.number(3774), key: "fork_server_port", to: defaults).value, .number(3774))
         XCTAssertEqual(defaults.object(forKey: "fork_server_port") as? Int, 3774)
+        // #650: the stable hostname on the named tunnel, empty = quick tunnel.
+        let host = try PrefCatalog.reply(from: defaults, keys: ["fork_tunnel_hostname"]).prefs[0]
+        XCTAssertEqual(host.section, "devices")
+        XCTAssertEqual(host.effect, .live)
+        XCTAssertEqual(host.value, .string(""))
+        XCTAssertEqual(try PrefCatalog.write(.string("code.example.com"), key: "fork_tunnel_hostname", to: defaults).value,
+                       .string("code.example.com"))
+        XCTAssertEqual(defaults.string(forKey: "fork_tunnel_hostname"), "code.example.com")
     }
 
     func testStoredValuesReadBackTypedAndAnInvalidChoiceIsTheDefault() throws {

@@ -72,7 +72,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port fork_tunnel_hostname; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }
@@ -427,6 +427,9 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" status | expect "d['forkTunnel']['state']=='invalidPort'" || fail "an out-of-range fork port must report invalidPort"
 "$CTL" prefs set fork_server_port 3773 >/dev/null || fail "prefs set fork_server_port back"
 "$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
+"$CTL" prefs set fork_tunnel_hostname code.e2e.invalid | expect "d['value']=='code.e2e.invalid'" || fail "prefs set fork_tunnel_hostname"
+"$CTL" prefs get fork_tunnel_hostname | expect "d['prefs'][0]['value']=='code.e2e.invalid'" || fail "prefs get fork_tunnel_hostname"
+"$CTL" prefs set fork_tunnel_hostname '""' | expect "d['value']==''" || fail "prefs set fork_tunnel_hostname back"
 "$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
 pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
 echo "prefs: ok"
