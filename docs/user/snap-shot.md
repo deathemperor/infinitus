@@ -69,7 +69,7 @@ SnapShots work on Wayland sessions. Each desktop provides capture differently, a
 current desktop and shows only what it needs. Preferences carry across desktops, but each desktop's
 helper and shortcut approval are separate.
 
-**GNOME.** Install the bundled **T3 Code SnapShots** extension during setup. It is installed
+**GNOME.** Install the bundled **Infinitus SnapShots** extension during setup. It is installed
 per-user, offline, and needs no administrator password. Sign out and back in after the first
 install so GNOME discovers it, then enable it from setup or from GNOME's Extensions app. If GNOME
 has disabled all user extensions, turn them on there first. Disable or remove the extension in

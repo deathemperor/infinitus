@@ -13,8 +13,6 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // The installed upstream app's real userData directories, which the fork
   // must recognise and never adopt.
   ["app/DesktopEnvironment.ts", '"T3 Code (Dev)" : "T3 Code (Alpha)"'],
-  // The KDE component name is the shipped GNOME/KDE extension's name.
-  ["snapShot/KdeSnapShot.ts", "Name=T3 Code SnapShots"],
 ];
 
 const SRC = NodeURL.fileURLToPath(new URL(".", import.meta.url));
