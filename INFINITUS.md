@@ -81,6 +81,19 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `applyProxyDraft` adds the ANTHROPIC_* environment variables (the key marked
   sensitive), a dedicated `homePath` (`~/.claude-proxy/<instanceId>` unless one
   was typed) and the picker model as a custom model.
+- `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
+  — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
+  both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
+  `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way.
+- `apps/web/src/components/chat/ChatComposer.tsx` — one block of hooks
+  (`useActiveProjectRef`, the captures UI store, the list query,
+  `useCapturesShortcuts`) beside the stash effects, `ComposerCapturesBadge`
+  in the shoulder dock after the stash badge, and `ComposerCapturesMenu` in
+  the anchored layer before the command menu, fed
+  `insertComposerTextAtEnd` (#433).
+- `apps/web/src/components/CommandPalette.tsx` — the `accounts.open`
+  listener and palette entry; an "Open captures" entry while a thread has
+  a project (#433).
 - `apps/server/src/auth/RpcAuthorization.ts` — a scope for each of them; the
   table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
   type error.
@@ -306,6 +319,19 @@ this file adds the fork's own rules. Plan and history: issue #555.
   session; `show` is never sent without a session since the pop-out and
   session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that one line is the fork's only edit there).
+- `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
+  the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
+  shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
+  (the list in the composer's anchored layer: Enter adds — a multi-line
+  paste is one capture — per item Send to composer / Copy / done / remove,
+  "Clear done"; Escape or a pointer outside closes, a Send that landed
+  closes, a busy composer toasts), `captures.logic` (ordering, selection and
+  paste normalisation, failure copy), `capturesUiStore` (the open state
+  the badge, the shortcuts and the palette share), `useCaptures`
+  (`useActiveProjectRef` — the routed thread's or draft's project;
+  `useCapturesShortcuts` — `captures.toggle` opens/closes, `captures.add`
+  captures the app's own selection, else opens with the input focused).
+  `state/captures.ts` is the web instance of the client-runtime atoms.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per

@@ -53,6 +53,7 @@ import {
   SquarePenIcon,
   TextSearchIcon,
   UsersIcon,
+  ListTodoIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -71,6 +72,8 @@ import { useAtomValue } from "@effect/atom-react";
 import { isDesktopLocalConnectionTarget } from "../connection/desktopLocal";
 import { useDesktopLocalBootstraps } from "../connection/useDesktopLocalBootstraps";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
+import { useCapturesUiStore } from "./captures/capturesUiStore";
+import { useActiveProjectRef } from "./captures/useCaptures";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { useClientSettings } from "../hooks/useSettings";
@@ -671,6 +674,8 @@ function OpenCommandPaletteDialog(props: {
   const accountsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
   );
+  // Captures (#433, fork) belong to the routed thread's project.
+  const capturesProject = useActiveProjectRef();
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const availableSettingsSearchItems = useAvailableSettingsSearchItems();
@@ -1849,6 +1854,20 @@ function OpenCommandPaletteDialog(props: {
       shortcutCommand: "accounts.open",
       run: async () => {
         await navigate({ to: "/accounts" });
+      },
+    });
+  }
+
+  if (capturesProject !== null) {
+    actionItems.push({
+      kind: "action",
+      value: "captures.toggle",
+      searchTerms: ["captures", "capture", "notes", "todo", "scratchpad", "clipboard"],
+      title: "Open captures",
+      icon: <ListTodoIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "captures.toggle",
+      run: async () => {
+        useCapturesUiStore.getState().show({ focusInput: true });
       },
     });
   }

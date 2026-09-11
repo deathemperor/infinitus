@@ -98,6 +98,13 @@ import {
 } from "../../promptStashStore";
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
+import { ComposerCapturesBadge } from "../captures/ComposerCapturesBadge";
+import { ComposerCapturesMenu } from "../captures/ComposerCapturesMenu";
+import { useCapturesUiStore } from "../captures/capturesUiStore";
+import { openCaptureCount } from "../captures/captures.logic";
+import { useActiveProjectRef, useCapturesShortcuts } from "../captures/useCaptures";
+import { captures as capturesAtoms } from "../../state/captures";
+import { useEnvironmentQuery } from "../../state/query";
 import { useComposerMenuState } from "./useComposerMenuState";
 import { useComposerFocusState } from "./useComposerFocusState";
 import { useComposerMultilinePrompt } from "./useComposerMultilinePrompt";
@@ -4275,6 +4282,23 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsTasksDrawerOpen(false);
   }, [activeThreadId]);
 
+  // Captures (#433, fork): the popover's open state, the project's open
+  // count for the badge, and the two shortcuts, all fork-owned.
+  const capturesProject = useActiveProjectRef();
+  const isCapturesMenuOpen = useCapturesUiStore((store) => store.open);
+  const capturesFocusInputKey = useCapturesUiStore((store) => store.focusInputKey);
+  const toggleCapturesMenu = useCapturesUiStore((store) => store.toggle);
+  const closeCapturesMenu = useCapturesUiStore((store) => store.close);
+  const capturesQuery = useEnvironmentQuery(
+    capturesProject === null
+      ? null
+      : capturesAtoms.list({
+          environmentId: capturesProject.environmentId,
+          input: { projectId: capturesProject.projectId },
+        }),
+  );
+  useCapturesShortcuts({ keybindings, terminalOpen, modelPickerOpen: isComposerModelPickerOpen });
+
   // Close the stash menu whenever the trigger-driven command menu opens so
   // the two popovers never stack in the same layer, and when the user
   // resumes typing (the menu is a transient picker, not a panel).
@@ -5148,6 +5172,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             onToggleMenu={toggleStashMenu}
           />
         ) : null}
+        {!isComposerApprovalState && capturesProject !== null ? (
+          <ComposerCapturesBadge
+            openCount={openCaptureCount(capturesQuery.data ?? [])}
+            menuOpen={isCapturesMenuOpen}
+            onToggleMenu={toggleCapturesMenu}
+          />
+        ) : null}
       </ComposerBanner.Dock>
       <div className="relative">
         <ComposerSurface.Main
@@ -5245,6 +5276,22 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   />
                 </ComposerCommandMenuLayer>
               )}
+
+              {isCapturesMenuOpen &&
+                !isStashMenuOpen &&
+                !composerMenuOpen &&
+                !isComposerApprovalState && (
+                  <ComposerCommandMenuLayer anchor={composerMenuAnchor}>
+                    <ComposerCapturesMenu
+                      project={capturesProject}
+                      focusInputKey={capturesFocusInputKey}
+                      onSend={(text) =>
+                        insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })
+                      }
+                      onClose={closeCapturesMenu}
+                    />
+                  </ComposerCommandMenuLayer>
+                )}
 
               {composerMenuOpen && !isComposerApprovalState && (
                 <ComposerCommandMenuLayer anchor={composerMenuAnchor}>
