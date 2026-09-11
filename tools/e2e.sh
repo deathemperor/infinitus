@@ -89,7 +89,8 @@ fail() {
         # #637: the app itself gone (no crash report, no last line) is one of
         # the two readings of "connection refused"; its wait status names
         # the signal (141 SIGPIPE, 143 SIGTERM, 137 SIGKILL).
-        if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else wait "$APP_PID" 2>/dev/null; echo "--- app gone: wait status $?"; fi
+        # (`|| st=$?`: under set -e a bare non-zero `wait` ends the script before the echo.)
+        if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else st=0; wait "$APP_PID" 2>/dev/null || st=$?; echo "--- app gone: wait status $st"; fi
         echo "--- status retry"; "$CTL" status 2>&1 | head -c 300; echo
     fi
     exit 1
@@ -421,6 +422,7 @@ echo "prefs: ok"
 
 # JSON-body verbs (#572 N1): the socket takes what the mirror routes take.
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
+"$CTL" perf | expect "d['leaseScopes'].get('e2e')==['fleets']" || fail "perf must name the lease e2e just took (#499)"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
