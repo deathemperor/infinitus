@@ -1247,7 +1247,7 @@ pair` (token masked, server log never uploaded), screenshots every route in
   `fork-visual-pass` artifact, on failure too. Runner fact (#825 hung 17 min
   at the start step with nothing logged; #831 starts in 3 s): a step that
   backgrounds a server must detach it — `setsid nohup … > log 2>&1
-  < /dev/null &` — and probe with `curl --max-time`, or the step holds the job
+< /dev/null &` — and probe with `curl --max-time`, or the step holds the job
   to its timeout.
 
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
