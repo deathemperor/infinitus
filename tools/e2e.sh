@@ -364,6 +364,8 @@ echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
+"$CTL" utilization --days 7 | expect "d['days']==7 and d['bucketSeconds']==1800 and isinstance(d['samples'], list) and d['windows'][:2]==['5h','7d'] and 'switches' in d['replay']" || fail "utilization verb (#747)"
+"$CTL" utilization --days 400 >/dev/null 2>&1 && fail "utilization must refuse an out-of-range day count"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
 # --- windows: Settings open idles too ------------------------------------
