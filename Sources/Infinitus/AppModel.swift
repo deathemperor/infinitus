@@ -105,6 +105,9 @@ final class AppModel: ObservableObject {
     /// setting on current build").
     let debugMenu: Bool
     @Published var cswapState: CswapSupervisor.State = .stopped
+    /// swapd's own `auto` under the same supervisor (#475: one daemon per
+    /// enabled engine, each owning its account policy).
+    @Published var swapdState: CswapSupervisor.State = .stopped
     struct EventEntry: Identifiable {
         let id = UUID()
         var at = Date()
@@ -365,6 +368,7 @@ final class AppModel: ObservableObject {
     weak var updateModel: UpdateModel?
     private let launchExecutableDate = AppModel.executableDate()
     private var supervisor: CswapSupervisor?
+    private var swapdSupervisor: CswapSupervisor?
     private var refreshTask: Task<Void, Never>?
     private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
@@ -1676,6 +1680,7 @@ final class AppModel: ObservableObject {
         }
         guard supervisor == nil, refreshTask == nil else { return }
         if let cswap, !isPlayground, cswapEnabled { startEngine(binary: cswap.binaryPath) }
+        if let swapd, !isPlayground, swapdEnabled { startSwapd(binary: swapd.binaryPath) }
         guard !registry.engines.isEmpty else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -2544,6 +2549,23 @@ final class AppModel: ObservableObject {
         Task { await supervisor.start() }
     }
 
+    /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the same
+    /// NDJSON stream and the same supervisor, its state kept apart so the
+    /// Engines pane and the badge can tell the two daemons apart.
+    private func startSwapd(binary: String) {
+        let supervisor = CswapSupervisor(
+            binaryPath: binary, arguments: ["auto", "--json"], environmentFlag: "SWAPD_SUPERVISED",
+            onLine: { [weak self] line in
+                Task { @MainActor in self?.consume(line, swapd: true) }
+            },
+            onState: { [weak self] state in
+                Task { @MainActor in self?.swapdState = state }
+            }
+        )
+        swapdSupervisor = supervisor
+        Task { await supervisor.start() }
+    }
+
     /// Engine event kinds → the durable log's vocabulary.
     static func eventKind(_ engineKind: String) -> String {
         switch engineKind {
@@ -2558,15 +2580,17 @@ final class AppModel: ObservableObject {
     /// already consuming soonest" after every minute's poll, and the
     /// poll itself says nothing, so neither reaches the Activity tail or
     /// the durable log until the reason changes (Infi4, 2026-09-11).
-    private var lastNoSwitch: String?
+    /// One slot per daemon (#475): with cswap and swapd both on, their
+    /// lines alternate and a shared slot would never suppress either.
+    private var lastNoSwitch: [Bool: String] = [:]
 
-    private func consume(_ line: EventLine) {
+    private func consume(_ line: EventLine, swapd: Bool = false) {
         switch line {
         case .event(let event):
             if event.kind == "poll" { return }
             if event.kind == "no-switch" {
-                if event.summary == lastNoSwitch { return }
-                lastNoSwitch = event.summary
+                if event.summary == lastNoSwitch[swapd] { return }
+                lastNoSwitch[swapd] = event.summary
             }
             logEvent(Self.eventKind(event.kind), icon: event.icon, event.summary)
             switch event.kind {
@@ -2583,7 +2607,7 @@ final class AppModel: ObservableObject {
                 break
             }
         case .schemaMismatch(let version):
-            cswapState = .schemaMismatch(version)
+            if swapd { swapdState = .schemaMismatch(version) } else { cswapState = .schemaMismatch(version) }
         case .garbage:
             break  // logged upstream; never fatal (spec §2)
         }
@@ -2776,11 +2800,13 @@ final class AppModel: ObservableObject {
 
     func relaunchApp() {
         let bundle = Bundle.main.bundleURL.path
-        let old = supervisor
+        let old = supervisor, oldSwapd = swapdSupervisor
         supervisor = nil
+        swapdSupervisor = nil
         let team = team
         Task {
             await old?.stop()
+            await oldSwapd?.stop()
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
             // Unbundled dev runs are a bare executable — `open` on its
@@ -3184,6 +3210,8 @@ final class AppModel: ObservableObject {
     /// status is clickable to toggle", user 2026-08-30). Deliberate states
     /// only — refused/backing-off/mismatch stay informational.
     func toggleEngine() {
+        // #475: with cswap off the badge is swapd's daemon.
+        guard cswapRegistered else { return toggleSwapd() }
         switch cswapState {
         case .running, .backingOff:
             let supervisor = supervisor
@@ -3197,6 +3225,26 @@ final class AppModel: ObservableObject {
             break
         }
     }
+
+    private func toggleSwapd() {
+        switch swapdState {
+        case .running, .backingOff:
+            let supervisor = swapdSupervisor
+            swapdSupervisor = nil
+            swapdState = .stopped
+            Task { await supervisor?.stop() }
+        case .stopped:
+            guard let swapd, swapdRegistered else { return }
+            startSwapd(binary: swapd.binaryPath)
+        case .refused, .schemaMismatch:
+            break
+        }
+    }
+
+    /// The daemon the sidebar badge reports: cswap's while it is
+    /// registered, else swapd's (#475).
+    var engineState: CswapSupervisor.State { cswapRegistered ? cswapState : swapdState }
+    var engineBadgeShown: Bool { cswapRegistered || swapdRegistered }
 
     /// Bounce the supervised engine — after a cswap upgrade the child is
     /// still the OLD binary until respawned.
@@ -3231,11 +3279,12 @@ final class AppModel: ObservableObject {
         // So are the phone's terminals (#507): a login shell holding a pty
         // must not outlive the app either.
         terminalHost.closeAll()
-        let supervisor = supervisor
+        let supervisor = supervisor, swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
         let team = team
         Task {
             await supervisor?.stop()
+            await swapdSupervisor?.stop()
             // Owned Claude sessions are this process's children (#151):
             // they don't outlive the app either (the #274 lesson).
             await owned?.stopAll()
@@ -3376,10 +3425,10 @@ extension AppModel: FleetModel {
     /// The engine badge's portable half (#9 phase D2) — the supervisor's
     /// own State can't cross to iOS, so the shared footer reads this.
     var engineBadge: EngineBadge? {
-        // The badge is the cswap child's state; with cswap off there is
-        // nothing to report and the footer hides the chip.
-        guard cswapRegistered else { return nil }
-        switch cswapState {
+        // The badge is the supervised child's state — cswap's, or swapd's
+        // once cswap is off (#475); with neither the footer hides the chip.
+        guard engineBadgeShown else { return nil }
+        switch engineState {
         case .running: return .running
         case .refused: return .refused
         case .backingOff(let seconds): return .backingOff(seconds: seconds)

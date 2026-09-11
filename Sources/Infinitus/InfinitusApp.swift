@@ -787,7 +787,7 @@ struct MenuContent: View {
             }
             .instantTip("Infinitus \(v) is out — About → Updates")
         }
-        if model.cswapRegistered { engineBadgeIcon }
+        if model.engineBadgeShown { engineBadgeIcon }
         if !model.footerActionsHidden {
         Button { model.relaunchApp() } label: {
             Image(systemName: "arrow.trianglehead.clockwise")
@@ -832,7 +832,7 @@ struct MenuContent: View {
     /// its conditionals so the rail's column math stays honest.
     private var compactRailItemCount: Int {
         var n = 1                                   // serviceDot
-        if model.cswapRegistered { n += 1 }         // engineBadgeIcon
+        if model.engineBadgeShown { n += 1 }         // engineBadgeIcon
         if !model.footerActionsHidden {
             n += 7                                  // 5 actions + restart + quit
         }
@@ -879,7 +879,7 @@ struct MenuContent: View {
             }
             .instantTip("Infinitus \(v) is out — About → Updates")
         }
-        if model.cswapRegistered { engineBadgeIcon }
+        if model.engineBadgeShown { engineBadgeIcon }
         if !model.footerActionsHidden {
         Button { model.relaunchApp() } label: {
             Image(systemName: "arrow.trianglehead.clockwise")
@@ -984,7 +984,7 @@ struct MenuContent: View {
     }
 
     private var engineTip: String {
-        switch model.cswapState {
+        switch model.engineState {
         case .running: return "auto-switch running — click to stop"
         case .refused: return "Another auto-switch engine (TUI or cswap auto) holds the mutex."
         case .backingOff(let s): return "engine retrying in \(Int(s))s — click to stop"
@@ -995,7 +995,7 @@ struct MenuContent: View {
 
     @ViewBuilder private var engineBadgeIcon: some View {
         Button { model.toggleEngine() } label: {
-            switch model.cswapState {
+            switch model.engineState {
             case .running: Image(systemName: "bolt.fill").foregroundStyle(.green)
             case .refused: Image(systemName: "exclamationmark.triangle")
             case .backingOff: Image(systemName: "clock")

@@ -366,6 +366,8 @@ echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, ra
 "$CTL" ignite swapd/claude 1 | expect "[a for a in d['fleet']['accounts'] if a['number']==1][0]['usage']['fiveHour']['resetsAt']=='2030-06-01T05:59:59Z'" \
     || fail "ignite didn't publish the refreshed window"
 echo "swapd: registered beside cswap, ignite published the refreshed window"
+# #475: an enabled engine runs its own `auto` under the supervisor.
+pgrep -f "$SOCKDIR/swapd auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
@@ -734,5 +736,6 @@ while [ "$(ps -o stat= -p "$APP_PID" 2>/dev/null | cut -c1)" ] \
     sleep 0.1
 done
 wait "$APP_PID" 2>/dev/null
+pgrep -f "$SOCKDIR/swapd auto" >/dev/null && fail "swapd auto outlived the app (#475)"
 echo "quit: ok (exited after $((i / 10)).$((i % 10))s)"
 echo "E2E PASS"
