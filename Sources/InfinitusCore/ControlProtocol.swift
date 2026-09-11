@@ -299,7 +299,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{shown}"),
         ControlCommand(name: "prefs", args: ["[get <key>...]"], effect: .read,
                        summary: "The preference catalog with current values: key, type, default, section (slug + name), live/restart effect, choices; `get` narrows it to the named keys.",
-                       replyShape: "{sections:[{slug,name}], prefs:[{key,type,default,value,section,effect,choices?}]}"),
+                       replyShape: "{sections:[{slug,name}], prefs:[{key,type,default,value,section,effect,choices?,min?,max?}]}"),
         ControlCommand(name: "activities-token", options: ["--body <json>", "--forget <deviceId>/<kind>"], effect: .write,
                        summary: "Register a phone's push token — the body `POST /activities/token` takes: {kind, token, deviceId, deviceName, environment, themeID?, macId?}. Without --body the CLI reads the JSON from stdin. `--forget <deviceId>/<kind>` withdraws that one registration instead (the phone's alerts switched off); forgotten is false when none was held.",
                        replyShape: "{slot} | with --forget {slot, forgotten}"),

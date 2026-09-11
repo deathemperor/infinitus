@@ -1237,7 +1237,13 @@ final class AppModel: ObservableObject {
     /// The preference catalog with this install's values (#558): what
     /// `infinitusctl prefs` and the mirror's `GET /prefs` answer.
     func prefsReply(keys: [String]? = nil) throws -> PrefCatalog.Reply {
-        try PrefCatalog.reply(from: defaults, keys: keys)
+        try PrefCatalog.reply(from: defaults, keys: keys, choices: ["gamification_style": themeChoices])
+    }
+
+    /// The open theme set as `{id, name}` rows (#747): the built-ins plus
+    /// the user's `themes.json`, which no static catalog can list.
+    private var themeChoices: [JSONValue] {
+        availableThemes.map { .object(["id": .string($0.id), "name": .string($0.name)]) }
     }
 
     /// One preference written and taken live (#558 write side): the
@@ -1310,6 +1316,10 @@ final class AppModel: ObservableObject {
         let interval = defaults.object(forKey: "refresh_interval") as? Int ?? 60
         set(\.refreshInterval, TitlePrefs.refreshChoices.contains(interval) ? interval : 60)
         set(\.gamification, defaults.string(forKey: "gamification_style") ?? "off")
+        set(\.introStyle, defaults.string(forKey: "intro_style") ?? "top")
+        set(\.introSpeed, defaults.object(forKey: "intro_speed") as? Double ?? 1.0)
+        set(\.introTitle, defaults.string(forKey: "intro_title") ?? "zoom")
+        set(\.burnStyle, defaults.string(forKey: "burn_style") ?? "ember")
         set(\.compactRows, defaults.object(forKey: "compact_rows") as? Bool ?? false)
         set(\.footerActionsHidden, defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false)
         set(\.titleRemaining, defaults.object(forKey: "title_remaining") as? Bool ?? false)
