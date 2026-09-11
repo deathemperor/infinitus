@@ -42,6 +42,7 @@ import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as ProviderService from "./provider/Services/ProviderService.ts";
 import * as ProviderSessionDirectory from "./provider/Services/ProviderSessionDirectory.ts";
 import * as ProviderSessionReaper from "./provider/Services/ProviderSessionReaper.ts";
+import { TurnStartGate } from "./orchestration/Services/TurnStartGate.ts";
 import { forkParked } from "./serverActivation.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
@@ -480,6 +481,7 @@ export const reconcileProviderSessions = Effect.gen(function* () {
   const providerService = yield* ProviderService.ProviderService;
   const query = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
   const settings = yield* ServerSettings.ServerSettingsService;
+  const turnStartGate = yield* TurnStartGate;
   const continueAfterRestart = yield* settings.getSettings.pipe(
     Effect.map((value) => value.continueThreadsAfterServerUpdate),
     Effect.catch((cause) =>
@@ -680,46 +682,51 @@ export const reconcileProviderSessions = Effect.gen(function* () {
         continue;
       }
 
+      // Fork (#616): the gate may keep a background thread's continuation for
+      // headroom; the marker stays prepared until the send runs.
       yield* forkParked(
-        Effect.gen(function* () {
-          const continuation = Effect.gen(function* () {
-            const providerInstanceId = binding.value.providerInstanceId;
-            if (providerInstanceId === undefined) {
-              return yield* new ProviderSessionContinuationError({
+        turnStartGate.start({
+          threadId: thread.id,
+          run: Effect.gen(function* () {
+            const continuation = Effect.gen(function* () {
+              const providerInstanceId = binding.value.providerInstanceId;
+              if (providerInstanceId === undefined) {
+                return yield* new ProviderSessionContinuationError({
+                  threadId: thread.id,
+                });
+              }
+              const capabilities = yield* providerService.getCapabilities(providerInstanceId);
+              yield* providerService.sendTurn({
                 threadId: thread.id,
+                ...(capabilities.promptlessTurnContinuation === true
+                  ? { continuation: true }
+                  : { input: SERVER_UPDATE_CONTINUATION_PROMPT }),
+                interactionMode: thread.interactionMode,
               });
-            }
-            const capabilities = yield* providerService.getCapabilities(providerInstanceId);
-            yield* providerService.sendTurn({
-              threadId: thread.id,
-              ...(capabilities.promptlessTurnContinuation === true
-                ? { continuation: true }
-                : { input: SERVER_UPDATE_CONTINUATION_PROMPT }),
-              interactionMode: thread.interactionMode,
             });
-          });
-          const continuationExit = yield* Effect.exit(continuation);
-          if (Exit.isSuccess(continuationExit) || Cause.hasInterrupts(continuationExit.cause)) {
-            if (Exit.isSuccess(continuationExit)) {
-              yield* clearContinuationMarkers(directory, [thread.id]).pipe(
-                Effect.uninterruptible,
-                Effect.catchCause((cause) =>
-                  Effect.logWarning("failed to clear completed provider session continuation", {
-                    threadId: thread.id,
-                    cause,
-                  }),
-                ),
-              );
+            const continuationExit = yield* Effect.exit(continuation);
+            if (Exit.isSuccess(continuationExit) || Cause.hasInterrupts(continuationExit.cause)) {
+              if (Exit.isSuccess(continuationExit)) {
+                yield* clearContinuationMarkers(directory, [thread.id]).pipe(
+                  Effect.uninterruptible,
+                  Effect.catchCause((cause) =>
+                    Effect.logWarning("failed to clear completed provider session continuation", {
+                      threadId: thread.id,
+                      cause,
+                    }),
+                  ),
+                );
+              }
+              return;
             }
-            return;
-          }
-          yield* Effect.logWarning("failed to continue provider session after server restart", {
-            threadId: thread.id,
-            cause: continuationExit.cause,
-          });
-          yield* settleAsError(
-            "Could not continue this thread after the server restart. Send a new message to continue.",
-          ).pipe(Effect.ignoreCause);
+            yield* Effect.logWarning("failed to continue provider session after server restart", {
+              threadId: thread.id,
+              cause: continuationExit.cause,
+            });
+            yield* settleAsError(
+              "Could not continue this thread after the server restart. Send a new message to continue.",
+            ).pipe(Effect.ignoreCause);
+          }),
         }),
       );
       continue;

@@ -19,6 +19,11 @@ import { OrchestrationCommandInvariantError } from "./orchestration/Errors.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import {
+  TurnStartGate,
+  TurnStartGatePassthrough,
+  type TurnStartGateShape,
+} from "./orchestration/Services/TurnStartGate.ts";
+import {
   ProviderSessionDirectoryPersistenceError,
   ProviderSessionNotFoundError,
 } from "./provider/Errors.ts";
@@ -85,8 +90,15 @@ const runReconciliation = (input: {
   readonly providerService?: ProviderService.ProviderService["Service"];
   readonly directory: ProviderSessionDirectory.ProviderSessionDirectory["Service"];
   readonly dispatch: OrchestrationEngine.OrchestrationEngineService["Service"]["dispatch"];
+  /** Fork (#616): the gate a continuation passes through; passthrough by default. */
+  readonly turnStartGate?: TurnStartGateShape;
 }) =>
   ServerRuntimeStartup.reconcileProviderSessions.pipe(
+    Effect.provide(
+      input.turnStartGate === undefined
+        ? TurnStartGatePassthrough
+        : Layer.succeed(TurnStartGate, input.turnStartGate),
+    ),
     Effect.provideService(
       ProjectionSnapshotQuery.ProjectionSnapshotQuery,
       queryWithThreads(input.threads),
@@ -723,7 +735,9 @@ it.effect("does not fail startup when the live provider session inventory cannot
       subscribeDomainEvents: Effect.succeed(Stream.empty),
       latestSequence: Effect.succeed(0),
     }),
-    Effect.provide(Layer.mergeAll(NodeServices.layer, ServerSettings.layerTest())),
+    Effect.provide(
+      Layer.mergeAll(NodeServices.layer, ServerSettings.layerTest(), TurnStartGatePassthrough),
+    ),
     Effect.tap(() => Effect.sync(() => assert.equal(queried, false))),
   );
 });
@@ -998,4 +1012,83 @@ it.effect("settles failed opt-in recovery without retrying the provider turn", (
       continueAfterServerUpdatePrepared: null,
     });
   }),
+);
+
+it.effect(
+  "hands a post-update continuation to the TurnStartGate: a gate that holds prepares and sends nothing (#616)",
+  () =>
+    Effect.gen(function* () {
+      const thread = makeThread("thread-held", "running", TurnId.make("turn-held"));
+      const held: ThreadId[] = [];
+      const gateReached = yield* Deferred.make<void>();
+      const sends: ProviderSendTurnInput[] = [];
+      const dispatched: OrchestrationCommand[] = [];
+      const upserts: ProviderSessionDirectory.ProviderRuntimeBinding[] = [];
+      const binding: ProviderSessionDirectory.ProviderRuntimeBinding = {
+        threadId: thread.id,
+        provider: ProviderDriverKind.make("codex"),
+        providerInstanceId,
+        status: "running",
+        resumeCursor: { threadId: thread.id },
+        runtimePayload: {
+          activeTurnId: thread.session.activeTurnId,
+          continueAfterServerUpdate: thread.session.activeTurnId,
+        },
+      };
+
+      yield* runReconciliation({
+        threads: [thread],
+        providerService: {
+          ...makeProviderService(),
+          getCapabilities: () => Effect.succeed({ sessionModelSwitch: "in-session" }),
+          sendTurn: (input) =>
+            Effect.sync(() => {
+              sends.push(input);
+              return { threadId: input.threadId, turnId: TurnId.make("continued") };
+            }),
+        },
+        directory: {
+          getBinding: () => Effect.succeed(Option.some(binding)),
+          upsert: (next) => Effect.sync(() => void upserts.push(next)),
+          recordImportedTranscript: () => Effect.die("unused"),
+          getProvider: () => Effect.die("unused"),
+          listThreadIds: () => Effect.die("unused"),
+          listBindings: () => Effect.succeed([]),
+        },
+        dispatch: (command) =>
+          Effect.sync(() => dispatched.push(command)).pipe(
+            Effect.as({ sequence: dispatched.length }),
+          ),
+        turnStartGate: {
+          start: ({ threadId }) =>
+            Effect.sync(() => {
+              held.push(threadId);
+            }).pipe(
+              Effect.andThen(Deferred.succeed(gateReached, undefined)),
+              Effect.as("held" as const),
+            ),
+        },
+      });
+      // The continuation is forked; the gate is reached after the loop returns.
+      yield* Deferred.await(gateReached);
+
+      assert.deepStrictEqual(held, [thread.id]);
+      assert.deepStrictEqual(sends, []);
+      // Prepared as upstream does before the send, and the marker stays so a
+      // release (or the next restart) still finds the continuation.
+      assert.deepStrictEqual(
+        dispatched.map((command) => command.type),
+        ["thread.session.set"],
+      );
+      assert.deepStrictEqual(
+        upserts.map((next) => next.runtimePayload),
+        [
+          {
+            activeTurnId: null,
+            continueAfterServerUpdate: thread.session.activeTurnId,
+            continueAfterServerUpdatePrepared: true,
+          },
+        ],
+      );
+    }),
 );
