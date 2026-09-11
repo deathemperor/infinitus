@@ -1,0 +1,289 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+    />
+    <title>Infinitus popup spike</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: light-dark(#1d1d1f, #f5f5f7);
+        --muted: light-dark(rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.6));
+        --track: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.12));
+      }
+      html,
+      body {
+        margin: 0;
+        /* Transparent: the window's vibrancy material is the background. */
+        background: transparent;
+        color: var(--fg);
+        font: 13px/1.35 -apple-system, "SF Pro Text", system-ui, sans-serif;
+        -webkit-user-select: none;
+        overflow: hidden;
+      }
+      .popup {
+        position: relative;
+        padding: 14px 16px;
+        height: 168px;
+        box-sizing: border-box;
+      }
+      .title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .row {
+        position: relative;
+        display: grid;
+        grid-template-columns: 32px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px;
+        border-radius: 10px;
+        background: light-dark(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.06));
+        overflow: hidden;
+      }
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        background: linear-gradient(135deg, #f0a35c, #d9673b);
+        color: #fff;
+      }
+      .name {
+        font-weight: 600;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .countdown {
+        font-variant-numeric: tabular-nums;
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--track);
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        width: 31%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #f0a35c, #d9673b);
+      }
+      /* Effect 1: a compositor-only shimmer. Only `transform` animates, on
+         its own layer, so each frame is a GPU composite with no layout,
+         paint or style recalc. */
+      .shimmer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          100deg,
+          transparent 35%,
+          rgba(255, 255, 255, 0.28) 50%,
+          transparent 65%
+        );
+        transform: translateX(-100%);
+        will-change: transform;
+      }
+      .effect-css .shimmer,
+      .effect-both .shimmer {
+        animation: sweep 2.4s linear infinite;
+      }
+      @keyframes sweep {
+        to {
+          transform: translateX(100%);
+        }
+      }
+      /* Effect 2: the ember canvas, the CAEmitterLayer analog, driven by rAF. */
+      canvas.embers {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .footer {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="popup effect-both" id="popup">
+      <div class="title">Claude · swapd</div>
+      <div class="row">
+        <canvas class="embers" id="embers"></canvas>
+        <div class="shimmer"></div>
+        <div class="avatar" id="avatar">W</div>
+        <div>
+          <div class="name" id="name">Work</div>
+          <div class="sub" id="sub">one@example.com · 5h window 31 %</div>
+        </div>
+        <div class="countdown" id="countdown">–:––:––</div>
+        <div class="bar"><i id="fill"></i></div>
+      </div>
+      <div class="footer"><span id="headroom">headroom abundant</span><span id="effect">effect: both</span></div>
+    </div>
+    <script>
+      "use strict";
+      // --- data: the fixture, read the way the real popup would read the
+      // `infinitusEnvironment.snapshot` atom (`infinitusActiveAccount`,
+      // `infinitusAccountLabel` in client-runtime state/infinitus.ts).
+      const $ = (id) => document.getElementById(id);
+      let resetsAt = Date.now() + 3_600_000;
+      window.spikeBridge.snapshot().then((snapshot) => {
+        const fleet = snapshot.fleets[0];
+        const account =
+          fleet.accounts.find((a) => a.number === fleet.activeNumber) ??
+          fleet.accounts.find((a) => a.active);
+        const label = account.alias || account.email || `#${account.number}`;
+        $("name").textContent = label;
+        $("avatar").textContent = label[0].toUpperCase();
+        const pct = account.usage.fiveHour.pct;
+        $("sub").textContent = `${account.email} · 5h window ${pct} %`;
+        $("fill").style.width = `${pct}%`;
+        $("headroom").textContent = `headroom ${fleet.headroom.state}`;
+        resetsAt = Date.parse(account.usage.fiveHour.resetsAt);
+        tick();
+      });
+
+      // --- countdown: one text write a second. (The native side learned that
+      // a per-second numericText transition grows the glyph cache; here the
+      // heap-growth number in the report is the analog.)
+      const pad = (n) => String(n).padStart(2, "0");
+      const tick = () => {
+        const left = Math.max(0, Math.round((resetsAt - Date.now()) / 1000));
+        $("countdown").textContent = `${Math.floor(left / 3600)}:${pad(Math.floor((left % 3600) / 60))}:${pad(left % 60)}`;
+      };
+      setInterval(tick, 1000);
+
+      // --- embers on rAF, paused when the panel is hidden.
+      const canvas = $("embers");
+      const ctx = canvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const sizeCanvas = () => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+      };
+      sizeCanvas();
+      const EMBERS = 40;
+      const embers = Array.from({ length: EMBERS }, () => spawn(true));
+      function spawn(anywhere) {
+        return {
+          x: Math.random(),
+          y: anywhere ? Math.random() : 1.05,
+          r: 0.6 + Math.random() * 1.4,
+          vy: 0.08 + Math.random() * 0.12, // fraction of height per second
+          vx: (Math.random() - 0.5) * 0.04,
+          life: Math.random(),
+        };
+      }
+      let mode = "both";
+      let visible = true;
+      let rafHandle = 0;
+      let last = 0;
+      const stats = { rafCalls: 0, deltas: [], hiddenRafCalls: 0 };
+      let skip = false;
+      const frame = (now) => {
+        rafHandle = 0;
+        // `canvas30`: draw every other vsync, the cheapest half-rate knob.
+        if (mode === "canvas30" && (skip = !skip)) {
+          schedule();
+          return;
+        }
+        stats.rafCalls += 1;
+        if (!visible) stats.hiddenRafCalls += 1;
+        const dt = last === 0 ? 1 / 60 : Math.min((now - last) / 1000, 0.1);
+        if (last !== 0) stats.deltas.push(now - last);
+        last = now;
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        for (let i = 0; i < embers.length; i += 1) {
+          const e = embers[i];
+          e.y -= e.vy * dt;
+          e.x += e.vx * dt;
+          e.life -= dt * 0.25;
+          if (e.y < -0.05 || e.life <= 0) embers[i] = spawn(false);
+          const alpha = Math.max(0, Math.min(1, e.life)) * 0.9;
+          ctx.fillStyle = `rgba(255, ${150 + Math.round(60 * e.life)}, 80, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(e.x * w, e.y * h, e.r * dpr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        schedule();
+      };
+      const running = () =>
+        visible && (mode === "canvas" || mode === "canvas30" || mode === "both");
+      const schedule = () => {
+        if (running() && rafHandle === 0) rafHandle = requestAnimationFrame(frame);
+      };
+      const stop = () => {
+        if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
+        rafHandle = 0;
+        last = 0;
+      };
+      window.spikeBridge.onVisible((next) => {
+        visible = next;
+        if (visible) schedule();
+        else stop();
+      });
+
+      // --- the hooks `main.cjs --auto` drives.
+      const percentile = (values, p) => {
+        if (values.length === 0) return null;
+        const sorted = [...values].sort((a, b) => a - b);
+        return Number(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(2));
+      };
+      window.spike = {
+        setEffect(next) {
+          mode = next;
+          $("popup").className = `popup effect-${next}`;
+          $("effect").textContent = `effect: ${next}`;
+          if (running()) schedule();
+          else {
+            stop();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+        },
+        resetStats() {
+          stats.rafCalls = 0;
+          stats.hiddenRafCalls = 0;
+          stats.deltas = [];
+        },
+        stats() {
+          const d = stats.deltas;
+          return {
+            rafCalls: stats.rafCalls,
+            hiddenRafCalls: stats.hiddenRafCalls,
+            frameMsP50: percentile(d, 0.5),
+            frameMsP95: percentile(d, 0.95),
+            frameMsMax: d.length ? Number(Math.max(...d).toFixed(2)) : null,
+            framesOver16ms: d.filter((x) => x > 16.7).length,
+          };
+        },
+      };
+      schedule();
+    </script>
+  </body>
+</html>

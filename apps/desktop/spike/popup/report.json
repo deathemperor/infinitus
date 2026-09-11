@@ -1,0 +1,243 @@
+{
+  "electron": "44.1.0",
+  "chrome": "152.0.7977.65",
+  "node": "24.19.0",
+  "macOS": "25.6.0",
+  "arch": "arm64",
+  "cores": 16,
+  "note": "electronCpuPct is Electron's getAppMetrics (share of all cores); psCpuPct is the ps cputime delta (share of one core), which is what native's perf cpuSeconds reports too",
+  "window": {
+    "width": 360,
+    "height": 168,
+    "vibrancy": "popover",
+    "type": "panel"
+  },
+  "conditions": [
+    {
+      "condition": "open, countdown, css shimmer + canvas embers",
+      "intervals": 4,
+      "electronCpuPct": 0.53,
+      "psCpuPct": 8.43,
+      "windowServerCpuPct": 44.44,
+      "rssMb": 426,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 156
+        },
+        "GPU": {
+          "cpuPct": 0.27,
+          "workingSetMb": 92
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.22,
+          "workingSetMb": 129
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 3646,
+        "hiddenRafCalls": 0,
+        "frameMsP50": 16.7,
+        "frameMsP95": 17.6,
+        "frameMsMax": 17.8,
+        "framesOver16ms": 1563
+      }
+    },
+    {
+      "condition": "open, countdown, css shimmer only",
+      "intervals": 2,
+      "electronCpuPct": 0.2,
+      "psCpuPct": 3.25,
+      "windowServerCpuPct": 44.66,
+      "rssMb": 426,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 157
+        },
+        "GPU": {
+          "cpuPct": 0.12,
+          "workingSetMb": 92
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.07,
+          "workingSetMb": 129
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 0,
+        "hiddenRafCalls": 0,
+        "frameMsP50": null,
+        "frameMsP95": null,
+        "frameMsMax": null,
+        "framesOver16ms": 0
+      }
+    },
+    {
+      "condition": "open, countdown, canvas embers only",
+      "intervals": 2,
+      "electronCpuPct": 0.44,
+      "psCpuPct": 7.08,
+      "windowServerCpuPct": 49.75,
+      "rssMb": 364,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 137
+        },
+        "GPU": {
+          "cpuPct": 0.24,
+          "workingSetMb": 73
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 41
+        },
+        "Tab": {
+          "cpuPct": 0.18,
+          "workingSetMb": 112
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 1827,
+        "hiddenRafCalls": 0,
+        "frameMsP50": 16.7,
+        "frameMsP95": 17.5,
+        "frameMsMax": 17.7,
+        "framesOver16ms": 598
+      }
+    },
+    {
+      "condition": "open, countdown, canvas embers at half rate",
+      "intervals": 2,
+      "electronCpuPct": 0.32,
+      "psCpuPct": 5.2,
+      "windowServerCpuPct": 43.86,
+      "rssMb": 370,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 137
+        },
+        "GPU": {
+          "cpuPct": 0.18,
+          "workingSetMb": 77
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 41
+        },
+        "Tab": {
+          "cpuPct": 0.16,
+          "workingSetMb": 114
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 911,
+        "hiddenRafCalls": 0,
+        "frameMsP50": 33.3,
+        "frameMsP95": 34.2,
+        "frameMsMax": 34.4,
+        "framesOver16ms": 911
+      }
+    },
+    {
+      "condition": "open, countdown, no effect",
+      "intervals": 2,
+      "electronCpuPct": 0.03,
+      "psCpuPct": 0.46,
+      "windowServerCpuPct": 42.62,
+      "rssMb": 369,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 138
+        },
+        "GPU": {
+          "cpuPct": 0.02,
+          "workingSetMb": 77
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 41
+        },
+        "Tab": {
+          "cpuPct": 0.01,
+          "workingSetMb": 113
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 0,
+        "hiddenRafCalls": 0,
+        "frameMsP50": null,
+        "frameMsP95": null,
+        "frameMsMax": null,
+        "framesOver16ms": 0
+      }
+    },
+    {
+      "condition": "hidden, effects on",
+      "intervals": 2,
+      "electronCpuPct": 0,
+      "psCpuPct": 0.07,
+      "windowServerCpuPct": 48.14,
+      "rssMb": 369,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 139
+        },
+        "GPU": {
+          "cpuPct": 0,
+          "workingSetMb": 76
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 41
+        },
+        "Tab": {
+          "cpuPct": 0,
+          "workingSetMb": 113
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 0,
+        "hiddenRafCalls": 0,
+        "frameMsP50": null,
+        "frameMsP95": null,
+        "frameMsMax": null,
+        "framesOver16ms": 0
+      }
+    }
+  ],
+  "panel": {
+    "bounds": {
+      "x": 0,
+      "y": 1992,
+      "width": 360,
+      "height": 168
+    },
+    "visible": true,
+    "screenshot": "/var/folders/5z/rw_tvbfd3zj9k3s396r7vzph0000gn/T/infinitus-popup-spike-14aKUT/panel.png"
+  }
+}
