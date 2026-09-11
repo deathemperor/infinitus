@@ -31,17 +31,25 @@ export const fetchProxyModels = Effect.fn("fetchProxyModels")(function* (
     HttpClientRequest.setHeader("Authorization", `Bearer ${input.apiKey}`),
     HttpClientRequest.setHeader("x-api-key", input.apiKey),
   );
-  const response = yield* client.execute(request).pipe(
+  const body = yield* client.execute(request).pipe(
+    Effect.flatMap((response) =>
+      response.status >= 200 && response.status < 300
+        ? response.json.pipe(
+            Effect.mapError(
+              () => new ProviderProxyModelsError({ detail: "The proxy did not send JSON." }),
+            ),
+          )
+        : Effect.fail(
+            new ProviderProxyModelsError({ detail: `The proxy answered ${response.status}.` }),
+          ),
+    ),
     Effect.timeout("15 seconds"),
-    Effect.mapError(() => new ProviderProxyModelsError({ detail: "The proxy did not answer." })),
-  );
-  if (response.status < 200 || response.status >= 300) {
-    return yield* new ProviderProxyModelsError({
-      detail: `The proxy answered ${response.status}.`,
-    });
-  }
-  const body = yield* response.json.pipe(
-    Effect.mapError(() => new ProviderProxyModelsError({ detail: "The proxy did not send JSON." })),
+    Effect.catchTag("TimeoutError", () =>
+      Effect.fail(new ProviderProxyModelsError({ detail: "The proxy did not answer in time." })),
+    ),
+    Effect.catchTag("HttpClientError", () =>
+      Effect.fail(new ProviderProxyModelsError({ detail: "The proxy did not answer." })),
+    ),
   );
   const reply = yield* decodeModelsReply(body).pipe(
     Effect.mapError(

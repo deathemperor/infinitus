@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import { useState } from "react";
 
 import { serverEnvironment } from "../../state/server";
@@ -25,14 +26,13 @@ interface ProxyProviderFieldsProps {
   readonly onChange: (draft: ProxyDraft) => void;
 }
 
-function proxyErrorDetail(cause: unknown): string {
-  const error =
-    typeof cause === "object" && cause !== null && "error" in cause ? cause.error : undefined;
-  return typeof error === "object" &&
-    error !== null &&
-    "detail" in error &&
-    typeof error.detail === "string"
-    ? error.detail
+function proxyErrorDetail(cause: Cause.Cause<unknown>): string {
+  const failure: unknown = Cause.squash(cause);
+  return typeof failure === "object" &&
+    failure !== null &&
+    "detail" in failure &&
+    typeof failure.detail === "string"
+    ? failure.detail
     : "Could not reach the proxy.";
 }
 
@@ -51,6 +51,14 @@ export function ProxyProviderFields({
   const [models, setModels] = useState<ReadonlyArray<string> | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** A loaded list belongs to one base URL; another proxy starts over. */
+  const changeProxy = (next: ProxyDraft) => {
+    if (next.baseUrl !== draft.baseUrl) {
+      setModels(null);
+      setLoadError(null);
+    }
+    onChange(next);
+  };
 
   const loadModels = async () => {
     setLoading(true);
@@ -153,7 +161,7 @@ export function ProxyProviderFields({
                 className="bg-background"
                 placeholder="http://127.0.0.1:20128/v1"
                 value={draft.baseUrl}
-                onChange={(event) => onChange({ ...draft, baseUrl: event.target.value })}
+                onChange={(event) => changeProxy({ ...draft, baseUrl: event.target.value })}
               />
             </label>
           </div>
@@ -172,7 +180,9 @@ export function ProxyProviderFields({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={loading || draft.apiKey.trim().length === 0}
+                disabled={
+                  loading || draft.apiKey.trim().length === 0 || draft.baseUrl.trim().length === 0
+                }
                 onClick={loadModels}
               >
                 {loading ? "Loading…" : "Load models"}
