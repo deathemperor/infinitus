@@ -1046,6 +1046,9 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   showInteractionModeToggle: boolean;
   interactionMode: ProviderInteractionMode;
   runtimeMode: RuntimeMode;
+  /** Fork (#843): a started thread shows the runtime mode as its icon alone;
+      the label moves into the tooltip. A draft keeps the label. */
+  runtimeModeLabelCollapsed?: boolean;
   size?: "sm" | "xs";
   hidden?: boolean;
   onToggleInteractionMode: () => void;
@@ -1054,6 +1057,10 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
   const runtimeModeOption = runtimeModeConfig[props.runtimeMode];
+  const runtimeModeLabelCollapsed = props.runtimeModeLabelCollapsed === true;
+  const runtimeModeTooltip = runtimeModeLabelCollapsed
+    ? `${runtimeModeOption.label} — ${runtimeModeOption.description}`
+    : runtimeModeOption.description;
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
     props.interactionMode === "plan"
@@ -1125,7 +1132,9 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             }
           >
             <ComposerControlIcon icon={RuntimeModeIcon} size={size} />
-            <SelectValue>{runtimeModeOption.label}</SelectValue>
+            <SelectValue className={runtimeModeLabelCollapsed ? "sr-only" : undefined}>
+              {runtimeModeOption.label}
+            </SelectValue>
           </TooltipTrigger>
           <SelectPopup alignItemWithTrigger={false} {...composerFloatingLayerProps}>
             {runtimeModeOptions.map((mode) => {
@@ -1149,7 +1158,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             })}
           </SelectPopup>
         </Select>
-        <TooltipPopup side="top">{runtimeModeOption.description}</TooltipPopup>
+        <TooltipPopup side="top">{runtimeModeTooltip}</TooltipPopup>
       </Tooltip>
 
       {interactionModeToggle}
@@ -4307,6 +4316,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           showInteractionModeToggle={planModeUiEnabled}
           interactionMode={interactionMode}
           runtimeMode={runtimeMode}
+          runtimeModeLabelCollapsed={routeKind === "server" && activeThreadId !== null}
           size={composerControlsInStrip ? "xs" : "sm"}
           hidden={composerControlsHidden || restingHiddenBlockCount > 0}
           onToggleInteractionMode={toggleInteractionMode}
