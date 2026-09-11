@@ -43,9 +43,17 @@ describe("parseDesktopDeepLink (#270 D)", () => {
     expect(link?.kind === "new" ? link.prompt.length : null).toBe(MAX_DEEP_LINK_PROMPT_LENGTH);
   });
 
+  it("carries a team join link whole, as the code", () => {
+    expect(parseDesktopDeepLink("infinitus://join/ABCD-1234", "infinitus")).toEqual({
+      kind: "join",
+      link: "infinitus://join/ABCD-1234",
+    });
+    expect(parseDesktopDeepLink("infinitus://join/", "infinitus")).toBeNull();
+    expect(parseDesktopDeepLink("infinitus://join", "infinitus")).toBeNull();
+  });
+
   it("claims nothing else", () => {
     expect(parseDesktopDeepLink("infinitus://app/index.html", "infinitus")).toBeNull();
-    expect(parseDesktopDeepLink("infinitus://join/abc", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus-dev://thread/e/t", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus://thread/e", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus://thread/e/t/extra", "infinitus")).toBeNull();
@@ -118,7 +126,7 @@ describe("deep link intake (#270 D)", () => {
     const intake = makeDeepLinkIntake();
     intake.attach(fake, ["/app"], "infinitus");
     expect(emit("open-url", "infinitus://app/clerk-callback?code=1")).not.toHaveBeenCalled();
-    expect(emit("open-url", "infinitus://join/abc")).not.toHaveBeenCalled();
+    expect(emit("open-url", "infinitus://pair/abc")).not.toHaveBeenCalled();
     const seen: string[] = [];
     intake.drain((url) => seen.push(url));
     expect(seen).toEqual([]);

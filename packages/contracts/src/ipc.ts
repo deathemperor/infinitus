@@ -352,6 +352,8 @@ export const DesktopDeepLink = Schema.Union([
     threadId: Schema.String,
   }),
   Schema.Struct({ kind: Schema.Literal("new"), project: Schema.String, prompt: Schema.String }),
+  /** `infinitus://join/<team code>`: the whole link text is the code (a secret). */
+  Schema.Struct({ kind: Schema.Literal("join"), link: Schema.String }),
 ]);
 export type DesktopDeepLink = typeof DesktopDeepLink.Type;
 

@@ -65,6 +65,14 @@ export function parseDesktopDeepLink(url: string, scheme: string): DesktopDeepLi
     const prompt = (parsed.searchParams.get("prompt") ?? "").slice(0, MAX_DEEP_LINK_PROMPT_LENGTH);
     return { kind: "new", project, prompt };
   }
+  // The native app's team join link. The whole link text is the code (the
+  // Mac's TeamModel takes it verbatim), so it travels untouched and is never
+  // logged: only its kind is.
+  if (parsed.host === "join") {
+    const segments = parsed.pathname.split("/").filter((segment) => segment.length > 0);
+    if (segments.length === 0) return null;
+    return { kind: "join", link: url };
+  }
   return null;
 }
 

@@ -530,7 +530,12 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
-  unknown project toasts.
+  unknown project toasts. `join` (`infinitus://join/<code>`, the native
+  app's team join link, the whole link text being the code) offers the
+  code to `pendingTeamJoin.ts` (in memory only, taken once) and opens
+  Settings › Infinitus › Team, whose Join field picks it up
+  (`InfinitusTeamPanel.tsx`); the request leaves only on the user's tap,
+  over `infinitus.secret`. Only the link's kind is ever logged.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per

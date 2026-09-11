@@ -22,6 +22,7 @@ import {
   SettingsSection,
   useRelativeTimeTick,
 } from "../settingsLayout";
+import { usePendingTeamJoinStore } from "../../deepLinks/pendingTeamJoin";
 import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { infinitusCommandFailure, infinitusPanelMessage } from "./panel.logic";
 import {
@@ -52,7 +53,18 @@ export function InfinitusTeamPanel() {
   const [busy, setBusy] = useState<TeamAction["type"] | "join" | null>(null);
   const [joinName, setJoinName] = useState("");
   /** The code, a secret (#747): in memory only, cleared on submit, gone with the page. */
-  const [joinCode, setJoinCode] = useState("");
+  // A join link the desktop received (infinitus://join/…) lands here as the
+  // code, once: on mount when the link opened this page, by subscription when
+  // it arrived with the page already open. The user still presses Request to join.
+  const [joinCode, setJoinCode] = useState(() => usePendingTeamJoinStore.getState().take() ?? "");
+  useEffect(
+    () =>
+      usePendingTeamJoinStore.subscribe((state) => {
+        if (state.code === null) return;
+        setJoinCode(usePendingTeamJoinStore.getState().take() ?? "");
+      }),
+    [],
+  );
   const [joinError, setJoinError] = useState<string | null>(null);
 
   const supported =
