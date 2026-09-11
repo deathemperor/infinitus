@@ -55,6 +55,9 @@ export function useLegacyQueueMigration(): void {
     if (pending.length === 0 || !primaryConnected) return;
     void (async () => {
       for (const entry of pending) {
+        // A take above re-runs this effect while this loop is still going;
+        // the newer pass must not dispatch what this one already has.
+        if (attemptedRef.current.has(entry.id)) continue;
         const key =
           entry.queuedFor === undefined ? null : parseComposerSendQueueKey(entry.queuedFor);
         const command = legacyQueuedEntryCommand(entry);
