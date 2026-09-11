@@ -371,13 +371,17 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   the page's own non-loopback origin; #651). Both up → an Internet / Same
   Wi‑Fi choice; neither → it points at Settings › Connections › Network
   access. "Type it instead" reveals host + code for the phone's manual form.
-  The link carries `&for=phone` in the fragment (#724): the card says to scan
-  from inside the app (Settings › Configuration › Environments › Add › Scan
-  QR), and a Camera-app scan that lands in Safari gets
-  `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone app")
-  from `routes/pair.tsx` instead of `PairingRouteSurface`, so the browser
-  never spends the one-time token; the phone's parser reads the token off the
-  fragment as before. It is mounted through the prefs panel's `footer`
+  The link is the site's universal link (#724): `https://infinitus.run/pair`
+  with `token`, `for=phone` and `to=<the Mac's origin>` all in the fragment,
+  which the site's server never sees — one shape for tunnel and LAN. A phone
+  with the app opens it in the app (`applinks:infinitus.run`, #782), which
+  rebuilds `<origin>/pair#token=…` and fills the sheet; the site's `/pair`
+  page forwards an app-less phone or a desktop browser to `<origin>/pair`,
+  where `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone
+  app") from `routes/pair.tsx` replaces `PairingRouteSurface`, so a browser
+  never spends the one-time token. Order of landing: the site's AASA
+  `applinks` + forwarder first, then this card, then a phone build with the
+  entitlement. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card

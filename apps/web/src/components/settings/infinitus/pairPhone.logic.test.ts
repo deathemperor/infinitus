@@ -41,7 +41,7 @@ describe("pairPhoneCardModel", () => {
     expect(model.origin).toEqual({ kind: "tunnel", url: TUNNEL_URL });
     expect(model.link).toEqual({
       kind: "active",
-      url: `${TUNNEL_URL}/pair#token=fixture-token&for=phone`,
+      url: phonePairingUrl(TUNNEL_URL, "fixture-token"),
       host: "example-words.trycloudflare.com",
       secondsLeft: 300,
     });
@@ -64,7 +64,7 @@ describe("pairPhoneCardModel", () => {
     expect(sameNetwork.lanNotice).toMatch(/only works for phones on your Wi‑Fi/);
     expect(sameNetwork.link).toMatchObject({
       kind: "active",
-      url: "http://192.168.1.20:3773/pair#token=fixture-token&for=phone",
+      url: phonePairingUrl("http://192.168.1.20:3773", "fixture-token"),
       host: "192.168.1.20:3773",
     });
   });
@@ -176,19 +176,30 @@ describe("pairPhoneCardModel", () => {
 });
 
 describe("phonePairingUrl", () => {
-  it("puts the token and the phone marker in the fragment of the /pair page, never the query", () => {
+  it("mints the site's universal link with token, marker and the Mac's origin in the fragment, never the query (#724)", () => {
     const url = new URL(phonePairingUrl(TUNNEL_URL, "fixture-token"));
-    expect(url.pathname).toBe("/pair");
+    expect(url.origin + url.pathname).toBe("https://infinitus.run/pair");
     expect(url.search).toBe("");
-    expect(url.hash).toBe("#token=fixture-token&for=phone");
-    // What the phone's parser and upstream's reader both do with the fragment.
-    expect(new URLSearchParams(url.hash.slice(1)).get("token")).toBe("fixture-token");
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    expect(fragment.get("token")).toBe("fixture-token");
+    expect(fragment.get("for")).toBe("phone");
+    expect(fragment.get("to")).toBe(new URL(TUNNEL_URL).origin);
+  });
+
+  it("hands a LAN origin the same way, port included", () => {
+    const fragment = new URLSearchParams(
+      new URL(phonePairingUrl("http://192.168.2.5:3773/settings", "t")).hash.slice(1),
+    );
+    expect(fragment.get("to")).toBe("http://192.168.2.5:3773");
   });
 });
 
 describe("isPhonePairingLink", () => {
   it("recognises the card's link and nothing else", () => {
     expect(isPhonePairingLink(new URL(phonePairingUrl(TUNNEL_URL, "fixture-token")))).toBe(true);
+    expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair#token=fixture-token&for=phone`))).toBe(
+      true,
+    );
     expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair#token=fixture-token`))).toBe(false);
     expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair?for=phone#token=fixture-token`))).toBe(
       false,

@@ -144,7 +144,7 @@ export function InfinitusPairPhoneCard() {
                     size={148}
                     level="M"
                     marginSize={1}
-                    title="Pairing link — scan from inside the Infinitus phone app, not the Camera app"
+                    title="Pairing link — scan with the Infinitus phone app, or its Camera app"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
