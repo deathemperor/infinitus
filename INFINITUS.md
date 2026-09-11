@@ -175,6 +175,26 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
   — the user-row revert button is a menu: "Revert files and chat" /
   "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
+  `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
+  `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
+  `RpcAuthorization.ts`); `apps/server/src/ws.ts` — the handler;
+  `apps/server/src/provider/Layers/ClaudeAdapter.ts` — the resume cursor
+  carries `anchors` (`{turn, at}`: each completed turn's last assistant uuid,
+  ≤ 200, trimmed on rollback) and `fork: true`; a forked thread's first start
+  passes `forkSession` + `resumeSessionAt` to the SDK and starts its own
+  anchors; `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
+  `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude driver only),
+  mode `fork` on `onRevertToTurnCount` (no confirm; navigates to the new
+  thread), `MessagesTimeline.tsx` — the third menu item. Fork-only:
+  `apps/server/src/infinitus/ThreadFork.ts` (+ test): `forkThreadAtTurn` —
+  binding first (insert-ignore: `resume` = the source session, the turn's
+  anchor as `resumeSessionAt`, `fork: true`), then `thread.create
+{historyImport: true}` on the source's branch and worktree, then
+  `thread.history.import` of a provenance marker ("Forked from **title** at
+  turn N") plus the source's user/assistant text up to that turn
+  (`forkSeedMessages`: by turn id, unattributed rows by time). The source
+  thread is never mutated. Codex has no fork point yet (issue filed).
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
   `PromptSnippet` schema with its caps and `projectPromptSnippets`

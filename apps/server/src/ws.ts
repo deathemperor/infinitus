@@ -145,6 +145,7 @@ import * as ReviewService from "./review/ReviewService.ts";
 import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts";
 import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
 import { importRecentAgentThreads } from "./project/AgentSessionImporter.ts";
+import { forkThreadAtTurn } from "./infinitus/ThreadFork.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
@@ -3090,6 +3091,26 @@ const makeWsRpcLayer = (
             infinitusSecret.forward({ ...input, sessionId: currentSession.sessionId }),
             // The verb only: never the args, never the value (#747).
             { "rpc.aggregate": "infinitus", "infinitus.command": input.command },
+          ),
+        [WS_METHODS.infinitusForkThread]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusForkThread,
+            forkThreadAtTurn(input).pipe(
+              Effect.provideService(
+                OrchestrationEngine.OrchestrationEngineService,
+                orchestrationEngine,
+              ),
+              Effect.provideService(
+                ProjectionSnapshotQuery.ProjectionSnapshotQuery,
+                projectionSnapshotQuery,
+              ),
+              Effect.provideService(Crypto.Crypto, crypto),
+              Effect.provideService(
+                ProviderSessionDirectory.ProviderSessionDirectory,
+                providerSessionDirectory,
+              ),
+            ),
+            { "rpc.aggregate": "infinitus", "thread.turnCount": input.turnCount },
           ),
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(

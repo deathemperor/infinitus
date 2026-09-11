@@ -417,6 +417,23 @@ export const InfinitusReleaseThreadResult = Schema.Struct({
 });
 export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;
 
+/** Fork a thread at a turn (#270 E2): a new thread on the same branch and
+    worktree whose Claude session continues from that turn; the source is not
+    touched. `turnCount` is the checkpoint turn count shown on the message. */
+export const InfinitusThreadForkInput = Schema.Struct({
+  threadId: ThreadId,
+  turnCount: Schema.Int,
+});
+export type InfinitusThreadForkInput = typeof InfinitusThreadForkInput.Type;
+export const InfinitusThreadForkResult = Schema.Struct({ threadId: ThreadId });
+export type InfinitusThreadForkResult = typeof InfinitusThreadForkResult.Type;
+/** Why a fork did not happen: not a Claude session, no anchor for that turn,
+    nothing to fork. The reason is shown to the user as is. */
+export class InfinitusThreadForkRefused extends Schema.TaggedError<InfinitusThreadForkRefused>()(
+  "InfinitusThreadForkRefused",
+  { reason: Schema.String },
+) {}
+
 /** The desktop shell's own Infinitus knobs (one-app feel, #654), kept by the
     shell rather than the server because they describe this window.
     `quitInfinitusWithApp`: quitting the desktop app also sends the menu-bar
