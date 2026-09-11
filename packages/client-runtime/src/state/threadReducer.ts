@@ -324,6 +324,7 @@ export function applyThreadDetailEvent(
           ...(event.payload.branchPullRequest !== undefined
             ? { branchPullRequest: event.payload.branchPullRequest }
             : {}),
+          ...(event.payload.babysit !== undefined ? { babysit: event.payload.babysit } : {}),
           ...(event.payload.activeOrderKey !== undefined
             ? { activeOrderKey: event.payload.activeOrderKey }
             : {}),

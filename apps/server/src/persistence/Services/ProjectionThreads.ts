@@ -14,6 +14,7 @@ import {
   ProjectId,
   ProviderInteractionMode,
   RuntimeMode,
+  ThreadBabysit,
   ThreadLinkedPullRequest,
   ThreadId,
   TurnId,
@@ -45,6 +46,8 @@ export const ProjectionThread = Schema.Struct({
   unsettledAt: Schema.NullOr(IsoDateTime),
   snoozedUntil: Schema.NullOr(IsoDateTime),
   snoozedAt: Schema.NullOr(IsoDateTime),
+  // Fork (#269 A). Optional so callers that build rows predate it.
+  babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
   pinnedAt: Schema.NullOr(IsoDateTime),
   pinOrderKey: Schema.optional(Schema.NullOr(Schema.String)),
   activeOrderKey: Schema.optional(Schema.NullOr(Schema.String)),

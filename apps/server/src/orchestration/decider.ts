@@ -4,6 +4,7 @@ import {
   SCRIPT_RUN_COMMAND_PATTERN,
   MessageId,
   ThreadLinkedPullRequest,
+  type ThreadBabysit,
   UserInputRequestedPayload,
   isImportedAgentSessionMessageId,
   type OrchestrationCommand,
@@ -128,6 +129,28 @@ function hasQueuedTurnStartForThread(
     },
     now,
   );
+}
+
+/** Fork (#269 A): the babysit half of a meta update. Turning it on is
+    idempotent (a babysat thread keeps its start and its rounds), turning
+    it off clears it, and a round count only lands while it is on. */
+function babysitPatch(
+  thread: { readonly babysit?: ThreadBabysit | null | undefined },
+  command: {
+    readonly babysit?: boolean | undefined;
+    readonly babysitRounds?: number | undefined;
+  },
+  occurredAt: string,
+): { readonly babysit?: ThreadBabysit | null } {
+  if (command.babysit === false) return thread.babysit == null ? {} : { babysit: null };
+  const current = thread.babysit ?? null;
+  if (command.babysit === true && current === null) {
+    return { babysit: { since: occurredAt, rounds: command.babysitRounds ?? 0 } };
+  }
+  if (command.babysitRounds !== undefined && current !== null) {
+    return { babysit: { ...current, rounds: command.babysitRounds } };
+  }
+  return {};
 }
 
 function findPullRequestLink(
@@ -1005,6 +1028,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           ...(command.linkedPullRequest !== undefined
             ? { linkedPullRequest: command.linkedPullRequest }
             : {}),
+          ...babysitPatch(thread, command, occurredAt),
           updatedAt: occurredAt,
         },
       };

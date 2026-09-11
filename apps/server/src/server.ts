@@ -78,6 +78,7 @@ import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairin
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
+import { InfinitusBabysitLive } from "./infinitus/Layers/InfinitusBabysit.ts";
 import { InfinitusTurnQueueLive } from "./infinitus/Layers/InfinitusTurnQueue.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
@@ -299,6 +300,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(CheckpointReactorLive),
   Layer.provideMerge(ThreadDeletionReactorLive),
   Layer.provideMerge(ThreadSettlementReactor.layer),
+  // Fork (#269 A): queues a fix round for a babysat thread's red pull
+  // request through `thread.turn.queue`; reads the sync reactor below.
+  Layer.provideMerge(InfinitusBabysitLive),
   Layer.provideMerge(PullRequestSyncReactor.layer),
   Layer.provideMerge(ThreadPullRequestReactor.layer),
   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
