@@ -813,6 +813,12 @@ final class AppModel: ObservableObject {
         model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
         return model
     }()
+    /// The desktop's CLI credential (#822): stored by `desktop-credential`, read by `desktop-token`.
+    private(set) lazy var desktopCredential: DesktopCredential = {
+        let credential = DesktopCredential(defaults: defaults)
+        credential.log = { [weak self] text in self?.logEvent("desktop", icon: "key", text) }
+        return credential
+    }()
     let quickTunnel = QuickTunnel()
     let namedTunnel = NamedTunnel()
     let forkTunnel = QuickTunnel(pidKey: "fork_tunnel_pid")
