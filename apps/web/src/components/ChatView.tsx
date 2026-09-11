@@ -6498,7 +6498,8 @@ export default function ChatView(props: ChatViewProps) {
       const localApi = readLocalApi();
       if (!localApi || !activeThread || isRevertingCheckpoint) return;
 
-      if (!supportsConversationRollback) {
+      // Fork (#269 E): restoring the files alone touches no conversation.
+      if (!supportsConversationRollback && mode !== "restore-files") {
         setThreadError(
           activeThread.id,
           "This provider does not support reverting conversation history. Start a new thread instead.",
@@ -6545,11 +6546,17 @@ export default function ChatView(props: ChatViewProps) {
               "Newer messages leave this thread; the workspace is untouched.",
               "This action cannot be undone.",
             ]
-          : [
-              `Revert this thread to checkpoint ${turnCount}?`,
-              "This will discard newer messages and turn diffs in this thread.",
-              "This action cannot be undone.",
-            ]
+          : mode === "restore-files"
+            ? [
+                `Restore the files to checkpoint ${turnCount}? The chat stays as it is.`,
+                "The workspace goes back to how it was at this message; newer messages and their checkpoints stay.",
+                "This action cannot be undone.",
+              ]
+            : [
+                `Revert this thread to checkpoint ${turnCount}?`,
+                "This will discard newer messages and turn diffs in this thread.",
+                "This action cannot be undone.",
+              ]
         ).join("\n"),
         { variant: "destructive" },
       );
@@ -6563,7 +6570,10 @@ export default function ChatView(props: ChatViewProps) {
       const result =
         mode === "chat"
           ? await rewindThreadChat({ environmentId, input })
-          : await revertThreadCheckpoint({ environmentId, input });
+          : await revertThreadCheckpoint({
+              environmentId,
+              input: mode === "restore-files" ? { ...input, keepChat: true } : input,
+            });
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         setThreadError(

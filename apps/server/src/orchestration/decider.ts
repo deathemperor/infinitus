@@ -1851,6 +1851,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         payload: {
           threadId: command.threadId,
           turnCount: command.turnCount,
+          ...(command.keepChat === true ? { keepChat: true } : {}),
           createdAt: command.createdAt,
         },
       };

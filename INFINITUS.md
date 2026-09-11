@@ -182,6 +182,17 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
   — the user-row revert button is a menu: "Revert files and chat" /
   "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Restore files, keep the chat (#269 E, Cursor's default checkpoint
+  action): `thread.checkpoint.revert` and its `-requested` event carry
+  `keepChat?: boolean`; `CheckpointReactor.handleRevertRequested` with it
+  restores the checkpoint and refreshes the workspace index, then stops:
+  no provider rollback (so no rollback-support guard), no later-checkpoint
+  ref deletion, no `thread.revert.complete` — one `checkpoint.restored`
+  info activity ("Files restored to turn N", `turnId: null`) instead, and
+  the span carries `keepChat`. Web: `TimelineRevertMode` `restore-files`,
+  the menu's "Restore files only" between the full revert and the chat
+  rewind, its own confirm text, and the mode skips the conversation-rollback
+  check. Test beside the E1 one.
 - Server-side message queue (#806, the server half of #270 F):
   `packages/contracts/src/baseSchemas.ts` — `QueueId`;
   `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,

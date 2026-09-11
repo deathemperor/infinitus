@@ -1389,6 +1389,9 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   turnCount: NonNegativeInt,
+  /** Fork (#269 E): restore the files only; the chat and the later
+      checkpoints stay. Absent or false is the full revert. */
+  keepChat: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -1920,6 +1923,8 @@ const ThreadUserInputResponseRequestedPayload = Schema.Struct({
 export const ThreadCheckpointRevertRequestedPayload = Schema.Struct({
   threadId: ThreadId,
   turnCount: NonNegativeInt,
+  /** Fork (#269 E): files only, see `thread.checkpoint.revert`. */
+  keepChat: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
