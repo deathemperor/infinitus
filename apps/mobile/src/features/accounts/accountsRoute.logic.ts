@@ -10,6 +10,10 @@ import {
   type ForecastModel,
 } from "@t3tools/client-runtime/state/infinitusAccounts";
 import {
+  exhaustedBand,
+  type ExhaustedBandModel,
+} from "@t3tools/client-runtime/state/infinitusExhausted";
+import {
   infinitusAccountLabel,
   infinitusActiveAccount,
 } from "@t3tools/client-runtime/state/infinitus";
@@ -59,25 +63,61 @@ export interface MacAccountsModel {
   readonly state: AccountsPageState;
   readonly unavailableReason: string | null;
   readonly sections: ReadonlyArray<FleetSectionModel>;
+  /** The all-exhausted band per fleet key (#706), only for fleets whose
+      every unheld account is at a limit — web's verdict, from one model. */
+  readonly bands: ReadonlyMap<string, ExhaustedBandModel>;
   readonly forecast: ForecastModel | null;
 }
 
-export function macAccountsModel(snapshot: InfinitusSnapshot | null): MacAccountsModel {
+export function macAccountsModel(
+  snapshot: InfinitusSnapshot | null,
+  nowMs: number,
+): MacAccountsModel {
   const state = accountsPageState({ capability: true, snapshot });
   if (state !== "ready" || snapshot === null) {
     return {
       state,
       unavailableReason: snapshot?.unavailableReason ?? null,
       sections: [],
+      bands: new Map(),
       forecast: null,
     };
+  }
+  const bands = new Map<string, ExhaustedBandModel>();
+  for (const fleet of snapshot.fleets) {
+    const band = exhaustedBand(fleet, nowMs);
+    if (band !== null) bands.set(fleet.key, band);
   }
   return {
     state,
     unavailableReason: null,
     sections: snapshot.fleets.map(buildFleetSection),
+    bands,
     forecast: buildForecast(snapshot),
   };
+}
+
+/** The band's one line: the revival as a clock time, "tomorrow at …" or a
+    date when further out, and who comes back first when known. The phone has
+    no timestamp-format setting, so the device locale formats it. */
+export function exhaustedCopy(band: ExhaustedBandModel, nowMs: number): string {
+  const when = band.revivalAt === null ? "" : upcoming(band.revivalAt, nowMs);
+  if (when === "") return "All accounts exhausted";
+  const who = band.revivesFirst === null ? "" : ` (${band.revivesFirst})`;
+  return `All accounts exhausted · next revival ${when}${who}`;
+}
+
+function upcoming(iso: string, nowMs: number): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const now = new Date(nowMs);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((startOfDay - startOfToday) / 86_400_000);
+  if (days <= 0) return time;
+  if (days === 1) return `tomorrow at ${time}`;
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }
 
 /** The row's context menu, one entry per action the shared model allows —
@@ -174,17 +214,20 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
 }
 
 /** What the home header's chip says for one Mac: the active account and its
-    fullest window. Nothing while the first snapshot is in flight; an
-    unavailable app still earns a muted chip, so the tap leads to the reason. */
+    fullest window, or "limited" in the hot tone while every unheld account of
+    its fleet is at a limit (#706). Nothing while the first snapshot is in
+    flight; an unavailable app still earns a muted chip, so the tap leads to
+    the reason. */
 export interface HomeChipModel {
   readonly label: string;
   readonly pct: number | null;
   readonly tone: "calm" | "warm" | "hot" | "off";
+  readonly limited: boolean;
 }
 
-export function homeChip(snapshot: InfinitusSnapshot | null): HomeChipModel | null {
+export function homeChip(snapshot: InfinitusSnapshot | null, nowMs: number): HomeChipModel | null {
   if (snapshot === null) return null;
-  if (!snapshot.available) return { label: "Infinitus", pct: null, tone: "off" };
+  if (!snapshot.available) return { label: "Infinitus", pct: null, tone: "off", limited: false };
   for (const fleet of snapshot.fleets) {
     const active = infinitusActiveAccount(fleet);
     if (active === null) continue;
@@ -192,10 +235,12 @@ export function homeChip(snapshot: InfinitusSnapshot | null): HomeChipModel | nu
       (candidate) => candidate.number === active.number,
     );
     const pct = row && row.windows.length > 0 ? Math.max(...row.windows.map((w) => w.pct)) : null;
+    const limited = exhaustedBand(fleet, nowMs) !== null;
     return {
       label: infinitusAccountLabel(active),
       pct,
-      tone: pct === null ? "calm" : windowTone(pct),
+      tone: limited ? "hot" : pct === null ? "calm" : windowTone(pct),
+      limited,
     };
   }
   return null;

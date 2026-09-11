@@ -13,6 +13,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { attentionSessionCount } from "../infinitus/sessions.logic";
 import { chipEnvironment, homeChip, infinitusMacs } from "./accountsRoute.logic";
+import { useNowMinute } from "./useNowMinute";
 
 const PCT_CLASS = {
   calm: "text-foreground-muted",
@@ -22,9 +23,9 @@ const PCT_CLASS = {
 } as const;
 
 /** The home header's Infinitus chip: the active account of the Mac the list
-    follows, its fullest usage window, and how many of its sessions wait on a
-    person; tap → Settings › Accounts. Renders
-    nothing when no paired Mac runs Infinitus. */
+    follows, its fullest usage window ("limited" while every account is at a
+    limit, #706), and how many of its sessions wait on a person; tap →
+    Settings › Accounts. Renders nothing when no paired Mac runs Infinitus. */
 export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: EnvironmentId | null }) {
   const navigation = useNavigation();
   const configs = useAtomValue(environmentServerConfigsAtom);
@@ -38,7 +39,8 @@ export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: Envir
       ? null
       : infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
-  const model = homeChip(mac === null ? null : view.data);
+  const now = useNowMinute();
+  const model = homeChip(mac === null ? null : view.data, now);
   const waiting = attentionSessionCount(mac === null ? null : view.data);
   if (mac === null || model === null) return null;
   return (
@@ -62,7 +64,9 @@ export function InfinitusHomeChip(props: { readonly selectedEnvironmentId: Envir
       <Text className="shrink text-sm font-t3-medium text-foreground" numberOfLines={1}>
         {model.label}
       </Text>
-      {model.pct !== null ? (
+      {model.limited ? (
+        <Text className={cn("text-sm font-t3-bold", PCT_CLASS.hot)}>limited</Text>
+      ) : model.pct !== null ? (
         <Text className={cn("text-sm font-t3-bold tabular-nums", PCT_CLASS[model.tone])}>
           {model.pct}%
         </Text>

@@ -9,6 +9,7 @@ import {
   commandFailureMessage,
   homeChip,
   infinitusMacs,
+  exhaustedCopy,
   macAccountsModel,
   rowBadges,
   rowMenuActions,
@@ -17,6 +18,34 @@ import {
 } from "./accountsRoute.logic";
 
 const macId = EnvironmentId.make("mac-1");
+const NOW = Date.parse("2026-09-11T08:00:00Z");
+const RESET = "2026-09-11T10:30:00.000Z";
+/** Every account at its 5h limit until RESET. */
+const exhaustedSnapshot: InfinitusSnapshot = {
+  available: true,
+  fleets: [
+    {
+      key: "cswap/claude",
+      engineID: "cswap",
+      provider: "claude",
+      capabilities: ["switch"],
+      activeNumber: 1,
+      accounts: [
+        {
+          number: 1,
+          alias: "death1",
+          email: "one@example.com",
+          isOrganization: false,
+          active: true,
+          usageStatus: "limited",
+          usage: { fiveHour: { pct: 100, resetsAt: RESET } },
+        },
+      ],
+    },
+  ],
+  sessions: [],
+  commands: [],
+};
 const plainId = EnvironmentId.make("server-2");
 
 const row: AccountRowModel = {
@@ -83,24 +112,27 @@ describe("infinitusMacs", () => {
 
 describe("macAccountsModel", () => {
   it("is loading before the first snapshot", () => {
-    expect(macAccountsModel(null)).toMatchObject({ state: "loading", sections: [] });
+    expect(macAccountsModel(null, NOW)).toMatchObject({ state: "loading", sections: [] });
   });
 
   it("carries the app's reason when it is unavailable", () => {
-    const model = macAccountsModel({
-      available: false,
-      unavailableReason: "the socket refused the connection",
-      fleets: [],
-      sessions: [],
-      commands: [],
-    });
+    const model = macAccountsModel(
+      {
+        available: false,
+        unavailableReason: "the socket refused the connection",
+        fleets: [],
+        sessions: [],
+        commands: [],
+      },
+      NOW,
+    );
     expect(model.state).toBe("unavailable");
     expect(model.unavailableReason).toBe("the socket refused the connection");
   });
 
   it("is empty with no fleets and ready with one section per fleet", () => {
-    expect(macAccountsModel({ ...readySnapshot, fleets: [] }).state).toBe("empty");
-    const model = macAccountsModel(readySnapshot);
+    expect(macAccountsModel({ ...readySnapshot, fleets: [] }, NOW).state).toBe("empty");
+    const model = macAccountsModel(readySnapshot, NOW);
     expect(model.state).toBe("ready");
     expect(model.sections.map((section) => section.title)).toEqual(["claude (cswap)"]);
     expect(model.forecast).toBeNull();
@@ -183,11 +215,12 @@ describe("commandFailureMessage", () => {
 
 describe("homeChip", () => {
   it("is silent while loading and muted when the app is unavailable", () => {
-    expect(homeChip(null)).toBeNull();
-    expect(homeChip({ available: false, fleets: [], sessions: [], commands: [] })).toEqual({
+    expect(homeChip(null, NOW)).toBeNull();
+    expect(homeChip({ available: false, fleets: [], sessions: [], commands: [] }, NOW)).toEqual({
       label: "Infinitus",
       pct: null,
       tone: "off",
+      limited: false,
     });
   });
 
@@ -219,14 +252,24 @@ describe("homeChip", () => {
         },
       ],
     };
-    expect(homeChip(snapshot)).toEqual({ label: "death2", pct: 91, tone: "hot" });
+    expect(homeChip(snapshot, NOW)).toEqual({
+      label: "death2",
+      pct: 91,
+      tone: "hot",
+      limited: false,
+    });
   });
 
   it("has nothing to say for a fleet with no active account, and no pct without usage", () => {
     expect(
-      homeChip({ ...readySnapshot, fleets: [{ ...readySnapshot.fleets[0]!, accounts: [] }] }),
+      homeChip({ ...readySnapshot, fleets: [{ ...readySnapshot.fleets[0]!, accounts: [] }] }, NOW),
     ).toBeNull();
-    expect(homeChip(readySnapshot)).toEqual({ label: "one@example.com", pct: null, tone: "calm" });
+    expect(homeChip(readySnapshot, NOW)).toEqual({
+      label: "one@example.com",
+      pct: null,
+      tone: "calm",
+      limited: false,
+    });
   });
 });
 
@@ -241,5 +284,40 @@ describe("chipEnvironment", () => {
     expect(chipEnvironment(EnvironmentId.make("other"), macs)?.label).toBe("Studio");
     expect(chipEnvironment(null, macs)?.label).toBe("Studio");
     expect(chipEnvironment(null, [])).toBeNull();
+  });
+});
+
+describe("exhausted band (#706)", () => {
+  it("the model carries a band only for a fleet whose every account is at a limit", () => {
+    expect(macAccountsModel(readySnapshot, NOW).bands.size).toBe(0);
+    const bands = macAccountsModel(exhaustedSnapshot, NOW).bands;
+    expect(bands.get("cswap/claude")).toEqual({ revivalAt: RESET, revivesFirst: "death1" });
+    // Past the reset the reading belongs to a window that rolled: no band.
+    expect(macAccountsModel(exhaustedSnapshot, Date.parse(RESET) + 1).bands.size).toBe(0);
+  });
+
+  it("the chip reads limited in the hot tone instead of the pct", () => {
+    expect(homeChip(exhaustedSnapshot, NOW)).toEqual({
+      label: "death1",
+      pct: 100,
+      tone: "hot",
+      limited: true,
+    });
+  });
+
+  it("the copy names the revival and who comes back first", () => {
+    const time = new Date(RESET).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: "death1" }, NOW)).toBe(
+      `All accounts exhausted · next revival ${time} (death1)`,
+    );
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null }, NOW)).toBe(
+      `All accounts exhausted · next revival ${time}`,
+    );
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null }, NOW - 86_400_000)).toBe(
+      `All accounts exhausted · next revival tomorrow at ${time}`,
+    );
+    expect(exhaustedCopy({ revivalAt: null, revivesFirst: null }, NOW)).toBe(
+      "All accounts exhausted",
+    );
   });
 });
