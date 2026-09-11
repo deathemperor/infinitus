@@ -25,6 +25,7 @@ import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
+import { isNotPolled } from "./Infinitus.ts";
 import type { InfinitusSessionHoldRelease } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import { CONTINUATION_PROMPT } from "./infinitusResumeOnLimit.logic.ts";
@@ -170,10 +171,9 @@ export const InfinitusSessionInterruptLive = Layer.effect(
         }
         // Foreground: never paused, but still running — a pin can be lifted.
         if (shell.value.pinnedAt != null) return;
-        if (shell.value.session?.activeTurnId !== entry.turnId) {
-          running.delete(threadId);
-          return;
-        }
+        // Runtime events own `running`: a session that names another turn is
+        // projection lag, not a turn that ended. The next reading looks again.
+        if (shell.value.session?.activeTurnId !== entry.turnId) return;
         const createdAt = DateTime.formatIso(yield* DateTime.now);
         const interrupted = yield* orchestrationEngine
           .dispatch({
@@ -302,19 +302,37 @@ export const InfinitusSessionInterruptLive = Layer.effect(
     const onRuntimeEvent = (event: ProviderRuntimeEvent) =>
       Effect.gen(function* () {
         const provider = fleetProviderForDriver(event.provider);
-        if (provider === null || event.turnId === undefined) return;
+        if (provider === null) return;
         switch (event.type) {
-          case "turn.started":
+          case "turn.started": {
+            if (event.turnId === undefined) return;
             // A new turn on a paused thread is the user moving on (or our own
             // continuation): nothing is paused there any more.
             paused.delete(event.threadId);
             running.set(event.threadId, { turnId: event.turnId, provider });
-            break;
+            // On a server nobody watches, `snapshot` is the pre-poll placeholder
+            // until something polls; one refresh reads the socket for real, so
+            // interrupt mode arms headlessly too.
+            let snapshot = yield* infinitus.snapshot;
+            if (isNotPolled(snapshot)) {
+              yield* infinitus.refresh;
+              snapshot = yield* infinitus.snapshot;
+            }
+            yield* settleWatch(snapshot);
+            return;
+          }
           case "turn.completed":
           case "turn.aborted":
-          case "session.exited":
-            if (running.get(event.threadId)?.turnId === event.turnId)
+            if (
+              event.turnId !== undefined &&
+              running.get(event.threadId)?.turnId === event.turnId
+            ) {
               running.delete(event.threadId);
+            }
+            break;
+          case "session.exited":
+            // The session is gone whatever turn it named; the base's turnId is optional.
+            running.delete(event.threadId);
             break;
           default:
             return;

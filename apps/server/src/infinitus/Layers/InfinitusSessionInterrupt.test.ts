@@ -38,6 +38,7 @@ import {
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
+import { NOT_POLLED_REASON } from "./Infinitus.ts";
 import { CONTINUATION_PROMPT } from "./infinitusResumeOnLimit.logic.ts";
 import { InfinitusSessionInterruptLive } from "./InfinitusSessionInterrupt.ts";
 import { PAUSE_MARKER_KIND, RESUME_MARKER_KIND } from "./infinitusSessionInterrupt.logic.ts";
@@ -104,6 +105,14 @@ const offline: InfinitusSnapshot = {
   sessions: [],
   commands: [],
 };
+/** What `snapshot` answers before the first poll on a server nobody watches. */
+const notPolled: InfinitusSnapshot = {
+  available: false,
+  unavailableReason: NOT_POLLED_REASON,
+  fleets: [],
+  sessions: [],
+  commands: [],
+};
 
 const shellFor = (
   threadId: ThreadId,
@@ -133,7 +142,7 @@ let eventCount = 0;
 const runtimeEvent = (
   type: ProviderRuntimeEvent["type"],
   threadId: ThreadId,
-  turnId: TurnId,
+  turnId: TurnId | undefined,
   provider: ProviderDriverKind = claude,
 ): ProviderRuntimeEvent =>
   ({
@@ -142,7 +151,7 @@ const runtimeEvent = (
     provider,
     createdAt: "2026-09-11T10:00:00Z",
     threadId,
-    turnId,
+    ...(turnId === undefined ? {} : { turnId }),
     payload: {},
   }) as ProviderRuntimeEvent;
 
@@ -170,6 +179,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
     const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input: string }>>([]);
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
     const watchers = yield* Ref.make(0);
+    const refreshes = yield* Ref.make(0);
 
     const layer = InfinitusSessionInterruptLive.pipe(
       Layer.provide(
@@ -208,6 +218,10 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
                 ).pipe(Effect.as(Stream.fromQueue(snapshots))),
               ),
             observed: Stream.empty,
+            // A refresh polls for real: here it lands the low reading.
+            refresh: Ref.update(refreshes, (n) => n + 1).pipe(
+              Effect.andThen(Ref.set(current, low)),
+            ),
           }),
           Layer.succeed(Crypto.Crypto, testCrypto),
         ),
@@ -254,6 +268,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
         ),
       ),
       watchers: Ref.get(watchers),
+      refreshes: Ref.get(refreshes),
     };
   });
 const makeHarness = makeHarnessWith();
@@ -371,6 +386,56 @@ describe("InfinitusSessionInterruptLive", () => {
         yield* h.emit(runtimeEvent("turn.started", one, turnOne));
         for (let i = 0; i < 50; i += 1) yield* Effect.yieldNow;
         expect(yield* h.watchers).toBe(0);
+      }),
+    ),
+  );
+
+  effectIt.effect("polls once for a real reading when nothing has been polled yet", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.setCurrent(notPolled);
+        yield* h.emit(runtimeEvent("turn.started", one, turnOne));
+        yield* settle(h.watchers, (n) => n === 1);
+        expect(yield* h.refreshes).toBe(1);
+
+        yield* h.emit(runtimeEvent("turn.started", two, turnTwo));
+        for (let i = 0; i < 20; i += 1) yield* Effect.yieldNow;
+        expect(yield* h.refreshes).toBe(1);
+      }),
+    ),
+  );
+
+  effectIt.effect(
+    "keeps a turn the session does not name yet (projection lag) for the next reading",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarness;
+          yield* h.setShell(shellFor(one));
+          yield* h.emit(runtimeEvent("turn.started", one, turnOne));
+          yield* settle(h.watchers, (n) => n === 1);
+
+          yield* h.poll(critical);
+          for (let i = 0; i < 20; i += 1) yield* Effect.yieldNow;
+          expect(yield* h.interrupts).toEqual([]);
+          yield* h.setShell(runningShell(one, turnOne));
+          yield* h.poll(critical);
+          const interrupts = yield* settle(h.interrupts, (list) => list.length === 1);
+          expect(interrupts).toEqual([{ threadId: one, turnId: turnOne }]);
+        }),
+      ),
+  );
+
+  effectIt.effect("stops watching when the session exits, even without a turn id", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.emit(runtimeEvent("turn.started", one, turnOne));
+        yield* settle(h.watchers, (n) => n === 1);
+
+        yield* h.emit(runtimeEvent("session.exited", one, undefined));
+        yield* settle(h.watchers, (n) => n === 0);
       }),
     ),
   );
