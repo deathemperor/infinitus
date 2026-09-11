@@ -22,6 +22,7 @@ ln -s infinitusctl "$APP/Contents/MacOS/ictl"
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp tools/demo-cswap "$APP/Contents/Resources/demo-cswap"
+cp tools/demo-swapd "$APP/Contents/Resources/demo-swapd"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

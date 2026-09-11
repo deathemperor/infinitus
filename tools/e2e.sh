@@ -153,6 +153,7 @@ case "$1" in
     auto)
         # The supervised-daemon contract: events on stdout, exit on stdin EOF.
         echo '{"schemaVersion":1,"event":"poll","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"threshold":10}'
+        echo '{"schemaVersion":1,"event":"sleep","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"summary":"sleep","threshold":10}'
         cat >/dev/null
         ;;
     *) echo '{"schemaVersion":1,"error":{"code":"unsupported","message":"stub swapd: no such verb"}}'; exit 1 ;;
@@ -314,6 +315,7 @@ echo "aws: orphan login wrapper swept at launch"
 
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
+"$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='signin-code')['stdin']=='secret' and 'stdin' not in next(c for c in d['commands'] if c['name']=='status')" || fail "manifest: stdin flag (#747)"
 "$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
 "$CTL" status | json "d['engines']['cswap']['registered']" | grep -q True || fail "cswap not registered"
 sleep 4   # first demo snapshot
@@ -368,6 +370,8 @@ echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, ra
 echo "swapd: registered beside cswap, ignite published the refreshed window"
 # #475: an enabled engine runs its own `auto` under the supervisor.
 pgrep -f "$SOCKDIR/swapd auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
+"$CTL" events | expect "not any((e.get('summary') or '') in ('poll', 'sleep') for e in (d if isinstance(d, list) else d.get('events', [])))" \
+    || fail "the supervisor must drop the poll/sleep heartbeats (#475)"
 # #616: the headroom verdict rides `fleets` only while priority_mode is on;
 # the stub's active slot sits at 5h 4% / 7d 18%, so 7d binds.
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must be absent while priority_mode is off"
@@ -440,6 +444,7 @@ echo "prefs: ok"
 # JSON-body verbs (#572 N1): the socket takes what the mirror routes take.
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
 "$CTL" perf | expect "d['leaseScopes'].get('e2e')==['fleets']" || fail "perf must name the lease e2e just took (#499)"
+"$CTL" perf | expect "'stats' not in d['leaseScopes'].get('local', [])" || fail "the local client must not hold stats without the Stats pane (#499)"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"

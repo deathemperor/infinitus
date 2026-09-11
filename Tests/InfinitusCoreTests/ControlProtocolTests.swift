@@ -130,4 +130,16 @@ final class ControlProtocolTests: XCTestCase {
                                                        environment: ["XDG_RUNTIME_DIR": "/run/user/1000", "XDG_STATE_HOME": "/var/x/state"]),
                        "/run/user/1000/infinitus/control.sock", "the runtime dir still wins")
     }
+
+    /// #747: the manifest says which verbs take a credential on the
+    /// request line's `secret` field, so a client can refuse to send one
+    /// anywhere else; payload readers are marked apart from them.
+    func testTheManifestDeclaresWhichVerbsTakeASecret() {
+        let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
+        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "proxy-key", "9router-password"])
+        let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
+        XCTAssertEqual(Set(payload), ["send", "approve", "event", "machine-hook"])
+        XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
+    }
+
 }

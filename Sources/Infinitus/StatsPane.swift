@@ -55,7 +55,11 @@ struct StatsPane: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { model.loadIfNeeded() }
+        .onAppear {
+            model.loadIfNeeded()
+            app.uiSurface(AppModel.statsSurface, visible: true)
+        }
+        .onDisappear { app.uiSurface(AppModel.statsSurface, visible: false) }
     }
 
     // MARK: tokens/min records (#89)

@@ -148,6 +148,12 @@ publishes the matching section as the GitHub release body.
 - The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
 - `infinitusctl prefs` carries the popup intro and burn prefs under a new `animations` section with the speed's range, and the theme pref lists every theme id with its name (#747).
+- The active account survives a swapd switch even on the app's first poll: swapd's own last-known slot carries it (#476).
+- The supervisor drops swapd's `sleep` heartbeat like cswap's `poll`, so the Activity log no longer gains a line a minute (#475).
+- The spend estimate (`cswap usage`) runs only while the cswap engine is on; with it off the Usage pane says so instead of showing stale numbers (#475).
+- The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
+- Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
+- The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
