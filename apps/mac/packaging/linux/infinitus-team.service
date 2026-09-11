@@ -1,0 +1,12 @@
+[Unit]
+Description=Infinitus team sync (fetch the store, then publish this machine)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# oneshot runs the two ExecStart lines in order and stops on the first
+# failure — `fetch && publish` without a shell. fetch pulls the store and
+# accepts the roster; publish only pushes, so the order matters.
+Type=oneshot
+ExecStart=%h/.local/bin/infinitusctl team fetch
+ExecStart=%h/.local/bin/infinitusctl team publish

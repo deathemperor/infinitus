@@ -1,0 +1,14 @@
+{
+  "account": {
+    "uuid": "acc-1234",
+    "email": "claude-work@example.com",
+    "has_claude_max": true,
+    "has_claude_pro": false
+  },
+  "organization": {
+    "uuid": "org-5678",
+    "name": "Acme Inc",
+    "organization_type": "claude_team",
+    "subscription_status": "active"
+  }
+}

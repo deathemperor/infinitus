@@ -16,6 +16,7 @@ export default defineConfig({
       "**/dist/**",
       "**/dist-electron/**",
       "**/.{idea,git,cache,output,temp}/**",
+      "apps/mac/**",
     ],
     hookTimeout: 60_000,
     testTimeout: 60_000,
@@ -43,6 +44,8 @@ export default defineConfig({
       "apps/mobile/ios/**",
       "apps/mobile/uniwind-types.d.ts",
       "*.icon/**",
+      // The Swift app (#823): its site, plugins and tools keep their own style.
+      "apps/mac/**",
     ],
     sortPackageJson: {},
     overrides: [
@@ -67,6 +70,7 @@ export default defineConfig({
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
       "apps/mobile/uniwind-types.d.ts",
+      "apps/mac/**",
     ],
     plugins: ["eslint", "oxc", "react", "unicorn", "typescript"],
     jsPlugins: ["./oxlint-plugin-t3code/index.ts"],

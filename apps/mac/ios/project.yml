@@ -1,0 +1,209 @@
+# XcodeGen manifest for the mobile companion (#9). The .xcodeproj is
+# GENERATED — run `xcodegen generate` in ios/ after changing this; the
+# project file itself stays untracked.
+name: InfinitusMobile
+options:
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  Infinitus:
+    path: ..
+  # The phone terminal's emulator (spec F decision: SwiftTerm both ends).
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm.git
+    from: 1.20.0
+# Both bundles need a version pair — the simulator refuses to install an
+# app extension without one ("Invalid placeholder attributes").
+settings:
+  base:
+    MARKETING_VERSION: "0.4.4"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  InfinitusMobile:
+    type: application
+    platform: iOS
+    sources: [InfinitusMobile]
+    # NSBonjourServices / NSLocalNetworkUsageDescription have no
+    # INFOPLIST_KEY_ equivalent, so the target gets a real (generated,
+    # untracked) Info.plist that Xcode merges the keys above into.
+    # Push (Live Activity tokens, #3's alerts) rides the aps-environment
+    # entitlement below — a personal team could not hold it (probed
+    # 2026-09-03); the paid team signs it (probed 2026-09-05, #70). The
+    # app asks for notification permission and registers its tokens with
+    # the Mac; the Mac pushes once Settings › Sync holds an APNs key.
+    info:
+      path: InfinitusMobile/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSLocalNetworkUsageDescription: Infinitus finds the Mac running your fleet on this Wi-Fi and reads its latest snapshot.
+        NSBonjourServices: [_infinitus._tcp]
+        # Scanning the Mac's pairing QR (#9 remote access) and taking a
+        # photo to attach to a session message.
+        NSCameraUsageDescription: Infinitus scans the pairing QR your Mac shows, and takes photos you attach to a session message.
+        # The Team tab's own lock (spec §2.2), Settings › Team.
+        NSFaceIDUsageDescription: Infinitus unlocks the Team tab with Face ID.
+        # PhotosPicker attachments on a message (2026-09-03 "add features
+        # to allow attachments").
+        NSPhotoLibraryUsageDescription: Infinitus attaches photos you pick to a message sent into a session, and offers screenshots you just took for one-tap sending.
+        # Dictation into the composer (2026-09-03 "smart dictation for mobile").
+        NSSpeechRecognitionUsageDescription: Infinitus turns what you say into a message for a session, on this phone where it can.
+        NSMicrophoneUsageDescription: Infinitus listens while you dictate a message to a session.
+        # Live Activities (#1 revival countdown, #2 working sessions), and
+        # the background refresh that keeps them moving with the app closed.
+        NSSupportsLiveActivities: true
+        # The tok/min line is pushed every few seconds (Settings › Sync on
+        # the Mac); without this iOS budgets updates to a handful an hour.
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [run.infinitus.mobile.refresh]
+        # `infinitus://pair?url=…&token=…` — the same pair link, opened
+        # from a message or a browser instead of the camera.
+        CFBundleURLTypes:
+          - CFBundleURLName: run.infinitus.mobile.pair
+            CFBundleURLSchemes: [infinitus]
+        # DM Sans 400/500/700, the T3 mobile client's face (T3 clone
+        # spec §3.2; OFL text alongside in Fonts/). `T3Font` falls back
+        # to the system face when a name is missing.
+        UIAppFonts: [DMSans-Regular.ttf, DMSans-Medium.ttf, DMSans-Bold.ttf]
+    # The share extension (#64) reads the pairing (routes, token, device
+    # id) from a keychain item both bundles can open. Keychain sharing
+    # only needs the team prefix, which every automatic profile grants;
+    # an App Group would need `group.…` registered in the developer
+    # portal, which xcodebuild cannot do (probed 2026-09-05).
+    entitlements:
+      path: InfinitusMobile/InfinitusMobile.entitlements
+      properties:
+        keychain-access-groups: ["$(AppIdentifierPrefix)run.infinitus.shared"]
+        aps-environment: development
+    dependencies:
+      - package: Infinitus
+        product: InfinitusCore
+      - package: Infinitus
+        product: InfinitusUI
+      - target: InfinitusMobileWidgets
+        embed: true
+      - target: InfinitusMobileShare
+        embed: true
+      - package: SwiftTerm
+        product: SwiftTerm
+    settings:
+      base:
+        # Mobile has its own id under the mac app's run.infinitus
+        # (CLAUDE.md). Revisit before TestFlight if wanted.
+        PRODUCT_BUNDLE_IDENTIFIER: run.infinitus.mobile
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # One alternate icon per theme (#83), AppIcon-<id> sets.
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: "YES"
+        # Signed on the paid personal team (2026-09-05; #9 done): a plain
+        # build is a device build, `-allowProvisioningUpdates` mints the
+        # profiles. CI's simulator job passes CODE_SIGNING_ALLOWED=NO on
+        # the command line (ci.yml). docs/RELEASING.md has the setup.
+        DEVELOPMENT_TEAM: Q783W6B4FA
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: "YES"
+        # The home screen says Infinitus, not the target's name (user
+        # 2026-09-05: "mobile app renames to Infinitus").
+        INFOPLIST_KEY_CFBundleDisplayName: Infinitus
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+  # Unit tests for the phone (T3 clone spec §5.5). CI's ios job runs
+  # them on a simulator; xcodegen folds this target into the app's scheme.
+  InfinitusMobileTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [InfinitusMobileTests]
+    dependencies:
+      - target: InfinitusMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: run.infinitus.mobile.tests
+        DEVELOPMENT_TEAM: Q783W6B4FA
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: "YES"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+  # Live Activity renderer (#1, #2): the widget extension the app embeds.
+  # LiveActivityAttributes.swift is compiled into both targets.
+  InfinitusMobileWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - InfinitusMobileWidgets
+      - InfinitusMobile/LiveActivityAttributes.swift
+      - InfinitusMobile/SharedKeychain.swift
+      - InfinitusMobile/WidgetBridge.swift
+    dependencies:
+      - package: Infinitus
+        product: InfinitusCore
+      - package: Infinitus
+        product: InfinitusUI
+    # The fleet widget (#80) reads its states from the shared keychain item.
+    entitlements:
+      path: InfinitusMobileWidgets/InfinitusMobileWidgets.entitlements
+      properties:
+        keychain-access-groups: ["$(AppIdentifierPrefix)run.infinitus.shared"]
+    info:
+      path: InfinitusMobileWidgets/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: run.infinitus.mobile.widgets
+        DEVELOPMENT_TEAM: Q783W6B4FA
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_CFBundleDisplayName: Infinitus
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+  # Share-sheet extension (#64): any app's Share → Infinitus posts the
+  # image with a message into a session, over the same mirror client the
+  # app uses (the pairing arrives through the shared keychain item).
+  InfinitusMobileShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - InfinitusMobileShare
+      - InfinitusMobile/NetworkFleetMirror.swift
+      - InfinitusMobile/MacPairing.swift
+      - InfinitusMobile/ShareBridge.swift
+      - InfinitusMobile/SharedKeychain.swift
+      - InfinitusMobile/AttachmentImage.swift
+    dependencies:
+      - package: Infinitus
+        product: InfinitusCore
+    entitlements:
+      path: InfinitusMobileShare/InfinitusMobileShare.entitlements
+      properties:
+        keychain-access-groups: ["$(AppIdentifierPrefix)run.infinitus.shared"]
+    info:
+      path: InfinitusMobileShare/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # A tapped session in the suggestions row (#82) arrives as
+            # an INSendMessageIntent naming it.
+            IntentsSupported: [INSendMessageIntent]
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 4
+              NSExtensionActivationSupportsFileWithMaxCount: 4
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: run.infinitus.mobile.share
+        DEVELOPMENT_TEAM: Q783W6B4FA
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_CFBundleDisplayName: Infinitus
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"

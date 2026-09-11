@@ -1,0 +1,304 @@
+import SwiftUI
+import InfinitusCore
+import InfinitusUI
+
+/// Value pushed by tapping a session's header (feed screen) — a distinct
+/// type from `SessionDetail` so the row tap (→ feed) and the header tap
+/// (→ detail, one level deeper) stack cleanly on the same `NavigationPath`.
+struct SessionDetailRoute: Hashable {
+    let session: SessionDetail
+    /// The session's Mac when it isn't the primary (#144 phase 2).
+    var macId: String? = nil
+}
+
+/// The Mac's session vocabulary in the user's words — one word system
+/// across the list, the feed header and the detail screen.
+enum SessionWords {
+    /// The theme's word for a status ("Questing" for busy under RPG);
+    /// the Off theme keeps the plain ones (user 2026-09-04: "theme the
+    /// listing and its words too").
+    static func status(_ raw: String, theme: RowTheme) -> String {
+        theme.sessionWord(raw)
+    }
+
+    /// The attention rank's word and color (#223 phase 3): approvals and
+    /// questions wear the theme's "waiting" word, work its "busy" word;
+    /// a failure says so in red; ready keeps the engine's own word.
+    static func status(_ attention: SessionListPresentation.Attention, raw: String, theme: RowTheme) -> String {
+        switch attention {
+        case .approval, .input: return theme.sessionWord("waiting")
+        case .working: return theme.sessionWord("busy")
+        case .failed: return "failed"
+        case .ready: return theme.sessionWord(raw)
+        }
+    }
+    static func color(_ attention: SessionListPresentation.Attention, raw: String) -> Color {
+        switch attention {
+        case .approval, .input: return .yellow
+        case .working: return .orange
+        case .failed: return .red
+        case .ready: return color(raw)
+        }
+    }
+
+    /// Same colors the Mac's sessions card uses for each status.
+    static func color(_ raw: String) -> Color {
+        switch raw {
+        case "busy": return .orange
+        case "waiting": return .yellow
+        case "idle": return .green
+        case "shell": return .blue
+        default: return .gray
+        }
+    }
+
+    static func kind(_ raw: String) -> String {
+        switch raw {
+        case "interactive": return "Interactive"
+        case "headless", "print": return "Headless"
+        case "": return "Unknown"
+        default: return raw.prefix(1).uppercased() + raw.dropFirst()
+        }
+    }
+
+    /// Fresh sessions say "now", not "0m".
+    static func age(since epochMs: Double) -> String {
+        let s = Int(-Date(timeIntervalSince1970: epochMs / 1000).timeIntervalSinceNow)
+        if s < 60 { return "now" }
+        if s < 3600 { return "\(s / 60)m" }
+        if s < 86_400 { return "\(s / 3600)h" }
+        return "\(s / 86_400)d"
+    }
+}
+
+/// One-line + full-section formatting for `SessionAccountSummary` —
+/// shared by the feed header (compact) and this screen (full section).
+/// Pure string/color-name building, no view state.
+enum AccountSummaryFormat {
+    static func headerLine(_ summary: SessionAccountSummary?) -> (text: String, colorName: String)? {
+        guard let summary else { return nil }
+        switch summary.kind {
+        case .swap, .unknownFleet:
+            guard let account = summary.account else { return ("no active account", "secondary") }
+            let suffix = summary.kind == .unknownFleet ? " (fleet's active account)" : ""
+            return (accountCaption(account) + suffix,
+                    AccountHeadroom.colorName(forPct: AccountHeadroom.worstPct(account)))
+        case .proxy:
+            let lowest = summary.proxyLowestHeadroom.map { " · lowest \(accountShortName($0))" } ?? ""
+            return ("CLIProxyAPI · per-request routing · \(summary.proxyAliveCount) alive\(lowest)",
+                    "secondary")
+        }
+    }
+
+    static func accountCaption(_ account: Account) -> String {
+        var parts = [accountShortName(account)]
+        if let five = account.usage?.fiveHour { parts.append("5h \(Int(five.pct))%") }
+        if let seven = account.usage?.sevenDay { parts.append("7d \(Int(seven.pct))%") }
+        if let reset = ResetLabel.compact(account.usage?.fiveHour) { parts.append("resets \(reset)") }
+        return parts.joined(separator: " · ")
+    }
+
+    static func accountShortName(_ account: Account) -> String {
+        [account.icon, account.alias ?? account.email].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+/// The detail screen behind a session's header tap (user 2026-09-03):
+/// every field the feed's header line has no room for, plus which
+/// account(s) are actually serving the session's requests.
+struct SessionDetailScreen: View {
+    @ObservedObject var model: MirrorModel
+    @ObservedObject var progress: MobileSessionProgress
+    let session: SessionDetail
+    /// `nil` is the primary Mac (#144 phase 2).
+    var macId: String? = nil
+
+    @State private var settingMode = false
+    @State private var modeResult: String?
+    private var p: SessionProgress? { model.progress(macId: macId, pid: session.pid) }
+    private var summary: SessionAccountSummary? { model.accountSummary(macId: macId, pid: session.pid) }
+    private var mirror: NetworkFleetMirror { model.mirror(for: macId) }
+
+    var body: some View {
+        List {
+            Section("Session") {
+                LabeledContent("Name", value: SessionNaming.displayName(name: p?.name, autoName: p?.autoName, cwd: session.cwd))
+                Text(session.cwd)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = session.cwd
+                        } label: { Label("Copy path", systemImage: "doc.on.doc") }
+                    }
+                if let branch = p?.gitBranch { LabeledContent("Branch", value: branch) }
+                if let model = p?.model { LabeledContent("Model", value: model) }
+                LabeledContent("Kind", value: SessionWords.kind(session.kind))
+                LabeledContent("Status", value: SessionWords.status(session.status, theme: model.rowTheme))
+                LabeledContent("Started", value: date(session.startedAt).formatted(date: .abbreviated, time: .shortened))
+                    .monospacedDigit()
+                if let last = p?.lastActivityAt {
+                    LabeledContent("Last activity", value: last.formatted(.relative(presentation: .numeric)))
+                }
+                permissionsRow
+                if let phase = p?.phase { LabeledContent("Phase", value: phase) }
+                if let title = p?.title { LabeledContent("Title", value: title) }
+                if let goal = p?.goal {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Goal").font(.caption).foregroundStyle(.secondary)
+                        Text(goal)
+                    }
+                }
+                if let tokens = p?.outputTokens, tokens > 0 {
+                    LabeledContent("Output tokens", value: TokenFormat.compact(tokens)).monospacedDigit()
+                }
+                if p?.retrying == true {
+                    Label("Retrying after an API error", systemImage: "arrow.clockwise")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            if let todos = p?.todos {
+                Section("Todos") {
+                    LabeledContent("Done", value: "\(todos.done)/\(todos.total)").monospacedDigit()
+                    if let activeForm = todos.activeForm {
+                        Text(activeForm).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            accountSection
+
+            Section {
+                NavigationLink(value: CheckpointsRoute(session: session, macId: macId)) {
+                    Label("Checkpoints", systemImage: "clock.arrow.2.circlepath")
+                }
+            } footer: {
+                Text("The repository as it was at each prompt, with Restore.")
+            }
+
+            Section {
+                Text(model.transportStatus(macId: macId).isEmpty ? model.rowTheme.loadingWord("searching") : model.transportStatus(macId: macId))
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Connection")
+            } footer: {
+                // The process id is for the terminal, not the eye.
+                Text("Process \(session.pid) on the Mac.").monospacedDigit()
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = String(session.pid)
+                        } label: { Label("Copy process id", systemImage: "doc.on.doc") }
+                    }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Session detail")
+        .navigationBarTitleDisplayMode(.inline)
+        .environment(\.sessionMirror, mirror)
+    }
+
+    /// The session's permission mode (#163 phase 2), changeable while it
+    /// runs: the Mac answers the plugin's PreToolUse hook from it. Only
+    /// widening is offered past the start mode — Claude Code already lets
+    /// a start mode's tools through, so a narrower pick would only pretend.
+    @ViewBuilder private var permissionsRow: some View {
+        let birth = model.birth(macId: macId, pid: session.pid)
+        let current = birth?.effectiveMode ?? "supervised"
+        let floor = SessionStart.modeRank(birth?.permissionMode)
+        Picker("Permissions", selection: Binding(
+            get: { current },
+            set: { mode in guard mode != current else { return }; setMode(mode) })) {
+            ForEach(SessionStart.hookModes.filter { SessionStart.modeRank($0.mode) >= floor }, id: \.mode) { choice in
+                Text(choice.label).tag(choice.mode)
+            }
+            if current == "auto" { Text("Auto").tag("auto") }
+        }
+        .disabled(settingMode)
+        if let modeResult {
+            Text(modeResult).font(.caption).foregroundStyle(.orange)
+        }
+    }
+
+    private func setMode(_ mode: String) {
+        settingMode = true
+        modeResult = nil
+        Task {
+            defer { settingMode = false }
+            do {
+                let reply = try await mirror.sessionInput(
+                    pid: Int32(session.pid), request: .init(kind: .mode, text: mode))
+                if reply.outcome != "delivered" { modeResult = reply.detail ?? reply.outcome }
+                await model.refresh(macId: macId)
+            } catch {
+                modeResult = "couldn't reach \(model.macName(macId) ?? "the Mac")"
+            }
+        }
+    }
+
+    @ViewBuilder private var accountSection: some View {
+        if let summary {
+            switch summary.kind {
+            case .swap, .unknownFleet:
+                Section("Account") {
+                    if let account = summary.account {
+                        accountRow(account)
+                        if summary.kind == .unknownFleet {
+                            Text("Fleet's active account — this session's own fleet couldn't be identified.")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    } else {
+                        Text("No active account on this fleet.").foregroundStyle(.secondary)
+                    }
+                }
+            case .proxy:
+                Section {
+                    ForEach(summary.proxyAccounts, id: \.number) { accountRow($0) }
+                } header: {
+                    Text("Account — CLIProxyAPI")
+                } footer: {
+                    Text("The proxy routes each request to whichever credential is free "
+                         + "(per-request routing) — \(summary.proxyAliveCount) of "
+                         + "\(summary.proxyAccounts.count) are alive right now.")
+                }
+            }
+        }
+    }
+
+    private func accountRow(_ account: Account) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Circle()
+                    .fill(ThemeColor.resolve(AccountHeadroom.colorName(forPct: AccountHeadroom.worstPct(account))))
+                    .frame(width: 8, height: 8)
+                Text(AccountSummaryFormat.accountShortName(account)).font(.subheadline.weight(.medium))
+                if let plan = account.plan {
+                    Text(plan).font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if account.active { Text("active").font(.caption2).foregroundStyle(.green) }
+            }
+            HStack(spacing: 10) {
+                if let five = account.usage?.fiveHour {
+                    Text("5h \(Int(five.pct))%").font(.caption).foregroundStyle(.secondary)
+                }
+                if let seven = account.usage?.sevenDay {
+                    Text("7d \(Int(seven.pct))%").font(.caption).foregroundStyle(.secondary)
+                }
+                if let reset = ResetLabel.compact(account.usage?.fiveHour) {
+                    Text("resets \(reset)").font(.caption).foregroundStyle(.tertiary)
+                }
+            }
+            .monospacedDigit()
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func repoName(_ path: String) -> String {
+        (path as NSString).lastPathComponent
+    }
+
+    private func date(_ epochMs: Double) -> Date {
+        Date(timeIntervalSince1970: epochMs / 1000)
+    }
+}

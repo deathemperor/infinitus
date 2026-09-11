@@ -1,0 +1,44 @@
+# Maintainer: deathemperor <deathemperor1st@gmail.com>
+# Prebuilt infinitus-tray from the GitHub release (Arch has no official
+# Swift toolchain; the release binaries are -static-stdlib, so glibc +
+# gcc-libs is all they need). The engine is the separate claude-swap
+# package — this is the bar/panel face for Waybar and Omarchy 4+.
+pkgname=infinitus-tray-bin
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="claude-swap fleet in the bar — Waybar module + Omarchy Quickshell panel"
+arch=(x86_64 aarch64)
+url="https://github.com/deathemperor/limitless"
+license=(MIT)
+depends=(glibc gcc-libs)
+optdepends=('claude-swap: the engine this front-end drives'
+            'waybar: bar module host'
+            'quickshell: Omarchy 4+ bar plugin host')
+provides=(infinitus-tray)
+conflicts=(infinitus-tray)
+# Versioned local names: without them makepkg reuses a cached old
+# binary on version bumps.
+source=("infinitus-omarchy-$pkgver.tar.gz::$url/releases/download/v$pkgver/infinitus-omarchy.tar.gz"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/deathemperor/limitless/v$pkgver/LICENSE")
+source_x86_64=("infinitus-tray-$pkgver-x86_64::$url/releases/download/v$pkgver/infinitus-tray-linux-x86_64")
+source_aarch64=("infinitus-tray-$pkgver-aarch64::$url/releases/download/v$pkgver/infinitus-tray-linux-aarch64")
+# Refresh with `updpkgsums` at every release — CI rebuilds the
+# binaries, so sums from a local build will not match the assets.
+# These are the v0.3.0 published-asset sums (updpkgsums, 2026-09-01).
+sha256sums=('204d39dee619e1ea04fcbabf794c7bbbd3680576795677c03496f09c3f8d8c82'
+            '271b92b111a4fb8314f3346791092806ae8777287fe2c6b4bd7b745756f58cbf')
+sha256sums_x86_64=('5c593a308e35569aa98f84cbb4502c563a10d7b266aa180587011010052db8d3')
+sha256sums_aarch64=('02de774f3f86516bb7ab58ed0185bf940dd566d9f5c6fdb93132c48d20b410a3')
+
+package() {
+  install -Dm755 "infinitus-tray-$pkgver-$CARCH" "$pkgdir/usr/bin/infinitus-tray"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # Waybar config + Quickshell plugin, ready to copy: the plugin is
+  # per-user config (~/.config/omarchy/plugins/), not a system path.
+  install -Dm644 omarchy/waybar-infinitus.jsonc \
+    "$pkgdir/usr/share/infinitus/waybar-infinitus.jsonc"
+  install -Dm644 omarchy/style.css "$pkgdir/usr/share/infinitus/style.css"
+  install -Dm644 omarchy/README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  cp -r omarchy/quickshell-plugin "$pkgdir/usr/share/infinitus/quickshell-plugin"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/infinitus/quickshell-plugin"
+}

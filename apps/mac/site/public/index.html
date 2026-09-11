@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infinitus — Claude Code account fleet manager for macOS &amp; Linux</title>
+<meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, 15 themes. macOS and Linux (Omarchy / Arch).">
+<meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, Claude Code rate limit, 5-hour window, weekly limit, swapd, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, session resume">
+<meta name="author" content="deathemperor">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="theme-color" content="#0a0d11">
+<link rel="canonical" href="https://infinitus.run/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Infinitus">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Infinitus — your Claude fleet, never off the clock">
+<meta property="og:description" content="Free, open-source mission control for a fleet of Claude Code accounts: live usage gauges, auto-rotation on limits, session resume, 15 themes. macOS &amp; Linux.">
+<meta property="og:image" content="https://infinitus.run/img/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Infinitus — your Claude fleet, never off the clock. Fleet manager for Claude Code, macOS &amp; Linux.">
+<meta property="og:url" content="https://infinitus.run/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Infinitus — your Claude fleet, never off the clock">
+<meta name="twitter:description" content="Free, open-source mission control for a fleet of Claude Code accounts. macOS &amp; Linux.">
+<meta name="twitter:image" content="https://infinitus.run/img/og.png">
+<meta name="twitter:image:alt" content="Infinitus — your Claude fleet, never off the clock.">
+<link rel="alternate" type="text/plain" href="https://infinitus.run/llms.txt" title="llms.txt">
+<link rel="icon" type="image/png" href="/img/icon.png">
+<link rel="apple-touch-icon" href="/img/icon128.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+  :root {
+    --bg: #0a0d11;
+    --panel: #11161d;
+    --panel-2: #151b23;
+    --line: #232b35;
+    --text: #e6e1d6;
+    --dim: #8b93a0;
+    --faint: #7c8592;
+    --orange: #f0a03c;
+    --mint: #58d38c;
+    --red: #e4574f;
+    --yellow: #e3c15c;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: "Instrument Serif", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--mint); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── fake macOS menu bar ── */
+  .menubar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(10,13,17,.88); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .menubar .wrap {
+    display: flex; align-items: center; gap: 22px;
+    height: 42px;
+  }
+  .menubar .item { color: var(--dim); }
+  .menubar .brand { color: var(--text); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px; }
+  .menubar .appicon { width: 18px; height: 18px; border-radius: 4px; }
+  .menubar .tray {
+    margin-left: auto; display: flex; align-items: center; gap: 16px;
+    color: var(--dim);
+  }
+  .menubar .infty {
+    color: var(--orange); font-weight: 600; font-size: 15px;
+    padding: 2px 8px; border-radius: 5px; background: rgba(240,160,60,.12);
+  }
+  .menubar nav a { color: var(--dim); }
+  .menubar nav a:hover { color: var(--text); text-decoration: none; }
+  .menubar nav { display: flex; gap: 18px; }
+  @media (max-width: 640px) { .menubar nav { display: none; } }
+
+  /* ── hero ── */
+  .hero { padding: 88px 24px 40px; }
+  h1 {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(42px, 7vw, 74px); line-height: 1.05;
+    margin: 0 0 22px; text-wrap: balance; letter-spacing: .01em;
+  }
+  h1 em { color: var(--orange); font-style: italic; }
+  .lede {
+    color: var(--dim); max-width: 58ch; font-size: 16px; margin: 0 0 34px;
+  }
+  .cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 8px;
+    font-family: var(--mono); font-size: 14px; font-weight: 600;
+    border: 1px solid var(--line); color: var(--text);
+  }
+  .btn:hover { text-decoration: none; border-color: var(--dim); }
+  .btn.primary {
+    background: var(--orange); border-color: var(--orange); color: #14100a;
+  }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .cta .note { color: var(--faint); font-size: 13px; }
+  .brew {
+    display: inline-flex; align-items: baseline; gap: 8px; margin: 16px 0 0;
+    padding: 10px 14px; border-radius: 8px; max-width: 100%;
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    background: rgba(255,255,255,.04); border: 1px solid var(--line);
+    cursor: pointer; text-align: left; white-space: nowrap; overflow-x: auto;
+  }
+  .brew:hover { border-color: var(--dim); }
+  .brew .p { color: var(--orange); }
+  .brew .k {
+    margin-left: 8px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px;
+  }
+  .brew.done .k { color: var(--orange); border-color: var(--orange); }
+  .also { color: var(--faint); font-size: 12.5px; margin: 14px 0 0; }
+  .also a { color: var(--dim); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+  .also a:hover { color: var(--text); }
+
+  .faq { margin: 0; max-width: 68ch; }
+  .faq dt { font-weight: 600; margin: 22px 0 6px; }
+  .faq dd { margin: 0; color: var(--dim); line-height: 1.6; }
+  .faq code { color: var(--mint); font-size: 13px; }
+  /* ── live fleet demo ── */
+  .fleet { padding: 26px 24px 70px; }
+  .fleet-frame {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px 24px 18px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.45);
+  }
+  .fleet-head {
+    display: flex; align-items: baseline; gap: 12px;
+    color: var(--faint); font-size: 12px; margin-bottom: 16px;
+    text-transform: uppercase; letter-spacing: .14em;
+  }
+  .fleet-head .live { color: var(--mint); }
+  .acct { display: grid; grid-template-columns: 150px 1fr 120px; gap: 14px;
+    align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+  .acct:first-of-type { border-top: 0; }
+  .acct .name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acct .name .mark { color: var(--orange); margin-right: 8px; }
+  .acct.dead .name, .acct.dead .stat { color: var(--faint); }
+  .gauge { height: 12px; border-radius: 6px; background: #1c232c; overflow: hidden; }
+  .gauge > i {
+    display: block; height: 100%; border-radius: 6px;
+    background: linear-gradient(90deg, var(--mint), #86e0ab);
+    transition: width .5s ease;
+  }
+  .acct.warn .gauge > i { background: linear-gradient(90deg, var(--orange), #f6bd6d); }
+  .acct.dead .gauge > i { background: var(--red); width: 2% !important; }
+  .acct .stat { font-size: 12.5px; color: var(--dim); text-align: right;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .acct .stat b { color: var(--text); font-weight: 600; }
+  .fleet-foot { margin-top: 14px; font-size: 12.5px; color: var(--faint); }
+  .fleet-foot .ev { color: var(--dim); }
+  .fleet-foot .ev b { color: var(--orange); font-weight: 600; }
+  @media (max-width: 560px) { .acct { grid-template-columns: 110px 1fr; }
+    .acct .stat { display: none; } }
+
+  .screen {
+    display: block; width: 100%; height: auto;
+    border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.4);
+  }
+
+  /* ── sections ── */
+  section { padding: 70px 0; border-top: 1px solid var(--line); }
+  h2 {
+    font-family: var(--serif); font-weight: 400; font-size: 34px;
+    margin: 0 0 10px; letter-spacing: .01em;
+  }
+  .sub { color: var(--dim); margin: 0 0 40px; max-width: 62ch; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .step { border: 1px solid var(--line); border-radius: 12px; padding: 22px;
+    background: var(--panel); }
+  .step .n { color: var(--orange); font-size: 13px; letter-spacing: .14em; }
+  .step h3 { margin: 10px 0 8px; font-size: 16px; font-weight: 600; }
+  .step p { margin: 0; color: var(--dim); font-size: 14px; }
+
+  .group { margin: 30px 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--dim); }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  @media (max-width: 960px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .grid { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+    background: var(--panel); }
+  .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .card h3 .dot { color: var(--mint); margin-right: 7px; }
+  .card p { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.6; }
+
+  .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .themes { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .themes { grid-template-columns: 1fr; } }
+  .themes img { width: 100%; height: auto; border-radius: 8px;
+    border: 1px solid var(--line); margin-top: 8px; }
+  .themes > div { border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; background: var(--panel); display: grid; gap: 2px; }
+  .themes b { font-weight: 600; font-size: 14px; }
+  .themes span { color: var(--dim); font-size: 12.5px; }
+
+  /* ── wall band ── */
+  .wall { background: #06080b; border-top: 1px solid var(--line); }
+  .wall .inner { display: grid; grid-template-columns: 1fr; gap: 40px; }
+
+  /* ── install ── */
+  pre {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; overflow-x: auto;
+    font-size: 13.5px; line-height: 1.7; margin: 0;
+  }
+  pre .c { color: var(--faint); }
+  pre .g { color: var(--mint); }
+  .install-cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 22px; }
+  @media (max-width: 860px) { .install-cols { grid-template-columns: minmax(0,1fr); } }
+  .install-cols h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+  .fineprint { color: var(--faint); font-size: 12.5px; margin-top: 14px; }
+
+  footer { border-top: 1px solid var(--line); padding: 40px 0 60px;
+    color: var(--faint); font-size: 13px; }
+  footer .wrap { display: flex; gap: 24px; flex-wrap: wrap;
+    justify-content: space-between; }
+  footer a { color: var(--dim); }
+
+  .closing { padding: 10px 0 70px; }
+  .closing h2 { margin-bottom: 18px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .gauge > i { transition: none; }
+  }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://infinitus.run/#app",
+      "name": "Infinitus",
+      "url": "https://infinitus.run/",
+      "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges and 15 themes.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
+      "softwareVersion": "0.4.5-alpha.1",
+      "license": "https://github.com/deathemperor/infinitus/blob/main/LICENSE",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "downloadUrl": "https://github.com/deathemperor/infinitus/releases/latest",
+      "installUrl": "https://infinitus.run/#install",
+      "screenshot": [
+        "https://infinitus.run/img/og.png",
+        "https://infinitus.run/img/themes/rpg.png"
+      ],
+      "image": "https://infinitus.run/img/icon128.png",
+      "featureList": [
+        "Live 5-hour, weekly and per-model usage gauges for every Claude Code account",
+        "Automatic rotation to the freshest account when a limit hits",
+        "Resume nudges that restart stopped Claude Code sessions after a switch",
+        "Session progress: what each running agent is doing, todo counts, retries",
+        "15 themes with their own intro, death and revival effects",
+        "Usage history and utilization estimates",
+        "Priority mode: a headroom verdict per fleet so clients pause background work before a window binds",
+        "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
+        "Session chat from the phone: streamed replies, prompts answered, photo and file attachments, Share sheet from any app",
+        "infinitusctl control CLI and an onboarding brief for coding agents",
+        "Linux tray daemon with an Omarchy Quickshell panel plugin"
+      ],
+      "sameAs": ["https://github.com/deathemperor/infinitus"],
+      "author": { "@type": "Person", "name": "deathemperor", "url": "https://github.com/deathemperor" }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://infinitus.run/#site",
+      "url": "https://infinitus.run/",
+      "name": "Infinitus",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://infinitus.run/#faq",
+      "mainEntity": [
+        { "@type": "Question", "name": "What is Infinitus?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Infinitus is a free, open-source menu bar app for macOS (and a tray daemon plus panel plugin for Linux) that manages a fleet of Claude Code accounts. It shows every account's 5-hour, weekly and per-model usage, rotates to the freshest account when a limit hits, and nudges stopped sessions back to work." } },
+        { "@type": "Question", "name": "Does Infinitus work with Claude Code?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus reads Claude Code's own local files to show session progress and drives account switching through the swapd CLI. It never modifies Claude Code itself." } },
+        { "@type": "Question", "name": "Which platforms does Infinitus support?",
+          "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. An iOS companion app is in progress." } },
+        { "@type": "Question", "name": "Is Infinitus free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
+        { "@type": "Question", "name": "How do I install Infinitus?",
+          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
+        { "@type": "Question", "name": "Are the usage numbers Infinitus shows exact?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Usage percentages come from Anthropic's own limits reporting; usage-cost figures in the app are estimates, never billing truth." } }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="wrap">
+    <span class="item brand"><img class="appicon" src="/img/icon.png" alt="" width="18" height="18"> Infinitus</span>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#themes">Themes</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <span class="tray">
+      <a href="https://github.com/deathemperor/infinitus" style="color:var(--dim)">GitHub</a>
+      <span class="infty" id="tray-pct" aria-hidden="true">∞ 64%</span>
+    </span>
+  </div>
+</div>
+
+<main>
+<header class="hero wrap">
+  <h1>Your Claude fleet,<br><em>never</em> off the clock.</h1>
+  <p class="lede">
+    Two or more Claude subscriptions? Infinitus is mission control for
+    a fleet of Claude Code accounts.
+    It watches every usage window, rotates to the freshest account the
+    moment a limit hits, and nudges your stopped sessions back to work —
+    so an agent run survives the five-hour wall without you.
+  </p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/Infinitus-0.4.5-alpha.1.zip">Download for macOS</a>
+    <a class="btn" href="https://github.com/deathemperor/infinitus">Source on GitHub</a>
+    <span class="note">v0.4.5-alpha.1 · alpha · macOS menu bar + Linux panel · free &amp; open source</span>
+  </div>
+  <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
+          title="Copy to clipboard" aria-label="Copy the Homebrew install command">
+    <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
+    <span class="k">copy</span>
+  </button>
+  <p class="also">Signed and notarized — it opens like any other app.
+    Needs the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI
+    on your PATH — Infinitus walks you through the first account.</p>
+  <p class="also">Also for
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-omarchy.tar.gz">Omarchy</a>
+    — or <a href="#install">brew / AUR / source</a>.</p>
+</header>
+
+<div class="fleet wrap" aria-hidden="true">
+  <div class="fleet-frame">
+    <div class="fleet-head"><span>account fleet</span><span class="live">● live rotation demo</span></div>
+    <div id="fleet"></div>
+    <div class="fleet-foot"><span class="ev" id="fleet-event">engine: consume-first · watching 3 windows per account</span></div>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">A native Swift app over the <a href="https://github.com/deathemperor/swapd"><b>swapd</b></a> engine.
+      Every engine touchpoint is an isolated <code>swapd --json</code>
+      subprocess — Infinitus never touches your credentials directly.</p>
+    <div class="steps">
+      <div class="step"><span class="n">01 · WATCH</span>
+        <h3>Every window, every account</h3>
+        <p>5-hour, weekly, and per-model usage gauges with reset clocks,
+        pace markers, and a flash warning when an account is dying.</p></div>
+      <div class="step"><span class="n">02 · SWITCH</span>
+        <h3>Rotate on the limit, not after it</h3>
+        <p>Consume-first auto-switch picks the account whose weekly window
+        resets soonest. Limits become a hand-off, not an outage.</p></div>
+      <div class="step"><span class="n">03 · RESUME</span>
+        <h3>Sessions pick themselves back up</h3>
+        <p>Stopped Claude Code sessions get a resume nudge on the fresh
+        account — with guards so a mid-turn session is never interrupted.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <h2>The popup</h2>
+    <p class="sub">The whole fleet in one glance — RPG theme shown: MP is
+      your 5-hour window, HP the weekly, Dragon the per-model quota.
+      Skulls are limited accounts; the crown is who's carrying.</p>
+    <video class="screen" src="/img/popup.mp4" width="2060" height="612"
+           autoplay loop muted playsinline controls
+           aria-label="Infinitus popup demo: intro animation, an account switch, a 5-hour window death, fleet-wide death and revival, and a theme change"></video>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="sub">Built for people who run agents all day and want to look
+      at one thing — briefly — when it matters.</p>
+    <h3 class="group">Watch &amp; switch</h3>
+    <div class="grid">
+      <div class="card"><h3><span class="dot">●</span>Session progress</h3>
+        <p>Zero-token transcript parsing shows what every agent is doing:
+        current task, todo progress, quiet time, retry trouble.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Revival probes</h3>
+        <p>When a countdown ends the Mac asks the engine again at once,
+        and "account is back" tells you — flagged when Anthropic reset
+        early, and once for the whole fleet when everyone returns.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Resume guards</h3>
+        <p>Evidence-gated nudges: only after a real switch or a fresh
+        capacity verdict, never into a busy session, with cooldowns.</p></div>
+      <div class="card"><h3><span class="dot">●</span>All-dead countdown</h3>
+        <p>When every account is limited, a giant countdown to the first
+        revival — and how many sessions are waiting on it.</p></div>
+      <div class="card"><h3><span class="dot">●</span>At this pace</h3>
+        <p>Measured burn per window, when each runs out, when the whole
+        fleet is out — and a full forecast dashboard behind it.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Reset battle plans</h3>
+        <p>The smart engine triggers 5-hour windows deliberately, chaining
+        two sessions back-to-back on the same account.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Session narration</h3>
+        <p>Optional one-line Claude summaries of what each agent is doing —
+        off by default, strictly budgeted, only while you're looking.</p></div>
+      <div class="card"><h3><span class="dot">●</span>One account, done right</h3>
+        <p>Single account? A card with big gauges and the reset time in
+        the menu bar — no fleet vocabulary until you add a second.</p></div>
+    </div>
+    <h3 class="group">Phone</h3>
+    <div class="grid">
+      <div class="card"><h3><span class="dot">●</span>Mobile companion</h3>
+        <p>Your fleet on the iPhone — over Wi-Fi, Tailscale, your own
+        Cloudflare hostname or a free quick tunnel. One QR, every route;
+        the Mac lists which devices are connected and how.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Session chat</h3>
+        <p>Every session as a chat on the phone: markdown replies streamed
+        live, tool runs in one chip, sub-agent cards. Answer prompts, reply,
+        attach photos from the camera or files, or share an image from any
+        app's Share sheet straight into a session.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Headless sessions</h3>
+        <p>Start a session with no terminal at all — from the popup, the
+        phone, or as the default. The Mac window, the phone and the
+        browser page are its chat; its prompts, questions, plans and
+        images reach all three.</p></div>
+      <div class="card"><h3><span class="dot">●</span>New session screens (preview)</h3>
+        <p>Turn them on in Settings › Appearance: a flat thread list with
+        snoozed and settled shelves and search, a session as a chat
+        thread, a task sheet under +, thread settings and a git pill.</p></div>
+      <div class="card"><h3><span class="dot">●</span>A browser page, no app needed</h3>
+        <p>Any machine with a browser gets the sessions list, a chat with
+        a session and Start a session, at the "Copy Browser Link" address
+        in Settings › Devices.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Live Activities</h3>
+        <p>Working sessions in the Dynamic Island; when everything is
+        limited, a lock-screen revival countdown that ticks natively, one
+        pair per paired Mac. With an APNs key on the Mac they keep moving
+        with the app closed.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Game HUD chat header</h3>
+        <p>A ringed portrait with the level on its rim, a name plate,
+        HP/MP-style bars and a buff square per model — or a compact
+        header, or a stat strip. Every style previews live in your theme.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Crash reports, on-device</h3>
+        <p>The phone app and the Mac app record their own crashes into
+        Settings. Nothing leaves your machine; any report can go into a
+        session's chat for triage.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Widgets in your theme</h3>
+        <p>Home-screen and lock-screen widgets draw the active account's
+        windows as your theme names and colors them, what's waiting on
+        you, and the revival countdown when every account is limited —
+        and one for whichever paired Mac you pick.</p></div>
+      <div class="card"><h3><span class="dot">●</span>AWS and gcloud login from the phone</h3>
+        <p>A session stuck on an expired <code>aws login</code> or
+        <code>gcloud auth login</code> shows up on your phone; sign in
+        there (passkeys included) and the session is told to carry on.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Sessions first</h3>
+        <p>The phone opens on what's waiting for you; unnamed sessions
+        get a Haiku title that follows the work; one Continue button
+        for a session a limit or a crash stopped.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Start a session from the phone</h3>
+        <p>A repository, the engine, a first prompt: the Mac opens a cmux
+        workspace or a Terminal window and the chat follows. "Start a
+        session in Infinitus" works from Siri, on any paired Mac.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Allow for this session</h3>
+        <p>The permission card can allow a tool for the rest of the
+        session — Bash by command verb, so allowing git never allows rm.
+        With the plugin, that prompt never comes back.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Star &amp; pause from the phone</h3>
+        <p>Swipe or long-press an account to star it or pause its
+        rotation; on the Mac, right-click the name in the popup, and a
+        paused row shows a play button to resume.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Profiles</h3>
+        <p>Named ways to start a session — folder, engine, permissions,
+        model, prompts, tools allowed without asking — as chips on the
+        phone, in Siri and in the Mac's Start a session.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Checkpoints, review, fork</h3>
+        <p>Every prompt checkpoints the repository; diff or restore one,
+        review a turn's hunks from the phone, or fork a past session under
+        a new id.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Claude Code plugin</h3>
+        <p><code>infinitusctl plugin install</code> adds hooks that tell
+        the Mac the moment a session needs you or ends a turn — the phone
+        gets the prompt at once, not at the next poll — and an MCP server
+        so a session can read the fleet and message another session.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Capture into a session</h3>
+        <p>On the Mac, Capture Screen for a Session… takes a region or a
+        window, a session, a note. On the phone, Share → Infinitus from
+        any app does the same, into a session on any paired Mac.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Dictate in any language</h3>
+        <p>Vietnamese in, English out — translated on the phone, or sent
+        as spoken with a note asking for an English reply. The
+        recognizer knows your session's terms.</p></div>
+    </div>
+    <h3 class="group">Themes &amp; history</h3>
+    <div class="grid">
+      <div class="card"><h3><span class="dot">●</span>Themes</h3>
+        <p>RPG HP bars, tactical-espionage flavor, or plain minimal —
+        the fleet reads at a glance either way.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Usage history</h3>
+        <p>Per-account utilization over time with waste estimates —
+        see the capacity your fleet left on the table. iCloud sync.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Team (preview)</h3>
+        <p>A team on any git remote you already have — GitHub, GitLab, a
+        bare repo on a NAS. Members publish stats, sessions, chosen
+        transcripts and their fleet — every account with tier, state and
+        headroom — end-to-end encrypted to the people they pick, or keep
+        any kind off the wire entirely; the host sees file names and
+        sizes. Leaders get insights: who's on, who's blocked, who's about
+        to run dry, cost per member, repo and model. Invite links, team codes, same-network
+        discovery and leader-initiated LAN invites; the phone has a Team
+        tab with its own Nearby, and Linux and Windows members join and
+        publish with <code>infinitusctl team</code> alone. Grant a teammate
+        the right to prompt, approve or steer a chosen session on your Mac;
+        every command is verified, audited and shown while it happens.
+        Drive theirs from their detail or <code>infinitusctl team send</code>
+        &mdash; over LAN, a tunnel, or the store on their next fetch. A leader
+        with a Cloudflare token gives each member a stable hostname under the
+        team's zone; their Mac runs the tunnel from the next fetch on.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Stats</h3>
+        <p>Commits, lines, PRs, messages, sessions, tool calls, switches,
+        limits and cost, by day, week, month or year — with the trend
+        against the last one. Where the effort went, per activity, model,
+        engine (Claude Code, Codex CLI) and effort setting. A tokens/min
+        record book: daily peaks, the all-time best, the trend.</p></div>
+    </div>
+    <h3 class="group">Integrations &amp; agents</h3>
+    <div class="grid">
+      <div class="card"><h3><span class="dot">●</span>Linux port</h3>
+        <p>A Quickshell panel for Omarchy / Arch with the same gauges,
+        dead-account flash, and session rows.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Agent-ready</h3>
+        <p><code>infinitusctl</code> drives the app over a local socket, and
+        an onboarding brief hands a coding agent the whole setup.</p></div>
+      <div class="card"><h3><span class="dot">●</span>CLIProxyAPI &amp; 9Router</h3>
+        <p>Fleets behind a proxy plug in as more engines — CLIProxyAPI's
+        management API, 9Router's dashboard (Claude, Kiro credits, Codex,
+        Gemini) — stacked with aligned columns.</p></div>
+      <div class="card"><h3><span class="dot">●</span>swapd</h3>
+        <p>The multi-provider engine behind the fleet — one fleet per
+        provider it holds (Claude, Gemini CLI…), its own auto-switch daemon,
+        and igniting an account refreshes it at once.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Priority mode</h3>
+        <p><em>hold</em> or <em>interrupt</em> gives every fleet a headroom
+        verdict — abundant, low, critical — so a client pauses background
+        work before a window binds, not after.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="themes">
+  <div class="wrap">
+    <h2>Fifteen skins, one fleet</h2>
+    <p class="sub">Every theme renames the windows, restyles the gauges,
+      and brings its own intro, death, and revival effects. Pick one in
+      Settings.</p>
+    <div class="themes">
+      <div><b>Off</b><span>plain numbers</span>
+        <img src="/img/themes/off.png" loading="lazy" width="1600" height="439"
+             alt="Off theme rows"></div>
+      <div><b>RPG</b><span>HP/MP gauges + gold</span>
+        <img src="/img/themes/rpg.png" loading="lazy" width="1600" height="439"
+             alt="RPG theme rows"></div>
+      <div><b>Movie</b><span>reels &amp; box office</span>
+        <img src="/img/themes/movie.png" loading="lazy" width="1600" height="439"
+             alt="Movie theme rows"></div>
+      <div><b>Hades</b><span>blades &amp; darkness</span>
+        <img src="/img/themes/hades.png" loading="lazy" width="1600" height="439"
+             alt="Hades theme rows"></div>
+      <div><b>Metal Gear</b><span>tactical espionage</span>
+        <img src="/img/themes/mgs.png" loading="lazy" width="1600" height="439"
+             alt="Metal Gear theme rows"></div>
+      <div><b>AI Agentic</b><span>tokens &amp; context</span>
+        <img src="/img/themes/agent.png" loading="lazy" width="1600" height="439"
+             alt="AI Agentic theme rows"></div>
+      <div><b>Classic SWE</b><span>hand-written, no AI</span>
+        <img src="/img/themes/swe.png" loading="lazy" width="1600" height="439"
+             alt="Classic SWE theme rows"></div>
+      <div><b>Sci-Fi</b><span>warp cores &amp; shields</span>
+        <img src="/img/themes/scifi.png" loading="lazy" width="1600" height="439"
+             alt="Sci-Fi theme rows"></div>
+      <div><b>Wild West</b><span>six-guns &amp; gold rush</span>
+        <img src="/img/themes/west.png" loading="lazy" width="1600" height="439"
+             alt="Wild West theme rows"></div>
+      <div><b>Cyberpunk</b><span>chrome &amp; neon</span>
+        <img src="/img/themes/cyber.png" loading="lazy" width="1600" height="439"
+             alt="Cyberpunk theme rows"></div>
+      <div><b>Gothic</b><span>candles &amp; cathedrals</span>
+        <img src="/img/themes/gothic.png" loading="lazy" width="1600" height="439"
+             alt="Gothic theme rows"></div>
+      <div><b>Musical</b><span>tempo &amp; encores</span>
+        <img src="/img/themes/musical.png" loading="lazy" width="1600" height="439"
+             alt="Musical theme rows"></div>
+      <div><b>Planet Earth</b><span>wild documentary</span>
+        <img src="/img/themes/earth.png" loading="lazy" width="1600" height="439"
+             alt="Planet Earth theme rows"></div>
+      <div><b>Cosmos</b><span>stars &amp; black holes</span>
+        <img src="/img/themes/cosmo.png" loading="lazy" width="1600" height="439"
+             alt="Cosmos theme rows"></div>
+      <div><b>Ocean</b><span>tides &amp; deep water</span>
+        <img src="/img/themes/ocean.png" loading="lazy" width="1600" height="439"
+             alt="Ocean theme rows"></div>
+    </div>
+  </div>
+</section>
+
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">Grab a release or build from source — it's a plain
+      SwiftPM project.</p>
+    <div class="install-cols">
+      <div>
+        <h3>macOS</h3>
+        <pre><span class="c"># Homebrew</span>
+<span class="g">brew</span> install --cask deathemperor/tap/infinitus
+
+<span class="c"># or grab Infinitus.app from the latest release</span>
+<span class="g">open</span> https://github.com/deathemperor/infinitus/releases
+
+<span class="c"># or build it yourself</span>
+<span class="g">git</span> clone https://github.com/deathemperor/infinitus
+<span class="g">cd</span> infinitus &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
+        <p class="fineprint">Releases are Developer ID signed and notarized
+        (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI on your PATH
+        (<code>cargo install --git https://github.com/deathemperor/swapd swapd</code>);
+        Infinitus walks you through first-account setup.</p>
+      </div>
+      <div>
+        <h3>Linux (Omarchy / Arch)</h3>
+        <pre><span class="c"># tray daemon + Quickshell panel plugin</span>
+<span class="g">git</span> clone https://github.com/deathemperor/infinitus
+<span class="g">cd</span> infinitus
+<span class="g">swift</span> build -c release --product infinitus-tray
+<span class="c"># panel: packaging/omarchy/quickshell-plugin/</span></pre>
+        <p class="fineprint">Same core, same gauges — rendered in your
+        Quickshell bar. On the AUR.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <dl class="faq">
+      <dt>What is Infinitus?</dt>
+      <dd>A free, open-source menu bar app (macOS) and tray daemon + panel
+        plugin (Linux) that manages a fleet of Claude Code accounts: every
+        account's 5-hour, weekly and per-model usage at a glance, automatic
+        rotation to the freshest account when a limit hits, and resume nudges
+        that put stopped sessions back to work.</dd>
+      <dt>Does it work with Claude Code?</dt>
+      <dd>Yes. It reads Claude Code's own local session files to show progress
+        and switches accounts through the <a href="https://github.com/deathemperor/swapd"><code>swapd</code></a> CLI. It
+        never modifies Claude Code.</dd>
+      <dt>Which platforms?</dt>
+      <dd>macOS 14+ on Apple silicon (Homebrew cask), and Linux — a static
+        <code>infinitus-tray</code> for x86_64 and aarch64 with a Quickshell
+        panel plugin for Omarchy / Arch (also on the AUR). The iPhone companion
+        builds from source today — no App Store build yet.</dd>
+      <dt>Is it free?</dt>
+      <dd>Free and open source, MIT licensed. Source is on
+        <a href="https://github.com/deathemperor/infinitus">GitHub</a>.</dd>
+      <dt>Are the numbers exact?</dt>
+      <dd>Usage percentages come from Anthropic's own limits reporting.
+        Usage-<em>cost</em> figures are estimates, never billing truth.</dd>
+    </dl>
+  </div>
+</section>
+<section id="get" class="closing">
+  <div class="wrap">
+    <h2>Keep the agents running.</h2>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/Infinitus-0.4.5-alpha.1.zip">Download for macOS</a>
+      <a class="btn" href="#install">Linux &amp; source</a>
+    </div>
+    <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
+            title="Copy to clipboard" aria-label="Copy the Homebrew install command">
+      <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
+      <span class="k">copy</span>
+    </button>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>♾ Infinitus — free &amp; open source, MIT licensed.</span>
+    <span>
+      <a href="https://github.com/deathemperor/infinitus">GitHub</a> ·
+      <a href="https://github.com/deathemperor/infinitus/issues">Issues</a> ·
+      <span title="Usage-cost figures shown in the app are estimates, never billing truth.">usage figures are estimates</span>
+    </span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Hero brew line: click copies, the badge says so for a moment.
+  document.querySelectorAll(".brew").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var done = function () {
+        button.classList.add("done");
+        button.querySelector(".k").textContent = "copied";
+        setTimeout(function () {
+          button.classList.remove("done");
+          button.querySelector(".k").textContent = "copy";
+        }, 1600);
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText(button.dataset.copy).then(done, done);
+      else done();
+    });
+  });
+  var accounts = [
+    { name: "papaya",  pct: 64, warn: false, dead: false, reset: "resets 2d 4h" },
+    { name: "banyan",  pct: 12, warn: true,  dead: false, reset: "resets 9h 12m" },
+    { name: "cassava", pct: 0,  warn: false, dead: true,  reset: "revives 1h 03m" }
+  ];
+  var activeIdx = 0;
+  var host = document.getElementById("fleet");
+  var evEl = document.getElementById("fleet-event");
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.querySelectorAll("video[autoplay]").forEach(function (v) { v.removeAttribute("autoplay"); v.pause(); });
+  }
+  var trayEl = document.getElementById("tray-pct");
+
+  function render() {
+    host.innerHTML = accounts.map(function (a, i) {
+      var cls = "acct" + (a.warn ? " warn" : "") + (a.dead ? " dead" : "");
+      var mark = i === activeIdx ? '<span class="mark">▶</span>' : "";
+      var stat = a.dead ? a.reset : "<b>" + a.pct + "%</b> · " + a.reset;
+      return '<div class="' + cls + '"><div class="name">' + mark + a.name +
+        '</div><div class="gauge"><i style="width:' + Math.max(a.pct, 2) +
+        '%"></i></div><div class="stat">' + stat + "</div></div>";
+    }).join("");
+    trayEl.textContent = "∞ " + accounts[activeIdx].pct + "%";
+  }
+
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  render();
+  if (reduced) return;
+
+  setInterval(function () {
+    var a = accounts[activeIdx];
+    a.pct = Math.max(0, a.pct - (1 + Math.floor(Math.random() * 3)));
+    a.warn = a.pct <= 15 && a.pct > 0;
+    if (a.pct === 0) {
+      a.dead = true; a.warn = false;
+      a.reset = "revives 4h 58m";
+      var next = accounts.findIndex(function (x) { return !x.dead; });
+      if (next === -1) {
+        accounts.forEach(function (x) { x.dead = false; x.warn = false; x.pct = 60 + Math.floor(Math.random() * 35); x.reset = "resets 6d 22h"; });
+        next = 0;
+        evEl.innerHTML = '<b>window reset</b> — fleet revived, back to work';
+      } else {
+        evEl.innerHTML = '<b>limit hit</b> — switched ' + a.name + " → " +
+          accounts[next].name + " · resume nudge sent to 3 sessions";
+      }
+      activeIdx = next;
+    }
+    render();
+  }, 1400);
+})();
+</script>
+
+</body>
+</html>

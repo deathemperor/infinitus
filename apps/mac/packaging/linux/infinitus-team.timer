@@ -1,0 +1,11 @@
+[Unit]
+Description=Infinitus team sync every 5 minutes
+
+[Timer]
+# OnCalendar, not OnUnitActiveSec: Persistent= only catches up missed
+# runs (a suspended or powered-off laptop) for calendar timers.
+OnCalendar=*:0/5
+Persistent=true
+
+[Install]
+WantedBy=timers.target

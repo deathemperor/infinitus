@@ -1,0 +1,6 @@
+{
+  "name": "infinitus",
+  "version": "0.1.0",
+  "description": "Hooks that tell the Infinitus Mac app the moment a session needs you or ends a turn — the phone hears about it at once.",
+  "author": { "name": "Loc Truong" }
+}

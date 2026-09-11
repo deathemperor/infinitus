@@ -1,0 +1,3 @@
+{"type":"user","uuid":"u1","timestamp":"2026-09-06T10:00:00.000Z","message":{"content":"research it"}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-06T10:00:01.000Z","message":{"content":[{"type":"tool_use","id":"ag1","name":"Agent","input":{"description":"Map session feed rendering","subagent_type":"Explore","prompt":"…"}}]}}
+{"type":"user","uuid":"r1","timestamp":"2026-09-06T10:05:00.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"ag1","content":"Findings: …"}]}}

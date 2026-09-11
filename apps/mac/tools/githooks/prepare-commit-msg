@@ -1,0 +1,13 @@
+#!/bin/sh
+# Every commit made by Claude (this session, its subagents, the e2
+# session) carries the Co-Authored-By trailer — the Stats tab counts it
+# and the user asked for it (2026-09-04: "some commits still missing
+# Claude in author"). Installed with `git config core.hooksPath
+# tools/githooks`; shared by every worktree of this repo.
+msg="$1"
+trailer='Co-Authored-By: Claude Code <noreply@anthropic.com>'
+grep -qi '^Co-Authored-By: .*Claude' "$msg" && exit 0
+# Merge / squash / amend messages come pre-filled; only append when the
+# hook runs for a real message (arg 2 is "message", "template" or empty).
+case "${2:-}" in merge|squash|commit) exit 0 ;; esac
+printf '\n%s\n' "$trailer" >> "$msg"

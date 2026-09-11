@@ -1,0 +1,18 @@
+.build/
+.swiftpm/
+Infinitus.app
+AppIcon.icns
+.dev-relaunch
+.build-linux/
+ios/*.xcodeproj
+
+# wrangler local cache (site/, and site/public/ if deploy is run from there)
+.wrangler/
+build-*/
+ios/build/
+ios/InfinitusMobile/Info.plist
+ios/InfinitusMobileWidgets/Info.plist
+ios/InfinitusMobile/InfinitusMobile.entitlements
+ios/InfinitusMobileShare/Info.plist
+ios/InfinitusMobileShare/InfinitusMobileShare.entitlements
+ios/InfinitusMobileWidgets/InfinitusMobileWidgets.entitlements

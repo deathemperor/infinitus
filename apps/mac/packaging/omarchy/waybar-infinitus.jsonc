@@ -1,0 +1,14 @@
+// Infinitus fleet module for Waybar (Omarchy's bar).
+// Merge into ~/.config/waybar/config.jsonc and add "custom/infinitus"
+// to modules-right. `signal: 8` lets rotate refresh the bar instantly.
+// Themes: `infinitus-tray themes` lists ids (rpg, hades, scifi, …).
+{
+  "custom/infinitus": {
+    "exec": "infinitus-tray status --theme rpg",
+    "return-type": "json",
+    "interval": 60,
+    "signal": 8,
+    "on-click": "infinitus-tray rotate && pkill -RTMIN+8 waybar",
+    "tooltip": true
+  }
+}

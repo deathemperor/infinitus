@@ -1,0 +1,5 @@
+/* Infinitus module states — tune to your Omarchy theme. */
+#custom-infinitus { padding: 0 10px; }
+#custom-infinitus.dead    { color: #f38ba8; }
+#custom-infinitus.warning { color: #f9e2af; }
+#custom-infinitus.error   { color: #f38ba8; font-style: italic; }
