@@ -150,6 +150,7 @@ publishes the matching section as the GitHub release body.
 - The supervisor drops swapd's `sleep` heartbeat like cswap's `poll`, so the Activity log no longer gains a line a minute (#475).
 - The spend estimate (`cswap usage`) runs only while the cswap engine is on; with it off the Usage pane says so instead of showing stale numbers (#475).
 - The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
+- Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
