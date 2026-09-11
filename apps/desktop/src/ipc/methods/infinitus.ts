@@ -7,6 +7,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import { InfinitusCaptureGestureService } from "../../captures/InfinitusCaptureGesture.ts";
 import { InfinitusDesktopPrefsService } from "../../infinitus/InfinitusDesktopPrefs.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
 import * as IpcChannels from "../channels.ts";
@@ -29,6 +30,16 @@ export const setInfinitusQuitWithApp = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.setQuitWithApp")(function* (enabled) {
     const prefs = yield* InfinitusDesktopPrefsService;
     return yield* prefs.setQuitWithApp(enabled);
+  }),
+});
+
+export const setInfinitusCaptureGestureEnabled = makeIpcMethod({
+  channel: IpcChannels.SET_INFINITUS_CAPTURE_GESTURE_ENABLED_CHANNEL,
+  payload: Schema.Boolean,
+  result: InfinitusDesktopPrefs,
+  handler: Effect.fn("desktop.ipc.infinitus.setCaptureGestureEnabled")(function* (enabled) {
+    const gesture = yield* InfinitusCaptureGestureService;
+    return yield* gesture.setEnabled(enabled);
   }),
 });
 

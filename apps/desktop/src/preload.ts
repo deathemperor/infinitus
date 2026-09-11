@@ -1,5 +1,6 @@
 import type {
   DesktopBridge,
+  DesktopCaptureGestureEvent,
   DesktopPreviewPointerEvent,
   DesktopPreviewRecordingFrame,
   DesktopPreviewTabState,
@@ -25,6 +26,21 @@ function isSnapShotEvent(value: unknown): value is DesktopSnapShotEvent {
     SNAP_SHOT_EVENT_TYPES.has(type) &&
     (id === undefined || typeof id === "string")
   );
+}
+
+const CAPTURE_GESTURE_FAILURES = new Set([
+  "accessibility",
+  "no-focus",
+  "unsupported",
+  "timeout",
+  "helper",
+]);
+function isCaptureGestureEvent(value: unknown): value is DesktopCaptureGestureEvent {
+  if (typeof value !== "object" || value === null) return false;
+  const { type, text, reason } = value as { type?: unknown; text?: unknown; reason?: unknown };
+  if (type === "captured") return typeof text === "string";
+  if (type === "empty") return true;
+  return type === "failed" && typeof reason === "string" && CAPTURE_GESTURE_FAILURES.has(reason);
 }
 
 exposeClerkBridge({ passkeys: true });
@@ -145,6 +161,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.GET_INFINITUS_DESKTOP_PREFS_CHANNEL),
   setInfinitusQuitWithApp: (enabled) =>
     ipcRenderer.invoke(IpcChannels.SET_INFINITUS_QUIT_WITH_APP_CHANNEL, enabled),
+  setInfinitusCaptureGestureEnabled: (enabled) =>
+    ipcRenderer.invoke(IpcChannels.SET_INFINITUS_CAPTURE_GESTURE_ENABLED_CHANNEL, enabled),
   openInfinitusSignIn: (input) =>
     ipcRenderer.invoke(IpcChannels.OPEN_INFINITUS_SIGN_IN_CHANNEL, input),
   closeInfinitusSignIn: (flowId) =>
@@ -185,6 +203,17 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IpcChannels.SNAP_SHOT_EVENT_CHANNEL, wrappedListener);
     return () => {
       ipcRenderer.removeListener(IpcChannels.SNAP_SHOT_EVENT_CHANNEL, wrappedListener);
+    };
+  },
+  onCaptureGestureEvent: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, event: unknown) => {
+      if (!isCaptureGestureEvent(event)) return;
+      listener(event);
+    };
+
+    ipcRenderer.on(IpcChannels.CAPTURE_GESTURE_EVENT_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.CAPTURE_GESTURE_EVENT_CHANNEL, wrappedListener);
     };
   },
   onQuitShortcut: (listener) => {

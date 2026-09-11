@@ -67,6 +67,7 @@ import {
   closeInfinitusSignIn,
   getInfinitusDesktopPrefs,
   openInfinitusSignIn,
+  setInfinitusCaptureGestureEnabled,
   setInfinitusQuitWithApp,
   submitInfinitusSignInCode,
 } from "./methods/infinitus.ts";
@@ -124,6 +125,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
 
   yield* ipc.handle(getInfinitusDesktopPrefs);
   yield* ipc.handle(setInfinitusQuitWithApp);
+  yield* ipc.handle(setInfinitusCaptureGestureEnabled);
   yield* ipc.handle(openInfinitusSignIn);
   yield* ipc.handle(closeInfinitusSignIn);
   yield* ipc.handle(submitInfinitusSignInCode);

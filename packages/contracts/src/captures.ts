@@ -16,7 +16,8 @@ export type CaptureId = typeof CaptureId.Type;
 
 /** A capture's body. Whole-line pastes are one capture, so the cap is a
     paragraph's worth (8 KiB), not a line's. */
-export const CaptureText = TrimmedNonEmptyString.check(Schema.isMaxLength(8_192));
+export const MAX_CAPTURE_TEXT_LENGTH = 8_192;
+export const CaptureText = TrimmedNonEmptyString.check(Schema.isMaxLength(MAX_CAPTURE_TEXT_LENGTH));
 
 /** Captures a project holds at once, done ones included. */
 export const MAX_CAPTURES_PER_PROJECT = 200;
