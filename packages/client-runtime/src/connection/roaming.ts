@@ -35,20 +35,31 @@ export function bearerHostOrder(
   return order;
 }
 
-/** Whether a failed host is one to walk past: it could not be reached at all.
-    A host that answered and refused (a blocked error, a rejected credential)
-    ends the walk — a hop must never hide a real refusal. */
+/** Whether a failed host is one to walk past: the Mac is not there. Nothing
+    answered (network, timeout), something else did (a café router's page —
+    `remote-unavailable` for a non-answer or no JSON; `configuration` for a
+    404 or another environment's id). A host that refused the credential
+    (authentication, permission) ends the walk — a hop must never hide a
+    real refusal. */
 export function roamsPast(error: ConnectionAttemptError): boolean {
-  return (
-    error._tag === "ConnectionTransientError" &&
-    (error.reason === "network" || error.reason === "timeout")
-  );
+  switch (error._tag) {
+    case "ConnectionTransientError":
+      return (
+        error.reason === "network" ||
+        error.reason === "timeout" ||
+        error.reason === "remote-unavailable"
+      );
+    case "ConnectionBlockedError":
+      return error.reason === "configuration";
+  }
 }
 
 /**
  * The profile after a connect landed on `liveHttpBaseUrl` and read
  * `descriptor`: the live host remembered, the alternates re-learned from the
- * server (the paired host itself never listed among them). Null when nothing
+ * server (the paired host itself never listed among them). A descriptor that
+ * names none leaves the known alternates alone — the tunnel is down for the
+ * moment, not gone, and a stale one costs one short probe. Null when nothing
  * changed, so the store is not written on every connect.
  */
 export function learnedBearerProfile(
@@ -56,9 +67,10 @@ export function learnedBearerProfile(
   liveHttpBaseUrl: string,
   descriptor: Pick<ExecutionEnvironmentDescriptor, "alternateHttpBaseUrls">,
 ): BearerConnectionProfile | null {
-  const alternates = (descriptor.alternateHttpBaseUrls ?? []).filter(
+  const named = (descriptor.alternateHttpBaseUrls ?? []).filter(
     (host) => host !== profile.httpBaseUrl,
   );
+  const alternates = named.length === 0 ? (profile.alternateHttpBaseUrls ?? []) : named;
   const sameAlternates =
     alternates.length === (profile.alternateHttpBaseUrls ?? []).length &&
     alternates.every((host, index) => profile.alternateHttpBaseUrls?.[index] === host);

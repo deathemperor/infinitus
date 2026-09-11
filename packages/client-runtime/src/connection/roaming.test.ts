@@ -32,15 +32,18 @@ describe("bearerHostOrder", () => {
 });
 
 describe("roamsPast", () => {
-  it("walks past a host that could not be reached, never one that refused", () => {
-    expect(roamsPast(new ConnectionTransientError({ reason: "network", detail: "x" }))).toBe(true);
-    expect(roamsPast(new ConnectionTransientError({ reason: "timeout", detail: "x" }))).toBe(true);
-    expect(
-      roamsPast(new ConnectionTransientError({ reason: "remote-unavailable", detail: "x" })),
-    ).toBe(false);
-    expect(roamsPast(new ConnectionBlockedError({ reason: "authentication", detail: "x" }))).toBe(
-      false,
-    );
+  it("walks past a host where the Mac is not, never one that refused the credential", () => {
+    const transient = (reason: ConnectionTransientError["reason"]) =>
+      roamsPast(new ConnectionTransientError({ reason, detail: "x" }));
+    const blocked = (reason: ConnectionBlockedError["reason"]) =>
+      roamsPast(new ConnectionBlockedError({ reason, detail: "x" }));
+    expect(transient("network")).toBe(true);
+    expect(transient("timeout")).toBe(true);
+    expect(transient("remote-unavailable")).toBe(true);
+    expect(blocked("configuration")).toBe(true);
+    expect(transient("transport")).toBe(false);
+    expect(blocked("authentication")).toBe(false);
+    expect(blocked("permission")).toBe(false);
   });
 });
 
@@ -63,12 +66,15 @@ describe("learnedBearerProfile", () => {
     expect(back?.lastGoodHttpBaseUrl).toBe(LAN);
   });
 
-  it("writes nothing when nothing changed, never lists the paired host, drops a gone tunnel", () => {
+  it("writes nothing when nothing changed, never lists the paired host, keeps the tunnel through a blip", () => {
     const settled = profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: LAN });
     expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [TUNNEL] })).toBeNull();
     expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [LAN, TUNNEL] })).toBeNull();
-    const gone = learnedBearerProfile(settled, LAN, {});
-    expect(gone?.alternateHttpBaseUrls).toBeUndefined();
-    expect(gone?.lastGoodHttpBaseUrl).toBe(LAN);
+    expect(learnedBearerProfile(settled, LAN, {})).toBeNull();
+    expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [] })).toBeNull();
+    const moved = learnedBearerProfile(settled, LAN, {
+      alternateHttpBaseUrls: ["https://other.example.test"],
+    });
+    expect(moved?.alternateHttpBaseUrls).toEqual(["https://other.example.test"]);
   });
 });

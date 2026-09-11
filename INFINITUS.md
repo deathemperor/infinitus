@@ -415,13 +415,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `status.forkTunnel` while it is up; a never-polled snapshot is refreshed
   once for it). The phone keeps them on the bearer profile from the pairing
   on and re-learns them on every connect, so a tunnel turned on after the
-  pairing is picked up by the next LAN connect. A connect tries the host
-  that worked last, then the paired one, then the alternates; a host that
-  cannot be reached at all (`ConnectionTransientError` network/timeout,
-  3 s descriptor wait on every host but the last) is walked past, one that
-  answers and refuses ends the walk. The bearer session is not host-bound,
-  so no re-pair. The environment row says "Connected via <host>" while
-  roamed, else "Also via <host> when you are away".
+  pairing is picked up by the next LAN connect, and a connect that finds
+  none named keeps the known ones (a tunnel blip is not a removal). A
+  connect tries the host that worked last, then the paired one, then the
+  alternates (3 s descriptor wait on every host but the last); a host where
+  the Mac is not — nothing answers (network, timeout), or something else
+  does (`remote-unavailable`, a 404 or another environment's id) — is
+  walked past, one that refuses the credential ends the walk. The bearer
+  session is not host-bound, so no re-pair. The environment row says
+  "Connected via <host>" while roamed, else "Also via <host> when you are
+  away".
 - `apps/mobile/src/features/infinitus/lanDiscovery.logic.ts` (+ `lanDiscovery.ts`,
   `InfinitusNearbyServers.tsx`) — "Find Macs on this network" on the
   add-connection form (#651): a sweep of the phone's private /24 for
