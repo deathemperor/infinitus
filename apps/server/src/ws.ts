@@ -1150,6 +1150,10 @@ const makeWsRpcLayer = (
                 interactionMode: bootstrap.createThread.interactionMode,
                 branch: bootstrap.createThread.branch,
                 worktreePath: bootstrap.createThread.worktreePath,
+                // Fork (#269 B): a best-of-N member carries its group through the bootstrap.
+                ...(bootstrap.createThread.groupId === undefined
+                  ? {}
+                  : { groupId: bootstrap.createThread.groupId }),
                 createdAt: bootstrap.createThread.createdAt,
               });
               // The successful create is a fence in the engine command queue:

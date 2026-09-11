@@ -785,6 +785,8 @@ export const OrchestrationThread = Schema.Struct({
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
+  // Fork (#269 B): the best-of-N group this thread was started in, if any.
+  groupId: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -863,6 +865,8 @@ export const OrchestrationThreadShell = Schema.Struct({
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
+  // Fork (#269 B): the best-of-N group this thread was started in, if any.
+  groupId: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   session: Schema.NullOr(OrchestrationSession),
   latestUserMessageAt: Schema.NullOr(IsoDateTime),
@@ -1080,6 +1084,8 @@ const ThreadCreateCommand = Schema.Struct({
   historyImport: Schema.optional(Schema.Literal(true)),
   /** Fork (#269 C): a side question of that thread; hidden from the thread lists. */
   sideOf: Schema.optional(ThreadId),
+  /** Fork (#269 B): the best-of-N group this thread is a member of; siblings share it. */
+  groupId: Schema.optional(TrimmedNonEmptyString),
 });
 
 const ThreadDeleteCommand = Schema.Struct({
@@ -1242,6 +1248,8 @@ const ThreadTurnStartBootstrapCreateThread = Schema.Struct({
   interactionMode: ProviderInteractionMode,
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
+  /** Fork (#269 B): see `ThreadCreateCommand.groupId`. */
+  groupId: Schema.optional(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
 });
 
@@ -1757,6 +1765,8 @@ export const ThreadCreatedPayload = Schema.Struct({
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   /** Fork (#269 C): see `ThreadCreateCommand.sideOf`. */
   sideOf: Schema.optional(ThreadId),
+  /** Fork (#269 B): see `ThreadCreateCommand.groupId`. */
+  groupId: Schema.optional(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

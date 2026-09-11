@@ -635,6 +635,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             snoozedAt: null,
             babysit: null,
             sideOf: event.payload.sideOf ?? null,
+            groupId: event.payload.groupId ?? null,
             pinnedAt: null,
             pinOrderKey: null,
             activeOrderKey: null,

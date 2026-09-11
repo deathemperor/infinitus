@@ -125,16 +125,25 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
         worktreePath: null,
         createdAt,
         sideOf: threadId,
+        // Fork (#269 B): the group column rides the same create.
+        groupId: "bake-1",
       });
       const side = yield* snapshotQuery
         .getThreadShellById(sideId)
         .pipe(Effect.map(Option.getOrThrow));
       assert.strictEqual(side.sideOf, threadId);
+      assert.strictEqual(side.groupId, "bake-1");
       assert.isUndefined((yield* shell()).sideOf);
-      const sideRows = yield* sql<{ readonly sideOf: string | null }>`
-        SELECT side_of AS "sideOf" FROM projection_threads WHERE thread_id = ${sideId}
+      assert.isUndefined((yield* shell()).groupId);
+      const sideRows = yield* sql<{
+        readonly sideOf: string | null;
+        readonly groupId: string | null;
+      }>`
+        SELECT side_of AS "sideOf", group_id AS "groupId"
+        FROM projection_threads WHERE thread_id = ${sideId}
       `;
       assert.strictEqual(sideRows[0]?.sideOf, threadId);
+      assert.strictEqual(sideRows[0]?.groupId, "bake-1");
     }),
   );
 });

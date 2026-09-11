@@ -321,6 +321,22 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `getLatestThreadForProject` skip `sideOf` threads. Tests:
   `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts`
   (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
+- **Best of N (#269 B; Cursor's `/best-of-n`).** One prompt, two to four
+  models, one worktree each, no judge. Server: `groupId` on `thread.create`
+  (and the bootstrap's `createThread`, copied in `apps/server/src/ws.ts`), the
+  created payload and the thread projection (`group_id`, migration 054;
+  `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`).
+  Web: `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`:
+  the draft's id is the first member, the rest are minted, titles carry the
+  model; `bestOfSiblings`, `bestOfMemberStatus`); `BestOfPicker.tsx` — the
+  "Best of" control beside the model picker, checkboxes for the active
+  provider's models, "Run N"; `ChatView.tsx` `onSend(…, bestOf)` starts one
+  bootstrap turn per member (text only, no `titleSeed`) and pins each;
+  `apps/web/src/components/BestOfGroupCard.tsx` — the card at the top of every
+  member listing the live siblings with a status word, links, and "Keep this
+  one" (interrupts, archives, removes the worktree with the work kept on its
+  branch). Tests: `bestOf.logic.test.ts`, `ProjectionPipeline.babysit.test.ts`
+  (the column).
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in

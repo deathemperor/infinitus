@@ -207,6 +207,8 @@ import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavaila
 import { RightPanelTabs } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
 import { SideQuestionPanel } from "./SideQuestionPanel";
+import { BestOfGroupCard } from "./BestOfGroupCard";
+import { planBestOfMembers, type BestOfChip, type BestOfMember } from "./chat/bestOf.logic";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
@@ -5445,6 +5447,13 @@ export default function ChatView(props: ChatViewProps) {
     requestedEnvMode: envMode,
     isGitRepo,
   });
+  // Fork (#269 B): a draft that will get its own worktree can start once per
+  // model; each member needs a worktree of its own, so local drafts cannot.
+  const supportsBestOf =
+    isLocalDraftThread &&
+    sendEnvMode === "worktree" &&
+    activeThreadBranch !== null &&
+    serverConfig?.environment.capabilities.infinitus === true;
   const localCheckoutBranchMismatch = useMemo(
     () =>
       isServerThread
@@ -6709,6 +6718,8 @@ export default function ChatView(props: ChatViewProps) {
       annotation: PreviewAnnotationPayload;
       image: ComposerImageAttachment | null;
     },
+    // Fork (#269 B): the models of a best-of send; the draft starts once per chip.
+    bestOf?: ReadonlyArray<BestOfChip>,
   ) => {
     e?.preventDefault();
     // Typed out in full rather than picked from the menu. Attachments or contexts
@@ -6986,6 +6997,11 @@ export default function ChatView(props: ChatViewProps) {
       return;
     }
     const threadIdForSend = activeThread.id;
+    // Fork (#269 B): a best-of send is text only; uploads bind to one thread.
+    if (bestOf && (composerImages.length > 0 || composerFiles.length > 0)) {
+      setThreadError(threadIdForSend, "Best of N sends text only. Remove the attachments first.");
+      return;
+    }
     const isFirstMessage = !isServerThread || activeThread.messages.length === 0;
     const baseBranchForWorktree =
       isFirstMessage && sendEnvMode === "worktree" && !activeThread.worktreePath
@@ -7318,19 +7334,43 @@ export default function ChatView(props: ChatViewProps) {
         }
       }
     } else if (failure === null && turnAttachmentsResult._tag === "Success") {
-      const bootstrap =
+      // Fork (#269 B): a best-of send starts one thread per model from this
+      // draft. The draft's own id is the first member, so the route promotes
+      // as it does for a plain send; the rest are minted here and share the
+      // group. Members keep their titled name (no `titleSeed`, so the
+      // auto-title never overwrites the model suffix).
+      const bestOfMembers =
+        bestOf && isLocalDraftThread && baseBranchForWorktree
+          ? planBestOfMembers({
+              firstThreadId: threadIdForSend,
+              chips: bestOf,
+              title,
+              groupId: randomUUID(),
+              newThreadId,
+            })
+          : null;
+      const memberModelSelection = (member: BestOfMember) =>
+        createModelSelection(
+          ctxSelectedModelSelection.instanceId,
+          member.model,
+          ctxSelectedModelSelection.options,
+        );
+      const buildBootstrap = (member: BestOfMember | null) =>
         isLocalDraftThread || baseBranchForWorktree
           ? {
               ...(isLocalDraftThread
                 ? {
                     createThread: {
                       projectId: activeProject.id,
-                      title,
-                      modelSelection: threadCreateModelSelection,
+                      title: member?.title ?? title,
+                      modelSelection: member
+                        ? memberModelSelection(member)
+                        : threadCreateModelSelection,
                       runtimeMode,
                       interactionMode: sendInteractionMode,
                       branch: activeThreadBranch,
                       worktreePath: activeThread.worktreePath,
+                      ...(member ? { groupId: member.groupId } : {}),
                       createdAt: activeThread.createdAt,
                     },
                   }
@@ -7348,6 +7388,17 @@ export default function ChatView(props: ChatViewProps) {
                 : {}),
             }
           : undefined;
+      const starts: ReadonlyArray<{
+        readonly threadId: ThreadId;
+        readonly messageId: MessageId;
+        readonly member: BestOfMember | null;
+      }> = bestOfMembers
+        ? bestOfMembers.map((member) => ({
+            threadId: member.threadId,
+            messageId: member.threadId === threadIdForSend ? messageIdForSend : newMessageId(),
+            member,
+          }))
+        : [{ threadId: threadIdForSend, messageId: messageIdForSend, member: null }];
       const backgroundThreadRef =
         resolvedSubmissionIntent === "background"
           ? scopeThreadRef(activeThread.environmentId, threadIdForSend)
@@ -7355,35 +7406,60 @@ export default function ChatView(props: ChatViewProps) {
       if (backgroundThreadRef) {
         beginBackgroundDraftSubmissionByRef(backgroundThreadRef);
       }
-      const startResult = await startThreadTurn({
-        environmentId,
-        input: {
-          threadId: threadIdForSend,
-          message: {
-            messageId: messageIdForSend,
-            role: "user",
-            text: outgoingMessageText,
-            attachments: turnAttachmentsResult.value,
+      let startResult: AtomCommandResult<unknown, unknown> | null = null;
+      const startedThreadIds: ThreadId[] = [];
+      for (const start of starts) {
+        const bootstrap = buildBootstrap(start.member);
+        const result = await startThreadTurn({
+          environmentId,
+          input: {
+            threadId: start.threadId,
+            message: {
+              messageId: start.messageId,
+              role: "user",
+              text: outgoingMessageText,
+              attachments: turnAttachmentsResult.value,
+            },
+            modelSelection: start.member
+              ? memberModelSelection(start.member)
+              : ctxSelectedModelSelection,
+            ...(start.member ? {} : { titleSeed: title }),
+            runtimeMode,
+            interactionMode: sendInteractionMode,
+            ...(bootstrap ? { bootstrap } : {}),
+            createdAt: messageCreatedAt,
           },
-          modelSelection: ctxSelectedModelSelection,
-          titleSeed: title,
-          runtimeMode,
-          interactionMode: sendInteractionMode,
-          ...(bootstrap ? { bootstrap } : {}),
-          createdAt: messageCreatedAt,
-        },
-      });
-      if (startResult._tag === "Failure") {
+        });
+        if (result._tag === "Failure") {
+          startResult = result;
+          break;
+        }
+        startedThreadIds.push(start.threadId);
+      }
+      if (startResult !== null && startedThreadIds.length === 0) {
         if (backgroundThreadRef) {
           clearBackgroundDraftSubmissionByRef(backgroundThreadRef);
         }
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        if (startResult !== null) {
+          // A later member failed after the draft became a thread: the send
+          // stands, and the thread says which sibling is missing.
+          const error = squashAtomCommandFailure(startResult);
+          setThreadError(
+            threadIdForSend,
+            `Best of ${starts.length}: only ${startedThreadIds.length} started. ${
+              error instanceof Error ? error.message : ""
+            }`.trim(),
+          );
+        }
         // Fork (#616): the server just created the thread with this send; pin
         // it now so its first turn is never held for headroom (a pin releases).
         if (isLocalDraftThread && pinAtCreation && supportsPinning) {
-          void pinThread(scopeThreadRef(activeThread.environmentId, threadIdForSend));
+          for (const startedThreadId of startedThreadIds) {
+            void pinThread(scopeThreadRef(activeThread.environmentId, startedThreadId));
+          }
         }
         // The turn is under way and will spend quota, so that thread's limits
         // snapshot is stale. Uploads may have outlasted a navigation, so only
@@ -8634,6 +8710,14 @@ export default function ChatView(props: ChatViewProps) {
             </div>
             {/* Messages Wrapper */}
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
+              {activeServerThread?.groupId ? (
+                <BestOfGroupCard
+                  environmentId={environmentId}
+                  projectId={activeServerThread.projectId}
+                  threadId={activeServerThread.id}
+                  groupId={activeServerThread.groupId}
+                />
+              ) : null}
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
@@ -8870,6 +8954,11 @@ export default function ChatView(props: ChatViewProps) {
                             onPageScrollRelease={onComposerPageScrollRelease}
                             onCompactContext={onCompactContext}
                             onAskSideQuestion={supportsSideQuestion ? askSideQuestion : undefined}
+                            onBestOf={
+                              supportsBestOf
+                                ? (chips) => void onSend(undefined, "foreground", undefined, chips)
+                                : undefined
+                            }
                             onSend={onSend}
                             onInterrupt={onInterrupt}
                             onImplementPlanInNewThread={onImplementPlanInNewThread}
