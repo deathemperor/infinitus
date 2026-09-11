@@ -321,7 +321,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   and the fork-port publisher (`prefs set fork_server_port` at startup —
   withheld, with one log line, from a dev-runner server or one whose home is
   a worktree-local `.t3`, so a dev run never takes the installed desktop's
-  tunnel, #640).
+  tunnel, #640). A command's spans carry the verb (#676): `Infinitus.command`
+  annotates `infinitus.command`, `infinitus.args` (joined, cut at 200
+  chars), `infinitus.options` (key NAMES only, never a value) and
+  `infinitus.effect` from the manifest; `InfinitusControlClient.request`
+  and the `ws.rpc.infinitus.command` span carry the verb alone.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
   resume-on-limit for the threads this server runs (#648), the fork's
   counterpart to native's terminal nudge: the Claude adapter's parked-turn

@@ -7,6 +7,7 @@ import { it as effectIt } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Tracer from "effect/Tracer";
 import { describe, expect } from "vite-plus/test";
 
 import {
@@ -151,6 +152,36 @@ describe("InfinitusControlClient", () => {
         args: ["claude", "2"],
         options: { fleet: "claude" },
       });
+    }),
+  );
+
+  effectIt.effect("traces the verb on its span, and nothing else from the request (#676)", () =>
+    Effect.gen(function* () {
+      const server = yield* controlServer(() => replyLine({ ok: true }));
+      const spans: Array<{ name: string; attributes: Record<string, unknown> }> = [];
+      const tracer = Tracer.make({
+        span: (options) => {
+          const span = new Tracer.NativeSpan(options);
+          const end = span.end.bind(span);
+          span.end = (endTime, exit) => {
+            end(endTime, exit);
+            spans.push({ name: span.name, attributes: Object.fromEntries(span.attributes) });
+          };
+          return span;
+        },
+      });
+
+      yield* request(makeConfig({ socketPath: server.socketPath }), {
+        command: "pair",
+        args: ["phone"],
+        options: { token: "s3cret-value" },
+      }).pipe(Effect.withTracer(tracer));
+
+      const span = spans.find((entry) => entry.name === "InfinitusControlClient.request");
+      expect(span?.attributes).toMatchObject({ "infinitus.command": "pair" });
+      const values = spans.flatMap((entry) => Object.values(entry.attributes).map(String));
+      expect(values.some((value) => value.includes("s3cret-value"))).toBe(false);
+      expect(values.some((value) => value.includes("phone"))).toBe(false);
     }),
   );
 

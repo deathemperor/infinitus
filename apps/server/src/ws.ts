@@ -3039,7 +3039,9 @@ const makeWsRpcLayer = (
               // `result` is an optional key: a command that answers with no
               // payload sends no key rather than an explicit undefined.
               .pipe(Effect.map((result) => (result === undefined ? {} : { result }))),
-            { "rpc.aggregate": "infinitus" },
+            // The verb on the RPC span too, so a trace reads it without
+            // opening the child (#676). Never the options.
+            { "rpc.aggregate": "infinitus", "infinitus.command": input.command },
           ),
         [WS_METHODS.infinitusLaunch]: (_input) =>
           observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
