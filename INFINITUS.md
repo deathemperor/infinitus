@@ -111,6 +111,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   alternates (#663).
 - `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
   `roamingHostsLine` under a saved environment's host (#663).
+- `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
+  `InfinitusNearbyServers` above the Host field (#651) and
+  `InfinitusAskToApprove` under the code field (#710), whose approved
+  credential goes through the screen's own `connectAndClose`.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`.
 - `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
@@ -502,6 +506,17 @@ this file adds the fork's own rules. Plan and history: issue #555.
   code: `missingPairingInput` in `pairing.ts` names the missing field
   ("Enter a pairing code.") in the banner, since a bare host built into a
   pairing URL would otherwise read as "Pairing URL is invalid."
+- `apps/mobile/src/features/infinitus/pairingApproval.logic.ts` (+ `pairingApproval.ts`,
+  `InfinitusAskToApprove.tsx`) — "Ask this Mac to approve" under the code
+  field (#710, PR 3): the phone POSTs a request with a random secret to the
+  server at the Host field's address (same scheme rule as `buildPairingUrl`,
+  so the approval and the credential exchange hit one origin), shows the
+  four-character match code, and polls every 2 s until the Mac's Devices card
+  decides; approval hands `connectAndClose` the one-time credential exactly as
+  a typed code would. Denied, expired (the server's 404, or 30 s past
+  `expiresAt` with nothing answering), refused (429) and unreachable each get
+  a banner; Cancel aborts the wait. `ConnectionsNewRouteScreen.tsx` only mounts
+  it and maps the credential to the existing connect path.
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
