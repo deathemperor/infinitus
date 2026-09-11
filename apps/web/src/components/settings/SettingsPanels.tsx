@@ -21,6 +21,7 @@ import {
 import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
+  type ComposerSendMode,
   type DiffLayout,
   type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,
@@ -178,6 +179,12 @@ const TIMESTAMP_FORMAT_LABELS = {
 const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
   stacked: "Stacked",
   split: "Split",
+};
+
+// Fork (#270 F)
+const COMPOSER_SEND_MODE_LABELS: Record<ComposerSendMode, string> = {
+  queue: "Queue until it finishes",
+  steer: "Send into the running turn",
 };
 
 const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
@@ -552,6 +559,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.composerCollapseOnScroll !== DEFAULT_UNIFIED_SETTINGS.composerCollapseOnScroll
         ? ["Collapse composer on scroll"]
         : []),
+      ...(settings.composerSendMode !== DEFAULT_UNIFIED_SETTINGS.composerSendMode
+        ? ["Sending while a turn runs"]
+        : []),
       ...(settings.contextWindowMeterEnabled !== DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled
         ? ["Context window indicator"]
         : []),
@@ -611,6 +621,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.confirmThreadDelete,
       settings.confirmThreadUnpin,
       settings.composerCollapseOnScroll,
+      settings.composerSendMode,
       settings.addProjectBaseDirectory,
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
@@ -717,6 +728,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
       composerCollapseOnScroll: DEFAULT_UNIFIED_SETTINGS.composerCollapseOnScroll,
+      composerSendMode: DEFAULT_UNIFIED_SETTINGS.composerSendMode,
       contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
@@ -2422,6 +2434,47 @@ export function GeneralSettingsPanel() {
               }
               aria-label="Collapse composer on scroll"
             />
+          }
+        />
+
+        <SettingsRow
+          {...searchableSetting("composer-send-mode")}
+          description="What Enter does while a turn is running. Queued messages wait under the composer until the thread is idle; ⌘↩ submits with the other behavior."
+          resetAction={
+            settings.composerSendMode !== DEFAULT_UNIFIED_SETTINGS.composerSendMode ? (
+              <SettingResetButton
+                label="sending while a turn runs"
+                onClick={() =>
+                  updateSettings({ composerSendMode: DEFAULT_UNIFIED_SETTINGS.composerSendMode })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.composerSendMode}
+              onValueChange={(value) => {
+                if (value === "queue" || value === "steer") {
+                  updateSettings({ composerSendMode: value });
+                }
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-56"
+                aria-label="Sending while a turn runs"
+              >
+                <SelectValue>{COMPOSER_SEND_MODE_LABELS[settings.composerSendMode]}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="queue">
+                  {COMPOSER_SEND_MODE_LABELS.queue}
+                </SelectItem>
+                <SelectItem hideIndicator value="steer">
+                  {COMPOSER_SEND_MODE_LABELS.steer}
+                </SelectItem>
+              </SelectPopup>
+            </Select>
           }
         />
 

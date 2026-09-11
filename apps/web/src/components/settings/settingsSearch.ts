@@ -252,6 +252,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rest resting scroll wheel conversation timeline shrink minimize"],
   },
   {
+    id: "composer-send-mode",
+    title: "Sending while a turn runs",
+    to: "/settings/general",
+    searchTerms: ["queue steer send now interrupt running turn enter composer follow-up"],
+  },
+  {
     id: "provider-update-checks",
     title: "Provider update checks",
     to: "/settings/general",

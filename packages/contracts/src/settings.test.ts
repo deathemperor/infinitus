@@ -429,6 +429,13 @@ describe("ClientSettings context window meter", () => {
   });
 });
 
+describe("ClientSettings composer send mode (#270 F)", () => {
+  it("queues by default and accepts steer", () => {
+    expect(decodeClientSettings({}).composerSendMode).toBe("queue");
+    expect(decodeClientSettingsPatch({ composerSendMode: "steer" }).composerSendMode).toBe("steer");
+  });
+});
+
 describe("ClientSettings composer collapse", () => {
   it("collapses on scroll by default and accepts opting out", () => {
     expect(decodeClientSettings({}).composerCollapseOnScroll).toBe(true);

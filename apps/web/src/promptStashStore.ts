@@ -55,6 +55,13 @@ const StashEntrySchema = Schema.Struct({
    * `finalizeEntryImages` lands, and flags entries orphaned by a reload.
    */
   pendingImageCount: Schema.optionalKey(Schema.Number),
+  /**
+   * Fork (#270 F): a message queued to send when this thread's running turn
+   * finishes, keyed by the scoped thread key. Queued entries share the stash's
+   * storage and image handling but never show in the stash menu, never get
+   * evicted for room, and drain oldest first.
+   */
+  queuedFor: Schema.optionalKey(Schema.String),
 });
 export type PromptStashEntry = typeof StashEntrySchema.Type;
 
@@ -209,6 +216,8 @@ interface PromptStashStoreState {
    * reload would resurrect the entry.
    */
   takeEntry: (entryId: string) => { entry: PromptStashEntry | null; durable: boolean };
+  /** Fork (#270 F): swaps a queued entry with its neighbour in the same thread's queue. */
+  moveEntry: (entryId: string, direction: "earlier" | "later") => void;
   /**
    * Attaches the encoded images to an entry written earlier by `stashEntry`,
    * clearing its pending count. Returns attached=false when the entry is gone
@@ -229,7 +238,16 @@ export const usePromptStashStore = create<PromptStashStoreState>()((set, get) =>
   entries: [],
   stashEntry: (entry) => {
     const nextEntries = [entry, ...get().entries];
-    const evicted = nextEntries.length > MAX_STASH_ENTRIES ? (nextEntries.pop() ?? null) : null;
+    // Over the cap the oldest *stash* entry goes; a queued message is never
+    // silently dropped (#270 F). With nothing evictable the write is refused.
+    let evicted: PromptStashEntry | null = null;
+    if (nextEntries.length > MAX_STASH_ENTRIES) {
+      const index = nextEntries.findLastIndex(
+        (candidate, position) => position > 0 && candidate.queuedFor === undefined,
+      );
+      if (index === -1) return { evicted: null, written: false, durable: false };
+      evicted = nextEntries.splice(index, 1)[0] ?? null;
+    }
     const { written, durable } = persistEntries(nextEntries);
     // A rejected write must not leave the entry visible either: the caller
     // keeps the composer intact on failure, so a stashed copy would
@@ -239,6 +257,30 @@ export const usePromptStashStore = create<PromptStashStoreState>()((set, get) =>
     }
     set(() => ({ entries: nextEntries }));
     return { evicted, written: true, durable };
+  },
+  moveEntry: (entryId, direction) => {
+    const entries = get().entries;
+    const index = entries.findIndex((candidate) => candidate.id === entryId);
+    const entry = index === -1 ? undefined : entries[index];
+    if (!entry) return;
+    // Entries are stored newest first; the queue reads oldest first, so
+    // "earlier in the queue" is a higher index among the same thread's rows.
+    const step = direction === "earlier" ? 1 : -1;
+    let target = index + step;
+    while (
+      target >= 0 &&
+      target < entries.length &&
+      entries[target]?.queuedFor !== entry.queuedFor
+    ) {
+      target += step;
+    }
+    const neighbour = target >= 0 && target < entries.length ? entries[target] : undefined;
+    if (!neighbour) return;
+    const nextEntries = [...entries];
+    nextEntries[index] = neighbour;
+    nextEntries[target] = entry;
+    persistEntries(nextEntries);
+    set(() => ({ entries: nextEntries }));
   },
   takeEntry: (entryId) => {
     const entries = get().entries;

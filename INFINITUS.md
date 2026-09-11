@@ -182,6 +182,27 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 G). `packages/shared/src/serverSettings.ts` —
   `applyServerSettingsPatch` merges `projectPromptSnippets` per project key
   like `projectScriptOverrides`, so one project's save leaves the others.
+- `packages/contracts/src/settings.ts` — `ComposerSendMode` and
+  `composerSendMode` (`queue` default, `steer`) on `ClientSettings` and its
+  patch (#270 F); `settings.test.ts` covers the default.
+- Queue vs steer (#270 F): `apps/web/src/promptStashStore.ts` — entries
+  carry `queuedFor` (a scoped thread key), the cap never evicts a queued
+  entry (refuses instead) and `moveEntry` reorders within one thread's
+  queue; `apps/web/src/composer-logic.ts` — `composerSendModeForEnter` (⌘↩
+  on a non-draft thread flips the mode; drafts keep ⌘↩ = background);
+  `apps/web/src/components/chat/ChatComposer.tsx` — `submitComposer` takes
+  the mode, parks the prompt through `stashCurrentPrompt({queuedFor})` while
+  `phase === "running"` (never for a question or approval answer), and the
+  drain (`shouldDrainSendQueue`: ready, not held, no send in flight, empty
+  composer, images saved) restores the head entry then submits once the
+  composer shows it; `ComposerPrimaryActions.tsx` — `runningSendMode` keeps
+  the send button beside Stop while running, labelled "Queue message" /
+  "Send now"; `ChatView.tsx` passes `isHeld` from the hold banner (#616 /
+  #743); `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a
+  turn runs" row. Fork-only: `components/chat/ComposerSendQueue.tsx` (the
+  rows under the composer: send now, edit, reorder, remove) and
+  `composerSendQueue.logic.ts` (+ test). The queue drains only while its
+  thread is open (client-side; server-side queue is a follow-up issue).
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
   methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /

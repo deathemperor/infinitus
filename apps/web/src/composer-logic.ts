@@ -1,4 +1,4 @@
-import type { AssistantCitation } from "@t3tools/contracts";
+import type { AssistantCitation, ComposerSendMode } from "@t3tools/contracts";
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
@@ -34,6 +34,20 @@ export function composerSubmissionIntentForEnter(input: {
     return null;
   }
   return input.modifierKey && input.isDraftThread ? "background" : "foreground";
+}
+
+/**
+ * Fork (#270 F): the modifier on Enter flips the running-turn send mode. A
+ * draft thread has no running turn and already spends ⌘↩ on "start in the
+ * background", so it keeps the setting as is.
+ */
+export function composerSendModeForEnter(input: {
+  sendMode: ComposerSendMode;
+  modifierKey: boolean;
+  isDraftThread: boolean;
+}): ComposerSendMode {
+  if (!input.modifierKey || input.isDraftThread) return input.sendMode;
+  return input.sendMode === "queue" ? "steer" : "queue";
 }
 
 const isInlineTokenSegment = (segment: ComposerPromptSegment): boolean => segment.type !== "text";

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   clampCollapsedComposerCursor,
   collapseExpandedComposerCursor,
+  composerSendModeForEnter,
   composerSubmissionIntentForEnter,
   detectComposerTrigger,
   expandCollapsedComposerCursor,
@@ -49,6 +50,23 @@ describe("formatAssistantCitationForComposer", () => {
     expect(text).toBe(`${serializeAssistantCitation(boundCitation)} `);
     expect(collectAssistantCitations(text).map((entry) => entry.citation)).toEqual([boundCitation]);
     expect(expandAssistantCitationsForProvider(text)).toMatch(/^\[assistant-quote-1\] \n\n/);
+  });
+});
+
+describe("composerSendModeForEnter (#270 F)", () => {
+  it("flips the mode on a modified Enter, except on a draft thread", () => {
+    expect(
+      composerSendModeForEnter({ sendMode: "queue", modifierKey: false, isDraftThread: false }),
+    ).toBe("queue");
+    expect(
+      composerSendModeForEnter({ sendMode: "queue", modifierKey: true, isDraftThread: false }),
+    ).toBe("steer");
+    expect(
+      composerSendModeForEnter({ sendMode: "steer", modifierKey: true, isDraftThread: false }),
+    ).toBe("queue");
+    expect(
+      composerSendModeForEnter({ sendMode: "queue", modifierKey: true, isDraftThread: true }),
+    ).toBe("queue");
   });
 });
 
