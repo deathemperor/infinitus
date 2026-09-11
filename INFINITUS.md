@@ -310,7 +310,11 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `usePinAtCreation` runs once a queued creation is delivered, right after the
   "delivered" outcome is recorded (its test, `use-thread-outbox-drain.test.ts`,
   mocks `./preferences` so the drain's module graph stays clear of
-  expo-secure-store).
+  expo-secure-store). The two `resolveThreadOutboxDeliveryAction` calls (the
+  pass and the live re-check before a send) are wrapped in
+  `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
+  its turn runs or the server holds it, the phone's copy of the desktop
+  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -963,6 +967,19 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   session is not host-bound, so no re-pair. The environment row says
   "Connected via <host>" while roamed, else "Also via <host> when you are
   away".
+- `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`)
+  — the phone outbox's queue rule (#807, #270 F): `queueBehindRunningTurn`
+  turns an existing thread's `send` into `wait` while the thread's session is
+  `starting` / `running` or the server's hold list names it (any kind: held,
+  paused, limited), so a follow-up typed during a turn lands after it instead
+  of steering; creations and every other action pass through. `mode` is
+  `"queue"` at both call sites — the phone has no copy of the desktop's
+  `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  `readHeldThreads` reads the environment's `infinitusEnvironment.holds` atom
+  from the registry (the web sidebar's idiom), null without the `infinitus`
+  capability and before the list's first delivery, so the first pass after
+  the app opens may send into a hold. The drain re-runs on every thread
+  shell change, so a queued row leaves when the turn ends.
 - `apps/mobile/src/features/infinitus/lanDiscovery.logic.ts` (+ `lanDiscovery.ts`,
   `InfinitusNearbyServers.tsx`) — "Find Macs on this network" on the
   add-connection form (#651): a sweep of the phone's private /24 for
