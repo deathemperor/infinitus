@@ -336,9 +336,9 @@ struct SwapdEnginePane: View {
                 if model.swapd == nil {
                     Text("Install the binary first \u{2014} the toggle turns on once it is found:")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(OnboardingBrief.swapdInstallCommand)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
+                    // The same one-press install the first-run card offers
+                    // (#871); a user who dismissed that card lands here.
+                    EngineInstallSection(model: model)
                 }
                 EngineToggleNotes(model: model)
             } header: {
