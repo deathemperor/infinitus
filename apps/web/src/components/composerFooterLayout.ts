@@ -192,6 +192,84 @@ export function resolveRestingComposerControlsLayout(
   return { hiddenCount, visible };
 }
 
+export interface RestingComposerControlsLayout {
+  hiddenCount: number;
+  visible: boolean;
+}
+
+const restingLayoutsEqual = (
+  a: RestingComposerControlsLayout,
+  b: RestingComposerControlsLayout,
+): boolean => a.hiddenCount === b.hiddenCount && a.visible === b.visible;
+
+const RESTING_CONTROLS_LOOP_BURST_LIMIT = 8;
+
+/**
+ * Break a measure/re-render loop before React does (#821).
+ *
+ * The composer re-measures its resting controls after every render. When a
+ * layout changes something the next measurement depends on (the strip's
+ * label room, the host's width) by more than the resolver's slack, the two
+ * layouts chase each other inside one task and React throws "Maximum update
+ * depth exceeded". Coming back to a layout already produced in the same
+ * burst (A → B → A before the next frame) is that loop and nothing else: a
+ * real resize that passes the same widths does so across frames.
+ *
+ * Once a loop is seen, the current layout is held while the host keeps
+ * reporting a width the loop already visited; a width the loop never saw
+ * releases the hold. Holding for a single call would only defer the flip to
+ * the next unrelated render.
+ *
+ * `settle` marks the frame boundary; the caller drives it from
+ * `requestAnimationFrame`.
+ */
+export function createRestingComposerControlsLayoutGuard() {
+  let burst: Array<RestingComposerControlsLayout> = [];
+  let burstWidths = new Set<number>();
+  let hold: { widths: Set<number> } | null = null;
+
+  return {
+    /** The layout to apply: `next`, or `current` while a loop is held off. */
+    next(
+      current: RestingComposerControlsLayout,
+      next: RestingComposerControlsLayout,
+      hostWidth: number,
+    ): RestingComposerControlsLayout {
+      if (hold) {
+        if (hold.widths.has(hostWidth)) return current;
+        hold = null;
+      }
+      if (restingLayoutsEqual(next, current)) return current;
+      if (burst.some((seen) => restingLayoutsEqual(seen, next))) {
+        burstWidths.add(hostWidth);
+        hold = { widths: burstWidths };
+        burst = [];
+        burstWidths = new Set();
+        return current;
+      }
+      if (burst.length === 0) burst.push(current);
+      if (burst.length < RESTING_CONTROLS_LOOP_BURST_LIMIT) burst.push(next);
+      burstWidths.add(hostWidth);
+      return next;
+    },
+    /** A frame has painted: layouts from before it no longer count as a loop. */
+    settle(): void {
+      burst = [];
+      burstWidths = new Set();
+    },
+    /** Forget everything, for a new host. */
+    reset(): void {
+      burst = [];
+      burstWidths = new Set();
+      hold = null;
+    },
+    /** Whether a loop is currently being held off. */
+    get holding(): boolean {
+      return hold !== null;
+    },
+  };
+}
+
 export function resolveScrollToEndClearance(input: {
   overlayHeight: number;
   mainSurfaceTop: number;

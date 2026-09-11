@@ -184,8 +184,10 @@ import { ComposerPreviewAnnotationCards } from "./ComposerPreviewAnnotationCards
 import {
   COMPOSER_FOOTER_COMPACT_BREAKPOINT_PX,
   COMPOSER_FOOTER_WIDE_ACTIONS_COMPACT_BREAKPOINT_PX,
+  createRestingComposerControlsLayoutGuard,
   getRestingComposerImagePreviewCounts,
   resolveRestingComposerControlsLayout,
+  type RestingComposerControlsLayout,
   shouldAnimateComposerRestingTransition,
   shouldUseCompactComposerPrimaryActions,
   shouldUseCompactComposerFooter,
@@ -977,7 +979,15 @@ function useRestingComposerControlsLayout(host: HTMLDivElement | null) {
   const controlsRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef(host);
   hostRef.current = host;
-  const [layout, setLayout] = useState({ hiddenCount: 0, visible: true });
+  const [layout, setLayout] = useState<RestingComposerControlsLayout>({
+    hiddenCount: 0,
+    visible: true,
+  });
+  // The guard's bookkeeping runs in `measure` against this mirror, never in
+  // the state updater: StrictMode calls updaters twice.
+  const layoutRef = useRef(layout);
+  const guardRef = useRef(createRestingComposerControlsLayoutGuard());
+  const settleFrameRef = useRef<number | null>(null);
 
   const measure = useCallback(() => {
     const currentHost = hostRef.current;
@@ -990,27 +1000,42 @@ function useRestingComposerControlsLayout(host: HTMLDivElement | null) {
     if (!measurement) return;
     const hostWidth = currentHost.clientWidth;
 
-    setLayout((current) => {
-      const next = resolveRestingComposerControlsLayout({
-        ...measurement,
-        hostWidth,
-        previous: current,
+    const current = layoutRef.current;
+    const next = guardRef.current.next(
+      current,
+      resolveRestingComposerControlsLayout({ ...measurement, hostWidth, previous: current }),
+      hostWidth,
+    );
+    if (next === current) return;
+    // A layout applied before the next paint that reappears in the same
+    // frame is the loop from #821; the guard holds it off. The frame
+    // callback tells the guard when a paint has separated two layouts.
+    if (settleFrameRef.current === null) {
+      settleFrameRef.current = requestAnimationFrame(() => {
+        settleFrameRef.current = null;
+        guardRef.current.settle();
       });
-      return next.hiddenCount === current.hiddenCount && next.visible === current.visible
-        ? current
-        : next;
-    });
+    }
+    layoutRef.current = next;
+    setLayout(next);
   }, []);
 
   useLayoutEffect(measure);
   useEffect(() => {
     if (!host) return;
+    const guard = guardRef.current;
     const observer = new ResizeObserver(measure);
     observer.observe(host);
     document.fonts.addEventListener("loadingdone", measure);
     return () => {
       observer.disconnect();
       document.fonts.removeEventListener("loadingdone", measure);
+      if (settleFrameRef.current !== null) {
+        cancelAnimationFrame(settleFrameRef.current);
+        settleFrameRef.current = null;
+      }
+      // A new host has new widths; a loop seen in the old one says nothing.
+      guard.reset();
     };
   }, [host, measure]);
 
