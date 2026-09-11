@@ -120,10 +120,26 @@ final class StatusItemController {
             : MenuBarGlyph.image
         item.button?.title = title
         item.button?.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        item.button?.toolTip = Self.accountsTooltip(model.accounts, active: model.activeNumber)
         effects.sync(model: model, enabled: model.menuBarEffects && themed)
         if item.isVisible != model.menuBarIconShown {
             item.isVisible = model.menuBarIconShown
         }
+    }
+
+    /// The accounts summary the pop-out used to be, as the item's tooltip
+    /// (#654): one line per account — the active one starred — with the
+    /// 5-hour and weekly percentages the engine last reported.
+    static func accountsTooltip(_ accounts: [Account], active: Int?) -> String? {
+        guard !accounts.isEmpty else { return nil }
+        let lines = accounts.map { a -> String in
+            let name = a.alias ?? String(a.email.prefix(while: { $0 != "@" }))
+            let usage = a.usage ?? a.lastGoodUsage
+            let pct = { (w: UsageWindow?) in w.map { "\(Int($0.pct.rounded()))%" } ?? "–" }
+            let mark = a.number == active ? "★ " : (a.disabled == true ? "⏸ " : "  ")
+            return "\(mark)\(name)  5h \(pct(usage?.fiveHour))  7d \(pct(usage?.sevenDay))"
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Left click on the status item: the fork desktop app is the client,
