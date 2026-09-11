@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  type SweepReport,
   nearbyServerFromDescriptor,
+  networkWord,
   pickedHostNeedsCode,
   preferredHost,
   probeUrl,
   subnetCandidates,
+  subnetLabel,
+  sweepSummary,
 } from "./lanDiscovery.logic";
 
 describe("subnetCandidates", () => {
@@ -90,5 +94,77 @@ describe("pickedHostNeedsCode", () => {
       pickedHostNeedsCode({ pickedHost: picked, hostInput: "10.0.0.9:3773", codeInput: "" }),
     ).toBe(false);
     expect(pickedHostNeedsCode({ pickedHost: null, hostInput: picked, codeInput: "" })).toBe(false);
+  });
+});
+
+const report = (overrides: Partial<SweepReport> = {}): SweepReport => ({
+  ownIp: "192.168.2.45",
+  network: "Wi‑Fi",
+  port: 3773,
+  timeoutMs: 800,
+  probed: 253,
+  servers: 0,
+  answeredOther: 0,
+  timedOut: 250,
+  failed: 3,
+  failure: "Network request failed",
+  aborted: false,
+  elapsedMs: 8_640,
+  ...overrides,
+});
+
+describe("sweepSummary", () => {
+  it("is one line with the subnet, the port, the phone's address and the counts (#787)", () => {
+    expect(sweepSummary(report())).toBe(
+      "Swept 192.168.2.0/24 on :3773 from 192.168.2.45 on Wi‑Fi: 253 probed, 0 answered, 250 timed out (800 ms), 3 failed, 8.6 s. First failure: Network request failed.",
+    );
+  });
+
+  it("names what else answered and an early stop, and copes without a network word", () => {
+    expect(
+      sweepSummary(
+        report({
+          network: null,
+          servers: 1,
+          answeredOther: 2,
+          timedOut: 0,
+          failed: 0,
+          failure: null,
+          aborted: true,
+          elapsedMs: 1_040,
+        }),
+      ),
+    ).toBe(
+      "Swept 192.168.2.0/24 on :3773 from 192.168.2.45: 253 probed, 1 answered, 0 timed out (800 ms), 0 failed, 2 not a server, 1.0 s. Stopped early.",
+    );
+  });
+
+  it("says why nothing was swept: a link-local or tailnet address, or none at all", () => {
+    expect(sweepSummary(report({ ownIp: "169.254.12.7", probed: 0 }))).toBe(
+      "Nothing swept: 169.254.12.7 on Wi‑Fi is not a private Wi‑Fi address.",
+    );
+    expect(sweepSummary(report({ ownIp: "100.101.5.9", network: null, probed: 0 }))).toBe(
+      "Nothing swept: 100.101.5.9 is not a private Wi‑Fi address.",
+    );
+    expect(sweepSummary(report({ ownIp: null, network: "cellular", probed: 0 }))).toBe(
+      "Nothing swept: the phone reported no address on cellular.",
+    );
+  });
+});
+
+describe("subnetLabel", () => {
+  it("is the /24 for a private address and null otherwise", () => {
+    expect(subnetLabel("10.1.2.3")).toBe("10.1.2.0/24");
+    expect(subnetLabel("169.254.1.1")).toBeNull();
+    expect(subnetLabel(null)).toBeNull();
+  });
+});
+
+describe("networkWord", () => {
+  it("turns expo-network's type into a word, absent when unknown", () => {
+    expect(networkWord("WIFI")).toBe("Wi‑Fi");
+    expect(networkWord("CELLULAR")).toBe("cellular");
+    expect(networkWord("ETHERNET")).toBe("ethernet");
+    expect(networkWord(undefined)).toBeNull();
   });
 });

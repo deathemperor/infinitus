@@ -5,7 +5,12 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { ConnectionSheetButton } from "../connection/ConnectionSheetButton";
 import { discoverNearbyServers } from "./lanDiscovery";
-import { type NearbyServer } from "./lanDiscovery.logic";
+import {
+  type NearbyServer,
+  type SweepReport,
+  networkWord,
+  sweepSummary,
+} from "./lanDiscovery.logic";
 
 type Phase = "idle" | "scanning" | "done";
 
@@ -19,6 +24,8 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
   const [phase, setPhase] = useState<Phase>("idle");
   const [found, setFound] = useState<ReadonlyArray<NearbyServer>>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The last sweep's line (#787): what was swept, from where, how it went. */
+  const [report, setReport] = useState<SweepReport | null>(null);
   const scan = useRef<AbortController | null>(null);
 
   useEffect(() => () => scan.current?.abort(), []);
@@ -30,19 +37,24 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
     setPhase("scanning");
     setFound([]);
     setNotice(null);
+    setReport(null);
     let ownIp: string | null = null;
     try {
       ownIp = await Network.getIpAddressAsync();
     } catch {
       ownIp = null;
     }
-    if (ownIp === null || ownIp === "0.0.0.0") {
-      setNotice("Join the Mac's Wi‑Fi first.");
-      setPhase("done");
-      return;
+    if (ownIp === "0.0.0.0") ownIp = null;
+    let network: string | null = null;
+    try {
+      network = networkWord((await Network.getNetworkStateAsync()).type);
+    } catch {
+      network = null;
     }
-    await discoverNearbyServers({
+    if (ownIp === null) setNotice("Join the Mac's Wi‑Fi first.");
+    const swept = await discoverNearbyServers({
       ownIp,
+      network,
       signal: controller.signal,
       onFound: (server) =>
         setFound((current) =>
@@ -52,7 +64,9 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
             : [...current, server],
         ),
     });
-    if (!controller.signal.aborted) setPhase("done");
+    if (controller.signal.aborted) return;
+    setReport(swept);
+    setPhase("done");
   }, []);
 
   return (
@@ -94,6 +108,11 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
         <Text className="text-xs text-foreground-muted">
           {notice ??
             "No Mac answered. On the Mac, turn on Network access under Settings › Connections, or type the host from its Devices card."}
+        </Text>
+      ) : null}
+      {phase === "done" && report !== null ? (
+        <Text className="text-xs text-foreground-muted" selectable>
+          {sweepSummary(report)}
         </Text>
       ) : null}
     </View>
