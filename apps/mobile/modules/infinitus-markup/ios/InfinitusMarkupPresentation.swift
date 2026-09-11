@@ -66,11 +66,12 @@ final class InfinitusMarkupPresentation: NSObject, QLPreviewControllerDataSource
     let name = "edited.\(modifiedContentsURL.pathExtension.isEmpty ? "png" : modifiedContentsURL.pathExtension)"
     let destination = directory.appendingPathComponent(name)
     try? FileManager.default.removeItem(at: destination)
-    do {
-      try FileManager.default.moveItem(at: modifiedContentsURL, to: destination)
+    // Never hand Quick Look's own temp path back: the caller deletes the edited
+    // file's parent directory, which must always be the private one.
+    if (try? FileManager.default.moveItem(at: modifiedContentsURL, to: destination)) != nil
+      || (try? FileManager.default.copyItem(at: modifiedContentsURL, to: destination)) != nil
+    {
       edited = destination
-    } catch {
-      edited = modifiedContentsURL
     }
   }
 
