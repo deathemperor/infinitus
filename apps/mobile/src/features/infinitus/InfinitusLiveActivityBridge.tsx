@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import Constants from "expo-constants";
+import { resolveApnsEnvironment } from "./apnsEnvironment";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { addPushToStartTokenListener, type LiveActivityFactory } from "expo-widgets";
 import { useEffect, useMemo } from "react";
@@ -61,6 +62,7 @@ export function InfinitusLiveActivityBridge() {
       sent.set(kind, { token, at: now });
       try {
         const deviceId = await loadOrCreateAgentAwarenessDeviceId();
+        const apnsEnvironment = await resolveApnsEnvironment();
         if (cancelled) return;
         const body = registrationBody({
           kind,
@@ -68,7 +70,7 @@ export function InfinitusLiveActivityBridge() {
           deviceId,
           deviceName: Constants.deviceName?.trim() || "iPhone",
           environmentId,
-          sandbox: __DEV__,
+          sandbox: apnsEnvironment === "sandbox",
           now: new Date(now),
         });
         const result = await run({ environmentId, input: registrationCommand(body) });
