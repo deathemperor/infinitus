@@ -1,5 +1,23 @@
 {
   "webcredentials": {
-    "apps": ["Q783W6B4FA.run.infinitus", "Q783W6B4FA.run.infinitus.mobile"]
+    "apps": [
+      "Q783W6B4FA.run.infinitus",
+      "Q783W6B4FA.run.infinitus.mobile"
+    ]
+  },
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "Q783W6B4FA.run.infinitus.mobile"
+        ],
+        "components": [
+          {
+            "/": "/pair",
+            "comment": "the Devices QR: infinitus.run/pair#token=\u2026&for=phone&to=<origin> (#724)"
+          }
+        ]
+      }
+    ]
   }
 }

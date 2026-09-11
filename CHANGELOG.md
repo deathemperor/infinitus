@@ -155,6 +155,7 @@ publishes the matching section as the GitHub release body.
 - Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 - The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
 - Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
+- infinitus.run serves the phone app's universal link: the Devices QR points at `infinitus.run/pair`, which the app takes on a phone that has it and a browser forwards to the Mac's own pairing page (#724).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
