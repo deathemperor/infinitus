@@ -62,6 +62,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (#648).
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
+- `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
+  methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654) and
+  `openInfinitusSignIn` / `closeInfinitusSignIn` /
+  `submitInfinitusSignInCode` (#677).
+- `apps/desktop/src/ipc/channels.ts`, `apps/desktop/src/ipc/DesktopIpcHandlers.ts`,
+  `apps/desktop/src/preload.ts` — the channels, `ipc.handle` lines and
+  preload entries for those methods; `apps/desktop/src/main.ts` —
+  `InfinitusDesktop.layer` in `desktopApplicationLayer`.
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
@@ -267,6 +275,19 @@ this file adds the fork's own rules. Plan and history: issue #555.
   native's `add <fleet>` (the sign-in opens on the Mac), then the page polls
   `wait-add --timeout 5` until the app says the flow ended
   (`addAccount.logic.ts`); hidden on a build whose manifest lacks `add`.
+  On a build whose manifest lists `signin-begin` (#677) the sign-in runs
+  inside the desktop app instead: the page sends `signin-begin <fleet>
+[--relogin <email>]` over `infinitus.command`, the desktop shell shows the
+  OAuth page in a child `BrowserWindow` per flow (fresh in-memory
+  `signin-<flowId>` partition, sandboxed, no preload —
+  `apps/desktop/src/infinitus/InfinitusSignIn.ts`), the page polls
+  `signin-status` every 2 s (`signIn.logic.ts`) and, for paste-code flows,
+  takes the code from the success page — the shell hands it to the app over
+  the control socket as `secret` (`submitInfinitusSignInCode`), so it never
+  crosses an RPC, the server or the tunnel. Offered only in the Electron
+  client for the primary environment; a phone or tunnel client on such a
+  build reads "Sign in from the Mac." Closing the OAuth window never
+  cancels; the page's Cancel sends `signin-cancel`.
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
   — the five Settings › Infinitus routes, thin shells over the panes above.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill

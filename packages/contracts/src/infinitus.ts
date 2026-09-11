@@ -355,6 +355,31 @@ export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
     shell rather than the server because they describe this window.
     `quitInfinitusWithApp`: quitting the desktop app also sends the menu-bar
     app its `quit` verb. Off by default. */
+/** Fork (#677): what the web asks the desktop shell to show for one sign-in
+    the app started with `signin-begin` — the provider's page in a child window
+    of its own. `label` is the app's own ("Add account", "Sign in again — x"). */
+export const InfinitusSignInWindowInput = Schema.Struct({
+  flowId: Schema.String,
+  url: Schema.String,
+  label: Schema.String,
+});
+export type InfinitusSignInWindowInput = typeof InfinitusSignInWindowInput.Type;
+
+/** The code from the OAuth success page, for `signin-code`. It goes from the
+    shell's main process to the control socket's `secret`, never over an RPC. */
+export const InfinitusSignInCodeInput = Schema.Struct({
+  flowId: Schema.String,
+  code: Schema.String,
+});
+export type InfinitusSignInCodeInput = typeof InfinitusSignInCodeInput.Type;
+
+/** `signin-code`'s answer: accepted, or the CLI's own rejection wording. */
+export const InfinitusSignInCodeResult = Schema.Struct({
+  ok: Schema.Boolean,
+  error: Schema.optionalKey(Schema.String),
+});
+export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
+
 export const InfinitusDesktopPrefs = Schema.Struct({
   quitInfinitusWithApp: Schema.Boolean,
 });

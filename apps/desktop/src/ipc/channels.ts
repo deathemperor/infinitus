@@ -108,3 +108,7 @@ export const PREVIEW_POINTER_EVENT_CHANNEL = "desktop:preview-pointer-event";
 // Fork: the desktop shell's Infinitus prefs (#654).
 export const GET_INFINITUS_DESKTOP_PREFS_CHANNEL = "desktop:infinitus-get-desktop-prefs";
 export const SET_INFINITUS_QUIT_WITH_APP_CHANNEL = "desktop:infinitus-set-quit-with-app";
+// Fork: a fleet's sign-in inside the app (#677).
+export const OPEN_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-open-sign-in";
+export const CLOSE_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-close-sign-in";
+export const SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL = "desktop:infinitus-submit-sign-in-code";

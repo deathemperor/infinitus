@@ -32,6 +32,7 @@ const row: AccountRowModel = {
   freshness: "updated just now",
   actions: ["switch", "hold", "prefer", "rename"],
   reloginNeeded: false,
+  email: "one@example.com",
 };
 
 const readySnapshot: InfinitusSnapshot = {
