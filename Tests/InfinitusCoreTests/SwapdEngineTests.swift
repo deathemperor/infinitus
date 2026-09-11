@@ -240,6 +240,26 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertFalse(fleet.accounts[0].active)
     }
 
+    /// swapd #28: while its engine lock is held, swapd names the slot it
+    /// last saw active (`lastKnownActiveSlot`) — enough on the very first
+    /// poll, with no app memory to carry from, and it outranks memory.
+    func testSwapdsLastKnownActiveSlotCarriesWithoutMemory() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,
+          "activeUnreadable":"switch-in-progress","lastKnownActiveSlot":7,"accounts":[
+          {"slot":3,"email":"a@b.c","organizationName":"","organizationUuid":"",
+           "active":false,"disabled":false,"preferred":false,"usageStatus":"ok","windows":[]},
+          {"slot":7,"email":"d@b.c","organizationName":"","organizationUuid":"",
+           "active":false,"disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fresh = SwapdMapping.fleets(from: list, now: now)[0]
+        XCTAssertEqual(fresh.activeNumber, 7)
+        XCTAssertTrue(fresh.accounts[1].active)
+        XCTAssertFalse(fresh.accounts[0].active)
+        let remembered = SwapdMapping.fleets(from: list, now: now, carriedActive: { _ in 3 })[0]
+        XCTAssertEqual(remembered.activeNumber, 7, "swapd's word outranks the app's memory")
+    }
+
     static func account(slot: Int) -> String {
         """
         {"slot":\(slot),"email":"a\(slot)@b.c","organizationName":"","organizationUuid":"",
