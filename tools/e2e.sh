@@ -367,6 +367,19 @@ echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, ra
 echo "swapd: registered beside cswap, ignite published the refreshed window"
 # #475: an enabled engine runs its own `auto` under the supervisor.
 pgrep -f "$SOCKDIR/swapd auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
+# #616: the headroom verdict rides `fleets` only while priority_mode is on;
+# the stub's active slot sits at 5h 4% / 7d 18%, so 7d binds.
+"$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must be absent while priority_mode is off"
+"$CTL" prefs set priority_mode hold | expect "d['value']=='hold'" || fail "prefs set priority_mode"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['window']=='7d' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['pct']==18" \
+    || fail "headroom must judge the fullest window abundant at 18%"
+"$CTL" prefs set priority_low_pct 15 | expect "d['value']==15" || fail "prefs set priority_low_pct"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='low'" || fail "headroom must go low once 7d is at or above priority_low_pct"
+"$CTL" prefs set priority_low_pct 80 | expect "d['value']==80" || fail "prefs set priority_low_pct back"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant'" || fail "headroom must release at 18% under priority_abundant_pct"
+"$CTL" prefs set priority_mode off | expect "d['value']=='off'" || fail "prefs set priority_mode off"
+"$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
+echo "headroom: absent off, 7d binds, low/abundant follow the thresholds (#616)"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"

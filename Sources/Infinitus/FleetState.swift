@@ -31,6 +31,9 @@ final class FleetState: ObservableObject, Identifiable {
     /// Set once a real snapshot decoded — gates the "no accounts" card
     /// so it can't flash during the first refresh.
     @Published var snapshotLoaded = false
+    /// The fleet's headroom verdict (#616); nil while `priority_mode`
+    /// is off or the active account has never carried usage.
+    @Published private(set) var headroom: Headroom?
     /// The last applied snapshot, as the launch cache stores it.
     private(set) var lastFleet: EngineFleet?
     /// Cash column (UsageSource): the cswap fleet mirrors the shared
@@ -86,6 +89,21 @@ final class FleetState: ObservableObject, Identifiable {
         lastFleet = fleet
     }
 
+    /// Re-judges the headroom from the last snapshot: after every apply,
+    /// and when the host's mode or thresholds change. A swap starts the
+    /// hysteresis over on the new account; the same account with no
+    /// usage this poll keeps its verdict (#159).
+    func judgeHeadroom(swapped: Bool = false) {
+        var next: Headroom?
+        if host.priorityMode != "off", let fleet = lastFleet {
+            let active = fleet.accounts.first { $0.active }
+            next = Headroom.verdict(previous: swapped ? nil : headroom, usage: active?.usage,
+                                    lowPct: Double(host.priorityLowPct),
+                                    abundantPct: Double(host.priorityAbundantPct))
+        }
+        if headroom != next { headroom = next }
+    }
+
     /// Dead or alive as of each account's last snapshot WITH usage —
     /// the diff's memory, unaffected by a refresh that dropped the usage.
     private var knownDead: [Int: Bool] = [:]
@@ -134,6 +152,7 @@ final class FleetState: ObservableObject, Identifiable {
            previousActive != now {
             switchFlashTick += 1
         }
+        judgeHeadroom(swapped: previousActive != fleet.activeNumber)
         // The death sequence (user 2026-08-31: kill animation for
         // the last drop of any kind, "still play dead animation
         // after"): the row keeps its gauges while the killing

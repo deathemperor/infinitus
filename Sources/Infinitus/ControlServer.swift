@@ -972,6 +972,7 @@ final class ControlServer {
         let candidateOrder: [Int]?
         let nextRecovery: NextRecovery?
         let accounts: [Account]
+        let headroom: Headroom?
     }
 
     /// The running (or last) sign-in, when the caller names it.
@@ -1014,7 +1015,8 @@ final class ControlServer {
                      caveat: model.fleetCaveats[f.engineID],
                      activeNumber: f.activeNumber, nextCandidate: f.nextCandidate,
                      candidateOrder: f.candidateOrder,
-                     nextRecovery: f.nextRecovery, accounts: f.accounts)
+                     nextRecovery: f.nextRecovery, accounts: f.accounts,
+                     headroom: f.headroom)
     }
 
     private func fleetsPayload() -> [FleetPayload] { model.fleets.map(fleetPayload) }

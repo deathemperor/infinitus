@@ -650,6 +650,13 @@ final class AppModel: ObservableObject {
     /// phone's reset alarm fires (#227); mirrored to the phone in FleetPrefs.
     @Published var reviveLeadMinutes: Int { didSet { defaults.set(reviveLeadMinutes, forKey: "revive_lead_minutes") } }
     var reviveLead: TimeInterval { TimeInterval(reviveLeadMinutes * 60) }
+    /// Headroom mode (#616): "off" or "hold"; the thresholds are the
+    /// hysteresis band each fleet's verdict moves in. A change re-judges
+    /// every fleet at once, so `fleets` answers the new setting now.
+    @Published var priorityMode: String { didSet { defaults.set(priorityMode, forKey: "priority_mode"); rejudgeHeadroom() } }
+    @Published var priorityLowPct: Int { didSet { defaults.set(priorityLowPct, forKey: "priority_low_pct"); rejudgeHeadroom() } }
+    @Published var priorityAbundantPct: Int { didSet { defaults.set(priorityAbundantPct, forKey: "priority_abundant_pct"); rejudgeHeadroom() } }
+    private func rejudgeHeadroom() { for fleet in fleets { fleet.judgeHeadroom() } }
     /// Settings › Sync "Phone lock screen": how often the working Live
     /// Activity's tok/min is pushed on its own (user 2026-09-08 "update the
     /// tok/min every 5s, make it configurable"); 0 = only with other changes.
@@ -1110,6 +1117,9 @@ final class AppModel: ObservableObject {
         pushAwsLogin = defaults.object(forKey: "push_aws_login") as? Bool ?? true
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         reviveLeadMinutes = defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10
+        priorityMode = Self.priorityMode(defaults)
+        priorityLowPct = defaults.object(forKey: "priority_low_pct") as? Int ?? 80
+        priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
         liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
@@ -1272,6 +1282,11 @@ final class AppModel: ObservableObject {
     /// the theme's layers — must not run for the thirty-odd keys a
     /// one-key write leaves alone (an e2e `prefs set popup_layout` cost
     /// 40 MB of RSS through the untouched didSets, 2026-09-10).
+    private static func priorityMode(_ defaults: UserDefaults) -> String {
+        let mode = defaults.string(forKey: "priority_mode") ?? "off"
+        return PrefCatalog.priorityModes.contains(mode) ? mode : "off"
+    }
+
     func reloadPrefs() {
         func set<T: Equatable>(_ path: ReferenceWritableKeyPath<AppModel, T>, _ value: T) {
             if self[keyPath: path] != value { self[keyPath: path] = value }
@@ -1302,6 +1317,9 @@ final class AppModel: ObservableObject {
         set(\.pushAwsLogin, defaults.object(forKey: "push_aws_login") as? Bool ?? true)
         set(\.pushRevived, defaults.object(forKey: "push_revived") as? Bool ?? true)
         set(\.reviveLeadMinutes, defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10)
+        set(\.priorityMode, Self.priorityMode(defaults))
+        set(\.priorityLowPct, defaults.object(forKey: "priority_low_pct") as? Int ?? 80)
+        set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
         set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")

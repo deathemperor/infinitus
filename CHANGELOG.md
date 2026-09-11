@@ -142,6 +142,7 @@ publishes the matching section as the GitHub release body.
 - `INFINITUS_DEFAULTS_SUITE=<name>` gives a dev or e2e instance its own preferences domain, so unbundled runs stop sharing (and clobbering) one another's settings (#690).
 - `infinitusctl activities-token --forget <deviceId>/<kind>` withdraws one push registration, so a phone that switches its alerts off stops getting them (#572).
 - An enabled swapd engine runs its own `swapd auto` daemon under the supervisor, and the badge follows it once cswap is off (#475).
+- With `priority_mode` set to `hold`, every fleet on `fleets` carries a `headroom` verdict (abundant/low with hysteresis on the active account's fullest window), so the fork can hold background threads while headroom is low (#616).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
