@@ -69,10 +69,18 @@ async function launchChrome({ cdpPort, profile }) {
       "--window-size=1400,900",
       "about:blank",
     ],
-    { stdio: "ignore" },
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
-  for (let i = 0; i < 50; i++) {
-    if (child.exitCode !== null) throw new Error(`Chrome exited with ${child.exitCode}`);
+  // Chrome's last lines of stderr, for the error when the port never opens.
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr = (stderr + chunk).slice(-2000);
+  });
+  // A cold CI runner can take well over 10 s to bring the port up.
+  for (let i = 0; i < 150; i++) {
+    if (child.exitCode !== null) {
+      throw new Error(`Chrome exited with ${child.exitCode}\n${stderr}`);
+    }
     try {
       const list = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
       const page = list.find((target) => target.type === "page");
@@ -82,7 +90,8 @@ async function launchChrome({ cdpPort, profile }) {
     }
     await sleep(200);
   }
-  throw new Error("Chrome did not open its debugging port");
+  child.kill();
+  throw new Error(`Chrome did not open its debugging port in 30 s\n${stderr}`);
 }
 
 function connect(wsUrl) {
