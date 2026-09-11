@@ -22,25 +22,30 @@ import * as ProviderSessionDirectory from "../provider/Services/ProviderSessionD
  * session there instead of continuing it. The source thread is not touched.
  *
  * Claude only: the adapter records an anchor (the last assistant uuid) per
- * completed turn in the resume cursor; nothing else has an addressable fork
- * point yet.
+ * completed turn in the resume cursor, keyed by the orchestration turn id so
+ * it survives session restarts; nothing else has an addressable fork point
+ * yet.
  */
 
 const CLAUDE_DRIVER = "claudeAgent";
 
-/** The turn anchors a Claude resume cursor carries, or none. */
+/** The anchor a Claude resume cursor carries for a turn, or none. */
 export function claudeForkAnchor(
   resumeCursor: unknown,
-  turnCount: number,
+  turnId: TurnId,
 ): { readonly sessionId: string; readonly at: string } | null {
   if (!resumeCursor || typeof resumeCursor !== "object") return null;
   const cursor = resumeCursor as { resume?: unknown; anchors?: unknown };
   if (typeof cursor.resume !== "string" || !Array.isArray(cursor.anchors)) return null;
   for (const anchor of cursor.anchors as ReadonlyArray<unknown>) {
     if (!anchor || typeof anchor !== "object") continue;
-    const { turn, at } = anchor as { turn?: unknown; at?: unknown };
-    if (turn === turnCount && typeof at === "string" && at.length > 0) {
-      return { sessionId: cursor.resume, at };
+    const candidate = anchor as { turnId?: unknown; at?: unknown };
+    if (
+      candidate.turnId === turnId &&
+      typeof candidate.at === "string" &&
+      candidate.at.length > 0
+    ) {
+      return { sessionId: cursor.resume, at: candidate.at };
     }
   }
   return null;
@@ -119,7 +124,11 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
   if (Option.isNone(binding) || binding.value.provider !== CLAUDE_DRIVER) {
     return yield* refuse("Forking a thread needs a Claude session.");
   }
-  const anchor = claudeForkAnchor(binding.value.resumeCursor, input.turnCount);
+  const checkpoint = source.value.checkpoints.find(
+    (candidate) => candidate.checkpointTurnCount === input.turnCount,
+  );
+  if (!checkpoint) return yield* refuse("Nothing to fork at this turn.");
+  const anchor = claudeForkAnchor(binding.value.resumeCursor, checkpoint.turnId);
   if (anchor === null) {
     return yield* refuse(
       "No fork point was recorded for this turn; turns completed before forking existed cannot be forked.",

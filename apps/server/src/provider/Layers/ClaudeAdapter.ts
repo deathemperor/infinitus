@@ -137,7 +137,8 @@ type PromptQueueItem =
 /** Fork (#270 E2): the last assistant uuid of each completed turn, the point
     a fork of this session at that turn resumes through. */
 interface ClaudeTurnAnchor {
-  readonly turn: number;
+  /** The orchestration turn id, stable across session restarts. */
+  readonly turnId: string;
   readonly at: string;
 }
 const MAX_CLAUDE_TURN_ANCHORS = 200;
@@ -874,9 +875,9 @@ function readClaudeResumeState(resumeCursor: unknown): ClaudeResumeState | undef
   if (Array.isArray(cursor.anchors)) {
     for (const candidate of cursor.anchors as ReadonlyArray<unknown>) {
       if (!candidate || typeof candidate !== "object") continue;
-      const { turn, at } = candidate as { turn?: unknown; at?: unknown };
-      if (typeof turn === "number" && Number.isInteger(turn) && typeof at === "string") {
-        anchors.push({ turn, at });
+      const { turnId, at } = candidate as { turnId?: unknown; at?: unknown };
+      if (typeof turnId === "string" && turnId.length > 0 && typeof at === "string") {
+        anchors.push({ turnId, at });
       }
     }
   }
@@ -2628,7 +2629,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     // Fork (#270 E2): a completed turn's last assistant message is where a
     // fork of this session at this turn resumes.
     if (status === "completed" && context.lastAssistantUuid) {
-      context.anchors.push({ turn: context.turns.length, at: context.lastAssistantUuid });
+      context.anchors.push({ turnId: turnState.turnId, at: context.lastAssistantUuid });
       if (context.anchors.length > MAX_CLAUDE_TURN_ANCHORS) {
         context.anchors.splice(0, context.anchors.length - MAX_CLAUDE_TURN_ANCHORS);
       }
@@ -5103,8 +5104,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     function* (threadId, numTurns) {
       const context = yield* requireSession(threadId);
       const nextLength = Math.max(0, context.turns.length - numTurns);
-      context.turns.splice(nextLength);
-      context.anchors = context.anchors.filter((anchor) => anchor.turn <= nextLength);
+      const rolledBack = new Set<string>(context.turns.splice(nextLength).map((turn) => turn.id));
+      context.anchors = context.anchors.filter((anchor) => !rolledBack.has(anchor.turnId));
       yield* updateResumeCursor(context);
       return yield* snapshotThread(context);
     },

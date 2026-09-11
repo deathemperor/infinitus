@@ -180,7 +180,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
   `RpcAuthorization.ts`); `apps/server/src/ws.ts` — the handler;
   `apps/server/src/provider/Layers/ClaudeAdapter.ts` — the resume cursor
-  carries `anchors` (`{turn, at}`: each completed turn's last assistant uuid,
+  carries `anchors` (`{turnId, at}`: each completed turn's last assistant uuid keyed
+  by the orchestration turn id, so a session restart cannot renumber them;
   ≤ 200, trimmed on rollback) and `fork: true`; a forked thread's first start
   passes `forkSession` + `resumeSessionAt` to the SDK and starts its own
   anchors; `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;

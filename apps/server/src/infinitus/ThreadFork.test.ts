@@ -6,20 +6,23 @@ import { claudeForkAnchor, forkMarkerText, forkSeedMessages } from "./ThreadFork
 const threadId = ThreadId.make("thread-1");
 
 describe("claudeForkAnchor (#270 E2)", () => {
-  it("finds the turn's anchor in a Claude resume cursor", () => {
+  it("finds the turn's anchor in a Claude resume cursor by turn id", () => {
     const cursor = {
       threadId,
       resume: "sess-1",
       anchors: [
-        { turn: 1, at: "uuid-1" },
-        { turn: 2, at: "uuid-2" },
+        { turnId: "turn-1", at: "uuid-1" },
+        { turnId: "turn-2", at: "uuid-2" },
       ],
     };
-    expect(claudeForkAnchor(cursor, 2)).toEqual({ sessionId: "sess-1", at: "uuid-2" });
-    expect(claudeForkAnchor(cursor, 3)).toBeNull();
-    expect(claudeForkAnchor({ resume: "sess-1" }, 1)).toBeNull();
-    expect(claudeForkAnchor({ anchors: [{ turn: 1, at: "uuid-1" }] }, 1)).toBeNull();
-    expect(claudeForkAnchor(null, 1)).toBeNull();
+    const turn = (id: string) => TurnId.make(id);
+    expect(claudeForkAnchor(cursor, turn("turn-2"))).toEqual({ sessionId: "sess-1", at: "uuid-2" });
+    expect(claudeForkAnchor(cursor, turn("turn-3"))).toBeNull();
+    expect(claudeForkAnchor({ resume: "sess-1" }, turn("turn-1"))).toBeNull();
+    expect(
+      claudeForkAnchor({ anchors: [{ turnId: "turn-1", at: "uuid-1" }] }, turn("turn-1")),
+    ).toBeNull();
+    expect(claudeForkAnchor(null, turn("turn-1"))).toBeNull();
   });
 });
 
