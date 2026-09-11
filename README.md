@@ -283,62 +283,6 @@ loop (needs `entr`). `run-unbundled.sh` runs the executable outside the
 bundle — a workaround for a login session whose menu bar stops adopting
 new bundled apps (see the script header).
 
-## Playground (development)
-
-![Playground — the production popup on a demo fleet, every animation on demand](docs/playground.png)
-
-A resizable window for developing the popup's UI and animations against a
-fabricated fleet — one account per condition (healthy, mildly and hotly
-ahead of pace, dead, fresh, behind pace, needs re-login, disabled,
-near-reset) — so every state is always on screen at once.
-
-Open it (debug builds): `defaults write <domain> debug_menu -bool true`,
-then the wand button in the popup footer or Settings → Animations →
-Open playground. Dev loops can launch straight into it with
-`INFINITUS_PLAYGROUND=1 ./run-unbundled.sh`.
-
-Drive it from the shell with `tools/playctl` — the playground polls a
-command file and acknowledges each line, so scripts (and coding agents)
-can flip knobs and replay animations without touching the mouse:
-`playctl theme rpg`, `playctl layout stacked`, `playctl drop fable`,
-`playctl kill`, `playctl dead` / `revive`, `playctl scenario solo`,
-`playctl refresh`,
-`playctl themes`, and `playctl shot out.png` to capture the window
-by its CGWindowID.
-
-Everything inside is sandboxed twice. The embedded popup is the real
-`MenuContent`, but it runs a **private AppModel pinned to the bundled
-`demo-cswap` script** — never the real engine; switching, rotating and
-reordering touch demo state only, and every outward side effect
-(snapshot cache, notifications, resume nudges, sync) is suppressed. The
-knobs write to a **throwaway defaults suite** seeded from your live
-settings — choices persist across playground opens, "Reset knobs" falls
-back to the seed, and your real prefs never change.
-
-The control rail drives the real pipelines, not canned replays:
-
-- **Play dead / revived / drop (5h, 7d, Fable)** — tmp-file hooks
-  (`$TMPDIR/infinitus-demo-*`) pin one of the demo windows' numbers and
-  the ordinary refresh diff plays the rest: death beat, revival fanfare,
-  HP-drop drama, spring refill.
-- **Play account switch / Replay intro** — a real engine switch on the
-  demo fleet; the celebration fires from the active-number diff.
-- **Scenario** — Normal / Empty fleet / All dead / One account / Two
-  accounts / No engine / Two engines: the fleet shapes that otherwise
-  need real accounts or waits, one click each.
-- **Layout / size / compact / theme / pace fire / intro** — the same
-  knobs as Settings, sandboxed.
-
-Below the popup sit self-contained demos: the three pace-fire styles
-side by side under one heat dial with a zoom slider, HP drops, window
-resets, and the inline flashes.
-
-Workflow: keep it open under `./dev.sh`, then point whatever you're
-iterating on at the demo row that exercises it — echo's Dragon bar sits
-at 77% forever (the RPG theme's All Lucky 7s fever), bravo burns hot,
-foxtrot mild, charlie is dead, golf wants a re-login. Nothing you do
-here can touch a real account.
-
 ## Architecture rule
 
 Everything is Swift; the engine stays fully isolated behind

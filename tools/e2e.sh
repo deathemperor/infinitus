@@ -6,8 +6,8 @@
 #   - any command that errors, a missing window, a wrong fleet shape
 #   - a switch/rotate/hold/unhold/rename/reorder that doesn't round-trip
 #     into `fleets`
-#   - the wall not taking over from the pop-out (and giving it back), or
-#     the all-dead scenario not producing the no-candidate fleet
+#   - the all-dead scenario not producing the no-candidate fleet, or not
+#     recovering
 #   - idle CPU above IDLE_BUDGET_PCT with the pop-out open on the RPG
 #     theme (the worst case: every effect armed — the 2026-09-03
 #     regression idled at 39%)
@@ -49,9 +49,6 @@ export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bund
 export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
 export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
-# The workspace window must never start a real `claude` from this run
-# (tools/t3ref/fixture.sh:97 exports the same gate for the same reason).
-export INFINITUS_WORKSPACE_NO_START=1
 LOG="$(mktemp -t infinitus-e2e)"
 DOMAIN=Infinitus   # the unbundled debug binary's defaults domain
 
@@ -84,16 +81,6 @@ json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
 expect() { python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($1) else 1)"; }
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
 popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
-wall_visible() { "$CTL" windows | expect "any(w['visible'] and 'WallRoot' in w['content'] for w in d)"; }
-# Not the title: the pop-out is called "Infinitus" too, and is wider than
-# the workspace's minimum — matching on the title would keep saying "yes"
-# after `hide workspace`. The content view is the workspace's own
-# (NSHostingView<LockGate<T3Root>>, detached to nothing on close), and the
-# size floor is T3WindowController.minimumSize, which contentMinSize holds.
-# What it proves is that the window EXISTS, is on screen and idles — the
-# gate matches the LockGate host, so a locked Mac showing the unlock panel
-# passes it too; it says nothing about the workspace itself having rendered.
-workspace_visible() { "$CTL" windows | expect "any(w['visible'] and 'T3Root' in w['content'] and w['size'][0]>=840 and w['size'][1]>=620 for w in d)"; }
 
 "$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
 
@@ -353,45 +340,12 @@ echo "swapd: registered beside cswap, ignite published the refreshed window"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
-# --- windows: the wall takes over from the pop-out and gives it back ----
-"$CTL" show wall | expect "d['shown']" || fail "show wall"
-sleep 2
-wall_visible || fail "wall window not visible after show wall"
-popout_visible && fail "pop-out still visible under the wall"
-"$CTL" show wall >/dev/null || fail "show wall (toggle off)"
-sleep 2
-wall_visible && fail "wall still visible after toggling off"
-popout_visible || fail "pop-out not restored after the wall closed"
-echo "windows: ok (wall over pop-out, restored)"
-
-# --- windows: the workspace opens beside the pop-out and idles ----------
-"$CTL" show workspace thread | expect "d['shown']=='workspace'" || fail "show workspace"
-sleep 3
-workspace_visible || fail "workspace window not visible after show workspace"
-popout_visible || fail "pop-out closed by the workspace (it is not a mode)"
-"$CTL" show workspace bogus 2>/dev/null && fail "show workspace accepted an unknown screen"
-# A cold first open builds the window, loads the thread's timeline and
-# parses its markdown — measured 29% over the 15 s starting 3 s after
-# `show`, 0.5% once that is done (parity fixture, 2026-09-09). The gate is
-# about what the window costs while it sits there, so settle first.
-sleep 12
-WA="$("$CTL" perf | json "d['cpuSeconds']")"
-sleep 15
-WB="$("$CTL" perf | json "d['cpuSeconds']")"
-WPCT="$(python3 -c "print(round(($WB-$WA)/15*100,1))")"
-echo "idle CPU with the workspace open: ${WPCT}%"
-python3 -c "import sys; sys.exit(0 if $WPCT <= $IDLE_BUDGET_PCT else 1)" || fail "workspace idle CPU ${WPCT}% over budget ${IDLE_BUDGET_PCT}%"
-"$CTL" hide workspace | expect "d['hidden']=='workspace'" || fail "hide workspace"
-sleep 1
-workspace_visible && fail "workspace still visible after hide"
-echo "windows: ok (workspace beside pop-out, idle ${WPCT}%, hidden)"
-
 # --- windows: Settings open idles too ------------------------------------
 # The Settings-open case sat at 18% for a week (#346: transcript reads,
 # the past-sessions walk, the team publish and the machine sampler all
 # ran on behind it) while the pop-out gate read 0.5%; this is the gate
-# that would have caught it. Same settle as the workspace: the window
-# builds its tabs on the first open.
+# that would have caught it. Settle first: the window builds its tabs on
+# the first open.
 settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
 "$CTL" show settings | expect "d['shown']=='settings'" || fail "show settings"
 sleep 3
@@ -445,26 +399,17 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 "$CTL" crash-report --body '{nope' >/dev/null 2>&1 && fail "crash-report accepted a broken body"
 echo "body verbs: ok"
 
-# --- scenarios: all-dead (every window maxed, no candidate) --------------
+# --- scenarios: all-dead (no candidate, then recovers) -------------------
 "$INFINITUS_CSWAP" simulate alldead >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is None and d[0].get('nextRecovery') is not None" \
     || fail "all-dead scenario not reflected in fleets"
 sleep 2
 popout_visible || fail "pop-out lost during all-dead"
-# The floating revival countdown (#1's macOS equivalent) rides the same
-# state: up while all-dead, gone — content detached — once the fleet is back.
-revival_visible() { "$CTL" windows | expect "any(w['visible'] and 'RevivalRoot' in w['content'] for w in d)"; }
-i=0
-until revival_visible; do
-    i=$((i + 1)); [ "$i" -lt 10 ] || fail "revival panel not shown during all-dead"
-    sleep 1
-done
-# The reviver band (#227) is a CA breath on the pop-out: once the panel
-# is up and the re-sort has settled, the all-dead state must idle like
-# any other — a per-frame regression shows up here, not only in the
-# long idle gate at the end.
-# Settle and sample like the workspace gate: the re-sort's tail and a loaded
-# runner's scheduling noise read as 14 % over a 6 s window (#428).
+# The reviver band (#227) is a CA breath on the pop-out: once the re-sort
+# has settled, the all-dead state must idle like any other — a per-frame
+# regression shows up here, not only in the long idle gate at the end.
+# Settle first: the re-sort's tail and a loaded runner's scheduling noise
+# read as 14 % over a 6 s window (#428).
 sleep 8
 RA="$("$CTL" perf | json "d['cpuSeconds']")"
 sleep 12
@@ -474,10 +419,7 @@ echo "all-dead CPU with the reviver band: ${RPCT}%"
 python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$INFINITUS_CSWAP" simulate off >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is not None" || fail "fleet didn't recover after simulate off"
-sleep 1
-revival_visible && fail "revival panel outlived the all-dead"
-"$CTL" windows | expect "not any('RevivalRoot' in w['content'] for w in d)" || fail "revival panel content not detached"
-echo "scenarios: ok (all-dead and back, revival panel up and gone)"
+echo "scenarios: ok (all-dead and back)"
 
 # --- control socket self-heal -------------------------------------------
 # A dev instance launched without INFINITUS_CONTROL_SOCKET unlinks and
@@ -519,7 +461,6 @@ echo "aws: need surfaced after ${i}s"
 # the by-hand nudge is a no-op with its reason on a session that never stopped.
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
 "$CTL" nudge "$SESSION_PID" | expect "d['pid']==$SESSION_PID and d['nudged']==False and d['reason'].startswith('not resumable')" || fail "nudge no-op"
-"$CTL" show session 999999 >/dev/null 2>&1 && fail "show session for a dead pid must be refused"
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).
@@ -709,7 +650,7 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
 echo "team control: ok (grantor + store-lane driver)"
 
 # --- performance --------------------------------------------------------
-# Sampled AFTER the churn above so a timer left behind by a closed wall
+# Sampled AFTER the churn above so a timer left behind by a closed window
 # or a scenario swap shows up as idle cost.
 sleep 10  # animations settle, launch-time caches land
 A="$("$CTL" perf | json "d['cpuSeconds']")"

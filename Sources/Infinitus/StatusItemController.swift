@@ -52,22 +52,6 @@ final class StatusItemHolder: ObservableObject {
         model.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
-        model.showWall = { [weak controller] in controller?.toggleWall() }
-        model.showWorkspace = { [weak controller] screen in controller?.showWorkspace(screen: screen) }
-        model.openSessionChat = { [weak model] session in
-            guard let model else { return }
-            SessionChatWindows.shared.open(session, model: model)
-        }
-        // Dev seam (like the phone's INFINITUS_FEED_PID): a dev instance
-        // opens the chat for one live pid at launch, for a screenshot.
-        if let raw = ProcessInfo.processInfo.environment["INFINITUS_CHAT_PID"], let pid = Int(raw) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                let cwd = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .first { Int($0.pid) == pid }?.cwd ?? "?"
-                model.openSessionChat?(SessionDetail(pid: pid, cwd: cwd, status: "idle", kind: "interactive",
-                                                     startedAt: Date().timeIntervalSince1970 * 1000))
-            }
-        }
         model.lock.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         model.team.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         // A cold-launch `infinitus://join/…` can call TeamModel.open(url:)
@@ -101,16 +85,6 @@ final class StatusItemController {
     private lazy var effects = MenuBarEffects(button: item.button)
     private let model: AppModel
     private let usage: UsageModel
-    private lazy var wall: WallWindowController = {
-        let w = WallWindowController()
-        w.visibilityChanged = { [weak self] in self?.syncLocalLease() }
-        return w
-    }()
-    private lazy var workspace: T3WindowController = {
-        let w = T3WindowController()
-        w.visibilityChanged = { [weak self] in self?.syncLocalLease() }
-        return w
-    }()
     private let settingsTabs: () -> [SettingsTab]
     private var sink: AnyCancellable?
 
@@ -199,7 +173,6 @@ final class StatusItemController {
 
     private func showAnchored() {
         model.lock.surfaceShown()
-        if wall.isVisible { wall.dismissForPopup() }
         if anchored == nil {
             let host = NSHostingController(rootView: AnchoredRoot(
                 model: model, usage: usage,
@@ -242,8 +215,7 @@ final class StatusItemController {
     /// same content to the pop-out, nothing hides from the user (brief
     /// step 3). Every other caller is a genuine dismiss and keeps the
     /// default: the global click-outside monitor, the local one, and
-    /// togglePopover()'s close branch. toggleWall() counts as a dismiss
-    /// too — nothing restores the anchored panel after the wall.
+    /// togglePopover()'s close branch.
     private func closeAnchored(feedLock: Bool = true) {
         if feedLock { model.lock.surfaceHidden() }
         anchored?.orderOut(nil)
@@ -474,12 +446,9 @@ final class StatusItemController {
     private func syncLocalLease() {
         model.uiSurface("popup", visible: anchored?.isVisible == true)
         model.uiSurface("popout", visible: pinned?.isVisible == true)
-        model.uiSurface("wall", visible: wall.isVisible)
-        model.uiSurface("workspace", visible: workspace.isVisible)
     }
 
     func showPinnedWindow(activate: Bool = true) {
-        if wall.isVisible { wall.dismissForPopup() }
         if pinned == nil {
             let host = NSHostingController(rootView: PinnedRoot(
                 model: model, usage: usage,
@@ -677,7 +646,7 @@ final class StatusItemController {
             // only which of the two it shows.
             let tabs = settingsTabs()
             let host = NSHostingView(rootView: LockGate(lock: model.lock) {
-                SettingsRoot(tabs: tabs, showWorkspace: { [weak self] in self?.showWorkspace(screen: nil) })
+                SettingsRoot(tabs: tabs)
             })
             // No sizing input from the content: hosting-view constraints
             // pin the window to SwiftUI's ideal size and beat the
@@ -736,24 +705,6 @@ final class StatusItemController {
         settings?.makeKeyAndOrderFront(nil)
     }
 
-    /// Wall is a MODE (user 2026-09-01): entering it closes the popup
-    /// and pop-out; leaving restores the pop-out if it was up.
-    func toggleWall() {
-        if wall.isVisible { wall.close(); return }
-        let hadPinned = pinned?.isVisible == true
-        if anchored?.isVisible == true { closeAnchored() }
-        if hadPinned { pinned?.orderOut(nil) }
-        syncLocalLease()
-        wall.restore = { [weak self] in
-            if hadPinned { self?.showPinnedWindow() }
-        }
-        wall.show(model: model, usage: usage)
-    }
-
-    /// The workspace is NOT a mode (unlike the wall): it does not close
-    /// the popup or the pop-out. A second `show workspace` just raises it.
-    func showWorkspace(screen: String?) { model.lock.surfaceShown(); workspace.show(model: model, screen: screen) }
-    func hideWorkspace() { workspace.close() }
     /// The window is kept (`isReleasedWhenClosed = false`), so the next
     /// `show settings` reopens it with its tabs built.
     func hideSettingsWindow() { settings?.orderOut(nil) }
@@ -817,16 +768,6 @@ private struct PinnedRoot: View {
         // window then follows THAT (fitPinned) instead of the other way
         // round, so wide rows never compress into wrapped lines.
         .fixedSize()
-        // ⌘⇧T opens the workspace window (the ⌘F pattern in
-        // InfinitusApp.SettingsRoot) — only fires while the pop-out is key.
-        .overlay {
-            Button("") { model.showWorkspace?(nil) }
-                .keyboardShortcut("t", modifiers: [.command, .shift])
-                .buttonStyle(.plain)
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // fullSizeContentView hands the hosting view a titlebar-high top

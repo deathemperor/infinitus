@@ -331,12 +331,10 @@ final class AppModel: ObservableObject {
     /// engine is registered from it, and the pane shows where it is.
     /// Never in the playground — that model is demo data only.
     let swapd: SwapdCLI?
-    /// True for the Animation Playground's private model: cswap is pinned
-    /// to the bundled demo script and every outward side effect —
+    /// The Animation Playground is retired (#654); the guards it gated —
     /// snapshot cache, notifications, resume nudges, push, sync, power
-    /// assertions, the engine supervisor — is suppressed, so nothing it
-    /// does can touch real accounts or real sessions (user 2026-08-31).
-    let isPlayground: Bool
+    /// assertions, the engine supervisor — stay put until they are swept.
+    let isPlayground = false
     /// Set by StatusItemHolder — opens the controller-owned Settings window
     /// (the SwiftUI Settings scene is unreachable from popover hosts).
     var showSettings: (() -> Void)?
@@ -349,15 +347,6 @@ final class AppModel: ObservableObject {
     /// Set by StatusItemHolder — closes the popover and opens the same
     /// content as a free-floating window (the pop-out action).
     var popOut: (() -> Void)?
-    /// Set by StatusItemHolder — toggles the full-screen fleet wall
-    /// (issue #11).
-    var showWall: (() -> Void)?
-    /// Opens the workspace window (T3 clone B), optionally on a screen
-    /// ("sidebar" | "thread" | "composer" — the parity harness's names).
-    var showWorkspace: ((String?) -> Void)?
-    /// Opens a live session's chat window (#151); set by the status item
-    /// controller, called from the sessions card's rows.
-    var openSessionChat: ((SessionDetail) -> Void)?
     // The bundle on disk was rebuilt since this instance launched (the
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
@@ -592,15 +581,6 @@ final class AppModel: ObservableObject {
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Floating revival countdown while every account is limited (#1's
-    /// macOS equivalent). On by default; ✕ on the panel hides one episode.
-    @Published var revivalPanelShown: Bool {
-        didSet {
-            defaults.set(revivalPanelShown, forKey: "revival_panel")
-            if !isPlayground { revivalPanel.sync(model: self) }
-        }
-    }
-    private lazy var revivalPanel = RevivalPanelController()
     /// Haiku names unnamed sessions (SessionNamer). On by default; one
     /// short Haiku turn per session on the active account.
     @Published var sessionAutoNames: Bool {
@@ -989,7 +969,6 @@ final class AppModel: ObservableObject {
     static let pushMemoryKey = "push_triggers_memory"
     static let announcedAwsLoginsKey = "push_announced_aws_logins"
     private let defaults: UserDefaults
-    static let playgroundSuite = "run.infinitus.playground"
 
     /// Custom skins from themes.json, loaded at launch and on demand
     /// (the Display pane reloads when it appears).
@@ -1044,21 +1023,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    init(playground: Bool = false) {
-        isPlayground = playground
-        // Playground prefs sandbox: reads SEED from the user's live
-        // settings (registration domain, volatile), writes land in a
-        // private suite that now PERSISTS across launches (user
-        // 2026-08-31: "persist playground state with selected
-        // changes") — still never touching real prefs. Reset wipes the
-        // suite back to the live-settings seed.
-        if playground {
-            let d = UserDefaults(suiteName: Self.playgroundSuite)!
-            d.register(defaults: UserDefaults.standard.dictionaryRepresentation())
-            defaults = d
-        } else {
-            defaults = UserDefaults.standard
-        }
+    init() {
+        // The playground is retired (#654); `isPlayground` is a constant
+        // now and `self` is out of reach during phase 1, so the guards
+        // below read this local until they are swept.
+        let playground = false
+        defaults = UserDefaults.standard
         Self.migrateLegacyDefaults()
         debugMenu = UserDefaults.standard.bool(forKey: "debug_menu")
         showAccountName = defaults.object(forKey: "show_account_name") as? Bool ?? true
@@ -1078,7 +1048,6 @@ final class AppModel: ObservableObject {
         titleReset = TitlePrefs.resetChoices.contains(reset) ? reset : "countdown"
         titleIconOnly = defaults.object(forKey: "title_icon_only") as? Bool ?? false
         popoverPinned = defaults.object(forKey: "popover_pinned") as? Bool ?? false
-        revivalPanelShown = defaults.object(forKey: "revival_panel") as? Bool ?? true
         sessionAutoNames = defaults.object(forKey: "session_auto_names") as? Bool ?? true
         popupLayout = defaults.string(forKey: "popup_layout") ?? "wide"
         popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
@@ -1320,7 +1289,6 @@ final class AppModel: ObservableObject {
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
-        set(\.revivalPanelShown, defaults.object(forKey: "revival_panel") as? Bool ?? true)
         set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
@@ -1334,20 +1302,6 @@ final class AppModel: ObservableObject {
             let install = defaults.object(forKey: "update_auto_install") as? Bool ?? false
             if update.autoInstall != install { update.autoInstall = install }
         }
-    }
-
-    /// Playground reset (user 2026-08-31): wipe the sandbox suite so
-    /// every knob falls back to the registration seed — the user's
-    /// live settings — then re-read. Playground models only.
-    func resetPlaygroundPrefs() {
-        guard isPlayground else { return }
-        defaults.removePersistentDomain(forName: Self.playgroundSuite)
-        reloadPrefs()
-        introStyle = defaults.string(forKey: "intro_style") ?? "top"
-        introSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
-        introTitle = defaults.string(forKey: "intro_title") ?? "zoom"
-        burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
-        chatHeader = defaults.string(forKey: "chat_header") ?? "compact"
     }
 
     // MARK: battle plan (#7)
@@ -2948,7 +2902,6 @@ final class AppModel: ObservableObject {
         let firstLoad = change.firstLoad
         if !isPlayground {
             updateBattlePlan(list)
-            revivalPanel.sync(model: self)
         }
         // The footer's ⚡ tokens/minute needs the transcripts read even
         // with the sessions card closed (user 2026-09-03 "display

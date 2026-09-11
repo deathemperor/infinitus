@@ -20,10 +20,6 @@ struct DisplayPane: View {
         Form {
             menuBarSection
             popupSection
-            // The wall's Section is built inside WallSection, so its
-            // anchor rides the wrapper view rather than the Section.
-            WallSection(model: model)
-                .settingsAnchor("Display/Fleet wall")
             sessionsSection
             startupSection
         }
@@ -145,8 +141,6 @@ struct DisplayPane: View {
                 Text("Headroom").tag(PopupSort.headroom)
                 Text("Candidates").tag(PopupSort.candidates)
             }
-            Toggle("Floating countdown when every account is out",
-                   isOn: $model.revivalPanelShown)
         } header: {
             Text("Popup")
         } footer: {
@@ -313,7 +307,7 @@ private struct PickTile<Art: View>: View {
 /// to and flashes its group.
 extension DisplayPane {
     static let searchEntries: [SettingsSearchEntry] = {
-        let menuBar = "Menu bar", popup = "Popup", wall = "Fleet wall"
+        let menuBar = "Menu bar", popup = "Popup"
         let sessions = "Sessions"
         // The last group is headed "Refresh and startup", but its anchor
         // stays "Display/Startup": renaming a header must never move the
@@ -342,9 +336,6 @@ extension DisplayPane {
             entry(popup, "Compact rows", ["compact", "one line", "dense"]),
             entry(popup, "Hide the action buttons", ["actions", "buttons", "footer", "chips"]),
             entry(popup, "Sort rows by headroom", ["order", "sort", "headroom", "next"]),
-            entry(popup, "Floating countdown when every account is out", ["revival", "panel", "floating", "all out"]),
-            entry(wall, "Screen", ["wall", "monitor", "external", "full screen"]),
-            entry(wall, "Enter Full-Screen Fleet Wall", ["wall", "full screen", "kiosk"]),
             entry(sessions, "Checkpoint the repository at every prompt", ["checkpoint", "git", "restore", "diff", "undo"]),
             entry(sessions, "Name unnamed sessions with Claude Haiku", ["haiku", "name", "title", "auto name"]),
             entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host", "headless", "owned"]),

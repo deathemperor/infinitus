@@ -23,19 +23,9 @@ struct MacSessionsPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths,
-                            onOpen: { session in
-                                model.sessionsShown = false
-                                model.openSessionChat?(session)
-                            })
-            Button {
-                model.sessionsShown = false
-                model.showWorkspace?(nil)
-            } label: {
-                Label("Open workspace", systemImage: "rectangle.3.group")
-                    .font(PopupFont.caption)
-            }
-            .buttonStyle(.plain)
+            // No row action: the session chat window is retired (#654) —
+            // the Infinitus desktop app is where a session opens.
+            SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
             // Team session control (#220 §6): who drove a session in the last minute.
             let driving = model.drivenBy.filter { $0.value.until > Date() }
             ForEach(driving.keys.sorted(), id: \.self) { id in
