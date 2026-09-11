@@ -14,6 +14,7 @@ import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
 import { InfinitusAlertPushBridge } from "./features/infinitus/InfinitusAlertPushBridge";
 import { InfinitusLiveActivityBridge } from "./features/infinitus/InfinitusLiveActivityBridge";
+import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
 import { IncomingShareProvider } from "./features/sharing/IncomingShareProvider";
@@ -102,6 +103,7 @@ function AppContent() {
               <InfinitusLiveActivityBridge />
               <InfinitusAlarmsBridge />
               <InfinitusAlertPushBridge />
+              <InfinitusNotificationPresenter />
             </BlurTargetView>
             {/* Anchored-menu overlays render here — in-window, so the
                 keyboard stays up while a dropdown is open. */}

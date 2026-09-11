@@ -153,8 +153,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   reset alarms toggles, pusher Mac) after General.
 - `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
   Activity token registration with the Mac), `InfinitusAlarmsBridge`
-  (local reset / swap alarms) and `InfinitusAlertPushBridge` (the `alert`
-  token, so the Mac's pushes reach the phone as banners).
+  (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
+  token, so the Mac's pushes reach the phone as banners) and
+  `InfinitusNotificationPresenter` (the app's one foreground notification
+  handler: Infinitus notifications show as banners in-app, T3's keep the
+  no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` keys (interface
