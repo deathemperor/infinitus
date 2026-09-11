@@ -41,6 +41,8 @@ export interface ComposerAttachmentStripProps {
   readonly imageBorderRadius?: number;
   /** Whether the remove button should sit in its own gutter instead of overlapping the image. */
   readonly removeButtonPlacement?: "overlay" | "gutter";
+  /** Infinitus (#269 I): a pencil on each image tile opens it for markup. */
+  readonly onMarkUp?: (attachment: DraftComposerImageAttachment) => void;
 }
 
 type ComposerAttachmentThumbnailProps = {
@@ -278,6 +280,23 @@ export function ComposerAttachmentStrip(props: ComposerAttachmentStripProps) {
               onPressPreview={props.onPressPreview}
               onPressVideo={props.onPressVideo}
             />
+            {props.onMarkUp && attachment.type === "image" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Mark up ${attachment.name}`}
+                className="absolute bottom-1 right-1 h-[22px] w-[22px] items-center justify-center rounded-[11px] bg-black/55"
+                hitSlop={6}
+                onPress={() => props.onMarkUp?.(attachment)}
+              >
+                <SymbolView
+                  name="pencil.tip"
+                  size={11}
+                  tintColor="#ffffff"
+                  type="monochrome"
+                  weight="bold"
+                />
+              </Pressable>
+            ) : null}
             <Pressable
               className="absolute h-[22px] w-[22px] items-center justify-center rounded-[11px] bg-black/55"
               style={{

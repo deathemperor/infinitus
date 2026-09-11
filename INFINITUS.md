@@ -1156,6 +1156,20 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   with the body (no trailing space); `ThreadComposer.tsx` feeds it the
   thread's project, `NewTaskDraftScreen.tsx` the picked project. Editing
   stays on the desktop.
+- `apps/mobile/modules/infinitus-markup/` (fork-owned local Expo module, iOS) —
+  `InfinitusMarkup.markUpImage(uri, title)`: Quick Look with editing on over a
+  private temporary copy of a draft image; resolves with the edited file's URL
+  or null (#269 I). `apps/mobile/src/features/infinitus/markup.ts` binds it
+  (`requireOptionalNativeModule`, so a build without the module shows no
+  pencil); `markupAttachment.logic.ts` picks the source bytes, sizes and
+  renames the result, and swaps it into the draft's list in place;
+  `useMarkUpDraftImage` runs the flow and replaces the attachment under a new
+  id through `replaceComposerDraftAttachments`, so it uploads again.
+  Registration: `ComposerAttachmentStrip.tsx` takes an optional `onMarkUp`
+  and draws a pencil badge on image tiles; `ThreadComposer.tsx` supplies it
+  (idle while voice input is busy). `apps/mobile/.swiftlint.yml` lists the
+  module's `ios/` directory. Android and the new-task draft screen are
+  unchanged.
 - `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`)
   — the phone outbox's queue rule (#807, #270 F): `queueBehindRunningTurn`
   turns an existing thread's `send` into `wait` while the thread's session is
