@@ -736,4 +736,13 @@ echo "idle CPU with no lease (pop-out closed, no phone): ${PCT}%  (budget ${IDLE
 python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU with no lease ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
+# #654: the fork's quit-with-window setting sends `quit`; the app answers,
+# then leaves on its own (tunnels, terminals, owned sessions first).
+"$CTL" quit | expect "d['quitting'] is True" || fail "quit"
+i=0
+while /bin/kill -0 "$APP_PID" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 100 ] || fail "the app did not exit within 10s of quit"
+    sleep 0.1
+done
+echo "quit: ok (exited after $((i / 10)).$((i % 10))s)"
 echo "E2E PASS"

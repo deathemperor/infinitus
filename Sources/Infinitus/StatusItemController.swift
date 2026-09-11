@@ -389,6 +389,13 @@ final class StatusItemController {
     private func showContextMenu() {
         let menu = NSMenu()
 
+        // The fork desktop app is the daily client (#654): one entry to
+        // reach it, shown only when LaunchServices knows the bundle.
+        if Self.forkDesktopURL != nil {
+            menu.addItem(menuItem("Open Infinitus", #selector(menuOpenFork)))
+            menu.addItem(.separator())
+        }
+
         let themes = NSMenu()
         for theme in model.availableThemes {
             let row = NSMenuItem(title: theme.name,
@@ -433,6 +440,14 @@ final class StatusItemController {
     @objc private func pickTheme(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         model.gamification = id
+    }
+    /// The T3 Code fork's desktop bundle, wherever it is installed.
+    static var forkDesktopURL: URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
+    }
+    @objc private func menuOpenFork() {
+        guard let url = Self.forkDesktopURL else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
     @objc private func menuRotate() { model.rotate() }
     @objc private func menuRefresh() {

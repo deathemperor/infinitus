@@ -207,6 +207,14 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: try .of(fleetsPayload()))
 
+        case "quit":
+            // Answer first: shutdown() ends the listener with the process.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                model.shutdown()
+            }
+            return ControlReply(ok: true, result: try .of(["quitting": true]))
+
         case "sessions":
             // #612: the id, the account alias, the start and the pending
             // sign-in needs ride along for the fork's sessions list.
