@@ -1,6 +1,6 @@
 import type { InfinitusLaunchResult } from "@t3tools/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -167,16 +167,19 @@ const InfinitusCompanionServiceLive = Layer.effect(
   }),
 );
 
-/** The startup launch, for the installed server only: a dev-runner or
-    worktree server says why it stays quiet, exactly like the port publish. */
+/** The startup launch, for the installed server only: a dev-runner server, a
+    worktree server or an isolated instance (an `INFINITUS_CONTROL_SOCKET`
+    override) says why it stays quiet, exactly like the port publish. */
 const InfinitusCompanionStartupLive = Layer.effectDiscard(
   forkParked(
     Effect.gen(function* () {
       const config = yield* ServerConfig;
+      const env = yield* HostProcessEnvironment;
       const reason = serverPortWithheldReason({
         devUrl: config.devUrl,
         baseDir: config.baseDir,
         worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
+        controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
       });
       if (reason !== undefined) {
         yield* Effect.logInfo("infinitus.companion.withheld", { reason });

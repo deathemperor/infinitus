@@ -557,7 +557,10 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
   Mac whose socket is still quiet 3 s after the server starts it runs `open
 -g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
-  withheld from dev/worktree servers exactly like the port publish), and the
+  withheld from dev/worktree servers and from any instance running with an
+  `INFINITUS_CONTROL_SOCKET` override — an isolated instance by definition,
+  which must never `open` the installed app — exactly like the port
+  publish), and the
   same body answers `infinitus.launch` (operate scope) for the web's "Launch
   Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
   error; the app coming up is the snapshot flipping.

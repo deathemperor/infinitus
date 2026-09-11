@@ -1,5 +1,6 @@
 import { InfinitusManifest } from "@t3tools/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
+import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -83,14 +84,22 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
  * desktop's bundled server is the one that should own it: a dev-runner server
  * (it serves the web app from Vite, so it carries a dev URL) or any server
  * whose home is a worktree-local `.t3` would otherwise take the tunnel with
- * it, last writer wins (#640).
+ * it, last writer wins (#640). An `INFINITUS_CONTROL_SOCKET` override is an
+ * isolated instance by definition (every dev instance runs with one): it
+ * neither publishes its port nor opens the installed app.
  */
 export const serverPortWithheldReason = (input: {
   readonly devUrl: URL | undefined;
   readonly baseDir: string;
   readonly worktreeT3Home: string | undefined;
+  /** `INFINITUS_CONTROL_SOCKET` as the process sees it: set means an isolated
+      instance pointed at its own (or no) app, never the installed one. */
+  readonly controlSocketOverride: string | undefined;
 }): string | undefined => {
   if (input.devUrl !== undefined) return "a dev-runner server serves the web app from a dev URL";
+  if (input.controlSocketOverride !== undefined && input.controlSocketOverride !== "") {
+    return "its control socket is an INFINITUS_CONTROL_SOCKET override (an isolated instance)";
+  }
   if (input.worktreeT3Home !== undefined && input.worktreeT3Home === input.baseDir) {
     return "its home is a worktree-local .t3";
   }
@@ -107,10 +116,12 @@ export const InfinitusServerPortLive = Layer.effectDiscard(
       const address = server.address;
       if (typeof address === "string" || !("port" in address)) return;
       const config = yield* ServerConfig;
+      const env = yield* HostProcessEnvironment;
       const reason = serverPortWithheldReason({
         devUrl: config.devUrl,
         baseDir: config.baseDir,
         worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
+        controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
       });
       if (reason !== undefined) {
         yield* Effect.logInfo("infinitus.server-port.withheld", { port: address.port, reason });

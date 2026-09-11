@@ -153,7 +153,12 @@ const settle = Effect.repeat(Effect.yieldNow, { times: 20 });
 
 describe("serverPortWithheldReason", () => {
   it("withholds the pref from a dev-runner or worktree server and publishes for the installed one", () => {
-    const installed = { devUrl: undefined, baseDir: "/Users/me/.t3", worktreeT3Home: undefined };
+    const installed = {
+      devUrl: undefined,
+      baseDir: "/Users/me/.t3",
+      worktreeT3Home: undefined,
+      controlSocketOverride: undefined,
+    };
     expect(serverPortWithheldReason(installed)).toBeUndefined();
     expect(
       serverPortWithheldReason({ ...installed, devUrl: new URL("http://localhost:3000") }),
@@ -163,14 +168,22 @@ describe("serverPortWithheldReason", () => {
         devUrl: undefined,
         baseDir: "/Users/me/wt/.t3",
         worktreeT3Home: "/Users/me/wt/.t3",
+        controlSocketOverride: undefined,
       }),
     ).toMatch(/worktree-local/);
+    // An isolated instance (its own control socket) is never the installed
+    // server, wherever its home is; an empty override is no override.
+    expect(
+      serverPortWithheldReason({ ...installed, controlSocketOverride: "/tmp/i3.sock" }),
+    ).toMatch(/INFINITUS_CONTROL_SOCKET override/);
+    expect(serverPortWithheldReason({ ...installed, controlSocketOverride: "" })).toBeUndefined();
     // A worktree checkout run against the shared home is not a worktree server.
     expect(
       serverPortWithheldReason({
         devUrl: undefined,
         baseDir: "/Users/me/.t3",
         worktreeT3Home: "/Users/me/wt/.t3",
+        controlSocketOverride: undefined,
       }),
     ).toBeUndefined();
   });
