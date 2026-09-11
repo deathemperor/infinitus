@@ -498,8 +498,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Pinned threads and a thread mid-turn are never held; a fleet that publishes
   no `headroom` (mode off, an older build) never holds. Held starts live in memory, oldest first, released
   2 s apart; one `infinitus.thread.held` / `infinitus.thread.released` work-log
-  row per hold, which the web derives the held state from. The snapshot
-  subscription is held only while a start is. Archived or deleted while held:
+  row per hold, which the web derives the held state from. "Run now" is the
+  `infinitus.releaseThread` RPC (operate scope, `{threadId}` → `{released,
+reason?}`, never an error) answered by `ws.ts` from the same service. The
+  snapshot subscription is held only while a start is. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the

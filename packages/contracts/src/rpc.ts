@@ -34,6 +34,8 @@ import {
   InfinitusCommandResult,
   InfinitusLaunchResult,
   InfinitusProtocolError,
+  InfinitusReleaseThreadInput,
+  InfinitusReleaseThreadResult,
   InfinitusSnapshot,
   InfinitusSubscribeInput,
   InfinitusUnavailable,
@@ -444,6 +446,7 @@ export const WS_METHODS = {
   // Infinitus methods
   infinitusCommand: "infinitus.command",
   infinitusLaunch: "infinitus.launch",
+  infinitusReleaseThread: "infinitus.releaseThread",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
   // Captures (#433)
@@ -1342,6 +1345,14 @@ const WsInfinitusLaunchRpc = Rpc.make(WS_METHODS.infinitusLaunch, {
   error: EnvironmentAuthorizationError,
 });
 
+/** Fork (#616): "Run now" for a thread session priority mode is holding. Never
+    fails: nothing held is a `released: false` with the reason. */
+const WsInfinitusReleaseThreadRpc = Rpc.make(WS_METHODS.infinitusReleaseThread, {
+  payload: InfinitusReleaseThreadInput,
+  success: InfinitusReleaseThreadResult,
+  error: EnvironmentAuthorizationError,
+});
+
 /** The requests waiting for this desktop's approval (#710): the current list,
     then the whole list again on every change. Metadata only. */
 const WsSubscribeInfinitusPairingRpc = Rpc.make(WS_METHODS.subscribeInfinitusPairing, {
@@ -1518,6 +1529,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeInfinitusRpc,
   WsInfinitusCommandRpc,
   WsInfinitusLaunchRpc,
+  WsInfinitusReleaseThreadRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
   WsSubscribeCapturesRpc,

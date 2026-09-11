@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { ForwardCompatibleOptional } from "./baseSchemas.ts";
+import { ForwardCompatibleOptional, ThreadId } from "./baseSchemas.ts";
 
 /**
  * Wire contracts for the Infinitus control socket: one JSON line per request,
@@ -371,6 +371,17 @@ export const InfinitusLaunchResult = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
+
+/** Fork (#616): "Run now" for a thread whose start session priority mode is
+    holding. `released` when a held start ran; otherwise the one-line reason
+    (nothing was held for that thread). Never an error. */
+export const InfinitusReleaseThreadInput = Schema.Struct({ threadId: ThreadId });
+export type InfinitusReleaseThreadInput = typeof InfinitusReleaseThreadInput.Type;
+export const InfinitusReleaseThreadResult = Schema.Struct({
+  released: Schema.Boolean,
+  reason: Schema.optionalKey(Schema.String),
+});
+export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;
 
 /** The desktop shell's own Infinitus knobs (one-app feel, #654), kept by the
     shell rather than the server because they describe this window.

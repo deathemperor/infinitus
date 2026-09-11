@@ -90,6 +90,12 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       label: "environment-data:infinitus:launch",
       tag: WS_METHODS.infinitusLaunch,
     }),
+    // "Run now" for a held thread (#616): the released marker row and the
+    // session starting show through the thread's own subscription.
+    releaseThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:releaseThread",
+      tag: WS_METHODS.infinitusReleaseThread,
+    }),
     // A read verb as a query: the same forward as `command`, held and re-read
     // only while a page subscribes. Keyed by its whole input, so each period
     // is its own atom.
