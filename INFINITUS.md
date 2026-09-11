@@ -247,6 +247,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
+- `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
+  marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
+  instead of the pairing form, so the browser does not spend a phone's token.
 - `apps/web/src/routes/settings.infinitus*.tsx` (five new files in upstream's
   routes directory) and `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
@@ -288,7 +291,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   access is on, else the page's own non-loopback origin; #651). Both up →
   an Internet / Same network choice; neither → it points at Settings ›
   Connections › Network access. "Type it instead" reveals host + code for
-  the phone's manual form. It is mounted through the prefs panel's `footer`
+  the phone's manual form. The link carries `&for=phone` in the fragment
+  (#724): the card says to scan from inside the app (Settings › Configuration ›
+  Environments › Add › Scan QR), and a Camera-app scan that lands in Safari
+  gets `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone
+  app") from `routes/pair.tsx` instead of `PairingRouteSurface`, so the
+  browser never spends the one-time token; the phone's parser reads the token
+  off the fragment as before. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card

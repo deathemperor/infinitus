@@ -139,6 +139,9 @@ describe("InfinitusPairPhoneCard", () => {
     const svg = renderer.root.findAll((node) => node.type === "svg");
     expect(svg).toHaveLength(1);
     expect(text(renderer)).toContain("Expires in 5:00");
+    expect(text(renderer)).toContain("Scan from inside the Infinitus app");
+    expect(text(renderer)).toContain("The Camera app opens a web page instead");
+    expect(text(renderer)).not.toContain("Scan with the Infinitus app");
     expect(text(renderer)).toContain("Copy link");
     // The token never lands in the DOM as text — only inside the QR.
     expect(text(renderer)).not.toContain("fixture-token");
@@ -263,7 +266,9 @@ describe("InfinitusPairPhoneCard", () => {
       const svg = renderer.root.findAll((node) => node.type === "svg");
       expect(svg[0]?.props.role ?? svg).toBeDefined();
       const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
-      expect(qr[0]?.props.value).toBe("http://192.168.1.20:3773/pair#token=fixture-token");
+      expect(qr[0]?.props.value).toBe(
+        "http://192.168.1.20:3773/pair#token=fixture-token&for=phone",
+      );
     } finally {
       vi.unstubAllGlobals();
     }

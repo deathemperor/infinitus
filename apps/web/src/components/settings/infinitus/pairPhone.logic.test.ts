@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   formatCountdown,
+  isPhonePairingLink,
   lanPairingOrigin,
   pairPhoneCardModel,
   phonePairingUrl,
@@ -40,7 +41,7 @@ describe("pairPhoneCardModel", () => {
     expect(model.origin).toEqual({ kind: "tunnel", url: TUNNEL_URL });
     expect(model.link).toEqual({
       kind: "active",
-      url: `${TUNNEL_URL}/pair#token=fixture-token`,
+      url: `${TUNNEL_URL}/pair#token=fixture-token&for=phone`,
       host: "example-words.trycloudflare.com",
       secondsLeft: 300,
     });
@@ -63,7 +64,7 @@ describe("pairPhoneCardModel", () => {
     expect(sameNetwork.lanNotice).toMatch(/only works for phones on your network/);
     expect(sameNetwork.link).toMatchObject({
       kind: "active",
-      url: "http://192.168.1.20:3773/pair#token=fixture-token",
+      url: "http://192.168.1.20:3773/pair#token=fixture-token&for=phone",
       host: "192.168.1.20:3773",
     });
   });
@@ -175,11 +176,27 @@ describe("pairPhoneCardModel", () => {
 });
 
 describe("phonePairingUrl", () => {
-  it("puts the token in the fragment of the /pair page, never the query", () => {
+  it("puts the token and the phone marker in the fragment of the /pair page, never the query", () => {
     const url = new URL(phonePairingUrl(TUNNEL_URL, "fixture-token"));
     expect(url.pathname).toBe("/pair");
     expect(url.search).toBe("");
-    expect(url.hash).toBe("#token=fixture-token");
+    expect(url.hash).toBe("#token=fixture-token&for=phone");
+    // What the phone's parser and upstream's reader both do with the fragment.
+    expect(new URLSearchParams(url.hash.slice(1)).get("token")).toBe("fixture-token");
+  });
+});
+
+describe("isPhonePairingLink", () => {
+  it("recognises the card's link and nothing else", () => {
+    expect(isPhonePairingLink(new URL(phonePairingUrl(TUNNEL_URL, "fixture-token")))).toBe(true);
+    expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair#token=fixture-token`))).toBe(false);
+    expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair?for=phone#token=fixture-token`))).toBe(
+      false,
+    );
+    expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair#for=laptop&token=fixture-token`))).toBe(
+      false,
+    );
+    expect(isPhonePairingLink(new URL(`${TUNNEL_URL}/pair`))).toBe(false);
   });
 });
 

@@ -105,10 +105,31 @@ function forkTunnelNotice(
   }
 }
 
+/** Marks a pairing link as minted for the phone app: `#token=…&for=phone`.
+    The phone reads the token as before (`URLSearchParams` on the fragment);
+    the browser's `/pair` page sees the marker and refuses to spend the token
+    on itself (#724 — the iOS Camera opens the link in Safari, which would
+    otherwise pair the browser and strand the phone). */
+const PHONE_LINK_PARAM = "for";
+const PHONE_LINK_VALUE = "phone";
+
+/** Where a phone user scans from; the Camera app is the wrong scanner. */
+export const SCAN_IN_APP_NOTICE =
+  "Scan from inside the Infinitus app: Settings › Configuration › Environments › Add › Scan QR. The Camera app opens a web page instead and the code stays unused.";
+
 /** The phone's pairing URL for an origin: upstream's `/pair` page with the
-    token in the fragment, which the phone app and a phone browser both read. */
+    token in the fragment, which the phone app reads, plus the phone marker. */
 export function phonePairingUrl(originUrl: string, credential: string): string {
-  return resolveDesktopPairingUrl(originUrl, credential);
+  const url = new URL(resolveDesktopPairingUrl(originUrl, credential));
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  hash.set(PHONE_LINK_PARAM, PHONE_LINK_VALUE);
+  url.hash = hash.toString();
+  return url.toString();
+}
+
+/** A link the Devices card minted for the phone, landing in a browser. */
+export function isPhonePairingLink(url: URL): boolean {
+  return new URLSearchParams(url.hash.replace(/^#/, "")).get(PHONE_LINK_PARAM) === PHONE_LINK_VALUE;
 }
 
 /**

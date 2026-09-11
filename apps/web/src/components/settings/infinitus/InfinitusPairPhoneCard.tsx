@@ -3,7 +3,9 @@
  * link whose host is the Mac's Cloudflare quick tunnel while it is up (else
  * this page's own LAN origin), so a phone off the network can reach this
  * server. The token is minted by upstream's pairing-token endpoint with the
- * standard scopes and TTL; nothing here adds an auth surface.
+ * standard scopes and TTL; nothing here adds an auth surface. The link carries
+ * the phone marker, so a Camera-app scan that lands in Safari is told to use
+ * the app instead of spending the code (#724).
  *
  * @module InfinitusPairPhoneCard
  */
@@ -25,6 +27,7 @@ import {
   pairPhoneCardModel,
   type PairPhoneReach,
   type PhonePairingLink,
+  SCAN_IN_APP_NOTICE,
 } from "./pairPhone.logic";
 
 const PAIRING_LABEL = "Infinitus phone";
@@ -138,12 +141,13 @@ export function InfinitusPairPhoneCard() {
                     size={148}
                     level="M"
                     marginSize={1}
-                    title="Pairing link — scan with the Infinitus phone app"
+                    title="Pairing link — scan from inside the Infinitus phone app, not the Camera app"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
+                  <p className="text-muted-foreground">{SCAN_IN_APP_NOTICE}</p>
                   <p className="text-muted-foreground">
-                    Scan with the Infinitus app. Expires in{" "}
+                    Expires in{" "}
                     <span className="tabular-nums text-foreground">
                       {formatCountdown(model.link.secondsLeft)}
                     </span>
