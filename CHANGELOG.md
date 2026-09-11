@@ -127,6 +127,7 @@ publishes the matching section as the GitHub release body.
 - The stats cache is written one transcript entry at a time, so each checkpoint's write no longer spikes the app by ~130 MB on a year of transcripts (#499).
 - The quick tunnel (mirror and fork) ignores ~/.cloudflared/config.yml, so a named tunnel's ingress no longer turns every quick-tunnel request into cloudflared's own 404.
 - A Live Activity push refused with BadDeviceToken is retried once on the other APNs gateway, so a phone build whose declared environment disagrees with its entitlement still gets its cards.
+- The control-socket watchdog also checks that its own socket still answers, so a listener that died under the app is re-bound within a refresh instead of refusing every call until a relaunch (#637).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
