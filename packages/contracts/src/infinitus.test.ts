@@ -7,6 +7,7 @@ import {
   InfinitusAwsLogins,
   InfinitusClientActivityReport,
   InfinitusCommandInput,
+  InfinitusSecretInput,
   InfinitusCommandResult,
   InfinitusControlReply,
   InfinitusCrashReport,
@@ -730,5 +731,21 @@ describe("InfinitusAwsLogins", () => {
       }).logins[0]?.state?.phase,
     ).toBe("levitating");
     expect(() => decodeLogins({ logins: [{ flow: "relay" }] })).toThrow();
+  });
+});
+
+describe("InfinitusSecretInput", () => {
+  const decode = Schema.decodeUnknownSync(InfinitusSecretInput);
+  const input = (args: Record<string, string>) => ({ command: "signin-code", args, secret: "s" });
+
+  it("takes identifiers as arguments and nothing longer or with control characters (#747)", () => {
+    expect(decode(input({ flowId: "flow-7" })).args).toEqual({ flowId: "flow-7" });
+    expect(() => decode(input({ flowId: "x".repeat(129) }))).toThrow();
+    expect(() => decode(input({ flowId: "flow\u0007" }))).toThrow();
+    expect(() => decode(input({ flowId: "" }))).toThrow();
+  });
+
+  it("keeps the secret redacted once decoded", () => {
+    expect(String(decode(input({})).secret)).toBe("<redacted>");
   });
 });

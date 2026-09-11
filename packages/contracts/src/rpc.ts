@@ -37,6 +37,9 @@ import {
   InfinitusProtocolError,
   InfinitusReleaseThreadInput,
   InfinitusReleaseThreadResult,
+  InfinitusSecretInput,
+  InfinitusSecretRefused,
+  InfinitusSecretResult,
   InfinitusSnapshot,
   InfinitusSubscribeInput,
   InfinitusUnavailable,
@@ -449,6 +452,7 @@ export const WS_METHODS = {
   infinitusLaunch: "infinitus.launch",
   infinitusReleaseThread: "infinitus.releaseThread",
   subscribeInfinitusHolds: "subscribeInfinitusHolds",
+  infinitusSecret: "infinitus.secret",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
   // Captures (#433)
@@ -1411,6 +1415,22 @@ const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
   ]),
 });
 
+/** The fork's one secret-carrying path (#747): forwards `secret` on the
+    control request line to a verb whose manifest entry says `stdin:
+    "secret"`, and refuses everything else before the socket. Administrative
+    scope; the reply is the verb's own, opaque. */
+const WsInfinitusSecretRpc = Rpc.make(WS_METHODS.infinitusSecret, {
+  payload: InfinitusSecretInput,
+  success: InfinitusSecretResult,
+  error: Schema.Union([
+    InfinitusSecretRefused,
+    InfinitusUnavailable,
+    InfinitusProtocolError,
+    InfinitusCommandFailed,
+    EnvironmentAuthorizationError,
+  ]),
+});
+
 export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
@@ -1542,6 +1562,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusLaunchRpc,
   WsInfinitusReleaseThreadRpc,
   WsSubscribeInfinitusHoldsRpc,
+  WsInfinitusSecretRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
   WsSubscribeCapturesRpc,
