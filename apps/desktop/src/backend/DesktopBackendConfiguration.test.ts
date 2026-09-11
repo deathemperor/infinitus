@@ -232,6 +232,11 @@ describe("DesktopBackendConfiguration", () => {
         assert.equal(first.cwd, environment.backendCwd);
         assert.equal(first.captureOutput, true);
         assert.equal(first.env.ELECTRON_RUN_AS_NODE, "1");
+        // The packaged macOS app names its bundle for the nested helper (#777).
+        assert.equal(
+          first.env.INFINITUS_DESKTOP_BUNDLE,
+          environment.path.resolve(environment.resourcesPath, "..", ".."),
+        );
         assert.isUndefined(first.env.T3CODE_PORT);
         assert.isUndefined(first.env.T3CODE_MODE);
         assert.isUndefined(first.env.T3CODE_DESKTOP_LAN_HOST);
@@ -292,6 +297,7 @@ describe("DesktopBackendConfiguration", () => {
         path.join(resourcesPath, "server.asar/apps/server/dist/bin.mjs"),
       );
       assert.equal(config.env.ELECTRON_RUN_AS_NODE, "1");
+      assert.isUndefined(config.env.INFINITUS_DESKTOP_BUNDLE);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 

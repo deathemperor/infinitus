@@ -106,6 +106,11 @@ export const InfinitusStatus = Schema.Struct({
   signInRunning: Schema.Boolean,
   engines: Schema.Record(Schema.String, InfinitusEngineState),
   forkTunnel: Schema.optionalKey(InfinitusForkTunnel),
+  /** The running app's own bundle path (#777): the fork's startup reconcile
+      quits and reopens a stale helper only when this is its nested bundle.
+      Absent from helpers that predate it; the struct drops unknown keys, so
+      the two versions tolerate each other. */
+  bundlePath: Schema.optionalKey(Schema.String),
 });
 export type InfinitusStatus = typeof InfinitusStatus.Type;
 

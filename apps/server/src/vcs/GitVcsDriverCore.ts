@@ -25,6 +25,7 @@ import {
   type ReviewDiffPreviewInput,
   type ReviewDiffPreviewSource,
   type VcsRef,
+  type VcsRemoveWorktreeInput,
 } from "@t3tools/contracts";
 import { dedupeRemoteBranchesWithLocalMatches, normalizeGitRemoteUrl } from "@t3tools/shared/git";
 import { compactTraceAttributes } from "@t3tools/shared/observability";
@@ -44,6 +45,12 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 // machine). Give it generous headroom while still bounding a genuinely hung git.
 const WORKTREE_ADD_TIMEOUT_MS = 300_000;
 const WORKTREE_REMOVE_TIMEOUT_MS = Duration.toMillis(Duration.minutes(5));
+/** Project-root file naming the gitignored files a new worktree is seeded
+    with (gitignore syntax; the same file Conductor and Claude Code read). */
+const WORKTREE_INCLUDE_FILE = ".worktreeinclude";
+/** What is seeded when the file is absent. */
+const WORKTREE_INCLUDE_DEFAULT = ".env*";
+const WORKTREE_WIP_COMMIT_MESSAGE = "wip: work saved when the thread was deleted";
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
 const OUTPUT_TRUNCATED_MARKER = "\n\n[truncated]";
 const PREPARED_COMMIT_PATCH_MAX_OUTPUT_BYTES = 49_000;
@@ -2867,6 +2874,35 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     },
   );
 
+  const seedWorktree = Effect.fn("GitVcsDriver.createWorktree.seed")(function* (
+    cwd: string,
+    worktreePath: string,
+  ) {
+    const includeFile = path.join(cwd, WORKTREE_INCLUDE_FILE);
+    const hasIncludeFile = yield* fileSystem
+      .exists(includeFile)
+      .pipe(Effect.orElseSucceed(() => false));
+    // `--others --ignored` with only these excludes lists the untracked files
+    // the patterns match, nothing else; the repo's own .gitignore is not
+    // consulted, so a named file is copied whether or not it is ignored.
+    const listed = yield* runGitStdout("GitVcsDriver.createWorktree.seed.list", cwd, [
+      "ls-files",
+      "--others",
+      "--ignored",
+      "-z",
+      hasIncludeFile ? `--exclude-from=${includeFile}` : `--exclude=${WORKTREE_INCLUDE_DEFAULT}`,
+    ]);
+    const relativePaths = listed.split("\0").filter((entry) => entry.length > 0);
+    for (const relativePath of relativePaths) {
+      const target = path.join(worktreePath, relativePath);
+      yield* fileSystem.makeDirectory(path.dirname(target), { recursive: true });
+      yield* fileSystem.copyFile(path.join(cwd, relativePath), target);
+    }
+    if (relativePaths.length > 0) {
+      yield* Effect.logInfo("worktree seeded", { worktreePath, files: relativePaths.length });
+    }
+  });
+
   const createWorktree: GitVcsDriver.GitVcsDriver["Service"]["createWorktree"] = Effect.fn(
     "createWorktree",
   )(function* (input) {
@@ -2906,6 +2942,21 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         ),
       );
     }
+
+    // Seed the gitignored files a fresh checkout lacks (#270 A): `.env*` by
+    // default, or whatever `.worktreeinclude` at the project root names in
+    // gitignore syntax. git does the matching over the parent's untracked
+    // files, so the semantics are gitignore's own. Best-effort, like the
+    // submodules: a copy that fails is logged and never rolls back the
+    // worktree.
+    yield* seedWorktree(input.cwd, worktreePath).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning("worktree seeding failed; copy the gitignored files by hand", {
+          worktreePath,
+          cause,
+        }),
+      ),
+    );
 
     if (input.newRefName && input.baseRefName) {
       const remoteNames = yield* listRemoteNames(input.cwd).pipe(Effect.orElseSucceed(() => []));
@@ -3110,9 +3161,78 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       input.branch,
     ]);
 
+  /** The branch a worktree has checked out, or null when it is detached or
+      the directory is already gone. */
+  const readWorktreeBranch = (worktreePath: string) =>
+    executeGit("GitVcsDriver.removeWorktree.branch", worktreePath, [
+      "symbolic-ref",
+      "--short",
+      "HEAD",
+    ]).pipe(
+      Effect.map((result) => (result.exitCode === 0 ? result.stdout.trim() || null : null)),
+      Effect.orElseSucceed(() => null),
+    );
+
+  /** Commits whatever the worktree holds uncommitted (#270 A), so the branch
+      keeps the work a forced removal would otherwise discard. Returns the
+      commit, or null when the tree was clean. */
+  const saveWorktreeWork = Effect.fn("GitVcsDriver.removeWorktree.saveWork")(function* (
+    worktreePath: string,
+  ) {
+    const status = yield* runGitStdout("GitVcsDriver.removeWorktree.status", worktreePath, [
+      "status",
+      "--porcelain",
+      "--untracked-files=all",
+    ]);
+    if (status.trim().length === 0) return null;
+    yield* runGit("GitVcsDriver.removeWorktree.stage", worktreePath, ["add", "-A"]);
+    yield* runGit("GitVcsDriver.removeWorktree.commit", worktreePath, [
+      "commit",
+      "--quiet",
+      "--no-verify",
+      "-m",
+      WORKTREE_WIP_COMMIT_MESSAGE,
+    ]);
+    return yield* runGitStdout("GitVcsDriver.removeWorktree.head", worktreePath, [
+      "rev-parse",
+      "HEAD",
+    ]).pipe(Effect.map((sha) => sha.trim()));
+  });
+
   const removeWorktree: GitVcsDriver.GitVcsDriver["Service"]["removeWorktree"] = Effect.fn(
     "removeWorktree",
   )(function* (input) {
+    const present = yield* fileSystem.exists(input.path).pipe(Effect.orElseSucceed(() => false));
+    const branch =
+      present && (input.keepWork || input.deleteBranch)
+        ? yield* readWorktreeBranch(input.path)
+        : null;
+    const savedWorkCommit =
+      present && input.keepWork && branch !== null ? yield* saveWorktreeWork(input.path) : null;
+    yield* removeWorktreeDirectory(input);
+    // A saved commit is the work's only copy now; the branch stays whatever
+    // the caller asked. A branch git refuses to delete (checked out again
+    // elsewhere, mid-rebase) is left, logged, and reported as kept.
+    let branchDeleted = false;
+    if (input.deleteBranch && branch !== null && savedWorkCommit === null) {
+      const deletion = yield* executeGit("GitVcsDriver.removeWorktree.deleteBranch", input.cwd, [
+        "branch",
+        "-D",
+        branch,
+      ]);
+      branchDeleted = deletion.exitCode === 0;
+      if (!branchDeleted) {
+        yield* Effect.logWarning(
+          `GitVcsDriver.removeWorktree: git branch -D exited with code ${deletion.exitCode} (stderr length ${deletion.stderr.length}); the branch was kept.`,
+        );
+      }
+    }
+    return { branch, savedWorkCommit, branchDeleted };
+  });
+
+  const removeWorktreeDirectory = Effect.fn("GitVcsDriver.removeWorktree.directory")(function* (
+    input: VcsRemoveWorktreeInput,
+  ) {
     const args = ["worktree", "remove"];
     if (input.force) {
       args.push("--force");

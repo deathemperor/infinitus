@@ -56,6 +56,21 @@ this file adds the fork's own rules. Plan and history: issue #555.
   pairing, #710) the same way, contracts in `infinitusPairing.ts`;
   `subscribeCaptures` / `captures.apply` (#433) the same way, contracts in
   `captures.ts`.
+- `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`,
+  `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding
+  (#270 A). `VcsRemoveWorktreeInput` gains `keepWork` (commit whatever the
+  worktree holds uncommitted to its branch, `wip: work saved when the thread
+was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
+  after the remove, skipped whenever `keepWork` had to commit: that commit
+  is the work's only copy), and answers `VcsRemoveWorktreeResult`
+  `{branch, savedWorkCommit, branchDeleted}`. The thread delete flow always
+  sends `keepWork`, asks "Also delete branch …?" as a second confirm (off by
+  default, like Conductor's delete-branch-on-archive) when the thread has a
+  branch, and toasts the saved commit. `createWorktree` seeds the new tree
+  with the parent's untracked files that `.worktreeinclude` at the project
+  root names (gitignore syntax, matched by `git ls-files --others --ignored
+--exclude-from`), or `.env*` when the file is absent; best-effort, logged,
+  never rolls back the worktree, and runs before the setup script.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), so the typed HTTP clients carry them.
@@ -368,13 +383,17 @@ this file adds the fork's own rules. Plan and history: issue #555.
   the page's own non-loopback origin; #651). Both up → an Internet / Same
   Wi‑Fi choice; neither → it points at Settings › Connections › Network
   access. "Type it instead" reveals host + code for the phone's manual form.
-  The link carries `&for=phone` in the fragment (#724): the card says to scan
-  from inside the app (Settings › Configuration › Environments › Add › Scan
-  QR), and a Camera-app scan that lands in Safari gets
-  `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone app")
-  from `routes/pair.tsx` instead of `PairingRouteSurface`, so the browser
-  never spends the one-time token; the phone's parser reads the token off the
-  fragment as before. It is mounted through the prefs panel's `footer`
+  The link is the site's universal link (#724): `https://infinitus.run/pair`
+  with `token`, `for=phone` and `to=<the Mac's origin>` all in the fragment,
+  which the site's server never sees — one shape for tunnel and LAN. A phone
+  with the app opens it in the app (`applinks:infinitus.run`, #782), which
+  rebuilds `<origin>/pair#token=…` and fills the sheet; the site's `/pair`
+  page forwards an app-less phone or a desktop browser to `<origin>/pair`,
+  where `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone
+  app") from `routes/pair.tsx` replaces `PairingRouteSurface`, so a browser
+  never spends the one-time token. Order of landing: the site's AASA
+  `applinks` + forwarder first, then this card, then a phone build with the
+  entitlement. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card
@@ -764,7 +783,21 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   opened over, `infinitus.companion.stale-socket`), and the
   same body answers `infinitus.launch` (operate scope) for the web's "Launch
   Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
-  error; the app coming up is the snapshot flipping.
+  error; the app coming up is the snapshot flipping. With the menu-bar app
+  nested in the desktop bundle (#777): the packaged macOS desktop sets
+  `INFINITUS_DESKTOP_BUNDLE` for its backend, the companion resolves the
+  helper at `Contents/Library/LoginItems/Infinitus Menu Bar.app` and its
+  version (PlistBuddy on its Info.plist), opens it by path first (`open -g
+-a`; a fresh DMG install is not in LaunchServices yet, and a brew-cask
+  copy may still carry the bundle id, #7) with the bundle id as the
+  fallback, and reconciles at startup: an answering helper whose
+  `status.bundlePath` is that nested path and whose `version` is not the
+  shipped one (the updater installs by moving bundles, so the old helper
+  keeps running) is sent `quit`, re-probed every 2 s until the socket stops
+  answering (never an `open` on top of a shutdown, #637), then reopened by
+  path. A standalone helper is left alone whatever its version; one that
+  reports no `bundlePath` only has its skew logged
+  (`infinitus.companion.skew-unarmed`).
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
