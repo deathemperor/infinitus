@@ -59,6 +59,7 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { UsageAccountsSection } from "./UsageAccounts";
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart, type UsageChartMetric } from "./UsageProviderChart";
@@ -454,6 +455,8 @@ export function UsagePage() {
                     />
                   </div>
                 </section>
+
+                <UsageAccountsSection environments={environments} />
 
                 <section className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-3">

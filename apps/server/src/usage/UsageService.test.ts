@@ -21,6 +21,7 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { UsageAttribution } from "../infinitus/Services/UsageAttribution.ts";
 import * as UsageService from "./UsageService.ts";
 
 function claudeLine(id: number, outputTokens: number, model = "claude-fable-5"): string {
@@ -98,6 +99,69 @@ function totalOutputTokens(summary: { buckets: readonly { totals: { outputTokens
 }
 
 describe("UsageService", () => {
+  it.live("attributes Claude records to the account the timeline names (#779)", () =>
+    Effect.gen(function* () {
+      const { transcript, settings, home } = yield* setup;
+      yield* Effect.promise(() => NodeFSP.writeFile(transcript, claudeLine(1, 5, "example-model")));
+
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        const summary = yield* service.readSummary(WINDOW);
+
+        assert.deepStrictEqual(summary.accounts?.lines, [
+          {
+            email: "one@example.invalid",
+            label: "work",
+            number: 1,
+            totals: summary.buckets[0]!.totals,
+            costUsd: 0,
+            records: 1,
+          },
+        ]);
+        assert.strictEqual(summary.accounts?.unattributed.records, 0);
+        assert.strictEqual(summary.accounts?.notClaude.records, 0);
+        assert.strictEqual(summary.accounts?.switchesInWindow, 1);
+        assert.strictEqual(summary.accounts?.basis, "test history");
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            Layer.succeed(UsageAttribution, {
+              resolve: Effect.succeed({
+                accountAt: (timestampMs: number) =>
+                  timestampMs >= Date.parse("2026-08-01T09:00:00Z") ? "one@example.invalid" : null,
+                describe: () => ({ label: "work", number: 1 }),
+                switchesAtMs: [
+                  Date.parse("2026-07-01T09:00:00Z"),
+                  Date.parse("2026-08-01T09:00:00Z"),
+                  Date.parse("2026-09-15T09:00:00Z"),
+                ],
+                basis: "test history",
+              }),
+            }),
+            serviceLayers({ prefix: "usage-service-attribution-test", home, settings }),
+          ),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.live("carries no accounts without a timeline", () =>
+    Effect.gen(function* () {
+      const { transcript, settings, home } = yield* setup;
+      yield* Effect.promise(() => NodeFSP.writeFile(transcript, claudeLine(1, 5, "example-model")));
+
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        const summary = yield* service.readSummary(WINDOW);
+        assert.strictEqual(summary.accounts, undefined);
+      }).pipe(
+        Effect.provide(
+          serviceLayers({ prefix: "usage-service-no-attribution-test", home, settings }),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.live("reprices unchanged transcripts when custom prices are added, edited, or removed", () =>
     Effect.gen(function* () {
       const { transcript, settings, home } = yield* setup;
