@@ -48,6 +48,8 @@ export const ProjectionThread = Schema.Struct({
   snoozedAt: Schema.NullOr(IsoDateTime),
   // Fork (#269 A). Optional so callers that build rows predate it.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#269 C). Optional for the same reason.
+  sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   pinnedAt: Schema.NullOr(IsoDateTime),
   pinOrderKey: Schema.optional(Schema.NullOr(Schema.String)),
   activeOrderKey: Schema.optional(Schema.NullOr(Schema.String)),

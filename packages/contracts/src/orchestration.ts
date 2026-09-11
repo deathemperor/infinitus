@@ -782,6 +782,9 @@ export const OrchestrationThread = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#269 C): the thread this one is a side question of. Such threads
+  // live in a drawer over their main thread, not in the lists.
+  sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -857,6 +860,9 @@ export const OrchestrationThreadShell = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#269 C): the thread this one is a side question of. Such threads
+  // live in a drawer over their main thread, not in the lists.
+  sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   session: Schema.NullOr(OrchestrationSession),
   latestUserMessageAt: Schema.NullOr(IsoDateTime),
@@ -1072,6 +1078,8 @@ const ThreadCreateCommand = Schema.Struct({
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
   historyImport: Schema.optional(Schema.Literal(true)),
+  /** Fork (#269 C): a side question of that thread; hidden from the thread lists. */
+  sideOf: Schema.optional(ThreadId),
 });
 
 const ThreadDeleteCommand = Schema.Struct({
@@ -1747,6 +1755,8 @@ export const ThreadCreatedPayload = Schema.Struct({
   ),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
+  /** Fork (#269 C): see `ThreadCreateCommand.sideOf`. */
+  sideOf: Schema.optional(ThreadId),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

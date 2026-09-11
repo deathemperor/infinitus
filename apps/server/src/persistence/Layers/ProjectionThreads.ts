@@ -14,7 +14,12 @@ import {
   ProjectionThreadRepository,
   type ProjectionThreadRepositoryShape,
 } from "../Services/ProjectionThreads.ts";
-import { ModelSelection, ThreadBabysit, ThreadLinkedPullRequest } from "@t3tools/contracts";
+import {
+  ModelSelection,
+  ThreadBabysit,
+  ThreadId,
+  ThreadLinkedPullRequest,
+} from "@t3tools/contracts";
 
 const ProjectionThreadDbRow = ProjectionThread.mapFields(
   Struct.assign({
@@ -22,6 +27,7 @@ const ProjectionThreadDbRow = ProjectionThread.mapFields(
     linkedPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     branchPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     babysit: Schema.NullOr(Schema.fromJsonString(ThreadBabysit)),
+    sideOf: Schema.NullOr(ThreadId),
   }),
 );
 type ProjectionThreadDbRow = typeof ProjectionThreadDbRow.Type;
@@ -54,6 +60,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           snoozed_until,
           snoozed_at,
           babysit_json,
+          side_of,
           pinned_at,
           pin_order_key,
           active_order_key,
@@ -86,6 +93,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           ${row.snoozedUntil},
           ${row.snoozedAt},
           ${row.babysit == null ? null : JSON.stringify(row.babysit)},
+          ${row.sideOf ?? null},
           ${row.pinnedAt},
           ${row.pinOrderKey ?? null},
           ${row.activeOrderKey ?? null},
@@ -118,6 +126,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           snoozed_until = excluded.snoozed_until,
           snoozed_at = excluded.snoozed_at,
           babysit_json = excluded.babysit_json,
+          side_of = excluded.side_of,
           pinned_at = excluded.pinned_at,
           pin_order_key = excluded.pin_order_key,
           active_order_key = excluded.active_order_key,
@@ -157,6 +166,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          side_of AS "sideOf",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
@@ -198,6 +208,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          side_of AS "sideOf",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",

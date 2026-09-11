@@ -109,6 +109,32 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
       // A round count while off changes nothing.
       yield* update("cmd-babysit-round-off", { babysitRounds: 4 });
       assert.isUndefined((yield* shell()).babysit);
+
+      // Fork (#269 C): a side question carries its main thread through the store.
+      const sideId = ThreadId.make("thread-side");
+      yield* engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("cmd-side-thread"),
+        threadId: sideId,
+        projectId,
+        title: "Side question: Babysat",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "plan",
+        branch: null,
+        worktreePath: null,
+        createdAt,
+        sideOf: threadId,
+      });
+      const side = yield* snapshotQuery
+        .getThreadShellById(sideId)
+        .pipe(Effect.map(Option.getOrThrow));
+      assert.strictEqual(side.sideOf, threadId);
+      assert.isUndefined((yield* shell()).sideOf);
+      const sideRows = yield* sql<{ readonly sideOf: string | null }>`
+        SELECT side_of AS "sideOf" FROM projection_threads WHERE thread_id = ${sideId}
+      `;
+      assert.strictEqual(sideRows[0]?.sideOf, threadId);
     }),
   );
 });

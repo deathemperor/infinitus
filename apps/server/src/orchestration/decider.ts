@@ -410,6 +410,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         type: "thread.created",
         payload: {
           threadId: command.threadId,
+          ...(command.sideOf === undefined ? {} : { sideOf: command.sideOf }),
           projectId: command.projectId,
           title: command.title,
           modelSelection: command.modelSelection,

@@ -439,6 +439,7 @@ export function projectEvent(
             interactionMode: payload.interactionMode,
             branch: payload.branch,
             worktreePath: payload.worktreePath,
+            ...(payload.sideOf === undefined ? {} : { sideOf: payload.sideOf }),
             pullRequests: [],
             branchPullRequest: null,
             latestTurn: null,

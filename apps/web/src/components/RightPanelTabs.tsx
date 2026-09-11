@@ -24,6 +24,7 @@ import {
   GitPullRequest,
   GitPullRequestArrow,
   Globe2,
+  MessageCircleQuestionMark,
   Plus,
   TerminalSquare,
   Volume2,
@@ -631,6 +632,8 @@ function surfaceTitle(
       return "Pull requests";
     case "agents":
       return "Agents";
+    case "side-question":
+      return "Side question";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "preview": {
@@ -716,6 +719,8 @@ function SurfaceIcon({
       return <GitPullRequestArrow className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
+    case "side-question":
+      return <MessageCircleQuestionMark className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
