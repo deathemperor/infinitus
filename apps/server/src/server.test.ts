@@ -116,6 +116,7 @@ import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
+import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
@@ -516,6 +517,7 @@ const buildAppUnderTest = (options?: {
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
     infinitus?: Partial<InfinitusService["Service"]>;
     infinitusSessionHold?: Partial<InfinitusSessionHold["Service"]>;
+    infinitusLimitStops?: Partial<InfinitusLimitStops["Service"]>;
     infinitusSessionInterrupt?: Partial<InfinitusSessionInterrupt["Service"]>;
     infinitusSecret?: Partial<InfinitusSecret["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
@@ -798,6 +800,11 @@ const buildAppUnderTest = (options?: {
             release: () => Effect.succeed({ released: false, reason: "nothing is held" }),
             held: Stream.empty,
             ...options?.layers?.infinitusSessionHold,
+          }),
+          // No limit stop either; resume-on-limit has its own tests (#648, #270 I).
+          Layer.mock(InfinitusLimitStops)({
+            stopped: Stream.make([]),
+            ...options?.layers?.infinitusLimitStops,
           }),
           // Nothing is ever paused here either; the layer has its own tests (#743).
           Layer.mock(InfinitusSessionInterrupt)({
@@ -4351,8 +4358,17 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         since: "2026-09-11T10:00:00.000Z",
         summary: "Held for headroom on claude, 5h window 84 %",
       };
+      const limited = {
+        threadId: ThreadId.make("thread-limited"),
+        since: "2026-09-11T10:01:00.000Z",
+        summary: "Limit hit on one@example.com",
+        kind: "limited" as const,
+      };
       yield* buildAppUnderTest({
-        layers: { infinitusSessionHold: { held: Stream.make([held]) } },
+        layers: {
+          infinitusSessionHold: { held: Stream.make([held]) },
+          infinitusLimitStops: { stopped: Stream.make([limited]) },
+        },
       });
 
       const wsUrl = yield* getWsServerUrl("/ws");
@@ -4362,7 +4378,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         ),
       );
 
-      assert.deepEqual(first, Option.some([held]));
+      // Held starts and limit stops share the stream (#270 I).
+      assert.deepEqual(first, Option.some([held, limited]));
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 

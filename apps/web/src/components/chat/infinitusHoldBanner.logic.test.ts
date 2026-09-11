@@ -73,4 +73,12 @@ describe("infinitusHoldBanner.logic", () => {
       },
     );
   });
+
+  it("names a limit stop and offers no button (#270 I)", () => {
+    expect(holdBannerTitle("limited")).toBe("Stopped on a usage limit");
+    expect(holdBannerText("Limit hit on one@example.com", { kind: "idle" }, "limited")).toEqual({
+      description: "Limit hit on one@example.com",
+      actionable: false,
+    });
+  });
 });

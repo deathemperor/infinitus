@@ -16,11 +16,16 @@ export const HOLD_MARKER_KIND = "infinitus.thread.held";
 export const RELEASE_MARKER_KIND = "infinitus.thread.released";
 export const PAUSE_MARKER_KIND = "infinitus.thread.paused";
 export const RESUME_MARKER_KIND = "infinitus.thread.resumed";
+/** Resume-on-limit's pair (#648, #270 I): the stop, and the turn resumed on
+    the swapped-to account (`infinitusResumeOnLimit.logic.ts`). */
+export const LIMIT_MARKER_KIND = "infinitus.thread.limited";
+export const LIMIT_RESUME_MARKER_KIND = "infinitus.turn.resumed";
 
 export interface ThreadHold {
   /** `held`: a start waits for headroom; `paused`: a running turn was
-      interrupted for it and waits to continue. */
-  readonly kind: "held" | "paused";
+      interrupted for it and waits to continue; `limited`: the turn stopped
+      on its account's usage limit and waits for a swap. */
+  readonly kind: "held" | "paused" | "limited";
   /** The held row, so a page can remember what it answered for this hold. */
   readonly markerId: string;
   readonly since: string;
@@ -46,8 +51,14 @@ export function threadHold(thread: {
   let released: Placed | null = null;
   thread.activities.forEach((activity, index) => {
     const placed = { activity, index };
-    const opens = activity.kind === HOLD_MARKER_KIND || activity.kind === PAUSE_MARKER_KIND;
-    const closes = activity.kind === RELEASE_MARKER_KIND || activity.kind === RESUME_MARKER_KIND;
+    const opens =
+      activity.kind === HOLD_MARKER_KIND ||
+      activity.kind === PAUSE_MARKER_KIND ||
+      activity.kind === LIMIT_MARKER_KIND;
+    const closes =
+      activity.kind === RELEASE_MARKER_KIND ||
+      activity.kind === RESUME_MARKER_KIND ||
+      activity.kind === LIMIT_RESUME_MARKER_KIND;
     if (opens && later(placed, held)) held = placed;
     else if (closes && later(placed, released)) released = placed;
   });
@@ -57,7 +68,12 @@ export function threadHold(thread: {
   const startedAt = thread.latestTurn?.startedAt ?? null;
   if (startedAt !== null && startedAt >= hold.activity.createdAt) return null;
   return {
-    kind: hold.activity.kind === PAUSE_MARKER_KIND ? "paused" : "held",
+    kind:
+      hold.activity.kind === PAUSE_MARKER_KIND
+        ? "paused"
+        : hold.activity.kind === LIMIT_MARKER_KIND
+          ? "limited"
+          : "held",
     markerId: hold.activity.id,
     since: hold.activity.createdAt,
     summary: hold.activity.summary,

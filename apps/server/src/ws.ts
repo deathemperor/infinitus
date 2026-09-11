@@ -89,6 +89,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
+import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
@@ -545,6 +546,7 @@ const makeWsRpcLayer = (
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusSessionHold = yield* InfinitusSessionHold;
+      const infinitusLimitStops = yield* InfinitusLimitStops;
       const infinitusSessionInterrupt = yield* InfinitusSessionInterrupt;
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
@@ -3073,7 +3075,13 @@ const makeWsRpcLayer = (
         [WS_METHODS.subscribeInfinitusHolds]: (_input) =>
           observeRpcStreamEffect(
             WS_METHODS.subscribeInfinitusHolds,
-            Effect.succeed(infinitusSessionHold.held),
+            // Fork (#270 I): held starts and limit-stopped turns share the
+            // sidebar's one stream; each list is whole, so the pair is too.
+            Effect.succeed(
+              Stream.zipLatest(infinitusSessionHold.held, infinitusLimitStops.stopped).pipe(
+                Stream.map(([held, stopped]) => [...held, ...stopped]),
+              ),
+            ),
             { "rpc.aggregate": "infinitus" },
           ),
         [WS_METHODS.infinitusSecret]: (input) =>

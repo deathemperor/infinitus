@@ -3,6 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   HOLD_MARKER_KIND,
+  LIMIT_MARKER_KIND,
+  LIMIT_RESUME_MARKER_KIND,
   PAUSE_MARKER_KIND,
   RELEASE_MARKER_KIND,
   RESUME_MARKER_KIND,
@@ -22,7 +24,9 @@ const marker = (
       ? "Held for headroom on claude, 5h window 84 %"
       : kind === PAUSE_MARKER_KIND
         ? "Paused for headroom on claude, 5h window 92 %"
-        : "Released",
+        : kind === LIMIT_MARKER_KIND
+          ? "Limit hit on one@example.com"
+          : "Released",
   payload: {},
   turnId: null,
   createdAt,
@@ -144,6 +148,35 @@ describe("threadHold", () => {
           marker(RESUME_MARKER_KIND, "2026-09-11T10:05:00Z"),
         ],
         latestTurn: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("names a limit stop until the turn resumes on another account or a new turn starts (#270 I)", () => {
+    expect(
+      threadHold({
+        activities: [marker(LIMIT_MARKER_KIND, "2026-09-11T10:00:00Z", "l1")],
+        latestTurn: turn("2026-09-11T09:30:00Z"),
+      }),
+    ).toEqual({
+      kind: "limited",
+      markerId: "l1",
+      since: "2026-09-11T10:00:00Z",
+      summary: "Limit hit on one@example.com",
+    });
+    expect(
+      threadHold({
+        activities: [
+          marker(LIMIT_MARKER_KIND, "2026-09-11T10:00:00Z"),
+          marker(LIMIT_RESUME_MARKER_KIND, "2026-09-11T10:05:00Z"),
+        ],
+        latestTurn: null,
+      }),
+    ).toBeNull();
+    expect(
+      threadHold({
+        activities: [marker(LIMIT_MARKER_KIND, "2026-09-11T10:00:00Z")],
+        latestTurn: turn("2026-09-11T10:20:00Z"),
       }),
     ).toBeNull();
   });

@@ -397,6 +397,10 @@ export const InfinitusHeldThread = Schema.Struct({
   threadId: ThreadId,
   since: Schema.String,
   summary: Schema.String,
+  /** `held` (absent on older servers): a start waits for headroom. `limited`
+      (#270 I): the thread's turn stopped on its account's usage limit and
+      resume-on-limit waits for a swap; the summary names the account. */
+  kind: Schema.optionalKey(Schema.Literals(["held", "limited"])),
 });
 export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
 

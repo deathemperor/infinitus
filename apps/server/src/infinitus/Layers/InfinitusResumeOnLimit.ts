@@ -5,7 +5,7 @@ import {
   type ThreadId,
   type TurnId,
 } from "@t3tools/contracts";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusHeldThread, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -14,6 +14,7 @@ import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
+import * as SubscriptionRef from "effect/SubscriptionRef";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -23,9 +24,12 @@ import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
+import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import {
   CONTINUATION_PROMPT,
   eventCancelsStop,
+  LIMIT_MARKER_KIND,
+  limitMarkerSummary,
   limitStopFromEvent,
   RESUME_COOLDOWN_MS,
   RESUME_MARKER_KIND,
@@ -56,9 +60,12 @@ type Input =
  * transcript up on the new credentials. Everything runs through one sequential
  * worker: one record per thread, a stop resumed once, resumes spaced by a
  * cooldown, and a turn the user moved on from is forgotten. Off by the
- * `infinitusResumeOnLimit` server setting.
+ * `infinitusResumeOnLimit` server setting. Each stop also leaves an
+ * `infinitus.thread.limited` row and joins the `stopped` list the sidebar
+ * reads (#270 I), until it resumes or is forgotten.
  */
-export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
+export const InfinitusResumeOnLimitLive = Layer.effect(
+  InfinitusLimitStops,
   Effect.gen(function* () {
     const providerService = yield* ProviderService;
     const orchestrationEngine = yield* OrchestrationEngineService;
@@ -72,6 +79,11 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const eventId = randomUUID.pipe(Effect.map(EventId.make));
 
     const stops = new Map<ThreadId, LimitStop>();
+    /** What the sidebar sees of `stops`: one entry per stopped thread. */
+    const stopped = yield* SubscriptionRef.make<ReadonlyArray<InfinitusHeldThread>>([]);
+    const marks = new Map<ThreadId, InfinitusHeldThread>();
+    // Suspended: the list is read when it runs, not when the layer builds.
+    const publish = Effect.suspend(() => SubscriptionRef.set(stopped, [...marks.values()]));
     const resumed = new Set<TurnId>();
     const lastResumeAt = new Map<ThreadId, number>();
     const watch = yield* FiberHandle.make();
@@ -159,8 +171,49 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const forget = (threadId: ThreadId) =>
       Effect.gen(function* () {
         stops.delete(threadId);
+        if (marks.delete(threadId)) yield* publish;
         if (stops.size === 0) yield* stopWatching;
       });
+
+    /** The row and the sidebar entry a stop leaves the moment it lands. */
+    const mark = (stop: LimitStop) =>
+      Effect.gen(function* () {
+        const createdAt = DateTime.formatIso(yield* DateTime.now);
+        const summary = limitMarkerSummary(stop);
+        marks.set(stop.threadId, {
+          threadId: stop.threadId,
+          since: createdAt,
+          summary,
+          kind: "limited",
+        });
+        yield* publish;
+        yield* orchestrationEngine.dispatch({
+          type: "thread.activity.append",
+          commandId: yield* commandId,
+          threadId: stop.threadId,
+          activity: {
+            id: yield* eventId,
+            tone: "info",
+            kind: LIMIT_MARKER_KIND,
+            summary,
+            payload: {
+              turnId: stop.turnId,
+              stop: stop.kind,
+              accounts: [...stop.activeAtStop.values()],
+            },
+            turnId: stop.turnId,
+            createdAt,
+          },
+          createdAt,
+        });
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("infinitus.resume-on-limit.marker-failed", {
+            threadId: stop.threadId,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      );
 
     const onRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
@@ -172,7 +225,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         const stop = limitStopFromEvent(event, yield* nowMillis, snapshot);
         if (stop === null) return;
         if (stop.turnId !== null && resumed.has(stop.turnId)) return;
+        const known = stops.has(stop.threadId);
         stops.set(stop.threadId, stop);
+        if (!known) yield* mark(stop);
         yield* Effect.logInfo("infinitus.resume-on-limit.stopped", {
           threadId: stop.threadId,
           turnId: stop.turnId,
@@ -251,5 +306,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         Stream.runForEach((event) => worker.enqueue({ source: "runtime", event })),
       ),
     );
+
+    return InfinitusLimitStops.of({ stopped: SubscriptionRef.changes(stopped) });
   }),
 );

@@ -626,7 +626,8 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   the holds themselves), one shared stream per environment through
   `infinitusEnvironment.holds` and `sidebar/useInfinitusHeldSummary.ts`;
   held outranks working in `resolveSidebarThreadStatus` since the start never
-  ran. `chat/PinAtCreationToggle.tsx` is
+  ran; a `kind: "limited"` entry (#270 I) reads "Limit" the same way, below
+  held. `chat/PinAtCreationToggle.tsx` is
   "Pin on create" under a draft's composer (per-browser, off by default);
   ChatView pins the thread right after the send that creates it. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
@@ -696,7 +697,13 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   reads `ok` from a probe taken after the stop (native's ResumeGate); then
   the parked turn is interrupted, a `infinitus.turn.resumed` work-log row
   names the account, and the thread continues with upstream's continuation
-  prompt from its resume cursor. Once per stop, 2-min cooldown per thread,
+  prompt from its resume cursor. The stop itself leaves an
+  `infinitus.thread.limited` row ("Limit hit on <account>") and joins the
+  layer's `InfinitusLimitStops.stopped` list (#270 I), which `ws.ts` merges
+  into `subscribeInfinitusHolds` beside the held starts so the sidebar reads
+  "Limit" with the account in the tooltip; the banner reads "Stopped on a
+  usage limit" with no button; the resumed row or a new turn closes it. Once
+  per stop, 2-min cooldown per thread,
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).

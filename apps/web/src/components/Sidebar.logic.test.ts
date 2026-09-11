@@ -839,6 +839,17 @@ describe("resolveSidebarThreadStatus", () => {
       resolveSidebarThreadStatus({ ...idle, hasPendingApprovals: true, session }, { held: true }),
     ).toBe("approval");
     expect(resolveSidebarThreadStatus({ ...idle, session }, { held: false })).toBe("working");
+    // Limited (#270 I): parked on a usage limit; below held, above working.
+    expect(resolveSidebarThreadStatus({ ...idle, session }, { limited: true })).toBe("limited");
+    expect(resolveSidebarThreadStatus({ ...idle, session }, { held: true, limited: true })).toBe(
+      "held",
+    );
+    expect(
+      resolveSidebarThreadStatus(
+        { ...idle, hasPendingUserInput: true, session },
+        { limited: true },
+      ),
+    ).toBe("input");
   });
 
   it("prioritizes awaiting input over a running session, below approval", () => {
