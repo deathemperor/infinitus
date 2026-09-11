@@ -287,6 +287,10 @@
       "types": "./src/infinitusControl.ts",
       "import": "./src/infinitusControl.ts"
     },
+    "./infinitusControlSocket": {
+      "types": "./src/infinitusControlSocket.ts",
+      "import": "./src/infinitusControlSocket.ts"
+    },
     "./claudeCompaction": {
       "types": "./src/claudeCompaction.ts",
       "import": "./src/claudeCompaction.ts"

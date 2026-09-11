@@ -59,5 +59,11 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       label: "environment-data:infinitus:command",
       tag: WS_METHODS.infinitusCommand,
     }),
+    // The app coming up shows through the snapshot subscription, so nothing
+    // to invalidate here either.
+    launch: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:launch",
+      tag: WS_METHODS.infinitusLaunch,
+    }),
   };
 }

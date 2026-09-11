@@ -24,11 +24,21 @@ vi.mock("../../state/environments", () => ({
     environments: [{ environmentId: "test-environment", label: "Test environment" }],
   }),
   usePrimaryEnvironmentId: () => "test-environment",
+  usePrimaryEnvironment: () => ({
+    environmentId: "test-environment",
+    serverConfig: {
+      environment: {
+        capabilities: { infinitus: true },
+        platform: { os: "darwin", arch: "arm64" },
+      },
+    },
+  }),
 }));
 vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     command: { label: "command-atom" },
+    launch: { label: "launch-atom" },
   },
 }));
 vi.mock("../../state/query", () => ({
@@ -176,6 +186,8 @@ describe("AccountsPage", () => {
     expect(markup).toContain("No Infinitus is listening on this host.");
     expect(markup).toContain("/tmp/infinitus.sock");
     expect(markup).toContain("Retry");
+    // The server is a Mac, so the offline card can also open the app (#654).
+    expect(markup).toContain("Launch Infinitus");
   });
 
   it("says so when the host reports no engines", () => {

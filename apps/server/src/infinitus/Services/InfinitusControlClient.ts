@@ -6,17 +6,9 @@ import type {
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
-/**
- * One call of one control command. `args` and `options` default to empty;
- * `secret` carries stdin-read material (a proxy key, a bot token) that goes on
- * the wire and never into a log, span or error.
- */
-export interface InfinitusControlRequestInput {
-  readonly command: string;
-  readonly args?: ReadonlyArray<string>;
-  readonly options?: Readonly<Record<string, string>>;
-  readonly secret?: string;
-}
+import type { InfinitusControlRequestInput } from "@t3tools/shared/infinitusControlSocket";
+
+export type { InfinitusControlRequestInput };
 
 export interface InfinitusControlClientShape {
   /** Resolved once at layer construction; null means Infinitus cannot run here. */

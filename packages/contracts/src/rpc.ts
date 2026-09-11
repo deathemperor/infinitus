@@ -27,6 +27,7 @@ import {
   InfinitusCommandFailed,
   InfinitusCommandInput,
   InfinitusCommandResult,
+  InfinitusLaunchResult,
   InfinitusProtocolError,
   InfinitusSnapshot,
   InfinitusUnavailable,
@@ -421,6 +422,7 @@ export const WS_METHODS = {
 
   // Infinitus methods
   infinitusCommand: "infinitus.command",
+  infinitusLaunch: "infinitus.launch",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -1298,6 +1300,15 @@ const WsSubscribeInfinitusRpc = Rpc.make(WS_METHODS.subscribeInfinitus, {
   stream: true,
 });
 
+/** Asks the server's host to open the Infinitus menu-bar app when its control
+    socket is not answering. Never fails: an unsupported host or a failed
+    `open` is a `launched: false` with the reason. */
+const WsInfinitusLaunchRpc = Rpc.make(WS_METHODS.infinitusLaunch, {
+  payload: Schema.Struct({}),
+  success: InfinitusLaunchResult,
+  error: EnvironmentAuthorizationError,
+});
+
 /** Forwards one command from the manifest to the control socket. */
 const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
   payload: InfinitusCommandInput,
@@ -1437,6 +1448,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeResourceTelemetryRpc,
   WsSubscribeInfinitusRpc,
   WsInfinitusCommandRpc,
+  WsInfinitusLaunchRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetWorkflowScriptRpc,
   WsOrchestrationGetTurnDiffRpc,

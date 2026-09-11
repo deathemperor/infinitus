@@ -40,6 +40,7 @@ import {
   infinitusPrefsPanelState,
   prefDefaultHint,
 } from "./panel.logic";
+import { InfinitusLaunchButton } from "./InfinitusLaunchButton";
 import {
   buildPrefSections,
   defaultValue,
@@ -292,6 +293,7 @@ export function InfinitusPrefsPanel({
           <InfinitusPanelNotice
             message={infinitusPanelMessage(state, snapshot?.unavailableReason)}
           />
+          {state === "unavailable" ? <InfinitusLaunchButton className="px-3 pb-3 sm:px-4" /> : null}
         </SettingsSection>
       </SettingsPageContainer>
     );
