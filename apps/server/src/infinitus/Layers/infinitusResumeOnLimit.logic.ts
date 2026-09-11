@@ -24,6 +24,10 @@ export const RESUME_COOLDOWN_MS = 120_000;
 /** The work-log row a resume leaves in the thread. Free-form kind: no
     contract change, and no `.failed` suffix so it never reads as severe. */
 export const RESUME_MARKER_KIND = "infinitus.turn.resumed";
+/** The row a limit stop leaves the moment it lands (#270 I): the sidebar pill
+    and the banner read "Limit hit" from it until the resumed row or a new
+    turn follows. */
+export const LIMIT_MARKER_KIND = "infinitus.thread.limited";
 
 /** What the resumed turn is told — upstream's own continuation prompt (the one
     a server update sends), so the thread reads the same after either. */
@@ -155,6 +159,13 @@ export function resumeTarget(stop: LimitStop, snapshot: InfinitusSnapshot): Resu
 }
 
 /** The marker's line. */
+/** The limited row's line: the account whose limit stopped the turn, when
+    the snapshot named one. */
+export function limitMarkerSummary(stop: LimitStop): string {
+  const accounts = [...new Set(stop.activeAtStop.values())];
+  return accounts.length === 0 ? "Limit hit" : `Limit hit on ${accounts.join(", ")}`;
+}
+
 export function resumeMarkerSummary(target: ResumeTarget): string {
   return `Turn resumed on ${target.account}`;
 }

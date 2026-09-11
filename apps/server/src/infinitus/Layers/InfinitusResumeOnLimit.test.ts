@@ -10,11 +10,16 @@ import {
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
-import type { InfinitusAccount, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type {
+  InfinitusAccount,
+  InfinitusHeldThread,
+  InfinitusSnapshot,
+} from "@t3tools/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -36,8 +41,13 @@ import {
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
+import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusResumeOnLimitLive } from "./InfinitusResumeOnLimit.ts";
-import { CONTINUATION_PROMPT, RESUME_MARKER_KIND } from "./infinitusResumeOnLimit.logic.ts";
+import {
+  CONTINUATION_PROMPT,
+  LIMIT_MARKER_KIND,
+  RESUME_MARKER_KIND,
+} from "./infinitusResumeOnLimit.logic.ts";
 
 const threadId = ThreadId.make("thread-1");
 const turnId = TurnId.make("turn-1");
@@ -133,6 +143,8 @@ interface Harness {
   readonly turns: Effect.Effect<ReadonlyArray<{ threadId: ThreadId; input?: string }>>;
   readonly dispatched: Effect.Effect<ReadonlyArray<OrchestrationCommand>>;
   readonly watchers: Effect.Effect<number>;
+  /** The sidebar's view of the stops (#270 I). */
+  readonly stopped: Stream.Stream<ReadonlyArray<InfinitusHeldThread>>;
 }
 
 /** Fork (#616): the gate a resume passes through; passthrough by default. */
@@ -200,7 +212,8 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
         ),
       ),
     );
-    yield* Layer.build(layer);
+    const context = yield* Layer.build(layer);
+    const limitStops = Context.get(context, InfinitusLimitStops);
 
     return {
       emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
@@ -211,6 +224,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
       turns: Ref.get(turns),
       dispatched: Ref.get(dispatched),
       watchers: Ref.get(watchers),
+      stopped: limitStops.stopped,
     } satisfies Harness;
   });
 const makeHarness = makeHarnessWith();
@@ -268,13 +282,17 @@ describe("InfinitusResumeOnLimitLive", () => {
           expect(kept[0]?.replacesActiveTurn).toBe(true);
           expect(yield* h.turns).toEqual([]);
           expect(yield* h.interrupts).toEqual([]);
-          expect(yield* h.dispatched).toEqual([]);
+          // The stop itself left its row (#270 I); nothing resumed yet.
+          expect((yield* h.dispatched).map((command) => command.type)).toEqual([
+            "thread.activity.append",
+          ]);
 
           // Released later: the resume runs then, on the account live now.
           yield* kept[0]!.run;
           expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
           expect(yield* h.interrupts).toEqual([{ threadId, turnId }]);
           expect((yield* h.dispatched).map((command) => command.type)).toEqual([
+            "thread.activity.append",
             "thread.activity.append",
             "thread.session.set",
           ]);
@@ -302,9 +320,16 @@ describe("InfinitusResumeOnLimitLive", () => {
         const dispatched = yield* h.dispatched;
         expect(dispatched.map((command) => command.type)).toEqual([
           "thread.activity.append",
+          "thread.activity.append",
           "thread.session.set",
         ]);
-        const marker = dispatched[0]!;
+        // The stop's own row came first (#270 I).
+        const limited = dispatched[0]!;
+        if (limited.type !== "thread.activity.append") throw new Error("limited row expected");
+        expect(limited.activity.kind).toBe(LIMIT_MARKER_KIND);
+        expect(limited.activity.summary).toBe("Limit hit on one@example.com");
+        expect(limited.activity.turnId).toBe(turnId);
+        const marker = dispatched[1]!;
         if (marker.type !== "thread.activity.append") throw new Error("marker expected");
         expect(marker.activity.kind).toBe(RESUME_MARKER_KIND);
         expect(marker.activity.summary).toBe("Turn resumed on two@example.com");
@@ -313,7 +338,7 @@ describe("InfinitusResumeOnLimitLive", () => {
           from: "one@example.com",
           to: "two@example.com",
         });
-        const set = dispatched[1]!;
+        const set = dispatched[2]!;
         if (set.type !== "thread.session.set") throw new Error("session.set expected");
         expect(set.session).toMatchObject({
           status: "starting",
@@ -377,7 +402,10 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.poll(swapped(at(150)));
         yield* settle(h.watchers, (n) => n === 0);
         expect(yield* h.turns).toEqual([]);
-        expect(yield* h.dispatched).toEqual([]);
+        // Only the stop's own row (#270 I); no resume.
+        expect((yield* h.dispatched).map((command) => command.type)).toEqual([
+          "thread.activity.append",
+        ]);
       }),
     ),
   );
@@ -402,6 +430,35 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* TestClock.adjust(Duration.seconds(120));
         yield* h.poll(swapped(at(260)));
         yield* settle(h.turns, (list) => list.length === 2);
+      }),
+    ),
+  );
+
+  effectIt.effect("publishes the stopped thread for the sidebar until it resumes (#270 I)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const seen = yield* Ref.make<ReadonlyArray<ReadonlyArray<InfinitusHeldThread>>>([]);
+        yield* Effect.forkScoped(
+          Stream.runForEach(h.stopped, (list) => Ref.update(seen, (lists) => [...lists, list])),
+        );
+        expect(yield* settle(Ref.get(seen), (lists) => lists.length === 1)).toEqual([[]]);
+
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        const afterStop = yield* settle(Ref.get(seen), (lists) => lists.length === 2);
+        expect(afterStop[1]).toEqual([
+          {
+            threadId,
+            since: expect.any(String),
+            summary: "Limit hit on one@example.com",
+            kind: "limited",
+          },
+        ]);
+
+        yield* h.poll(swapped(at(150)));
+        const afterResume = yield* settle(Ref.get(seen), (lists) => lists.length === 3);
+        expect(afterResume[2]).toEqual([]);
       }),
     ),
   );

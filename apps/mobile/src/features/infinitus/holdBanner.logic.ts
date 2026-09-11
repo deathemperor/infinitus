@@ -14,7 +14,14 @@ type HoldKind = ThreadHold["kind"];
 
 /** What the card is headed. */
 export function holdBannerTitle(kind: HoldKind): string {
-  return kind === "paused" ? "Paused for headroom" : "Waiting for headroom";
+  switch (kind) {
+    case "paused":
+      return "Paused for headroom";
+    case "limited":
+      return "Stopped on a usage limit";
+    case "held":
+      return "Waiting for headroom";
+  }
 }
 export type HoldPhase =
   | { readonly kind: "idle" }
@@ -74,6 +81,9 @@ export function holdBannerText(
   phase: HoldPhase,
   kind: HoldKind = "held",
 ): { readonly description: string; readonly actionable: boolean } {
+  // A limit stop has no button (#270 I): resume-on-limit continues the turn
+  // itself once the account swaps; the row says which account ran out.
+  if (kind === "limited") return { description: summary, actionable: false };
   switch (phase.kind) {
     case "gone":
       return {

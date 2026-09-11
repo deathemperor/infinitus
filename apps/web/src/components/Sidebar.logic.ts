@@ -790,11 +790,14 @@ export function resolveThreadRowClassName(input: {
 // thread needs attention, not what the thread is currently doing.
 // Held (#741): the server keeps the thread's turn start for headroom
 // (session priority mode, #616). Nothing runs in it, so it reads as a calm
-// background state, not as working.
+// background state, not as working. Limited (#270 I): the turn stopped on
+// its account's usage limit and resume-on-limit waits for a swap — parked,
+// not working, not failed.
 export type SidebarThreadStatus =
   | "approval"
   | "input"
   | "held"
+  | "limited"
   | "working"
   | "monitoring"
   | "failed"
@@ -808,7 +811,12 @@ export function shouldRecedeSidebarThread(input: {
   isSelected: boolean;
 }): boolean {
   if (input.isActive || input.isSelected) return false;
-  if (input.status === "working" || input.status === "monitoring" || input.status === "held") {
+  if (
+    input.status === "working" ||
+    input.status === "monitoring" ||
+    input.status === "held" ||
+    input.status === "limited"
+  ) {
     return true;
   }
   if (input.status === "ready" || input.status === "approval" || input.status === "input") {
@@ -824,7 +832,7 @@ type SidebarThreadStatusInput = Pick<
 
 export function resolveSidebarThreadStatus(
   thread: SidebarThreadStatusInput,
-  options?: { readonly held?: boolean },
+  options?: { readonly held?: boolean; readonly limited?: boolean },
 ): SidebarThreadStatus {
   if (thread.hasPendingApprovals) {
     return "approval";
@@ -836,6 +844,11 @@ export function resolveSidebarThreadStatus(
   // was requested, never sent.
   if (options?.held === true) {
     return "held";
+  }
+  // A limit-stopped turn is parked, whatever the session row still says
+  // (a parked turn stays "running" until it is resumed or interrupted).
+  if (options?.limited === true) {
+    return "limited";
   }
   if (thread.session?.status === "running" || thread.session?.status === "starting") {
     return "working";
