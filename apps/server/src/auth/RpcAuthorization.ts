@@ -1,5 +1,6 @@
 import {
   AuthAccessReadScope,
+  AuthAccessWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
@@ -164,6 +165,10 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.infinitusCommand]: AuthOrchestrationOperateScope,
   // Launching the app spawns a process on the host.
   [WS_METHODS.infinitusLaunch]: AuthOrchestrationOperateScope,
+  // Pending pairing requests are pairing metadata, like the pairing-links
+  // list; deciding one mints a pairing credential, like creating a link.
+  [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,
+  [WS_METHODS.infinitusPairingDecide]: AuthAccessWriteScope,
 } as const satisfies Readonly<Record<WsRpcMethod, AuthEnvironmentScope>>;
 
 export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope {

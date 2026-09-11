@@ -51,15 +51,25 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
   `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an
-  Anthropic-compatible proxy's models) the same way.
+  Anthropic-compatible proxy's models) the same way;
+  `subscribeInfinitusPairing` / `infinitus.pairingDecide` (approve-on-Mac
+  pairing, #710) the same way, contracts in `infinitusPairing.ts`.
+- `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
+  `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
+  routes (#710), so the typed HTTP clients carry them.
+- `packages/contracts/package.json` — the `./infinitus` and
+  `./infinitusPairing` subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
   `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663).
-- `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` in
-  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts it.
+- `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` and
+  `subscribeInfinitusPairing` in `EnvironmentSubscriptionRpcTag`, so the
+  client's `subscribe` accepts them.
 - `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
   and answers the two Infinitus methods; answers `provider.proxyModels` with
-  `fetchProxyModels` over the server's `HttpClient`.
+  `fetchProxyModels` over the server's `HttpClient`; pulls `InfinitusPairing`
+  and answers the pairing stream and `decide` (the approver's session scopes
+  go along; only the request id reaches the span).
 - `packages/client-runtime/src/state/server.ts` — `serverEnvironment.proxyModels`
   command (single-flight per base URL).
 - `apps/web/src/components/settings/AddProviderInstanceDialog.tsx` — the Claude
@@ -72,7 +82,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648).
+  (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
+  `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
+  (#710).
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
@@ -84,7 +96,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   preload entries for those methods; `apps/desktop/src/main.ts` —
   `InfinitusDesktop.layer` in `desktopApplicationLayer`.
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
-  harness's stub stack, since the routes layer now needs the service.
+  harness's stub stack, since the routes layer now needs the service; a
+  `Layer.mock(InfinitusPairing)` beside it.
 - `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
   the descriptor through `withAlternateHttpBaseUrls` (#663).
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`

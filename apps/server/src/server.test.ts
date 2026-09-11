@@ -112,6 +112,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
+import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -783,6 +784,11 @@ const buildAppUnderTest = (options?: {
           }),
           Layer.mock(InfinitusCompanion)({
             launch: Effect.succeed({ launched: false, reason: "no Infinitus in tests" }),
+          }),
+          // Nothing is ever waiting for approval here; the store has its own tests.
+          Layer.mock(InfinitusPairing)({
+            pending: Stream.empty,
+            decide: () => Effect.succeed({ decided: false }),
           }),
           Layer.mock(UsageLimitSources.UsageLimitSources)({
             current: Effect.succeed([]),

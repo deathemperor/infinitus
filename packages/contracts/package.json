@@ -23,6 +23,10 @@
       "types": "./src/infinitus.ts",
       "import": "./src/infinitus.ts"
     },
+    "./infinitusPairing": {
+      "types": "./src/infinitusPairing.ts",
+      "import": "./src/infinitusPairing.ts"
+    },
     "./productName": {
       "types": "./src/productName.ts",
       "import": "./src/productName.ts"
