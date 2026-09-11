@@ -7,6 +7,10 @@ import {
   parseTeamStatus,
   relativeUnix,
   teamCommandInput,
+  teamCreateCommandInput,
+  teamCreateDraft,
+  teamCreateSecretArgs,
+  teamCreateSupported,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
@@ -141,5 +145,35 @@ describe("team.logic (#747)", () => {
     expect(infinitusSecretFailure(Cause.fail(new Error("team-join needs the team code")))).toBe(
       "team-join needs the team code",
     );
+  });
+});
+
+describe("team.logic create (#747)", () => {
+  it("gates on team-create taking stdin as a secret", () => {
+    expect(teamCreateSupported([command("team-create", "secret")])).toBe(true);
+    expect(teamCreateSupported([command("team-create")])).toBe(false);
+  });
+
+  it("trims the draft and refuses blanks and overlong fields", () => {
+    expect(teamCreateDraft(" Alpha ", "Me", " git@host:o/r.git ")).toEqual({
+      name: "Alpha",
+      leader: "Me",
+      remote: "git@host:o/r.git",
+    });
+    expect(teamCreateDraft("", "Me", "url")).toBeNull();
+    expect(teamCreateDraft("Alpha", "Me", "u".repeat(129))).toBeNull();
+  });
+
+  it("keys the secret call by the manifest's names and keeps the token off the args", () => {
+    const draft = { name: "Alpha", leader: "Me", remote: "https://host/o/r.git" };
+    expect(teamCreateSecretArgs(draft)).toEqual({
+      command: "team-create",
+      args: { name: "Alpha", remote: "https://host/o/r.git", as: "Me" },
+    });
+    expect(teamCreateCommandInput(draft)).toEqual({
+      command: "team-create",
+      args: ["Alpha"],
+      options: { remote: "https://host/o/r.git", as: "Me" },
+    });
   });
 });

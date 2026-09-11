@@ -477,9 +477,15 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   invite link on `secret` — a `type="password"` `autoComplete="off"` field
   held in memory only, cleared on submit and gone with the page; the Mac's
   error verbatim and the code never interpolated. The server's four secret
-  refusals get a plain sentence each (`infinitusSecretFailure`). Gated on
-  `team-status`; Join also on `team-join` with `stdin: "secret"`. Create and
-  Hostnames follow in their own PRs.
+  refusals get a plain sentence each (`infinitusSecretFailure`). Create a
+  team (no team only): team name, your name and the empty private repo's URL
+  as the manifest's `name` / `--remote` / `--as` (args keys `name`, `remote`,
+  `as`); a write token, when the remote needs one, rides `secret` over
+  `infinitus.secret`, and with the token field empty the same verb goes over
+  `infinitus.command` (an ssh remote, a credential-less one) — no empty
+  secret is ever sent. Gated on `team-status`; Join also on `team-join` and
+  Create on `team-create`, each with `stdin: "secret"`. Hostnames follow in
+  their own PR.
 - `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
   the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
   shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
