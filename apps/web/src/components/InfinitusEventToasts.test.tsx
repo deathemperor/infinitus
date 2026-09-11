@@ -10,7 +10,7 @@ const environmentId = EnvironmentId.make("test-environment");
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
-  pairing: null as ReadonlyArray<PairingApprovalRequest> | null,
+  pairing: { kind: "loading" } as PairingAccess,
   capability: true as boolean | undefined,
   addToast: vi.fn(),
   command: vi.fn(),
@@ -39,14 +39,15 @@ vi.mock("../state/environments", () => ({
 vi.mock("../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
-    pairing: () => ({ label: "pairing-atom" }),
     command: { label: "command-atom" },
   },
 }));
+vi.mock("../components/settings/infinitus/usePairingRequests", () => ({
+  usePairingRequests: () => testState.pairing,
+}));
 vi.mock("../state/query", () => ({
   useEnvironmentQuery: (atom: { label: string } | null) => ({
-    data:
-      atom === null ? null : atom.label === "pairing-atom" ? testState.pairing : testState.snapshot,
+    data: atom === null ? null : testState.snapshot,
     error: null,
     isPending: false,
     isSuccess: true,
@@ -56,6 +57,7 @@ vi.mock("../state/query", () => ({
 vi.mock("../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
 
 import { InfinitusEventToasts } from "./InfinitusEventToasts";
+import type { PairingAccess } from "./settings/infinitus/pairingAccess.logic";
 
 const event = (id: string, icon: string, text: string) => ({
   id,
@@ -92,11 +94,13 @@ async function deliver(renderer: ReactTestRenderer, snapshot: InfinitusSnapshot)
   });
 }
 
-async function deliverPairing(
-  renderer: ReactTestRenderer,
-  requests: ReadonlyArray<PairingApprovalRequest>,
-): Promise<void> {
-  testState.pairing = requests;
+const pending = (...requests: ReadonlyArray<PairingApprovalRequest>): PairingAccess => ({
+  kind: "ok",
+  requests,
+});
+
+async function deliverPairing(renderer: ReactTestRenderer, access: PairingAccess): Promise<void> {
+  testState.pairing = access;
   await act(async () => {
     renderer.update(<InfinitusEventToasts />);
   });
@@ -115,7 +119,7 @@ const pairingRequest = (id: string, deviceName = "Titan"): PairingApprovalReques
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
-  testState.pairing = null;
+  testState.pairing = { kind: "loading" };
   testState.capability = true;
   testState.addToast = vi.fn();
   testState.command = vi.fn().mockResolvedValue({ _tag: "Success", value: {} });
@@ -241,7 +245,7 @@ describe("InfinitusEventToasts", () => {
 
 describe("InfinitusEventToasts — pairing requests (#710)", () => {
   it("toasts a request already pending at mount, once, with Open leading to the Devices card", async () => {
-    testState.pairing = [pairingRequest("req-1")];
+    testState.pairing = pending(pairingRequest("req-1"));
     const renderer = await mount();
     expect(testState.addToast).toHaveBeenCalledTimes(1);
     const toast = testState.addToast.mock.calls[0]?.[0] as {
@@ -259,26 +263,49 @@ describe("InfinitusEventToasts — pairing requests (#710)", () => {
     toast.actionProps.onClick();
     expect(testState.navigate).toHaveBeenCalledWith({ to: "/settings/infinitus/devices" });
 
-    await deliverPairing(renderer, [pairingRequest("req-1")]);
+    await deliverPairing(renderer, pending(pairingRequest("req-1")));
     expect(testState.addToast).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 
   it("toasts each new request as the list changes and nothing when one leaves", async () => {
-    testState.pairing = [];
+    testState.pairing = pending();
     const renderer = await mount();
     expect(testState.addToast).not.toHaveBeenCalled();
 
-    await deliverPairing(renderer, [pairingRequest("req-1")]);
-    await deliverPairing(renderer, [pairingRequest("req-1"), pairingRequest("req-2", "Pixel")]);
+    await deliverPairing(renderer, pending(pairingRequest("req-1")));
+    await deliverPairing(
+      renderer,
+      pending(pairingRequest("req-1"), pairingRequest("req-2", "Pixel")),
+    );
     expect(testState.addToast).toHaveBeenCalledTimes(2);
     expect(testState.addToast).toHaveBeenLastCalledWith(
       expect.objectContaining({ title: "“Pixel” wants to pair" }),
     );
 
-    await deliverPairing(renderer, [pairingRequest("req-2", "Pixel")]);
-    await deliverPairing(renderer, []);
+    await deliverPairing(renderer, pending(pairingRequest("req-2", "Pixel")));
+    await deliverPairing(renderer, pending());
     expect(testState.addToast).toHaveBeenCalledTimes(2);
+    renderer.unmount();
+  });
+
+  it("toasts nothing when the stream is refused for want of a scope, and warns once on any other failure (#730)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    testState.pairing = { kind: "forbidden" };
+    const renderer = await mount();
+    await deliverPairing(renderer, { kind: "forbidden" });
+    expect(testState.addToast).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+
+    await deliverPairing(renderer, { kind: "failed", message: "socket closed" });
+    await deliverPairing(renderer, { kind: "failed", message: "socket closed" });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(testState.addToast).not.toHaveBeenCalled();
+
+    // The stream coming back is news again.
+    await deliverPairing(renderer, pending(pairingRequest("req-1")));
+    expect(testState.addToast).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
     renderer.unmount();
   });
 });
