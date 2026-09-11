@@ -4,6 +4,7 @@ import * as Order from "effect/Order";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 
+import { withoutSideQuestionSnapshots } from "../infinitus/sideQuestions";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
 import { useArchivedThreadListActions } from "../home/useThreadListActions";
 import {
@@ -49,7 +50,8 @@ export function ArchivedThreadsRouteScreen() {
   const groups = useMemo(
     () =>
       buildArchivedThreadGroups({
-        snapshots,
+        // Fork (#269 C): side questions live in their thread's drawer.
+        snapshots: withoutSideQuestionSnapshots(snapshots),
         environmentLabels,
         environmentId: selectedEnvironmentId,
         searchQuery,
