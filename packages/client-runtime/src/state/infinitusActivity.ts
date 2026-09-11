@@ -31,6 +31,16 @@ export const ACTIVITY_KIND_LABELS: Readonly<Record<string, string>> = {
   pairing: "pairing",
 };
 
+/** The engine poller's two lines a minute — `poll` and `no switch — <reason>`
+    — which bury the switches, tunnel and pairing events the page exists for
+    (#696). Native logs every engine event other than switch, all-exhausted
+    and session-resumed as kind `other` (AppModel.eventKind, native 273b1f848),
+    so the text decides; the icon cannot, since `hand.raised` is also the
+    "session is waiting for an answer" row. */
+export function isPollRow(row: Pick<ActivityRow, "kind" | "text">): boolean {
+  return row.kind === "other" && (row.text === "poll" || row.text.startsWith("no switch"));
+}
+
 const decodeRows = Schema.decodeUnknownOption(Schema.Array(InfinitusEventRow));
 
 /** The `events` reply as rows, or null for anything else. */

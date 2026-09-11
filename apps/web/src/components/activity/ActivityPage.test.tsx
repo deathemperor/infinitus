@@ -7,6 +7,7 @@ const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   events: null as { result?: unknown } | null,
   capability: true as boolean | undefined,
+  showPolls: false,
   refresh: vi.fn(),
 }));
 
@@ -15,6 +16,9 @@ const NOW_ISO = "2026-09-11T12:00:00.000Z";
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () => ({ environment: { capabilities: { infinitus: testState.capability } } }),
+}));
+vi.mock("../../hooks/useLocalStorage", () => ({
+  useLocalStorage: () => [testState.showPolls, vi.fn()],
 }));
 vi.mock("../../hooks/useNowMinute", () => ({ useNowMinute: () => NOW_ISO }));
 vi.mock("../../hooks/useSettings", () => ({
@@ -74,8 +78,26 @@ beforeEach(() => {
   testState.snapshot = null;
   testState.events = null;
   testState.capability = true;
+  testState.showPolls = false;
   testState.refresh = vi.fn();
 });
+
+const pollRows = [
+  {
+    at: "2026-09-11T11:58:00Z",
+    icon: "clock.arrow.circlepath",
+    text: "poll",
+    kind: "other",
+    id: "P",
+  },
+  {
+    at: "2026-09-11T11:58:01Z",
+    icon: "hand.raised",
+    text: "no switch — already consuming soonest",
+    kind: "other",
+    id: "N",
+  },
+];
 
 describe("ActivityPage", () => {
   it("lists the log newest first under day headings with kind chips", () => {
@@ -107,6 +129,31 @@ describe("ActivityPage", () => {
     expect(markup).toContain(">switch<");
     expect(markup).toContain("Today");
     expect(markup).toContain("Yesterday");
+  });
+
+  it("hides the poller's lines until Show polls is on, and says so when they are all there is", () => {
+    testState.snapshot = readySnapshot;
+    testState.events = {
+      result: [
+        ...pollRows,
+        { at: "2026-09-11T02:44:12Z", icon: "🔑", text: "phone paired", kind: "pairing", id: "K" },
+      ],
+    };
+    let markup = renderToStaticMarkup(<ActivityPage />);
+    expect(markup).toContain("phone paired");
+    expect(markup).not.toContain("already consuming soonest");
+    expect(markup).not.toContain(">poll<");
+    expect(markup).toContain('aria-pressed="false"');
+
+    testState.events = { result: pollRows };
+    markup = renderToStaticMarkup(<ActivityPage />);
+    expect(markup).toContain("Only polls so far");
+    expect(markup).not.toContain("Nothing logged yet.");
+
+    testState.showPolls = true;
+    markup = renderToStaticMarkup(<ActivityPage />);
+    expect(markup).toContain("already consuming soonest");
+    expect(markup).toContain('aria-pressed="true"');
   });
 
   it("says so when the build has no events verb, when nothing is logged, and when offline", () => {

@@ -7,13 +7,16 @@ import {
   ACTIVITY_KIND_LABELS,
   activityRows,
   decodeEventRows,
+  isPollRow,
 } from "@t3tools/client-runtime/state/infinitusActivity";
 import type { InfinitusEvent } from "@t3tools/contracts/infinitus";
+import * as Schema from "effect/Schema";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
 import { isElectron } from "../../env";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { usePrimaryEnvironmentId } from "../../state/environments";
@@ -32,6 +35,8 @@ import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { activityDays } from "./activity.logic";
 
 const EVENTS_INPUT = { command: "events", args: [], options: { limit: "100" } } as const;
+/** Whether the poller's per-minute lines show; off by default (#696). */
+const SHOW_POLLS_KEY = "infinitus.activityShowPolls";
 
 /**
  * `/activity` (#659): the pop-out's Activity pane, in the fork — every
@@ -48,6 +53,11 @@ export function ActivityPage() {
   );
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const minute = useNowMinute();
+  const [showPolls, setShowPolls] = useLocalStorage<boolean, boolean>(
+    SHOW_POLLS_KEY,
+    false,
+    Schema.Boolean,
+  );
   const ready = capability === true && environmentId !== null;
   const snapshotQuery = useEnvironmentQuery(
     ready ? infinitusEnvironment.snapshot({ environmentId, input: {} }) : null,
@@ -72,10 +82,18 @@ export function ActivityPage() {
   }, [news]);
   useEffect(() => setDeltas([]), [environmentId]);
 
-  const days = useMemo(
-    () => (initial === null ? [] : activityDays(activityRows(initial, deltas), Date.parse(minute))),
-    [initial, deltas, minute],
+  // The store keeps every row so the toggle is instant; only the view drops
+  // the poller's lines.
+  const rows = useMemo(
+    () => (initial === null ? [] : activityRows(initial, deltas)),
+    [initial, deltas],
   );
+  const visible = useMemo(
+    () => (showPolls ? rows : rows.filter((row) => !isPollRow(row))),
+    [rows, showPolls],
+  );
+  const hiddenPolls = rows.length - visible.length;
+  const days = useMemo(() => activityDays(visible, Date.parse(minute)), [visible, minute]);
 
   const topbarContent = (
     <div className="flex w-full min-w-0 items-center gap-x-3 py-2">
@@ -86,6 +104,14 @@ export function ActivityPage() {
       </WorkspaceBreadcrumb>
       <Button
         className="ms-auto"
+        size="sm"
+        variant={showPolls ? "secondary" : "ghost"}
+        aria-pressed={showPolls}
+        onClick={() => setShowPolls((previous) => !previous)}
+      >
+        Show polls
+      </Button>
+      <Button
         onClick={() => eventsQuery.refresh()}
         aria-label="Refresh activity"
         aria-busy={eventsQuery.isPending}
@@ -132,7 +158,11 @@ export function ActivityPage() {
         <p className="text-muted-foreground text-sm">The events reply could not be read.</p>
       );
   } else if (days.length === 0) {
-    body = <p className="text-muted-foreground text-sm">Nothing logged yet.</p>;
+    body = (
+      <p className="text-muted-foreground text-sm">
+        {hiddenPolls === 0 ? "Nothing logged yet." : "Only polls so far — Show polls to see them."}
+      </p>
+    );
   } else {
     body = (
       <div className="flex flex-col gap-5">

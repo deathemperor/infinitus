@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { activityRows, decodeEventRows } from "./infinitusActivity.ts";
+import { activityRows, decodeEventRows, isPollRow } from "./infinitusActivity.ts";
 
 describe("decodeEventRows", () => {
   it("reads the verb's array and rejects anything else", () => {
@@ -9,6 +9,18 @@ describe("decodeEventRows", () => {
     ).toHaveLength(1);
     expect(decodeEventRows({ events: [] })).toBeNull();
     expect(decodeEventRows([{ at: 1 }])).toBeNull();
+  });
+});
+
+describe("isPollRow", () => {
+  it("names the poller's two lines by text, never by icon or a real kind", () => {
+    expect(isPollRow({ kind: "other", text: "poll" })).toBe(true);
+    expect(isPollRow({ kind: "other", text: "no switch — already consuming soonest" })).toBe(true);
+    expect(isPollRow({ kind: "other", text: "headless session 42 is waiting for an answer" })).toBe(
+      false,
+    );
+    expect(isPollRow({ kind: "other", text: "fork server: poll" })).toBe(false);
+    expect(isPollRow({ kind: "switch", text: "poll" })).toBe(false);
   });
 });
 
