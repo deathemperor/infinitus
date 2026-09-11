@@ -234,6 +234,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` keys (interface
   and sanitizer).
+- `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
+  `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
+  feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  builds `InfinitusHoldBanner` from the thread's detail for it (never for a
+  queued creation).
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -687,6 +692,14 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   `expiresAt` with nothing answering), refused (429) and unreachable each get
   a banner; Cancel aborts the wait. `ConnectionsNewRouteScreen.tsx` only mounts
   it and maps the credential to the existing connect path.
+- `apps/mobile/src/features/infinitus/InfinitusHoldBanner.tsx` (+
+  `holdBanner.logic.ts`, `pinThread.ts`, `pinThread.logic.ts`) — the phone's
+  held-thread card (#742, the web's #745): "Waiting for headroom" with the
+  held row's line, **Run now** (`infinitus.releaseThread`, then what the hold
+  answered) and **Pin** (capability-gated; pins like the thread list does,
+  top-of-run order key on reordering servers, and pinning releases the hold on
+  the server). Derived from the work-log marker rows via
+  `@t3tools/client-runtime/state/infinitusThreadHold`; nothing persisted.
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the

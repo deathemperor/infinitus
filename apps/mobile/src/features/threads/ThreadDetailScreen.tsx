@@ -37,6 +37,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
   Alert,
@@ -127,6 +128,9 @@ export interface ThreadDetailScreenProps {
     | { readonly kind: "preparing"; readonly preparingWorktree: boolean }
     | { readonly kind: "failed"; readonly reason: string; readonly onEditTask: () => void }
     | null;
+  /** Infinitus (fork, #742): the "Waiting for headroom" card for a held
+      thread, built by the route from the thread's detail; null otherwise. */
+  readonly infinitusHoldBanner?: ReactNode;
   readonly activePendingApproval: PendingApproval | null;
   readonly respondingApprovalId: ApprovalRequestId | null;
   readonly activePendingUserInput: PendingUserInput | null;
@@ -943,6 +947,15 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                     onDismiss={() => props.onDismissFeedback(submission.id)}
                   />
                 ))}
+                {props.infinitusHoldBanner ? (
+                  <Animated.View
+                    className="shrink-0 px-4 pb-3"
+                    entering={FadeInDown.duration(220)}
+                    exiting={FadeOut.duration(140)}
+                  >
+                    {props.infinitusHoldBanner}
+                  </Animated.View>
+                ) : null}
                 {usageLimitsReport && activeUserInputRequestId === null ? (
                   <Animated.View
                     className="shrink-0 px-4 pb-3"

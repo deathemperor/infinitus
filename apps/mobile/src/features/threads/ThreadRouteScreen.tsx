@@ -75,6 +75,7 @@ import { useSelectedThreadRequests } from "../../state/use-selected-thread-reque
 import { useSelectedThreadWorktree } from "../../state/use-selected-thread-worktree";
 import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { threadEnvironment } from "../../state/threads";
+import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import {
@@ -867,6 +868,16 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusHoldBanner={
+            creationState === null && selectedThreadDetail !== null ? (
+              <InfinitusHoldBanner
+                environmentId={environmentId}
+                threadId={selectedThread.id}
+                activities={selectedThreadDetail.activities}
+                latestTurn={selectedThreadDetail.latestTurn}
+              />
+            ) : null
+          }
           activePendingApproval={requests.activePendingApproval}
           respondingApprovalId={requests.respondingApprovalId}
           activePendingUserInput={requests.activePendingUserInput}
