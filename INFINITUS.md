@@ -1191,7 +1191,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
   Mac-driven Live Activity: layouts (content = native's activity states),
-  token registration, settings.
+  token registration, settings. `testCard.logic.ts` (#845) backs the
+  section's "Show a test card" row (iOS, under the Live Activity switch):
+  one press starts `InfinitusWorking` locally with a fabricated state, no
+  APNs in the loop, so a blank card blames the widget and a refusal
+  (ActivityKit's message in an alert) blames the phone's settings; with
+  working cards live the same row reads "End the working card(s)" and ends
+  them all — the Mac cannot end a card it never got an update token for.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
