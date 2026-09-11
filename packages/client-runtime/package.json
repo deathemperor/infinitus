@@ -135,6 +135,10 @@
       "types": "./src/state/infinitusExhausted.ts",
       "default": "./src/state/infinitusExhausted.ts"
     },
+    "./state/infinitusThreadHold": {
+      "types": "./src/state/infinitusThreadHold.ts",
+      "default": "./src/state/infinitusThreadHold.ts"
+    },
     "./state/infinitusStats": {
       "types": "./src/state/infinitusStats.ts",
       "default": "./src/state/infinitusStats.ts"

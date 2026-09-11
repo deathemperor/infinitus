@@ -510,7 +510,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
   row per hold, which the web derives the held state from. "Run now" is the
   `infinitus.releaseThread` RPC (operate scope, `{threadId}` → `{released,
 reason?}`, never an error) answered by `ws.ts` from the same service. The
-  snapshot subscription is held only while a start is. Archived or deleted while held:
+  snapshot subscription is held only while a start is. The web reads the held
+  state from those rows (`packages/client-runtime/src/state/infinitusThreadHold.ts`)
+  and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
+  `infinitusHoldBanner.logic.ts`) in the composer banner stack, one mount in
+  `ChatView.tsx` beside the snoozed/settled banners: "Waiting for headroom",
+  the row's line, "Run now" and "Pin". Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
