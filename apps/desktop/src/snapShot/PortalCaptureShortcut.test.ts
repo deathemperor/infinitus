@@ -3,6 +3,7 @@ import * as NodeEvents from "node:events";
 import { DBusError, Message, MessageType, Variant, type MessageBus } from "dbus-next";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import { PortalCaptureShortcut, portalShortcutTrigger } from "./PortalCaptureShortcut.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const chord = {
   key: "2",
@@ -318,7 +319,7 @@ it("guides users to manual desktop settings when the portal cannot open them", a
   expect(client.hasSession).toBe(true);
   expect(client.state.shortcutCanRetry).toBe(false);
   expect(client.state.shortcutMessage).toBe(
-    "Shortcut permission wasn't granted. Allow T3 Code in your desktop's shortcut settings.",
+    `Shortcut permission wasn't granted. Allow ${PRODUCT_NAME} in your desktop's shortcut settings.`,
   );
   await expect(client.configure()).rejects.toThrow("Open your desktop's shortcut settings");
   expect(bus.calls.some((message) => message.member === "ConfigureShortcuts")).toBe(false);

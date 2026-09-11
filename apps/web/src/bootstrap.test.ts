@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { showBootError } from "./lib/bootError";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 class BootElement extends EventTarget {
   children: BootElement[] = [];
@@ -64,7 +65,7 @@ describe("app startup failures", () => {
     await import("./bootstrap");
     await vi.dynamicImportSettled();
 
-    expect(bootShell?.text).toContain("T3 Code could not load.");
+    expect(bootShell?.text).toContain(`${PRODUCT_NAME} could not load.`);
     const reloadButton = bootShell?.children[0]?.children.find(
       (element) => element.tagName === "button",
     );
@@ -78,7 +79,7 @@ describe("app startup failures", () => {
 
     showBootError(new Error("internal module path"));
 
-    expect(bootShell?.text).toContain("T3 Code could not load.");
+    expect(bootShell?.text).toContain(`${PRODUCT_NAME} could not load.`);
     expect(bootShell?.text.includes("internal module path")).toBe(dev);
   });
 

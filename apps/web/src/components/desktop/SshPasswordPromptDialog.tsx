@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 function describeSshTarget(request: DesktopSshPasswordPromptRequest): string {
   return request.username ? `${request.username}@${request.destination}` : request.destination;
@@ -161,7 +162,7 @@ function ActiveSshPasswordPrompt({
           <DialogTitle>SSH Password Required</DialogTitle>
           <DialogDescription>
             T3 needs your SSH password to connect to <code>{target}</code>. The password is passed
-            to the local SSH process for this connection attempt and is not saved by T3 Code.
+            to the local SSH process for this connection attempt and is not saved by {PRODUCT_NAME}.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-3" scrollFade={false}>

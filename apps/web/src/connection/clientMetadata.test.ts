@@ -6,6 +6,7 @@ import {
   browserFamily,
   clientPresentationMetadata,
 } from "./clientMetadata";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const desktopChrome = {
   userAgent:
@@ -80,7 +81,7 @@ describe("client telemetry metadata", () => {
         desktopBridge: { getClientPlatform: () => "darwin" },
       }),
     ).toEqual({
-      label: "T3 Code Desktop",
+      label: `${PRODUCT_NAME} Desktop`,
       deviceType: "desktop",
       os: "macOS",
       surface: "desktop",

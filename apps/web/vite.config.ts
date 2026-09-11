@@ -130,12 +130,16 @@ const devProxyTarget = resolveDevProxyTarget(process.env.T3CODE_PORT, configured
 // both machines sit idle. Compressing turns it into a few seconds of CPU.
 // Brotli quality 5 keeps encode time in the hundreds of ms; the default
 // (quality 11) would trade the transfer stall for an equally long encode stall.
-/** index.html can't import a constant: the boot-shell title and splash
- *  labels take the fork's product name here (INFINITUS.md). */
+/** index.html can't import a constant, and `src/lib/bootError.ts` must not
+ *  (bundledDev.test copies it into a bare root with no workspace packages):
+ *  the boot-shell title, splash labels and boot-error copy take the fork's
+ *  product name here (INFINITUS.md). */
 function productNamePlugin(): Plugin {
   return {
     name: "infinitus-product-name",
     transformIndexHtml: (html) => html.replaceAll("T3 Code", PRODUCT_NAME),
+    transform: (code, id) =>
+      id.endsWith("/src/lib/bootError.ts") ? code.replaceAll("T3 Code", PRODUCT_NAME) : null,
   };
 }
 

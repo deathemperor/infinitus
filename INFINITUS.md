@@ -65,17 +65,25 @@ this file adds the fork's own rules. Plan and history: issue #555.
   capability from `resolveInfinitusControlSocketPath`.
 - `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
   (window title, auth/pairing surfaces) instead of "T3 Code".
-- `apps/web/src/components/sidebar/SidebarChrome.tsx`,
-  `apps/web/src/components/onboarding/WelcomeWizard.tsx` — the brand mark and
-  the first-run heading read `PRODUCT_NAME`; in-copy "T3 Code" mentions stay
-  upstream's (#601).
+- `apps/web/src/**` — every user-facing "T3 Code" (brand mark, first-run
+  heading, copy, errors, labels, the boot-shell fallback) reads `PRODUCT_NAME`;
+  `productName.guard.test.ts` fails on a new literal outside its allowlist (the
+  GNOME extension's shipped name). Comments, "T3 Connect" and the
+  `t3code/<version>` UA token stay (#601 slice A).
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
-  boot-shell title and splash labels to `PRODUCT_NAME`.
+  boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
+  `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
+  and cannot import the constant).
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
   `@t3tools/shared/desktopIdentity` (`infinitus-desktop` / `infinitus-desktop-dev`), plus the
   `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.
+- `apps/desktop/src/**` — the same rule and guard test, allowlisting the
+  installed app's real `T3 Code (Alpha)`/`(Dev)` directory names and the KDE
+  component name; `resolveDesktopAppBranding` titles a fork release plain
+  `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)`/`(Nightly)`/
+  `(Alpha)` otherwise.
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
   (it never does), so an installed `T3 Code (Alpha)` is left alone.

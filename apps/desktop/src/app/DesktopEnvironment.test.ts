@@ -4,6 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
@@ -182,4 +183,13 @@ describe("DesktopEnvironment", () => {
       );
     }),
   );
+
+  it("titles a fork release plainly and keeps upstream's stage suffixes", () => {
+    const branding = (isDevelopment: boolean, appVersion: string) =>
+      DesktopEnvironment.resolveDesktopAppBranding({ isDevelopment, appVersion }).displayName;
+    assert.equal(branding(false, "0.0.40-infinitus.20260910.5"), PRODUCT_NAME);
+    assert.equal(branding(true, "0.0.40-infinitus.20260910.5"), `${PRODUCT_NAME} (Dev)`);
+    assert.equal(branding(false, "0.0.40-nightly.20260910.5"), `${PRODUCT_NAME} (Nightly)`);
+    assert.equal(branding(false, "0.0.40"), `${PRODUCT_NAME} (Alpha)`);
+  });
 });
