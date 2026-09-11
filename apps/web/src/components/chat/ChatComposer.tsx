@@ -2078,7 +2078,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // Prompts (#270 G, fork): the routed project's saved snippets, for the
   // Prompts popover and the `/` menu below.
-  const promptSnippets = useProjectPromptSnippets(useActiveProjectRef());
+  // One route read for the fork's project-scoped features; the hook is
+  // identity-stable so the composer can still bail out of no-op updates (#821).
+  const activeProjectRef = useActiveProjectRef();
+  const promptSnippets = useProjectPromptSnippets(activeProjectRef);
   // ------------------------------------------------------------------
   // Derived: composer trigger / menu
   // ------------------------------------------------------------------
@@ -4497,7 +4500,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   // Captures (#433, fork): the popover's open state, the project's open
   // count for the badge, and the two shortcuts, all fork-owned.
-  const capturesProject = useActiveProjectRef();
+  const capturesProject = activeProjectRef;
   const isCapturesMenuOpen = useCapturesUiStore((store) => store.open);
   const capturesFocusInputKey = useCapturesUiStore((store) => store.focusInputKey);
   const toggleCapturesMenu = useCapturesUiStore((store) => store.toggle);
@@ -4510,7 +4513,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           input: { projectId: capturesProject.projectId },
         }),
   );
-  useCapturesShortcuts({ keybindings, terminalOpen, modelPickerOpen: isComposerModelPickerOpen });
+  useCapturesShortcuts({
+    keybindings,
+    terminalOpen,
+    modelPickerOpen: isComposerModelPickerOpen,
+    project: activeProjectRef,
+  });
   // Prompts (#270 G, fork): the popover's open state; its list is read above
   // the command-menu derivation so the `/` menu can offer the snippets too.
   const isPromptsMenuOpen = usePromptsUiStore((store) => store.open);
