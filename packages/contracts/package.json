@@ -22,6 +22,10 @@
     "./infinitus": {
       "types": "./src/infinitus.ts",
       "import": "./src/infinitus.ts"
+    },
+    "./productName": {
+      "types": "./src/productName.ts",
+      "import": "./src/productName.ts"
     }
   },
   "scripts": {

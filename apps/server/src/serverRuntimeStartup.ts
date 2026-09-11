@@ -10,6 +10,7 @@ import {
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { resolveProjectAutoPull } from "@t3tools/shared/serverSettings";
 import * as Cause from "effect/Cause";
 import * as Console from "effect/Console";
@@ -936,7 +937,7 @@ export const make = (options?: StartupOptions) =>
             const startupBrowserTarget = yield* resolveStartupBrowserTarget;
             if (serverConfig.mode !== "desktop") {
               yield* Effect.logInfo(
-                "Authentication required. Open T3 Code using the pairing URL.",
+                `Authentication required. Open ${PRODUCT_NAME} using the pairing URL.`,
               ).pipe(Effect.annotateLogs({ pairingUrl: startupBrowserTarget }));
             }
             yield* runStartupPhase("browser.open", maybeOpenBrowser(startupBrowserTarget));

@@ -1,5 +1,6 @@
 import * as NodeCrypto from "node:crypto";
 
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -722,9 +723,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       const commitEnv: NodeJS.ProcessEnv = {
         ...process.env,
         GIT_INDEX_FILE: tempIndexPath,
-        GIT_AUTHOR_NAME: "T3 Code",
+        GIT_AUTHOR_NAME: PRODUCT_NAME,
         GIT_AUTHOR_EMAIL: "t3code@users.noreply.github.com",
-        GIT_COMMITTER_NAME: "T3 Code",
+        GIT_COMMITTER_NAME: PRODUCT_NAME,
         GIT_COMMITTER_EMAIL: "t3code@users.noreply.github.com",
       };
 

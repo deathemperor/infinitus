@@ -3,6 +3,7 @@ import {
   type PullRequestDiffInput,
   type PullRequestDiffResult,
 } from "@t3tools/contracts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -31,7 +32,7 @@ export class PullRequestDiffCredentialRejectedError extends Schema.TaggedError<P
   },
 ) {
   override get message(): string {
-    return "This environment session is no longer valid (invalid_credential). Refresh the page or quit and reopen T3 Code.";
+    return `This environment session is no longer valid (invalid_credential). Refresh the page or quit and reopen ${PRODUCT_NAME}.`;
   }
 }
 

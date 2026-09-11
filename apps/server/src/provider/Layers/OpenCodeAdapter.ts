@@ -31,6 +31,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import type { OpencodeClient, Part, PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
@@ -1281,8 +1282,7 @@ export function makeOpenCodeAdapter(
       ) {
         return;
       }
-      const detail =
-        "OpenCode accepted the prompt, but T3 Code could not confirm its message or session status.";
+      const detail = `OpenCode accepted the prompt, but ${PRODUCT_NAME} could not confirm its message or session status.`;
       const abortExit = yield* Effect.exit(
         runOpenCodeSdk("session.abort", (signal) =>
           context.client.session.abort({ sessionID: context.openCodeSessionId }, { signal }),

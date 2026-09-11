@@ -190,8 +190,31 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
-- `packages/shared/src/productName.ts` — `PRODUCT_NAME`, the one constant the
-  branded surfaces import.
+- `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
+  every user-facing string routes through (#601 phase 2); contracts holds it
+  because shared depends on contracts, and `packages/shared/src/productName.ts`
+  re-exports it so `@t3tools/shared/productName` imports keep working.
+- `apps/server` — rule: any string the user reads (CLI help and command
+  descriptions, log lines, errors, HTTP/HTML pages, pairing and service copy,
+  MCP tool descriptions, the git author name, the prompts and runtime
+  instructions the assistant echoes) says `${PRODUCT_NAME}`, never a literal
+  "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
+  the `t3-code` MCP server id, the `t3code/<version>` UA token, upstream URLs,
+  "T3 Connect").
+- `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels, the
+  Live Activity title, the auth device label and the `infinitus` variant's
+  permission strings read `PRODUCT_NAME`; the `development`/`preview`/
+  `production` variants keep their upstream names (they build the real T3 Code
+  app side by side), the `t3code` URL scheme and bundle ids stay, and the
+  compact title still draws upstream's T3 wordmark glyph (an asset, not a
+  string).
+- `packages/contracts`, `packages/shared`, `packages/ssh`,
+  `packages/client-runtime` — rule: schema descriptions, error messages, the
+  askpass failure lines and the relay API title read `${PRODUCT_NAME}`; doc
+  comments, fixtures and the installed app's real `T3 Code (Alpha)` name stay
+  literal. `PRODUCT_NAME` is interpolated into generated shell and PowerShell
+  scripts (`packages/ssh/src/auth.ts`), so it must never contain `'`, `"` or
+  `$`.
 - `packages/shared/src/homeDir.ts` — `DEFAULT_HOME_DIR_NAME`, the fork's
   default state directory (`~/.infinitus`, never the real T3 Code's `~/.t3`).
 - `packages/shared/src/desktopIdentity.ts` — the desktop URL scheme

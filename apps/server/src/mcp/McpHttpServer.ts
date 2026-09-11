@@ -1,4 +1,5 @@
 import * as NodeCrypto from "node:crypto";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -444,7 +445,7 @@ export const PullRequestsToolkitRegistrationLive = McpServer.toolkit(PullRequest
 );
 
 const McpTransportLive = McpServer.layerHttp({
-  name: "T3 Code",
+  name: PRODUCT_NAME,
   version: packageJson.version,
   path: "/mcp",
   protocols: [McpProtocol.v2025_06_18],

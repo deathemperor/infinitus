@@ -20,6 +20,7 @@ import { SettingsSection } from "../settings/components/SettingsSection";
 import { AccountRow } from "./AccountRow";
 import { type InfinitusMac, infinitusMacs, macAccountsModel } from "./accountsRoute.logic";
 import { ForecastStrip } from "./ForecastStrip";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /** Settings › Accounts (#572): every paired Mac that runs Infinitus, its fleets
     and their accounts, read and driven through the T3 server's adapter. */
@@ -47,7 +48,7 @@ export function AccountsRouteScreen() {
         {macs.length === 0 ? (
           <EmptyState
             title="No Infinitus Mac"
-            detail="Accounts appear here once a paired Mac's T3 Code server runs beside Infinitus. Plain servers have nothing to show."
+            detail={`Accounts appear here once a paired Mac's ${PRODUCT_NAME} server runs beside the Infinitus menu bar app. Plain servers have nothing to show.`}
           />
         ) : (
           macs.map((mac) => (
