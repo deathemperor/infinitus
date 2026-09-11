@@ -16,8 +16,8 @@ final class LiveActivityPusher: ObservableObject {
     static let teamIDKey = "apns_team_id"
     private static let registrationsKey = "apns_activity_registrations"
 
-    @Published var keyID: String { didSet { UserDefaults.standard.set(keyID, forKey: Self.keyIDKey) } }
-    @Published var teamID: String { didSet { UserDefaults.standard.set(teamID, forKey: Self.teamIDKey) } }
+    @Published var keyID: String { didSet { AppDefaults.standard.set(keyID, forKey: Self.keyIDKey) } }
+    @Published var teamID: String { didSet { AppDefaults.standard.set(teamID, forKey: Self.teamIDKey) } }
     @Published private(set) var keyStored = false
     @Published private(set) var registrations: [String: ActivityPushRegistration] = [:]
     /// One line for the pane: the last push's outcome.
@@ -31,7 +31,7 @@ final class LiveActivityPusher: ObservableObject {
     private var inFlight: Set<String> = []
 
     init() {
-        let defaults = UserDefaults.standard
+        let defaults = AppDefaults.standard
         keyID = defaults.string(forKey: Self.keyIDKey) ?? ""
         teamID = defaults.string(forKey: Self.teamIDKey) ?? ""
         if let data = defaults.data(forKey: Self.registrationsKey) {
@@ -104,7 +104,7 @@ final class LiveActivityPusher: ObservableObject {
     private func persist() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        UserDefaults.standard.set(try? encoder.encode(registrations), forKey: Self.registrationsKey)
+        AppDefaults.standard.set(try? encoder.encode(registrations), forKey: Self.registrationsKey)
     }
 
     // MARK: tick

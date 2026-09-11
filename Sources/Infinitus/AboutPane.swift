@@ -27,7 +27,7 @@ final class UpdateModel: ObservableObject {
     /// Set at wiring: bounces the supervised engine after a real upgrade
     /// (the child stays the OLD binary until respawned).
     var restartEngine: (() -> Void)?
-    private let defaults = UserDefaults.standard
+    private let defaults = AppDefaults.standard
     private static let pypiURL = URL(string: "https://pypi.org/pypi/claude-swap/json")!
 
     init(cli: CswapCLI?) {
@@ -159,7 +159,7 @@ final class AppReleaseModel: ObservableObject {
         string: "https://api.github.com/repos/deathemperor/infinitus/releases/tags/nightly")!
     private static let caskURL = URL(
         string: "https://raw.githubusercontent.com/deathemperor/homebrew-tap/main/Casks/infinitus.rb")!
-    private let defaults = UserDefaults.standard
+    private let defaults = AppDefaults.standard
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
@@ -355,7 +355,7 @@ struct AboutPane: View {
     /// Shared with the phone's `/app/update` route (#121) so the two
     /// never run two upgrades at once.
     @ObservedObject var brew: BrewUpdater
-    @AppStorage("update_channel") private var updateChannel = "stable"
+    @AppStorage("update_channel", store: AppDefaults.standard) private var updateChannel = "stable"
     @Environment(\.openURL) private var openURL
 
     private var appVersion: String {

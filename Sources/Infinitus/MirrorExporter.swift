@@ -31,7 +31,7 @@ actor MirrorExporter {
     private var tailProgress: [String: SessionProgress] = [:]
     /// Folders sessions have run in, newest first (#91's repository
     /// picker); kept across launches.
-    private var recentCwds: [String] = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
+    private var recentCwds: [String] = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
     private static let recentCap = 20
 
     func record(listJSON: Data, prefs: FleetPrefs,
@@ -83,7 +83,7 @@ actor MirrorExporter {
         if recent.count > Self.recentCap { recent = Array(recent.prefix(Self.recentCap)) }
         if recent != recentCwds {
             recentCwds = recent
-            UserDefaults.standard.set(recent, forKey: "recent_cwds")
+            AppDefaults.standard.set(recent, forKey: "recent_cwds")
         }
         let shown = Array(sessionRecords.prefix(6))
         let sessions = shown.map { record -> SessionPanelRow in

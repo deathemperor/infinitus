@@ -133,7 +133,7 @@ final class StatusItemController {
         // item has landed in the bar (a popover anchored to an unplaced
         // button shows at the screen corner); no NSApp.activate —
         // restoring at login must not steal focus.
-        let popOutRestore = UserDefaults.standard.bool(forKey: "popout_shown")
+        let popOutRestore = AppDefaults.standard.bool(forKey: "popout_shown")
         if model.popoverPinned || popOutRestore {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 guard let self, self.anchored?.isVisible != true,
@@ -310,7 +310,7 @@ final class StatusItemController {
     func popOut() {
         if let pinned, pinned.isVisible {
             pinned.orderOut(nil)
-            UserDefaults.standard.set(false, forKey: "popout_shown")
+            AppDefaults.standard.set(false, forKey: "popout_shown")
             // Popping back IN: the content returns to its anchor spot —
             // just hiding the window left nothing on screen (user bug
             // report 2026-08-30).
@@ -511,7 +511,7 @@ final class StatusItemController {
                 name: NSWindow.willCloseNotification, object: w)
             pinned = w
             fitPinned(to: pinnedIdeal)
-            let d = UserDefaults.standard
+            let d = AppDefaults.standard
             if let x = d.object(forKey: "popout_x") as? Double,
                let y = d.object(forKey: "popout_y") as? Double {
                 w.setFrameOrigin(NSPoint(x: x, y: y))
@@ -519,7 +519,7 @@ final class StatusItemController {
             }
         }
         model.lock.surfaceShown()
-        UserDefaults.standard.set(true, forKey: "popout_shown")
+        AppDefaults.standard.set(true, forKey: "popout_shown")
         if activate {
             NSApp.activate(ignoringOtherApps: true)
             pinned?.makeKeyAndOrderFront(nil)
@@ -548,7 +548,7 @@ final class StatusItemController {
 
     @objc private func pinnedMoved() {
         guard let pinned, pinned.isVisible else { return }
-        let d = UserDefaults.standard
+        let d = AppDefaults.standard
         d.set(Double(pinned.frame.origin.x), forKey: "popout_x")
         d.set(Double(pinned.frame.origin.y), forKey: "popout_y")
     }
@@ -557,7 +557,7 @@ final class StatusItemController {
         // App-quit closes the window too; only a USER close drops the flag.
         guard !AppDelegate.terminating else { return }
         model.lock.surfaceHidden()
-        UserDefaults.standard.set(false, forKey: "popout_shown")
+        AppDefaults.standard.set(false, forKey: "popout_shown")
         syncLocalLease()
     }
 

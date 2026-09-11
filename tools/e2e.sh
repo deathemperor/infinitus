@@ -50,8 +50,11 @@ export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
 export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
 LOG="$(mktemp -t infinitus-e2e)"
-DOMAIN=Infinitus   # the unbundled debug binary's defaults domain
-VOLATILE_KEYS="popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port fork_tunnel_hostname"
+# This run's own defaults domain (#690): unbundled debug binaries used to
+# share one, so a peer's leftover fork_server_port could fail another
+# session's run. Deleted whole in cleanup.
+DOMAIN="infinitus-e2e-$$"
+export INFINITUS_DEFAULTS_SUITE="$DOMAIN"
 
 cleanup() {
     pkill -f "$APP" 2>/dev/null || true
@@ -69,10 +72,7 @@ cleanup() {
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
-    # Leave the dev domain as we found it for the keys we touched.
-    for k in $VOLATILE_KEYS; do
-        defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
-    done
+    defaults delete "$DOMAIN" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -109,10 +109,6 @@ popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='
 
 "$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
 
-# Every unbundled debug binary shares this defaults domain (#690): a
-# peer's instance can leave a value behind (a fork_server_port it was
-# handed), so the volatile keys are reset here as well as in cleanup.
-for k in $VOLATILE_KEYS; do defaults delete "$DOMAIN" "$k" 2>/dev/null || true; done
 # Worst-case prefs: pop-out restored on launch, RPG theme, ember burn.
 defaults write "$DOMAIN" popout_shown -bool true
 defaults write "$DOMAIN" popover_pinned -bool false

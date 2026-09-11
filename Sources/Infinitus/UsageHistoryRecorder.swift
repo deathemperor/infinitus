@@ -19,7 +19,7 @@ actor UsageHistoryRecorder {
     /// Stable per-machine suffix so machines never write each other's
     /// files (merge happens at read time instead).
     static var machineID: String {
-        let d = UserDefaults.standard
+        let d = AppDefaults.standard
         if let id = d.string(forKey: "machine_id"), !id.isEmpty { return id }
         let id = String(UUID().uuidString.prefix(8)).lowercased()
         d.set(id, forKey: "machine_id")

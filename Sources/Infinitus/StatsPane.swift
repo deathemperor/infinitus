@@ -12,7 +12,7 @@ import InfinitusCore
 struct StatsPane: View {
     @ObservedObject var model: StatsModel
     @ObservedObject var app: AppModel
-    @AppStorage("stats_period") private var periodRaw = Stats.Period.week.rawValue
+    @AppStorage("stats_period", store: AppDefaults.standard) private var periodRaw = Stats.Period.week.rawValue
 
     private var period: Stats.Period { Stats.Period(rawValue: periodRaw) ?? .week }
     private var summary: Stats.Summary? { model.summaries[period] }

@@ -138,14 +138,14 @@ final class NamedTunnel: ObservableObject {
             return
         }
         self.process = process
-        UserDefaults.standard.set(Int(process.processIdentifier), forKey: Self.pidKey)
+        AppDefaults.standard.set(Int(process.processIdentifier), forKey: Self.pidKey)
         status = "connecting \(hostname)…"
     }
 
     /// Same orphan story as the quick tunnel: a hard kill leaves the
     /// child running, and the pid has to still look like ours.
     private func reapOrphan() {
-        let defaults = UserDefaults.standard
+        let defaults = AppDefaults.standard
         let pid = defaults.integer(forKey: Self.pidKey)
         defaults.removeObject(forKey: Self.pidKey)
         guard pid > 1, let command = QuickTunnel.commandLine(of: pid),
@@ -158,7 +158,7 @@ final class NamedTunnel: ObservableObject {
         (process.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         process.terminationHandler = nil
         self.process = nil
-        UserDefaults.standard.removeObject(forKey: Self.pidKey)
+        AppDefaults.standard.removeObject(forKey: Self.pidKey)
         if process.isRunning { process.terminate() }
         connected = false
         status = nil
@@ -174,7 +174,7 @@ final class NamedTunnel: ObservableObject {
     private func ended() {
         guard process != nil else { return }
         process = nil
-        UserDefaults.standard.removeObject(forKey: Self.pidKey)
+        AppDefaults.standard.removeObject(forKey: Self.pidKey)
         connected = false
         // A rejected token already explains the exit; keep that line.
         if status?.hasPrefix("Cloudflare rejected") != true { status = "the named tunnel stopped" }

@@ -32,7 +32,7 @@ final class ResumeService: ObservableObject {
     /// own (#117), unlike the plain resume which only logs.
     var push: ((String) -> Void)?
 
-    private let defaults = UserDefaults.standard
+    private let defaults = AppDefaults.standard
     private let claudeDir = ClaudeSessions.configHome()
     private var busy = false
     /// Stop uuids already nudged. A stop that still stands after our best
