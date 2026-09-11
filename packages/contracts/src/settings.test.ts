@@ -444,6 +444,37 @@ describe("ClientSettings composer collapse", () => {
   });
 });
 
+describe("ServerSettings project prompt snippets (#270 G)", () => {
+  it("defaults to no snippets and decodes a per-project list", () => {
+    expect(decodeServerSettings({}).projectPromptSnippets).toEqual({});
+    const settings = decodeServerSettings({
+      projectPromptSnippets: {
+        "project-1": [{ id: "review", name: "Review", text: "Review the diff for bugs." }],
+        "project-2": null,
+      },
+    });
+    expect(settings.projectPromptSnippets["project-1" as never]).toEqual([
+      { id: "review", name: "Review", text: "Review the diff for bugs." },
+    ]);
+    expect(settings.projectPromptSnippets["project-2" as never]).toBeNull();
+  });
+
+  it("refuses an oversized name and a blank body", () => {
+    expect(() =>
+      decodeServerSettingsPatch({
+        projectPromptSnippets: {
+          "project-1": [{ id: "x", name: "n".repeat(61), text: "body" }],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      decodeServerSettingsPatch({
+        projectPromptSnippets: { "project-1": [{ id: "x", name: "Name", text: "   " }] },
+      }),
+    ).toThrow();
+  });
+});
+
 describe("ServerSettings thread settlement", () => {
   it("defaults merge settlement on and inactivity settlement to three days", () => {
     const settings = decodeServerSettings({});
