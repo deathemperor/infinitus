@@ -138,6 +138,7 @@ import { useEnvironmentQuery } from "../state/query";
 import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
 import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
 import { onNextAttentionThreadRequest } from "./sidebar/nextAttentionBus";
+import { SidebarNeedsAttention } from "./sidebar/SidebarNeedsAttention";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
   buildThreadRouteParams,
@@ -256,6 +257,7 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 // Fresh keys deliberately reset both shelves to collapsed for existing users.
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
+const NEEDS_ATTENTION_EXPANDED_KEY = "t3code:sidebar:needs-attention-expanded";
 
 function compactSidebarTimeLabel(label: string): string {
   if (label === "just now") return "now";
@@ -2338,6 +2340,15 @@ export default function Sidebar() {
   const projectGroupsRef = useRef(projectGroups);
   projectGroupsRef.current = projectGroups;
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
+  // The environments whose holds the needs-attention section reads (#269 D).
+  const infinitusEnvironmentIds = useMemo(
+    () =>
+      [...serverConfigs]
+        .filter(([, config]) => config.environment.capabilities.infinitus === true)
+        .map(([environmentId]) => environmentId)
+        .sort(),
+    [serverConfigs],
+  );
   // Threads on non-primary environments (T3 Connect, hosted) resolve their
   // provider entry from their own environment's config: default instance ids
   // are driver slugs, so a flat map would collide across environments.
@@ -2749,6 +2760,17 @@ export default function Sidebar() {
   const toggleSnoozedShelf = useCallback(
     () => setSnoozedShelfExpanded((value) => !value),
     [setSnoozedShelfExpanded],
+  );
+  // Fork (#269 D): the blocked threads above the list, open by default;
+  // collapsed it still shows the count.
+  const [needsAttentionExpanded, setNeedsAttentionExpanded] = useLocalStorage(
+    NEEDS_ATTENTION_EXPANDED_KEY,
+    true,
+    Schema.Boolean,
+  );
+  const toggleNeedsAttention = useCallback(
+    () => setNeedsAttentionExpanded((value) => !value),
+    [setNeedsAttentionExpanded],
   );
   const visibleSnoozedThreads = useMemo(() => {
     if (snoozedShelfExpanded) return snoozedThreads;
@@ -4660,6 +4682,18 @@ export default function Sidebar() {
         }
       >
         <SidebarGroup className="ps-[calc(var(--sidebar-content-inset)+1px)] pe-[var(--sidebar-content-inset)] pb-1 pt-0">
+          {!isSearchingThreads ? (
+            <SidebarNeedsAttention
+              threads={searchableThreads}
+              infinitusEnvironmentIds={infinitusEnvironmentIds}
+              routeThreadKey={routeThreadKey}
+              environmentLabelById={environmentLabelById}
+              projectDisplayNameByKey={projectDisplayNameByKey}
+              expanded={needsAttentionExpanded}
+              onToggle={toggleNeedsAttention}
+              onThreadClick={handleThreadClick}
+            />
+          ) : null}
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider

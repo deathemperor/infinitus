@@ -687,6 +687,16 @@ configured}` and drawn as the configured row with Forget token, which is
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
   `resolveNextAttentionThreadId` + tests.
+- `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx` (+
+  `sidebarNeedsAttention.logic.ts` + test) — the "Needs attention" section
+  above the sidebar's list (#269 D): every thread in `approval | input |
+  held | limited` across all projects and environments, in that order and
+  longest wait first (`collectNeedsAttention`; a hold's `since`, else the
+  thread's `updatedAt`), hidden when empty, collapsible (localStorage
+  `t3code:sidebar:needs-attention-expanded`, open by default, the count in
+  the collapsed header). One derived atom reads every Infinitus
+  environment's `infinitusEnvironment.holds` (the same family the rows
+  subscribe to); rows click through `handleThreadClick` like the list.
 - `apps/web/src/components/deepLinks/` — the desktop's deep links landing
   (#270 D): `DeepLinkCoordinator` pulls the shell's latest link once the
   primary environment is connected and on every `onDeepLinkPending` ping;
