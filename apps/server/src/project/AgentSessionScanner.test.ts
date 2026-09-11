@@ -105,10 +105,15 @@ const runScan = (input: ScannerTestInput) =>
     return yield* scanner.scan;
   }).pipe(Effect.provide(makeScannerTestLayer(input)));
 
-const runRecentThreadOutcomes = (input: ScannerTestInput & { readonly workspaceRoot: string }) =>
+const runRecentThreadOutcomes = (
+  input: ScannerTestInput & {
+    readonly workspaceRoot: string;
+    readonly options?: AgentSessionScanner.AgentSessionRecentThreadOptions;
+  },
+) =>
   Effect.gen(function* () {
     const scanner = yield* AgentSessionScanner.AgentSessionScanner;
-    return yield* scanner.recentThreads(input.workspaceRoot).pipe(
+    return yield* scanner.recentThreads(input.workspaceRoot, [], input.options).pipe(
       Stream.runCollect,
       Effect.map((outcomes) => Array.from(outcomes)),
     );
@@ -1504,6 +1509,95 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
           ["Review this code", "Looks good"],
           ["Fix the project", "Done"],
         ]);
+      }),
+    );
+
+    // Infinitus (fork): a single-session move filters by transcript name
+    // before any budget is spent, and the rest is neither imported nor skipped.
+    it.effect("yields only the requested session ids when a filter is given", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const nowMs = Date.parse("2026-08-24T12:00:00.000Z");
+        yield* TestClock.setTime(nowMs);
+        const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+        const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+        const workspace = yield* makeTempDir("t3code-workspace-");
+
+        const claudeTranscript = (sessionId: string) =>
+          `${JSON.stringify({
+            type: "user",
+            cwd: workspace,
+            sessionId,
+            timestamp: "2026-08-23T12:00:00.000Z",
+            message: { role: "user", content: `Prompt ${sessionId}` },
+          })}\n`;
+        for (const sessionId of ["claude-a", "claude-b", "claude-c"]) {
+          yield* writeTranscript({
+            filePath: path.join(claudeHomePath, "projects", "-selected", `${sessionId}.jsonl`),
+            contents: claudeTranscript(sessionId),
+            mtimeMs: nowMs - 60 * 60 * 1000,
+          });
+        }
+
+        const outcomes = yield* runRecentThreadOutcomes({
+          claudeHomePath,
+          codexHomePath,
+          workspaceRoot: workspace,
+          options: { providerSessionIds: new Set(["claude-b"]) },
+        });
+
+        expect(outcomes.map((outcome) => outcome._tag)).toEqual(["Importable"]);
+        expect(
+          outcomes.flatMap((outcome) =>
+            outcome._tag === "Importable" ? [outcome.thread.providerSessionId] : [],
+          ),
+        ).toEqual(["claude-b"]);
+      }),
+    );
+
+    it.effect("recollects transcripts for a requested session the cache has not seen", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const nowMs = Date.parse("2026-08-24T12:00:00.000Z");
+        yield* TestClock.setTime(nowMs);
+        const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+        const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+        const workspace = yield* makeTempDir("t3code-workspace-");
+        const write = (sessionId: string) =>
+          writeTranscript({
+            filePath: path.join(claudeHomePath, "projects", "-selected", `${sessionId}.jsonl`),
+            contents: `${JSON.stringify({
+              type: "user",
+              cwd: workspace,
+              sessionId,
+              timestamp: "2026-08-23T12:00:00.000Z",
+              message: { role: "user", content: `Prompt ${sessionId}` },
+            })}\n`,
+            mtimeMs: nowMs - 60 * 60 * 1000,
+          });
+        yield* write("claude-first");
+
+        // One scanner instance for both calls: the first fills its cache.
+        yield* Effect.gen(function* () {
+          const scanner = yield* AgentSessionScanner.AgentSessionScanner;
+          const collect = (options?: AgentSessionScanner.AgentSessionRecentThreadOptions) =>
+            scanner.recentThreads(workspace, [], options).pipe(
+              Stream.runCollect,
+              Effect.map((outcomes) =>
+                Array.from(outcomes).flatMap((outcome) =>
+                  outcome._tag === "Importable" ? [outcome.thread.providerSessionId] : [],
+                ),
+              ),
+            );
+          expect(yield* collect()).toEqual(["claude-first"]);
+          yield* write("claude-later");
+          expect(yield* collect({ providerSessionIds: new Set(["claude-later"]) })).toEqual([
+            "claude-later",
+          ]);
+          expect(yield* collect({ providerSessionIds: new Set(["claude-first"]) })).toEqual([
+            "claude-first",
+          ]);
+        }).pipe(Effect.provide(makeScannerTestLayer({ claudeHomePath, codexHomePath })));
       }),
     );
 

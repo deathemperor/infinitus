@@ -13,6 +13,7 @@ import {
   ProjectId,
   ProviderDriverKind,
   ThreadId,
+  type AgentSessionImportedThread,
   type AgentSessionImportInput,
   type AgentSessionImportResult,
   type OrchestrationThread,
@@ -128,11 +129,17 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
     .pipe(
       Effect.mapError((cause) => new AgentSessionScanError({ operation: "read-projects", cause })),
     );
+  // Infinitus (fork): a single-session move names the sessions it wants and
+  // gets back where each one landed.
+  const requestedSessionIds =
+    input.providerSessionIds === undefined ? undefined : new Set(input.providerSessionIds);
   const threads = scanner.recentThreads(
     workspaceRoot,
     completedSources.map((entry) => entry.source),
+    requestedSessionIds === undefined ? {} : { providerSessionIds: requestedSessionIds },
   );
   const importedThreadIds = new Set<ThreadId>();
+  const importedThreads: Array<AgentSessionImportedThread> = [];
   let importedCount = 0;
   let skippedCount = 0;
 
@@ -148,6 +155,7 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
         );
         if (outcome._tag === "AlreadyImported") {
           importedThreadIds.add(threadId);
+          importedThreads.push({ providerSessionId: outcome.source.providerSessionId, threadId });
           importedCount += 1;
         } else if (importedThreadIds.has(threadId)) {
           const recorded = yield* directory
@@ -286,6 +294,7 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
 
       if (imported) {
         importedThreadIds.add(threadId);
+        importedThreads.push({ providerSessionId: thread.providerSessionId, threadId });
         importedCount += 1;
       } else {
         skippedCount += 1;
@@ -293,5 +302,9 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
     }),
   );
 
-  return { importedCount, skippedCount } satisfies AgentSessionImportResult;
+  return {
+    importedCount,
+    skippedCount,
+    ...(requestedSessionIds === undefined ? {} : { threads: importedThreads }),
+  } satisfies AgentSessionImportResult;
 });

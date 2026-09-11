@@ -1,5 +1,11 @@
 import * as Schema from "effect/Schema";
-import { IsoDateTime, NonNegativeInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  IsoDateTime,
+  NonNegativeInt,
+  ProjectId,
+  ThreadId,
+  TrimmedNonEmptyString,
+} from "./baseSchemas.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 /** Coding agent home directories the scanner knows how to read. */
@@ -76,6 +82,12 @@ export type AgentSessionScanResult = typeof AgentSessionScanResult.Type;
 export const AgentSessionImportInput = Schema.Struct({
   projectId: ProjectId,
   expectedWorkspaceRoot: Schema.optional(TrimmedNonEmptyString),
+  /**
+   * Infinitus (fork): import only the transcripts whose provider session id
+   * is listed, so one tracked terminal session can move into a thread on its
+   * own. Absent, every recent transcript of the project is imported (upstream).
+   */
+  providerSessionIds: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
 });
 export type AgentSessionImportInput = typeof AgentSessionImportInput.Type;
 
@@ -97,9 +109,23 @@ export class AgentSessionImportProjectChangedError extends Schema.TaggedError<Ag
   }
 }
 
+/** Infinitus (fork): which thread a requested provider session ended up in. */
+export const AgentSessionImportedThread = Schema.Struct({
+  providerSessionId: TrimmedNonEmptyString,
+  threadId: ThreadId,
+});
+export type AgentSessionImportedThread = typeof AgentSessionImportedThread.Type;
+
 export const AgentSessionImportResult = Schema.Struct({
   importedCount: NonNegativeInt,
   skippedCount: NonNegativeInt,
+  /**
+   * Infinitus (fork): present only when `providerSessionIds` was given — one
+   * entry per requested session that now has a thread (imported now or
+   * already imported earlier). A requested session with no entry had no
+   * importable transcript.
+   */
+  threads: Schema.optional(Schema.Array(AgentSessionImportedThread)),
 });
 export type AgentSessionImportResult = typeof AgentSessionImportResult.Type;
 

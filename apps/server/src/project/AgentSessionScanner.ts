@@ -178,6 +178,17 @@ export type AgentSessionRecentThread =
   | { readonly _tag: "Duplicate"; readonly source: AgentSessionImportSource }
   | { readonly _tag: "Skipped" };
 
+/**
+ * Infinitus (fork): `providerSessionIds` keeps only the transcripts whose file
+ * name (Claude names a transcript after its session id) is listed, before any
+ * import budget is spent. Transcripts outside the set are dropped silently —
+ * they are not `Skipped`, so a single-session move never counts the rest of
+ * the project as skipped.
+ */
+export interface AgentSessionRecentThreadOptions {
+  readonly providerSessionIds?: ReadonlySet<string>;
+}
+
 /** Service tag for agent session discovery. */
 export class AgentSessionScanner extends Context.Service<
   AgentSessionScanner,
@@ -192,6 +203,7 @@ export class AgentSessionScanner extends Context.Service<
     readonly recentThreads: (
       workspaceRoot: string,
       completedSources?: ReadonlyArray<AgentSessionImportSource>,
+      options?: AgentSessionRecentThreadOptions,
     ) => Stream.Stream<AgentSessionRecentThread, AgentSessionScanError>;
   }
 >()("t3/project/AgentSessionScanner") {}
@@ -1328,6 +1340,7 @@ export const make = Effect.gen(function* () {
   const prepareRecentThreads = Effect.fn("AgentSessionScanner.prepareRecentThreads")(function* (
     workspaceRoot: string,
     completedSources: ReadonlyArray<AgentSessionImportSource>,
+    options: AgentSessionRecentThreadOptions,
   ) {
     const root = path.resolve(expandHomePath(workspaceRoot));
     const realRoot = yield* fileSystem.realPath(root).pipe(Effect.orElseSucceed(() => root));
@@ -1336,7 +1349,12 @@ export const make = Effect.gen(function* () {
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     const cutoffMs = nowMs - RECENT_THREAD_WINDOW_MS;
 
-    const candidates = cachedCandidates ?? (yield* collectCandidates()).candidates;
+    // A filtered call (fork, #648) names sessions that may have started after
+    // the last scan, so the cache serves it only when it holds every name.
+    const candidates =
+      cachedCandidates !== null && cacheCoversRequested(cachedCandidates, options)
+        ? cachedCandidates
+        : (yield* collectCandidates()).candidates;
     cachedCandidates = candidates;
 
     const eligibleTranscripts: Array<{
@@ -1354,6 +1372,12 @@ export const make = Effect.gen(function* () {
           transcript.mtimeMs === null ||
           transcript.mtimeMs < cutoffMs ||
           transcript.mtimeMs > nowMs
+        ) {
+          continue;
+        }
+        if (
+          options.providerSessionIds !== undefined &&
+          !options.providerSessionIds.has(path.basename(transcript.filePath, ".jsonl"))
         ) {
           continue;
         }
@@ -1484,10 +1508,24 @@ export const make = Effect.gen(function* () {
     );
   });
 
+  const cacheCoversRequested = (
+    cached: ReadonlyArray<RawCandidate>,
+    options: AgentSessionRecentThreadOptions,
+  ): boolean => {
+    if (options.providerSessionIds === undefined) return true;
+    const known = new Set(
+      cached.flatMap((candidate) =>
+        candidate.transcripts.map((transcript) => path.basename(transcript.filePath, ".jsonl")),
+      ),
+    );
+    return Array.from(options.providerSessionIds).every((sessionId) => known.has(sessionId));
+  };
+
   const recentThreads: AgentSessionScanner["Service"]["recentThreads"] = (
     workspaceRoot,
     completedSources = [],
-  ) => Stream.unwrap(prepareRecentThreads(workspaceRoot, completedSources));
+    options = {},
+  ) => Stream.unwrap(prepareRecentThreads(workspaceRoot, completedSources, options));
 
   return AgentSessionScanner.of({ scan, recentThreads });
 });
