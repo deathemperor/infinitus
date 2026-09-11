@@ -168,29 +168,16 @@ describe("promptStashStore", () => {
     expect(evicted?.id).toBe("stash");
   });
 
-  it("moveEntry swaps a queued entry with its neighbour in the same queue only (#270 F)", () => {
+  it("unqueueEntry turns a legacy queued entry into a plain stash entry (#806)", () => {
     const store = usePromptStashStore.getState();
     store.stashEntry({ ...makeEntry({ id: "a" }), queuedFor: "t" });
     store.stashEntry(makeEntry({ id: "stash" }));
-    store.stashEntry({ ...makeEntry({ id: "b" }), queuedFor: "t" });
-    store.stashEntry({ ...makeEntry({ id: "other" }), queuedFor: "u" });
-    // Stored newest first: other, b, stash, a. "b" earlier in its queue means
-    // it trades places with "a", skipping the stash entry between them.
-    store.moveEntry("b", "earlier");
-    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
-      "other",
-      "a",
-      "stash",
-      "b",
-    ]);
-    // Nothing earlier than the last of a queue: no change.
-    store.moveEntry("b", "earlier");
-    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
-      "other",
-      "a",
-      "stash",
-      "b",
-    ]);
+    store.unqueueEntry("a");
+    store.unqueueEntry("stash");
+    store.unqueueEntry("missing");
+    const entries = usePromptStashStore.getState().entries;
+    expect(entries.map((entry) => entry.id)).toEqual(["stash", "a"]);
+    expect(entries.every((entry) => entry.queuedFor === undefined)).toBe(true);
   });
 
   // This test environment has no `localStorage`, so the store runs on its

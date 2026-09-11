@@ -1,73 +1,134 @@
 import { describe, expect, it } from "vite-plus/test";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, QueueId, ThreadId, type OrchestrationQueuedTurn } from "@t3tools/contracts";
+import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
 
 import type { PromptStashEntry } from "../../promptStashStore";
 import {
   composerSendQueueKey,
-  queuedEntriesForThread,
-  queuedEntrySnippet,
-  shouldDrainSendQueue,
+  legacyQueuedEntryCommand,
+  orderedQueuedTurns,
+  parseComposerSendQueueKey,
+  queuedTurnEditableText,
+  queuedTurnMoveKey,
+  queuedTurnSnippet,
 } from "./composerSendQueue.logic";
 
-const key = composerSendQueueKey(EnvironmentId.make("env"), ThreadId.make("t1"));
-
-function entry(id: string, queuedFor?: string, prompt = id): PromptStashEntry {
+function row(id: string, orderKey: string, text = id): OrchestrationQueuedTurn {
   return {
-    id,
-    createdAt: "2026-09-11T00:00:00.000Z",
-    prompt,
+    queueId: QueueId.make(id),
+    messageId: `${id}-message` as OrchestrationQueuedTurn["messageId"],
+    text,
     attachments: [],
-    droppedImageNames: [],
-    ...(queuedFor === undefined ? {} : { queuedFor }),
+    orderKey,
+    createdAt: "2026-09-12T00:00:00.000Z",
+    updatedAt: "2026-09-12T00:00:00.000Z",
   };
 }
 
-describe("queuedEntriesForThread (#270 F)", () => {
-  it("returns this thread's queued entries oldest first and leaves the stash alone", () => {
-    const entries = [
-      entry("newest", key),
-      entry("stash"),
-      entry("other", "elsewhere"),
-      entry("oldest", key),
-    ];
-    expect(queuedEntriesForThread(entries, key).map((candidate) => candidate.id)).toEqual([
-      "oldest",
-      "newest",
-    ]);
-    expect(queuedEntriesForThread(entries, null)).toEqual([]);
+describe("orderedQueuedTurns (#806)", () => {
+  it("sorts by order key and leaves the input alone", () => {
+    const rows = [row("b", "a1"), row("a", "a0"), row("c", "a2")];
+    expect(orderedQueuedTurns(rows).map((entry) => entry.queueId)).toEqual(["a", "b", "c"]);
+    expect(rows.map((entry) => entry.queueId)).toEqual(["b", "a", "c"]);
+    expect(orderedQueuedTurns(undefined)).toEqual([]);
   });
 });
 
-describe("shouldDrainSendQueue (#270 F)", () => {
-  const idle = {
-    phase: "ready" as const,
-    isHeld: false,
-    isSendBusy: false,
-    isSendDisabled: false,
-    composerEmpty: true,
-    isServerThread: true,
-    pendingImageCount: 0,
-  };
+describe("queuedTurnMoveKey (#806)", () => {
+  const rows = orderedQueuedTurns([row("a", "a0"), row("b", "a1"), row("c", "a2")]);
 
-  it("drains only an idle, unheld, empty composer on a server thread", () => {
-    expect(shouldDrainSendQueue(idle)).toBe(true);
-    expect(shouldDrainSendQueue({ ...idle, phase: "running" })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, phase: "disconnected" })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, phase: "connecting" })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, isHeld: true })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, isSendBusy: true })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, isSendDisabled: true })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, composerEmpty: false })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, isServerThread: false })).toBe(false);
-    expect(shouldDrainSendQueue({ ...idle, pendingImageCount: 1 })).toBe(false);
-  });
-});
-
-describe("queuedEntrySnippet", () => {
-  it("collapses whitespace and names attachment-only entries", () => {
-    expect(queuedEntrySnippet(entry("a", key, "  fix\n\nthe   test "))).toBe("fix the test");
-    expect(queuedEntrySnippet({ ...entry("b", key, ""), pendingImageCount: 1 })).toBe(
-      "1 attachment",
+  it("lands between the two rows before, or the two after", () => {
+    const earlier = queuedTurnMoveKey(rows, QueueId.make("c"), "earlier");
+    expect(earlier).toBe(pinOrderKeyBetween("a0", "a1"));
+    const later = queuedTurnMoveKey(rows, QueueId.make("a"), "later");
+    expect(later).toBe(pinOrderKeyBetween("a1", "a2"));
+    expect(queuedTurnMoveKey(rows, QueueId.make("b"), "earlier")).toBe(
+      pinOrderKeyBetween(null, "a0"),
     );
+    expect(queuedTurnMoveKey(rows, QueueId.make("b"), "later")).toBe(
+      pinOrderKeyBetween("a2", null),
+    );
+  });
+
+  it("is a no-op at either end or for an unknown row", () => {
+    expect(queuedTurnMoveKey(rows, QueueId.make("a"), "earlier")).toBeNull();
+    expect(queuedTurnMoveKey(rows, QueueId.make("c"), "later")).toBeNull();
+    expect(queuedTurnMoveKey(rows, QueueId.make("zzz"), "later")).toBeNull();
+  });
+});
+
+describe("queuedTurnSnippet", () => {
+  it("collapses whitespace, drops the effort prefix, and names attachment-only rows", () => {
+    expect(queuedTurnSnippet(row("a", "a0", "  fix\n\nthe   test "))).toBe("fix the test");
+    expect(queuedTurnSnippet(row("b", "a0", "Ultrathink:\nfix it"))).toBe("fix it");
+    expect(
+      queuedTurnSnippet({
+        ...row("c", "a0", ""),
+        attachments: [
+          { type: "image", id: "img", name: "a.png", mimeType: "image/png", sizeBytes: 1 },
+        ],
+      }),
+    ).toBe("1 attachment");
+    expect(queuedTurnEditableText("Ultrathink:\nplain")).toBe("plain");
+    expect(queuedTurnEditableText("plain")).toBe("plain");
+  });
+});
+
+describe("legacy stash rows (#270 F → #806)", () => {
+  const key = composerSendQueueKey(EnvironmentId.make("env"), ThreadId.make("t1"));
+
+  it("round-trips the stash key", () => {
+    expect(parseComposerSendQueueKey(key)).toEqual({ environmentId: "env", threadId: "t1" });
+    expect(parseComposerSendQueueKey("nospace")).toBeNull();
+    expect(parseComposerSendQueueKey("env ")).toBeNull();
+  });
+
+  it("turns an entry into one queue command with ids derived from the entry", () => {
+    const entry: PromptStashEntry = {
+      id: "entry-1",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      prompt: "queued text",
+      attachments: [
+        {
+          id: "img-1",
+          name: "shot.png",
+          mimeType: "image/png",
+          sizeBytes: 3,
+          dataUrl: "data:image/png;base64,AAA",
+        },
+      ],
+      files: [
+        {
+          id: "file-1",
+          name: "notes.txt",
+          mimeType: "text/plain",
+          sizeBytes: 5,
+          attachmentId: "upload-1",
+          environmentId: EnvironmentId.make("env"),
+        },
+      ],
+      droppedImageNames: [],
+      queuedFor: key,
+    };
+    expect(legacyQueuedEntryCommand(entry)).toEqual({
+      commandId: "stash-migrate:entry-1",
+      queueId: "entry-1",
+      message: {
+        messageId: "entry-1",
+        role: "user",
+        text: "queued text",
+        attachments: [
+          {
+            type: "image",
+            name: "shot.png",
+            mimeType: "image/png",
+            sizeBytes: 3,
+            dataUrl: "data:image/png;base64,AAA",
+          },
+          { type: "file", id: "upload-1", name: "notes.txt", mimeType: "text/plain", sizeBytes: 5 },
+        ],
+      },
+    });
+    expect(legacyQueuedEntryCommand({ ...entry, pendingImageCount: 1 })).toBeNull();
   });
 });

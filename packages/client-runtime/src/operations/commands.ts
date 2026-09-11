@@ -49,6 +49,10 @@ export type UnlinkThreadPullRequestInput = CommandInput<"thread.pull-request.unl
 export type SetThreadRuntimeModeInput = CommandInput<"thread.runtime-mode.set">;
 export type SetThreadInteractionModeInput = CommandInput<"thread.interaction-mode.set">;
 export type StartThreadTurnInput = CommandInput<"thread.turn.start">;
+export type QueueThreadTurnInput = CommandInput<"thread.turn.queue">;
+export type UpdateQueuedThreadTurnInput = CommandInput<"thread.turn.queue.update">;
+export type RemoveQueuedThreadTurnInput = CommandInput<"thread.turn.queue.remove">;
+export type MoveQueuedThreadTurnInput = CommandInput<"thread.turn.queue.move">;
 export type InterruptThreadTurnInput = CommandInput<"thread.turn.interrupt">;
 export type RespondToThreadApprovalInput = CommandInput<"thread.approval.respond">;
 export type RespondToThreadUserInputInput = CommandInput<"thread.user-input.respond">;
@@ -305,6 +309,49 @@ export const startThreadTurn: (input: StartThreadTurnInput) => CommandEffect = E
     type: "thread.turn.start",
     commandId: metadata.commandId,
     createdAt: metadata.createdAt,
+  });
+});
+
+// Fork (#806): the server-side message queue.
+export const queueThreadTurn: (input: QueueThreadTurnInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.queueThreadTurn",
+)(function* (input) {
+  const metadata = yield* timestampedCommandMetadata(input);
+  return yield* dispatch({
+    ...input,
+    type: "thread.turn.queue",
+    commandId: metadata.commandId,
+    createdAt: metadata.createdAt,
+  });
+});
+
+export const updateQueuedThreadTurn: (input: UpdateQueuedThreadTurnInput) => CommandEffect =
+  Effect.fn("EnvironmentCommands.updateQueuedThreadTurn")(function* (input) {
+    const metadata = yield* timestampedCommandMetadata(input);
+    return yield* dispatch({
+      ...input,
+      type: "thread.turn.queue.update",
+      commandId: metadata.commandId,
+      createdAt: metadata.createdAt,
+    });
+  });
+
+export const removeQueuedThreadTurn: (input: RemoveQueuedThreadTurnInput) => CommandEffect =
+  Effect.fn("EnvironmentCommands.removeQueuedThreadTurn")(function* (input) {
+    return yield* dispatch({
+      ...input,
+      type: "thread.turn.queue.remove",
+      commandId: yield* commandId(input),
+    });
+  });
+
+export const moveQueuedThreadTurn: (input: MoveQueuedThreadTurnInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.moveQueuedThreadTurn",
+)(function* (input) {
+  return yield* dispatch({
+    ...input,
+    type: "thread.turn.queue.move",
+    commandId: yield* commandId(input),
   });
 });
 
