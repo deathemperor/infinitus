@@ -10,10 +10,15 @@ final class DemoSwapdTests: XCTestCase {
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("tools/demo-swapd").path
 
+    /// The CI Linux image ships no python3; the script's contract is
+    /// checked wherever one exists (every Mac, the e2e runner).
+    static let python = ["/usr/bin/python3", "/usr/local/bin/python3", "/opt/homebrew/bin/python3"]
+        .first { FileManager.default.isExecutableFile(atPath: $0) }
+
     func run(_ args: [String], state: String) throws -> Data {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["python3", Self.script] + args
+        process.executableURL = URL(fileURLWithPath: try XCTUnwrap(Self.python))
+        process.arguments = [Self.script] + args
         var env = ProcessInfo.processInfo.environment
         env["INFINITUS_DEMO_STATE"] = state
         process.environment = env
@@ -27,6 +32,7 @@ final class DemoSwapdTests: XCTestCase {
     }
 
     func testTheDemoFleetDecodesThroughTheSwapdMapping() throws {
+        try XCTSkipIf(Self.python == nil, "no python3 on this runner")
         let state = NSTemporaryDirectory() + "demo-swapd-test-\(getpid()).json"
         defer { try? FileManager.default.removeItem(atPath: state) }
         let list = try JSONDecoder().decode(SwapdList.self, from: try run(["list", "--json"], state: state))
