@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   holdBannerBusy,
   holdBannerText,
+  holdBannerTitle,
   holdPhaseAfterPin,
   holdPhaseAfterRelease,
   pinLabel,
@@ -63,6 +64,24 @@ describe("banner copy", () => {
     });
     expect(holdBannerText(summary, { kind: "gone", reason: "restart" })).toEqual({
       description: "Nothing is held any more (restart). Send the message again.",
+      actionable: false,
+    });
+  });
+
+  it("speaks of resuming for a paused turn (#743)", () => {
+    expect(holdBannerTitle("held")).toBe("Waiting for headroom");
+    expect(holdBannerTitle("paused")).toBe("Paused for headroom");
+    expect(runNowLabel({ kind: "idle" }, "paused")).toBe("Resume now");
+    expect(runNowLabel({ kind: "released" }, "paused")).toBe("Resuming...");
+    const summary = "Paused for headroom on claude, 5h window 92 %";
+    expect(holdBannerText(summary, { kind: "idle" }, "paused")).toEqual({
+      description: summary,
+      actionable: true,
+    });
+    expect(
+      holdBannerText(summary, { kind: "gone", reason: "nothing is paused" }, "paused"),
+    ).toEqual({
+      description: "Nothing is paused any more (nothing is paused). Send a message to continue.",
       actionable: false,
     });
   });

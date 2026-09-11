@@ -739,6 +739,8 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   top-of-run order key on reordering servers, and pinning releases the hold on
   the server). Derived from the work-log marker rows via
   `@t3tools/client-runtime/state/infinitusThreadHold`; nothing persisted.
+  A turn interrupt mode paused (#743) gets the same card as "Paused for
+  headroom" with **Resume now**.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
