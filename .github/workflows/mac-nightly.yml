@@ -4,7 +4,7 @@ name: Mac nightly
 # reinstall`. Scheduled here directly since #823 moved the app into main.
 on:
   schedule:
-    - cron: "0 17 * * *"   # 17:00 UTC = midnight GMT+7
+    - cron: "0 17 * * *" # 17:00 UTC = midnight GMT+7
   workflow_dispatch:
 permissions:
   contents: write

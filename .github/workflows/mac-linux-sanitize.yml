@@ -11,7 +11,7 @@ on:
   # needs a long run to surface (#510 took ~1,300 descriptors) is found
   # here, not on a random PR's mac-linux job.
   schedule:
-    - cron: "0 16 * * *"   # 16:00 UTC = 23:00 GMT+7, an hour before nightly.yml
+    - cron: "0 16 * * *" # 16:00 UTC = 23:00 GMT+7, an hour before nightly.yml
   workflow_dispatch:
     inputs:
       iterations:

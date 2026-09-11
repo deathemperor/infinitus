@@ -34,9 +34,9 @@ makes wrong, in its own PR.
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
   (read it when working there), its own CHANGELOG/VERSION, path-filtered
   CI jobs (`mac-*` in ci.yml) and its own workflows (`mac-nightly.yml`,
-  `mac-linux-sanitize.yml`, `mac-release.yml`). It came in by `git subtree
-  add` from the frozen `native` branch, history included (the merge's
-  second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
+  `mac-linux-sanitize.yml`, `mac-release.yml`). It came in as a subtree
+  (`git subtree add`) from the frozen `native` branch, history included
+  (the merge's second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
   `swift test`, `/bin/sh tools/e2e.sh`. infinitus.run is `apps/mac/site`,
   deployed by hand with wrangler from that directory.
 - **Fork releases are GitHub prereleases with their own tag scheme.**
