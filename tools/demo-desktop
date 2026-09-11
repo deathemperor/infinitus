@@ -70,7 +70,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.authed(): return
-        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or b"{}")
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         SEQ[0] += 1
         if self.path == "/api/orchestration/dispatch":
             DISPATCHES.append(body)

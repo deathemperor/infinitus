@@ -413,7 +413,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Where Infinitus desktop is (origin, the published port) and the CLI credential kept for it, masked.",
                        replyShape: "{origin, port, credential: <masked>|null, expiresAt, stale}"),
         ControlCommand(name: "desktop-token", effect: .read,
-                       summary: "The stored desktop credential for the CLI's own use (local socket only; the CLI never prints it).",
+                       summary: "The stored desktop credential, for the CLI's own requests to Infinitus desktop (this socket only; the CLI never prints it).",
                        replyShape: "{origin, token, expiresAt}"),
     ]
 
