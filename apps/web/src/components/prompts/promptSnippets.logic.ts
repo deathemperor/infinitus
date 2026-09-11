@@ -76,3 +76,38 @@ export function promptSnippetPreview(text: string, maxChars = 80): string {
   if (firstLine.length <= maxChars) return firstLine;
   return `${firstLine.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
 }
+
+/** A snippet as a row of the composer's `/` menu (#270 G, slash trigger). */
+export interface PromptSnippetSlashItem {
+  readonly id: string;
+  readonly type: "prompt-snippet";
+  readonly snippet: PromptSnippet;
+  readonly label: string;
+  readonly description: string;
+}
+
+/**
+ * The project's snippets that match the `/` menu's query by name (case
+ * insensitive, a leading `/` or `prompt:` ignored), as menu rows: the name is
+ * the label, the first line of the body the description. Empty query lists
+ * them all, in saved order.
+ */
+export function promptSnippetSlashItems(
+  snippets: readonly PromptSnippet[],
+  query: string,
+): PromptSnippetSlashItem[] {
+  const needle = query
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+/, "")
+    .replace(/^prompt:/, "");
+  return snippets
+    .filter((snippet) => needle.length === 0 || snippet.name.toLowerCase().includes(needle))
+    .map((snippet) => ({
+      id: `prompt:${snippet.id}`,
+      type: "prompt-snippet" as const,
+      snippet,
+      label: snippet.name,
+      description: `Prompt · ${promptSnippetPreview(snippet.text)}`,
+    }));
+}
