@@ -319,6 +319,25 @@ export const DesktopSnapShotEvent = Schema.Union([
 ]);
 export type DesktopSnapShotEvent = typeof DesktopSnapShotEvent.Type;
 
+/**
+ * Fork (#433 slice 2): one read of the front app's selection after the
+ * double-tap-Shift gesture. `text` is capped at `MAX_CAPTURE_TEXT_LENGTH`
+ * by the helper; `failed` names what to fix.
+ */
+export const DesktopCaptureGestureEvent = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("captured"), text: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("empty") }),
+  Schema.Struct({
+    type: Schema.Literal("failed"),
+    reason: Schema.Literals(["accessibility", "no-focus", "unsupported", "timeout", "helper"]),
+  }),
+]);
+export type DesktopCaptureGestureEvent = typeof DesktopCaptureGestureEvent.Type;
+export type DesktopCaptureGestureFailure = Extract<
+  DesktopCaptureGestureEvent,
+  { readonly type: "failed" }
+>["reason"];
+
 export const DesktopPendingSnapShot = Schema.Struct({
   id: DesktopSnapShotId,
   name: Schema.String,
@@ -1293,6 +1312,10 @@ export interface DesktopBridge {
    */
   getInfinitusDesktopPrefs?: () => Promise<InfinitusDesktopPrefs>;
   setInfinitusQuitWithApp?: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
+  /** Fork (#433 slice 2): the double-tap-Shift capture gesture's switch; the
+      shell asks for the Accessibility grant when it turns on. Optional: a
+      shell without it hides the row. */
+  setInfinitusCaptureGestureEnabled?: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
   /**
    * Fork (#677): a fleet's sign-in inside this app — the provider's page in a
    * child window per flow, the pasted code handed to the menu-bar app over its
@@ -1332,6 +1355,8 @@ export interface DesktopBridge {
   probeRemoteEditors?: () => Promise<readonly EditorId[]>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
+  /** Fork (#433 slice 2): the capture gesture's reads. Optional: older shells never emit them. */
+  onCaptureGestureEvent?: (listener: (event: DesktopCaptureGestureEvent) => void) => () => void;
   /**
    * Quit-confirmation hint pushes. Optional: older desktop builds never emit
    * them.

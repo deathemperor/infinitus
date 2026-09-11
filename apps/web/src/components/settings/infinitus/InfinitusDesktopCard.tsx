@@ -7,18 +7,26 @@ import { SettingsRow, SettingsSection } from "../settingsLayout";
 type InfinitusDesktopBridge = {
   readonly getInfinitusDesktopPrefs: () => Promise<InfinitusDesktopPrefs>;
   readonly setInfinitusQuitWithApp: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
+  /** Absent under a shell before the capture gesture, or off a Mac: the row hides. */
+  readonly setInfinitusCaptureGestureEnabled?: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
 };
 
 /** The bridge, when this is the desktop shell and it is new enough to carry
     the fork's Infinitus prefs; anything else hides the card. */
 export function infinitusDesktopBridge(
-  bridge: Partial<InfinitusDesktopBridge> | undefined,
+  bridge:
+    | (Partial<InfinitusDesktopBridge> & { readonly getClientPlatform?: () => string })
+    | undefined,
 ): InfinitusDesktopBridge | null {
   if (bridge?.getInfinitusDesktopPrefs === undefined) return null;
   if (bridge.setInfinitusQuitWithApp === undefined) return null;
+  const onMac = bridge.getClientPlatform?.() === "darwin";
   return {
     getInfinitusDesktopPrefs: bridge.getInfinitusDesktopPrefs,
     setInfinitusQuitWithApp: bridge.setInfinitusQuitWithApp,
+    ...(onMac && bridge.setInfinitusCaptureGestureEnabled !== undefined
+      ? { setInfinitusCaptureGestureEnabled: bridge.setInfinitusCaptureGestureEnabled }
+      : {}),
   };
 }
 
@@ -55,6 +63,14 @@ export function InfinitusDesktopCard() {
 
   if (bridge === null) return null;
 
+  const write = (change: Promise<InfinitusDesktopPrefs>) => {
+    setError(null);
+    change.then(setPrefs, (cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    });
+  };
+  const setCaptureGesture = bridge.setInfinitusCaptureGestureEnabled;
+
   return (
     <SettingsSection id="infinitus-desktop" title="This window">
       <SettingsRow
@@ -66,15 +82,24 @@ export function InfinitusDesktopCard() {
             aria-label="Quit the menu-bar app with this window"
             disabled={prefs === null}
             checked={prefs?.quitInfinitusWithApp === true}
-            onCheckedChange={(checked) => {
-              setError(null);
-              bridge.setInfinitusQuitWithApp(checked === true).then(setPrefs, (cause: unknown) => {
-                setError(cause instanceof Error ? cause.message : String(cause));
-              });
-            }}
+            onCheckedChange={(checked) => write(bridge.setInfinitusQuitWithApp(checked === true))}
           />
         }
       />
+      {setCaptureGesture === undefined ? null : (
+        <SettingsRow
+          title="Capture selected text with a double tap of Shift"
+          description="In any app, select text and tap Shift twice to add it to the active project's captures. Needs the Accessibility permission, asked for when this turns on."
+          control={
+            <Switch
+              aria-label="Capture selected text with a double tap of Shift"
+              disabled={prefs === null}
+              checked={prefs?.captureGestureEnabled === true}
+              onCheckedChange={(checked) => write(setCaptureGesture(checked === true))}
+            />
+          }
+        />
+      )}
     </SettingsSection>
   );
 }

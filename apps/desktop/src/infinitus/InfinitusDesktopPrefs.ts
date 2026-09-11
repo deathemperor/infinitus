@@ -19,6 +19,7 @@ export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefsSchema.Type;
 
 export const DEFAULT_INFINITUS_DESKTOP_PREFS: InfinitusDesktopPrefs = {
   quitInfinitusWithApp: false,
+  captureGestureEnabled: false,
 };
 
 const INFINITUS_DESKTOP_PREFS_FILE = "infinitus-desktop.json";
@@ -27,6 +28,7 @@ const INFINITUS_DESKTOP_PREFS_FILE = "infinitus-desktop.json";
     hand edit that dropped one, still reads. */
 const PrefsDocument = Schema.Struct({
   quitInfinitusWithApp: Schema.optionalKey(Schema.Boolean),
+  captureGestureEnabled: Schema.optionalKey(Schema.Boolean),
 });
 const decodeDocument = Schema.decodeUnknownSync(Schema.fromJsonString(PrefsDocument));
 const encodeDocument = Schema.encodeSync(Schema.fromJsonString(PrefsDocument));
@@ -36,7 +38,10 @@ export function decodeInfinitusDesktopPrefs(raw: string | null): InfinitusDeskto
   if (raw === null) return DEFAULT_INFINITUS_DESKTOP_PREFS;
   try {
     const parsed = decodeDocument(raw);
-    return { quitInfinitusWithApp: parsed.quitInfinitusWithApp === true };
+    return {
+      quitInfinitusWithApp: parsed.quitInfinitusWithApp === true,
+      captureGestureEnabled: parsed.captureGestureEnabled === true,
+    };
   } catch {
     return DEFAULT_INFINITUS_DESKTOP_PREFS;
   }
@@ -60,6 +65,9 @@ export class InfinitusDesktopPrefsService extends Context.Service<
   {
     readonly get: Effect.Effect<InfinitusDesktopPrefs>;
     readonly setQuitWithApp: (
+      enabled: boolean,
+    ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
+    readonly setCaptureGestureEnabled: (
       enabled: boolean,
     ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
   }
@@ -89,14 +97,17 @@ const make = Effect.gen(function* () {
       Effect.mapError((cause) => new InfinitusDesktopPrefsWriteError({ path: prefsPath, cause })),
     );
 
+  const setFlag = (key: keyof InfinitusDesktopPrefs, enabled: boolean) =>
+    SynchronizedRef.updateAndGetEffect(ref, (prefs) => {
+      if (prefs[key] === enabled) return Effect.succeed(prefs);
+      const next: InfinitusDesktopPrefs = { ...prefs, [key]: enabled };
+      return write(next).pipe(Effect.as(next));
+    });
+
   return InfinitusDesktopPrefsService.of({
     get: SynchronizedRef.get(ref),
-    setQuitWithApp: (enabled) =>
-      SynchronizedRef.updateAndGetEffect(ref, (prefs) => {
-        if (prefs.quitInfinitusWithApp === enabled) return Effect.succeed(prefs);
-        const next: InfinitusDesktopPrefs = { ...prefs, quitInfinitusWithApp: enabled };
-        return write(next).pipe(Effect.as(next));
-      }),
+    setQuitWithApp: (enabled) => setFlag("quitInfinitusWithApp", enabled),
+    setCaptureGestureEnabled: (enabled) => setFlag("captureGestureEnabled", enabled),
   });
 });
 

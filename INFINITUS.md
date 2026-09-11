@@ -113,9 +113,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
-  methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654) and
+  methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
-  `submitInfinitusSignInCode` (#677).
+  `submitInfinitusSignInCode` (#677), and `setInfinitusCaptureGestureEnabled`
+  / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
+  beside `DesktopSnapShotEvent` (#433 slice 2). `packages/contracts/src/infinitus.ts`
+  — `captureGestureEnabled` on `InfinitusDesktopPrefs`;
+  `packages/contracts/src/captures.ts` — `MAX_CAPTURE_TEXT_LENGTH`, the cap
+  the desktop's selected-text helper cuts at.
 - `apps/desktop/src/ipc/channels.ts`, `apps/desktop/src/ipc/DesktopIpcHandlers.ts`,
   `apps/desktop/src/preload.ts` — the channels, `ipc.handle` lines and
   preload entries for those methods; `apps/desktop/src/main.ts` —
@@ -335,7 +340,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   this app — /accounts for a limit or a switch, /activity for a waiting
   session; `show` is never sent without a session since the pop-out and
   session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
-  (an upstream file: that one line is the fork's only edit there).
+  (an upstream file: that line and `CaptureGestureCoordinator`'s are the
+  fork's only edits there).
 - `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
   the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
   shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
@@ -349,6 +355,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `useCapturesShortcuts` — `captures.toggle` opens/closes, `captures.add`
   captures the app's own selection, else opens with the input focused).
   `state/captures.ts` is the web instance of the client-runtime atoms.
+  `CaptureGestureCoordinator` (+ `captureGesture.logic`, #433 slice 2) is
+  the desktop gesture's landing: mounted once from `__root.tsx` beside
+  `SnapShotCoordinator`, it adds a `captured` event's text to the routed
+  thread's project, else the last project a gesture reached, else holds it
+  until a thread with a project is open, and toasts `empty` / `failed`
+  (the Accessibility fix by name). `useAddCapture` is shared with the
+  shortcuts.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
@@ -568,6 +581,30 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   under an older shell). `InfinitusLaunchButton.tsx` is the launch button on
   the Accounts offline card and every Infinitus pane's unavailable notice,
   drawn only when the server's host is a Mac.
+- `apps/desktop/src/captures/` — the capture gesture (#433 slice 2, macOS
+  only): with `captureGestureEnabled` on (the card's second row, drawn only
+  on a Mac shell; turning it on asks for the Accessibility grant, the one
+  SnapShot's context uses), a double tap of Shift in any app captures that
+  app's selected text. `MacDoubleTapShiftProcess.ts` is the SnapShot
+  modifier-pair poller's sibling (`osascript` sampling
+  `CGEventSourceFlagsState` at 30 Hz, `ready` / `trigger` on stderr) reading
+  two sub-350 ms presses with no character typed between them
+  (`CGEventSourceCounterForEventType` for key-downs; both Shifts held is
+  SnapShot's pair and never fires). `MacSelectedText.ts` is one `osascript`
+  read of the frontmost app's focused element's `AXSelectedText` (3 s
+  deadline, text cut to `MAX_CAPTURE_TEXT_LENGTH` in the helper; `failed`
+  names `accessibility` / `no-focus` / `unsupported` / `timeout` / `helper`).
+  `InfinitusCaptureGesture.ts` is the service (`setEnabled` writes the knob,
+  then starts or stops the poller; one read at a time; a launch with the
+  knob on checks the grant silently) and the renderer dispatch on
+  `desktop:infinitus-capture-gesture-event`: an open window is not revealed,
+  with none open one is (`revealOrCreateMain`) so the text is not lost.
+  `shell.beep()` confirms a read that got text, since the user is in another
+  app. The text never reaches a log or a span, only its length. Merged into
+  `InfinitusDesktop.layer`; the switch is `setInfinitusCaptureGestureEnabled`
+  (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
+  (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
+  developer's Mac (the tests mock `spawn`).
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).

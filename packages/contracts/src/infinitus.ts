@@ -417,6 +417,9 @@ export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 
 export const InfinitusDesktopPrefs = Schema.Struct({
   quitInfinitusWithApp: Schema.Boolean,
+  /** #433 slice 2: a double tap of Shift in any app captures its selected text
+      into the active project. macOS only; off by default. */
+  captureGestureEnabled: Schema.Boolean,
 });
 export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
 

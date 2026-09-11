@@ -26,13 +26,13 @@ export function useActiveProjectRef(): ActiveProjectRef | null {
   return { environmentId: thread.environmentId, projectId: thread.projectId };
 }
 
-/** Adds one capture to the active project, toasting a refusal. */
-function useAddCapture(project: ActiveProjectRef | null) {
+/** Adds one capture to a project, toasting a refusal. */
+export function useAddCapture() {
   const apply = useAtomCommand(captures.apply, { reportFailure: false });
   return useCallback(
-    async (raw: string): Promise<boolean> => {
+    async (raw: string, project: ActiveProjectRef): Promise<boolean> => {
       const text = captureText(raw);
-      if (text === null || project === null) return false;
+      if (text === null) return false;
       const result = await apply({
         environmentId: project.environmentId,
         input: { projectId: project.projectId, command: { type: "add", text } },
@@ -45,7 +45,7 @@ function useAddCapture(project: ActiveProjectRef | null) {
       });
       return false;
     },
-    [apply, project],
+    [apply],
   );
 }
 
@@ -68,7 +68,7 @@ export function useCapturesShortcuts(input: {
 }): void {
   const { keybindings, terminalOpen, modelPickerOpen } = input;
   const project = useActiveProjectRef();
-  const addCapture = useAddCapture(project);
+  const addCapture = useAddCapture();
 
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent) => {
@@ -93,7 +93,7 @@ export function useCapturesShortcuts(input: {
         ui.show({ focusInput: true });
         return;
       }
-      void addCapture(selection);
+      void addCapture(selection, project);
     };
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);

@@ -12,7 +12,11 @@ import { InfinitusDesktopCard, infinitusDesktopBridge } from "./InfinitusDesktop
 type Bridge = {
   getInfinitusDesktopPrefs: () => Promise<InfinitusDesktopPrefs>;
   setInfinitusQuitWithApp: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
+  setInfinitusCaptureGestureEnabled: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
+  getClientPlatform: () => string;
 };
+
+const off: InfinitusDesktopPrefs = { quitInfinitusWithApp: false, captureGestureEnabled: false };
 
 // The unit project runs in node: give the card the one window global it reads.
 function installBridge(bridge: Partial<Bridge> | undefined) {
@@ -41,16 +45,35 @@ afterEach(() => {
 describe("infinitusDesktopBridge", () => {
   it("needs both methods, so an older shell or the browser hides the card", () => {
     expect(infinitusDesktopBridge(undefined)).toBeNull();
-    expect(
-      infinitusDesktopBridge({
-        getInfinitusDesktopPrefs: async () => ({ quitInfinitusWithApp: false }),
-      }),
-    ).toBeNull();
+    expect(infinitusDesktopBridge({ getInfinitusDesktopPrefs: async () => off })).toBeNull();
     const both = {
-      getInfinitusDesktopPrefs: async () => ({ quitInfinitusWithApp: false }),
-      setInfinitusQuitWithApp: async () => ({ quitInfinitusWithApp: true }),
+      getInfinitusDesktopPrefs: async () => off,
+      setInfinitusQuitWithApp: async () => ({ ...off, quitInfinitusWithApp: true }),
     };
     expect(infinitusDesktopBridge(both)).not.toBeNull();
+  });
+
+  it("carries the capture gesture switch only on a Mac shell that has it", () => {
+    const setGesture = async () => ({ ...off, captureGestureEnabled: true });
+    const base = {
+      getInfinitusDesktopPrefs: async () => off,
+      setInfinitusQuitWithApp: async () => off,
+    };
+    expect(infinitusDesktopBridge(base)?.setInfinitusCaptureGestureEnabled).toBeUndefined();
+    expect(
+      infinitusDesktopBridge({
+        ...base,
+        setInfinitusCaptureGestureEnabled: setGesture,
+        getClientPlatform: () => "win32",
+      })?.setInfinitusCaptureGestureEnabled,
+    ).toBeUndefined();
+    expect(
+      infinitusDesktopBridge({
+        ...base,
+        setInfinitusCaptureGestureEnabled: setGesture,
+        getClientPlatform: () => "darwin",
+      })?.setInfinitusCaptureGestureEnabled,
+    ).toBe(setGesture);
   });
 });
 
@@ -62,9 +85,9 @@ describe("InfinitusDesktopCard", () => {
   });
 
   it("reads the knob from the shell and writes it back through the bridge", async () => {
-    const set = vi.fn(async (enabled: boolean) => ({ quitInfinitusWithApp: enabled }));
+    const set = vi.fn(async (enabled: boolean) => ({ ...off, quitInfinitusWithApp: enabled }));
     installBridge({
-      getInfinitusDesktopPrefs: async () => ({ quitInfinitusWithApp: false }),
+      getInfinitusDesktopPrefs: async () => off,
       setInfinitusQuitWithApp: set,
     });
     const renderer = await render();
@@ -81,7 +104,7 @@ describe("InfinitusDesktopCard", () => {
 
   it("shows a failed write and keeps the previous value", async () => {
     installBridge({
-      getInfinitusDesktopPrefs: async () => ({ quitInfinitusWithApp: true }),
+      getInfinitusDesktopPrefs: async () => ({ ...off, quitInfinitusWithApp: true }),
       setInfinitusQuitWithApp: async () => {
         throw new Error("disk full");
       },
@@ -92,5 +115,39 @@ describe("InfinitusDesktopCard", () => {
     });
     expect(text(renderer)).toContain("disk full");
     expect(renderer.root.findByType("input").props.checked).toBe(true);
+  });
+
+  it("draws the capture gesture row on a Mac shell and writes it through its own method", async () => {
+    const setGesture = vi.fn(async (enabled: boolean) => ({
+      ...off,
+      captureGestureEnabled: enabled,
+    }));
+    installBridge({
+      getInfinitusDesktopPrefs: async () => off,
+      setInfinitusQuitWithApp: async () => off,
+      setInfinitusCaptureGestureEnabled: setGesture,
+      getClientPlatform: () => "darwin",
+    });
+    const renderer = await render();
+    expect(text(renderer)).toContain("Capture selected text with a double tap of Shift");
+    const toggle = renderer.root.findAllByType("input")[1]!;
+    expect(toggle.props.checked).toBe(false);
+    await act(async () => {
+      toggle.props.onCheckedChange(true);
+    });
+    expect(setGesture).toHaveBeenCalledWith(true);
+    expect(renderer.root.findAllByType("input")[1]!.props.checked).toBe(true);
+  });
+
+  it("hides the capture gesture row off a Mac", async () => {
+    installBridge({
+      getInfinitusDesktopPrefs: async () => off,
+      setInfinitusQuitWithApp: async () => off,
+      setInfinitusCaptureGestureEnabled: async () => off,
+      getClientPlatform: () => "linux",
+    });
+    const renderer = await render();
+    expect(text(renderer)).not.toContain("double tap of Shift");
+    expect(renderer.root.findAllByType("input")).toHaveLength(1);
   });
 });
