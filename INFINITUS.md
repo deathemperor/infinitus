@@ -232,6 +232,24 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (`packages/client-runtime/src/state/infinitusActivity.ts`, exported as
   `@t3tools/client-runtime/state/infinitusActivity`) — no polling of its own.
   Sidebar "Activity" beside Stats.
+- `apps/web/src/routes/machine.tsx`, `apps/web/src/components/machine/` — the
+  `/machine` page (#659): the pop-out's Machine pane in the fork, read-only —
+  the sample summary (load, swap, processes, WindowServer, temp entries,
+  Claude sessions' RSS), warnings, hooks grouped by owner, runaways, residue
+  and the sessions table. Reads `machine` through
+  `infinitusEnvironment.machine`, a query atom re-read every minute only
+  while the page is mounted (native samples at most once per 55 s) and
+  dropped a minute after it leaves; a `{sampling: true}` first reply is
+  re-read once after 5 s. Its read model is
+  `packages/client-runtime/src/state/infinitusMachine.ts` (exported as
+  `@t3tools/client-runtime/state/infinitusMachine`): only the rendered
+  fields are declared (Swift enums such as `source` travel in their
+  `{"case": {"_0": …}}` shape and are ignored), `heavy`/`risky`/`stuck`
+  ported verbatim from `HookInventory`/`MachineReport`. Unlike native's
+  owner-name order, hook owners sort by what needs a look — stuck, then
+  live instances, then expected spawns an hour — with the top 12 shown and
+  the rest behind "Show all". `machine-kill`, `machine-reclaim` and
+  `machine-hook` are not exposed. Sidebar "Machine" beside Activity.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud

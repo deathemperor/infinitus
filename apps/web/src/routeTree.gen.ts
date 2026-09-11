@@ -14,6 +14,7 @@ import { Route as UsageRouteImport } from './routes/usage'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PairRouteImport } from './routes/pair'
+import { Route as MachineRouteImport } from './routes/machine'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsRouteImport } from './routes/accounts'
@@ -64,6 +65,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const PairRoute = PairRouteImport.update({
   id: '/pair',
   path: '/pair',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachineRoute = MachineRouteImport.update({
+  id: '/machine',
+  path: '/machine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectRoute = ConnectRouteImport.update({
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AccountsRoute
   '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
+  '/machine': typeof MachineRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
   '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
+  '/machine': typeof MachineRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/accounts': typeof AccountsRoute
   '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
+  '/machine': typeof MachineRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
@@ -306,6 +315,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/activity'
     | '/connect'
+    | '/machine'
     | '/pair'
     | '/settings'
     | '/stats'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/activity'
     | '/connect'
+    | '/machine'
     | '/pair'
     | '/settings'
     | '/stats'
@@ -370,6 +381,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/activity'
     | '/connect'
+    | '/machine'
     | '/pair'
     | '/settings'
     | '/stats'
@@ -404,6 +416,7 @@ export interface RootRouteChildren {
   AccountsRoute: typeof AccountsRoute
   ActivityRoute: typeof ActivityRoute
   ConnectRoute: typeof ConnectRoute
+  MachineRoute: typeof MachineRoute
   PairRoute: typeof PairRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StatsRoute: typeof StatsRoute
@@ -448,6 +461,13 @@ declare module '@tanstack/react-router' {
       path: '/pair'
       fullPath: '/pair'
       preLoaderRoute: typeof PairRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine': {
+      id: '/machine'
+      path: '/machine'
+      fullPath: '/machine'
+      preLoaderRoute: typeof MachineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connect': {
@@ -698,6 +718,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountsRoute: AccountsRoute,
   ActivityRoute: ActivityRoute,
   ConnectRoute: ConnectRoute,
+  MachineRoute: MachineRoute,
   PairRoute: PairRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StatsRoute: StatsRoute,

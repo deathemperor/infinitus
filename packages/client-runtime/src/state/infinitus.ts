@@ -29,6 +29,15 @@ const INFINITUS_STATS_IDLE_TTL_MS = 60_000;
     snapshot subscription's deltas carry everything after. No re-read. */
 const INFINITUS_EVENTS_STALE_MS = 60_000;
 const INFINITUS_EVENTS_IDLE_TTL_MS = 60_000;
+/** The Machine page's read (#659): `machine` re-read every minute while a
+    page holds the atom (native samples at most once per 55 s, so faster only
+    re-reads the same report), stale after 30 s so a remount inside the
+    minute shows the held report, and dropped a minute after the page leaves.
+    A manual refresh — the button, the page's 5 s retry while native is
+    still sampling — always reads (`Atom.swr`'s refresh is forceful). */
+const INFINITUS_MACHINE_STALE_MS = 30_000;
+const INFINITUS_MACHINE_REFRESH_MS = 60_000;
+const INFINITUS_MACHINE_IDLE_TTL_MS = 60_000;
 
 /** What a fleet row shows for an account: its alias, else the email it signed
     in with, else the number the engine knows it by. */
@@ -95,6 +104,13 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       staleTimeMs: INFINITUS_STATS_STALE_MS,
       refreshIntervalMs: INFINITUS_STATS_REFRESH_MS,
       idleTtlMs: INFINITUS_STATS_IDLE_TTL_MS,
+    }),
+    machine: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:machine",
+      tag: WS_METHODS.infinitusCommand,
+      staleTimeMs: INFINITUS_MACHINE_STALE_MS,
+      refreshIntervalMs: INFINITUS_MACHINE_REFRESH_MS,
+      idleTtlMs: INFINITUS_MACHINE_IDLE_TTL_MS,
     }),
   };
 }

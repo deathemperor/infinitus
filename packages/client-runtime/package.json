@@ -139,6 +139,10 @@
       "types": "./src/state/infinitusActivity.ts",
       "default": "./src/state/infinitusActivity.ts"
     },
+    "./state/infinitusMachine": {
+      "types": "./src/state/infinitusMachine.ts",
+      "default": "./src/state/infinitusMachine.ts"
+    },
     "./state/infinitusSessions": {
       "types": "./src/state/infinitusSessions.ts",
       "default": "./src/state/infinitusSessions.ts"
