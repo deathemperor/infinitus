@@ -192,9 +192,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events
   (an account switch, every account exhausted, a session waiting for an
   answer) as the app's toasts; nothing from the first snapshot, deduped by
-  the server's event id. The waiting toast's Show opens the session's own
-  window (`show session <pid>`) when the manifest's `show` takes one, else
-  the pop-out (#612). Mounted once from `apps/web/src/routes/__root.tsx`
+  the server's event id. Every toast has one Open action
+  (`toastAction`): the waiting session's own window (`show session <pid>`,
+  #612) while the manifest's `show` takes a session, otherwise a page of
+  this app — /accounts for a limit or a switch, /activity for a waiting
+  session; `show` is never sent without a session since the pop-out and
+  session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that one line is the fork's only edit there).
 - `packages/client-runtime/src/state/infinitusExhausted.ts` (exported as
   `@t3tools/client-runtime/state/infinitusExhausted`) — the all-accounts-

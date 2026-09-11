@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { eventRepeatKey, eventToast, showCommandArgs } from "./infinitusEventToasts.logic";
+import { eventRepeatKey, eventToast, toastAction } from "./infinitusEventToasts.logic";
 
 describe("eventToast", () => {
   it("maps the three kinds worth interrupting for", () => {
@@ -8,6 +8,7 @@ describe("eventToast", () => {
       type: "error",
       title: "All accounts exhausted",
       description: "all exhausted",
+      kind: "limit",
     });
     expect(
       eventToast({
@@ -18,6 +19,7 @@ describe("eventToast", () => {
       type: "info",
       title: "Switched accounts",
       description: "switched one@example.com → two@example.com",
+      kind: "switch",
     });
     expect(
       eventToast({ icon: "hand.raised", text: "headless session 4243 is waiting for an answer" }),
@@ -25,7 +27,7 @@ describe("eventToast", () => {
       type: "warning",
       title: "A session is waiting for you",
       description: "headless session 4243 is waiting for an answer",
-      action: "show-popout",
+      kind: "waiting",
       pid: 4243,
     });
   });
@@ -75,14 +77,40 @@ describe("eventRepeatKey", () => {
   });
 });
 
-describe("showCommandArgs", () => {
+describe("toastAction", () => {
   const withSession = [{ name: "show", args: ["popout|settings|session <pid|name>"] }];
-  const without = [{ name: "show", args: ["popout|settings|wall"] }];
+  const settingsOnly = [{ name: "show", args: ["settings"] }];
 
-  it("targets the session's window when the toast names one and the build's show takes it", () => {
-    expect(showCommandArgs({ pid: 4243 }, withSession)).toEqual(["session", "4243"]);
-    expect(showCommandArgs({ pid: 4243 }, without)).toEqual(["popout"]);
-    expect(showCommandArgs({}, withSession)).toEqual(["popout"]);
-    expect(showCommandArgs({ pid: 4243 }, [])).toEqual(["popout"]);
+  it("opens the session's window only while the build's show takes a session (#612)", () => {
+    expect(toastAction({ kind: "waiting", pid: 4243 }, withSession)).toEqual({
+      kind: "command",
+      args: ["session", "4243"],
+    });
+  });
+
+  it("never sends show without a session: the retired pop-out gives way to this app's pages (#670)", () => {
+    expect(toastAction({ kind: "waiting", pid: 4243 }, settingsOnly)).toEqual({
+      kind: "navigate",
+      to: "/activity",
+    });
+    expect(toastAction({ kind: "waiting" }, withSession)).toEqual({
+      kind: "navigate",
+      to: "/activity",
+    });
+    expect(toastAction({ kind: "waiting", pid: 4243 }, [])).toEqual({
+      kind: "navigate",
+      to: "/activity",
+    });
+  });
+
+  it("sends account news to the accounts page", () => {
+    expect(toastAction({ kind: "limit" }, withSession)).toEqual({
+      kind: "navigate",
+      to: "/accounts",
+    });
+    expect(toastAction({ kind: "switch" }, settingsOnly)).toEqual({
+      kind: "navigate",
+      to: "/accounts",
+    });
   });
 });
