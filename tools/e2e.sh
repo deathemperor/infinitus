@@ -86,6 +86,10 @@ fail() {
     if [ -n "${APP_PID:-}" ]; then
         echo "--- app unix sockets"; lsof -p "$APP_PID" -a -U 2>/dev/null | tail -n +2 | cut -c1-140 | head -12
         echo "--- socket dir"; /bin/ls -li "$SOCKDIR" 2>/dev/null | head -8
+        # #637: the app itself gone (no crash report, no last line) is one of
+        # the two readings of "connection refused"; its wait status names
+        # the signal (141 SIGPIPE, 143 SIGTERM, 137 SIGKILL).
+        if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else wait "$APP_PID" 2>/dev/null; echo "--- app gone: wait status $?"; fi
         echo "--- status retry"; "$CTL" status 2>&1 | head -c 300; echo
     fi
     exit 1
