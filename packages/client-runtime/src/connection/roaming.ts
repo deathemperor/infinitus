@@ -1,5 +1,5 @@
 import type { ExecutionEnvironmentDescriptor } from "@t3tools/contracts";
-import { deriveWsBaseUrl } from "@t3tools/shared/advertisedEndpoint";
+import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "@t3tools/shared/advertisedEndpoint";
 
 import { BearerConnectionProfile } from "./catalog.ts";
 import type { ConnectionAttemptError } from "./model.ts";
@@ -15,6 +15,30 @@ import type { ConnectionAttemptError } from "./model.ts";
     probe before the walk moves on. The default remote timeout is ten seconds,
     which is the whole wait a phone off the LAN would otherwise sit through. */
 export const ROAM_PROBE_TIMEOUT_MS = 3_000;
+
+/**
+ * The server's alternates in the phone's own shape: each normalized the way a
+ * paired host is (`normalizeHttpBaseUrl` — scheme, host, port, a bare `/`),
+ * so `https://code.infinitus.run` and the paired `https://code.infinitus.run/`
+ * are one host; the paired host itself and anything unparsable left out; no
+ * repeats.
+ */
+export function normalizedAlternates(
+  alternates: ReadonlyArray<string> | undefined,
+  pairedHttpBaseUrl: string,
+): ReadonlyArray<string> {
+  const kept: Array<string> = [];
+  for (const raw of alternates ?? []) {
+    let host: string;
+    try {
+      host = normalizeHttpBaseUrl(raw);
+    } catch {
+      continue;
+    }
+    if (host !== pairedHttpBaseUrl && !kept.includes(host)) kept.push(host);
+  }
+  return kept;
+}
 
 /** The hosts to try, in order: the one that worked last (it is the paired one
     until a roam), then the paired one, then the alternates. No repeats, and
@@ -70,9 +94,7 @@ export function learnedBearerProfile(
   liveHttpBaseUrl: string,
   descriptor: Pick<ExecutionEnvironmentDescriptor, "alternateHttpBaseUrls">,
 ): BearerConnectionProfile | null {
-  const alternates = (descriptor.alternateHttpBaseUrls ?? []).filter(
-    (host) => host !== profile.httpBaseUrl,
-  );
+  const alternates = normalizedAlternates(descriptor.alternateHttpBaseUrls, profile.httpBaseUrl);
   const sameAlternates =
     alternates.length === (profile.alternateHttpBaseUrls ?? []).length &&
     alternates.every((host, index) => profile.alternateHttpBaseUrls?.[index] === host);

@@ -10,6 +10,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { bootstrapRemoteBearerSession } from "../authorization/remote.ts";
 import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "../environment/endpoint.ts";
+import { normalizedAlternates } from "./roaming.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
 import * as ClientCapabilities from "../platform/capabilities.ts";
 import {
@@ -83,13 +84,14 @@ const resolvePairingTarget = Effect.fn("clientRuntime.connection.onboarding.reso
   },
 );
 
-/** The alternates worth keeping: never the paired host itself, absent when
-    there are none (an absent key, the catalog's shape for "no alternates"). */
+/** The alternates worth keeping, in the profile's normalized shape: never the
+    paired host itself, absent when there are none (an absent key, the
+    catalog's shape for "no alternates"). */
 function pairingAlternates(
   alternates: ReadonlyArray<string> | undefined,
   httpBaseUrl: string,
 ): { readonly alternateHttpBaseUrls?: ReadonlyArray<string> } {
-  const kept = (alternates ?? []).filter((host) => host !== httpBaseUrl);
+  const kept = normalizedAlternates(alternates, httpBaseUrl);
   return kept.length === 0 ? {} : { alternateHttpBaseUrls: kept };
 }
 

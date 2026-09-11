@@ -3,10 +3,15 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { BearerConnectionProfile } from "./catalog.ts";
 import { ConnectionBlockedError, ConnectionTransientError } from "./model.ts";
-import { bearerHostOrder, learnedBearerProfile, roamsPast } from "./roaming.ts";
+import {
+  bearerHostOrder,
+  learnedBearerProfile,
+  normalizedAlternates,
+  roamsPast,
+} from "./roaming.ts";
 
-const LAN = "http://192.168.100.61:3773";
-const TUNNEL = "https://code.infinitus.run";
+const LAN = "http://192.168.100.61:3773/";
+const TUNNEL = "https://code.infinitus.run/";
 
 const profile = (over: Partial<ConstructorParameters<typeof BearerConnectionProfile>[0]> = {}) =>
   new BearerConnectionProfile({
@@ -43,6 +48,18 @@ describe("bearerHostOrder", () => {
   });
 });
 
+describe("normalizedAlternates", () => {
+  it("shapes the server's hosts like a paired one, so a pairing over the tunnel has no alternate", () => {
+    expect(normalizedAlternates(["https://code.infinitus.run"], LAN)).toEqual([TUNNEL]);
+    expect(normalizedAlternates(["https://code.infinitus.run"], TUNNEL)).toEqual([]);
+    expect(
+      normalizedAlternates(["https://code.infinitus.run/", "https://code.infinitus.run"], LAN),
+    ).toEqual([TUNNEL]);
+    expect(normalizedAlternates(["not a url", "wss://code.infinitus.run"], LAN)).toEqual([TUNNEL]);
+    expect(normalizedAlternates(undefined, LAN)).toEqual([]);
+  });
+});
+
 describe("roamsPast", () => {
   it("walks past a host where the Mac is not, never one that refused the credential", () => {
     const transient = (reason: ConnectionTransientError["reason"]) =>
@@ -62,7 +79,9 @@ describe("roamsPast", () => {
 describe("learnedBearerProfile", () => {
   it("learns the tunnel from a later LAN connect when the pairing had none", () => {
     const paired = profile();
-    const learned = learnedBearerProfile(paired, LAN, { alternateHttpBaseUrls: [TUNNEL] });
+    const learned = learnedBearerProfile(paired, LAN, {
+      alternateHttpBaseUrls: ["https://code.infinitus.run"],
+    });
     expect(learned).not.toBeNull();
     expect(learned?.alternateHttpBaseUrls).toEqual([TUNNEL]);
     expect(learned?.lastGoodHttpBaseUrl).toBe(LAN);
@@ -95,7 +114,7 @@ describe("learnedBearerProfile", () => {
     const moved = learnedBearerProfile(settled, LAN, {
       alternateHttpBaseUrls: ["https://other.example.test"],
     });
-    expect(moved?.alternateHttpBaseUrls).toEqual(["https://other.example.test"]);
-    expect(bearerHostOrder(moved!)).toEqual([LAN, "https://other.example.test"]);
+    expect(moved?.alternateHttpBaseUrls).toEqual(["https://other.example.test/"]);
+    expect(bearerHostOrder(moved!)).toEqual([LAN, "https://other.example.test/"]);
   });
 });

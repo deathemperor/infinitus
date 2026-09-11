@@ -271,8 +271,8 @@ describe("ConnectionResolver", () => {
 
   // Fork (#663): one environment, two hosts — the LAN one it was paired on
   // and the tunnel it also answers on.
-  const LAN = "http://192.168.100.61:3773";
-  const TUNNEL = "https://code.infinitus.run";
+  const LAN = "http://192.168.100.61:3773/";
+  const TUNNEL = "https://code.infinitus.run/";
   const roamingTarget = new BearerConnectionTarget({
     environmentId: ENVIRONMENT_ID,
     label: "Mac",

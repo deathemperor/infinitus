@@ -415,7 +415,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `status.forkTunnel` while it is up; a never-polled snapshot is refreshed
   once for it). The phone keeps them on the bearer profile from the pairing
   on and re-learns them on every connect, so a tunnel turned on after the
-  pairing is picked up by the next LAN connect. The server's list replaces
+  pairing is picked up by the next LAN connect; each is stored in the
+  profile's normalized shape (`normalizeHttpBaseUrl`), so a pairing made
+  over the tunnel itself has no alternate. The server's list replaces
   the phone's on every connect — it is the authority on its own doors, and a
   quick-tunnel hostname it no longer holds can be handed to anyone, so the
   bearer token never follows a stale one (a host the profile no longer

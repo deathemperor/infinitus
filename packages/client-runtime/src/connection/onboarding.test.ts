@@ -138,7 +138,7 @@ describe("connection onboarding", () => {
               CLIENT_PRESENTATION_LAYER,
               pairingHttpLayer(calls, {
                 alternateHttpBaseUrls: [
-                  "https://code.infinitus.run",
+                  "https://code.infinitus.run/",
                   "https://remote.example.test/",
                 ],
               }),
@@ -148,7 +148,7 @@ describe("connection onboarding", () => {
 
         expect(registration.profile).toMatchObject({
           httpBaseUrl: "https://remote.example.test/",
-          alternateHttpBaseUrls: ["https://code.infinitus.run"],
+          alternateHttpBaseUrls: ["https://code.infinitus.run/"],
         });
         expect("lastGoodHttpBaseUrl" in registration.profile).toBe(false);
       }),
@@ -262,8 +262,8 @@ describe("connection onboarding", () => {
                 label: "Mac",
                 httpBaseUrl: "http://192.168.1.8:3773",
                 wsBaseUrl: "ws://192.168.1.8:3773",
-                alternateHttpBaseUrls: ["https://code.infinitus.run"],
-                lastGoodHttpBaseUrl: "https://code.infinitus.run",
+                alternateHttpBaseUrls: ["https://code.infinitus.run/"],
+                lastGoodHttpBaseUrl: "https://code.infinitus.run/",
               }),
             ),
           }),
@@ -272,7 +272,7 @@ describe("connection onboarding", () => {
 
         expect(registration.profile).toMatchObject({
           httpBaseUrl: "http://192.168.1.9:3773/",
-          alternateHttpBaseUrls: ["https://code.infinitus.run"],
+          alternateHttpBaseUrls: ["https://code.infinitus.run/"],
         });
         expect("lastGoodHttpBaseUrl" in registration.profile).toBe(false);
       }),
