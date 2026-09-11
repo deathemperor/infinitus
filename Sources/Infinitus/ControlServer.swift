@@ -155,6 +155,10 @@ final class ControlServer {
     }
 
     private static let log = Logger(subsystem: "run.infinitus", category: "control")
+    /// One formatter for every timestamp the verbs emit: a fresh
+    /// ISO8601DateFormatter is an ICU `udat_open` each time, and `events`
+    /// built one per row on every desktop-app poll (#346's sample).
+    nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
 
     private func handle(line: Data) async -> ControlReply {
         let request: ControlRequest
@@ -171,9 +175,15 @@ final class ControlServer {
             let shown = request.args.prefix(request.command == "prefs" ? 2 : 1).joined(separator: " ")
             Self.log.notice("\(request.command, privacy: .public) \(shown, privacy: .public)")
         }
-        guard !busy else { return .failure("busy: another control command is running") }
-        busy = true
-        defer { busy = false }
+        // One write at a time; reads run alongside. The desktop app polls
+        // status/fleets/events/sessions continuously, and a blanket guard
+        // handed the CLI (and the phone) "busy" whenever a poll was in
+        // flight — a `perf` probe hit it on the live bundle (#346).
+        if command.effect != .read {
+            guard !busy else { return .failure("busy: another control command is running") }
+            busy = true
+        }
+        defer { if command.effect != .read { busy = false } }
         do { return try await dispatch(request) }
         catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
     }
@@ -230,7 +240,7 @@ final class ControlServer {
             // #612: the id, the account alias, the start and the pending
             // sign-in needs ride along for the fork's sessions list.
             let account = model.activeAccountName
-            let iso = ISO8601DateFormatter()
+            let iso = Self.iso
             return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
                 // The merged list (#402): a headless child's need off its
                 // stream, and a need a finished login already met is gone.
@@ -698,7 +708,7 @@ final class ControlServer {
                 // so a consumer classifies and dedupes without reading
                 // icons or text (#615).
                 ["id": JSONValue.string(e.id.uuidString),
-                 "at": .string(ISO8601DateFormatter().string(from: e.at)),
+                 "at": .string(Self.iso.string(from: e.at)),
                  "kind": .string(e.kind), "icon": .string(e.icon), "text": .string(e.text)]
             }
             return ControlReply(ok: true, result: .array(rows.map(JSONValue.object)))

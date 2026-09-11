@@ -460,7 +460,16 @@ final class AppModel: ObservableObject {
     var cliproxyBaseURL: String {
         defaults.string(forKey: "cliproxy_base_url") ?? CLIProxyEngine.defaultBaseURL.absoluteString
     }
-    var cliproxyKeyPresent: Bool { Keychain.read(account: cliproxyBaseURL) != nil }
+    /// Memoised for the process: the only writers are the two save
+    /// functions below, which relaunch — and `status` asked the keychain
+    /// twice per desktop-app poll before this (#346's sample).
+    private var cliproxyKeyPresentCache: Bool?
+    var cliproxyKeyPresent: Bool {
+        if let cached = cliproxyKeyPresentCache { return cached }
+        let present = Keychain.read(account: cliproxyBaseURL) != nil
+        cliproxyKeyPresentCache = present
+        return present
+    }
 
     /// Pane "Save & restart": URL to defaults, key to the keychain
     /// (empty key = clear), then relaunch so the registry rebuilds.
@@ -472,6 +481,7 @@ final class AppModel: ObservableObject {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { Keychain.delete(account: url) }
         else { _ = Keychain.write(account: url, value: trimmed) }
+        cliproxyKeyPresentCache = !trimmed.isEmpty
         relaunchApp()
     }
 
@@ -487,8 +497,12 @@ final class AppModel: ObservableObject {
     var nineRouterBaseURL: String {
         defaults.string(forKey: "9router_base_url") ?? NineRouterEngine.defaultBaseURL.absoluteString
     }
+    private var nineRouterPasswordPresentCache: Bool?
     var nineRouterPasswordPresent: Bool {
-        Keychain.read(account: nineRouterBaseURL, service: Keychain.nineRouterService) != nil
+        if let cached = nineRouterPasswordPresentCache { return cached }
+        let present = Keychain.read(account: nineRouterBaseURL, service: Keychain.nineRouterService) != nil
+        nineRouterPasswordPresentCache = present
+        return present
     }
     func saveNineRouter(baseURL: String, password: String) {
         let url = baseURL.trimmingCharacters(in: .whitespaces)
@@ -498,6 +512,7 @@ final class AppModel: ObservableObject {
         let trimmed = password.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { Keychain.delete(account: url, service: Keychain.nineRouterService) }
         else { _ = Keychain.write(account: url, value: trimmed, service: Keychain.nineRouterService) }
+        nineRouterPasswordPresentCache = !trimmed.isEmpty
         relaunchApp()
     }
 
