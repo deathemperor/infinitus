@@ -40,7 +40,7 @@ func usage() -> String {
     out += "  team <subcommand>      teams: create, code, request, approve, publish… (`\(programName) team --help`)\n"
     out += "  plugin install|uninstall|status   the Claude Code plugin: hooks that push prompts to the phone the moment they appear\n"
     out += "  mcp                    the plugin's MCP server over stdio (fleet_status, list_sessions, session_message)\n"
-    out += "\nFleet keys come from `infinitusctl fleets` (e.g. cswap/claude, cliproxy/claude).\n"
+    out += "\nFleet keys come from `infinitusctl fleets` (e.g. swapd/claude, cliproxy/claude).\n"
     out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code and signin-code read their secret from stdin.\n"
     out += "Socket: \(ControlProtocol.socketURL().path)\n"
     return out
@@ -77,15 +77,20 @@ while i < args.count {
     i += 1
 }
 
+// A secret or a body comes on stdin only when something is piped in: an
+// interactive terminal (or an e2e run whose stdin is a live pipe) must
+// not sit in readDataToEndOfFile forever for a verb that has nothing to
+// read (`activities-token --forget` hung a run for 90 min, 2026-09-11).
+let stdinPiped = isatty(0) == 0
 var secret: String?
-if ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "send", "approve"].contains(command) {
+if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "send", "approve", "team-create", "team-join", "team-hostname"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // A JSON body verb (#572 N1) takes `--body <json>`; without it the JSON
 // comes from stdin, so `infinitusctl crash-report < report.json` works.
-if ["activities-token", "client-activity", "crash-report"].contains(command), options[ControlBody.option] == nil {
+if stdinPiped, ["activities-token", "client-activity", "crash-report"].contains(command), options[ControlBody.option] == nil {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     options[ControlBody.option] = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }

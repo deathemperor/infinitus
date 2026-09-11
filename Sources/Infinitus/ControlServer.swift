@@ -196,6 +196,15 @@ final class ControlServer {
     }
 
     /// The snapshot after a team action, or the action's error.
+    private func lockReply() -> ControlReply {
+        let policy = model.lock.policy
+        return ControlReply(ok: true, result: .object([
+            "enabled": .bool(policy.enabled),
+            "locked": .bool(policy.locked),
+            "relock": .string(policy.relock.label),
+        ]))
+    }
+
     private func teamReply() throws -> ControlReply {
         if let err = model.team.lastError { throw Fail(err) }
         return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
@@ -512,7 +521,7 @@ final class ControlServer {
             guard r.args.count >= 3, ["on", "off"].contains(r.args[2]) else { throw Fail("usage: prefer <fleet> <n> on|off") }
             guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
             guard account.preferred != nil else {
-                throw Fail("the installed cswap has no autoswitch.preferred setting (claude-swap PR #312)")
+                throw Fail("the engine reports no pick-first flag for \(fleet.id)")
             }
             try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on")
             await model.refreshSnapshot()
@@ -581,7 +590,7 @@ final class ControlServer {
             }
             if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
-            } else if fleet.engineID == CswapEngine.engineID {
+            } else if fleet.capabilities.contains(.addCurrent) {
                 model.addFirstAccount()
             } else {
                 throw Fail("\(key) has no sign-in flow")
@@ -621,7 +630,7 @@ final class ControlServer {
             if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
                                       relogin: relogin, headless: true)
-            } else if fleet.engineID == CswapEngine.engineID {
+            } else if fleet.capabilities.contains(.addCurrent) {
                 flow.start(model: model, relogin: relogin, headless: true)
             } else {
                 throw Fail("\(key) has no sign-in flow")
@@ -769,12 +778,46 @@ final class ControlServer {
             ]))
 
         case "lock-status":
-            let policy = model.lock.policy
-            return ControlReply(ok: true, result: .object([
-                "enabled": .bool(policy.enabled),
-                "locked": .bool(policy.locked),
-                "relock": .string(policy.relock.label),
-            ]))
+            return lockReply()
+
+        case "lock":
+            // #747: the fork's Lock pane drives the biometric lock through
+            // these; `on` and `unlock` run the prompt on this Mac.
+            switch r.args.first {
+            case "on":
+                if !model.lock.enabled {
+                    let on = await model.lock.turnOn()
+                    guard on else { throw Fail(model.lock.lastError ?? "the unlock prompt was cancelled") }
+                }
+            case "off":
+                // The pane warns before turning it off inside a team; the
+                // verb wants the same deliberate step.
+                let teams = model.lock.teamNames()
+                guard teams.isEmpty || r.options["yes"] != nil else {
+                    throw Fail("this Mac is in \(teams.joined(separator: ", ")); lock off --yes turns the lock off anyway")
+                }
+                model.lock.turnOff()
+            case "now":
+                model.lock.lockNow()
+            case "relock":
+                let choices: [String: LockPolicy.Relock] = ["immediately": .immediately, "5m": .fiveMinutes,
+                                                             "1h": .oneHour, "sleep": .onSleep]
+                guard r.args.count >= 2, let relock = choices[r.args[1]] else {
+                    throw Fail("usage: lock relock immediately|5m|1h|sleep")
+                }
+                model.lock.relock = relock
+            default:
+                throw Fail("usage: lock on|off [--yes]|now|relock immediately|5m|1h|sleep")
+            }
+            return lockReply()
+
+        case "unlock":
+            guard model.lock.enabled else { throw Fail("the lock is off") }
+            guard model.lock.policy.locked else { return lockReply() }
+            await model.lock.unlock()
+            if let err = model.lock.lastError { throw Fail(err) }
+            guard !model.lock.policy.locked else { throw Fail("the unlock prompt was cancelled") }
+            return lockReply()
 
         case "team-status":
             return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
@@ -789,8 +832,42 @@ final class ControlServer {
             guard let name = r.args.first, !name.isEmpty, let remote, !remote.isEmpty else {
                 throw Fail("usage: team-create <name> --remote <url> [--as <your name>]")
             }
-            await model.team.create(name: name, remote: remote, token: nil, leaderName: r.options["as"] ?? "Leader")
+            // The remote's write token rides stdin (#747, `stdin: "secret"`);
+            // empty stdin is the credential-less create it always was.
+            await model.team.create(name: name, remote: remote, token: r.secret, leaderName: r.options["as"] ?? "Leader")
             return try teamReply()
+
+        case "team-join":
+            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: team-join <your name>  (the team code or invite link on stdin)") }
+            guard let code = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else {
+                throw Fail("team-join needs the team code or invite link on stdin")
+            }
+            if let failure = await model.team.join(code: code, name: name) { throw Fail(failure) }
+            return try teamReply()
+
+        case "team-hostname":
+            // Settings › Team › Hostnames: the Cloudflare zone, the label
+            // and the API token (stdin) hostnames are minted under.
+            if r.options["clear"] != nil {
+                await model.team.forgetCloudflare()
+                if let err = model.team.lastError { throw Fail(err) }
+                return ControlReply(ok: true, result: .object([
+                    "zone": .null, "label": .null, "configured": .bool(model.team.cloudflareConfigured),
+                ]))
+            }
+            guard let zone = r.options["zone"], zone != "true", !zone.isEmpty,
+                  let label = r.options["label"], label != "true", !label.isEmpty else {
+                throw Fail("usage: team-hostname --zone <zone> --label <label>  (the Cloudflare API token on stdin) | team-hostname --clear")
+            }
+            guard let token = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {
+                throw Fail("team-hostname needs the Cloudflare API token on stdin")
+            }
+            await model.team.saveCloudflare(zone: zone, label: label, token: token)
+            if let err = model.team.lastError { throw Fail(err) }
+            return ControlReply(ok: true, result: .object([
+                "zone": .string(zone), "label": .string(label),
+                "configured": .bool(model.team.cloudflareConfigured),
+            ]))
 
         case "team-code":
             let days = min(max(r.options["days"].flatMap(Int.init) ?? 7, 1), 3650)
@@ -895,7 +972,7 @@ final class ControlServer {
 
         case "engine":
             guard r.args.count == 2, ["on", "off"].contains(r.args[1]) else {
-                throw Fail("usage: engine cswap|swapd|cliproxy|9router on|off")
+                throw Fail("usage: engine swapd|cliproxy|9router on|off")
             }
             let on = r.args[1] == "on"
             let changed: Bool
@@ -1041,8 +1118,6 @@ final class ControlServer {
             version: info["CFBundleShortVersionString"] as? String ?? "dev",
             sha: info["InfinitusGitSHA"] as? String ?? info["CFBundleVersion"] as? String ?? "dev",
             engines: [
-                "cswap": EngineStatus(enabled: model.cswapEnabled, registered: model.cswapRegistered,
-                                      keyPresent: nil),
                 "swapd": EngineStatus(enabled: model.swapdEnabled, registered: model.swapdRegistered,
                                       keyPresent: nil),
                 "cliproxy": EngineStatus(enabled: model.cliproxyEnabled,

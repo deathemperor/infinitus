@@ -34,7 +34,7 @@ final class PrefCatalogTests: XCTestCase {
 
     func testAnUnsetSuiteReadsTheDefaults() throws {
         let reply = try PrefCatalog.reply(from: defaults)
-        XCTAssertEqual(reply.sections.map(\.slug), ["display", "themes", "push", "devices", "engines", "about", "sessions"])
+        XCTAssertEqual(reply.sections.map(\.slug), ["display", "themes", "animations", "push", "devices", "engines", "about", "sessions"])
         XCTAssertEqual(reply.prefs.count, PrefCatalog.entries.count)
         for pref in reply.prefs { XCTAssertEqual(pref.value, pref.default, pref.key) }
         let layout = try XCTUnwrap(reply.prefs.first { $0.key == "popup_layout" })
@@ -142,6 +142,40 @@ final class PrefCatalogTests: XCTestCase {
         let data = Data(#"{"key":"popup_layout","value":"stacked"}"#.utf8)
         XCTAssertEqual(try JSONDecoder().decode(PrefCatalog.Write.self, from: data),
                        PrefCatalog.Write(key: "popup_layout", value: .string("stacked")))
+    }
+
+    /// #747: the popup intro and burn prefs sit under `animations`; the
+    /// speed carries its range and a write outside it is refused.
+    func testTheAnimationPrefsCarryTheirRangeAndRefuseAValueOutsideIt() throws {
+        let reply = try PrefCatalog.reply(from: defaults, keys: ["intro_style", "intro_speed"])
+        XCTAssertEqual(reply.prefs.map(\.section), ["animations", "animations"])
+        XCTAssertEqual(reply.prefs[0].choices, [.string("top"), .string("bottom"), .string("fade"), .string("rows")])
+        XCTAssertEqual(reply.prefs[1].min, 0.4)
+        XCTAssertEqual(reply.prefs[1].max, 2)
+        XCTAssertNil(reply.prefs[0].min)
+        XCTAssertEqual(try PrefCatalog.write(.number(1.5), key: "intro_speed", to: defaults).value, .number(1.5))
+        XCTAssertThrowsError(try PrefCatalog.write(.number(3), key: "intro_speed", to: defaults)) { error in
+            XCTAssertEqual((error as? PrefCatalog.Violation)?.message, "intro_speed must be between 0.4 and 2, not 3")
+        }
+        XCTAssertThrowsError(try PrefCatalog.write(.number(0.1), key: "intro_speed", to: defaults))
+        XCTAssertEqual(defaults.double(forKey: "intro_speed"), 1.5, "the refused writes left the stored value alone")
+        let text = String(decoding: try JSONEncoder().encode(try PrefCatalog.reply(from: defaults, keys: ["intro_style"])), as: UTF8.self)
+        XCTAssertFalse(text.contains("\"min\""), "an unbounded pref carries no min/max keys: \(text)")
+    }
+
+    /// The theme id set is open (custom `themes.json` ids), so the reply
+    /// takes run-time choices by key while validation stays the entry's.
+    func testRunTimeChoicesReplaceTheEntrysInTheReplyOnly() throws {
+        defaults.set("my-skin", forKey: "gamification_style")
+        let rows: [JSONValue] = [.object(["id": .string("off"), "name": .string("Off")]),
+                                 .object(["id": .string("my-skin"), "name": .string("My skin")])]
+        let reply = try PrefCatalog.reply(from: defaults, keys: ["gamification_style", "popup_layout"],
+                                          choices: ["gamification_style": rows])
+        let theme = try XCTUnwrap(reply.prefs.first { $0.key == "gamification_style" })
+        XCTAssertEqual(theme.choices, rows)
+        XCTAssertEqual(theme.value, .string("my-skin"))
+        XCTAssertEqual(reply.prefs.first { $0.key == "popup_layout" }?.choices, [.string("wide"), .string("stacked"), .string("hstack")])
+        XCTAssertNoThrow(try PrefCatalog.write(.string("another"), key: "gamification_style", to: defaults))
     }
 
     func testTheReplyEncodesDefaultAndValueAsPlainJSON() throws {

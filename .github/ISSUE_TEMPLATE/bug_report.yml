@@ -31,7 +31,7 @@ body:
         - Mac app (menu bar popup, pop-out, wall, settings)
         - Phone app (iOS, widgets, share sheet)
         - infinitusctl / InfinitusCLI
-        - Engines (cswap, CLIProxyAPI, other adapters)
+        - Engines (swapd, CLIProxyAPI, other adapters)
         - Sessions, resume nudge, transcripts
         - Team publishing
         - Build, CI, or release tooling (make-app.sh, Homebrew, nightly)
@@ -94,7 +94,7 @@ body:
     attributes:
       label: Environment
       description: macOS / iOS version, install method (brew, nightly, built from source), engine and version if relevant.
-      placeholder: macOS 26.0, brew infinitus@nightly, cswap 0.9.1
+      placeholder: macOS 26.0, brew infinitus@nightly, swapd 0.1.0
 
   - type: textarea
     id: logs

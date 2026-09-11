@@ -169,7 +169,7 @@ public enum SentinelNotes {
         "foreign_credential": "live credential belongs to another account — a switch repairs it",
         "api_key": "API key (no quota)",
         "keychain_unavailable": "keychain unavailable — locked or in use; try again",
-        "relogin_required": "re-login needed — refresh token dead; log in with Claude Code, then run: cswap add",
+        "relogin_required": "re-login needed — refresh token dead; log in with Claude Code, then run: swapd add",
         "no_credentials": "no credentials",
     ]
 

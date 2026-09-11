@@ -1,151 +1,9 @@
 import SwiftUI
 import InfinitusCore
 
-/// Claude provider pane: auto-switch control + the spec-driven cswap
-/// settings. A top-level sidebar row, CodexBar-style (user 2026-08-30 —
-/// providers sit IN the settings sidebar, not behind a nested split).
-struct ClaudeEnginePane: View {
-    @ObservedObject var model: AppModel
-    @ObservedObject var settings: SettingsModel
-    @ObservedObject var update: UpdateModel
-    @ObservedObject var reliability: ResumeReliabilityModel
-    /// Stopping halts rotation while sessions are running, so it asks.
-    @State private var confirmStop = false
-
-    var body: some View {
-        Form {
-            Section {
-                Toggle("Engine on (credential swap under Claude Code)", isOn: $model.cswapEnabled)
-                EngineToggleNotes(model: model)
-                LabeledContent("Rotation") {
-                    HStack {
-                        stateText
-                        Button(toggleTitle) {
-                            if rotating { confirmStop = true } else { model.toggleEngine() }
-                        }
-                        .disabled(!togglable)
-                    }
-                }
-            } header: {
-                Text("Claude \u{2014} cswap engine")
-            } footer: {
-                Text("Rotating swaps the Claude account under Claude Code before a limit "
-                     + "stalls a session. When it is stopped, the account in use stays put.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Demo fleet (fabricated accounts)", isOn: $model.mockMode)
-            } header: {
-                Text("Mock data")
-            } footer: {
-                Text("Five made-up accounts standing in for the engine \u{2014} one burns "
-                     + "ahead of pace, one is dead, rotate and reorder play along. Nothing "
-                     + "reads or touches your real accounts; flipping this restarts the app.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            ResumeNudgesSection(service: model.resume)
-            ResumeReliabilitySection(model: reliability)
-            // Engine updates live WITH the engine (user 2026-08-30:
-            // "move all of updates of engine to its engine setting");
-            // About keeps the app's own release channel.
-            Section {
-                Toggle("Update automatically", isOn: Binding(
-                    get: { update.autoCheck && update.autoInstall },
-                    set: { update.autoCheck = $0; update.autoInstall = $0 }))
-                LabeledContent {
-                    HStack {
-                        if update.updateAvailable {
-                            Button("Update Now") { Task { await update.upgrade() } }
-                                .disabled(update.busy)
-                                .buttonStyle(.borderedProminent)
-                        }
-                        Button(update.busy ? "Checking\u{2026}" : "Check for Updates") {
-                            Task { await update.check() }
-                        }
-                        .disabled(update.busy)
-                    }
-                } label: {
-                    Text("cswap engine \(update.current ?? "—")")
-                    if let latest = update.latest {
-                        Text("latest on PyPI: \(latest)")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                if let status = update.status {
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(update.updateAvailable ? Color.orange : .secondary)
-                }
-                Link(destination: releaseNotesURL) {
-                    Label("Release notes", systemImage: "doc.text")
-                }
-                Link(destination: URL(string: "https://github.com/deathemperor/claude-swap")!) {
-                    Label("Engine — claude-swap", systemImage: "gearshape.2")
-                }
-                if let output = update.upgradeOutput, !output.isEmpty {
-                    DisclosureGroup("Upgrade output") {
-                        ScrollView {
-                            Text(output)
-                                .font(.system(.caption, design: .monospaced))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                        }
-                        .frame(maxHeight: 160)
-                    }
-                }
-            } header: {
-                Text("Engine updates")
-            } footer: {
-                Text("Automatic updates check daily for a newer engine release, install it "
-                     + "unattended and restart the engine. Nothing else changes.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            SettingsFormBody(model: settings)
-        }
-        .formStyle(.grouped)
-        .task { await settings.load() }
-        .onAppear { if update.current == nil { Task { await update.check() } } }
-        .confirmationDialog("Stop rotating Claude accounts?", isPresented: $confirmStop) {
-            Button("Stop", role: .destructive) { model.toggleEngine() }
-            Button("Keep Rotating", role: .cancel) { }
-        } message: {
-            Text("Sessions stall at their limits until you start it again. The account in "
-                 + "use keeps working, and your accounts are untouched \u{2014} Start puts "
-                 + "rotation back exactly as it was.")
-        }
-    }
-
-    private var releaseNotesURL: URL {
-        // Release notes live on the upstream repo (the PyPI package's home).
-        if update.updateAvailable, let latest = update.latest {
-            return URL(string: "https://github.com/realiti4/claude-swap/releases/tag/v\(latest)")!
-        }
-        return URL(string: "https://github.com/realiti4/claude-swap/releases")!
-    }
-
-    private var stateText: some View { EngineStateText(state: model.cswapState) }
-
-    /// Stop opens the confirmation, so it wears the ellipsis; Start acts.
-    private var toggleTitle: String { rotating ? "Stop\u{2026}" : "Start" }
-
-    /// Whether rotation is currently active, i.e. the button would stop it.
-    private var rotating: Bool {
-        if case .running = model.cswapState { return true }
-        if case .backingOff = model.cswapState { return true }
-        return false
-    }
-
-    private var togglable: Bool {
-        switch model.cswapState {
-        case .running, .stopped, .backingOff: return true
-        case .refused, .schemaMismatch: return false
-        }
-    }
-}
-
-/// One supervised daemon's state, as the cswap and swapd panes both show it.
+/// One supervised daemon's state, as the swapd pane shows it.
 struct EngineStateText: View {
-    let state: CswapSupervisor.State
+    let state: EngineSupervisor.State
     var body: some View {
         Group {
             switch state {
@@ -159,7 +17,7 @@ struct EngineStateText: View {
     }
 }
 
-extension CswapSupervisor.State {
+extension EngineSupervisor.State {
     /// Sidebar live-dot: only a genuinely running engine counts.
     var isRunning: Bool {
         if case .running = self { return true }
@@ -450,15 +308,10 @@ struct EngineToggleNotes: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        if model.cswapEnabled && model.cliproxyEnabled {
-            Text("Both engines are on. cswap swaps the credential under "
+        if model.swapdEnabled && model.cliproxyEnabled {
+            Text("Both engines are on. swapd swaps the credential under "
                  + "Claude Code; the proxy rotates behind its own endpoint \u{2014} "
                  + "for the same accounts they fight. Run one per account set.")
-                .font(.caption).foregroundStyle(.orange)
-        }
-        if model.cswapEnabled && model.swapdEnabled {
-            Text("cswap and swapd both keep Claude Code's login. Side by side they only "
-                 + "show the same accounts twice \u{2014} let one of them do the switching.")
                 .font(.caption).foregroundStyle(.orange)
         }
         Text("Flipping an engine restarts the app.")
@@ -466,11 +319,13 @@ struct EngineToggleNotes: View {
     }
 }
 
-/// swapd pane (preview, #8): the multi-provider engine that will replace
-/// cswap. Off until asked for, and safe beside cswap during the
-/// transition — the app assumes neither exists.
+/// swapd pane (#8): the multi-provider credential-swap engine. A
+/// top-level sidebar row, CodexBar-style (user 2026-08-30 — providers
+/// sit IN the settings sidebar, not behind a nested split). The app
+/// assumes the binary may be missing.
 struct SwapdEnginePane: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var reliability: ResumeReliabilityModel
 
     var body: some View {
         Form {
@@ -479,20 +334,34 @@ struct SwapdEnginePane: View {
                        isOn: $model.swapdEnabled)
                     .disabled(model.swapd == nil && !model.swapdEnabled)
                 if model.swapd == nil {
-                    Text("Install the binary first \u{2014} the toggle turns on once it is found.")
+                    Text("Install the binary first \u{2014} the toggle turns on once it is found:")
                         .font(.caption).foregroundStyle(.secondary)
+                    Text(OnboardingBrief.swapdInstallCommand)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
                 }
                 EngineToggleNotes(model: model)
             } header: {
-                Text("swapd engine (preview)")
+                Text("swapd engine")
             } footer: {
                 Text("One binary per machine, several providers: it keeps your logins, "
                      + "shows each one's usage windows and swaps the live login before a "
-                     + "limit binds \u{2014} what cswap does for Claude, for every CLI. "
-                     + "Igniting an account here refreshes it at once, so the row shows "
-                     + "the window that just started.")
+                     + "limit binds. Igniting an account here refreshes it at once, so "
+                     + "the row shows the window that just started.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("Demo fleet (fabricated accounts)", isOn: $model.mockMode)
+            } header: {
+                Text("Mock data")
+            } footer: {
+                Text("Made-up accounts standing in for the engine \u{2014} one burns "
+                     + "ahead of pace, one is dead, rotate and reorder play along. Nothing "
+                     + "reads or touches your real accounts; flipping this restarts the app.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            ResumeNudgesSection(service: model.resume)
+            ResumeReliabilitySection(model: reliability)
             Section {
                 LabeledContent("Binary") {
                     Text(model.swapd?.binaryPath ?? "not found")

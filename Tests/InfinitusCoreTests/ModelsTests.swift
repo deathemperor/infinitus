@@ -162,4 +162,27 @@ final class ModelsCodableTests: XCTestCase {
         let list = AccountList(activeAccountNumber: 3, accounts: [account])
         XCTAssertEqual(list.schemaVersion, 1)
     }
+
+    /// #756: the app's own session scan fills the block cswap's list used
+    /// to carry — busy first, counts by status, epoch milliseconds.
+    func testLiveSessionsBuildFromTheAppsOwnRecords() {
+        func record(_ pid: Int32, _ status: String?, _ id: String = "s") -> ClaudeSessionRecord {
+            ClaudeSessionRecord(pid: pid, sessionId: id, cwd: "/w", kind: "interactive", status: status,
+                                messagingSocketPath: "", peerProtocol: 1,
+                                startedAt: Date(timeIntervalSince1970: 1_700_000_000))
+        }
+        let live = LiveSessions(records: [record(1, "idle", "a"), record(2, "busy", "b"), record(3, nil, ""), record(4, "waiting", "d")])
+        XCTAssertEqual(live.busy, 1)
+        XCTAssertEqual(live.total, 4)
+        XCTAssertEqual(live.idle, 1)
+        XCTAssertEqual(live.waiting, 1)
+        XCTAssertEqual(live.shell, 0)
+        XCTAssertEqual(live.unknown, 1)
+        XCTAssertEqual(live.sessions?.map(\.pid), [2, 4, 1, 3])
+        XCTAssertEqual(live.sessions?.first?.startedAt, 1_700_000_000_000)
+        XCTAssertEqual(live.sessions?.first?.sessionId, "b")
+        XCTAssertNil(live.sessions?.last?.sessionId)
+        XCTAssertEqual(live.sessions?.last?.status, "unknown")
+        XCTAssertEqual(LiveSessions(records: []).total, 0)
+    }
 }

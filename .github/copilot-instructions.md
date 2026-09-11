@@ -2,7 +2,7 @@
 
 Infinitus is a native macOS menu bar app (Swift, SwiftUI + AppKit) with an
 iOS companion, a CLI (`infinitusctl`), and a cross-platform core
-(InfinitusCore). Account policy engines such as cswap are adapters behind
+(InfinitusCore). Account policy engines such as swapd are adapters behind
 `AccountEngine`; the app never depends on one engine existing.
 
 ## How to review
@@ -21,16 +21,16 @@ iOS companion, a CLI (`infinitusctl`), and a cross-platform core
 
 ## Project rules a diff can violate
 
-- **Engine isolation.** Every engine touchpoint is a `cswap … --json`
-  subprocess through `Sources/InfinitusCore/Engines/Cswap/CswapCLI.swift`.
+- **Engine isolation.** Every engine touchpoint is a `swapd … --json`
+  subprocess through `Sources/InfinitusCore/Engines/Swapd/SwapdCLI.swift`.
   Flag any read of `~/.claude-swap-backup/*` or any parsing of engine
   internals. Reading Claude Code's own files (`~/.claude/settings.json`,
   `~/.claude/sessions/*`, `~/.claude/projects/*/*.jsonl`) is fine.
-- **No cswap dependency outside the adapter.** Flag a feature, data
-  format, CLI command, or publisher that only works when cswap is
-  installed, and any new cswap subcommand meant to ship app features.
+- **No engine dependency outside the adapter.** Flag a feature, data
+  format, CLI command, or publisher that only works when swapd is
+  installed, and any new swapd subcommand meant to ship app features.
 - **Gate UI on capabilities, never on engine identity.** Flag
-  `if engine.id == "cswap"`-style checks in UI; the check belongs on the
+  `if engine.id == "swapd"`-style checks in UI; the check belongs on the
   fleet's `capabilities`.
 - **Account policy lives in the engines.** Flag app-side code that
   re-implements auto-swap, pick-first, or account ordering instead of

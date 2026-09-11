@@ -103,9 +103,9 @@ actor MirrorExporter {
         let shownIds = Set(shown.map(\.sessionId))
         tails = tails.filter { shownIds.contains($0.key) }
         tailProgress = tailProgress.filter { shownIds.contains($0.key) }
-        // Cash column (#9 phase D1a): the cache UsagePane.swift's refresh
-        // already writes, verbatim — no new subprocess, no engine call.
-        let usageJSON = try? Data(contentsOf: UsageModel.cacheURL)
+        // Cash column (#9 phase D1a) was `cswap usage`'s cache; the field
+        // stays on the wire, empty, until a native estimate (#756).
+        let usageJSON: Data? = nil
         let perMinute = TokenRate.perMinute(progressByPid, now: now)
         tokenPeak = TokenRate.nextPeak(tokenPeak, seeing: perMinute)
         // The engine's rows know pids only; the session records know the

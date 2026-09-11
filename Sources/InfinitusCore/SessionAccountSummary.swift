@@ -3,20 +3,20 @@ import Foundation
 // MARK: - Session → account attribution (phone header + detail screen)
 //
 // "Which account is active or using the session" (user 2026-09-03): a
-// cswap session always rides the fleet's one active credential; a
-// CLIProxyAPI session routes per request across every account in that
-// fleet, so there is no single "the" account. Pure data decision, gated
-// on the owning fleet's identity — never on `Provider` alone, since a
-// CLIProxyAPI Claude fleet must not read as a cswap one.
+// credential-swap (swapd) session always rides the fleet's one active
+// credential; a CLIProxyAPI session routes per request across every
+// account in that fleet, so there is no single "the" account. Pure data
+// decision, gated on the owning fleet's identity — never on `Provider`
+// alone, since a CLIProxyAPI Claude fleet must not read as a swapd one.
 
 /// Which fleet a live session's requests actually go through, and what
 /// to say about its account(s).
 public struct SessionAccountSummary: Sendable {
-    public enum Kind: Sendable, Equatable { case cswap, proxy, unknownFleet }
+    public enum Kind: Sendable, Equatable { case swap, proxy, unknownFleet }
 
     public let kind: Kind
     public let engineID: String
-    /// cswap / unknownFleet: the fleet's one active account (nil if the
+    /// swap / unknownFleet: the fleet's one active account (nil if the
     /// fleet reports no active number, or it doesn't match any account).
     public let account: Account?
     /// proxy only: every account on that fleet, for the detail list.
@@ -26,10 +26,9 @@ public struct SessionAccountSummary: Sendable {
 }
 
 public enum SessionAccountLookup {
-    /// `CswapEngine.engineID` itself is `#if !os(iOS)` (it spawns a
-    /// subprocess) — hardcoded here so this file compiles on the phone
-    /// too. Matches `MirrorFleetModel.cswapEngineID` on the mobile side.
-    public static let cswapEngineID = "cswap"
+    /// `SwapdEngine.engineID` itself is `#if !os(iOS)` (it spawns a
+    /// subprocess) — hardcoded here so this file compiles on the phone too.
+    public static let swapEngineID = "swapd"
 
     /// - Parameters:
     ///   - pid: the session's pid (`SessionDetail.pid`).
@@ -37,7 +36,7 @@ public enum SessionAccountLookup {
     /// - Returns: nil only when there are no fleets at all to attribute to.
     public static func summarize(pid: Int, fleets: [EngineFleet]) -> SessionAccountSummary? {
         // The fleet whose OWN liveSessions carries this pid — today only
-        // ever cswap's, per `SessionsScreen.fleetsWithSessions`, but the
+        // ever swapd's, per `SessionsScreen.fleetsWithSessions`, but the
         // lookup stays generic for whichever engine reports sessions next.
         let owner = fleets.first { fleet in
             fleet.liveSessions?.sessions?.contains { $0.pid == pid } ?? false
@@ -49,8 +48,8 @@ public enum SessionAccountLookup {
             fleet.accounts.first { $0.number == fleet.activeNumber }
         }
 
-        if fleet.engineID == cswapEngineID, fleet.provider == .claude {
-            return SessionAccountSummary(kind: .cswap, engineID: fleet.engineID,
+        if fleet.engineID == swapEngineID, fleet.provider == .claude {
+            return SessionAccountSummary(kind: .swap, engineID: fleet.engineID,
                                           account: activeAccount(fleet), proxyAccounts: [],
                                           proxyAliveCount: 0, proxyLowestHeadroom: nil)
         }

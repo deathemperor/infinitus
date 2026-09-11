@@ -42,7 +42,7 @@ cost a day; the reasoning is in `CLAUDE.md` under "Hard-won facts".
 
 ## Engines and control
 
-- Engine calls go through `CswapCLI` as `cswap … --json` subprocesses.
+- Engine calls go through `SwapdCLI` as `swapd … --json` subprocesses.
   Flag direct file reads of engine state.
 - Every engine is an `AccountEngine` yielding `EngineFleet`s; `AppModel`
   is a facade over the primary fleet. Flag new engine-specific branches in

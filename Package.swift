@@ -18,7 +18,7 @@ var targets: [Target] = [
             dependencies: [.product(name: "Crypto", package: "swift-crypto"), "CZlib"],
             path: "Sources/InfinitusCore"),
     // Linux/Omarchy frontend: a Waybar custom module over the same core
-    // (packaging/omarchy). The engine stays behind `cswap … --json`.
+    // (packaging/omarchy). The engine stays behind `swapd … --json`.
     .executableTarget(
         name: "InfinitusTray",
         dependencies: ["InfinitusCore"],

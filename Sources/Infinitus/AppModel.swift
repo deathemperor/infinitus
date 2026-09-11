@@ -6,8 +6,8 @@ import InfinitusCore
 import InfinitusUI
 
 /// Main-actor state the MenuBarExtra renders. Feeds per spec §2:
-/// snapshots from `cswap list --json` (timer + right after any switch
-/// event), events from the supervised `cswap auto --json`.
+/// snapshots from `swapd list --json` (timer + right after any switch
+/// event), events from the supervised `swapd auto --json`.
 @MainActor
 final class AppModel: ObservableObject {
     // MARK: fleets (#8 multi-engine seam)
@@ -15,7 +15,7 @@ final class AppModel: ObservableObject {
     // Every enabled engine's fleets live in the registry as FleetState
     // objects — rows, ticks, pending switch. AppModel stays the popup
     // chrome's model AND a FleetModel facade over the PRIMARY Claude
-    // fleet (cswap's on a cswap machine), so the mac-only panes, the
+    // fleet (swapd's on a swapd machine), so the mac-only panes, the
     // title, resume nudges and push triggers keep reading `accounts`
     // exactly as before.
     private(set) lazy var registry = EngineRegistry(host: self)
@@ -26,14 +26,6 @@ final class AppModel: ObservableObject {
     /// Per-engine honesty note for the fleet header (proxy: routing
     /// strategy that ignores priority tiers).
     @Published var fleetCaveats: [String: String] = [:]
-    /// The cswap cash column's source (UsagePane.swift owns the scan);
-    /// the cswap fleet mirrors it, other engines report their own.
-    var usageModel: UsageModel? {
-        didSet {
-            guard let usageModel else { return }
-            for f in fleets where f.engineID == CswapEngine.engineID { f.follow(usageModel) }
-        }
-    }
     private var forwardingFleetChange = false
 
     var accounts: [Account] { primary?.accounts ?? [] }
@@ -104,10 +96,9 @@ final class AppModel: ObservableObject {
     /// not-yet-copied key (user 2026-09-03 "not seeing the animations
     /// setting on current build").
     let debugMenu: Bool
-    @Published var cswapState: CswapSupervisor.State = .stopped
-    /// swapd's own `auto` under the same supervisor (#475: one daemon per
-    /// enabled engine, each owning its account policy).
-    @Published var swapdState: CswapSupervisor.State = .stopped
+    /// swapd's `auto` under the supervisor (#475: one daemon per enabled
+    /// engine, each owning its account policy).
+    @Published var swapdState: EngineSupervisor.State = .stopped
     struct EventEntry: Identifiable {
         let id = UUID()
         var at = Date()
@@ -329,10 +320,9 @@ final class AppModel: ObservableObject {
     /// for fresh polls.
     private var recentSamples: [UsageSample] = []
 
-    let cswap: CswapCLI?
-    /// The swapd binary this Mac has, when it has one (preview, #8): the
-    /// engine is registered from it, and the pane shows where it is.
-    /// Never in the playground — that model is demo data only.
+    /// The swapd binary this Mac has, when it has one (#8): the engine is
+    /// registered from it, and the pane shows where it is. Mock mode and
+    /// the playground run the bundled demo script in its place.
     let swapd: SwapdCLI?
     /// The Animation Playground is retired (#654); the guards it gated —
     /// snapshot cache, notifications, resume nudges, push, sync, power
@@ -362,13 +352,8 @@ final class AppModel: ObservableObject {
     /// The one BrewUpdater instance the About pane's button and the
     /// phone's `POST /app/update` route both drive; set by InfinitusApp.
     var brewUpdater: BrewUpdater?
-    /// The About pane's update checker: `update_auto_*` writes from the
-    /// socket, the mirror or iCloud sync reach it through `reloadPrefs`
-    /// (it reads the defaults once, at init); set by InfinitusApp.
-    weak var updateModel: UpdateModel?
     private let launchExecutableDate = AppModel.executableDate()
-    private var supervisor: CswapSupervisor?
-    private var swapdSupervisor: CswapSupervisor?
+    private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
     private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
@@ -423,9 +408,9 @@ final class AppModel: ObservableObject {
     /// phone's own `chat_header` choices.
     @Published var chatHeader: String { didSet { defaults.set(chatHeader, forKey: "chat_header") } }
     /// Mock mode (user 2026-08-31): the bundled demo fleet stands in
-    /// for the engine. Machine-local, deliberately never synced. cswap
+    /// for the engine. Machine-local, deliberately never synced. swapd
     /// is a let, so flipping this relaunches — the restart IS the
-    /// re-detect (installEngine precedent).
+    /// re-detect.
     @Published var mockMode: Bool {
         didSet {
             defaults.set(mockMode, forKey: "mock_mode")
@@ -436,15 +421,7 @@ final class AppModel: ObservableObject {
     // MARK: engines (#8) — which engines the registry runs. Like
     // mockMode, flipping one relaunches: the registry is built once at
     // init and the restart IS the re-detect.
-    @Published var cswapEnabled: Bool {
-        didSet {
-            guard cswapEnabled != oldValue else { return }
-            defaults.set(cswapEnabled, forKey: "engine_cswap_enabled")
-            relaunchApp()
-        }
-    }
-    /// The swapd engine (preview): off until asked for, and it runs
-    /// BESIDE cswap during the transition — neither is assumed.
+    /// The swapd engine: on by default, off when asked.
     @Published var swapdEnabled: Bool {
         didSet {
             guard swapdEnabled != oldValue else { return }
@@ -845,14 +822,10 @@ final class AppModel: ObservableObject {
     /// Every app notification: Notification Center here, and the same
     /// text to any phone that registered an alert token (issue #3).
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
-    /// engine's away-push. Text over stdin, matching the channel-setup
-    /// commands; no channels configured is a quiet no-op (try?). The
-    /// away-push channels are cswap's.
+    /// phone (#756: the engine's own away-push channels went with cswap;
+    /// swapd's `notify` only reports).
     func push(_ msg: String) {
         notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
-        if let cswap {
-            Task { _ = try? await cswap.run(["notify", "push", "-"], stdin: msg) }
-        }
     }
 
     struct SessionRow {
@@ -1103,8 +1076,7 @@ final class AppModel: ObservableObject {
         // only the typed getter reads as true (#249).
         let mock = defaults.bool(forKey: "mock_mode")
         mockMode = mock
-        cswapEnabled = defaults.object(forKey: "engine_cswap_enabled") as? Bool ?? true
-        swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? false
+        swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
@@ -1142,34 +1114,27 @@ final class AppModel: ObservableObject {
             // Isolation is the contract: no demo script, no data at all
             // (never fall back to the real engine here).
             if let demo = Self.demoScriptPath() {
-                cswap = CswapCLI(binaryPath: demo)
+                swapd = SwapdCLI(binaryPath: demo)
             } else {
-                cswap = nil
+                swapd = nil
                 lastError = "demo script missing — playground has no data"
             }
         } else if mock, let demo = Self.demoScriptPath() {
-            cswap = CswapCLI(binaryPath: demo)
-        } else if let path = CswapLocator.locate() {
-            cswap = CswapCLI(binaryPath: path)
+            swapd = SwapdCLI(binaryPath: demo)
+        } else if let path = SwapdLocator.locate() {
+            swapd = SwapdCLI(binaryPath: path)
             if mock {
                 lastError = "demo script missing — running the real engine"
             }
         } else {
-            cswap = nil
-            lastError = "cswap not found — install it (uv tool install claude-swap)"
+            swapd = nil
+            if swapdEnabled { lastError = "swapd not found — install it: \(OnboardingBrief.swapdInstallCommand)" }
         }
-        swapd = playground ? nil : SwapdLocator.locate().map(SwapdCLI.init(binaryPath:))
         // A freshly minted token has to survive the launch that made it:
         // property initialisation doesn't run `didSet`.
         if storedToken.isEmpty { defaults.set(mirrorPairToken, forKey: "mirror_pair_token") }
         if !playground { sync.attach(model: self) }
-        if let cswap, cswapEnabled || playground { registry.register(CswapEngine(cli: cswap)) }
-        // After cswap on purpose: while both are on, the Claude fleet the
-        // popup chrome reasons about stays the one cswap reports.
-        if let swapd, swapdEnabled { registry.register(SwapdEngine(cli: swapd)) }
-        else if swapdEnabled, !playground {
-            lastError = "swapd is enabled but no binary was found — install it (cargo install --path swapd)"
-        }
+        if let swapd, swapdEnabled || playground { registry.register(SwapdEngine(cli: swapd)) }
         // The proxy is never part of the playground (isolation contract)
         // and needs its key before it can be an engine at all.
         if !playground, cliproxyEnabled,
@@ -1191,7 +1156,7 @@ final class AppModel: ObservableObject {
         NSLog("Infinitus engines: %@", registry.engines.map(\.id).joined(separator: ", "))
         // Last run's snapshot renders NOW — the popup otherwise opened
         // as an empty sliver and expanded seconds later when the first
-        // `cswap list` returned, eating the intro (user 2026-08-30).
+        // `swapd list` returned, eating the intro (user 2026-08-30).
         // Live values roll in over it via the numeric transitions.
         if !playground,
            let data = try? Data(contentsOf: Self.snapshotCacheURL),
@@ -1237,7 +1202,13 @@ final class AppModel: ObservableObject {
     /// The preference catalog with this install's values (#558): what
     /// `infinitusctl prefs` and the mirror's `GET /prefs` answer.
     func prefsReply(keys: [String]? = nil) throws -> PrefCatalog.Reply {
-        try PrefCatalog.reply(from: defaults, keys: keys)
+        try PrefCatalog.reply(from: defaults, keys: keys, choices: ["gamification_style": themeChoices])
+    }
+
+    /// The open theme set as `{id, name}` rows (#747): the built-ins plus
+    /// the user's `themes.json`, which no static catalog can list.
+    private var themeChoices: [JSONValue] {
+        availableThemes.map { .object(["id": .string($0.id), "name": .string($0.name)]) }
     }
 
     /// One preference written and taken live (#558 write side): the
@@ -1259,18 +1230,14 @@ final class AppModel: ObservableObject {
         return (pref, false)
     }
 
-    static let enginePrefs = ["engine_cswap_enabled": "cswap", "engine_swapd_enabled": "swapd",
-                              "engine_cliproxy_enabled": "cliproxy", "engine_9router_enabled": "9router"]
+    static let enginePrefs = ["engine_swapd_enabled": "swapd", "engine_cliproxy_enabled": "cliproxy",
+                              "engine_9router_enabled": "9router"]
 
     /// `engine <id> on|off` and `prefs set engine_<id>_enabled`: the
     /// toggle behind the same guards; true when it changed (the setter's
     /// `didSet` then relaunches), false when it already was so.
     func setEngineEnabled(_ engine: String, on: Bool) throws -> Bool {
         switch engine {
-        case "cswap":
-            guard cswap != nil || !on else { throw PrefCatalog.Violation(key: "engine_cswap_enabled", message: "cswap is not installed") }
-            guard cswapEnabled != on else { return false }
-            cswapEnabled = on
         case "swapd":
             guard swapd != nil || !on else { throw PrefCatalog.Violation(key: "engine_swapd_enabled", message: "swapd is not installed") }
             guard swapdEnabled != on else { return false }
@@ -1310,6 +1277,10 @@ final class AppModel: ObservableObject {
         let interval = defaults.object(forKey: "refresh_interval") as? Int ?? 60
         set(\.refreshInterval, TitlePrefs.refreshChoices.contains(interval) ? interval : 60)
         set(\.gamification, defaults.string(forKey: "gamification_style") ?? "off")
+        set(\.introStyle, defaults.string(forKey: "intro_style") ?? "top")
+        set(\.introSpeed, defaults.object(forKey: "intro_speed") as? Double ?? 1.0)
+        set(\.introTitle, defaults.string(forKey: "intro_title") ?? "zoom")
+        set(\.burnStyle, defaults.string(forKey: "burn_style") ?? "ember")
         set(\.compactRows, defaults.object(forKey: "compact_rows") as? Bool ?? false)
         set(\.footerActionsHidden, defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false)
         set(\.titleRemaining, defaults.object(forKey: "title_remaining") as? Bool ?? false)
@@ -1346,12 +1317,6 @@ final class AppModel: ObservableObject {
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
         set(\.forkTunnelHostname, defaults.string(forKey: "fork_tunnel_hostname") ?? "")
-        if let update = updateModel {
-            let check = defaults.object(forKey: "update_auto_check") as? Bool ?? true
-            if update.autoCheck != check { update.autoCheck = check }
-            let install = defaults.object(forKey: "update_auto_install") as? Bool ?? false
-            if update.autoInstall != install { update.autoInstall = install }
-        }
     }
 
     // MARK: battle plan (#7)
@@ -1708,8 +1673,7 @@ final class AppModel: ObservableObject {
         if !isPlayground || ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] != nil {
             controlServer.start()
         }
-        guard supervisor == nil, refreshTask == nil else { return }
-        if let cswap, !isPlayground, cswapEnabled { startEngine(binary: cswap.binaryPath) }
+        guard swapdSupervisor == nil, refreshTask == nil else { return }
         if let swapd, !isPlayground, swapdEnabled { startSwapd(binary: swapd.binaryPath) }
         guard !registry.engines.isEmpty else { return }
         refreshTask = Task { [weak self] in
@@ -2565,28 +2529,14 @@ final class AppModel: ObservableObject {
         return MirrorPairing.pairURL(endpoints: endpoints, token: mirrorPairToken)
     }
 
-    private func startEngine(binary: String) {
-        let supervisor = CswapSupervisor(
-            binaryPath: binary,
-            onLine: { [weak self] line in
-                Task { @MainActor in self?.consume(line) }
-            },
-            onState: { [weak self] state in
-                Task { @MainActor in self?.cswapState = state }
-            }
-        )
-        self.supervisor = supervisor
-        Task { await supervisor.start() }
-    }
-
-    /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the same
-    /// NDJSON stream and the same supervisor, its state kept apart so the
-    /// Engines pane and the badge can tell the two daemons apart.
+    /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the daemon's
+    /// NDJSON stream, restarted by the supervisor; its state feeds the
+    /// Engines pane and the badge.
     private func startSwapd(binary: String) {
-        let supervisor = CswapSupervisor(
+        let supervisor = EngineSupervisor(
             binaryPath: binary, arguments: ["auto", "--json"], environmentFlag: "SWAPD_SUPERVISED",
             onLine: { [weak self] line in
-                Task { @MainActor in self?.consume(line, swapd: true) }
+                Task { @MainActor in self?.consume(line) }
             },
             onState: { [weak self] state in
                 Task { @MainActor in self?.swapdState = state }
@@ -2610,20 +2560,17 @@ final class AppModel: ObservableObject {
     /// already consuming soonest" after every minute's poll, and the
     /// poll itself says nothing, so neither reaches the Activity tail or
     /// the durable log until the reason changes (Infi4, 2026-09-11).
-    /// One slot per daemon (#475): with cswap and swapd both on, their
-    /// lines alternate and a shared slot would never suppress either.
-    private var lastNoSwitch: [Bool: String] = [:]
+    private var lastNoSwitch: String?
 
-    private func consume(_ line: EventLine, swapd: Bool = false) {
+    private func consume(_ line: EventLine) {
         switch line {
         case .event(let event):
-            // Heartbeats: cswap's `poll` and swapd's `sleep` mark every tick
-            // and say nothing (#475: the real daemon logged "sleep" once a
-            // minute; the e2e stub only ever emitted `poll`).
+            // Heartbeats: `poll` and `sleep` mark every tick and say
+            // nothing (#475: the real daemon logs "sleep" once a minute).
             if event.kind == "poll" || event.kind == "sleep" { return }
             if event.kind == "no-switch" {
-                if event.summary == lastNoSwitch[swapd] { return }
-                lastNoSwitch[swapd] = event.summary
+                if event.summary == lastNoSwitch { return }
+                lastNoSwitch = event.summary
             }
             logEvent(Self.eventKind(event.kind), icon: event.icon, event.summary)
             switch event.kind {
@@ -2640,7 +2587,7 @@ final class AppModel: ObservableObject {
                 break
             }
         case .schemaMismatch(let version):
-            if swapd { swapdState = .schemaMismatch(version) } else { cswapState = .schemaMismatch(version) }
+            swapdState = .schemaMismatch(version)
         case .garbage:
             break  // logged upstream; never fatal (spec §2)
         }
@@ -2656,15 +2603,15 @@ final class AppModel: ObservableObject {
     /// the "restart to update" action after an on-disk rebuild.
     // MARK: onboarding — engine install (todo 2026-08-30)
 
-    /// The bundled demo engine (tools/demo-cswap -> Resources), a tiny
-    /// fabricated-fleet cswap. Unbundled dev runs look next to the
+    /// The bundled demo engine (tools/demo-swapd -> Resources), a tiny
+    /// fabricated-fleet swapd. Unbundled dev runs look next to the
     /// executable instead (run-unbundled.sh copies it there).
     static func demoScriptPath() -> String? {
-        if let p = Bundle.main.path(forResource: "demo-cswap", ofType: nil),
+        if let p = Bundle.main.path(forResource: "demo-swapd", ofType: nil),
            FileManager.default.isExecutableFile(atPath: p) { return p }
         if let dir = (Bundle.main.executablePath as NSString?)?
             .deletingLastPathComponent {
-            let p = dir + "/demo-cswap"
+            let p = dir + "/demo-swapd"
             if FileManager.default.isExecutableFile(atPath: p) { return p }
         }
         return nil
@@ -2673,7 +2620,7 @@ final class AppModel: ObservableObject {
     /// Playground-only: pretend no engine was found, so the onboarding
     /// card is reachable without an env-var relaunch (issue #6).
     @Published var simulateNoEngine = false
-    /// True when no engine at all is configured (no cswap binary and no
+    /// True when no engine at all is configured (no swapd binary and no
     /// proxy); the popup swaps its rows for the onboarding card. A
     /// proxy-only setup is a working setup, not a missing engine.
     var engineMissing: Bool { registry.engines.isEmpty || simulateNoEngine }
@@ -2682,10 +2629,16 @@ final class AppModel: ObservableObject {
     /// (user 2026-09-07 from the phone: "Disable liquid glass for set up
     /// steps", photo of the card over a Finder icon grid).
     var setupStepShown: Bool { engineMissing || (accounts.isEmpty && snapshotLoaded) }
-    /// cswap is on and its binary was found — the only case the rail's
+    /// swapd is on and its binary was found — the only case the rail's
     /// auto-switch toggle and badge mean anything.
-    var cswapRegistered: Bool { registry.engines.contains { $0.id == CswapEngine.engineID } }
     var swapdRegistered: Bool { registry.engines.contains { $0.id == SwapdEngine.engineID } }
+    /// The primary fleet's engine when it can adopt Claude Code's current
+    /// login (`.addCurrent`): the in-app sign-in flow hands it the fresh
+    /// credential. Gate UI on this, never on an engine id.
+    var currentLoginEngine: AccountEngine? {
+        guard let primary, primary.capabilities.contains(.addCurrent) else { return nil }
+        return primary.engine
+    }
 
     // MARK: onboarding — machine detection (todo 2026-09-01)
 
@@ -2724,121 +2677,31 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `cswap add` registers whichever account Claude Code is signed in
+    /// `swapd add` registers whichever account Claude Code is signed in
     /// as — the "adopt the current login" onboarding path.
     func addFirstAccount() {
-        guard let cswap, !addingFirstAccount else { return }
+        guard let engine = currentLoginEngine, !addingFirstAccount else { return }
         addingFirstAccount = true
         firstAccountMessage = nil
         Task {
             do {
-                _ = try await cswap.run(["add"])
+                try await engine.addCurrent()
                 await refreshSnapshot()
             } catch {
-                // The engine's own text when it gave one (`cswap add` says
+                // The engine's own text when it gave one (`swapd add` says
                 // what went wrong in its login); otherwise a sentence, never
                 // the raw error.
-                firstAccountMessage = (error as? CLIError)?.message ?? EngineFailure.sentence(error)
+                firstAccountMessage = EngineFailure.sentence(error)
             }
             addingFirstAccount = false
         }
     }
-    @Published var installingEngine = false
-    @Published var installMessage: String?
-
-    /// Button-triggered only — never auto-installs. Bootstraps `uv`
-    /// first when the Mac has none (Homebrew if it is there, else
-    /// Astral's standalone installer), then runs
-    /// `uv tool install claude-swap` and relaunches so init re-runs the
-    /// locator (cswap stays a let; the restart IS the re-detect).
-    func installEngine() {
-        guard !installingEngine else { return }
-        let steps = EngineInstall.plan(
-            uv: CswapLocator.locate(candidates: EngineInstall.uvCandidates()),
-            brew: CswapLocator.locate(candidates: EngineInstall.brewCandidates()))
-        installingEngine = true
-        installMessage = steps.first.map(EngineInstall.progressMessage)
-        Task.detached {
-            for step in steps {
-                await MainActor.run { [weak self] in
-                    self?.installMessage = EngineInstall.progressMessage(step)
-                }
-                let result: (ok: Bool, output: String)
-                switch step {
-                case .installUV(.brew(let brew)):
-                    result = AppModel.runInstallStep(brew, ["install", "uv"])
-                case .installUV(.standalone):
-                    result = AppModel.runInstallStep(
-                        "/bin/sh", ["-c", EngineInstall.standaloneScript])
-                case .installEngine:
-                    guard let uv = CswapLocator.locate(
-                        candidates: EngineInstall.uvCandidates()) else {
-                        await MainActor.run { [weak self] in
-                            self?.installingEngine = false
-                            self?.installMessage = "uv installed but not on this Mac's "
-                                + "usual paths — run: uv tool install claude-swap"
-                        }
-                        return
-                    }
-                    result = AppModel.runInstallStep(uv, ["tool", "install", "claude-swap"])
-                }
-                guard result.ok else {
-                    await MainActor.run { [weak self] in
-                        self?.installingEngine = false
-                        self?.installMessage = EngineInstall.failureMessage(
-                            step, output: result.output)
-                    }
-                    return
-                }
-            }
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.installingEngine = false
-                self.installMessage = "Installed — restarting…"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    self.relaunchApp()
-                }
-            }
-        }
-    }
-
-    /// One blocking install child, combined stdout+stderr. Called only
-    /// off the main actor (Task.detached).
-    private nonisolated static func runInstallStep(_ path: String, _ arguments: [String])
-        -> (ok: Bool, output: String) {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: path)
-        p.arguments = arguments
-        // A GUI app's inherited PATH reaches neither Homebrew nor
-        // ~/.local/bin, and both installers shell out to their own tools.
-        var env = ProcessInfo.processInfo.environment
-        env["PATH"] = "\(NSHomeDirectory())/.local/bin:/opt/homebrew/bin:/usr/local/bin:"
-            + (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
-        p.environment = env
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = pipe
-        do {
-            try p.run()
-            // Drain before waiting: a filled pipe buffer would wedge the
-            // child forever (the uv installer is chatty).
-            let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(),
-                             as: UTF8.self)
-            p.waitUntilExit()
-            return (p.terminationStatus == 0, out)
-        } catch {
-            return (false, error.localizedDescription)
-        }
-    }
-
     func relaunchApp() {
         let bundle = Bundle.main.bundleURL.path
-        let old = supervisor, oldSwapd = swapdSupervisor
-        supervisor = nil
+        let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
         let team = team
         Task {
-            await old?.stop()
             await oldSwapd?.stop()
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -2874,7 +2737,7 @@ final class AppModel: ObservableObject {
     /// One pass over every enabled engine: snapshots gathered
     /// concurrently, applied per fleet, then the app-level hooks
     /// (cache, history, mirror, notifications, resume, push, sync) run
-    /// off the PRIMARY Claude fleet exactly as they did when cswap was
+    /// off the PRIMARY Claude fleet exactly as they did when swapd was
     /// the only engine. An engine that fails keeps its last good rows
     /// (the rumps menubar's _worker policy) and records its error.
     func refreshSnapshot() async {
@@ -2912,8 +2775,9 @@ final class AppModel: ObservableObject {
             // Only publish a change: every @Published set re-runs each
             // observer's body, once per refresh, even for an identical value (#18).
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
-            for fleet in fleets.map(overlayingOwnedStatus) {
-                let state = registry.state(for: fleet)
+            for reported in fleets {
+                let state = registry.state(for: reported)
+                let fleet = overlayingOwnedStatus(withLocalSessions(reported, primary: state === primary))
                 let before = state.lastFleet
                 let change = state.apply(fleet)
                 anyChanged = anyChanged || change.changed
@@ -3056,7 +2920,7 @@ final class AppModel: ObservableObject {
                 liveActivityPusher.tick(fleet: primaryFleet,
                                         machine: machineName,
                                         themes: availableThemes, macTheme: rowTheme,
-                                        report: usageModel?.report,
+                                        report: primary.report,
                                         tokenRate: sessionProgress.tokenRate)
             }
             statsModel.refreshIfStale()
@@ -3150,7 +3014,7 @@ final class AppModel: ObservableObject {
         }
         // Switch notifications come from this DISPLAY-feed diff, not the
         // engine's `switch` events: our engine is parked whenever another
-        // host (rumps, cswap watch, cswap auto) holds the mutex, and a
+        // host (a stray `swapd auto`) holds the mutex, and a
         // parked engine sees no events — the 2026-08-28 silent-switch
         // bug. The diff sees every switch regardless of who executed it,
         // manual ones included.
@@ -3243,23 +3107,6 @@ final class AppModel: ObservableObject {
     /// status is clickable to toggle", user 2026-08-30). Deliberate states
     /// only — refused/backing-off/mismatch stay informational.
     func toggleEngine() {
-        // #475: with cswap off the badge is swapd's daemon.
-        guard cswapRegistered else { return toggleSwapd() }
-        switch cswapState {
-        case .running, .backingOff:
-            let supervisor = supervisor
-            self.supervisor = nil
-            cswapState = .stopped
-            Task { await supervisor?.stop() }
-        case .stopped:
-            guard let cswap, cswapRegistered else { return }
-            startEngine(binary: cswap.binaryPath)
-        case .refused, .schemaMismatch:
-            break
-        }
-    }
-
-    private func toggleSwapd() {
         switch swapdState {
         case .running, .backingOff:
             let supervisor = swapdSupervisor
@@ -3274,22 +3121,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The daemon the sidebar badge reports: cswap's while it is
-    /// registered, else swapd's (#475).
-    var engineState: CswapSupervisor.State { cswapRegistered ? cswapState : swapdState }
-    var engineBadgeShown: Bool { cswapRegistered || swapdRegistered }
-
-    /// Bounce the supervised engine — after a cswap upgrade the child is
-    /// still the OLD binary until respawned.
-    func restartEngine() {
-        guard let cswap else { return }
-        let old = supervisor
-        supervisor = nil
-        Task {
-            await old?.stop()
-            await MainActor.run { self.startEngine(binary: cswap.binaryPath) }
-        }
-    }
+    /// The daemon the sidebar badge reports.
+    var engineState: EngineSupervisor.State { swapdState }
+    var engineBadgeShown: Bool { swapdRegistered }
 
     // Primary-fleet actions (the mac-only panes and the wall call these;
     // the shared rows act on their own FleetState).
@@ -3312,11 +3146,10 @@ final class AppModel: ObservableObject {
         // So are the phone's terminals (#507): a login shell holding a pty
         // must not outlive the app either.
         terminalHost.closeAll()
-        let supervisor = supervisor, swapdSupervisor = swapdSupervisor
+        let swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
         let team = team
         Task {
-            await supervisor?.stop()
             await swapdSupervisor?.stop()
             // Owned Claude sessions are this process's children (#151):
             // they don't outlive the app either (the #274 lesson).
@@ -3367,6 +3200,17 @@ final class AppModel: ObservableObject {
     nonisolated func overlayingOwnedStatus(_ records: [ClaudeSessionRecord]) -> [ClaudeSessionRecord] {
         guard let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return records }
         return records.map { r in owned.status(pid: r.pid).map { r.with(status: $0) } ?? r }
+    }
+
+    /// The primary fleet's live sessions are the app's own scan when the
+    /// engine reports none (#756: cswap's list carried them, swapd's does
+    /// not) — the keep-awake busy count, the token-rate/AWS-login scan,
+    /// the mirror's sessions block and the session→account attribution
+    /// all read this block off the primary fleet. Never in the playground
+    /// (demo data only).
+    func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
+        guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
+        return fleet.with(liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))
     }
 
     /// The engine's live-session list with the same overlay, so the card
@@ -3453,13 +3297,13 @@ extension AppModel: FleetModel {
         guard !TokenFlow.shared.running, !addingFirstAccount else { return }
         TokenFlow.shared.start(model: self)
     }
-    var canAddAccount: Bool { cswapRegistered }
+    var canAddAccount: Bool { currentLoginEngine != nil }
 
     /// The engine badge's portable half (#9 phase D2) — the supervisor's
     /// own State can't cross to iOS, so the shared footer reads this.
     var engineBadge: EngineBadge? {
-        // The badge is the supervised child's state — cswap's, or swapd's
-        // once cswap is off (#475); with neither the footer hides the chip.
+        // The badge is the supervised daemon's state; with no engine the
+        // footer hides the chip.
         guard engineBadgeShown else { return nil }
         switch engineState {
         case .running: return .running

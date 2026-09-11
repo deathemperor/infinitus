@@ -194,7 +194,7 @@ public enum EngineBadgeText {
     public static func tip(_ engine: EngineBadge) -> String {
         switch engine {
         case .running: return "auto-switch running — click to stop"
-        case .refused: return "Another auto-switch engine (TUI or cswap auto) holds the mutex."
+        case .refused: return "Another auto-switch daemon (a stray swapd auto) holds the engine's mutex."
         case .backingOff(let s): return "engine retrying in \(Int(s))s — click to stop"
         case .schemaMismatch: return "update the app"
         case .stopped: return "auto-switch off — click to start"

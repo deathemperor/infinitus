@@ -26,14 +26,14 @@ enum T3ComposerLimits {
     }
 
     /// The accounts a session's requests go through (`SessionAccountLookup`):
-    /// cswap's one active account, or every account behind a proxy fleet.
+    /// a swap engine's one active account, or every account behind a proxy fleet.
     /// nil when there is no fleet to attribute the session to.
     static func report(_ summary: SessionAccountSummary?, provider: Provider, now: Date) -> Report? {
         guard let summary else { return nil }
         let accounts: [Account]
         switch summary.kind {
         case .proxy: accounts = summary.proxyAccounts
-        case .cswap, .unknownFleet: accounts = summary.account.map { [$0] } ?? []
+        case .swap, .unknownFleet: accounts = summary.account.map { [$0] } ?? []
         }
         return Report(provider: provider, members: accounts.map { T3UsageLimits.member($0, now: now) },
                       notices: T3UsageLimits.notices(accounts))
