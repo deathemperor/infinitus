@@ -27,6 +27,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "infinitus-popup-spike-"))
 app.setPath("userData", scratch);
 
 const AUTO = process.argv.includes("--auto");
+/** `--scaling`: only the arms that say how cost grows with more effects. */
+const SCALING = process.argv.includes("--scaling");
 /** `--shot`: show the panel, capture it, quit; no measurement. */
 const SHOT = process.argv.includes("--shot");
 const WIDTH = 360;
@@ -289,6 +291,15 @@ const measure = async () => {
   };
   showPanel();
   report.panel = await capturePanel();
+  if (SCALING) {
+    report.conditions.push(
+      await condition("open, countdown, css shimmer x1", () => rendererEval("window.spike.setEffect('css')"), 2),
+      await condition("open, countdown, css shimmer x5 (staggered layers)", () => rendererEval("window.spike.setEffect('css5')"), 2),
+      await condition("open, countdown, canvas 40 embers", () => rendererEval("window.spike.setEffect('canvas')"), 2),
+      await condition("open, countdown, canvas 200 embers (five rows' worth)", () => rendererEval("window.spike.setEffect('canvas200')"), 2),
+    );
+    return finish(report);
+  }
   report.conditions.push(
     await condition("open, countdown, css shimmer + canvas embers", () => rendererEval("window.spike.setEffect('both')"), 4),
     await condition("open, countdown, css shimmer only", () => rendererEval("window.spike.setEffect('css')"), 2),
@@ -300,6 +311,10 @@ const measure = async () => {
       hidePanel();
     }, 2),
   );
+  finish(report);
+};
+
+const finish = (report) => {
   const out = path.join(scratch, "report.json");
   fs.writeFileSync(out, JSON.stringify(report, null, 2));
   process.stdout.write(`${JSON.stringify(report)}\n`);

@@ -101,10 +101,16 @@
         transform: translateX(-100%);
         will-change: transform;
       }
-      .effect-css .shimmer,
-      .effect-both .shimmer {
+      .effect-css .shimmer.primary,
+      .effect-both .shimmer.primary,
+      .effect-css5 .shimmer {
         animation: sweep 2.4s linear infinite;
       }
+      /* Five staggered layers: the "five effects" scaling arm. */
+      .shimmer:nth-of-type(2) { animation-delay: -0.5s; }
+      .shimmer:nth-of-type(3) { animation-delay: -1s; }
+      .shimmer:nth-of-type(4) { animation-delay: -1.5s; }
+      .shimmer:nth-of-type(5) { animation-delay: -2s; }
       @keyframes sweep {
         to {
           transform: translateX(100%);
@@ -132,6 +138,10 @@
       <div class="title">Claude · swapd</div>
       <div class="row">
         <canvas class="embers" id="embers"></canvas>
+        <div class="shimmer primary"></div>
+        <div class="shimmer"></div>
+        <div class="shimmer"></div>
+        <div class="shimmer"></div>
         <div class="shimmer"></div>
         <div class="avatar" id="avatar">W</div>
         <div>
@@ -186,8 +196,12 @@
         canvas.height = Math.round(rect.height * dpr);
       };
       sizeCanvas();
-      const EMBERS = 40;
-      const embers = Array.from({ length: EMBERS }, () => spawn(true));
+      // 40 embers is one row's worth; `canvas200` is five rows' worth in one
+      // loop, the scaling arm.
+      let embers = Array.from({ length: 40 }, () => spawn(true));
+      const setEmberCount = (count) => {
+        if (embers.length !== count) embers = Array.from({ length: count }, () => spawn(true));
+      };
       function spawn(anywhere) {
         return {
           x: Math.random(),
@@ -233,8 +247,8 @@
         }
         schedule();
       };
-      const running = () =>
-        visible && (mode === "canvas" || mode === "canvas30" || mode === "both");
+      const CANVAS_MODES = new Set(["canvas", "canvas30", "canvas200", "both"]);
+      const running = () => visible && CANVAS_MODES.has(mode);
       const schedule = () => {
         if (running() && rafHandle === 0) rafHandle = requestAnimationFrame(frame);
       };
@@ -258,6 +272,7 @@
       window.spike = {
         setEffect(next) {
           mode = next;
+          setEmberCount(next === "canvas200" ? 200 : 40);
           $("popup").className = `popup effect-${next}`;
           $("effect").textContent = `effect: ${next}`;
           if (running()) schedule();

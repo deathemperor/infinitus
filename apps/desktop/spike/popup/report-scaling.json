@@ -1,0 +1,177 @@
+{
+  "electron": "44.1.0",
+  "chrome": "152.0.7977.65",
+  "node": "24.19.0",
+  "macOS": "25.6.0",
+  "arch": "arm64",
+  "cores": 16,
+  "note": "electronCpuPct is Electron's getAppMetrics (share of all cores); psCpuPct is the ps cputime delta (share of one core), which is what native's perf cpuSeconds reports too",
+  "window": {
+    "width": 360,
+    "height": 168,
+    "vibrancy": "popover",
+    "type": "panel"
+  },
+  "conditions": [
+    {
+      "condition": "open, countdown, css shimmer x1",
+      "intervals": 2,
+      "electronCpuPct": 0.21,
+      "psCpuPct": 3.25,
+      "windowServerCpuPct": 52.56,
+      "rssMb": 402,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0.01,
+          "workingSetMb": 156
+        },
+        "GPU": {
+          "cpuPct": 0.13,
+          "workingSetMb": 92
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.08,
+          "workingSetMb": 106
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 0,
+        "hiddenRafCalls": 0,
+        "frameMsP50": null,
+        "frameMsP95": null,
+        "frameMsMax": null,
+        "framesOver16ms": 0
+      }
+    },
+    {
+      "condition": "open, countdown, css shimmer x5 (staggered layers)",
+      "intervals": 2,
+      "electronCpuPct": 0.24,
+      "psCpuPct": 3.88,
+      "windowServerCpuPct": 48.61,
+      "rssMb": 402,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 156
+        },
+        "GPU": {
+          "cpuPct": 0.15,
+          "workingSetMb": 92
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.09,
+          "workingSetMb": 106
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 0,
+        "hiddenRafCalls": 0,
+        "frameMsP50": null,
+        "frameMsP95": null,
+        "frameMsMax": null,
+        "framesOver16ms": 0
+      }
+    },
+    {
+      "condition": "open, countdown, canvas 40 embers",
+      "intervals": 2,
+      "electronCpuPct": 0.47,
+      "psCpuPct": 7.68,
+      "windowServerCpuPct": 55.22,
+      "rssMb": 420,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 156
+        },
+        "GPU": {
+          "cpuPct": 0.27,
+          "workingSetMb": 93
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.22,
+          "workingSetMb": 123
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 1824,
+        "hiddenRafCalls": 0,
+        "frameMsP50": 16.7,
+        "frameMsP95": 17.6,
+        "frameMsMax": 17.7,
+        "framesOver16ms": 659
+      }
+    },
+    {
+      "condition": "open, countdown, canvas 200 embers (five rows' worth)",
+      "intervals": 2,
+      "electronCpuPct": 0.58,
+      "psCpuPct": 9.37,
+      "windowServerCpuPct": 48.47,
+      "rssMb": 425,
+      "byType": {
+        "Browser": {
+          "cpuPct": 0,
+          "workingSetMb": 157
+        },
+        "GPU": {
+          "cpuPct": 0.28,
+          "workingSetMb": 93
+        },
+        "Utility:Network Service": {
+          "cpuPct": 0,
+          "workingSetMb": 48
+        },
+        "Tab": {
+          "cpuPct": 0.28,
+          "workingSetMb": 127
+        }
+      },
+      "rendererHeapMb": 9.5,
+      "heapGrowthKbPerMin": 0,
+      "frames": {
+        "rafCalls": 1823,
+        "hiddenRafCalls": 0,
+        "frameMsP50": 16.7,
+        "frameMsP95": 17.6,
+        "frameMsMax": 17.8,
+        "framesOver16ms": 675
+      }
+    }
+  ],
+  "panel": {
+    "bounds": {
+      "x": 7320,
+      "y": 30,
+      "width": 360,
+      "height": 168
+    },
+    "visible": true,
+    "tray": {
+      "x": 7560,
+      "y": 0,
+      "width": 33,
+      "height": 22
+    },
+    "screenshot": "/var/folders/5z/rw_tvbfd3zj9k3s396r7vzph0000gn/T/infinitus-popup-spike-asuQyg/panel.png"
+  }
+}
