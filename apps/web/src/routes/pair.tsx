@@ -1,10 +1,12 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
+import { InfinitusPhoneLinkSurface } from "../components/auth/InfinitusPhoneLinkSurface";
 import {
   HostedPairingRouteSurface,
   PairingPendingSurface,
   PairingRouteSurface,
 } from "../components/auth/PairingRouteSurface";
+import { isPhonePairingLink } from "../components/settings/infinitus/pairPhone.logic";
 
 export const Route = createFileRoute("/pair")({
   beforeLoad: async ({ context }) => {
@@ -32,6 +34,11 @@ function PairRouteView() {
 
   if (!authGateState) {
     return null;
+  }
+
+  // A Devices-card link for the phone, opened in a browser: never spend it here (#724).
+  if (typeof window !== "undefined" && isPhonePairingLink(new URL(window.location.href))) {
+    return <InfinitusPhoneLinkSurface />;
   }
 
   if (authGateState.status === "hosted-pairing") {
