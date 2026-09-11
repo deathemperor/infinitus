@@ -41,7 +41,7 @@ func usage() -> String {
     out += "  plugin install|uninstall|status   the Claude Code plugin: hooks that push prompts to the phone the moment they appear\n"
     out += "  mcp                    the plugin's MCP server over stdio (fleet_status, list_sessions, session_message)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. cswap/claude, cliproxy/claude).\n"
-    out += "proxy-key, 9router-password, aws-login-code and gcloud-login-code read their secret from stdin.\n"
+    out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code and signin-code read their secret from stdin.\n"
     out += "Socket: \(ControlProtocol.socketURL().path)\n"
     return out
 }
@@ -78,7 +78,7 @@ while i < args.count {
 }
 
 var secret: String?
-if ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "aws-login-callback", "event", "send", "approve"].contains(command) {
+if ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "send", "approve"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
