@@ -126,11 +126,12 @@ export function ComposerSelectControl({
       icon={
         <ComposerControlChevron
           size={size}
-          className={
-            chevronOnHover
-              ? "opacity-0 transition-opacity group-hover/select:opacity-100 group-focus-visible/select:opacity-100 group-aria-expanded/select:opacity-100 group-data-[popup-open]/select:opacity-100"
-              : undefined
-          }
+          {...(chevronOnHover
+            ? {
+                className:
+                  "opacity-0 transition-opacity group-hover/select:opacity-100 group-focus-visible/select:opacity-100 group-aria-expanded/select:opacity-100 group-data-[popup-open]/select:opacity-100",
+              }
+            : {})}
         />
       }
       size={size}
