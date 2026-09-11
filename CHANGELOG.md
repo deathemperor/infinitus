@@ -132,6 +132,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl quit` ends the menu-bar app gracefully, and the status item menu gains "Open Infinitus" when the fork desktop app is installed (#654).
 - The native pop-out, wall, workspace and session windows are retired — the Infinitus desktop app is the client; the menu bar keeps the status glyph, its menu and Settings (#654).
 - Settings keeps only what cannot leave the Mac — Accounts, engines, Devices, Lock, Team and About; Display, Themes, Push, Profiles, Usage, Utilization, Stats, Machine, Activity and Animations are the desktop app's now (#654).
+- Restart Infinitus (and a relaunch asked by a pref with restart effect) no longer wedges the app on a Mac in a team — the team's sign-off runs before terminate, as quit's does.
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
