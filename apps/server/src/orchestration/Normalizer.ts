@@ -133,15 +133,19 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
 
     if (
       canonicalCommand.type !== "thread.turn.start" &&
+      canonicalCommand.type !== "thread.turn.queue" &&
+      canonicalCommand.type !== "thread.turn.queue.update" &&
       canonicalCommand.type !== "thread.user-input.respond"
     ) {
       return canonicalCommand as OrchestrationCommand;
     }
 
+    // A queued message (#806) stores its uploads the way a sent one does, so
+    // the drain's turn start carries plain stored attachments.
     const attachments =
-      canonicalCommand.type === "thread.turn.start"
-        ? canonicalCommand.message.attachments
-        : Object.values(canonicalCommand.attachmentsByQuestionId ?? {}).flat();
+      canonicalCommand.type === "thread.user-input.respond"
+        ? Object.values(canonicalCommand.attachmentsByQuestionId ?? {}).flat()
+        : canonicalCommand.message.attachments;
     if (
       canonicalCommand.type === "thread.user-input.respond" &&
       attachments.length > PROVIDER_SEND_TURN_MAX_ATTACHMENTS
@@ -309,13 +313,17 @@ export const cleanupFailedUploadedAttachments = Effect.fn(
   "Normalizer.cleanupFailedUploadedAttachments",
 )(function* (command: ClientOrchestrationCommand, normalizedCommand: OrchestrationCommand) {
   const originalAttachments =
-    command.type === "thread.turn.start"
+    command.type === "thread.turn.start" ||
+    command.type === "thread.turn.queue" ||
+    command.type === "thread.turn.queue.update"
       ? command.message.attachments
       : command.type === "thread.user-input.respond"
         ? Object.values(command.attachmentsByQuestionId ?? {}).flat()
         : [];
   const normalizedAttachments =
-    normalizedCommand.type === "thread.turn.start"
+    normalizedCommand.type === "thread.turn.start" ||
+    normalizedCommand.type === "thread.turn.queue" ||
+    normalizedCommand.type === "thread.turn.queue.update"
       ? normalizedCommand.message.attachments
       : normalizedCommand.type === "thread.user-input.respond"
         ? Object.values(normalizedCommand.attachmentsByQuestionId ?? {}).flat()

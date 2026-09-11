@@ -242,6 +242,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
       setShell: (shell: OrchestrationThreadShell) =>
         Ref.update(shells, (map) => new Map([...map, [shell.id, shell]])),
       resume: interrupt.resume,
+      pausedThreads: interrupt.pausedThreads,
       turns: Ref.get(turns),
       interrupts: Ref.get(dispatched).pipe(
         Effect.map((commands) =>
@@ -550,6 +551,27 @@ describe("InfinitusSessionInterruptLive", () => {
         yield* settle(h.turns, (list) => list.length === 1);
         expect((yield* h.markers)[1]?.summary).toBe("Resumed: pinned");
         yield* settle(h.watchers, (n) => n === 0);
+      }),
+    ),
+  );
+
+  effectIt.effect("publishes the paused threads, then the empty list on resume (#806)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const seen = yield* Ref.make<ReadonlyArray<ReadonlyArray<ThreadId>>>([]);
+        yield* Effect.forkScoped(
+          Stream.runForEach(h.pausedThreads, (list) => Ref.update(seen, (all) => [...all, list])),
+        );
+        yield* settle(Ref.get(seen), (all) => all.length === 1);
+        expect((yield* Ref.get(seen))[0]).toEqual([]);
+
+        yield* pausedOne(h);
+        yield* settle(Ref.get(seen), (all) => all.at(-1)?.includes(one) === true);
+
+        expect(yield* h.resume(one)).toEqual({ released: true });
+        yield* settle(Ref.get(seen), (all) => all.at(-1)?.length === 0);
+        expect(yield* Ref.get(seen)).toEqual([[], [one], []]);
       }),
     ),
   );

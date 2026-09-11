@@ -78,6 +78,7 @@ import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairin
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
+import { InfinitusTurnQueueLive } from "./infinitus/Layers/InfinitusTurnQueue.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -304,6 +305,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#806): sends queued messages when their thread is idle, not held
+  // and not paused; needs both layers below.
+  Layer.provideMerge(InfinitusTurnQueueLive),
   // Fork (#743): pauses background turns running on a fleet that reads
   // critical headroom, and continues them through the gate below.
   Layer.provideMerge(InfinitusSessionInterruptLive),

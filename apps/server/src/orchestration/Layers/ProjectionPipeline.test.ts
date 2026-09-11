@@ -7,6 +7,7 @@ import {
   EventId,
   MessageId,
   ProjectId,
+  QueueId,
   ThreadId,
   type ThreadPullRequestSnapshot,
   ThreadLinkedPullRequest,
@@ -4605,6 +4606,163 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
         (yield* cleanupCursor)[0]!.lastAppliedSequence,
         cursorBeforeRetry[0]!.lastAppliedSequence,
       );
+    }),
+  );
+});
+
+engineLayer("OrchestrationProjectionPipeline turn queue (#806)", (it) => {
+  it.effect("queues, edits, moves, sends and deletes rows through the projection", () =>
+    Effect.gen(function* () {
+      const engine = yield* OrchestrationEngineService;
+      const snapshotQuery = yield* ProjectionSnapshotQuery;
+      const sql = yield* SqlClient.SqlClient;
+      const createdAt = "2026-01-01T00:00:00.000Z";
+      const projectId = ProjectId.make("project-queue");
+      const threadId = ThreadId.make("thread-queue");
+      const modelSelection = {
+        instanceId: ProviderInstanceId.make("codex"),
+        model: "gpt-5-codex",
+      };
+      const message = (id: string, text: string) => ({
+        messageId: MessageId.make(id),
+        role: "user" as const,
+        text,
+        attachments: [],
+      });
+      const countRows = () =>
+        sql<{ readonly count: number }>`
+          SELECT COUNT(*) AS count FROM projection_thread_queued_turns WHERE thread_id = ${threadId}
+        `.pipe(Effect.map((rows) => rows[0]?.count ?? 0));
+      const queuedIds = () =>
+        snapshotQuery
+          .getThreadShellById(threadId)
+          .pipe(
+            Effect.map(
+              (shell) => Option.getOrThrow(shell).queuedTurns?.map((row) => row.queueId) ?? [],
+            ),
+          );
+
+      yield* engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("queue-project"),
+        projectId,
+        title: "Queue Project",
+        workspaceRoot: "/tmp/project-queue",
+        defaultModelSelection: modelSelection,
+        createdAt,
+      });
+      yield* engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("queue-create"),
+        threadId,
+        projectId,
+        title: "Queue",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdAt,
+      });
+      yield* engine.dispatch({
+        type: "thread.turn.queue",
+        commandId: CommandId.make("queue-1"),
+        threadId,
+        queueId: QueueId.make("q1"),
+        message: message("m1", "first"),
+        createdAt,
+      });
+      yield* engine.dispatch({
+        type: "thread.turn.queue",
+        commandId: CommandId.make("queue-2"),
+        threadId,
+        queueId: QueueId.make("q2"),
+        message: message("m2", "second"),
+        modelSelection,
+        createdAt,
+      });
+      assert.deepEqual(yield* queuedIds(), ["q1", "q2"]);
+
+      // The command read model carries the rows, so the decider judges the
+      // next command against them.
+      const readModel = yield* snapshotQuery.getCommandReadModel();
+      assert.deepEqual(
+        readModel.threads
+          .find((thread) => thread.id === threadId)
+          ?.queuedTurns?.map((row) => row.text),
+        ["first", "second"],
+      );
+
+      yield* engine.dispatch({
+        type: "thread.turn.queue.move",
+        commandId: CommandId.make("queue-move"),
+        threadId,
+        queueId: QueueId.make("q2"),
+        orderKey: "b",
+      });
+      assert.deepEqual(yield* queuedIds(), ["q2", "q1"]);
+
+      yield* engine.dispatch({
+        type: "thread.turn.queue.update",
+        commandId: CommandId.make("queue-update"),
+        threadId,
+        queueId: QueueId.make("q1"),
+        message: message("m1b", "first, edited"),
+        createdAt,
+      });
+      const detail = Option.getOrThrow(yield* snapshotQuery.getThreadDetailById(threadId));
+      assert.deepEqual(
+        detail.queuedTurns?.map((row) => [row.queueId, row.text, row.modelSelection?.model]),
+        [
+          ["q2", "second", "gpt-5-codex"],
+          ["q1", "first, edited", undefined],
+        ],
+      );
+
+      // Sending from the row removes it in the same batch as the message.
+      yield* engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("queue-send"),
+        threadId,
+        message: message("m2", "second"),
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        queuedFrom: QueueId.make("q2"),
+        createdAt,
+      });
+      assert.deepEqual(yield* queuedIds(), ["q1"]);
+      const sent = Option.getOrThrow(yield* snapshotQuery.getThreadDetailById(threadId));
+      assert.deepEqual(
+        sent.messages.map((entry) => entry.text),
+        ["second"],
+      );
+
+      yield* engine.dispatch({
+        type: "thread.turn.queue.remove",
+        commandId: CommandId.make("queue-remove"),
+        threadId,
+        queueId: QueueId.make("q1"),
+      });
+      assert.deepEqual(yield* queuedIds(), []);
+      assert.isUndefined(
+        Option.getOrThrow(yield* snapshotQuery.getThreadShellById(threadId)).queuedTurns,
+      );
+
+      yield* engine.dispatch({
+        type: "thread.turn.queue",
+        commandId: CommandId.make("queue-3"),
+        threadId,
+        queueId: QueueId.make("q3"),
+        message: message("m3", "third"),
+        createdAt,
+      });
+      assert.strictEqual(yield* countRows(), 1);
+      yield* engine.dispatch({
+        type: "thread.delete",
+        commandId: CommandId.make("queue-delete"),
+        threadId,
+      });
+      assert.strictEqual(yield* countRows(), 0);
     }),
   );
 });

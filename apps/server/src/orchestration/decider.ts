@@ -21,6 +21,7 @@ import {
   threadPullRequestKeysEqual,
 } from "@t3tools/shared/threadPullRequests";
 import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
+import { isValidOrderKey, orderKeyBetween } from "@t3tools/shared/orderKeys";
 import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -1385,7 +1386,200 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           },
         });
       }
-      return [...lifecycleResetEvents, userMessageEvent, turnStartRequestedEvent];
+      // Fork (#806): the queued row this send came from leaves the queue in
+      // the same batch as the send. A row already gone (removed by the user
+      // meanwhile) changes nothing: the send still goes.
+      const queueRemovedEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      if (
+        command.queuedFrom !== undefined &&
+        (targetThread.queuedTurns ?? []).some((row) => row.queueId === command.queuedFrom)
+      ) {
+        queueRemovedEvents.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+          })),
+          causationEventId: turnStartRequestedEvent.eventId,
+          type: "thread.turn-queue-removed",
+          payload: {
+            threadId: command.threadId,
+            queueId: command.queuedFrom,
+            reason: "sent",
+            removedAt: command.createdAt,
+          },
+        });
+      }
+      return [
+        ...lifecycleResetEvents,
+        userMessageEvent,
+        turnStartRequestedEvent,
+        ...queueRemovedEvents,
+      ];
+    }
+
+    // Fork (#806): the server-side message queue. Rows are not messages and
+    // not thread activity; nothing here wakes a settled or snoozed thread —
+    // the drain's `thread.turn.start` does that when the row is sent.
+    case "thread.turn.queue": {
+      const thread = yield* requireThreadNotArchived({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const rows = thread.queuedTurns ?? [];
+      const existing = rows.find((row) => row.queueId === command.queueId);
+      // Idempotent by re-emission (see thread.pin): a raced duplicate of the
+      // same row projects as a no-op and keeps the row the user already has.
+      if (existing !== undefined) {
+        return {
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.turn-queued",
+          payload: { threadId: command.threadId, queuedTurn: existing },
+        };
+      }
+      if (command.orderKey !== undefined && !isValidOrderKey(command.orderKey)) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queue order key '${command.orderKey}' is not a valid order key.`,
+        });
+      }
+      const lastKey =
+        rows
+          .map((row) => row.orderKey)
+          .toSorted()
+          .at(-1) ?? null;
+      const orderKey = command.orderKey ?? orderKeyBetween(lastKey, null);
+      if (orderKey === null) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Thread '${command.threadId}' has a corrupt queue order key.`,
+        });
+      }
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.turn-queued",
+        payload: {
+          threadId: command.threadId,
+          queuedTurn: {
+            queueId: command.queueId,
+            messageId: command.message.messageId,
+            text: command.message.text,
+            attachments: command.message.attachments,
+            ...(command.modelSelection !== undefined
+              ? { modelSelection: command.modelSelection }
+              : {}),
+            orderKey,
+            createdAt: command.createdAt,
+            updatedAt: command.createdAt,
+          },
+        },
+      };
+    }
+
+    case "thread.turn.queue.update": {
+      const thread = yield* requireThreadNotArchived({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const existing = (thread.queuedTurns ?? []).find((row) => row.queueId === command.queueId);
+      if (existing === undefined) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queued message '${command.queueId}' does not exist on thread '${command.threadId}'.`,
+        });
+      }
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.turn-queue-updated",
+        payload: {
+          threadId: command.threadId,
+          queuedTurn: {
+            ...existing,
+            messageId: command.message.messageId,
+            text: command.message.text,
+            attachments: command.message.attachments,
+            updatedAt: command.createdAt,
+          },
+        },
+      };
+    }
+
+    case "thread.turn.queue.remove": {
+      yield* requireThread({ readModel, command, threadId: command.threadId });
+      // Idempotent by re-emission (see thread.unpin): removing a row that is
+      // already gone lands on the same state.
+      const occurredAt = yield* nowIso;
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.turn-queue-removed",
+        payload: {
+          threadId: command.threadId,
+          queueId: command.queueId,
+          reason: "user",
+          removedAt: occurredAt,
+        },
+      };
+    }
+
+    case "thread.turn.queue.move": {
+      const thread = yield* requireThreadNotArchived({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const existing = (thread.queuedTurns ?? []).find((row) => row.queueId === command.queueId);
+      if (existing === undefined) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queued message '${command.queueId}' does not exist on thread '${command.threadId}'.`,
+        });
+      }
+      if (!isValidOrderKey(command.orderKey)) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queue order key '${command.orderKey}' is not a valid order key.`,
+        });
+      }
+      const occurredAt = yield* nowIso;
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.turn-queue-moved",
+        payload: {
+          threadId: command.threadId,
+          queueId: command.queueId,
+          orderKey: command.orderKey,
+          // A duplicate drop on the same slot keeps the row's updatedAt.
+          updatedAt: existing.orderKey === command.orderKey ? existing.updatedAt : occurredAt,
+        },
+      };
     }
 
     case "thread.turn.interrupt": {

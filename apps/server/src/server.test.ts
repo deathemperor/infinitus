@@ -4322,6 +4322,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         yield* buildAppUnderTest({
           layers: {
             infinitusSessionInterrupt: {
+              pausedThreads: Stream.empty,
               resume: (threadId) =>
                 Effect.sync(() => {
                   resumed.push(threadId);

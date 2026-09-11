@@ -17,6 +17,7 @@ import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
+import * as SubscriptionRef from "effect/SubscriptionRef";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -112,6 +113,9 @@ export const InfinitusSessionInterruptLive = Layer.effect(
     /** Insertion order is age: `paused` continues oldest first. */
     const running = new Map<ThreadId, Tracked>();
     const paused = new Map<ThreadId, Paused>();
+    const published = yield* SubscriptionRef.make<ReadonlyArray<ThreadId>>([]);
+    /** Follows every change to `paused` so subscribers (#806) see it. */
+    const publishPaused = Effect.suspend(() => SubscriptionRef.set(published, [...paused.keys()]));
     const watch = yield* FiberHandle.make();
 
     const shellOf = (threadId: ThreadId) =>
@@ -203,6 +207,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
         if (!interrupted) return;
         running.delete(threadId);
         paused.set(threadId, { ...entry, since: createdAt, summary: pauseMarkerSummary(fleet) });
+        yield* publishPaused;
         const headroom = fleet.headroom;
         yield* appendMarker(threadId, PAUSE_MARKER_KIND, pauseMarkerSummary(fleet), {
           fleet: fleet.key,
@@ -264,6 +269,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
           // The wait is long enough for the thread to have gone or been sent
           // into; the record goes first so our own turn.started forgets nothing.
           paused.delete(threadId);
+          yield* publishPaused;
           const shell = yield* shellOf(threadId);
           if (Option.isNone(shell) || shell.value.archivedAt !== null) continue;
           if (shell.value.session?.activeTurnId != null) continue;
@@ -314,7 +320,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
             if (event.turnId === undefined) return;
             // A new turn on a paused thread is the user moving on (or our own
             // continuation): nothing is paused there any more.
-            paused.delete(event.threadId);
+            if (paused.delete(event.threadId)) yield* publishPaused;
             running.set(event.threadId, { turnId: event.turnId, provider });
             // On a server nobody watches, `snapshot` is the pre-poll placeholder
             // until something polls; one refresh reads the socket for real, so
@@ -360,7 +366,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
               yield* resume([threadId], "pinned");
             } else {
               running.delete(threadId);
-              paused.delete(threadId);
+              if (paused.delete(threadId)) yield* publishPaused;
             }
             yield* settleWatch(yield* infinitus.snapshot);
             return;
@@ -411,6 +417,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
     );
 
     return InfinitusSessionInterrupt.of({
+      pausedThreads: SubscriptionRef.changes(published),
       resume: (threadId) =>
         Effect.gen(function* () {
           const reply = yield* Deferred.make<InfinitusSessionHoldRelease>();
