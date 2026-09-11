@@ -65,7 +65,7 @@ public enum PrefCatalog {
     public static let sessions = Section(slug: "sessions", name: "Sessions")
     public static let sections: [Section] = [display, themes, push, devices, engines, about, sessions]
 
-    public static let priorityModes = ["off", "hold"]
+    public static let priorityModes = ["off", "hold", "interrupt"]
 
     private static func strings(_ values: [String]) -> [JSONValue] { values.map(JSONValue.string) }
     private static func ints(_ values: [Int]) -> [JSONValue] { values.map { .number(Double($0)) } }

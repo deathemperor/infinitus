@@ -92,7 +92,8 @@ final class FleetState: ObservableObject, Identifiable {
             let active = fleet.accounts.first { $0.active }
             next = Headroom.verdict(previous: swapped ? nil : headroom, usage: active?.usage,
                                     lowPct: Double(host.priorityLowPct),
-                                    abundantPct: Double(host.priorityAbundantPct))
+                                    abundantPct: Double(host.priorityAbundantPct),
+                                    interrupt: host.priorityMode == "interrupt")
         }
         if headroom != next { headroom = next }
     }
