@@ -186,7 +186,7 @@ public enum UsageHistory {
 /// Only WEEKLY windows (7d + per-model) count — a 5h window recycles
 /// ~34× a week and "waste" there is meaningless idle time, not lost
 /// quota worth charting.
-public struct WindowGeneration: Sendable, Equatable {
+public struct WindowGeneration: Sendable, Equatable, Encodable {
     public let email: String
     /// "7d" or the scoped model name ("Fable").
     public let window: String
