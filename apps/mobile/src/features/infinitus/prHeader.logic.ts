@@ -3,7 +3,9 @@ import type {
   PullRequestMergeability,
   PullRequestReviewDecision,
   PullRequestState,
+  ThreadPullRequestLink,
 } from "@t3tools/contracts";
+import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 
 /** What the phone knows about a thread's pull request, from the linked
     snapshot the server pushes or from the row's live summary (#269). Every
@@ -36,6 +38,27 @@ export function prPhaseLabel(pr: PrPhaseInput): string {
 /** Whether the row's phase is the "a person can review this now" one. */
 export function prReadyForReview(pr: PrPhaseInput): boolean {
   return prPhaseLabel(pr) === "Ready for review";
+}
+
+/** The thread list's version (#269 F): the thread's current linked pull
+    request, from the snapshot the server pushes with the thread, is open,
+    out of draft, with no failing or running checks and no verdict yet. A
+    thread whose server does not push links, or whose link has not synced,
+    is never "ready for review" — the row keeps its time label. */
+export function threadReadyForReview(
+  pullRequests: ReadonlyArray<ThreadPullRequestLink>,
+  supportsLinks: boolean,
+): boolean {
+  if (!supportsLinks) return false;
+  const snapshot = resolveThreadCurrentPullRequestLink(pullRequests)?.snapshot ?? null;
+  if (snapshot === null) return false;
+  return prReadyForReview({
+    state: snapshot.state,
+    isDraft: snapshot.isDraft,
+    checksState: snapshot.checksState,
+    reviewDecision: snapshot.reviewDecision,
+    mergeability: snapshot.mergeability,
+  });
 }
 
 /** The host page listing a pull request's checks; only GitHub has one at a

@@ -1,12 +1,40 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import type { ThreadPullRequestLink } from "@t3tools/contracts";
+
 import {
   prChecksUrl,
   prHeaderLabel,
   prHeaderMenuItems,
   prPhaseLabel,
   prReadyForReview,
+  threadReadyForReview,
 } from "./prHeader.logic";
+
+const link = (
+  snapshot: Partial<NonNullable<ThreadPullRequestLink["snapshot"]>> | null,
+): ThreadPullRequestLink => ({
+  host: "github.com",
+  repository: "o/r",
+  number: 12,
+  url: "https://github.com/o/r/pull/12",
+  source: "manual",
+  linkedAt: "2026-09-12T00:00:00.000Z",
+  snapshot:
+    snapshot === null
+      ? null
+      : {
+          state: "open",
+          title: "t",
+          headBranch: "h",
+          baseBranch: "main",
+          isDraft: false,
+          updatedAt: null,
+          syncedAt: "2026-09-12T00:00:00.000Z",
+          ...snapshot,
+        },
+  stack: null,
+});
 
 describe("prPhaseLabel", () => {
   it("names the terminal states before anything else", () => {
@@ -103,5 +131,22 @@ describe("prHeaderMenuItems", () => {
 
   it("labels the header item by number", () => {
     expect(prHeaderLabel(42)).toBe("#42");
+  });
+});
+
+describe("threadReadyForReview", () => {
+  it("reads the current link's snapshot", () => {
+    expect(threadReadyForReview([link({ checksState: "passing" })], true)).toBe(true);
+    expect(threadReadyForReview([link({})], true)).toBe(true);
+    expect(threadReadyForReview([link({ isDraft: true })], true)).toBe(false);
+    expect(threadReadyForReview([link({ checksState: "pending" })], true)).toBe(false);
+    expect(threadReadyForReview([link({ reviewDecision: "approved" })], true)).toBe(false);
+    expect(threadReadyForReview([link({ state: "merged" })], true)).toBe(false);
+  });
+
+  it("is never ready without a synced link or the capability", () => {
+    expect(threadReadyForReview([link(null)], true)).toBe(false);
+    expect(threadReadyForReview([], true)).toBe(false);
+    expect(threadReadyForReview([link({ checksState: "passing" })], false)).toBe(false);
   });
 });
