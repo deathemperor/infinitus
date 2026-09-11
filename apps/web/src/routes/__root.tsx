@@ -24,6 +24,7 @@ import { SshPasswordPromptDialog } from "../components/desktop/SshPasswordPrompt
 import { SnapShotCoordinator } from "../components/desktop/SnapShotCoordinator";
 import { CaptureGestureCoordinator } from "../components/captures/CaptureGestureCoordinator";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
+import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { SlowRpcRequestToastCoordinator } from "../components/SlowRpcRequestToastCoordinator";
@@ -195,6 +196,7 @@ function RootRouteView() {
         >
           {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
           {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
+          {primaryEnvironmentAuthenticated ? <DeepLinkCoordinator /> : null}
           <RelayClientInstallDialog />
           <ConnectOnboardingDialog />
           <SshPasswordPromptDialog />

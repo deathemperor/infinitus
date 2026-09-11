@@ -13,6 +13,7 @@ import * as DesktopEarlyElectronStartup from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopAppBranding } from "./DesktopEnvironment.ts";
 import { renderUrlHandlerDesktopEntry } from "./DesktopLinuxUrlHandler.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
+import { deepLinkIntake } from "../infinitus/InfinitusDeepLinks.ts";
 
 export interface DesktopPreReadyCommandLineReader {
   readonly hasSwitch: (switchName: string) => boolean;
@@ -91,6 +92,16 @@ export const make = Effect.gen(function* () {
         Electron.app.commandLine.appendSwitch("password-store", linux.passwordStore);
       }
     }
+
+    // Fork (#270 D): a cold launch's `open-url` lands before `ready`, so the
+    // deep-link listeners go on before anything can yield to Electron.
+    deepLinkIntake.attach(
+      Electron.app,
+      process.argv,
+      ElectronProtocol.getDesktopScheme(
+        DesktopEarlyElectronStartup.isDevelopmentEnvironment(process.env),
+      ),
+    );
 
     return { linux, linuxPasswordStoreCommandLine };
   });

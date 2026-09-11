@@ -46,7 +46,7 @@ const EarlyDesktopSettingsJson = fromLenientJson(
 );
 const decodeEarlyDesktopSettingsJson = Schema.decodeSync(EarlyDesktopSettingsJson);
 
-const isDevelopmentEnvironment = (env: NodeJS.ProcessEnv): boolean =>
+export const isDevelopmentEnvironment = (env: NodeJS.ProcessEnv): boolean =>
   trimNonEmpty(env.VITE_DEV_SERVER_URL) !== null;
 
 function resolveEarlyDesktopSettingsPath(input: {

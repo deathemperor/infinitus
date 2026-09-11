@@ -338,6 +338,22 @@ export type DesktopCaptureGestureFailure = Extract<
   { readonly type: "failed" }
 >["reason"];
 
+/**
+ * Fork (#270 D): one `<scheme>://` link the desktop shell was opened with.
+ * `thread` routes to a thread; `new` opens the composer on a project (matched
+ * by id, then title, then workspace-root basename) with `prompt` prefilled,
+ * never sent. The shell keeps only the latest link until the renderer pulls it.
+ */
+export const DesktopDeepLink = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("thread"),
+    environmentId: Schema.String,
+    threadId: Schema.String,
+  }),
+  Schema.Struct({ kind: Schema.Literal("new"), project: Schema.String, prompt: Schema.String }),
+]);
+export type DesktopDeepLink = typeof DesktopDeepLink.Type;
+
 export const DesktopPendingSnapShot = Schema.Struct({
   id: DesktopSnapShotId,
   name: Schema.String,
@@ -1357,6 +1373,13 @@ export interface DesktopBridge {
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
   /** Fork (#433 slice 2): the capture gesture's reads. Optional: older shells never emit them. */
   onCaptureGestureEvent?: (listener: (event: DesktopCaptureGestureEvent) => void) => () => void;
+  /**
+   * Fork (#270 D): the link the shell was opened with, cleared on read; the
+   * shell pings `onDeepLinkPending` when a new one lands while the window is
+   * up. Optional: a browser or an older shell has neither.
+   */
+  consumePendingDeepLink?: () => Promise<DesktopDeepLink | null>;
+  onDeepLinkPending?: (listener: () => void) => () => void;
   /**
    * Quit-confirmation hint pushes. Optional: older desktop builds never emit
    * them.
