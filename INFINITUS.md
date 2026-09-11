@@ -486,7 +486,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   secret is ever sent. Hostnames (leaders only): the Cloudflare zone and
   label member hostnames are minted under as `--zone` / `--label` (args keys
   `zone`, `label`) with the API token on `secret`, answered `{zone, label,
-  configured}` and drawn as the configured row with Forget token, which is
+configured}` and drawn as the configured row with Forget token, which is
   `team-hostname --clear` over `infinitus.command` (no stdin) and answers
   `{zone: null, label: null, configured: false}`; the Mac has no read for the
   ledger, so the form shows until a save answers. Gated on `team-status`;
