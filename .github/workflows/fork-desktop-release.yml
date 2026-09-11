@@ -93,8 +93,12 @@ jobs:
           set -euo pipefail
           dir="$RUNNER_TEMP/native-helper"
           mkdir -p "$dir"
-          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'Infinitus-*.zip' -D "$dir"
-          zip=$(ls "$dir"/Infinitus-*.zip)
+          # The native release carries two bundles: the standalone `Infinitus-<v>.zip`
+          # (CFBundleName "Infinitus", the infinitus:// URL type) and the nested
+          # build `Infinitus-Menu-Bar-<v>.zip` ("Infinitus Menu Bar", no URL type).
+          # Only the second is nested.
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'Infinitus-Menu-Bar-*.zip' -D "$dir"
+          zip=$(ls "$dir"/Infinitus-Menu-Bar-*.zip)
           if [[ -n "$SHA256" ]]; then
             echo "$SHA256  $zip" | shasum -a 256 -c -
           fi
