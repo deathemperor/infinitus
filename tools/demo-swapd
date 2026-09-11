@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Demo swapd: the app's mock mode speaking swapd's `list --json` contract
+— the same fabricated fleet as demo-cswap (one account per condition:
+healthy, ahead of pace mild+hot, dead, fresh, behind pace, sentinel,
+disabled, near-reset), reshaped into swapd's provider/slot vocabulary
+(SwapdMapping.swift). No real data; ships in the app bundle's Resources."""
+import json, sys, os, datetime
+
+TMPDIR = os.environ.get("TMPDIR", "/tmp")
+# Not next to the script: Resources are sealed by the code signature.
+STATE = os.environ.get("INFINITUS_DEMO_STATE") or os.path.join(TMPDIR, "infinitus-demo-state.json")
+
+def flag(name):
+    return os.path.exists(os.path.join(TMPDIR, name))
+
+# Same demo hooks as demo-cswap, ported onto alpha's swapd windows.
+DROP = flag("infinitus-demo-drop")      # alpha's 5h +25 pts (rm = spring refill)
+DEAD = flag("infinitus-demo-dead")      # alpha's 5h pinned at 100 (dies)
+KILL = flag("infinitus-demo-kill")      # alpha's 5h jumps to 100 (kills)
+DROP5 = flag("infinitus-demo-drop5h")   # playground: pin the 5h bar +35
+DROP7 = flag("infinitus-demo-drop7d")   # playground: pin the 7d bar +35
+DROPF = flag("infinitus-demo-dropfable")  # playground: pin the Fable bar +35
+
+def state():
+    try:
+        st = json.load(open(STATE))
+    except Exception:
+        st = {}
+    st.setdefault("active", 1)
+    return st
+
+def save(st): json.dump(st, open(STATE, "w"))
+
+def iso(hours):
+    # Plain UTC, no fractional seconds — matches ISO8601DateFormatter's
+    # default `.withInternetDateTime` (WeeklyRoll.parse / UsageHistory.parseISO).
+    t = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=hours)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def win(kind, pct, hours=None, expected=None, ahead=None, name=None):
+    w = {"kind": kind, "pct": pct}
+    if hours is not None:
+        w["resetsAt"] = iso(hours)
+    if name:
+        w["name"] = name
+    if expected is not None:
+        w["pace"] = {"expectedPct": expected, "ahead": ahead,
+                     "exhaustsAt": iso(hours * 2), "lastsToReset": not ahead}
+    return w
+
+def account(slot, alias, plan, windows, active, status="ok", disabled=False):
+    return {
+        "slot": slot, "email": f"{alias}@example.com",
+        "organizationName": f"{alias}@example.com's Organization",
+        "organizationUuid": f"00000000-0000-0000-0000-0000000000{slot:02d}",
+        "plan": plan, "alias": alias, "active": active, "disabled": disabled,
+        "preferred": False, "usageStatus": status, "windows": windows,
+        "fetchedAt": iso(0), "ageSeconds": 30.0,
+    }
+
+def fleet(active):
+    return [
+        account(1, "alpha", "Max 20x", [
+            win("5h", 100.0 if DEAD or KILL else 72.0 if DROP5 else 62.0 if DROP else 37.0, 2.4),
+            win("7d", 57.0 if DROP7 else 22.0, 118, 31.0, False),
+            win("scoped", 53.0 if DROPF else 18.0, 118, 31.0, False, "Fable"),
+        ], active == 1),
+        account(2, "bravo", "Max 20x", [
+            win("5h", 72.0, 1.1),
+            win("7d", 64.0, 96, 39.0, True),
+            win("scoped", 58.0, 96, 39.0, True, "Fable"),
+        ], active == 2),
+        account(3, "charlie", "Max 5x", [   # dead: 7d maxed
+            win("5h", 12.0, 3.0),
+            win("7d", 100.0, 27, 74.0, False),
+            win("scoped", 100.0, 27, 74.0, False, "Fable"),
+        ], active == 3),
+        account(4, "delta", "Max 5x", [     # fresh
+            win("5h", 4.0, 4.6),
+            win("7d", 9.0, 140, 12.0, False),
+            win("scoped", 6.0, 140, 12.0, False, "Fable"),
+        ], active == 4),
+        account(5, "echo", "Max 20x", [
+            win("5h", 51.0, 0.9),
+            win("7d", 41.0, 108, 35.0, False),
+            win("scoped", 23.0, 108, 35.0, False, "Fable"),
+        ], active == 5),
+        account(6, "foxtrot", "Max 20x", [  # mildly ahead of pace (+8)
+            win("5h", 44.0, 2.0),
+            win("7d", 47.0, 100, 39.0, True),
+            win("scoped", 43.0, 100, 39.0, True, "Fable"),
+        ], active == 6),
+        account(7, "golf", "Pro", [], active == 7,        # sentinel: needs re-login
+                status="relogin-required"),
+        account(8, "hotel", "Max 5x", [      # disabled by the user
+            win("5h", 28.0, 1.7),
+            win("7d", 33.0, 130, 20.0, False),
+            win("scoped", 30.0, 130, 20.0, False, "Fable"),
+        ], active == 8, disabled=True),
+        account(9, "india", "Max 20x", [     # 5h nearly maxed, resets in 4m
+            win("5h", 97.0, 0.07),
+            win("7d", 55.0, 90, 52.0, False),
+            win("scoped", 50.0, 90, 52.0, False, "Fable"),
+        ], active == 9),
+        # Untouched account (issue #16): a never-used window is bare
+        # {"kind":"5h","pct":0} — no resetsAt, no pace.
+        account(10, "juliet", "Max 20x", [win("5h", 0.0), win("7d", 0.0)], active == 10),
+    ]
+
+def apply_overrides(accounts, st):
+    disabled = set(st.get("disabled", [])); enabled = set(st.get("enabled", []))
+    preferred = set(st.get("preferred", [])); aliases = st.get("aliases", {})
+    for a in accounts:
+        n = a["slot"]
+        if n in disabled: a["disabled"] = True
+        elif n in enabled: a["disabled"] = False
+        a["preferred"] = n in preferred
+        if str(n) in aliases: a["alias"] = aliases[str(n)]
+    return accounts
+
+def provider_view(st, refreshed_slot=None):
+    # Onboarding simulation: an engine that manages nothing yet.
+    if st.get("scenario") == "empty" or os.environ.get("DEMO_EMPTY"):
+        return {"provider": "claude", "installed": True, "accounts": []}
+    accounts = apply_overrides(fleet(st["active"]), st)
+    if refreshed_slot is not None:
+        now = iso(0)
+        for a in accounts:
+            if refreshed_slot == "all" or a["slot"] == refreshed_slot:
+                a["fetchedAt"] = now; a["ageSeconds"] = 0.0
+    view = {"provider": "claude", "installed": True, "activeSlot": st["active"],
+            "nextCandidate": 4 if st["active"] != 4 else 1, "accounts": accounts}
+    if st.get("scenario") == "alldead" or os.environ.get("SHIM_ALLDEAD"):
+        # Every window maxed: no viable candidate, echo recovers first.
+        for a in accounts:
+            for w in a["windows"]:
+                w["pct"] = 100.0
+        view.pop("nextCandidate", None)
+        view["nextRecovery"] = {"slot": 5, "at": iso(0.9)}
+    return view
+
+def list_payload(refreshed_slot=None):
+    return {"schemaVersion": 1, "providers": [provider_view(state(), refreshed_slot)]}
+
+def err(code, message):
+    print(json.dumps({"schemaVersion": 1, "error": {"code": code, "message": message}}))
+    sys.exit(1)
+
+def parse_args(argv):
+    provider = None; slot = None; pos = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--json":
+            i += 1
+        elif a == "--provider" and i + 1 < len(argv):
+            provider = argv[i + 1]; i += 2
+        elif a == "--slot" and i + 1 < len(argv):
+            slot = int(argv[i + 1]); i += 2
+        else:
+            pos.append(a); i += 1
+    return provider, slot, pos
+
+_, slot_flag, pos = parse_args(sys.argv[1:])
+cmd = pos[0] if pos else ""
+rest = pos[1:]
+
+def slot_arg(default=None):
+    if slot_flag is not None:
+        return slot_flag
+    if rest and rest[0].lstrip("-").isdigit():
+        return int(rest[0])
+    return default
+
+if cmd == "version":
+    print(json.dumps({"schemaVersion": 1, "version": "0.1.0-demo"}))
+elif cmd == "doctor":
+    print(json.dumps({"schemaVersion": 1, "home": os.path.join(TMPDIR, "demo-swapd"),
+                      "providers": [{"provider": "claude", "installed": True,
+                                     "path": "/usr/bin/true"}]}))
+elif cmd == "list":
+    print(json.dumps(list_payload()))
+elif cmd == "refresh":
+    n = slot_arg()
+    print(json.dumps(list_payload(refreshed_slot=n if n is not None else "all")))
+elif cmd == "ignite":
+    print(json.dumps(list_payload(refreshed_slot=slot_arg())))
+elif cmd == "switch":
+    st = state()
+    n = slot_arg()
+    st["active"] = n if n is not None else (4 if st["active"] != 4 else 1)
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd in ("hold", "unhold"):
+    st = state()
+    n = slot_arg()
+    dis = set(st.get("disabled", [])); en = set(st.get("enabled", []))
+    if cmd == "hold": dis.add(n); en.discard(n)
+    else: en.add(n); dis.discard(n)
+    st["disabled"] = sorted(dis); st["enabled"] = sorted(en)
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "prefer":
+    st = state()
+    n = slot_arg()
+    on = rest[1] if len(rest) > 1 else "on"
+    pref = set(st.get("preferred", []))
+    if on == "on": pref.add(n)
+    else: pref.discard(n)
+    st["preferred"] = sorted(pref)
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "alias":
+    st = state()
+    n = slot_arg()
+    aliases = st.setdefault("aliases", {})
+    if "--unset" in rest[1:]:
+        aliases.pop(str(n), None)
+    else:
+        aliases[str(n)] = " ".join(a for a in rest[1:] if a != "--unset")
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "config":
+    st = state()
+    cfg = st.setdefault("config", {})
+    sub = rest[0] if rest else "list"
+    if sub == "set" and len(rest) > 2:
+        cfg[rest[1]] = rest[2]; save(st)
+        print(json.dumps({"schemaVersion": 1, "ok": True, "key": rest[1], "value": rest[2]}))
+    elif sub == "unset" and len(rest) > 1:
+        cfg.pop(rest[1], None); save(st)
+        print(json.dumps({"schemaVersion": 1, "ok": True, "key": rest[1]}))
+    elif sub == "get" and len(rest) > 1:
+        print(json.dumps({"schemaVersion": 1, "key": rest[1], "value": cfg.get(rest[1])}))
+    else:
+        print(json.dumps({"schemaVersion": 1, "config": cfg}))
+elif cmd == "simulate":
+    # Playground scenario staging: persists so every later `list` plays
+    # the scene, unlike the DEMO_/SHIM_ env vars which need a fresh process.
+    st = state()
+    mode = rest[0] if rest else "off"
+    if mode == "off":
+        st.pop("scenario", None)
+    else:
+        st["scenario"] = mode
+    save(st)
+    print(json.dumps({"schemaVersion": 1, "ok": True, "scenario": st.get("scenario")}))
+elif cmd == "auto":
+    # The supervised-daemon contract (tools/e2e.sh): events on stdout, one
+    # per line, exit on stdin EOF. Heartbeats only — a demo never switches.
+    st = state()
+    accts = fleet(st["active"])
+    acc = next((a for a in accts if a["slot"] == st["active"]), accts[0])
+    threshold = float(st.get("config", {}).get("claude.threshold", 10))
+    print(json.dumps({"schemaVersion": 1, "event": "poll", "ts": iso(0), "provider": "claude",
+                      "active": {"number": acc["slot"], "slot": acc["slot"], "email": acc["email"]},
+                      "threshold": threshold}), flush=True)
+    print(json.dumps({"schemaVersion": 1, "event": "sleep", "ts": iso(0)}), flush=True)
+    try:
+        sys.stdin.read()
+    except KeyboardInterrupt:
+        pass
+    sys.exit(0)
+else:
+    err("unsupported", "demo swapd: no such verb")
