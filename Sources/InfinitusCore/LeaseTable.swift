@@ -89,6 +89,19 @@ public final class LeaseTable: @unchecked Sendable {
         return leases.count
     }
 
+    /// Who holds what, for `perf` (#499): `clientId → ["sessions",
+    /// "session:412", "stats"…]`, sorted — the answer to "why is the
+    /// corpus still resident" without a heap dump.
+    public func held(now: Date = Date()) -> [String: [String]] {
+        lock.lock(); defer { lock.unlock() }
+        sweep(now)
+        return leases.mapValues { lease in
+            lease.scopes.map { scope in
+                scope.pid.map { "\(scope.type.rawValue):\($0)" } ?? scope.type.rawValue
+            }.sorted()
+        }
+    }
+
     private func sweep(_ now: Date) {
         leases = leases.filter { $0.value.expiresAt > now }
     }
