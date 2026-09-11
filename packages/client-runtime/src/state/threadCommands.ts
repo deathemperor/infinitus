@@ -17,6 +17,7 @@ import {
   type RespondToThreadUserInputInput,
   type DismissThreadUserInputInput,
   type RevertThreadCheckpointInput,
+  type RewindThreadChatInput,
   type SetThreadInteractionModeInput,
   type SetThreadRuntimeModeInput,
   type PinThreadInput,
@@ -41,6 +42,7 @@ import {
   respondToThreadUserInput,
   dismissThreadUserInput,
   revertThreadCheckpoint,
+  rewindThreadChat,
   setThreadInteractionMode,
   setThreadRuntimeMode,
   pinThread,
@@ -69,6 +71,7 @@ export type {
   RespondToThreadUserInputInput,
   DismissThreadUserInputInput,
   RevertThreadCheckpointInput,
+  RewindThreadChatInput,
   SetThreadInteractionModeInput,
   SetThreadRuntimeModeInput,
   PinThreadInput,
@@ -231,6 +234,13 @@ export function createThreadEnvironmentAtoms<R, E>(
     revertCheckpoint: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:revert-checkpoint",
       execute: (input: RevertThreadCheckpointInput) => revertThreadCheckpoint(input),
+      scheduler,
+      concurrency,
+    }),
+    // Fork (#270 E1)
+    rewindChat: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:rewind-chat",
+      execute: (input: RewindThreadChatInput) => rewindThreadChat(input),
       scheduler,
       concurrency,
     }),

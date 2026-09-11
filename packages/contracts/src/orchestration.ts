@@ -1287,6 +1287,20 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+/**
+ * Fork (#270 E1): rewind the chat to a checkpoint's turn count without
+ * touching files. The later turns leave every projection the way a revert's
+ * do (the event log keeps them); the workspace and the git checkpoint refs
+ * stay as they are.
+ */
+const ThreadChatRewindCommand = Schema.Struct({
+  type: Schema.Literal("thread.chat.rewind"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  turnCount: NonNegativeInt,
+  createdAt: IsoDateTime,
+});
+
 const ThreadSessionStopCommand = Schema.Struct({
   type: Schema.Literal("thread.session.stop"),
   commandId: CommandId,
@@ -1327,6 +1341,7 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
+  ThreadChatRewindCommand,
   ThreadSessionStopCommand,
 ]);
 export type DispatchableClientOrchestrationCommand =
@@ -1359,6 +1374,7 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
+  ThreadChatRewindCommand,
   ThreadSessionStopCommand,
 ]);
 export type ClientOrchestrationCommand = typeof ClientOrchestrationCommand.Type;
@@ -1527,6 +1543,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.approval-response-requested",
   "thread.user-input-response-requested",
   "thread.checkpoint-revert-requested",
+  "thread.chat-rewind-requested",
   "thread.reverted",
   "thread.session-stop-requested",
   "thread.session-set",
@@ -1965,6 +1982,11 @@ export const OrchestrationEvent = Schema.Union([
   Schema.Struct({
     ...EventBaseFields,
     type: Schema.Literal("thread.checkpoint-revert-requested"),
+    payload: ThreadCheckpointRevertRequestedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.chat-rewind-requested"),
     payload: ThreadCheckpointRevertRequestedPayload,
   }),
   Schema.Struct({
