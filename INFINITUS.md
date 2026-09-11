@@ -518,7 +518,9 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
   `infinitusHoldBanner.logic.ts`) in the composer banner stack, one mount in
   `ChatView.tsx` beside the snoozed/settled banners: "Waiting for headroom",
-  the row's line, "Run now" and "Pin". Archived or deleted while held:
+  the row's line, "Run now" and "Pin". `chat/PinAtCreationToggle.tsx` is
+  "Pin on create" under a draft's composer (per-browser, off by default);
+  ChatView pins the thread right after the send that creates it. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
