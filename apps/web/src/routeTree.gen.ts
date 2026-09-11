@@ -41,6 +41,7 @@ import { Route as SettingsInfinitusTeamRouteImport } from './routes/settings.inf
 import { Route as SettingsInfinitusSessionsRouteImport } from './routes/settings.infinitus.sessions'
 import { Route as SettingsInfinitusProfilesRouteImport } from './routes/settings.infinitus.profiles'
 import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
+import { Route as SettingsInfinitusLockRouteImport } from './routes/settings.infinitus.lock'
 import { Route as SettingsInfinitusEnginesRouteImport } from './routes/settings.infinitus.engines'
 import { Route as SettingsInfinitusDevicesRouteImport } from './routes/settings.infinitus.devices'
 import { Route as SettingsInfinitusAnimationsRouteImport } from './routes/settings.infinitus.animations'
@@ -209,6 +210,11 @@ const SettingsInfinitusNotificationsRoute =
     path: '/infinitus/notifications',
     getParentRoute: () => SettingsRoute,
   } as any)
+const SettingsInfinitusLockRoute = SettingsInfinitusLockRouteImport.update({
+  id: '/infinitus/lock',
+  path: '/infinitus/lock',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsInfinitusEnginesRoute =
   SettingsInfinitusEnginesRouteImport.update({
     id: '/infinitus/engines',
@@ -270,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
   '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
   '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
@@ -308,6 +315,7 @@ export interface FileRoutesByTo {
   '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
   '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
   '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
@@ -348,6 +356,7 @@ export interface FileRoutesById {
   '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
   '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
   '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
+  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
@@ -388,6 +397,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/animations'
     | '/settings/infinitus/devices'
     | '/settings/infinitus/engines'
+    | '/settings/infinitus/lock'
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/animations'
     | '/settings/infinitus/devices'
     | '/settings/infinitus/engines'
+    | '/settings/infinitus/lock'
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
@@ -465,6 +476,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/animations'
     | '/settings/infinitus/devices'
     | '/settings/infinitus/engines'
+    | '/settings/infinitus/lock'
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
@@ -715,6 +727,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsInfinitusNotificationsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/infinitus/lock': {
+      id: '/settings/infinitus/lock'
+      path: '/infinitus/lock'
+      fullPath: '/settings/infinitus/lock'
+      preLoaderRoute: typeof SettingsInfinitusLockRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/infinitus/engines': {
       id: '/settings/infinitus/engines'
       path: '/infinitus/engines'
@@ -784,6 +803,7 @@ interface SettingsRouteChildren {
   SettingsInfinitusAnimationsRoute: typeof SettingsInfinitusAnimationsRoute
   SettingsInfinitusDevicesRoute: typeof SettingsInfinitusDevicesRoute
   SettingsInfinitusEnginesRoute: typeof SettingsInfinitusEnginesRoute
+  SettingsInfinitusLockRoute: typeof SettingsInfinitusLockRoute
   SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
   SettingsInfinitusProfilesRoute: typeof SettingsInfinitusProfilesRoute
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
@@ -807,6 +827,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusAnimationsRoute: SettingsInfinitusAnimationsRoute,
   SettingsInfinitusDevicesRoute: SettingsInfinitusDevicesRoute,
   SettingsInfinitusEnginesRoute: SettingsInfinitusEnginesRoute,
+  SettingsInfinitusLockRoute: SettingsInfinitusLockRoute,
   SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
   SettingsInfinitusProfilesRoute: SettingsInfinitusProfilesRoute,
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
