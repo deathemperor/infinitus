@@ -757,6 +757,21 @@ final class ControlServer {
             // and the session set, which made `--period year` ~0.5 MB.
             return ControlReply(ok: true, result: try .of(summary.compacted()))
 
+        case "utilization":
+            // #747: the Utilization pane's figures, computed here, for the
+            // desktop app's page — history is file IO, so off the main actor.
+            let days = r.options["days"].flatMap(Int.init) ?? 7
+            guard (1...90).contains(days) else { throw Fail("usage: utilization [--days <1|7|30>]") }
+            let now = Date().timeIntervalSince1970
+            var snap = await Task.detached(priority: .utility) {
+                var snap = UtilizationModel.compute(days: days, now: now)
+                snap.rates = TokenRateScanner.scan(projectsDir: TokenRateScanner.defaultProjectsDir(),
+                                                   cacheURL: UtilizationModel.ratesCacheURL)
+                return snap
+            }.value
+            snap.liveRate = LiveForecastRelay.shared.tokenRate
+            return ControlReply(ok: true, result: try .of(snap))
+
         case "perf":
             var usage = rusage()
             getrusage(RUSAGE_SELF, &usage)
@@ -1010,6 +1025,21 @@ final class ControlServer {
             model.saveCLIProxy(baseURL: url, key: r.secret ?? "")
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
+        case "push-slack":
+            // #756: the away channel the engine used to post to, now the
+            // app's own; the webhook comes on stdin, empty forgets it.
+            if let why = model.awayPush.setSlack(r.secret ?? "") { throw Fail(why) }
+            return ControlReply(ok: true, result: try .of(awayPushReply()))
+
+        case "push-telegram":
+            let token = r.secret ?? ""
+            guard token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || (r.options["chat"].map { $0 != "true" && !$0.isEmpty } ?? false) else {
+                throw Fail("usage: push-telegram --chat <chat id or @channel>  (the bot token on stdin; empty stdin forgets it)")
+            }
+            if let why = model.awayPush.setTelegram(token: token, chat: r.options["chat"] ?? "") { throw Fail(why) }
+            return ControlReply(ok: true, result: try .of(awayPushReply()))
+
         case "9router-password":
             let url = r.options["url"] ?? model.nineRouterBaseURL
             model.saveNineRouter(baseURL: url, password: r.secret ?? "")
@@ -1034,6 +1064,46 @@ final class ControlServer {
             model.team.discoverable = arg == "on"
             return ControlReply(ok: true, result: .object(["discoverable": .bool(arg == "on")]))
 
+        case "desktop-credential":
+            // #822: the desktop's own push at port publish (or a hand-fed
+            // token); the secret rides stdin, never argv. Empty stdin forgets.
+            let token = r.secret ?? ""
+            let origin = r.options["origin"] ?? model.desktopCredential.origin ?? "http://127.0.0.1:\(model.forkServerPort)"
+            guard token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (r.options["origin"].map { $0 != "true" && !$0.isEmpty } ?? true) else {
+                throw Fail("usage: desktop-credential --origin <http://127.0.0.1:port> [--expiresAt <iso>]  (the token on stdin; empty stdin forgets it)")
+            }
+            let expiresAt = r.options["expiresAt"].flatMap { $0 == "true" ? nil : $0 }
+            if let why = model.desktopCredential.store(origin: origin, expiresAt: expiresAt, token: token) { throw Fail(why) }
+            return ControlReply(ok: true, result: .object([
+                "origin": model.desktopCredential.origin.map(JSONValue.string) ?? .null,
+                "expiresAt": model.desktopCredential.expiresAt.map(JSONValue.string) ?? .null,
+                "stored": .bool(model.desktopCredential.stored),
+            ]))
+
+        case "desktop-status":
+            let credential = model.desktopCredential
+            let origin = credential.origin
+            // Stale: the desktop moved port since it handed the credential over.
+            let stale = origin.flatMap { URL(string: $0)?.port }.map { $0 != model.forkServerPort } ?? false
+            return ControlReply(ok: true, result: .object([
+                "origin": origin.map(JSONValue.string) ?? .null,
+                "port": .number(Double(model.forkServerPort)),
+                "credential": credential.masked.map(JSONValue.string) ?? .null,
+                "expiresAt": credential.expiresAt.map(JSONValue.string) ?? .null,
+                "stale": .bool(stale),
+            ]))
+
+        case "desktop-token":
+            // The dispatcher has one entry, the Unix socket (the phone goes
+            // through the mirror), so every request here is local.
+            guard let origin = model.desktopCredential.origin, let token = model.desktopCredential.token() else {
+                throw Fail("no Infinitus desktop credential — launch Infinitus desktop")
+            }
+            return ControlReply(ok: true, result: .object([
+                "origin": .string(origin), "token": .string(token),
+                "expiresAt": model.desktopCredential.expiresAt.map(JSONValue.string) ?? .null,
+            ]))
+
         default:
             return .failure("\(r.command) is in the manifest but not implemented")
         }
@@ -1047,6 +1117,12 @@ final class ControlServer {
             throw Fail("no fleet \(key); fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
         }
         return fleet
+    }
+
+    private struct AwayPushReply: Encodable { let slack: Bool, telegram: Bool, telegramChat: String? }
+    private func awayPushReply() -> AwayPushReply {
+        AwayPushReply(slack: model.awayPush.slackConfigured, telegram: model.awayPush.telegramConfigured,
+                      telegramChat: model.awayPush.telegramConfigured ? model.awayPush.telegramChat : nil)
     }
 
     private func target(_ r: ControlRequest) throws -> (FleetState, Int) {

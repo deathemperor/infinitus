@@ -813,6 +813,12 @@ final class AppModel: ObservableObject {
         model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
         return model
     }()
+    /// The desktop's CLI credential (#822): stored by `desktop-credential`, read by `desktop-token`.
+    private(set) lazy var desktopCredential: DesktopCredential = {
+        let credential = DesktopCredential(defaults: defaults)
+        credential.log = { [weak self] text in self?.logEvent("desktop", icon: "key", text) }
+        return credential
+    }()
     let quickTunnel = QuickTunnel()
     let namedTunnel = NamedTunnel()
     let forkTunnel = QuickTunnel(pidKey: "fork_tunnel_pid")
@@ -826,7 +832,14 @@ final class AppModel: ObservableObject {
     /// swapd's `notify` only reports).
     func push(_ msg: String) {
         notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+        awayPush.send(msg)
     }
+    /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
+    lazy var awayPush: AwayPush = {
+        let push = AwayPush(defaults: defaults)
+        push.log = { [weak self] icon, text in self?.logEvent("other", icon: icon, text) }
+        return push
+    }()
 
     struct SessionRow {
         let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
