@@ -10,7 +10,7 @@ import {
 } from "./addAccount.logic";
 
 const flow = (phase: AddAccountFlow["phase"], target: string | null = null): AddAccountFlow => ({
-  fleetKey: "cswap/claude",
+  fleetKey: "swapd/claude",
   target,
   phase,
 });

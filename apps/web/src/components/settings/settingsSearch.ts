@@ -642,7 +642,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/engines",
     targetId: "infinitus-engines",
     infinitusOnly: true,
-    searchTerms: ["cswap swapd cliproxy 9router proxy accounts registered key"],
+    searchTerms: ["swapd cliproxy 9router proxy accounts registered key"],
   },
   {
     id: "infinitus-profiles",

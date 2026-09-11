@@ -169,7 +169,7 @@ function rowActions(
 }
 
 /** The capability the native `add <fleet>` verb acts on: the in-app OAuth
-    sign-in (cswap declares every capability, the proxy this one). A fleet with
+    sign-in (swapd declares every capability, the proxy this one). A fleet with
     only `addToken` pastes a token in the Mac app and is not offered here. */
 const ADD_CAPABILITY = "addOAuth";
 

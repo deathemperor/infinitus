@@ -96,7 +96,6 @@ export function prefDefaultHint(row: PrefRowModel, value: boolean | number | str
 /** The engines the app knows by their product names; anything the native side
     adds later shows its own key. */
 const ENGINE_LABELS: Readonly<Record<string, string>> = {
-  cswap: "cswap",
   swapd: "swapd",
   cliproxy: "CLIProxyAPI",
   "9router": "9Router",

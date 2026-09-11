@@ -25,7 +25,7 @@ function fleet(
 ): InfinitusFleet {
   return {
     key: "claude",
-    engineID: "cswap",
+    engineID: "swapd",
     provider: "claude",
     capabilities: [],
     accounts,

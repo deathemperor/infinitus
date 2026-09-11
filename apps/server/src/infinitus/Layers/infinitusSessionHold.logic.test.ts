@@ -40,23 +40,23 @@ describe("fleetProviderForDriver", () => {
 
 describe("headroomVerdict", () => {
   it("is unknown with no fleet for the provider", () => {
-    expect(headroomVerdict(snapshot([fleet("cswap/claude", "claude")]), "codex")).toEqual({
+    expect(headroomVerdict(snapshot([fleet("swapd/claude", "claude")]), "codex")).toEqual({
       verdict: "unknown",
     });
   });
 
   it("is unknown while the fleet publishes no headroom (mode off, older build)", () => {
-    expect(headroomVerdict(snapshot([fleet("cswap/claude", "claude")]), "claude")).toEqual({
+    expect(headroomVerdict(snapshot([fleet("swapd/claude", "claude")]), "claude")).toEqual({
       verdict: "unknown",
     });
   });
 
   it("holds on low and on critical, naming the fleet", () => {
-    const low = fleet("cswap/claude", "claude", {
+    const low = fleet("swapd/claude", "claude", {
       headroom: { state: "low", window: "5h", pct: 84 },
     });
     expect(headroomVerdict(snapshot([low]), "claude")).toEqual({ verdict: "hold", fleet: low });
-    const critical = fleet("cswap/claude", "claude", { headroom: { state: "critical" } });
+    const critical = fleet("swapd/claude", "claude", { headroom: { state: "critical" } });
     expect(headroomVerdict(snapshot([critical]), "claude")).toEqual({
       verdict: "hold",
       fleet: critical,
@@ -64,7 +64,7 @@ describe("headroomVerdict", () => {
   });
 
   it("releases on abundant", () => {
-    const abundant = fleet("cswap/claude", "claude", { headroom: { state: "abundant" } });
+    const abundant = fleet("swapd/claude", "claude", { headroom: { state: "abundant" } });
     expect(headroomVerdict(snapshot([abundant]), "claude")).toEqual({
       verdict: "release",
       fleet: abundant,
@@ -72,7 +72,7 @@ describe("headroomVerdict", () => {
   });
 
   it("with two fleets for one provider holds only when every one reads low, releases when any reads abundant", () => {
-    const low = fleet("cswap/claude", "claude", { headroom: { state: "low" } });
+    const low = fleet("swapd/claude", "claude", { headroom: { state: "low" } });
     const silent = fleet("swapd/claude", "claude");
     const abundant = fleet("swapd/claude", "claude", { headroom: { state: "abundant" } });
     const alsoLow = fleet("swapd/claude", "claude", { headroom: { state: "critical" } });
@@ -109,10 +109,10 @@ describe("marker summaries", () => {
   it("names the fleet and the binding window when known", () => {
     expect(
       holdMarkerSummary(
-        fleet("cswap/claude", "claude", { headroom: { state: "low", window: "5h", pct: 84 } }),
+        fleet("swapd/claude", "claude", { headroom: { state: "low", window: "5h", pct: 84 } }),
       ),
     ).toBe("Held for headroom on claude, 5h window 84 %");
-    expect(holdMarkerSummary(fleet("cswap/claude", "claude", { headroom: { state: "low" } }))).toBe(
+    expect(holdMarkerSummary(fleet("swapd/claude", "claude", { headroom: { state: "low" } }))).toBe(
       "Held for headroom on claude",
     );
   });

@@ -40,7 +40,7 @@ const snapshotWith = (
   provider = "claude",
 ): InfinitusSnapshot => ({
   available: true,
-  fleets: [{ key: `cswap/${provider}`, engineID: "cswap", provider, capabilities: [], accounts }],
+  fleets: [{ key: `swapd/${provider}`, engineID: "swapd", provider, capabilities: [], accounts }],
   sessions: [],
   commands: [],
 });
@@ -79,7 +79,7 @@ describe("limitStopFromEvent", () => {
       turnId,
       kind: "parked",
       stoppedAt: NOW,
-      activeAtStop: new Map([["cswap/claude", "one@example.com"]]),
+      activeAtStop: new Map([["swapd/claude", "one@example.com"]]),
     });
     expect(
       limitStopFromEvent(
@@ -195,7 +195,7 @@ describe("resumeTarget", () => {
           account(2, "two@example.com", { active: true, usageFetchedAt: after }),
         ]),
       ),
-    ).toEqual({ fleetKey: "cswap/claude", account: "two@example.com", from: "one@example.com" });
+    ).toEqual({ fleetKey: "swapd/claude", account: "two@example.com", from: "one@example.com" });
   });
 
   it("the same account back after its reset counts, once probed", () => {
@@ -204,7 +204,7 @@ describe("resumeTarget", () => {
         stop,
         snapshotWith([account(1, "one@example.com", { active: true, usageFetchedAt: after })]),
       ),
-    ).toEqual({ fleetKey: "cswap/claude", account: "one@example.com", from: "one@example.com" });
+    ).toEqual({ fleetKey: "swapd/claude", account: "one@example.com", from: "one@example.com" });
   });
 
   it("without a probe time only a different account counts", () => {

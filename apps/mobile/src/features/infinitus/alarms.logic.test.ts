@@ -37,8 +37,8 @@ function account(
 
 function fleet(accounts: InfinitusAccount[], activeNumber?: number): InfinitusFleet {
   return {
-    key: "cswap/claude",
-    engineID: "cswap",
+    key: "swapd/claude",
+    engineID: "swapd",
     provider: "claude",
     capabilities: [],
     accounts,
@@ -80,7 +80,7 @@ describe("resetAlarms", () => {
       DEFAULT_LEAD_MS,
     );
     expect(alarms).toHaveLength(1);
-    expect(alarms[0]?.id).toBe("infinitus-reset-cswap/claude-1");
+    expect(alarms[0]?.id).toBe("infinitus-reset-swapd/claude-1");
     expect(alarms[0]?.fireAt).toBe(new Date(reset - DEFAULT_LEAD_MS).toISOString());
     expect(alarms[0]?.title).toBe("papaya resets in 10 min");
     expect(alarms[0]?.body).toMatch(/^the session limit lifts at /);
@@ -145,7 +145,7 @@ describe("swapAlarm", () => {
     const swap = swapAlarm(2, fleet(accounts, 1));
     expect(swap?.title).toBe("swapped to papaya");
     expect(swap?.fireAt).toBeNull();
-    expect(swap?.id).toBe("infinitus-swap-cswap/claude");
+    expect(swap?.id).toBe("infinitus-swap-swapd/claude");
   });
 });
 
@@ -162,8 +162,8 @@ describe("planAlarms / leadMs", () => {
     const after = snapshot([fleet([account(1, 100, reset), account(2, 0, null)], 1)], 30);
     const alarms = planAlarms(after, before, now);
     expect(alarms.map((alarm) => alarm.id)).toEqual([
-      "infinitus-reset-cswap/claude-1",
-      "infinitus-swap-cswap/claude",
+      "infinitus-reset-swapd/claude-1",
+      "infinitus-swap-swapd/claude",
     ]);
     expect(alarms[0]?.title).toMatch(/resets in 30 min$/);
     expect(planAlarms({ ...after, available: false }, before, now)).toEqual([]);

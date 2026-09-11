@@ -50,7 +50,7 @@ const isLow = (fleet: InfinitusFleet): boolean =>
  * with an active account reads abundant, `hold` when every one reads low
  * (or critical, which is low until Interrupt exists), else `unknown` — no
  * fleet, no active account, or a fleet that publishes no verdict (mode off,
- * an older build). Two fleets for one provider happen during the cswap to
+ * an older build). Two fleets for one provider happen during the swapd to
  * swapd transition (#475); a silent one never holds.
  */
 export function headroomVerdict(snapshot: InfinitusSnapshot, provider: string): HeadroomVerdict {

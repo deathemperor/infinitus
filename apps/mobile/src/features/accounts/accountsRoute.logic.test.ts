@@ -25,8 +25,8 @@ const exhaustedSnapshot: InfinitusSnapshot = {
   available: true,
   fleets: [
     {
-      key: "cswap/claude",
-      engineID: "cswap",
+      key: "swapd/claude",
+      engineID: "swapd",
       provider: "claude",
       capabilities: ["switch"],
       activeNumber: 1,
@@ -68,8 +68,8 @@ const readySnapshot: InfinitusSnapshot = {
   available: true,
   fleets: [
     {
-      key: "cswap/claude",
-      engineID: "cswap",
+      key: "swapd/claude",
+      engineID: "swapd",
       provider: "claude",
       capabilities: ["switch"],
       accounts: [
@@ -134,7 +134,7 @@ describe("macAccountsModel", () => {
     expect(macAccountsModel({ ...readySnapshot, fleets: [] }, NOW).state).toBe("empty");
     const model = macAccountsModel(readySnapshot, NOW);
     expect(model.state).toBe("ready");
-    expect(model.sections.map((section) => section.title)).toEqual(["claude (cswap)"]);
+    expect(model.sections.map((section) => section.title)).toEqual(["claude (swapd)"]);
     expect(model.forecast).toBeNull();
   });
 });
@@ -291,7 +291,7 @@ describe("exhausted band (#706)", () => {
   it("the model carries a band only for a fleet whose every account is at a limit", () => {
     expect(macAccountsModel(readySnapshot, NOW).bands.size).toBe(0);
     const bands = macAccountsModel(exhaustedSnapshot, NOW).bands;
-    expect(bands.get("cswap/claude")).toEqual({ revivalAt: RESET, revivesFirst: "death1" });
+    expect(bands.get("swapd/claude")).toEqual({ revivalAt: RESET, revivesFirst: "death1" });
     // Past the reset the reading belongs to a window that rolled: no band.
     expect(macAccountsModel(exhaustedSnapshot, Date.parse(RESET) + 1).bands.size).toBe(0);
   });

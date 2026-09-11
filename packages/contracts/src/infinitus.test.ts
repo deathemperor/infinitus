@@ -45,14 +45,14 @@ const status = {
   playground: false,
   signInRunning: false,
   engines: {
-    cswap: { enabled: true, registered: true },
+    swapd: { enabled: true, registered: true },
     cliproxy: { enabled: false, registered: false, keyPresent: false },
   },
 } as const;
 
 const fleet = {
-  key: "cswap/claude",
-  engineID: "cswap",
+  key: "swapd/claude",
+  engineID: "swapd",
   provider: "claude",
   capabilities: ["switch", "rotate", "rename"],
   activeNumber: 1,
@@ -94,7 +94,7 @@ describe("InfinitusStatus", () => {
     const decoded = decodeStatus(status);
 
     expect(decoded.socket).toBe(status.socket);
-    expect(decoded.engines.cswap?.keyPresent).toBeUndefined();
+    expect(decoded.engines.swapd?.keyPresent).toBeUndefined();
     expect(decoded.engines.cliproxy?.keyPresent).toBe(false);
   });
 
@@ -210,7 +210,7 @@ describe("InfinitusFleet", () => {
     const decoded = decodeFleet({ ...fleet, headroom: { state: "starving", window: "5h" } });
 
     expect(decoded.headroom).toBeUndefined();
-    expect(decoded.key).toBe("cswap/claude");
+    expect(decoded.key).toBe("swapd/claude");
   });
 });
 
@@ -335,7 +335,7 @@ describe("InfinitusManifest", () => {
         },
         {
           name: "engine",
-          args: ["cswap|swapd|cliproxy|9router", "on|off"],
+          args: ["swapd|cliproxy|9router", "on|off"],
           options: [],
           effect: "restart",
           summary: "Turn an engine on or off; the app relaunches.",
@@ -359,12 +359,12 @@ describe("InfinitusControlReply", () => {
     const decoded = decodeReply({
       schemaVersion: 1,
       ok: false,
-      error: "no fleet named cswap/gemini",
+      error: "no fleet named swapd/gemini",
       restarting: false,
     });
 
     expect(decoded.ok).toBe(false);
-    expect(decoded.error).toBe("no fleet named cswap/gemini");
+    expect(decoded.error).toBe("no fleet named swapd/gemini");
     expect(decoded.result).toBeUndefined();
   });
 
@@ -501,13 +501,13 @@ describe("the RPC payloads", () => {
   it("round-trips a command input", () => {
     const input = decodeCommandInput({
       command: "switch",
-      args: ["cswap/claude", "2"],
+      args: ["swapd/claude", "2"],
       options: { yes: "true" },
     });
 
     expect(encodeCommandInput(input)).toEqual({
       command: "switch",
-      args: ["cswap/claude", "2"],
+      args: ["swapd/claude", "2"],
       options: { yes: "true" },
     });
   });
@@ -519,8 +519,8 @@ describe("the RPC payloads", () => {
   });
 
   it("carries any result shape, and none at all", () => {
-    expect(decodeCommandResult({ result: { fleet: "cswap/claude" } }).result).toEqual({
-      fleet: "cswap/claude",
+    expect(decodeCommandResult({ result: { fleet: "swapd/claude" } }).result).toEqual({
+      fleet: "swapd/claude",
     });
     expect(decodeCommandResult({}).result).toBeUndefined();
     expect(encodeCommandResult(decodeCommandResult({}))).toEqual({});
