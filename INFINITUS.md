@@ -143,7 +143,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
   `submitInfinitusSignInCode` (#677), and `setInfinitusCaptureGestureEnabled`
   / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
-  beside `DesktopSnapShotEvent` (#433 slice 2). `packages/contracts/src/infinitus.ts`
+  beside `DesktopSnapShotEvent` (#433 slice 2), and `consumePendingDeepLink`
+  / `onDeepLinkPending` with the `DesktopDeepLink` schema after it (#270 D).
+  `packages/contracts/src/infinitus.ts`
   — `captureGestureEnabled` on `InfinitusDesktopPrefs`;
   `packages/contracts/src/captures.ts` — `MAX_CAPTURE_TEXT_LENGTH`, the cap
   the desktop's selected-text helper cuts at.
@@ -151,6 +153,11 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `apps/desktop/src/preload.ts` — the channels, `ipc.handle` lines and
   preload entries for those methods; `apps/desktop/src/main.ts` —
   `InfinitusDesktop.layer` in `desktopApplicationLayer`.
+  `apps/desktop/src/app/DesktopPreReadyPlatform.ts` — `deepLinkIntake.attach`
+  at the end of the pre-ready setup, and `DesktopEarlyElectronStartup.ts`
+  exports `isDevelopmentEnvironment` for its scheme (#270 D).
+- `apps/web/src/routes/__root.tsx` — `DeepLinkCoordinator` mounted beside
+  `DesktopAppActivationCoordinator` (#270 D).
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service; a
   `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.
@@ -445,6 +452,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
   `resolveNextAttentionThreadId` + tests.
+- `apps/web/src/components/deepLinks/` — the desktop's deep links landing
+  (#270 D): `DeepLinkCoordinator` pulls the shell's latest link once the
+  primary environment is connected and on every `onDeepLinkPending` ping;
+  `thread` navigates to `/$environmentId/$threadId`, `new` resolves the
+  project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
+  workspace-root basename, case-insensitive) and opens the composer through
+  `useNewThreadHandler` with the prompt set on the draft — never sent; an
+  unknown project toasts.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
@@ -805,6 +820,24 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
   (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
   developer's Mac (the tests mock `spawn`).
+- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
+  `<scheme>://thread/<environmentId>/<threadId>` and
+  `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
+  own scheme (`infinitus` / `infinitus-dev`); only those two hosts are
+  claimed, `app` stays the renderer origin and the Clerk callback, `join` /
+  `pair` are the native app's. `deepLinkIntake` is attached before Electron
+  is ready (a cold launch's `open-url` lands before `ready`; Windows and
+  Linux carry the URL in argv and `second-instance`) and holds the latest
+  URL until the service drains it; the service keeps the latest parsed link
+  (`consume` clears it), opens or reveals the main window once the backend
+  is ready (`createMainIfBackendReady`, the "activate without windows" gate)
+  and pings `desktop:infinitus-deep-link-pending` when the page is loaded —
+  a loading page pulls on mount. The prompt is cut at
+  `MAX_DEEP_LINK_PROMPT_LENGTH` and never logged, only its length. Merged
+  into `InfinitusDesktop.layer`; `consumeInfinitusDeepLink` in
+  `ipc/methods/infinitus.ts`. On a Mac, LaunchServices sends `infinitus://`
+  to one app: the native `Infinitus.app` also claims the scheme for
+  `join` / `pair`, so whichever registered last gets every link (#270).
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).

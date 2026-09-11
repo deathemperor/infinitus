@@ -28,6 +28,7 @@ vi.mock("electron", () => ({
   app: {
     setDesktopName: setDesktopNameMock,
     getVersion: () => "0.0.37",
+    on: () => undefined,
     commandLine: {
       appendSwitch: appendSwitchMock,
       getSwitchValue: getSwitchValueMock,

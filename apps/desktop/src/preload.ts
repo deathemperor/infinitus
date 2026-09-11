@@ -169,6 +169,18 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.CLOSE_INFINITUS_SIGN_IN_CHANNEL, flowId),
   submitInfinitusSignInCode: (input) =>
     ipcRenderer.invoke(IpcChannels.SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL, input),
+  consumePendingDeepLink: () =>
+    ipcRenderer.invoke(IpcChannels.CONSUME_INFINITUS_DEEP_LINK_CHANNEL, undefined),
+  onDeepLinkPending: (listener) => {
+    const wrappedListener = () => {
+      listener();
+    };
+
+    ipcRenderer.on(IpcChannels.INFINITUS_DEEP_LINK_PENDING_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.INFINITUS_DEEP_LINK_PENDING_CHANNEL, wrappedListener);
+    };
+  },
   pickFolder: (options) => ipcRenderer.invoke(IpcChannels.PICK_FOLDER_CHANNEL, options),
   pickProjectFavicon: (initialPath) =>
     ipcRenderer.invoke(IpcChannels.PICK_PROJECT_FAVICON_CHANNEL, initialPath),

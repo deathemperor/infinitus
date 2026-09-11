@@ -65,6 +65,7 @@ import * as AppActivationIpc from "./methods/appActivation.ts";
 import { getWslState, setWslBackendEnabled, setWslDistro, setWslOnly } from "./methods/wsl.ts";
 import {
   closeInfinitusSignIn,
+  consumeInfinitusDeepLink,
   getInfinitusDesktopPrefs,
   openInfinitusSignIn,
   setInfinitusCaptureGestureEnabled,
@@ -129,6 +130,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(openInfinitusSignIn);
   yield* ipc.handle(closeInfinitusSignIn);
   yield* ipc.handle(submitInfinitusSignInCode);
+  yield* ipc.handle(consumeInfinitusDeepLink);
 
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(pickProjectFavicon);

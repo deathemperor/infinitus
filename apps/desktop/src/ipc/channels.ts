@@ -116,3 +116,6 @@ export const CAPTURE_GESTURE_EVENT_CHANNEL = "desktop:infinitus-capture-gesture-
 export const OPEN_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-open-sign-in";
 export const CLOSE_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-close-sign-in";
 export const SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL = "desktop:infinitus-submit-sign-in-code";
+// Fork: deep links (#270 D).
+export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-deep-link";
+export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";

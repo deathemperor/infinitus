@@ -1,3 +1,4 @@
+import { DesktopDeepLink } from "@t3tools/contracts";
 import {
   InfinitusDesktopPrefs,
   InfinitusSignInCodeInput,
@@ -8,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { InfinitusCaptureGestureService } from "../../captures/InfinitusCaptureGesture.ts";
+import { InfinitusDeepLinksService } from "../../infinitus/InfinitusDeepLinks.ts";
 import { InfinitusDesktopPrefsService } from "../../infinitus/InfinitusDesktopPrefs.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
 import * as IpcChannels from "../channels.ts";
@@ -70,5 +72,15 @@ export const submitInfinitusSignInCode = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.submitSignInCode")(function* (input) {
     const signIn = yield* InfinitusSignInService;
     return yield* signIn.submitCode(input);
+  }),
+});
+
+export const consumeInfinitusDeepLink = makeIpcMethod({
+  channel: IpcChannels.CONSUME_INFINITUS_DEEP_LINK_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.NullOr(DesktopDeepLink),
+  handler: Effect.fn("desktop.ipc.infinitus.consumeDeepLink")(function* () {
+    const deepLinks = yield* InfinitusDeepLinksService;
+    return yield* deepLinks.consume;
   }),
 });
