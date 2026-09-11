@@ -2,7 +2,11 @@
 
 A `v*` tag push runs `.github/workflows/release.yml`: build on the
 macOS 26 runner, zip, GitHub release, tap cask bump. Nightly does the same
-from `main` daily.
+from `main` daily. Since 0.4.5 a release carries two Mac assets (#777):
+`Infinitus-<v>.zip` (the standalone app, what the cask installs) and
+`Infinitus-Menu-Bar-<v>.zip` (the same build as `Infinitus Menu Bar.app`,
+no `infinitus://` URL type — what Infinitus desktop nests and pins by
+sha256 in its `apps/desktop/native-helper.json`).
 
 ## Signing today
 
