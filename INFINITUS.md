@@ -258,7 +258,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Connections › Network access. "Type it instead" reveals host + code for
   the phone's manual form. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
-  Above it in the same slot, the "Pairing requests" card
+  Above it, through the panel's `lead` slot (drawn whatever the native app's
+  state — the requests come from this server), the "Pairing requests" card
   (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710): the
   server's pending approve-on-Mac asks from `subscribeInfinitusPairing`
   (device name, os · address, the match code large, a countdown), each with

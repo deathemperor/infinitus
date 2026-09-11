@@ -126,11 +126,11 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function renderPanel() {
+async function renderPanel(lead?: ReactNode) {
   await act(() => {
     renderer = create(
       <StrictMode>
-        <InfinitusPrefsPanel sectionSlugs={["display"]} title="Infinitus" />
+        <InfinitusPrefsPanel sectionSlugs={["display"]} title="Infinitus" lead={lead} />
       </StrictMode>,
     );
   });
@@ -154,6 +154,17 @@ describe("InfinitusPrefsPanel states", () => {
     fake.capability = undefined;
     await renderPanel();
     expect(rendered()).toContain("does not reach an Infinitus app");
+  });
+
+  it("draws the lead slot whatever the app's state, since it is not the app's", async () => {
+    fake.capability = undefined;
+    await renderPanel(<p>lead-card</p>);
+    expect(rendered()).toContain("lead-card");
+    act(() => renderer?.unmount());
+    fake.capability = true;
+    await renderPanel(<p>lead-card</p>);
+    expect(rendered()).toContain("lead-card");
+    expect(rendered()).toContain("Show only the icon");
   });
 
   it("waits while the first snapshot is still coming", async () => {

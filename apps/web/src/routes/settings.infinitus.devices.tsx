@@ -9,12 +9,8 @@ function SettingsInfinitusDevicesRoute() {
     <InfinitusPrefsPanel
       sectionSlugs={["devices"]}
       title="Devices"
-      footer={
-        <>
-          <InfinitusPairingRequestsCard />
-          <InfinitusPairPhoneCard />
-        </>
-      }
+      lead={<InfinitusPairingRequestsCard />}
+      footer={<InfinitusPairPhoneCard />}
     />
   );
 }
