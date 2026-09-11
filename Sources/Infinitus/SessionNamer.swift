@@ -131,7 +131,10 @@ final class SessionNamer: ObservableObject {
                 p.standardOutput = out
                 p.standardError = FileHandle.nullDevice
                 do { try p.run() } catch { cont.resume(throwing: error); return }
-                input.fileHandleForWriting.write(Data(prompt.utf8))
+                // A CLI that quit before reading (#637): the non-throwing
+                // `write(_:)` would raise an uncaught exception on the
+                // broken pipe; the throwing one just leaves no name.
+                try? input.fileHandleForWriting.write(contentsOf: Data(prompt.utf8))
                 try? input.fileHandleForWriting.close()
                 let timeoutItem = DispatchWorkItem { p.terminate() }
                 DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout, execute: timeoutItem)
