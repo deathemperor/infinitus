@@ -751,7 +751,13 @@ const make = Effect.gen(function* () {
       return;
     }
 
-    yield* providerService.assertConversationRollbackSupported(event.payload.threadId);
+    // Fork (#269 E): files only — no conversation rollback, so no need for
+    // the provider to support one.
+    const keepChat = event.payload.keepChat === true;
+    yield* Effect.annotateCurrentSpan({ keepChat });
+    if (!keepChat) {
+      yield* providerService.assertConversationRollbackSupported(event.payload.threadId);
+    }
 
     const restored = yield* checkpointStore.restoreCheckpoint({
       cwd: sessionRuntime.value.cwd,
@@ -771,6 +777,40 @@ const make = Effect.gen(function* () {
     // Refresh the workspace entry index so the @-mention file picker
     // reflects the reverted filesystem state.
     yield* workspaceEntries.refresh(sessionRuntime.value.cwd);
+
+    // Fork (#269 E): the chat, the later turns and their checkpoint refs
+    // stay (a later full revert can still reach them); one activity says
+    // what happened to the files.
+    if (keepChat) {
+      yield* orchestrationEngine
+        .dispatch({
+          type: "thread.activity.append",
+          commandId: yield* serverCommandId("checkpoint-files-restored"),
+          threadId: event.payload.threadId,
+          activity: {
+            id: yield* serverEventId,
+            tone: "info",
+            kind: "checkpoint.restored",
+            summary: `Files restored to turn ${event.payload.turnCount}`,
+            payload: { turnCount: event.payload.turnCount },
+            turnId: null,
+            createdAt: now,
+          },
+          createdAt: now,
+        })
+        .pipe(
+          Effect.catch((error) =>
+            appendRevertFailureActivity({
+              threadId: event.payload.threadId,
+              turnCount: event.payload.turnCount,
+              detail: error.message,
+              createdAt: now,
+            }),
+          ),
+          Effect.asVoid,
+        );
+      return;
+    }
 
     const rolledBackTurns = Math.max(0, currentTurnCount - event.payload.turnCount);
     if (rolledBackTurns > 0) {

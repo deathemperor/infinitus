@@ -1605,9 +1605,10 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 }
 
-/** Fork (#270 E1/E2): what a revert from a user message touches; `fork`
-    leaves this thread alone and opens a new one from here. */
-export type TimelineRevertMode = "files" | "chat" | "fork";
+/** Fork (#270 E1/E2, #269 E): what a revert from a user message touches;
+    `restore-files` keeps the chat, `fork` leaves this thread alone and opens
+    a new one from here. */
+export type TimelineRevertMode = "files" | "restore-files" | "chat" | "fork";
 
 function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
   const ctx = use(TimelineRowCtx);
@@ -1641,6 +1642,9 @@ function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
       <MenuPopup align="end">
         <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "files")}>
           Revert files and chat
+        </MenuItem>
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "restore-files")}>
+          Restore files only
         </MenuItem>
         <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "chat")}>
           Rewind chat only
