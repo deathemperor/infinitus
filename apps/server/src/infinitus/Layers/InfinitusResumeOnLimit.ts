@@ -18,6 +18,7 @@ import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
@@ -64,6 +65,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const infinitus = yield* InfinitusService;
     const settings = yield* ServerSettingsService;
+    const turnStartGate = yield* TurnStartGate;
     const crypto = yield* Crypto.Crypto;
     const randomUUID = crypto.randomUUIDv4;
     const commandId = randomUUID.pipe(Effect.map(CommandId.make));
@@ -202,15 +204,24 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             }
           }
           lastResumeAt.set(stop.threadId, now);
-          yield* resume(stop, target).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning("infinitus.resume-on-limit.failed", {
-                threadId: stop.threadId,
-                turnId: stop.turnId,
-                cause: Cause.pretty(cause),
-              }),
+          // Fork (#616): a background thread's resume waits with the gate while
+          // its fleet reads low; run later, it resumes on the account live then.
+          yield* turnStartGate.start({
+            threadId: stop.threadId,
+            replacesActiveTurn: stop.kind === "parked",
+            run: Effect.gen(function* () {
+              const current = resumeTarget(stop, yield* infinitus.snapshot) ?? target;
+              yield* resume(stop, current);
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("infinitus.resume-on-limit.failed", {
+                  threadId: stop.threadId,
+                  turnId: stop.turnId,
+                  cause: Cause.pretty(cause),
+                }),
+              ),
             ),
-          );
+          });
         }
       });
 

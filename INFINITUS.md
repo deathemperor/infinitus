@@ -101,9 +101,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
   (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
-  (#710). `TurnStartGatePassthrough` in `RuntimeDependenciesLive` (#616).
-  `CaptureStore.layer` (#433) in the state-dir file services'
-  `Layer.mergeAll` beside `Keybindings.layer`.
+  (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
+  and the `TurnStartGate` it implements. `CaptureStore.layer` (#433) in the
+  state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does
@@ -487,6 +487,20 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (kept for later; the gate captures the caller's context and runs it under
   that later). The passthrough layer is the server's default; the hold layer
   replaces it.
+- `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+
+  `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) —
+  session priority mode (#616): the gate that holds a background thread's
+  start (the user's send, an async answer, resume-on-limit, the post-update
+  continuation) while the fleet its driver spends on publishes `headroom.state`
+  `low`/`critical`, and runs it when the fleet reads `abundant`, the thread is
+  pinned, `release(threadId)` ("Run now"), or a real poll carries no verdict
+  for the fleet any more (mode turned off; an unreachable app keeps the hold).
+  Pinned threads and a thread mid-turn are never held; a fleet that publishes
+  no `headroom` (mode off, an older build) never holds. Held starts live in memory, oldest first, released
+  2 s apart; one `infinitus.thread.held` / `infinitus.thread.released` work-log
+  row per hold, which the web derives the held state from. The snapshot
+  subscription is held only while a start is. Archived or deleted while held:
+  forgotten. A restart forgets held starts; the message is still in the thread.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
