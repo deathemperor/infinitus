@@ -861,6 +861,71 @@ describe("events", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
+  effectIt.effect("asks only for what followed the last id when the build offers --after", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const manifest = manifestWithEvents();
+      yield* stub.setResult("manifest", {
+        ...manifest,
+        commands: manifest.commands.map((command) =>
+          (command as { name: string }).name === "events"
+            ? { ...(command as object), options: ["--after <event id>"] }
+            : command,
+        ),
+      });
+      const row = (id: string, at: string, kind: string) => ({ ...switched(at), id, kind });
+      // The first read seeds from the whole log: no id to ask after yet.
+      yield* stub.setResult("events", [
+        row("a", "2026-09-10T08:00:00Z", "switch"),
+        row("b", "2026-09-10T08:01:00Z", "limit"),
+      ]);
+      const infinitus = yield* InfinitusService;
+      const { queue, fiber, first } = yield* subscribe(infinitus);
+      expect(first.events).toEqual([]);
+      const seed = (yield* stub.requests).filter((request) => request.command === "events");
+      expect(seed.map((request) => request.options)).toEqual([{}]);
+
+      // From then on the poll names the newest id and takes the reply as all new.
+      yield* stub.setResult("events", {
+        after: "b",
+        known: true,
+        rows: [row("c", "2026-09-10T08:01:00Z", "revival")],
+      });
+      yield* TestClock.adjust(FAST);
+      const next = yield* Queue.take(queue);
+      expect(next.events?.map((event) => event.id)).toEqual(["c"]);
+      const incremental = (yield* stub.requests).filter((request) => request.command === "events");
+      expect(incremental.at(-1)?.options).toEqual({ after: "b" });
+
+      // Nothing new: an empty incremental reply keeps the cursor on "c".
+      yield* stub.setResult("events", { after: "c", known: true, rows: [] });
+      yield* TestClock.adjust(FAST);
+      expect((yield* Queue.take(queue)).events).toEqual([]);
+
+      // The app restarted: it does not know "c" and answers the full suffix of
+      // its new log. Only rows newer than the last one seen are fresh, and
+      // the cursor moves to the new run's ids.
+      yield* stub.setResult("events", {
+        after: "c",
+        known: false,
+        rows: [
+          row("x", "2026-09-10T08:00:30Z", "switch"),
+          row("y", "2026-09-10T08:02:00Z", "limit"),
+        ],
+      });
+      yield* TestClock.adjust(FAST);
+      expect((yield* Queue.take(queue)).events?.map((event) => event.id)).toEqual(["y"]);
+      yield* stub.setResult("events", { after: "y", known: true, rows: [] });
+      yield* TestClock.adjust(FAST);
+      yield* Queue.take(queue);
+      expect((yield* stub.requests).findLast((r) => r.command === "events")?.options).toEqual({
+        after: "y",
+      });
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
   effectIt.effect("is absent on a build whose manifest lacks the command", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;

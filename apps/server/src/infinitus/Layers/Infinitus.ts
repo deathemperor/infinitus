@@ -77,12 +77,32 @@ const decodeSessions = Schema.decodeUnknownEffect(Schema.Array(InfinitusSession)
 const decodeForecast = Schema.decodeUnknownEffect(InfinitusForecast);
 const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
 const decodeAwsLogins = Schema.decodeUnknownEffect(InfinitusAwsLogins);
-const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(InfinitusEventRow));
+/** `events` answers a bare array; with `--after <id>` (a build whose manifest
+    lists the option) an object: `known: true` carries only the rows logged
+    after that id, `known: false` (the app restarted, the id is not in this
+    run's log) the usual full suffix. */
+const EventsReply = Schema.Union([
+  Schema.Array(InfinitusEventRow),
+  Schema.Struct({
+    after: Schema.String,
+    known: Schema.Boolean,
+    rows: Schema.Array(InfinitusEventRow),
+  }),
+]);
+const decodeEvents = Schema.decodeUnknownEffect(EventsReply);
+const EVENTS_AFTER_OPTION = "--after";
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
 /** See `eventCursor`. */
 type EventCursor =
-  | { readonly kind: "ids"; readonly ids: ReadonlySet<string> }
+  | {
+      readonly kind: "ids";
+      readonly ids: ReadonlySet<string>;
+      /** The newest id seen — what `--after` asks for — and its timestamp,
+          which decides what is fresh when the app's log starts over. */
+      readonly lastId: string | undefined;
+      readonly lastAt: string;
+    }
   | { readonly kind: "at"; readonly at: string; readonly seen: ReadonlySet<string> };
 
 const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
@@ -166,8 +186,9 @@ const makeInfinitus = Effect.gen(function* () {
   const fetchCommand = <A>(
     command: string,
     decode: (input: unknown) => Effect.Effect<A, Schema.SchemaError>,
+    options?: Readonly<Record<string, string>>,
   ): Effect.Effect<Fetched<A>> =>
-    client.request({ command }).pipe(
+    client.request(options === undefined ? { command } : { command, options }).pipe(
       Effect.flatMap(decode),
       Effect.map((value): Fetched<A> => ({ kind: "value", value })),
       Effect.catchTag("InfinitusUnavailable", (error) =>
@@ -218,8 +239,16 @@ const makeInfinitus = Effect.gen(function* () {
       reply. A `None` cursor takes the whole reply as already seen; so does a
       reply whose id-lessness disagrees with an id cursor (a different build
       answered), which reseeds rather than replays. */
+  const newestAt = (rows: ReadonlyArray<InfinitusEventRow>, floor: string) =>
+    rows.reduce((latest, row) => (row.at > latest ? row.at : latest), floor);
+
+  /** `reply`: `full` is the whole log suffix without `--after` — fresh is
+      what the cursor has not seen; `incremental` is only what followed the
+      id; `reset` is the full suffix after the app restarted (it did not know
+      the id), where only rows newer than the last one seen are fresh. */
   const newEvents = Effect.fn("newEvents")(function* (
     rows: ReadonlyArray<InfinitusEventRow>,
+    reply: "full" | "incremental" | "reset",
   ): Effect.fn.Return<ReadonlyArray<InfinitusEvent>> {
     const cursor = yield* Ref.get(eventCursor);
     const ids = rows.flatMap((row) => (typeof row.id === "string" ? [row.id] : []));
@@ -227,8 +256,32 @@ const makeInfinitus = Effect.gen(function* () {
     let fresh: ReadonlyArray<InfinitusEventRow> = [];
     if (Option.isSome(cursor)) {
       const known = cursor.value;
-      if (known.kind === "ids" && carriesIds) {
+      if (known.kind === "ids" && carriesIds && reply === "incremental") {
         fresh = rows.filter((row) => row.id !== undefined && !known.ids.has(row.id));
+        const merged = new Set([...known.ids, ...ids]);
+        // Bounded: only the newest ids matter for dedupe once `--after` drives the reads.
+        const kept = new Set([...merged].slice(-500));
+        yield* Ref.set(
+          eventCursor,
+          Option.some({
+            kind: "ids",
+            ids: kept,
+            lastId: ids.at(-1) ?? known.lastId,
+            lastAt: newestAt(rows, known.lastAt),
+          }),
+        );
+        const first = yield* Ref.getAndUpdate(eventSequence, (n) => n + fresh.length);
+        return fresh.map((row, index) => ({ ...row, id: row.id ?? `${row.at}#${first + index}` }));
+      }
+      if (known.kind === "ids" && carriesIds) {
+        // `reset`: the app's log started over (ids hold for one run), so only
+        // rows newer than the last one seen are fresh; `full` dedupes by id.
+        fresh = rows.filter(
+          (row) =>
+            row.id !== undefined &&
+            !known.ids.has(row.id) &&
+            (reply !== "reset" || row.at > known.lastAt),
+        );
       } else if (known.kind === "at") {
         fresh = rows.filter(
           (row) =>
@@ -238,7 +291,17 @@ const makeInfinitus = Effect.gen(function* () {
       }
     }
     if (carriesIds) {
-      yield* Ref.set(eventCursor, Option.some({ kind: "ids", ids: new Set(ids) }));
+      const previousAt =
+        Option.isSome(cursor) && cursor.value.kind === "ids" ? cursor.value.lastAt : "";
+      yield* Ref.set(
+        eventCursor,
+        Option.some({
+          kind: "ids",
+          ids: new Set(ids),
+          lastId: ids.at(-1),
+          lastAt: newestAt(rows, previousAt),
+        }),
+      );
     } else {
       const newest = rows.reduce<string | null>(
         (latest, row) => (latest === null || row.at > latest ? row.at : latest),
@@ -287,10 +350,30 @@ const makeInfinitus = Effect.gen(function* () {
     // Absent on a build without the command and on a cycle whose reply did
     // not decode; otherwise only what the log gained since the previous poll.
     let events: InfinitusSnapshot["events"];
-    if (knownCommands.some((entry) => entry.name === EVENTS_COMMAND)) {
-      const fetched = yield* fetchCommand(EVENTS_COMMAND, decodeEvents);
+    const eventsCommand = knownCommands.find((entry) => entry.name === EVENTS_COMMAND);
+    if (eventsCommand !== undefined) {
+      // Only what followed the last id, when the build offers it (#346: the
+      // 5 s poll no longer re-serialises the whole log).
+      const cursor = yield* Ref.get(eventCursor);
+      const after =
+        eventsCommand.options.some((option) => option.startsWith(EVENTS_AFTER_OPTION)) &&
+        Option.isSome(cursor) &&
+        cursor.value.kind === "ids"
+          ? cursor.value.lastId
+          : undefined;
+      const fetched = yield* fetchCommand(
+        EVENTS_COMMAND,
+        decodeEvents,
+        after === undefined ? undefined : { after },
+      );
       if (fetched.kind === "unavailable") return yield* goUnavailable(fetched.reason);
-      if (fetched.kind === "value") events = yield* newEvents(fetched.value);
+      if (fetched.kind === "value") {
+        const reply = fetched.value;
+        events =
+          "rows" in reply
+            ? yield* newEvents(reply.rows, reply.known ? "incremental" : "reset")
+            : yield* newEvents(reply, "full");
+      }
     }
     const now = yield* Clock.currentTimeMillis;
     const slowDue = now >= (yield* Ref.get(nextSlowAtMillis));

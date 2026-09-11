@@ -349,7 +349,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   annotates `infinitus.command`, `infinitus.args` (joined, cut at 200
   chars), `infinitus.options` (key NAMES only, never a value) and
   `infinitus.effect` from the manifest; `InfinitusControlClient.request`
-  and the `ws.rpc.infinitus.command` span carry the verb alone.
+  and the `ws.rpc.infinitus.command` span carry the verb alone. The poller
+  reads `events --after <last id>` when the manifest lists the option
+  (#346): `known: true` replies are all new, `known: false` (the app
+  restarted) re-seeds the cursor and publishes only rows newer than the last
+  one seen; builds without the option get the full-list read as before.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
   resume-on-limit for the threads this server runs (#648), the fork's
   counterpart to native's terminal nudge: the Claude adapter's parked-turn
