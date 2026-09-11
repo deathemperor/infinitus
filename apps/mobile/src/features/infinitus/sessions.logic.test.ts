@@ -3,11 +3,13 @@ import type {
   InfinitusSession,
   InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
+import { ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   attentionSessionCount,
   macSessionsView,
+  moveOutcome,
   sessionChoiceCommand,
   sessionMenuActions,
   sessionMenuChoice,
@@ -15,6 +17,7 @@ import {
 } from "./sessions.logic";
 
 const NOW = Date.parse("2026-09-10T12:00:00Z");
+const threadId = ThreadId.make("thread-1");
 
 function session(overrides: Partial<InfinitusSession> = {}): InfinitusSession {
   return { pid: 1, cwd: "/work/proj", kind: "interactive", status: "idle", ...overrides };
@@ -92,6 +95,36 @@ describe("session menu", () => {
       ["mode:acceptEdits", "on"],
       ["mode:bypassPermissions", "off"],
     ]);
+  });
+
+  it("offers the move only to a row with a session id (#648)", () => {
+    const moveable = macSessionsView(
+      snapshot({ sessions: [session({ pid: 77, sessionId: "s-77" })], commands: ALL_VERBS }),
+      NOW,
+    )!.rows[0]!;
+    const actions = sessionMenuActions(moveable, { setMode: true, show: true, nudge: true });
+    expect(actions.map((action) => action.id)).toEqual(["show", "nudge", "move", "mode"]);
+    expect(sessionMenuActions(moveable, { setMode: false, show: false, nudge: false })).toEqual([
+      { id: "move", title: "Move to a thread", image: "arrow.up.right" },
+    ]);
+    expect(sessionMenuChoice("move")).toEqual({ kind: "move" });
+  });
+
+  it("reads where the import put the session, else why it did not", () => {
+    expect(
+      moveOutcome(
+        { importedCount: 1, skippedCount: 0, threads: [{ providerSessionId: "s-77", threadId }] },
+        "s-77",
+      ),
+    ).toEqual({ threadId });
+    expect(moveOutcome({ importedCount: 0, skippedCount: 1 }, "s-77")).toEqual({
+      threadId: null,
+      reason: "The session's transcript could not be imported; the server log has the reason.",
+    });
+    expect(moveOutcome({ importedCount: 0, skippedCount: 0, threads: [] }, "s-77")).toEqual({
+      threadId: null,
+      reason: "No transcript of this session was found in its folder.",
+    });
   });
 
   it("maps ids back to choices and choices to commands by pid", () => {

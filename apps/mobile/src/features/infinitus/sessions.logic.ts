@@ -1,5 +1,7 @@
 import type { MenuAction } from "@react-native-menu/menu";
 import {
+  canMoveSession,
+  movedThreadId,
   nudgeCommandArgs,
   SESSION_PERMISSION_MODES,
   type SessionActions,
@@ -11,6 +13,7 @@ import {
   sessionRows,
   showSessionCommandArgs,
 } from "@t3tools/client-runtime/state/infinitusSessions";
+import type { AgentSessionImportResult, ThreadId } from "@t3tools/contracts";
 import type { InfinitusCommandInput, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 
 /** What one Mac's Sessions card draws: the shared rows (the ones needing a
@@ -60,8 +63,10 @@ const MODE_SYMBOL: Record<SessionPermissionMode, string> = {
 };
 
 /** The row's context menu: "Open on the Mac" and "Nudge" when the manifest has
-    the verbs, then a submenu of permission modes with the current one checked.
-    Ids: `show`, `nudge`, `mode:<mode>`. Empty when the build offers nothing. */
+    the verbs, "Move to a thread" when the row carries a session id (a server
+    RPC, not a socket verb), then a submenu of permission modes with the
+    current one checked. Ids: `show`, `nudge`, `move`, `mode:<mode>`. Empty
+    when the build offers nothing. */
 export function sessionMenuActions(
   row: SessionRowModel,
   actions: SessionActions,
@@ -69,6 +74,9 @@ export function sessionMenuActions(
   const items: MenuAction[] = [];
   if (actions.show) items.push({ id: "show", title: "Open on the Mac", image: "macwindow" });
   if (actions.nudge) items.push({ id: "nudge", title: "Nudge", image: "play.circle" });
+  if (canMoveSession(row)) {
+    items.push({ id: "move", title: "Move to a thread", image: "arrow.up.right" });
+  }
   if (actions.setMode) {
     items.push({
       id: "mode",
@@ -87,12 +95,13 @@ export function sessionMenuActions(
 export type SessionMenuChoice =
   | { readonly kind: "show" }
   | { readonly kind: "nudge" }
+  | { readonly kind: "move" }
   | { readonly kind: "mode"; readonly mode: SessionPermissionMode };
 
 /** A menu id back to the action it names; null for the submenu's own row and
     anything unknown. */
 export function sessionMenuChoice(id: string): SessionMenuChoice | null {
-  if (id === "show" || id === "nudge") return { kind: id };
+  if (id === "show" || id === "nudge" || id === "move") return { kind: id };
   if (!id.startsWith("mode:")) return null;
   const mode = id.slice("mode:".length);
   const option = SESSION_PERMISSION_MODES.find((candidate) => candidate.mode === mode);
@@ -100,10 +109,10 @@ export function sessionMenuChoice(id: string): SessionMenuChoice | null {
 }
 
 /** The command a choice sends for a row, or null when there is nothing to send
-    (the mode already set). */
+    (the mode already set). A move is not a command; the card handles it. */
 export function sessionChoiceCommand(
   row: SessionRowModel,
-  choice: SessionMenuChoice,
+  choice: Exclude<SessionMenuChoice, { kind: "move" }>,
 ): InfinitusCommandInput | null {
   let args: SessionCommandArgs;
   switch (choice.kind) {
@@ -120,3 +129,24 @@ export function sessionChoiceCommand(
   }
   return { command: args.command, args: [...args.args], options: {} };
 }
+
+/** Where the import put the session, else why it did not. With a filter,
+    `skippedCount` counts only the requested transcripts: found but not
+    importable (the server log says why), else not found at all. */
+export function moveOutcome(
+  result: AgentSessionImportResult,
+  sessionId: string,
+): { readonly threadId: ThreadId } | { readonly threadId: null; readonly reason: string } {
+  const threadId = movedThreadId(result, sessionId);
+  if (threadId !== null) return { threadId };
+  return {
+    threadId: null,
+    reason:
+      result.skippedCount > 0
+        ? "The session's transcript could not be imported; the server log has the reason."
+        : "No transcript of this session was found in its folder.",
+  };
+}
+
+/** The row's line once moved: the terminal session is never touched. */
+export const MOVED_NOTE = "Moved to a thread. Close the terminal session on the Mac when done.";
