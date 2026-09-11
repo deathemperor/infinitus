@@ -33,6 +33,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `nightly` from `main`. The fork's desktop releases are prereleases tagged
   `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
   channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
+  On that channel an available update downloads itself
+  (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
+  behind a click, and a click that raced a relaunch started over.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
@@ -407,6 +410,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Mac's Sessions card (`features/infinitus/InfinitusSessions.tsx` +
   `sessions.logic.ts`, rows from
   `@t3tools/client-runtime/state/infinitusSessions`; `session-mode` per row).
+  Its row menu's "Move to a thread" (#648, rows with a session id) is the
+  web flow on the phone: the cwd becomes a project when it is not one
+  (`projectEnvironment.create` + a `waitForProject` in `state/entities.ts`),
+  `agentSessions.import` (`apps/mobile/src/state/agentSessions.ts`) runs
+  with the row's id, then the Thread screen opens; the row keeps a "close
+  the terminal session" line, nothing reaches the Infinitus socket. No bulk
+  "Move idle" on the phone.
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -475,7 +485,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   terminal session is never killed or typed into. The pure parts
   (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
   shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
-  the row-model module for mobile later.
+  the row-model module; mobile's Sessions card uses them (above).
 
 - `packages/contracts/src/agentSessions.ts`,
   `apps/server/src/project/AgentSessionScanner.ts`,

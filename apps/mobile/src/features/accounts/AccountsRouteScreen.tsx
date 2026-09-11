@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -77,6 +77,7 @@ function useNowMinute(): number {
 
 function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boolean }) {
   const { mac } = props;
+  const navigation = useNavigation();
   const view = useEnvironmentQuery(
     infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
@@ -123,7 +124,22 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         </SettingsSection>
       ))}
       {model.forecast ? <ForecastStrip forecast={model.forecast} /> : null}
-      {sessions ? <InfinitusSessions environmentId={mac.environmentId} view={sessions} /> : null}
+      {sessions ? (
+        <InfinitusSessions
+          environmentId={mac.environmentId}
+          view={sessions}
+          // The settings sheet route itself becomes the thread (the new-task
+          // draft leaves its sheet the same way), so nothing stacks on the sheet.
+          onOpenThread={(threadId) =>
+            (navigation.getParent() ?? navigation).dispatch(
+              StackActions.replace("Thread", {
+                environmentId: String(mac.environmentId),
+                threadId: String(threadId),
+              }),
+            )
+          }
+        />
+      ) : null}
     </View>
   );
 }
