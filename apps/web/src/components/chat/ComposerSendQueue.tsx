@@ -1,23 +1,24 @@
+import type { OrchestrationQueuedTurn } from "@t3tools/contracts";
 import { ArrowDownIcon, ArrowUpIcon, ClockIcon, PenLineIcon, SendIcon, XIcon } from "lucide-react";
 import { memo } from "react";
 
 import { Button } from "~/components/ui/button";
-import { type PromptStashEntry } from "../../promptStashStore";
 import { ComposerBanner } from "./ComposerBanner";
-import { queuedEntrySnippet } from "./composerSendQueue.logic";
+import { queuedTurnSnippet } from "./composerSendQueue.logic";
 
 /**
- * The messages waiting for this thread's turn to finish (#270 F), under the
- * composer. Each row can leave now (steer), go back into the composer for
- * editing, move within the queue, or be dropped.
+ * The messages the server holds for this thread until its turn finishes
+ * (#270 F, #806), under the composer, in send order. Each row can leave now
+ * (steer), go back into the composer for editing, move within the queue, or
+ * be dropped.
  */
 export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
-  entries: ReadonlyArray<PromptStashEntry>;
+  entries: ReadonlyArray<OrchestrationQueuedTurn>;
   isRunning: boolean;
-  onSendNow: (entry: PromptStashEntry) => void;
-  onEdit: (entry: PromptStashEntry) => void;
-  onMove: (entry: PromptStashEntry, direction: "earlier" | "later") => void;
-  onRemove: (entry: PromptStashEntry) => void;
+  onSendNow: (entry: OrchestrationQueuedTurn) => void;
+  onEdit: (entry: OrchestrationQueuedTurn) => void;
+  onMove: (entry: OrchestrationQueuedTurn, direction: "earlier" | "later") => void;
+  onRemove: (entry: OrchestrationQueuedTurn) => void;
 }) {
   const { entries, isRunning, onSendNow, onEdit, onMove, onRemove } = props;
   if (entries.length === 0) return null;
@@ -36,16 +37,18 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
       </ComposerBanner.Row>
       <ComposerBanner.Children render={<ul role="list" />} aria-label="Queued messages">
         {entries.map((entry, index) => {
-          const snippet = queuedEntrySnippet(entry);
-          const saving = entry.pendingImageCount ? entry.pendingImageCount > 0 : false;
+          const snippet = queuedTurnSnippet(entry);
           return (
-            <ComposerBanner.Row render={<li />} key={entry.id} data-queued-message={entry.id}>
+            <ComposerBanner.Row
+              render={<li />}
+              key={entry.queueId}
+              data-queued-message={entry.queueId}
+            >
               <ComposerBanner.Icon />
               <ComposerBanner.Content>
                 <span className="min-w-0 flex-1 truncate text-foreground/80">{snippet}</span>
               </ComposerBanner.Content>
               <ComposerBanner.Actions>
-                {saving ? <span className="shrink-0 text-muted-foreground">saving…</span> : null}
                 {entries.length > 1 ? (
                   <>
                     <Button
@@ -73,7 +76,6 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  disabled={saving}
                   aria-label={`Edit queued message: ${snippet}`}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => onEdit(entry)}
@@ -83,7 +85,6 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  disabled={saving}
                   aria-label={`Send now: ${snippet}`}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => onSendNow(entry)}

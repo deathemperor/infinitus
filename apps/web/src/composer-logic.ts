@@ -11,7 +11,8 @@ import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "./lib/terminalContext";
 
 export type ComposerTriggerKind = "path" | "slash-command" | "skill";
 export type ComposerSlashCommand = "model" | "plan" | "default";
-export type ComposerSubmissionIntent = "foreground" | "background";
+/** `queue` (#806): the message waits on the server for the running turn to finish. */
+export type ComposerSubmissionIntent = "foreground" | "background" | "queue";
 
 export interface ComposerTrigger {
   kind: ComposerTriggerKind;

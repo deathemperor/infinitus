@@ -56,10 +56,10 @@ const StashEntrySchema = Schema.Struct({
    */
   pendingImageCount: Schema.optionalKey(Schema.Number),
   /**
-   * Fork (#270 F): a message queued to send when this thread's running turn
-   * finishes, keyed by the scoped thread key. Queued entries share the stash's
-   * storage and image handling but never show in the stash menu, never get
-   * evicted for room, and drain oldest first.
+   * Legacy (#270 F, before #806): a message queued to send when this thread's
+   * running turn finished, keyed by the scoped thread key. Such entries never
+   * show in the stash menu and are never evicted for room; the queue lives on
+   * the server now, and `useLegacyQueueMigration` moves them there once.
    */
   queuedFor: Schema.optionalKey(Schema.String),
 });
@@ -216,8 +216,11 @@ interface PromptStashStoreState {
    * reload would resurrect the entry.
    */
   takeEntry: (entryId: string) => { entry: PromptStashEntry | null; durable: boolean };
-  /** Fork (#270 F): swaps a queued entry with its neighbour in the same thread's queue. */
-  moveEntry: (entryId: string, direction: "earlier" | "later") => void;
+  /**
+   * Fork (#806): a legacy queued entry the server refused (its thread is gone
+   * or archived) becomes a plain stash entry, so the prompt stays reachable.
+   */
+  unqueueEntry: (entryId: string) => void;
   /**
    * Attaches the encoded images to an entry written earlier by `stashEntry`,
    * clearing its pending count. Returns attached=false when the entry is gone
@@ -258,27 +261,14 @@ export const usePromptStashStore = create<PromptStashStoreState>()((set, get) =>
     set(() => ({ entries: nextEntries }));
     return { evicted, written: true, durable };
   },
-  moveEntry: (entryId, direction) => {
+  unqueueEntry: (entryId) => {
     const entries = get().entries;
     const index = entries.findIndex((candidate) => candidate.id === entryId);
-    const entry = index === -1 ? undefined : entries[index];
-    if (!entry) return;
-    // Entries are stored newest first; the queue reads oldest first, so
-    // "earlier in the queue" is a higher index among the same thread's rows.
-    const step = direction === "earlier" ? 1 : -1;
-    let target = index + step;
-    while (
-      target >= 0 &&
-      target < entries.length &&
-      entries[target]?.queuedFor !== entry.queuedFor
-    ) {
-      target += step;
-    }
-    const neighbour = target >= 0 && target < entries.length ? entries[target] : undefined;
-    if (!neighbour) return;
+    const existing = index === -1 ? undefined : entries[index];
+    if (!existing || existing.queuedFor === undefined) return;
+    const { queuedFor: _queuedFor, ...unqueued } = existing;
     const nextEntries = [...entries];
-    nextEntries[index] = neighbour;
-    nextEntries[target] = entry;
+    nextEntries[index] = unqueued;
     persistEntries(nextEntries);
     set(() => ({ entries: nextEntries }));
   },
