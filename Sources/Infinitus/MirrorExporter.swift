@@ -103,7 +103,7 @@ actor MirrorExporter {
         let shownIds = Set(shown.map(\.sessionId))
         tails = tails.filter { shownIds.contains($0.key) }
         tailProgress = tailProgress.filter { shownIds.contains($0.key) }
-        // Cash column (#9 phase D1a): the cache UsagePane.swift's refresh
+        // Cash column (#9 phase D1a): the cache UsageModel.swift's refresh
         // already writes, verbatim — no new subprocess, no engine call.
         let usageJSON = try? Data(contentsOf: UsageModel.cacheURL)
         let perMinute = TokenRate.perMinute(progressByPid, now: now)

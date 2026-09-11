@@ -26,7 +26,7 @@ final class AppModel: ObservableObject {
     /// Per-engine honesty note for the fleet header (proxy: routing
     /// strategy that ignores priority tiers).
     @Published var fleetCaveats: [String: String] = [:]
-    /// The cswap cash column's source (UsagePane.swift owns the scan);
+    /// The cswap cash column's source (UsageModel.swift owns the scan);
     /// the cswap fleet mirrors it, other engines report their own.
     var usageModel: UsageModel? {
         didSet {
@@ -3247,9 +3247,9 @@ extension AppModel: FleetModel {
     /// (the forecast dashboard), selected through the same notification
     /// the playground's `playctl settings` uses.
     func openForecast() {
+        // The Utilization pane is the desktop app's now (#654); Settings
+        // is what the Mac still opens.
         showSettings?()
-        NotificationCenter.default.post(name: Notification.Name("infinitus.selectPane"),
-                                        object: "Utilization")
     }
 
     /// The primary fleet's engine decides what the mac-only panes may do.
