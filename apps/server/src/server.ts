@@ -300,6 +300,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(CheckpointReactorLive),
   Layer.provideMerge(ThreadDeletionReactorLive),
   Layer.provideMerge(ThreadSettlementReactor.layer),
+  // Fork (#269 A): queues a fix round for a babysat thread's red pull
+  // request through `thread.turn.queue`; reads the sync reactor below.
+  Layer.provideMerge(InfinitusBabysitLive),
   Layer.provideMerge(PullRequestSyncReactor.layer),
   Layer.provideMerge(ThreadPullRequestReactor.layer),
   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
@@ -309,9 +312,6 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#806): sends queued messages when their thread is idle, not held
   // and not paused; needs both layers below.
   Layer.provideMerge(InfinitusTurnQueueLive),
-  // Fork (#269 A): queues a fix round for a babysat thread's red pull
-  // request; reads the sync reactor and writes through the queue above.
-  Layer.provideMerge(InfinitusBabysitLive),
   // Fork (#743): pauses background turns running on a fleet that reads
   // critical headroom, and continues them through the gate below.
   Layer.provideMerge(InfinitusSessionInterruptLive),
