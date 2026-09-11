@@ -12,6 +12,7 @@ import { environmentShell } from "../../state/shell";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
 import { resolveDeepLinkProject } from "./deepLink.logic";
+import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
  * Mounted once in the app shell (#270 D): the link the desktop was opened
@@ -41,6 +42,13 @@ export function DeepLinkCoordinator() {
       const ref = resolveThreadRouteRef(link);
       if (ref === null) return;
       await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(ref) });
+      return;
+    }
+    if (link.kind === "join") {
+      // The code goes to the Team page's Join field and leaves only when the
+      // user presses Request to join; nothing joins on its own.
+      usePendingTeamJoinStore.getState().offer(link.link);
+      await navigate({ to: "/settings/infinitus/team" });
       return;
     }
     const project = resolveDeepLinkProject(readProjects(), link.project);
