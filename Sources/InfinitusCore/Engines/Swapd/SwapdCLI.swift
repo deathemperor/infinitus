@@ -143,6 +143,12 @@ public struct SwapdCLI: Sendable {
         try await listVerb(["list"], provider: nil)
     }
 
+    /// The provider's switch log, newest last; the view takes the tail.
+    public func history(provider: Provider) async throws -> SwapdHistory {
+        try JSONDecoder().decode(SwapdHistory.self, from: await run(
+            ["history", "--json", "--provider", Self.providerID(provider)]))
+    }
+
     /// Force one usage fetch past the engine's serve floor (`--slot n`), or
     /// every stale slot without one, then answer with the fresh list.
     public func refresh(provider: Provider, slot: Int? = nil) async throws -> SwapdList {

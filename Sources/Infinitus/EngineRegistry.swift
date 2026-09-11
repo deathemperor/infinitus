@@ -5,7 +5,7 @@ import InfinitusCore
 /// The enabled engines and the fleets they last reported (#8). One
 /// FleetState per (engine, provider), created on first sight and kept
 /// for the app's life so its animation ticks survive across snapshots.
-/// Order: Claude fleets first (cswap before anything else), then the
+/// Order: Claude fleets first (swapd before anything else), then the
 /// rest in registration order.
 @MainActor
 final class EngineRegistry: ObservableObject {
@@ -26,7 +26,7 @@ final class EngineRegistry: ObservableObject {
     }
 
     /// The Claude fleet the popup chrome, title, resume nudge and push
-    /// triggers reason about — cswap's when cswap is on.
+    /// triggers reason about — swapd's when swapd is on.
     var primary: FleetState? { fleets.first { $0.provider == .claude } }
 
     /// Find or create the state for a reported fleet.
@@ -36,9 +36,6 @@ final class EngineRegistry: ObservableObject {
             preconditionFailure("fleet from unregistered engine \(fleet.engineID)")
         }
         let state = FleetState(fleet: fleet, engine: engine, host: host)
-        if fleet.engineID == CswapEngine.engineID, let usage = host.usageModel {
-            state.follow(usage)
-        }
         // Row changes must re-render whoever observes the host (the
         // popup chrome, the title); the host guards the return trip.
         sinks[state.id] = state.objectWillChange.sink { [weak self] _ in

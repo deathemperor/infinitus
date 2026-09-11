@@ -10,7 +10,7 @@
 #
 # Everything the app could otherwise reach into is redirected under $state:
 # the Claude config dir, the profiles list, the team dir and the engine
-# (tools/demo-cswap — fabricated fleet, no credentials, no network), and the
+# (tools/demo-swapd — fabricated fleet, no credentials, no network), and the
 # control socket is /tmp/t3fix.sock, never the real app's. The real
 # Infinitus.app is untouched.
 set -euo pipefail
@@ -28,7 +28,7 @@ domain=Infinitus   # the unbundled debug binary's defaults domain, never run.inf
 stop() {
     # The app supervises the demo engine, so its children go too — by PID,
     # walking down from the recorded app pid. Never by pattern: a
-    # `pkill -f demo-cswap` would also kill a concurrent tools/e2e.sh run's
+    # `pkill -f demo-swapd` would also kill a concurrent tools/e2e.sh run's
     # own engine child.
     if [ -f "$state/app.pid" ]; then
         app=$(cat "$state/app.pid")
@@ -154,7 +154,7 @@ INFINITUS_CONTROL_SOCKET=$sock \
 INFINITUS_APP_SUPPORT=$state/app-support \
 INFINITUS_MIRROR_SNAPSHOT=$state/mirror-snapshot.json \
 CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR \
-INFINITUS_CSWAP=$root/tools/demo-cswap \
+INFINITUS_SWAPD_CLI=$root/tools/demo-swapd \
 INFINITUS_DEMO_STATE=$state/demo-state.json \
 INFINITUS_PROFILES=$state/profiles.json \
 INFINITUS_TEAM_DIR=$state/team \

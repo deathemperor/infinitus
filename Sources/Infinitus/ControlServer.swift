@@ -521,7 +521,7 @@ final class ControlServer {
             guard r.args.count >= 3, ["on", "off"].contains(r.args[2]) else { throw Fail("usage: prefer <fleet> <n> on|off") }
             guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
             guard account.preferred != nil else {
-                throw Fail("the installed cswap has no autoswitch.preferred setting (claude-swap PR #312)")
+                throw Fail("the engine reports no pick-first flag for \(fleet.id)")
             }
             try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on")
             await model.refreshSnapshot()
@@ -590,7 +590,7 @@ final class ControlServer {
             }
             if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
-            } else if fleet.engineID == CswapEngine.engineID {
+            } else if fleet.capabilities.contains(.addCurrent) {
                 model.addFirstAccount()
             } else {
                 throw Fail("\(key) has no sign-in flow")
@@ -630,7 +630,7 @@ final class ControlServer {
             if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
                                       relogin: relogin, headless: true)
-            } else if fleet.engineID == CswapEngine.engineID {
+            } else if fleet.capabilities.contains(.addCurrent) {
                 flow.start(model: model, relogin: relogin, headless: true)
             } else {
                 throw Fail("\(key) has no sign-in flow")
@@ -987,7 +987,7 @@ final class ControlServer {
 
         case "engine":
             guard r.args.count == 2, ["on", "off"].contains(r.args[1]) else {
-                throw Fail("usage: engine cswap|swapd|cliproxy|9router on|off")
+                throw Fail("usage: engine swapd|cliproxy|9router on|off")
             }
             let on = r.args[1] == "on"
             let changed: Bool
@@ -1133,8 +1133,6 @@ final class ControlServer {
             version: info["CFBundleShortVersionString"] as? String ?? "dev",
             sha: info["InfinitusGitSHA"] as? String ?? info["CFBundleVersion"] as? String ?? "dev",
             engines: [
-                "cswap": EngineStatus(enabled: model.cswapEnabled, registered: model.cswapRegistered,
-                                      keyPresent: nil),
                 "swapd": EngineStatus(enabled: model.swapdEnabled, registered: model.swapdRegistered,
                                       keyPresent: nil),
                 "cliproxy": EngineStatus(enabled: model.cliproxyEnabled,

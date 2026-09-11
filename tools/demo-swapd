@@ -124,12 +124,22 @@ def provider_view(st, refreshed_slot=None):
         return {"provider": "claude", "installed": True, "accounts": []}
     accounts = apply_overrides(fleet(st["active"]), st)
     if refreshed_slot is not None:
+        # A forced fetch (refresh/ignite) sees the window the run just
+        # opened: fresh 5h clock, nothing used — distinguishable from the
+        # one `list` was serving (tools/e2e.sh asserts on it).
         now = iso(0)
         for a in accounts:
             if refreshed_slot == "all" or a["slot"] == refreshed_slot:
                 a["fetchedAt"] = now; a["ageSeconds"] = 0.0
+                for w in a["windows"]:
+                    if w["kind"] == "5h":
+                        w["pct"] = 0.0; w["resetsAt"] = iso(5); w.pop("pace", None)
+    order = st.get("order")
+    if order:
+        by_slot = {a["slot"]: a for a in accounts}
+        accounts = [by_slot[n] for n in order if n in by_slot] + [a for a in accounts if a["slot"] not in order]
     view = {"provider": "claude", "installed": True, "activeSlot": st["active"],
-            "nextCandidate": 4 if st["active"] != 4 else 1, "accounts": accounts}
+            "nextCandidate": next_candidate(st), "accounts": accounts}
     if st.get("scenario") == "alldead" or os.environ.get("SHIM_ALLDEAD"):
         # Every window maxed: no viable candidate, echo recovers first.
         for a in accounts:
@@ -138,6 +148,9 @@ def provider_view(st, refreshed_slot=None):
         view.pop("nextCandidate", None)
         view["nextRecovery"] = {"slot": 5, "at": iso(0.9)}
     return view
+
+def next_candidate(st):
+    return 4 if st["active"] != 4 else 1
 
 def list_payload(refreshed_slot=None):
     return {"schemaVersion": 1, "providers": [provider_view(state(), refreshed_slot)]}
@@ -188,9 +201,38 @@ elif cmd == "ignite":
 elif cmd == "switch":
     st = state()
     n = slot_arg()
-    st["active"] = n if n is not None else (4 if st["active"] != 4 else 1)
+    st["active"] = n if n is not None else next_candidate(st)
     save(st)
     print(json.dumps(list_payload()))
+elif cmd == "rotate":
+    st = state()
+    st["active"] = next_candidate(st)
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "reorder":
+    # Every slot exactly once, the way swapd insists.
+    st = state()
+    wanted = [int(x) for x in rest if x.lstrip("-").isdigit()]
+    have = sorted(a["slot"] for a in fleet(st["active"]))
+    if sorted(wanted) != have:
+        err("invalid-argument", "reorder needs every slot exactly once")
+    st["order"] = wanted
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "remove":
+    err("unsupported", "demo swapd: accounts are fabricated, nothing to forget")
+elif cmd == "history":
+    print(json.dumps({"schemaVersion": 1, "switches": [
+        {"ts": iso(-3), "from": {"slot": 1, "email": "alpha@example.com"},
+         "to": {"slot": 2, "email": "bravo@example.com"}, "trigger": "at-limit"}]}))
+elif cmd == "reset":
+    # tools/e2e.sh: back to the pristine fleet (slot 1 active, nothing
+    # held, aliased, preferred or reordered, no scenario).
+    try:
+        os.remove(STATE)
+    except FileNotFoundError:
+        pass
+    print(json.dumps({"schemaVersion": 1, "ok": True}))
 elif cmd in ("hold", "unhold"):
     st = state()
     n = slot_arg()

@@ -98,7 +98,7 @@ public struct SessionListCard<P: SessionProgressSource>: View {
                                         : tooltip(s, progress.byPid[s.pid]) + " · click to chat")
                 }
             } else {
-                Text("Session detail needs a newer cswap engine.")
+                Text("Session detail needs a newer engine.")
                     .font(PopupFont.caption2).foregroundStyle(.tertiary)
             }
         }

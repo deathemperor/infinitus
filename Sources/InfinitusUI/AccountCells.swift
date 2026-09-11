@@ -113,7 +113,7 @@ public struct AccountRows<M: FleetModel, U: UsageSource>: View {
         }
         .animation(.easeInOut(duration: 0.3), value: model.popupLayout)
         // Warm the cash figures when the popup opens in a themed mode: a
-        // background `cswap usage` run, cached in the shared UsageModel.
+        // background cost-report run, cached on the fleet's UsageSource.
         .onAppear { if !model.rowTheme.plain { usage.loadIfNeeded() } }
     }
 }

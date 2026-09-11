@@ -29,7 +29,7 @@ enum TrayHistory {
     static func record(accounts: [Account], enginePath: String) {
         // The demo engine's fabricated fleet must not pollute history
         // (same rule as the macOS playground gate).
-        guard !enginePath.hasSuffix("demo-cswap") else { return }
+        guard !enginePath.hasSuffix("demo-swapd") else { return }
         let histURL = dir.appendingPathComponent(
             "usage-history.\(machineID()).jsonl")
         let stateURL = dir.appendingPathComponent("usage-history.last.json")
