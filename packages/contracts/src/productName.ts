@@ -4,4 +4,4 @@
  * through this constant so upstream-sync conflicts collapse to import
  * lines; see INFINITUS.md.
  */
-export { PRODUCT_NAME } from "@t3tools/contracts/productName";
+export const PRODUCT_NAME = "Infinitus";

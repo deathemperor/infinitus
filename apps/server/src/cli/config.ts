@@ -1,4 +1,5 @@
 import * as NetService from "@t3tools/shared/Net";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
 import { DesktopBackendBootstrap, PortSchema } from "@t3tools/contracts";
 import * as Config from "effect/Config";
@@ -32,7 +33,7 @@ const hostFlag = Flag.string("host").pipe(
 );
 export const baseDirFlag = Flag.string("base-dir").pipe(
   Flag.withDescription(
-    "Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).",
+    `Explicit ${PRODUCT_NAME} data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).`,
   ),
   Flag.optional,
 );

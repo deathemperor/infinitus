@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { View } from "react-native";
 
 import { AppText as Text } from "./AppText";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const appVariant = Constants.expoConfig?.extra?.appVariant;
 const BRAND_MARK_SOURCE =
@@ -32,7 +33,9 @@ export function BrandMark(props: { readonly compact?: boolean; readonly stageLab
       />
       <View className="gap-1">
         <View className="flex-row items-center gap-2">
-          <Text className="text-lg font-t3-bold tracking-[-0.4px] text-foreground">T3 Code</Text>
+          <Text className="text-lg font-t3-bold tracking-[-0.4px] text-foreground">
+            {PRODUCT_NAME}
+          </Text>
           <View className="rounded-full bg-subtle px-2 py-1">
             <Text className="text-3xs font-t3-bold tracking-[1.1px] uppercase text-foreground-muted">
               {stageLabel}

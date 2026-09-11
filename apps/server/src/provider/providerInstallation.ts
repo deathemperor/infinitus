@@ -6,6 +6,7 @@ import {
   ProviderSetupError,
   type ProviderSetupInput,
 } from "@t3tools/contracts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { resolveCommandPath } from "@t3tools/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -79,7 +80,7 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
         instanceId,
         operation,
         detail:
-          "This instance uses a custom executable. Clear its binary path to manage installation in T3 Code.",
+          `This instance uses a custom executable. Clear its binary path to manage installation in ${PRODUCT_NAME}.`,
       });
     }
   });

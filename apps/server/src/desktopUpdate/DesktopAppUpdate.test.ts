@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import type { DesktopUpdateState, DesktopUpdateStatusReport } from "@t3tools/contracts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -114,7 +115,7 @@ it.layer(NodeServices.layer)("desktop app update", (it) => {
       const noFd = yield* makeHarness({ controlFd: undefined });
       expect(noFd.service.available).toBe(false);
       expect((yield* noFd.service.run(() => Effect.void).pipe(Effect.flip)).reason).toContain(
-        "not started by the T3 Code desktop app",
+        `not started by the ${PRODUCT_NAME} desktop app`,
       );
       const desktop = yield* makeHarness();
       expect(desktop.service.available).toBe(true);
@@ -162,7 +163,7 @@ it.layer(NodeServices.layer)("desktop app update", (it) => {
         ],
       });
       expect((yield* upToDate.service.run(() => Effect.void).pipe(Effect.flip)).reason).toBe(
-        "The T3 Code desktop app on this machine is already up to date on 1.2.3.",
+        `The ${PRODUCT_NAME} desktop app on this machine is already up to date on 1.2.3.`,
       );
 
       const failed = yield* makeHarness({

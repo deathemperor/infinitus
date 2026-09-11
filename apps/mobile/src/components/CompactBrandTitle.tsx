@@ -6,6 +6,7 @@ import { AppText as Text } from "./AppText";
 import { T3Wordmark } from "./T3Wordmark";
 import { IPAD_HOME_TITLE_OFFSET } from "../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../lib/mobileBranding";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /**
  * Horizontal correction applied to content rendered in the brand title slot,
@@ -30,7 +31,7 @@ export function CompactBrandTitle(
   return (
     <View
       aria-level={1}
-      accessibilityLabel="T3 Code, Threads"
+      accessibilityLabel={`${PRODUCT_NAME}, Threads`}
       accessible
       role="heading"
       className="flex-row items-center gap-1.5"
