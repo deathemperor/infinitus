@@ -10,6 +10,7 @@ import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { InfinitusAskToApprove } from "../infinitus/InfinitusAskToApprove";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
 import {
@@ -177,6 +178,13 @@ export function ConnectionsNewRouteScreen({
     [navigation, onChangeConnectionPairingUrl, onConnectPress],
   );
 
+  const handleApprovedCredential = useCallback(
+    (credential: string) => {
+      void connectAndClose(buildPairingUrl(hostInput, credential), false);
+    },
+    [connectAndClose, hostInput],
+  );
+
   const handleSubmit = useCallback(async () => {
     const missing = missingPairingInput(hostInput, codeInput);
     setFormError(missing);
@@ -306,6 +314,11 @@ export function ConnectionsNewRouteScreen({
                   className="rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground"
                 />
               </View>
+              <InfinitusAskToApprove
+                host={hostInput}
+                disabled={isSubmitting}
+                onCredential={handleApprovedCredential}
+              />
 
               {formError !== null ? (
                 <ErrorBanner message={formError} />
