@@ -692,6 +692,26 @@ export const make = Effect.gen(function* () {
     );
   }).pipe(Effect.withSpan("desktop.updates.startPollers"));
 
+  // Fork channel (INFINITUS.md): an available update downloads itself, so the
+  // user only relaunches. Upstream keeps the download behind a click; a click
+  // that races the next relaunch starts the download over. The download
+  // action is refused while the check that found the update still holds the
+  // action slot, so wait it out in short steps.
+  const autoDownloadOnForkChannel = Effect.gen(function* () {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const state = yield* Ref.get(updateStateRef);
+      if (state.channel !== "infinitus" || state.status !== "available") return;
+      const result = yield* downloadAvailableUpdate;
+      if (result.accepted) {
+        yield* logUpdaterInfo("update downloaded without a click (fork channel)", {
+          completed: result.completed,
+        });
+        return;
+      }
+      yield* Effect.sleep("500 millis");
+    }
+  }).pipe(Effect.withSpan("desktop.updates.autoDownloadOnForkChannel"));
+
   const handleUpdateAvailable = Effect.fn("desktop.updates.handleUpdateAvailable")(function* (
     raw: unknown,
   ) {
@@ -912,7 +932,7 @@ export const make = Effect.gen(function* () {
         );
       });
       yield* electronUpdater.on("update-available", (info: unknown) => {
-        runEffect(handleUpdateAvailable(info));
+        runEffect(handleUpdateAvailable(info).pipe(Effect.andThen(autoDownloadOnForkChannel)));
       });
       yield* electronUpdater.on("update-not-available", () => {
         runEffect(handleUpdateNotAvailable);
