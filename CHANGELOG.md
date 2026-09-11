@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
+- `history <fleet> [--limit n]` hands the engine's own switch log to the fork — swapd's `{schemaVersion, switches:[{ts, from?, to, trigger?}]}` untouched (#779).
 
 ## 0.4.5-alpha.1
 
