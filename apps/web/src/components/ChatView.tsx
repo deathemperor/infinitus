@@ -48,6 +48,7 @@ import { wasBootstrapThreadDeleted } from "@t3tools/client-runtime/errors";
 import { type CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
 import { effectiveSnoozed, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
 import { useInfinitusHoldBanner } from "./chat/useInfinitusHoldBanner";
+import { PinAtCreationToggle, usePinAtCreation } from "./chat/PinAtCreationToggle";
 import {
   parseCodexFeedbackCommand,
   submitCodexFeedback,
@@ -5562,6 +5563,8 @@ export default function ChatView(props: ChatViewProps) {
   const supportsSettlement = serverConfig?.environment.capabilities.threadSettlement === true;
   const supportsSnooze = serverConfig?.environment.capabilities.threadSnooze === true;
   const supportsPinning = serverConfig?.environment.capabilities.threadPinning === true;
+  // Fork (#616): a new thread the user wants prioritized from its first turn.
+  const [pinAtCreation] = usePinAtCreation();
   const activeThreadPinned = supportsPinning && activeThreadShell?.pinnedAt != null;
   const nowMinute = useNowMinute();
   const snoozeNow = new Date().toISOString();
@@ -7263,6 +7266,11 @@ export default function ChatView(props: ChatViewProps) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        // Fork (#616): the server just created the thread with this send; pin
+        // it now so its first turn is never held for headroom (a pin releases).
+        if (isLocalDraftThread && pinAtCreation && supportsPinning) {
+          void pinThread(scopeThreadRef(activeThread.environmentId, threadIdForSend));
+        }
         // The turn is under way and will spend quota, so that thread's limits
         // snapshot is stale. Uploads may have outlasted a navigation, so only
         // the sending thread's panel clears.
@@ -8765,6 +8773,9 @@ export default function ChatView(props: ChatViewProps) {
                             onExpandImage={onExpandTimelineImage}
                             onFileOpen={openFileAttachment}
                           />
+                          {isLocalDraftThread && supportsPinning ? (
+                            <PinAtCreationToggle className="mt-2 px-1" />
+                          ) : null}
                         </div>
                       </ComposerSurface.Host>
                       <div className="min-h-0">
