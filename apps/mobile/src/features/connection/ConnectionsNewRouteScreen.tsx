@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import Constants from "expo-constants";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -20,6 +21,7 @@ import {
   parsePairingUrl,
 } from "./pairing";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
+import { routePairingPrefill } from "./pairPrefill.logic";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -38,13 +40,13 @@ export function ConnectionsNewRouteScreen({
   } = useRemoteConnections();
   const navigation = useNavigation();
   const params = route.params ?? {};
-  // Deep-link prefill exists for development automation only. A production
-  // link must not arrive with attacker-chosen host and token already filled.
-  const routePairingUrl = __DEV__ ? (params.pairingUrl?.trim() ?? "") : "";
-  const shouldAutoConnect =
-    __DEV__ &&
-    routePairingUrl.length > 0 &&
-    (params.autoConnect === "1" || params.autoConnect === "true");
+  // Deep-link prefill: development, and the Infinitus variant's scanned QR
+  // (#724); auto-connect stays development-only. See pairPrefill.logic.
+  const { pairingUrl: routePairingUrl, autoConnect: shouldAutoConnect } = routePairingPrefill({
+    params,
+    dev: __DEV__,
+    appVariant: Constants.expoConfig?.extra?.appVariant,
+  });
   const insets = useSafeAreaInsets();
   const [hostInput, setHostInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
