@@ -285,6 +285,20 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Sessions since #743), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
+- `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
+  `components/desktop/InfinitusCompletionSoundCoordinator.tsx`,
+  `components/settings/InfinitusCompletionSoundRow.tsx`,
+  `assets/infinitus-completion-chime.wav`) — the completion sound (#270 H):
+  a turn finishing on any thread while the window is hidden or unfocused
+  rings the picked sound (Chime, or the SnapShot Whoosh / Click), off by
+  default. The preference is per window in localStorage
+  (`infinitus:completion-sound:v1`), not a client setting: a sound belongs
+  to the machine that plays it. `turnsJustCompleted` rings only for threads
+  the window already knew (a bootstrap seeds, never rings). Registration
+  points: the coordinator mounted from `__root.tsx` beside
+  `SnapShotCoordinator`, the row from `SnapShotSettings.tsx` after the
+  capture sound, and the `completion-sound` search item in
+  `settingsSearch.ts`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
