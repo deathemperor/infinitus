@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import {
   completeConfirmDialogClose,
@@ -64,6 +64,9 @@ export function ConfirmDialogHost() {
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
+  // Enter confirms: the popup's initial focus lands on Confirm instead of the
+  // popup itself, where a keypress went nowhere. Escape still cancels.
+  const confirmRef = useRef<HTMLButtonElement>(null);
 
   return (
     <AlertDialog
@@ -75,7 +78,7 @@ export function ConfirmDialogHost() {
         if (!open) completeConfirmDialogClose();
       }}
     >
-      <AlertDialogPopup className="max-w-lg">
+      <AlertDialogPopup className="max-w-lg" initialFocus={confirmRef}>
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           {copy.description ? (
@@ -86,7 +89,7 @@ export function ConfirmDialogHost() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-          <Button variant={confirmVariant} onClick={onConfirm}>
+          <Button ref={confirmRef} variant={confirmVariant} onClick={onConfirm}>
             Confirm
           </Button>
         </AlertDialogFooter>
