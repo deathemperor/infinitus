@@ -20,6 +20,7 @@ import { exhaustedBand } from "@t3tools/client-runtime/state/infinitusExhausted"
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
+import * as Redacted from "effect/Redacted";
 import { ChevronDownIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -57,6 +58,8 @@ import {
   signInEnded,
   signInStatusCommandArgs,
   signInStatusReply,
+  signInCodeReply,
+  signInCodeSecretArgs,
   snapshotOffersSignIn,
   type SignInFlow,
 } from "./signIn.logic";
@@ -168,6 +171,9 @@ export function AccountsPage() {
   // The exhausted band's "reset has passed" reads against the shared minute clock.
   const minute = useNowMinute();
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  // The fork's one secret-carrying call (#747): the sign-in code, on a client
+  // without the shell. The value lives in the form field until submitted.
+  const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
 
   // The spinner lives only as long as the snapshot the command was sent
   // against; the timeout covers a command the app answered without changing
@@ -259,18 +265,24 @@ export function AccountsPage() {
   // The in-app sign-in (#677): `signin-begin` on the app, the provider's page
   // in the shell's child window, `signin-status` every two seconds until the
   // app says it ended. Only this Mac's own app can show the window, so the
-  // path exists for the primary environment in the desktop client alone.
-  const inAppSignIn =
-    bridge !== null && environmentId !== null && environmentId === primaryEnvironmentId;
+  // shell path exists for the primary environment in the desktop client;
+  // every other client opens the page from a link and hands the code over
+  // `infinitus.secret` (#747).
+  const shellSignIn =
+    bridge !== null && environmentId !== null && environmentId === primaryEnvironmentId
+      ? bridge
+      : null;
+  const inAppSignIn = environmentId !== null;
 
   const startSignIn = async (fleetKey: string, target: AccountRowModel | null) => {
-    if (environmentId === null || bridge === null) return;
+    if (environmentId === null) return;
     const run = ++signInRunRef.current;
     const live = () => signInRunRef.current === run;
     const base: SignInFlow = {
       fleetKey,
       target: target?.label ?? null,
       flowId: null,
+      url: null,
       pasteCode: false,
       phase: "starting",
       error: null,
@@ -296,9 +308,16 @@ export function AccountsPage() {
       });
       return;
     }
-    const begunFlow: SignInFlow = { ...base, flowId: reply.flowId, pasteCode: reply.pasteCode };
+    const begunFlow: SignInFlow = {
+      ...base,
+      flowId: reply.flowId,
+      url: shellSignIn === null ? reply.url : null,
+      pasteCode: reply.pasteCode,
+    };
     setSignInFlow(begunFlow);
-    await bridge.open({ flowId: reply.flowId, url: reply.url, label: reply.label }).catch(() => {});
+    await shellSignIn
+      ?.open({ flowId: reply.flowId, url: reply.url, label: reply.label })
+      .catch(() => {});
     while (live()) {
       await new Promise((resolve) => setTimeout(resolve, SIGN_IN_POLL_MS));
       if (!live()) return;
@@ -327,7 +346,7 @@ export function AccountsPage() {
           : { ...flow, codeError: current.codeError, codeBusy: current.codeBusy },
       );
       if (signInEnded(flow.phase)) {
-        await bridge.close(reply.flowId).catch(() => {});
+        await shellSignIn?.close(reply.flowId).catch(() => {});
         if (flow.phase === "done") {
           await runCommand({ environmentId, input: { command: "refresh", args: [], options: {} } });
         }
@@ -340,19 +359,43 @@ export function AccountsPage() {
     if (environmentId === null || signInFlow === null) return;
     signInRunRef.current += 1;
     if (signInFlow.flowId !== null) {
-      await bridge?.close(signInFlow.flowId).catch(() => {});
+      await shellSignIn?.close(signInFlow.flowId).catch(() => {});
       await runCommand({ environmentId, input: signInCancelCommandArgs(signInFlow.flowId) });
     }
     setSignInFlow(null);
   };
 
+  /** The code over `infinitus.secret` (#747): the value goes on the secret
+      channel and is dropped here; the reply carries the CLI's wording only. */
+  const submitCodeOverRpc = async (
+    flowId: string,
+    code: string,
+  ): Promise<{ readonly ok: boolean; readonly error?: string }> => {
+    if (environmentId === null) return { ok: false, error: "No environment." };
+    const answer = await runSecret({
+      environmentId,
+      input: { ...signInCodeSecretArgs(flowId), secret: Redacted.make(code) },
+    });
+    if (answer._tag === "Failure") return { ok: false, error: commandErrorMessage(answer.cause) };
+    return (
+      signInCodeReply(answer.value.result) ?? {
+        ok: false,
+        error: "Infinitus answered unexpectedly.",
+      }
+    );
+  };
+
   const submitSignInCode = async (code: string) => {
-    if (bridge === null || signInFlow === null || signInFlow.flowId === null) return;
+    if (signInFlow === null || signInFlow.flowId === null) return;
     const flowId = signInFlow.flowId;
     setSignInFlow((current) =>
       current === null ? current : { ...current, codeBusy: true, codeError: null },
     );
-    const result = await bridge.submitCode({ flowId, code }).catch((cause: unknown) => ({
+    const result = await (
+      shellSignIn === null
+        ? submitCodeOverRpc(flowId, code)
+        : shellSignIn.submitCode({ flowId, code })
+    ).catch((cause: unknown) => ({
       ok: false,
       error: cause instanceof Error ? cause.message : String(cause),
     }));

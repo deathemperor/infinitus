@@ -1,6 +1,7 @@
 import type { DesktopBridge } from "@t3tools/contracts";
 import type {
   InfinitusCommandInput,
+  InfinitusSecretInput,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
@@ -10,15 +11,19 @@ import * as Schema from "effect/Schema";
 
 /**
  * A fleet's sign-in inside this app (#677): the menu-bar app runs the flow
- * with no window (`signin-begin`), the desktop shell shows the provider's page
- * in a child window, and this page shows where it stands, takes the code from
- * the success page, and says how it ended. Pure — the page keeps one
+ * with no window (`signin-begin`), the provider's page opens in the desktop
+ * shell's child window or, on any other client, from a link in a new tab
+ * (#747), and this page shows where it stands, takes the code from the
+ * success page, and says how it ended. The code reaches the app through the
+ * shell where there is one, else through `infinitus.secret` as `signin-code
+ * <flowId>` with the code on the secret channel. Pure — the page keeps one
  * `SignInFlow` and renders these words.
  */
 
 const BEGIN_COMMAND = "signin-begin";
 const STATUS_COMMAND = "signin-status";
 const CANCEL_COMMAND = "signin-cancel";
+const CODE_COMMAND = "signin-code";
 
 /** How often the page asks `signin-status` while a flow runs. */
 export const SIGN_IN_POLL_MS = 2_000;
@@ -39,6 +44,9 @@ export interface SignInFlow {
   readonly fleetKey: string;
   readonly target: string | null;
   readonly flowId: string | null;
+  /** The provider's page for this device to open, when no shell window shows
+      it; null while the shell has it or before the app answered. */
+  readonly url: string | null;
   readonly pasteCode: boolean;
   readonly phase: SignInPhase;
   readonly error: string | null;
@@ -92,6 +100,29 @@ export function signInCancelCommandArgs(flowId: string): InfinitusCommandInput {
   return { command: CANCEL_COMMAND, args: [flowId], options: {} };
 }
 
+/** `signin-code <flowId>` for `infinitus.secret`; the page adds the code as
+    `secret` (#747). `flowId` is the manifest's bare name for `<flowId>`. */
+export function signInCodeSecretArgs(flowId: string): Omit<InfinitusSecretInput, "secret"> {
+  return { command: CODE_COMMAND, args: { flowId } };
+}
+
+const CodeReply = Schema.Struct({
+  ok: Schema.Boolean,
+  error: Schema.optionalKey(Schema.String),
+});
+const decodeCode = Schema.decodeUnknownOption(CodeReply);
+
+/** `signin-code`'s answer, or null for anything else. The error is the
+    CLI's own wording; the code itself never comes back. */
+export function signInCodeReply(result: unknown): InfinitusSignInCodeResult | null {
+  const decoded = decodeCode(result);
+  if (decoded._tag === "None") return null;
+  return {
+    ok: decoded.value.ok,
+    ...(decoded.value.error === undefined ? {} : { error: decoded.value.error }),
+  };
+}
+
 const BeginReply = Schema.Struct({
   flowId: Schema.String,
   url: Schema.String,
@@ -140,13 +171,14 @@ export function signInBusy(flow: SignInFlow | null): boolean {
 /** The line under the fleet's title while a flow runs or just ended. */
 export function signInStatusText(flow: SignInFlow): string {
   const who = flow.target === null ? "" : ` as ${flow.target}`;
+  const where = flow.url === null ? "in the window" : "on the sign-in page";
   switch (flow.phase) {
     case "starting":
       return "Starting the sign-in…";
     case "waitingForCode":
-      return `Sign in${who} in the window, then paste the code from the success page here.`;
+      return `Sign in${who} ${where}, then paste the code from the success page here.`;
     case "waitingForToken":
-      return flow.pasteCode ? "Checking the code…" : `Sign in${who} in the window.`;
+      return flow.pasteCode ? "Checking the code…" : `Sign in${who} ${where}.`;
     case "registering":
       return "Adding the account…";
     case "done":
@@ -155,6 +187,3 @@ export function signInStatusText(flow: SignInFlow): string {
       return `Sign-in failed: ${flow.error ?? "the app gave no reason"}`;
   }
 }
-
-/** What a client without the in-app path says next to a fleet that has it. */
-export const SIGN_IN_FROM_MAC = "Sign in from the Mac.";

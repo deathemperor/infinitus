@@ -15,13 +15,7 @@ import {
   type AddAccountFlow,
 } from "./addAccount.logic";
 import { ExhaustedBand } from "./ExhaustedBand";
-import {
-  SIGN_IN_FROM_MAC,
-  signInBusy,
-  signInEnded,
-  signInStatusText,
-  type SignInFlow,
-} from "./signIn.logic";
+import { signInBusy, signInEnded, signInStatusText, type SignInFlow } from "./signIn.logic";
 
 /** The in-app sign-in (#677) as the page hands it to a fleet: whether the
     build offers it, whether this client can show it, the flow on this fleet. */
@@ -63,11 +57,10 @@ export function FleetSection({
   /** Starts the fleet's sign-in: a new account, or the row to sign in again as. */
   readonly onAdd: (target: AccountRowModel | null) => void;
 }) {
-  // The in-app sign-in when the build and this client both have it; a build
-  // with it but a client without (the phone, the tunnel) points at the Mac;
-  // an older build keeps the sign-in on the Mac (#672).
+  // The in-app sign-in when the build has it (#677; every client since #747:
+  // the shell's window, or a link and the code over the secret RPC); an
+  // older build keeps the sign-in on the Mac (#672).
   const inApp = signIn.offers && signIn.inApp && section.canAdd;
-  const fromMac = signIn.offers && !signIn.inApp && section.canAdd;
   const canAdd = !signIn.offers && offersAdd && section.canAdd;
   const busy = inApp
     ? signInBusy(signIn.flow) || signInRunning
@@ -88,6 +81,8 @@ export function FleetSection({
       ? signIn.flow
       : null;
   const cancellable = inApp && signIn.flow !== null && !signInEnded(signIn.flow.phase);
+  /** The provider's page to open from this device, while the flow waits for it. */
+  const signInUrl = cancellable && signIn.flow?.url != null ? signIn.flow.url : null;
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +114,17 @@ export function FleetSection({
           </Button>
         ) : null}
       </div>
-      {fromMac ? <p className="text-muted-foreground text-xs">{SIGN_IN_FROM_MAC}</p> : null}
+      {signInUrl === null ? null : (
+        <a
+          href={signInUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs underline underline-offset-2"
+          aria-label={`Open the sign-in page: ${section.title}`}
+        >
+          Open the sign-in page
+        </a>
+      )}
       {section.caveat === null ? null : (
         <p className="text-muted-foreground text-xs">{section.caveat}</p>
       )}
@@ -143,9 +148,10 @@ export function FleetSection({
             }
           }}
         >
+          {/* A secret (#747): masked, never remembered, cleared on submit. */}
           <input
             name="code"
-            type="text"
+            type="password"
             autoComplete="off"
             spellCheck={false}
             aria-label={`Sign-in code: ${section.title}`}

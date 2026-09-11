@@ -497,10 +497,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `signin-status` every 2 s (`signIn.logic.ts`) and, for paste-code flows,
   takes the code from the success page — the shell hands it to the app over
   the control socket as `secret` (`submitInfinitusSignInCode`), so it never
-  crosses an RPC, the server or the tunnel. Offered only in the Electron
-  client for the primary environment; a phone or tunnel client on such a
-  build reads "Sign in from the Mac." Closing the OAuth window never
-  cancels; the page's Cancel sends `signin-cancel`.
+  crosses an RPC, the server or the tunnel. On every other client (a
+  browser, the tunnel, the desktop looking at a remote environment) the page
+  is a link this device opens in a new tab and the code goes over
+  `infinitus.secret` as `signin-code {flowId}` (#747 step 2): the field is
+  `type="password"`, `autoComplete="off"`, cleared on submit and gone with
+  the form; the CLI's own `error` is shown; the submitted value is never
+  interpolated into any message. Closing the OAuth window never cancels;
+  the page's Cancel sends `signin-cancel`.
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
   — the five Settings › Infinitus routes, thin shells over the panes above.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
