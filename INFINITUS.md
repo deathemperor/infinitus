@@ -29,6 +29,16 @@ makes wrong, in its own PR.
   new files, new routes, new settings sections; edits to upstream files stay
   at registration points so merges stay small. The list of upstream files we
   edit on purpose is in "Registration points" below — keep it current.
+  Expected on every sync (#823 layer 3): upstream's tests assume a plain
+  `x.y.z` is a `latest` build titled "(Alpha)"; here every non-nightly
+  version is an `infinitus` build, so their fixture expectations in
+  `scripts/build-desktop-artifact.test.ts` (0.0.17 icons and brand, 0.0.33
+  publish config, DMG background), `apps/desktop/src/settings/DesktopAppSettings.test.ts`
+  (default channel), `apps/desktop/src/app/DesktopEnvironment.test.ts`,
+  `DesktopAppIdentity.test.ts` and `DesktopPreReadyPlatform.test.ts` (plain
+  title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
+  (upstream-channel tests start on a nightly feed via the harness `settings`
+  option) are re-flipped to `infinitus` after each merge, never the rule.
 - **`apps/mac` is the Swift app** (#823 layer 2, 2026-09-12). Today's
   native Infinitus (menu bar, engines, team, tunnels, mirror API, control
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
