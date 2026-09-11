@@ -314,6 +314,7 @@ echo "aws: orphan login wrapper swept at launch"
 
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
+"$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='signin-code')['stdin']=='secret' and 'stdin' not in next(c for c in d['commands'] if c['name']=='status')" || fail "manifest: stdin flag (#747)"
 "$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
 "$CTL" status | json "d['engines']['cswap']['registered']" | grep -q True || fail "cswap not registered"
 sleep 4   # first demo snapshot
