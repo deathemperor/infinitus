@@ -230,6 +230,21 @@ const QuitConfirmationModeSetting = Schema.Union([QuitConfirmationMode, LegacyCo
  * A user-chosen font family (a single name or a comma-separated list). Empty
  * means "use the app default"; clients compose their own fallback stacks.
  */
+/**
+ * Fork (#270 G): one saved prompt fragment of a project — a short name for
+ * the picker and the body the composer receives. Ids are minted by the
+ * client that adds the snippet (`nextPromptSnippetId`).
+ */
+export const MAX_PROMPT_SNIPPET_NAME_LENGTH = 60;
+export const MAX_PROMPT_SNIPPET_TEXT_LENGTH = 8_192;
+export const MAX_PROMPT_SNIPPETS_PER_PROJECT = 50;
+export const PromptSnippet = Schema.Struct({
+  id: TrimmedNonEmptyString.check(Schema.isMaxLength(64)),
+  name: TrimmedNonEmptyString.check(Schema.isMaxLength(MAX_PROMPT_SNIPPET_NAME_LENGTH)),
+  text: TrimmedNonEmptyString.check(Schema.isMaxLength(MAX_PROMPT_SNIPPET_TEXT_LENGTH)),
+});
+export type PromptSnippet = typeof PromptSnippet.Type;
+
 export const FontFamilyPreference = Schema.String.check(Schema.isMaxLength(200));
 export type FontFamilyPreference = typeof FontFamilyPreference.Type;
 
@@ -966,6 +981,14 @@ export const ServerSettings = Schema.Struct({
   projectScriptOverrides: Schema.Record(ProjectId, Schema.NullOr(Schema.Array(ProjectScript))).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
+  /**
+   * Fork (#270 G): each project's saved prompt snippets, inserted into the
+   * composer from its Prompts popover. Server-side so every client attached
+   * to the server sees one list; `null` clears a project's entry.
+   */
+  projectPromptSnippets: Schema.Record(ProjectId, Schema.NullOr(Schema.Array(PromptSnippet))).pipe(
+    Schema.withDecodingDefault(Effect.succeed({})),
+  ),
   projectAutoPullOverrides: Schema.Record(ProjectId, Schema.Boolean).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
@@ -1257,6 +1280,9 @@ export const ServerSettingsPatch = Schema.Struct({
   defaultProjectScripts: Schema.optionalKey(Schema.Array(ProjectScript)),
   projectScriptOverrides: Schema.optionalKey(
     Schema.Record(ProjectId, Schema.NullOr(Schema.Array(ProjectScript))),
+  ),
+  projectPromptSnippets: Schema.optionalKey(
+    Schema.Record(ProjectId, Schema.NullOr(Schema.Array(PromptSnippet))),
   ),
   projectAutoPullOverrides: Schema.optionalKey(
     Schema.Record(ProjectId, Schema.NullOr(Schema.Boolean)),

@@ -48,6 +48,7 @@ import {
 } from "../../hooks/useSettings";
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";
 import { ProjectActionsList } from "./ProjectActionsList";
+import { ProjectPromptSnippetsSection } from "../prompts/ProjectPromptSnippetsSection";
 import { isElectron } from "../../env";
 import {
   decodeProjectScriptKeybindingRule,
@@ -1239,6 +1240,15 @@ function ProjectDetail({
             }
           />
         </SettingsSection>
+
+        <ProjectPromptSnippetsSection
+          environmentId={representative.environmentId}
+          projectId={representative.id}
+          connected={
+            environmentById.get(representative.environmentId)?.connection.phase === "connected"
+          }
+          reportFailure={reportFailure}
+        />
 
         <SettingsSection title="Checkout">
           {hasMultipleCheckouts ? (

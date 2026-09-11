@@ -21,6 +21,20 @@ import {
 } from "./serverSettings.ts";
 
 describe("serverSettings helpers", () => {
+  it("merges project prompt snippets per project and clears one with null (#270 G)", () => {
+    const one = ProjectId.make("project-1");
+    const two = ProjectId.make("project-2");
+    const review = { id: "review", name: "Review", text: "Review the diff." };
+    const tests = { id: "tests", name: "Tests", text: "Add tests." };
+    const first = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      projectPromptSnippets: { [one]: [review] },
+    });
+    const both = applyServerSettingsPatch(first, { projectPromptSnippets: { [two]: [tests] } });
+    expect(both.projectPromptSnippets).toEqual({ [one]: [review], [two]: [tests] });
+    const cleared = applyServerSettingsPatch(both, { projectPromptSnippets: { [one]: null } });
+    expect(cleared.projectPromptSnippets).toEqual({ [one]: null, [two]: [tests] });
+  });
+
   it("replaces SSH host lists when saving, editing, and removing hosts", () => {
     const host = { id: "mini", label: "Mac mini", target: "mini" };
     const saved = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, { deviceHosts: [host] });

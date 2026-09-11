@@ -100,7 +100,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `useCapturesShortcuts`) beside the stash effects, `ComposerCapturesBadge`
   in the shoulder dock after the stash badge, and `ComposerCapturesMenu` in
   the anchored layer before the command menu, fed
-  `insertComposerTextAtEnd` (#433).
+  `insertComposerTextAtEnd` (#433). Beside them the Prompts block (#270 G):
+  `useProjectPromptSnippets`, the prompts UI store, `ComposerPromptsBadge`
+  after the Captures badge, `ComposerPromptsMenu` after the Captures menu
+  (the Captures guard also checks `!isPromptsMenuOpen`).
+- `apps/web/src/components/settings/ProjectSettingsPanel.tsx` —
+  `ProjectPromptSnippetsSection` between the "Project" and "Checkout"
+  sections, fed the representative project and the panel's `reportFailure`
+  (#270 G).
 - `apps/web/src/components/CommandPalette.tsx` — the `accounts.open`
   listener and palette entry; an "Open captures" entry while a thread has
   a project (#433).
@@ -122,7 +129,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `serverRuntimeStartup.reconcile.test.ts`, `AgentSessionImporter.test.ts`)
   provide the passthrough gate, with a `turnStartGate` override in the first two.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
-  `ServerSettings` (default on) and `ServerSettingsPatch` (#648).
+  `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
+  `PromptSnippet` schema with its caps and `projectPromptSnippets`
+  (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on both
+  (#270 G). `packages/shared/src/serverSettings.ts` —
+  `applyServerSettingsPatch` merges `projectPromptSnippets` per project key
+  like `projectScriptOverrides`, so one project's save leaves the others.
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
   methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
@@ -422,6 +434,24 @@ this file adds the fork's own rules. Plan and history: issue #555.
   until a thread with a project is open, and toasts `empty` / `failed`
   (the Accessibility fix by name). `useAddCapture` is shared with the
   shortcuts.
+- `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G):
+  `promptSnippets.logic` (the project's list from server settings, draft
+  trimming against the schema caps, name-derived ids, upsert/remove under
+  the 50-per-project cap, the settings patch — an empty list stores `null` —
+  and the one-line preview), `promptsUiStore` (the popover's open state),
+  `ComposerPromptsBadge` (the shoulder tab after Captures, saved count),
+  `ComposerPromptsMenu` (one row per snippet in the composer's anchored
+  layer; a click puts the body at the end of the composer via
+  `insertComposerTextAtEnd` and closes; "Edit prompts…" opens Settings ›
+  Projects for the project; Escape or a pointer outside closes),
+  `useProjectPromptSnippets` (the routed project's list plus its settings
+  group key), and `ProjectPromptSnippetsSection` (Settings › Projects ›
+  Prompts: add / edit / remove, saved to the representative checkout's
+  server settings through `serverEnvironment.updateSettings`). Snippet text
+  is user prose: toasts and labels show the name, never the body. The phone
+  has no server-settings reader yet, so it does not show the list; a
+  slash-style trigger in the composer's command menu is a follow-up (four
+  upstream touchpoints).
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /

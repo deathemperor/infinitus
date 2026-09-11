@@ -261,6 +261,14 @@ export function applyServerSettingsPatch(
           },
         }
       : {}),
+    ...(patch.projectPromptSnippets !== undefined
+      ? {
+          projectPromptSnippets: {
+            ...current.projectPromptSnippets,
+            ...patch.projectPromptSnippets,
+          },
+        }
+      : {}),
     ...(usageLimitSourcesPatch !== undefined
       ? {
           usageLimitSources: mergeSettingsEntries(
