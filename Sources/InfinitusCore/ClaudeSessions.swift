@@ -30,6 +30,11 @@ public struct ClaudeSessionRecord: Sendable, Equatable {
     /// How Claude Code was entered: "cli" for a terminal, "sdk-cli" for a
     /// stream-json host such as `OwnedSessions` (#151); nil on older builds.
     public let entrypoint: String?
+    /// A session another host resumes on its own limit stops: the SDK
+    /// sessions the app owns (#151, OwnedSessions' resume wire) and the
+    /// fork server's threads (#648) both enter as `sdk-cli`, and neither
+    /// has a terminal for the nudge path to type into.
+    public var resumedElsewhere: Bool { entrypoint == "sdk-cli" }
 
     public init(pid: Int32, sessionId: String, cwd: String, kind: String = "interactive",
                 status: String? = nil, messagingSocketPath: String = "", peerProtocol: Int = 0,

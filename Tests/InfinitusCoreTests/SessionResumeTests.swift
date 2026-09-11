@@ -139,6 +139,16 @@ final class SessionResumeTests: XCTestCase {
         XCTAssertEqual(sessions.map(\.entrypoint), [nil, "sdk-cli"])
     }
 
+    /// #648: the fork server resumes its own threads; they enter as
+    /// `sdk-cli`, the same tell as the app's owned sessions (#151).
+    func testSDKSessionsAreResumedElsewhere() throws {
+        try writeSession(pid: 21, id: "s1", cwd: "/p")
+        try writeSession(pid: 22, id: "s2", cwd: "/p", entrypoint: "sdk-cli")
+        try writeSession(pid: 23, id: "s3", cwd: "/p", entrypoint: "cli")
+        let sessions = ClaudeSessions.list(claudeDir: dir, alive: { _ in true })
+        XCTAssertEqual(sessions.filter { !$0.resumedElsewhere }.map(\.sessionId), ["s1", "s3"])
+    }
+
     func testVerdicts() throws {
         let s = StoppedSession(sessionId: "s1", pid: 1, cwd: "/p", stopUuid: "stop-1")
         try writeTranscript(cwd: "/p", id: "s1", lines: [limitStop])
