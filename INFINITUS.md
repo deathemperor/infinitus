@@ -262,8 +262,23 @@ this file adds the fork's own rules. Plan and history: issue #555.
   Connections › Network access. "Type it instead" reveals host + code for
   the phone's manual form. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
+  Above it, through the panel's `lead` slot (drawn whatever the native app's
+  state — the requests come from this server), the "Pairing requests" card
+  (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710): the
+  server's pending approve-on-Mac asks from `subscribeInfinitusPairing`
+  (device name, os · address, the match code large, a countdown), each with
+  Approve / Deny through `infinitus.pairingDecide`; `decided: false` reads
+  "already expired". The stream carries no secret and no credential, so the
+  card never sees one.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
-  snapshot and command atoms.
+  snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
+  which also holds the pairing stream + decide command, #710).
+- `apps/web/src/hooks/useInfinitusPairingToasts.ts` — a toast per phone
+  asking to pair (#710): title with the device name, one Open action to
+  `/settings/infinitus/devices`. Never an Approve in the toast (a spoofed
+  device name must not be let in by reflex) and never the match code; every
+  unseen id is toasted once, including those already pending at load. Mounted
+  from `InfinitusEventToasts` beside the events hook.
 - `apps/web/src/hooks/useInfinitusEventToasts.ts`,
   `apps/web/src/hooks/infinitusEventToasts.logic.ts`,
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events

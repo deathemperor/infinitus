@@ -38,6 +38,7 @@ const INFINITUS_EVENTS_IDLE_TTL_MS = 60_000;
 const INFINITUS_MACHINE_STALE_MS = 30_000;
 const INFINITUS_MACHINE_REFRESH_MS = 60_000;
 const INFINITUS_MACHINE_IDLE_TTL_MS = 60_000;
+const INFINITUS_PAIRING_IDLE_TTL_MS = 1_000;
 
 /** What a fleet row shows for an account: its alias, else the email it signed
     in with, else the number the engine knows it by. */
@@ -111,6 +112,21 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       staleTimeMs: INFINITUS_MACHINE_STALE_MS,
       refreshIntervalMs: INFINITUS_MACHINE_REFRESH_MS,
       idleTtlMs: INFINITUS_MACHINE_IDLE_TTL_MS,
+    }),
+    // Approve-on-Mac pairing (#710): the server's pending requests, resent
+    // whole on every change (metadata and the match code only — never the
+    // phone's secret or the credential). No idle grace: a request lives two
+    // minutes, so a released view starts over rather than showing a stale list.
+    pairing: createEnvironmentSubscriptionAtomFamily(runtime, {
+      label: "environment-data:infinitus:pairing",
+      idleTtlMs: INFINITUS_PAIRING_IDLE_TTL_MS,
+      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusPairing>) =>
+        subscribe(WS_METHODS.subscribeInfinitusPairing, input),
+    }),
+    // The decided request leaves the stream, so nothing to invalidate.
+    pairingDecide: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:pairingDecide",
+      tag: WS_METHODS.infinitusPairingDecide,
     }),
   };
 }

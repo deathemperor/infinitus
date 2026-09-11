@@ -203,12 +203,17 @@ export function InfinitusPrefsPanel({
   sectionSlugs,
   title,
   children,
+  lead,
   footer,
 }: {
   readonly sectionSlugs: ReadonlyArray<string>;
   readonly title: string;
   /** The Engines pane's status list, drawn above the toggles. */
   readonly children?: ReactNode;
+  /** Drawn first whatever the native app's state: the Devices pane's pairing
+      requests (#710) come from this server, not from Infinitus, and matter
+      most while the app is down and a phone is trying to get back in. */
+  readonly lead?: ReactNode;
   /** The Devices pane's pairing card, drawn under the prefs once they answer. */
   readonly footer?: ReactNode;
 }) {
@@ -288,6 +293,7 @@ export function InfinitusPrefsPanel({
   if (state !== "ready") {
     return (
       <SettingsPageContainer>
+        {lead}
         <SettingsSection id={`infinitus-${sectionSlugs[0] ?? "prefs"}`} title={title}>
           {snapshot?.available === true ? children : null}
           <InfinitusPanelNotice
@@ -303,6 +309,7 @@ export function InfinitusPrefsPanel({
 
   return (
     <SettingsPageContainer>
+      {lead}
       {children}
       {writeState.relaunching ? (
         <p role="status" className="px-3 text-[13px] text-muted-foreground sm:px-4">
