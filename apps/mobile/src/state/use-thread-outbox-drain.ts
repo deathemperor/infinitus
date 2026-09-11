@@ -57,6 +57,8 @@ import {
   type ThreadOutboxCommandStage,
 } from "./thread-outbox-model";
 import { environmentThreadShells, threadEnvironment } from "./threads";
+import { readHeldThreads } from "./threadOutboxHolds";
+import { isThreadHeld, queueBehindRunningTurn } from "./threadOutboxQueue.logic";
 import {
   appendComposerDraftAttachments,
   composerDraftsAtom,
@@ -1070,12 +1072,25 @@ export function useThreadOutboxDrain(): void {
         (candidate) => candidate.environmentId === nextQueuedMessage.environmentId,
       );
       const shellStatus = shellStatuses.get(nextQueuedMessage.environmentId) ?? "empty";
-      const deliveryAction = resolveThreadOutboxDeliveryAction({
+      const threadBusy =
+        thread?.session?.status === "running" || thread?.session?.status === "starting";
+      // Infinitus (fork, #807): a follow-up waits behind a running or held
+      // turn instead of steering it, like the desktop composer's queue (#270 F).
+      const deliveryAction = queueBehindRunningTurn({
+        action: resolveThreadOutboxDeliveryAction({
+          isCreation: creation !== undefined,
+          threadExists: thread !== undefined,
+          shellStatus,
+          environmentConnected: environment?.connectionState === "connected",
+          threadBusy,
+        }),
         isCreation: creation !== undefined,
-        threadExists: thread !== undefined,
-        shellStatus,
-        environmentConnected: environment?.connectionState === "connected",
-        threadBusy: thread?.session?.status === "running" || thread?.session?.status === "starting",
+        threadBusy,
+        threadHeld: isThreadHeld(
+          readHeldThreads(nextQueuedMessage.environmentId, serverConfigs),
+          nextQueuedMessage.threadId,
+        ),
+        mode: "queue",
       });
       // The delivery action resolves first; capability checks apply only to
       // a message that will send. Checking earlier would restore a
@@ -1183,12 +1198,22 @@ export function useThreadOutboxDrain(): void {
           );
           const liveThreadBusy =
             liveThread?.session?.status === "running" || liveThread?.session?.status === "starting";
-          const liveDeliveryAction = resolveThreadOutboxDeliveryAction({
+          // Infinitus (fork, #807): the same queue rule against the live thread.
+          const liveDeliveryAction = queueBehindRunningTurn({
+            action: resolveThreadOutboxDeliveryAction({
+              isCreation: creation !== undefined,
+              threadExists: liveThread !== undefined,
+              shellStatus,
+              environmentConnected: environment?.connectionState === "connected",
+              threadBusy: liveThreadBusy,
+            }),
             isCreation: creation !== undefined,
-            threadExists: liveThread !== undefined,
-            shellStatus,
-            environmentConnected: environment?.connectionState === "connected",
             threadBusy: liveThreadBusy,
+            threadHeld: isThreadHeld(
+              readHeldThreads(nextQueuedMessage.environmentId, serverConfigs),
+              nextQueuedMessage.threadId,
+            ),
+            mode: "queue",
           });
           if (liveDeliveryAction !== "send") {
             return true;

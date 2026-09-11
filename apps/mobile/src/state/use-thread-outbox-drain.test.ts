@@ -92,6 +92,12 @@ vi.mock("./threads", () => ({
   threadEnvironment: {},
 }));
 
+// Infinitus (fork, #807): the drain's queue rule reads the holds atom, whose
+// real module reaches the connection runtime; no list here means nothing held.
+vi.mock("./threadOutboxHolds", () => ({
+  readHeldThreads: () => null,
+}));
+
 // Infinitus (fork, #742): the drain's pin-at-creation reads the preferences
 // atom, whose real module reaches expo-secure-store; a never-loaded store
 // means "off", so no creation here gets pinned.
