@@ -5,6 +5,7 @@ import {
   nextPromptSnippetId,
   promptSnippetDraft,
   promptSnippetPreview,
+  promptSnippetSlashItems,
   promptSnippetsPatch,
   removePromptSnippet,
   snippetsForProject,
@@ -56,6 +57,29 @@ describe("promptSnippets.logic (#270 G)", () => {
     expect(promptSnippetsPatch(project, [])).toEqual({
       projectPromptSnippets: { [project]: null },
     });
+  });
+
+  it("offers the snippets as `/` menu rows filtered by name", () => {
+    const tests: PromptSnippet = {
+      id: "tests",
+      name: "Add tests",
+      text: "Add tests.\nCover edges.",
+    };
+    const all = promptSnippetSlashItems([review, tests], "");
+    expect(all.map((item) => item.id)).toEqual(["prompt:review", "prompt:tests"]);
+    expect(all[1]).toMatchObject({
+      type: "prompt-snippet",
+      label: "Add tests",
+      description: "Prompt · Add tests.",
+      snippet: tests,
+    });
+    expect(promptSnippetSlashItems([review, tests], "/TEST").map((item) => item.id)).toEqual([
+      "prompt:tests",
+    ]);
+    expect(promptSnippetSlashItems([review, tests], "prompt:rev").map((item) => item.id)).toEqual([
+      "prompt:review",
+    ]);
+    expect(promptSnippetSlashItems([review, tests], "zzz")).toEqual([]);
   });
 
   it("previews the first line, cut with an ellipsis", () => {

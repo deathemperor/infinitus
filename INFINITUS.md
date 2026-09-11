@@ -128,7 +128,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `insertComposerTextAtEnd` (#433). Beside them the Prompts block (#270 G):
   `useProjectPromptSnippets`, the prompts UI store, `ComposerPromptsBadge`
   after the Captures badge, `ComposerPromptsMenu` after the Captures menu
-  (the Captures guard also checks `!isPromptsMenuOpen`).
+  (the Captures guard also checks `!isPromptsMenuOpen`); `useProjectPromptSnippets`
+  is read just above the "Derived: composer trigger / menu" block so the
+  slash-menu `useMemo` appends `promptSnippetSlashItems(...)` after
+  `searchSlashCommandItems`, and `pickComposerMenuItem` has a
+  `prompt-snippet` branch before the skill one.
+- `apps/web/src/components/chat/ComposerCommandMenu.tsx` — the
+  `prompt-snippet` variant of `ComposerCommandItem` (label + description
+  render through the default row) (#270 G).
 - `apps/web/src/components/settings/ProjectSettingsPanel.tsx` —
   `ProjectPromptSnippetsSection` between the "Project" and "Checkout"
   sections, fed the group's checkouts (`promptSnippetTargets`, the
@@ -567,10 +574,12 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   Prompts: add / edit / remove, read from the representative checkout and
   saved to every checkout of the group through
   `serverEnvironment.updateSettings`, like the panel's overrides). Snippet text
-  is user prose: toasts and labels show the name, never the body. The phone
-  has no server-settings reader yet, so it does not show the list; a
-  slash-style trigger in the composer's command menu is a follow-up (four
-  upstream touchpoints).
+  is user prose: toasts and labels show the name, never the body. The `/`
+  menu offers them too (`promptSnippetSlashItems`: filtered by name, a
+  leading `/` or `prompt:` ignored, listed after the commands and skills;
+  picking one replaces the `/query` with the body where it was typed, via
+  `applyPromptReplacement`). The phone lists the same snippets from its
+  server config's settings (see `apps/mobile/src/features/threads/promptSnippetItems.ts`).
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /

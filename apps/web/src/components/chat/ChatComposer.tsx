@@ -107,6 +107,7 @@ import { ComposerPromptsBadge } from "../prompts/ComposerPromptsBadge";
 import { ComposerPromptsMenu } from "../prompts/ComposerPromptsMenu";
 import { usePromptsUiStore } from "../prompts/promptsUiStore";
 import { useProjectPromptSnippets } from "../prompts/useProjectPromptSnippets";
+import { promptSnippetSlashItems } from "../prompts/promptSnippets.logic";
 import { captures as capturesAtoms } from "../../state/captures";
 import { useEnvironmentQuery } from "../../state/query";
 import { useComposerMenuState } from "./useComposerMenuState";
@@ -2037,6 +2038,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       prompt,
     ],
   );
+  // Prompts (#270 G, fork): the routed project's saved snippets, for the
+  // Prompts popover and the `/` menu below.
+  const promptSnippets = useProjectPromptSnippets(useActiveProjectRef());
   // ------------------------------------------------------------------
   // Derived: composer trigger / menu
   // ------------------------------------------------------------------
@@ -2134,7 +2138,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         [...builtInSlashCommandItems, ...visibleProviderSlashCommandItems, ...skillItems],
         composerTrigger.rangeStart === 0,
       );
-      return searchSlashCommandItems(slashCommandItems, query);
+      return [
+        ...searchSlashCommandItems(slashCommandItems, query),
+        // Fork (#270 G): the project's saved prompts, by name, after the commands.
+        ...promptSnippetSlashItems(promptSnippets.snippets, composerTrigger.query),
+      ];
     }
     if (composerTrigger.kind === "skill") {
       return searchProviderSkills(selectedProviderSkills, composerTrigger.query).map((skill) => ({
@@ -2154,6 +2162,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     compactSlashCommandAvailable,
     composerTrigger,
     planModeUiEnabled,
+    promptSnippets.snippets,
     selectedProvider,
     selectedProviderSkills,
     selectedProviderSlashCommands,
@@ -2934,6 +2943,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           replacementRangeEnd,
           replacement,
           { expectedText: snapshot.value.slice(trigger.rangeStart, replacementRangeEnd) },
+        );
+        if (applied) {
+          setComposerHighlightedItemId(null);
+        }
+        return;
+      }
+      if (item.type === "prompt-snippet") {
+        // Fork (#270 G): the body replaces the `/query` where it was typed.
+        const applied = applyPromptReplacement(
+          trigger.rangeStart,
+          trigger.rangeEnd,
+          item.snippet.text,
+          { expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd) },
         );
         if (applied) {
           setComposerHighlightedItemId(null);
@@ -4302,9 +4324,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }),
   );
   useCapturesShortcuts({ keybindings, terminalOpen, modelPickerOpen: isComposerModelPickerOpen });
-  // Prompts (#270 G, fork): the project's saved snippets and the popover's
-  // open state; the menu inserts through `insertComposerTextAtEnd`.
-  const promptSnippets = useProjectPromptSnippets(capturesProject);
+  // Prompts (#270 G, fork): the popover's open state; its list is read above
+  // the command-menu derivation so the `/` menu can offer the snippets too.
   const isPromptsMenuOpen = usePromptsUiStore((store) => store.open);
   const togglePromptsMenu = usePromptsUiStore((store) => store.toggle);
   const closePromptsMenu = usePromptsUiStore((store) => store.close);

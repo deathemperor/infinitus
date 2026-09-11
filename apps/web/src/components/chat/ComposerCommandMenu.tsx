@@ -5,6 +5,7 @@ import {
 } from "@t3tools/client-runtime/providerSkills";
 import {
   type ProjectEntry,
+  type PromptSnippet,
   type ProviderDriverKind,
   type ServerProviderSkill,
   type ServerProviderSlashCommand,
@@ -55,6 +56,15 @@ export type ComposerCommandItem =
       type: "skill";
       provider: ProviderDriverKind;
       skill: ServerProviderSkill;
+      label: string;
+      description: string;
+    }
+  // Fork (#270 G): a saved prompt snippet of the project, offered by the `/`
+  // menu; picking it puts the body where the trigger was.
+  | {
+      id: string;
+      type: "prompt-snippet";
+      snippet: PromptSnippet;
       label: string;
       description: string;
     };
