@@ -1,13 +1,16 @@
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, ProjectId, ResolvedKeybindingsConfig } from "@t3tools/contracts";
-import { useCallback, useEffect } from "react";
+import { useParams } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
-import { useHandleNewThread } from "../../hooks/useHandleNewThread";
+import { useComposerDraftStore } from "../../composerDraftStore";
 import { resolveShortcutCommand } from "../../keybindings";
 import { getTerminalFocusOwner } from "../../lib/terminalFocus";
 import { captures } from "../../state/captures";
+import { useThread } from "../../state/entities";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
 import { captureApplyFailureMessage, captureText } from "./captures.logic";
 import { useCapturesUiStore } from "./capturesUiStore";
@@ -17,11 +20,35 @@ export interface ActiveProjectRef {
   readonly projectId: ProjectId;
 }
 
-/** The project the routed thread — or the draft, once a project is
-    chosen — belongs to. Null on a draft with no project yet. */
+/**
+ * The project the routed thread — or the draft, once a project is chosen —
+ * belongs to. Null on a draft with no project yet.
+ *
+ * Reads the route as three strings rather than through `useHandleNewThread`:
+ * that hook's `useParams` selector builds a new target object on every
+ * render, which React counts as a changed store snapshot.
+ * A component reading it can then never bail out of a same-state update,
+ * and the composer's every-render layout measure turned that into a
+ * synchronous update loop (#821). Chat-route components read this hook
+ * once and pass the ref down.
+ */
 export function useActiveProjectRef(): ActiveProjectRef | null {
-  const { activeDraftThread, activeThread } = useHandleNewThread();
-  const thread = activeThread ?? activeDraftThread;
+  const environmentId = useParams({ strict: false, select: (params) => params.environmentId });
+  const threadId = useParams({ strict: false, select: (params) => params.threadId });
+  const draftId = useParams({ strict: false, select: (params) => params.draftId });
+  const routeTarget = useMemo(
+    () => resolveThreadRouteTarget({ environmentId, threadId, draftId }),
+    [draftId, environmentId, threadId],
+  );
+  const activeThread = useThread(routeTarget?.kind === "server" ? routeTarget.threadRef : null);
+  const draftThread = useComposerDraftStore((store) =>
+    routeTarget === null
+      ? null
+      : routeTarget.kind === "server"
+        ? store.getDraftThread(routeTarget.threadRef)
+        : store.getDraftSession(routeTarget.draftId),
+  );
+  const thread = activeThread ?? draftThread;
   if (!thread) return null;
   return { environmentId: thread.environmentId, projectId: thread.projectId };
 }
@@ -65,9 +92,9 @@ export function useCapturesShortcuts(input: {
   readonly keybindings: ResolvedKeybindingsConfig;
   readonly terminalOpen: boolean;
   readonly modelPickerOpen: boolean;
+  readonly project: ActiveProjectRef | null;
 }): void {
-  const { keybindings, terminalOpen, modelPickerOpen } = input;
-  const project = useActiveProjectRef();
+  const { keybindings, terminalOpen, modelPickerOpen, project } = input;
   const addCapture = useAddCapture();
 
   useEffect(() => {
