@@ -9,6 +9,7 @@ import {
   probeUrl,
   subnetCandidates,
   subnetLabel,
+  shouldRetrySweep,
   sweepSummary,
 } from "./lanDiscovery.logic";
 
@@ -166,5 +167,50 @@ describe("networkWord", () => {
     expect(networkWord("CELLULAR")).toBe("cellular");
     expect(networkWord("ETHERNET")).toBe("ethernet");
     expect(networkWord(undefined)).toBeNull();
+  });
+});
+
+describe("shouldRetrySweep (#787)", () => {
+  const report = (over: Partial<import("./lanDiscovery.logic").SweepReport>) => ({
+    ownIp: "192.168.2.45",
+    network: "Wi‑Fi",
+    port: 3773,
+    timeoutMs: 800,
+    probed: 253,
+    servers: 0,
+    answeredOther: 0,
+    timedOut: 250,
+    failed: 3,
+    failure: "Network request failed",
+    aborted: false,
+    elapsedMs: 8_600,
+    ...over,
+  });
+
+  it("retries the session's first silent sweep once", () => {
+    expect(shouldRetrySweep({ report: report({}), firstSweepOfSession: true })).toBe(true);
+    expect(shouldRetrySweep({ report: report({}), firstSweepOfSession: false })).toBe(false);
+    expect(shouldRetrySweep({ report: report({ retried: true }), firstSweepOfSession: true })).toBe(
+      false,
+    );
+  });
+
+  it("never retries a sweep that found a Mac, probed nothing, or was stopped", () => {
+    expect(shouldRetrySweep({ report: report({ servers: 1 }), firstSweepOfSession: true })).toBe(
+      false,
+    );
+    expect(shouldRetrySweep({ report: report({ probed: 0 }), firstSweepOfSession: true })).toBe(
+      false,
+    );
+    expect(shouldRetrySweep({ report: report({ aborted: true }), firstSweepOfSession: true })).toBe(
+      false,
+    );
+  });
+
+  it("says in the line that the sweep was the second one", () => {
+    expect(sweepSummary(report({ retried: true }))).toContain(
+      "Second sweep, 2 s after the first found nothing.",
+    );
+    expect(sweepSummary(report({}))).not.toContain("Second sweep");
   });
 });

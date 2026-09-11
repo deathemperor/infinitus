@@ -984,6 +984,14 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   was not the one picked, and nothing is swept), how many probes answered,
   timed out or failed, and the first failure's words; counts and addresses
   only.
+  The session's first sweep gets one automatic retry (#787 hardening): iOS's
+  Local Network prompt settles after the first probes go out, and those are
+  misses for good, so `shouldRetrySweep` (first sweep since the app opened,
+  probed something, not stopped, no server heard) has the page wait
+  `SWEEP_RETRY_DELAY_MS` (2 s) with "looking once more…" and sweep again;
+  the line then ends "Second sweep, 2 s after the first found nothing."
+  (`SweepReport.retried`). A sweep that found a Mac, probed nothing or was
+  stopped is not retried, nor is any later sweep.
 - `apps/mobile/src/features/infinitus/pairingApproval.logic.ts` (+ `pairingApproval.ts`,
   `InfinitusAskToApprove.tsx`) — "Ask this Mac to approve" under the code
   field (#710, PR 3): the phone POSTs a request with a random secret to the
