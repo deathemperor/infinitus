@@ -553,7 +553,12 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
   `infinitusHoldBanner.logic.ts`) in the composer banner stack, one mount in
   `ChatView.tsx` beside the snoozed/settled banners: "Waiting for headroom",
-  the row's line, "Run now" and "Pin". The sidebar row reads "Held" (#741)
+  the row's line, "Run now" and "Pin". The same state and banner cover a turn
+  interrupt mode paused (#743): `threadHold` also reads the
+  `infinitus.thread.paused` / `infinitus.thread.resumed` rows and answers
+  `kind: "held" | "paused"`; the banner then reads "Paused for headroom" with
+  "Resume now" (the same RPC, which falls through to the interrupt layer).
+  The sidebar row reads "Held" (#741)
   from the `subscribeInfinitusHolds` stream (read scope; the service's `held`:
   the in-memory list, then again on every change — lost with a restart like
   the holds themselves), one shared stream per environment through

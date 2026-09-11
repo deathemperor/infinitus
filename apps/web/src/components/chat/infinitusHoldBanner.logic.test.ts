@@ -1,7 +1,12 @@
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
-import { holdBannerText, holdPhaseAfterRelease, runNowLabel } from "./infinitusHoldBanner.logic";
+import {
+  holdBannerText,
+  holdBannerTitle,
+  holdPhaseAfterRelease,
+  runNowLabel,
+} from "./infinitusHoldBanner.logic";
 
 describe("infinitusHoldBanner.logic", () => {
   it("reads the release result into a phase", () => {
@@ -43,5 +48,29 @@ describe("infinitusHoldBanner.logic", () => {
       description: "Run now failed: socket closed",
       actionable: true,
     });
+  });
+
+  it("speaks of resuming for a paused turn (#743)", () => {
+    expect(holdBannerTitle("held")).toBe("Waiting for headroom");
+    expect(holdBannerTitle("paused")).toBe("Paused for headroom");
+    expect(runNowLabel({ kind: "idle" }, "paused")).toBe("Resume now");
+    expect(runNowLabel({ kind: "releasing" }, "paused")).toBe("Resuming...");
+    const summary = "Paused for headroom on claude, 5h window 92 %";
+    expect(holdBannerText(summary, { kind: "idle" }, "paused")).toEqual({
+      description: summary,
+      actionable: true,
+    });
+    expect(
+      holdBannerText(summary, { kind: "gone", reason: "nothing is paused" }, "paused"),
+    ).toEqual({
+      description: "Nothing is paused any more (nothing is paused). Send a message to continue.",
+      actionable: false,
+    });
+    expect(holdBannerText(summary, { kind: "failed", message: "socket closed" }, "paused")).toEqual(
+      {
+        description: "Resume now failed: socket closed",
+        actionable: true,
+      },
+    );
   });
 });
