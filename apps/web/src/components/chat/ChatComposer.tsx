@@ -193,6 +193,8 @@ import { measureRestingComposerControls } from "./restingComposerControlsMeasure
 import { observeResponsiveBreakpointFade, usePanelAnimationSettings } from "../../panelAnimations";
 import { type ComposerPromptEditorHandle, ComposerPromptEditor } from "../ComposerPromptEditor";
 import { ProviderModelPicker } from "./ProviderModelPicker";
+import { BestOfPicker } from "./BestOfPicker";
+import type { BestOfChip } from "./bestOf.logic";
 import { type ComposerCommandItem, ComposerCommandMenu } from "./ComposerCommandMenu";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
 import { CompactComposerControlsMenu } from "./CompactComposerControlsMenu";
@@ -1442,6 +1444,8 @@ export interface ChatComposerProps {
   onCompactContext: () => void;
   /** Fork (#269 C): absent when the thread cannot host a side question. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 B): absent unless this draft can start once per model (a worktree draft). */
+  onBestOf?: ((chips: ReadonlyArray<BestOfChip>) => void) | undefined;
   onSend: (e?: { preventDefault: () => void }, intent?: ComposerSubmissionIntent) => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
@@ -1550,6 +1554,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onPageScrollRelease,
     onCompactContext,
     onAskSideQuestion,
+    onBestOf,
     onSend,
     onInterrupt,
     onImplementPlanInNewThread,
@@ -4338,6 +4343,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onInstanceModelChange={onProviderModelSelect}
         onOpenProviderSetup={onOpenProviderSetup}
       />
+      {onBestOf ? (
+        <BestOfPicker
+          size={composerControlsInStrip ? "xs" : "sm"}
+          options={modelOptionsByInstance.get(selectedInstanceId) ?? []}
+          currentModel={selectedModelForPickerWithCustomFallback}
+          disabled={providerCatalogPending}
+          onRun={onBestOf}
+        />
+      ) : null}
 
       {composerControlsCompact ? (
         <CompactComposerControlsMenu

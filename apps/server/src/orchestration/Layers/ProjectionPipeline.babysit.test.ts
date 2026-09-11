@@ -135,7 +135,10 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
       assert.strictEqual(side.groupId, "bake-1");
       assert.isUndefined((yield* shell()).sideOf);
       assert.isUndefined((yield* shell()).groupId);
-      const sideRows = yield* sql<{ readonly sideOf: string | null; readonly groupId: string | null }>`
+      const sideRows = yield* sql<{
+        readonly sideOf: string | null;
+        readonly groupId: string | null;
+      }>`
         SELECT side_of AS "sideOf", group_id AS "groupId"
         FROM projection_threads WHERE thread_id = ${sideId}
       `;
