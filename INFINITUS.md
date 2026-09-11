@@ -3,6 +3,13 @@
 This `main` is a fork of [T3 Code](https://github.com/pingdotgg/t3code) that
 drives the Infinitus engine. AGENTS.md (upstream's guide) applies in full;
 this file adds the fork's own rules. Plan and history: issue #555.
+Unification (#823, user ruling 2026-09-11): the product is one name,
+Infinitus — no user-facing "fork", "native" or "T3 Code" anywhere (layer 1);
+the Swift app moves into `main` as `apps/mac` (layer 2) and one version
+`0.5.0-alpha.N` ships everything from one release (layer 3). "Fork" and
+"native" below are contributor shorthand for this TypeScript tree and the
+Swift app while those layers land; each layer rewrites the paragraphs it
+makes wrong, in its own PR.
 
 ## Non-negotiables
 
@@ -1237,7 +1244,11 @@ pair` (token masked, server log never uploaded), screenshots every route in
   `fork-visual-routes.ts` with the runner's Chrome through
   `fork-visual-pass.mjs`, then `fork-visual-check.ts` fails the job on a
   missing marker or an empty state. The PNGs and text captures upload as the
-  `fork-visual-pass` artifact, on failure too.
+  `fork-visual-pass` artifact, on failure too. Runner fact (#825 hung 17 min
+  at the start step with nothing logged; #831 starts in 3 s): a step that
+  backgrounds a server must detach it — `setsid nohup … > log 2>&1
+  < /dev/null &` — and probe with `curl --max-time`, or the step holds the job
+  to its timeout.
 
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
