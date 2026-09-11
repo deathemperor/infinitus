@@ -2,7 +2,11 @@ import {
   resolveProviderSkillSourceKind,
   type ProviderSkillSourceKind,
 } from "@t3tools/client-runtime/providerSkills";
-import type { ServerProviderSkill, ServerProviderSlashCommand } from "@t3tools/contracts";
+import type {
+  PromptSnippet,
+  ServerProviderSkill,
+  ServerProviderSlashCommand,
+} from "@t3tools/contracts";
 import type { ComposerTriggerKind } from "@t3tools/shared/composerTrigger";
 import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
@@ -38,6 +42,15 @@ export type ComposerCommandItem =
       readonly id: string;
       readonly type: "skill";
       readonly skill: ServerProviderSkill;
+      readonly label: string;
+      readonly description: string;
+    }
+  // Fork (#270 G): a saved prompt of the project from its server settings;
+  // picking it puts the body where the trigger was.
+  | {
+      readonly id: string;
+      readonly type: "prompt-snippet";
+      readonly snippet: PromptSnippet;
       readonly label: string;
       readonly description: string;
     };
@@ -83,6 +96,8 @@ function itemIcon(item: ComposerCommandItem): AppSymbolName | null {
       return "terminal";
     case "skill":
       return SKILL_SOURCE_SYMBOL_BY_KIND[resolveProviderSkillSourceKind(item.skill)];
+    case "prompt-snippet":
+      return "doc.text";
     case "path":
       return null;
   }

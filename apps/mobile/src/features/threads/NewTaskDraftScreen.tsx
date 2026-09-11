@@ -49,6 +49,7 @@ import { AppText as Text } from "../../components/AppText";
 import { hasProviderUsageLimits, isUsageLimitsCommand } from "@t3tools/shared/usageLimits";
 import { COMPOSER_LAYOUT_TRANSITION, ComposerSurface } from "./ThreadComposer";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
+import { useProjectPromptSnippets } from "./usePromptSnippets";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
   ComposerDictationCancelAction,
@@ -327,10 +328,16 @@ export function NewTaskDraftScreen(props: {
       selectedEnvironmentServerConfig?.providers ?? [],
       selectedEnvironmentServerConfig?.usageLimitSources ?? [],
     );
+  // Fork (#270 G): the picked project's saved prompts for the `/` menu.
+  const promptSnippets = useProjectPromptSnippets(
+    selectedProject?.environmentId ?? null,
+    selectedProject?.id ?? null,
+  );
   const composerMenu = useComposerCommandMenu({
     draftMessage: flow.prompt,
     ownerKey: flow.draftKey,
     environmentId: selectedProject?.environmentId ?? null,
+    promptSnippets,
     projectCwd:
       (flow.workspaceMode === "worktree"
         ? selectedProject?.workspaceRoot

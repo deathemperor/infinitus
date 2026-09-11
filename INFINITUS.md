@@ -1045,6 +1045,20 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   session is not host-bound, so no re-pair. The environment row says
   "Connected via <host>" while roamed, else "Also via <host> when you are
   away".
+- `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
+  `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
+  snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`
+  reads `projectPromptSnippets` off the environment's server config (which
+  carries the server settings, so no request of its own) and
+  `promptSnippetCommandItems(snippets, query)` turns them into `/` menu rows
+  filtered by name (a leading `/` or `prompt:` ignored). Registration:
+  `ComposerCommandPopover.tsx` gains the `prompt-snippet` variant (icon
+  `doc.text`); `use-composer-command-menu.ts` takes an optional
+  `promptSnippets` input, appends the rows after commands and skills on the
+  slash trigger, and `resolveComposerCommandSelection` replaces the trigger
+  with the body (no trailing space); `ThreadComposer.tsx` feeds it the
+  thread's project, `NewTaskDraftScreen.tsx` the picked project. Editing
+  stays on the desktop.
 - `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`)
   — the phone outbox's queue rule (#807, #270 F): `queueBehindRunningTurn`
   turns an existing thread's `send` into `wait` while the thread's session is
