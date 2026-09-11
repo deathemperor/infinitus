@@ -153,6 +153,7 @@ case "$1" in
     auto)
         # The supervised-daemon contract: events on stdout, exit on stdin EOF.
         echo '{"schemaVersion":1,"event":"poll","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"threshold":10}'
+        echo '{"schemaVersion":1,"event":"sleep","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"summary":"sleep","threshold":10}'
         cat >/dev/null
         ;;
     *) echo '{"schemaVersion":1,"error":{"code":"unsupported","message":"stub swapd: no such verb"}}'; exit 1 ;;
@@ -368,6 +369,8 @@ echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, ra
 echo "swapd: registered beside cswap, ignite published the refreshed window"
 # #475: an enabled engine runs its own `auto` under the supervisor.
 pgrep -f "$SOCKDIR/swapd auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
+"$CTL" events | expect "not any((e.get('summary') or '') in ('poll', 'sleep') for e in (d if isinstance(d, list) else d.get('events', [])))" \
+    || fail "the supervisor must drop the poll/sleep heartbeats (#475)"
 # #616: the headroom verdict rides `fleets` only while priority_mode is on;
 # the stub's active slot sits at 5h 4% / 7d 18%, so 7d binds.
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must be absent while priority_mode is off"
