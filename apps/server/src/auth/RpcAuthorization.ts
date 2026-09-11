@@ -169,6 +169,10 @@ export const RPC_REQUIRED_SCOPES = {
   // list; deciding one mints a pairing credential, like creating a link.
   [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,
   [WS_METHODS.infinitusPairingDecide]: AuthAccessWriteScope,
+  // A project's captures (#433) are the user's own working notes, read and
+  // changed by whoever can read and drive its threads — a paired phone too.
+  [WS_METHODS.subscribeCaptures]: AuthOrchestrationReadScope,
+  [WS_METHODS.capturesApply]: AuthOrchestrationOperateScope,
 } as const satisfies Readonly<Record<WsRpcMethod, AuthEnvironmentScope>>;
 
 export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope {

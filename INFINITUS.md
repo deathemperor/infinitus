@@ -53,23 +53,27 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an
   Anthropic-compatible proxy's models) the same way;
   `subscribeInfinitusPairing` / `infinitus.pairingDecide` (approve-on-Mac
-  pairing, #710) the same way, contracts in `infinitusPairing.ts`.
+  pairing, #710) the same way, contracts in `infinitusPairing.ts`;
+  `subscribeCaptures` / `captures.apply` (#433) the same way, contracts in
+  `captures.ts`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), so the typed HTTP clients carry them.
-- `packages/contracts/package.json` — the `./infinitus` and
-  `./infinitusPairing` subpath exports.
+- `packages/contracts/package.json` — the `./infinitus`,
+  `./infinitusPairing` and `./captures` subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
   `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663).
-- `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` and
-  `subscribeInfinitusPairing` in `EnvironmentSubscriptionRpcTag`, so the
-  client's `subscribe` accepts them.
+- `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
+  `subscribeInfinitusPairing` and `subscribeCaptures` in
+  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
 - `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
   and answers the two Infinitus methods; answers `provider.proxyModels` with
   `fetchProxyModels` over the server's `HttpClient`; pulls `InfinitusPairing`
   and answers the pairing stream and `decide` (the approver's session scopes
-  go along; only the request id reaches the span).
+  go along; only the request id reaches the span); pulls `CaptureStore` and
+  answers `subscribeCaptures` / `captures.apply` (#433; the project id and
+  the command's type reach the span, a capture's text never).
 - `packages/client-runtime/src/state/server.ts` — `serverEnvironment.proxyModels`
   command (single-flight per base URL).
 - `apps/web/src/components/settings/AddProviderInstanceDialog.tsx` — the Claude
@@ -85,6 +89,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `TurnStartGatePassthrough` in `RuntimeDependenciesLive` (#616).
+  `CaptureStore.layer` (#433) in the state-dir file services'
+  `Layer.mergeAll` beside `Keybindings.layer`.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does
@@ -103,7 +109,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `InfinitusDesktop.layer` in `desktopApplicationLayer`.
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service; a
-  `Layer.mock(InfinitusPairing)` beside it.
+  `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.
 - `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
   the descriptor through `withAlternateHttpBaseUrls` (#663).
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
@@ -300,6 +306,21 @@ this file adds the fork's own rules. Plan and history: issue #555.
   session; `show` is never sent without a session since the pop-out and
   session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that one line is the fork's only edit there).
+- `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
+  `packages/client-runtime/src/state/captures.ts` (exported as
+  `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
+  project of `CaptureItem {id, text, createdAt, doneAt}` (≤ 200 items, ≤ 8 KiB
+  each; `add` / `edit` / `setDone` / `remove` / `clearDone`, a command naming
+  a gone id is a no-op), kept by the server as
+  `<stateDir>/captures/<percent-encoded projectId>.json` — never in the
+  workspace — written atomically under one lock and streamed whole after every
+  change (`subscribeCaptures`, `orchestration:read`; `captures.apply`,
+  `orchestration:operate`). A file the server cannot decode fails the
+  project's reads and writes with `CaptureStoreError` (the issue, never the
+  contents) rather than being overwritten. The client-runtime atoms are the
+  `list` subscription family keyed `{environmentId, input: {projectId}}` and
+  the `apply` command; the web popover (PR B) and the phone read the same
+  stream.
 - `packages/client-runtime/src/state/infinitusExhausted.ts` (exported as
   `@t3tools/client-runtime/state/infinitusExhausted`) — the all-accounts-
   exhausted band's verdict (#659): a fleet whose every unheld account has a

@@ -74,6 +74,7 @@ import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
+import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import { OrchestrationReactorLive } from "./orchestration/Layers/OrchestrationReactor.ts";
@@ -503,9 +504,15 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(Layer.mergeAll(TerminalLayerLive, PreviewLayerLive, DeviceLayerLive)),
   Layer.provideMerge(PersistenceLayerLive),
   // Both read a user-owned file out of the state directory and stream changes
-  // to clients; neither depends on the other.
+  // to clients; neither depends on the other. The capture store (#433) keeps
+  // one such file per project.
   Layer.provideMerge(
-    Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer),
+    Layer.mergeAll(
+      Keybindings.layer,
+      EnvironmentTheme.layer,
+      UsageLimitSources.layer,
+      CaptureStore.layer,
+    ),
   ),
   Layer.provideMerge(ProviderRegistryLive),
   // The instance registry is the new routing keystone — text generation,

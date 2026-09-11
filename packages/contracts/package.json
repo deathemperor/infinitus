@@ -27,6 +27,10 @@
       "types": "./src/infinitusPairing.ts",
       "import": "./src/infinitusPairing.ts"
     },
+    "./captures": {
+      "types": "./src/captures.ts",
+      "import": "./src/captures.ts"
+    },
     "./productName": {
       "types": "./src/productName.ts",
       "import": "./src/productName.ts"
