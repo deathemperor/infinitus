@@ -197,12 +197,15 @@ describe("AccountsPage", () => {
     expect(markup).toContain("Launch Infinitus");
   });
 
-  it("says so when the host reports no engines", () => {
+  it("says what is missing when the host reports no engines", () => {
     testState.snapshot = { available: true, fleets: [], sessions: [], commands: [] };
 
     const markup = renderToStaticMarkup(<AccountsPage />);
 
-    expect(markup).toContain("No engines report accounts on this host.");
+    expect(markup).toContain("No accounts yet");
+    expect(markup).toContain("This Mac reports no engine at all.");
+    expect(markup).toContain("Open Engines");
+    expect(markup).toContain("Set up an engine");
   });
 
   it("draws every fleet with its accounts, badges, windows and forecast", () => {
@@ -735,7 +738,7 @@ describe("AccountsPage", () => {
 
     testState.snapshot = { available: true, fleets: [], sessions: [], commands: [], awsLogins };
     const empty = renderToStaticMarkup(<AccountsPage />);
-    expect(empty).toContain("No engines report accounts on this host.");
+    expect(empty).toContain("No accounts yet");
     expect(empty).toContain("Sign in: AWS dev");
   });
 
