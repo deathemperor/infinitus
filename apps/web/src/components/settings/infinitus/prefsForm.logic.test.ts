@@ -293,6 +293,29 @@ describe("parseControlInput", () => {
     expect(parseControlInput(style, "Hades").ok).toBe(false);
   });
 
+  it("labels the session priority modes, the interrupt choice included (#743)", () => {
+    const mode = pref({
+      key: "priority_mode",
+      section: "sessions",
+      type: "string",
+      default: "off",
+      value: "hold",
+      choices: ["off", "hold", "interrupt"],
+    });
+    const row = rowOf(catalog([{ slug: "sessions", name: "Sessions" }], [mode]), "priority_mode");
+
+    expect(row.label).toBe("Session priority");
+    expect(row.control).toEqual({
+      kind: "select",
+      value: "hold",
+      options: [
+        { value: "off", label: "Off — every thread runs" },
+        { value: "hold", label: "Hold — new turns wait for headroom" },
+        { value: "interrupt", label: "Interrupt — running turns pause too" },
+      ],
+    });
+  });
+
   it("carries a bounded number's range and refuses a value outside it (#747)", () => {
     const speed = pref({
       key: "intro_speed",

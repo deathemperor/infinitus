@@ -14,6 +14,7 @@ export type SettingsPath =
   | "/settings/infinitus"
   | "/settings/infinitus/themes"
   | "/settings/infinitus/animations"
+  | "/settings/infinitus/sessions"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
@@ -73,6 +74,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/infinitus": "Menu bar",
   "/settings/infinitus/themes": "Themes",
   "/settings/infinitus/animations": "Animations",
+  "/settings/infinitus/sessions": "Sessions",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
@@ -639,6 +641,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-animations",
     infinitusOnly: true,
     searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
+  },
+  {
+    id: "infinitus-sessions",
+    title: "Infinitus sessions",
+    to: "/settings/infinitus/sessions",
+    targetId: "infinitus-sessions",
+    infinitusOnly: true,
+    searchTerms: ["session priority mode hold interrupt headroom low abundant pct background"],
   },
   {
     id: "infinitus-push",
