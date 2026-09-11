@@ -26,7 +26,7 @@ const INFINITUS_BUNDLE_ID = "run.infinitus";
 /** Where the fork's desktop bundle nests the menu-bar app (#777): the one
     path `SMAppService.loginItem` accepts. The desktop names its own bundle in
     `INFINITUS_DESKTOP_BUNDLE`; CLI and dev servers never set it. */
-export const NESTED_HELPER_RELATIVE_PATH = "Contents/Library/LoginItems/Infinitus Menu Bar.app";
+const NESTED_HELPER_RELATIVE_PATH = "Contents/Library/LoginItems/Infinitus Menu Bar.app";
 /** How long the socket may stay quiet after the server starts before the app
     is opened for the user (#654 step 1). */
 export const STARTUP_GRACE = Duration.seconds(3);
