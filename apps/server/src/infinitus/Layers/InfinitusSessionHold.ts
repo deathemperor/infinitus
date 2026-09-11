@@ -18,6 +18,7 @@ import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
+import { isNotPolled } from "./Infinitus.ts";
 import {
   InfinitusSessionHold,
   type InfinitusSessionHoldRelease,
@@ -138,11 +139,17 @@ const InfinitusSessionHoldLive = Layer.effect(
       Effect.gen(function* () {
         let first = true;
         for (const threadId of threadIds) {
-          const mine = held.filter((entry) => entry.threadId === threadId);
-          if (mine.length === 0) continue;
-          held = held.filter((entry) => entry.threadId !== threadId);
+          if (!held.some((entry) => entry.threadId === threadId)) continue;
           if (!first) yield* Effect.sleep(Duration.millis(RELEASE_SPACING_MS));
           first = false;
+          // The wait is long enough for the thread to have gone: the archive
+          // event is queued behind this input, so ask the projection directly.
+          const shell = yield* projectionSnapshotQuery
+            .getThreadShellById(threadId)
+            .pipe(Effect.option, Effect.map(Option.flatten));
+          const mine = held.filter((entry) => entry.threadId === threadId);
+          held = held.filter((entry) => entry.threadId !== threadId);
+          if (Option.isNone(shell) || shell.value.archivedAt !== null) continue;
           const provider = mine[0]!.provider;
           yield* appendMarker(
             threadId,
@@ -277,7 +284,14 @@ const InfinitusSessionHoldLive = Layer.effect(
         const info = yield* providerService.getInstanceInfo(shell.value.modelSelection.instanceId);
         const provider = fleetProviderForDriver(info.driverKind);
         if (provider === null) return null;
-        const verdict = headroomVerdict(yield* infinitus.snapshot, provider);
+        // On a server nobody watches, `snapshot` is the pre-poll placeholder
+        // until something polls; one refresh reads the socket for real.
+        let snapshot = yield* infinitus.snapshot;
+        if (isNotPolled(snapshot)) {
+          yield* infinitus.refresh;
+          snapshot = yield* infinitus.snapshot;
+        }
+        const verdict = headroomVerdict(snapshot, provider);
         return verdict.verdict === "hold" ? { provider, fleet: verdict.fleet } : null;
       }).pipe(
         Effect.catchCause((cause) =>

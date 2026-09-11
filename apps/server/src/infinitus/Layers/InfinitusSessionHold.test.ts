@@ -28,6 +28,7 @@ import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
+import { NOT_POLLED_REASON } from "./Infinitus.ts";
 import { InfinitusSessionHoldLayers } from "./InfinitusSessionHold.ts";
 import { HOLD_MARKER_KIND, RELEASE_MARKER_KIND } from "./infinitusSessionHold.logic.ts";
 
@@ -56,6 +57,14 @@ const snapshotWith = (fleets: ReadonlyArray<InfinitusFleet>): InfinitusSnapshot 
 
 const low = snapshotWith([fleet({ headroom: { state: "low", window: "5h", pct: 84 } })]);
 const abundant = snapshotWith([fleet({ headroom: { state: "abundant" } })]);
+/** What `snapshot` answers before the first poll on a server nobody watches. */
+const notPolled: InfinitusSnapshot = {
+  available: false,
+  unavailableReason: NOT_POLLED_REASON,
+  fleets: [],
+  sessions: [],
+  commands: [],
+};
 const silent = snapshotWith([fleet()]);
 
 const shellFor = (
@@ -92,6 +101,7 @@ const makeHarness = Effect.gen(function* () {
   const ran = yield* Ref.make<ReadonlyArray<string>>([]);
   const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
   const watchers = yield* Ref.make(0);
+  const refreshes = yield* Ref.make(0);
 
   const layer = InfinitusSessionHoldLayers.pipe(
     Layer.provide(
@@ -135,6 +145,10 @@ const makeHarness = Effect.gen(function* () {
               ).pipe(Effect.as(Stream.fromQueue(snapshots))),
             ),
           observed: Stream.empty,
+          // A refresh polls for real: here it lands the low reading.
+          refresh: Ref.update(refreshes, (n) => n + 1).pipe(
+            Effect.andThen(Ref.set(current, low)),
+          ),
         }),
         Layer.succeed(Crypto.Crypto, testCrypto),
       ),
@@ -171,6 +185,7 @@ const makeHarness = Effect.gen(function* () {
       ),
     ),
     watchers: Ref.get(watchers),
+    refreshes: Ref.get(refreshes),
   };
 });
 
@@ -239,6 +254,31 @@ describe("InfinitusSessionHoldLayers", () => {
     ),
   );
 
+  effectIt.effect("polls once for a real reading when nothing has been polled yet", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.setCurrent(notPolled);
+
+        expect(yield* h.start(one)).toBe("held");
+        expect(yield* h.refreshes).toBe(1);
+        expect(yield* h.ran).toEqual([]);
+      }),
+    ),
+  );
+
+  effectIt.effect("does not poll again once a reading exists", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.setCurrent(abundant);
+
+        expect(yield* h.start(one)).toBe("started");
+        expect(yield* h.refreshes).toBe(0);
+      }),
+    ),
+  );
+
   effectIt.effect("releases held starts when the fleet reads abundant, and stops watching", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -279,6 +319,29 @@ describe("InfinitusSessionHoldLayers", () => {
         yield* TestClock.adjust(Duration.seconds(2));
         const ran = yield* settle(h.ran, (list) => list.length === 2);
         expect(ran).toEqual(["thread-1", "thread-2"]);
+      }),
+    ),
+  );
+
+  effectIt.effect("skips a thread archived while it waited its turn in a release", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.start(one);
+        yield* h.start(two);
+        yield* settle(h.watchers, (n) => n === 1);
+
+        yield* h.poll(abundant);
+        yield* settle(h.ran, (list) => list.length === 1);
+        yield* h.setShell(shellFor(two, { archivedAt: "2026-09-11T10:00:00Z" }));
+        yield* TestClock.adjust(Duration.seconds(2));
+        yield* settle(h.watchers, (n) => n === 0);
+        expect(yield* h.ran).toEqual(["thread-1"]);
+        expect((yield* h.markers).map((marker) => [marker.threadId, marker.kind])).toEqual([
+          [one, HOLD_MARKER_KIND],
+          [two, HOLD_MARKER_KIND],
+          [one, RELEASE_MARKER_KIND],
+        ]);
       }),
     ),
   );
