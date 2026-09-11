@@ -92,6 +92,14 @@ vi.mock("./threads", () => ({
   threadEnvironment: {},
 }));
 
+// Infinitus (fork, #742): the drain's pin-at-creation reads the preferences
+// atom, whose real module reaches expo-secure-store; a never-loaded store
+// means "off", so no creation here gets pinned.
+vi.mock("./preferences", async () => {
+  const { Atom, AsyncResult } = await import("effect/unstable/reactivity");
+  return { mobilePreferencesAtom: Atom.make(AsyncResult.initial()) };
+});
+
 vi.mock("./use-atom-command", () => ({
   useAtomCommand: () => async () => undefined,
 }));

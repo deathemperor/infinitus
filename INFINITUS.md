@@ -232,13 +232,20 @@ this file adds the fork's own rules. Plan and history: issue #555.
   no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
-  `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` keys (interface
-  and sanitizer).
+  `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
+  `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
   feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
   queued creation).
+- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
+  `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
+  control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
+  `usePinAtCreation` runs once a queued creation is delivered, right after the
+  "delivered" outcome is recorded (its test, `use-thread-outbox-drain.test.ts`,
+  mocks `./preferences` so the drain's module graph stays clear of
+  expo-secure-store).
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -724,6 +731,13 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   top-of-run order key on reordering servers, and pinning releases the hold on
   the server). Derived from the work-log marker rows via
   `@t3tools/client-runtime/state/infinitusThreadHold`; nothing persisted.
+- `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
+  `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
+  phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
+  only for a project whose server pins threads, backed by the
+  `infinitusPinAtCreation` preference (off by default); the outbox drain reads
+  it as each creation is delivered and pins through `usePinThread`, silently
+  on failure (the held banner still offers Pin).
 - `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
