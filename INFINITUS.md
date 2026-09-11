@@ -103,7 +103,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
-  and the `TurnStartGate` it implements. `CaptureStore.layer` (#433) in the
+  and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
+  before it (#743), a consumer of that gate. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
@@ -547,7 +548,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   2 s apart; one `infinitus.thread.held` / `infinitus.thread.released` work-log
   row per hold, which the web derives the held state from. "Run now" is the
   `infinitus.releaseThread` RPC (operate scope, `{threadId}` → `{released,
-reason?}`, never an error) answered by `ws.ts` from the same service. The
+reason?}`, never an error) answered by `ws.ts` from the same service, falling
+  through to `InfinitusSessionInterrupt.resume` when nothing is held (#743). The
   snapshot subscription is held only while a start is. The web reads the held
   state from those rows (`packages/client-runtime/src/state/infinitusThreadHold.ts`)
   and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
@@ -563,6 +565,28 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   "Pin on create" under a draft's composer (per-browser, off by default);
   ChatView pins the thread right after the send that creates it. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
+- `apps/server/src/infinitus/Layers/InfinitusSessionInterrupt.ts` (+
+  `infinitusSessionInterrupt.logic.ts`, `Services/InfinitusSessionInterrupt.ts`)
+  — session priority mode, interrupt (#743): pauses the background turns
+  already running on a fleet whose `headroom.state` reads `critical` (what
+  native publishes in interrupt mode where hold mode publishes `low`; the
+  fork reads only the verdict) and continues them when the fleet reads
+  `abundant`, the thread is pinned, `resume(threadId)` ("Resume now"), or a
+  real poll carries no verdict any more; an unreachable app keeps the pause.
+  Running turns are tracked from the driver's `turn.started`/`turn.completed`/
+  `turn.aborted`/`session.exited` runtime events; the snapshot subscription
+  (what makes the server poll, #346) is held only while a turn runs and the
+  `priority_mode` pref reads `interrupt` (or a fleet already reads critical),
+  or while a turn is paused — the one place the fork reads that pref, and only
+  to know whether watching can lead anywhere. A pause is upstream's own
+  `thread.turn.interrupt` command for the turn the session still names, so
+  the transcript shows the interruption, plus an `infinitus.thread.paused`
+  work-log row ("Paused for headroom on claude, 5h window 92 %"); a resume
+  appends `infinitus.thread.resumed` and sends `CONTINUATION_PROMPT` through
+  `TurnStartGate` like every other start (a fleet still low holds it) —
+  except "Resume now", which runs like the hold's "Run now". Pinned threads
+  are never paused; paused turns continue oldest first, 2 s apart; a thread
+  the user sends into, archives or deletes while paused is forgotten.
 - `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+
   `Services/InfinitusSecret.ts`) — the fork's one secret-carrying path (#747,
   the only exception to "secrets never over the fork RPC"): `infinitus.secret`

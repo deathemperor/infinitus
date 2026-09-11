@@ -117,6 +117,7 @@ import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
+import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -515,6 +516,7 @@ const buildAppUnderTest = (options?: {
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
     infinitus?: Partial<InfinitusService["Service"]>;
     infinitusSessionHold?: Partial<InfinitusSessionHold["Service"]>;
+    infinitusSessionInterrupt?: Partial<InfinitusSessionInterrupt["Service"]>;
     infinitusSecret?: Partial<InfinitusSecret["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     usageLimitSources?: Partial<UsageLimitSources.UsageLimitSources["Service"]>;
@@ -796,6 +798,11 @@ const buildAppUnderTest = (options?: {
             release: () => Effect.succeed({ released: false, reason: "nothing is held" }),
             held: Stream.empty,
             ...options?.layers?.infinitusSessionHold,
+          }),
+          // Nothing is ever paused here either; the layer has its own tests (#743).
+          Layer.mock(InfinitusSessionInterrupt)({
+            resume: () => Effect.succeed({ released: false, reason: "nothing is paused" }),
+            ...options?.layers?.infinitusSessionInterrupt,
           }),
           // No secret ever leaves here; the layer has its own tests (#747).
           Layer.mock(InfinitusSecret)({
@@ -4297,6 +4304,43 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
         assert.deepEqual(result, { released: true });
         assert.deepEqual(released, ["thread-held"]);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "infinitus.releaseThread continues a paused turn when nothing is held, and says so when neither (#743)",
+    () =>
+      Effect.gen(function* () {
+        const resumed: Array<string> = [];
+        yield* buildAppUnderTest({
+          layers: {
+            infinitusSessionInterrupt: {
+              resume: (threadId) =>
+                Effect.sync(() => {
+                  resumed.push(threadId);
+                  return threadId === "thread-paused"
+                    ? { released: true }
+                    : { released: false, reason: "nothing is paused" };
+                }),
+            },
+          },
+        });
+
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const [paused, neither] = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            Effect.all([
+              client[WS_METHODS.infinitusReleaseThread]({
+                threadId: ThreadId.make("thread-paused"),
+              }),
+              client[WS_METHODS.infinitusReleaseThread]({ threadId: ThreadId.make("thread-idle") }),
+            ]),
+          ),
+        );
+
+        assert.deepEqual(paused, { released: true });
+        assert.deepEqual(neither, { released: false, reason: "nothing is held or paused" });
+        assert.deepEqual(resumed, ["thread-paused", "thread-idle"]);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
