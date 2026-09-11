@@ -1,5 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
+  infinitusCapabilityOf,
+  infinitusPageState,
+} from "@t3tools/client-runtime/state/infinitusAccounts";
+import {
   ACTIVITY_KIND_LABELS,
   activityRows,
   decodeEventRows,
@@ -44,7 +48,9 @@ const SHOW_POLLS_KEY = "infinitus.activityShowPolls";
  */
 export function ActivityPage() {
   const environmentId = usePrimaryEnvironmentId();
-  const capability = useAtomValue(primaryServerConfigAtom)?.environment.capabilities.infinitus;
+  const capability = infinitusCapabilityOf(
+    useAtomValue(primaryServerConfigAtom)?.environment.capabilities,
+  );
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const minute = useNowMinute();
   const [showPolls, setShowPolls] = useLocalStorage<boolean, boolean>(
@@ -119,7 +125,8 @@ export function ActivityPage() {
   );
 
   let body: ReactNode;
-  if (capability !== true) {
+  const gate = infinitusPageState({ capability, snapshot });
+  if (gate === "unsupported") {
     body = (
       <section className="max-w-xl rounded-lg border p-4">
         <p className="text-muted-foreground text-sm">
@@ -127,9 +134,9 @@ export function ActivityPage() {
         </p>
       </section>
     );
-  } else if (snapshot === null) {
+  } else if (gate === "loading" || snapshot === null) {
     body = <ActivitySkeleton />;
-  } else if (!snapshot.available) {
+  } else if (gate === "unavailable") {
     body = (
       <AccountsUnavailable
         reason={snapshot.unavailableReason ?? null}

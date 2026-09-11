@@ -1,5 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
+  infinitusCapabilityOf,
+  infinitusPageState,
+} from "@t3tools/client-runtime/state/infinitusAccounts";
+import {
   ACTIVITY_FOOTNOTE,
   activityRows,
   decodeStatsSummary,
@@ -55,7 +59,9 @@ const ESTIMATE_NOTE = "Estimates from transcripts and repos on the Mac, never bi
  */
 export function StatsPage() {
   const environmentId = usePrimaryEnvironmentId();
-  const capability = useAtomValue(primaryServerConfigAtom)?.environment.capabilities.infinitus;
+  const capability = infinitusCapabilityOf(
+    useAtomValue(primaryServerConfigAtom)?.environment.capabilities,
+  );
   const [period, setPeriod] = useLocalStorage<StatsPeriod, string>(
     PERIOD_KEY,
     "week",
@@ -116,7 +122,8 @@ export function StatsPage() {
   );
 
   let body: ReactNode;
-  if (capability !== true) {
+  const gate = infinitusPageState({ capability, snapshot });
+  if (gate === "unsupported") {
     body = (
       <section className="max-w-xl rounded-lg border p-4">
         <p className="text-muted-foreground text-sm">
@@ -124,9 +131,9 @@ export function StatsPage() {
         </p>
       </section>
     );
-  } else if (snapshot === null) {
+  } else if (gate === "loading" || snapshot === null) {
     body = <StatsSkeleton />;
-  } else if (!snapshot.available) {
+  } else if (gate === "unavailable") {
     body = (
       <AccountsUnavailable
         reason={snapshot.unavailableReason ?? null}

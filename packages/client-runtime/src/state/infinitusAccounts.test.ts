@@ -13,6 +13,9 @@ import {
   addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
+  infinitusCapabilityAcross,
+  infinitusCapabilityOf,
+  infinitusPageState,
   buildSignInRows,
   signInCommandArgs,
   snapshotOffersAdd,
@@ -377,7 +380,9 @@ describe("page state", () => {
   it("answers for every outcome", () => {
     const state = (input: Parameters<typeof accountsPageState>[0]): AccountsPageState =>
       accountsPageState(input);
-    expect(state({ capability: undefined, snapshot: null })).toBe("unsupported");
+    expect(state({ capability: undefined, snapshot: null })).toBe("loading");
+    expect(state({ capability: undefined, snapshot: snapshot() })).toBe("loading");
+    expect(state({ capability: false, snapshot: null })).toBe("unsupported");
     expect(state({ capability: false, snapshot: snapshot() })).toBe("unsupported");
     expect(state({ capability: true, snapshot: null })).toBe("loading");
     expect(
@@ -390,6 +395,31 @@ describe("page state", () => {
     expect(state({ capability: true, snapshot: snapshot({ fleets: [twoAccounts] }) })).toBe(
       "ready",
     );
+  });
+
+  it("gates every page the same way: false is unsupported, undefined waits", () => {
+    expect(infinitusPageState({ capability: undefined, snapshot: null })).toBe("loading");
+    expect(infinitusPageState({ capability: undefined, snapshot: snapshot() })).toBe("loading");
+    expect(infinitusPageState({ capability: false, snapshot: null })).toBe("unsupported");
+    expect(infinitusPageState({ capability: true, snapshot: null })).toBe("loading");
+    expect(infinitusPageState({ capability: true, snapshot: snapshot({ available: false }) })).toBe(
+      "unavailable",
+    );
+    expect(infinitusPageState({ capability: true, snapshot: snapshot() })).toBe("ready");
+  });
+
+  it("reads one server's answer: no config is unknown, an absent field is false", () => {
+    expect(infinitusCapabilityOf(undefined)).toBeUndefined();
+    expect(infinitusCapabilityOf({})).toBe(false);
+    expect(infinitusCapabilityOf({ infinitus: false })).toBe(false);
+    expect(infinitusCapabilityOf({ infinitus: true })).toBe(true);
+  });
+
+  it("folds every environment's answer into one capability", () => {
+    expect(infinitusCapabilityAcross([])).toBeUndefined();
+    expect(infinitusCapabilityAcross([undefined, undefined])).toBeUndefined();
+    expect(infinitusCapabilityAcross([undefined, false])).toBe(false);
+    expect(infinitusCapabilityAcross([false, undefined, true])).toBe(true);
   });
 });
 
