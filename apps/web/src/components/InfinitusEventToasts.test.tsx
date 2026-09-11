@@ -1,5 +1,7 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
+import * as DateTime from "effect/DateTime";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -8,6 +10,7 @@ const environmentId = EnvironmentId.make("test-environment");
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
+  pairing: null as ReadonlyArray<PairingApprovalRequest> | null,
   capability: true as boolean | undefined,
   addToast: vi.fn(),
   command: vi.fn(),
@@ -36,12 +39,14 @@ vi.mock("../state/environments", () => ({
 vi.mock("../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
+    pairing: () => ({ label: "pairing-atom" }),
     command: { label: "command-atom" },
   },
 }));
 vi.mock("../state/query", () => ({
-  useEnvironmentQuery: (atom: unknown) => ({
-    data: atom === null ? null : testState.snapshot,
+  useEnvironmentQuery: (atom: { label: string } | null) => ({
+    data:
+      atom === null ? null : atom.label === "pairing-atom" ? testState.pairing : testState.snapshot,
     error: null,
     isPending: false,
     isSuccess: true,
@@ -87,9 +92,30 @@ async function deliver(renderer: ReactTestRenderer, snapshot: InfinitusSnapshot)
   });
 }
 
+async function deliverPairing(
+  renderer: ReactTestRenderer,
+  requests: ReadonlyArray<PairingApprovalRequest>,
+): Promise<void> {
+  testState.pairing = requests;
+  await act(async () => {
+    renderer.update(<InfinitusEventToasts />);
+  });
+}
+
+const pairingRequest = (id: string, deviceName = "Titan"): PairingApprovalRequest => ({
+  id,
+  deviceName,
+  os: "iOS 26",
+  remoteAddress: "192.168.1.20",
+  matchCode: "AB12",
+  createdAt: DateTime.makeUnsafe("2026-09-11T10:00:00Z"),
+  expiresAt: DateTime.makeUnsafe("2026-09-11T10:02:00Z"),
+});
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
+  testState.pairing = null;
   testState.capability = true;
   testState.addToast = vi.fn();
   testState.command = vi.fn().mockResolvedValue({ _tag: "Success", value: {} });
@@ -209,6 +235,50 @@ describe("InfinitusEventToasts", () => {
     const renderer = await mount();
     await deliver(renderer, snapshotWith([switched("a")]));
     expect(testState.addToast).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+});
+
+describe("InfinitusEventToasts — pairing requests (#710)", () => {
+  it("toasts a request already pending at mount, once, with Open leading to the Devices card", async () => {
+    testState.pairing = [pairingRequest("req-1")];
+    const renderer = await mount();
+    expect(testState.addToast).toHaveBeenCalledTimes(1);
+    const toast = testState.addToast.mock.calls[0]?.[0] as {
+      type: string;
+      title: string;
+      description: string;
+      actionProps: { children: string; onClick: () => void };
+    };
+    expect(toast.type).toBe("info");
+    expect(toast.title).toBe("“Titan” wants to pair");
+    // The toast opens the card; it never approves, and never shows the code.
+    expect(toast.actionProps.children).toBe("Open");
+    expect(`${toast.title} ${toast.description}`).not.toContain("AB12");
+    expect(`${toast.title} ${toast.description}`).not.toContain("Approve");
+    toast.actionProps.onClick();
+    expect(testState.navigate).toHaveBeenCalledWith({ to: "/settings/infinitus/devices" });
+
+    await deliverPairing(renderer, [pairingRequest("req-1")]);
+    expect(testState.addToast).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it("toasts each new request as the list changes and nothing when one leaves", async () => {
+    testState.pairing = [];
+    const renderer = await mount();
+    expect(testState.addToast).not.toHaveBeenCalled();
+
+    await deliverPairing(renderer, [pairingRequest("req-1")]);
+    await deliverPairing(renderer, [pairingRequest("req-1"), pairingRequest("req-2", "Pixel")]);
+    expect(testState.addToast).toHaveBeenCalledTimes(2);
+    expect(testState.addToast).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "“Pixel” wants to pair" }),
+    );
+
+    await deliverPairing(renderer, [pairingRequest("req-2", "Pixel")]);
+    await deliverPairing(renderer, []);
+    expect(testState.addToast).toHaveBeenCalledTimes(2);
     renderer.unmount();
   });
 });

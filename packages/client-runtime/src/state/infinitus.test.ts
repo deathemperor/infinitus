@@ -5,7 +5,12 @@ import type {
   InfinitusFleet,
   InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
+import type {
+  PairingApprovalDecideInput,
+  PairingApprovalRequest,
+} from "@t3tools/contracts/infinitusPairing";
 import { describe, expect, it } from "@effect/vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Latch from "effect/Latch";
 import * as Layer from "effect/Layer";
@@ -192,6 +197,79 @@ describe("Infinitus environment atoms", () => {
         expect(yield* Ref.get(calls)).toEqual([
           { command: "swap", args: ["claude", "2"], options: { yes: "true" } },
         ]);
+      }),
+    ),
+  );
+});
+
+describe("Infinitus pairing atoms", () => {
+  const request = (id: string): PairingApprovalRequest => ({
+    id,
+    deviceName: "Titan",
+    os: "iOS 26",
+    remoteAddress: "192.168.1.20",
+    matchCode: "AB12",
+    createdAt: DateTime.makeUnsafe("2026-09-11T10:00:00Z"),
+    expiresAt: DateTime.makeUnsafe("2026-09-11T10:02:00Z"),
+  });
+
+  it.effect("holds the latest pending list the subscription delivers", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const lists = yield* Queue.unbounded<ReadonlyArray<PairingApprovalRequest>>();
+        const client = {
+          [WS_METHODS.subscribeInfinitusPairing]: () => Stream.fromQueue(lists),
+        } as unknown as WsRpcProtocolClient;
+        const { atoms, registry } = yield* makeTestRuntime(client);
+        const atom = atoms.pairing({ environmentId: TARGET.environmentId, input: {} });
+
+        const observed: Array<ReadonlyArray<PairingApprovalRequest>> = [];
+        const seeded = Latch.makeUnsafe();
+        const emptied = Latch.makeUnsafe();
+        const unmount = registry.mount(atom);
+        const stop = registry.subscribe(atom, (result) => {
+          if (!AsyncResult.isSuccess(result)) return;
+          observed.push(result.value);
+          if (result.value.length === 0) emptied.openUnsafe();
+          else seeded.openUnsafe();
+        });
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            stop();
+            unmount();
+          }),
+        );
+
+        yield* Queue.offer(lists, [request("req-1")]);
+        yield* seeded.await;
+        expect(yield* AtomRegistry.getResult(registry, atom)).toEqual([request("req-1")]);
+
+        yield* Queue.offer(lists, []);
+        yield* emptied.await;
+        expect(observed).toEqual([[request("req-1")], []]);
+      }),
+    ),
+  );
+
+  it.effect("forwards a decision and resolves with the server's verdict", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const calls = yield* Ref.make<ReadonlyArray<PairingApprovalDecideInput>>([]);
+        const client = {
+          [WS_METHODS.infinitusPairingDecide]: (input: PairingApprovalDecideInput) =>
+            Ref.update(calls, (current) => [...current, input]).pipe(Effect.as({ decided: true })),
+        } as unknown as WsRpcProtocolClient;
+        const { atoms, registry } = yield* makeTestRuntime(client);
+
+        const result = yield* Effect.promise(() =>
+          atoms.pairingDecide.run(registry, {
+            environmentId: TARGET.environmentId,
+            input: { id: "req-1", approve: false },
+          }),
+        );
+
+        expect(result).toMatchObject({ _tag: "Success", value: { decided: true } });
+        expect(yield* Ref.get(calls)).toEqual([{ id: "req-1", approve: false }]);
       }),
     ),
   );
