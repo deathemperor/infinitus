@@ -2366,14 +2366,18 @@ final class AppModel: ObservableObject {
     }
 
     /// The fork's hostname on the named tunnel while that route applies:
-    /// a hostname is set and the companion's named tunnel is running. A
+    /// a hostname is set and the companion's named tunnel is configured
+    /// (enabled, with a hostname). The route follows configuration, not
+    /// the connector's life: once chosen, the fork never falls back to a
+    /// quick tunnel — a dead named tunnel reports `stopped` (no throwaway
+    /// name under the phone), and it comes back with the connector. A
     /// locally-managed tunnel (config.yml) is checked for the ingress
     /// rule to the fork's port; a dashboard-managed one can't be, so the
     /// pref is trusted. Logged once per change, not per refresh.
     private var forkNamedHost: String? {
         let host = NamedTunnel.normalizeHostname(forkTunnelHostname)
-        guard !host.isEmpty, namedTunnel.isRunning else { return nil }
         let companion = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
+        guard !host.isEmpty, mirrorNamedTunnelEnabled, !companion.isEmpty else { return nil }
         if NamedTunnel.localConfigCovers(companion), !NamedTunnel.localConfigRoutes(host, toPort: forkServerPort) {
             if forkNamedHostWarned != host {
                 forkNamedHostWarned = host
