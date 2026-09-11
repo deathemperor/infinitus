@@ -233,7 +233,7 @@ public enum WindowPlanner {
 
     // MARK: replay
 
-    public struct ReplayReport: Sendable, Equatable {
+    public struct ReplayReport: Sendable, Equatable, Encodable {
         public let from: Double
         public let to: Double
         /// Active account changed between consecutive polls.

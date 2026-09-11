@@ -155,6 +155,7 @@ publishes the matching section as the GitHub release body.
 - Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 - The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
 - Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
+- `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

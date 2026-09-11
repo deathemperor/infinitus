@@ -30,7 +30,68 @@ final class UtilizationModel: ObservableObject {
     @Published var account: String?
 
     /// Window choices actually present in the data, stable order.
-    var windows: [String] {
+    var windows: [String] { Self.windowNames(samples) }
+
+    var emails: [String] { Self.emails(samples) }
+
+    func loadIfNeeded() { if samples.isEmpty && !loading { refresh() } }
+
+    func refresh() {
+        guard !loading else { return }
+        loading = true
+        let days = rangeDays
+        Task.detached(priority: .utility) {
+            let snap = Self.compute(days: days, now: Date().timeIntervalSince1970)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.samples = snap.samples
+                self.generations = snap.generations
+                self.fiveHourWindows = snap.fiveHourWindows
+                self.replay = snap.replay
+                self.dryRunPlan = snap.dryRunPlan
+                self.loading = false
+            }
+        }
+        refreshRates()
+    }
+
+    /// What the pane charts, as one value: the `utilization` verb (#747)
+    /// answers with the same computation so the desktop app renders the
+    /// app's figures instead of redoing them.
+    struct Snapshot: Encodable, Sendable {
+        let days: Int
+        let bucketSeconds: Double
+        let samples: [UsageSample]
+        let generations: [WindowGeneration]
+        let fiveHourWindows: [FiveHourWindow]
+        let replay: WindowPlanner.ReplayReport
+        let dryRunPlan: WindowPlanner.Plan?
+        let windows: [String]
+        let emails: [String]
+        var rates: TokenRates?
+        /// The popup's 5-minute output rate, from the relay (main actor).
+        var liveRate: TokenRate?
+    }
+
+    nonisolated static func compute(days: Int, now: Double) -> Snapshot {
+        let urls = UsageHistoryRecorder.readableURLs()
+        let merged = UsageHistory.merge(urls.map { UsageHistory.load(url: $0) })
+        // Waste generations and 5h windows need the FULL history (a
+        // reset may predate the chart range); the chart gets the
+        // trimmed, thinned slice.
+        let gens = WasteMath.generations(merged)
+        let windows = WindowTelemetry.fiveHourWindows(merged, now: now)
+        let cutoff = now - Double(days) * 86400
+        let bucket: TimeInterval = days <= 1 ? 300 : days <= 7 ? 1800 : 7200
+        let thin = UsageHistory.downsample(merged.filter { $0.t >= cutoff }, bucket: bucket)
+        let replay = WindowPlanner.replay(merged, from: cutoff, to: now)
+        let plan = Self.dryRunPlan(merged, now: now)
+        return Snapshot(days: days, bucketSeconds: bucket, samples: thin, generations: gens,
+                        fiveHourWindows: windows, replay: replay, dryRunPlan: plan,
+                        windows: windowNames(thin), emails: emails(thin))
+    }
+
+    nonisolated static func windowNames(_ samples: [UsageSample]) -> [String] {
         var names: [String] = ["5h", "7d"]
         var seen = Set<String>()
         for s in samples {
@@ -41,44 +102,9 @@ final class UtilizationModel: ObservableObject {
         return names
     }
 
-    var emails: [String] {
+    nonisolated static func emails(_ samples: [UsageSample]) -> [String] {
         var seen = Set<String>()
         return samples.compactMap { seen.insert($0.email).inserted ? $0.email : nil }
-    }
-
-    func loadIfNeeded() { if samples.isEmpty && !loading { refresh() } }
-
-    func refresh() {
-        guard !loading else { return }
-        loading = true
-        let days = rangeDays
-        Task.detached(priority: .utility) {
-            let urls = UsageHistoryRecorder.readableURLs()
-            let merged = UsageHistory.merge(urls.map { UsageHistory.load(url: $0) })
-            // Waste generations and 5h windows need the FULL history (a
-            // reset may predate the chart range); the chart gets the
-            // trimmed, thinned slice.
-            let gens = WasteMath.generations(merged)
-            let windows = WindowTelemetry.fiveHourWindows(
-                merged, now: Date().timeIntervalSince1970)
-            let now = Date().timeIntervalSince1970
-            let cutoff = now - Double(days) * 86400
-            let bucket: TimeInterval = days <= 1 ? 300 : days <= 7 ? 1800 : 7200
-            let thin = UsageHistory.downsample(
-                merged.filter { $0.t >= cutoff }, bucket: bucket)
-            let replay = WindowPlanner.replay(merged, from: cutoff, to: now)
-            let plan = Self.dryRunPlan(merged, now: now)
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.samples = thin
-                self.generations = gens
-                self.fiveHourWindows = windows
-                self.replay = replay
-                self.dryRunPlan = plan
-                self.loading = false
-            }
-        }
-        refreshRates()
     }
 
     nonisolated static let ratesCacheURL: URL = {
