@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)
@@ -128,7 +131,6 @@ publishes the matching section as the GitHub release body.
 - Control verbs `lock on|off|now|relock`, `unlock`, `team-join`, `team-hostname` and a write token on `team-create` let the fork's Lock and Team panes drive the Mac, secrets on stdin (#747).
 - `infinitusctl` reads a secret or body from stdin only when something is piped in, so a bare verb at a terminal no longer waits for Ctrl-D.
 - Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
-- `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).
 - The app knows when it runs nested inside Infinitus desktop (`status` says `bundlePath`/`nested`): updates and Start at login defer to the desktop, a second copy yields to the one already running, the desktop's own threads are not announced twice, and `make-app.sh INFINITUS_BUNDLE_NAME` names the nested bundle and leaves the `infinitus://` scheme to the desktop (#777, #270).
 - infinitus.run serves the phone app's universal link: the Devices QR points at `infinitus.run/pair`, which the app takes on a phone that has it and a browser forwards to the Mac's own pairing page (#724).
 
