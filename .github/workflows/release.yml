@@ -119,7 +119,7 @@ jobs:
           else
             GATE=$'Builds are ad-hoc signed, not notarized. If Gatekeeper refuses the\nfirst launch:\n  xattr -dr com.apple.quarantine "/Applications/Infinitus.app"\nor install with --no-quarantine.\n\n'
           fi
-          CAVEATS="${GATE}The app drives the claude-swap engine:"$'\n'"  uv tool install claude-swap   (or pipx install claude-swap)" \
+          CAVEATS="${GATE}The app drives the swapd engine:"$'\n'"  cargo install --git https://github.com/deathemperor/swapd swapd" \
             perl -0pi -e 's|^  caveats <<~EOS\n.*?^  EOS\n|"  caveats <<~EOS\n" . join("", map { $_ eq "" ? "\n" : "    $_\n" } split(/\n/, $ENV{CAVEATS})) . "  EOS\n"|mse' \
             Casks/infinitus.rb
           git -c user.name="infinitus-release" \
