@@ -7,7 +7,16 @@ import InfinitusCore
 /// defaults; the chat id is not a secret and sits in defaults.
 @MainActor
 final class AwayPush {
-    static let service = "run.infinitus.away-push"
+    /// One keychain per Mac: a dev or e2e instance (its own defaults
+    /// suite, #690) gets its own slot, so a fixture's simulated pushes never
+    /// reach the user's real channels and its forget never deletes them.
+    static let service: String = {
+        let base = "run.infinitus.away-push"
+        if let suite = ProcessInfo.processInfo.environment["INFINITUS_DEFAULTS_SUITE"], !suite.isEmpty {
+            return base + "." + suite
+        }
+        return base
+    }()
     static let slackAccount = "slack-webhook"
     static let telegramAccount = "telegram-bot"
     static let chatKey = "away_telegram_chat"
