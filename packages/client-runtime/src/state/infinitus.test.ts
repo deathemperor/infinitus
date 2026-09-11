@@ -4,6 +4,7 @@ import type {
   InfinitusCommandInput,
   InfinitusFleet,
   InfinitusHeldThread,
+  InfinitusSecretInput,
   InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
 import type {
@@ -17,6 +18,7 @@ import * as Latch from "effect/Latch";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
+import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
@@ -316,6 +318,41 @@ describe("Infinitus pairing atoms", () => {
         expect(yield* Ref.get(calls)).toEqual([{ id: "req-1", approve: false }]);
       }),
     ),
+  );
+
+  it.effect(
+    "hands a secret to infinitus.secret still redacted and resolves with the verb's reply (#747)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const calls = yield* Ref.make<ReadonlyArray<InfinitusSecretInput>>([]);
+          const client = {
+            [WS_METHODS.infinitusSecret]: (input: InfinitusSecretInput) =>
+              Ref.update(calls, (current) => [...current, input]).pipe(
+                Effect.as({ result: { ok: true } }),
+              ),
+          } as unknown as WsRpcProtocolClient;
+          const { atoms, registry } = yield* makeTestRuntime(client);
+
+          const result = yield* Effect.promise(() =>
+            atoms.secret.run(registry, {
+              environmentId: TARGET.environmentId,
+              input: {
+                command: "signin-code",
+                args: { flowId: "flow-7" },
+                secret: Redacted.make("s3cret"),
+              },
+            }),
+          );
+
+          expect(result).toMatchObject({ _tag: "Success", value: { result: { ok: true } } });
+          const [call] = yield* Ref.get(calls);
+          expect(call).toMatchObject({ command: "signin-code", args: { flowId: "flow-7" } });
+          // What a log line or a span would show of it.
+          expect(String(call?.secret)).toBe("<redacted>");
+          expect(Redacted.value(call!.secret)).toBe("s3cret");
+        }),
+      ),
   );
 });
 

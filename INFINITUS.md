@@ -333,7 +333,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `usePairingRequests`, shared with the toast hook, #730).
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
-  which also holds the pairing stream + decide command, #710).
+  which also holds the pairing stream + decide command, #710, and the
+  `secret` command for `infinitus.secret`, #747: a pane hands a `Redacted`
+  value through, keyed by the manifest's bare arg names; the atom keeps
+  nothing of its input and the request observer sees the method only).
 - `apps/web/src/hooks/useInfinitusPairingToasts.ts` — a toast per phone
   asking to pair (#710): title with the device name, one Open action to
   `/settings/infinitus/devices`. Never an Approve in the toast (a spoofed

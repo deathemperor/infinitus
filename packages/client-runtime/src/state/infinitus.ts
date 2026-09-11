@@ -142,5 +142,17 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       label: "environment-data:infinitus:pairingDecide",
       tag: WS_METHODS.infinitusPairingDecide,
     }),
+    // The fork's one secret-carrying call (#747): a Settings pane hands a
+    // `Redacted` value straight through to `infinitus.secret`. The command
+    // keeps nothing of its input (each run is its own atom, dropped when it
+    // settles), the request observer sees the method name only, and a
+    // failure report prints the server's error, never the payload. `args`
+    // keys are the manifest's bare names: `flowId` for `<flowId>`, `url` for
+    // `--url <…>`. The server re-reads the app itself after the verb, so
+    // the snapshot stream carries the change; nothing to invalidate here.
+    secret: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:secret",
+      tag: WS_METHODS.infinitusSecret,
+    }),
   };
 }
