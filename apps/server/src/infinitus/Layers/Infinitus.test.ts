@@ -869,7 +869,7 @@ describe("events", () => {
         ...manifest,
         commands: manifest.commands.map((command) =>
           (command as { name: string }).name === "events"
-            ? { ...(command as object), options: ["--after <event id>"] }
+            ? { ...(command as object), options: ["limit", "after"] }
             : command,
         ),
       });
