@@ -101,7 +101,9 @@ final class ResumeService: ObservableObject {
         let activeBox = activeBox
         Task.detached(priority: .utility) { [weak self] in
             let hosts = PtyHosts.available()
-            let sessions = ClaudeSessions.list(claudeDir: claudeDir)
+            // The nudge path only serves terminal sessions: SDK-entered
+            // ones resume through their own host (#648).
+            let sessions = ClaudeSessions.list(claudeDir: claudeDir).filter { !$0.resumedElsewhere }
             let stops = Transcript.findStopped(sessions: sessions, claudeDir: claudeDir)
             var sweep: PtyNudge.SweepResult?
             if doRearm {
