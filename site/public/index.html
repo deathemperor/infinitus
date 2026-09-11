@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Infinitus — Claude Code account fleet manager for macOS &amp; Linux</title>
-<meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, a full-screen fleet wall, 15 themes. macOS and Linux (Omarchy / Arch).">
+<meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, 15 themes. macOS and Linux (Omarchy / Arch).">
 <meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, claude-swap, Claude Code rate limit, 5-hour window, weekly limit, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, session resume">
 <meta name="author" content="deathemperor">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -14,7 +14,7 @@
 <meta property="og:site_name" content="Infinitus">
 <meta property="og:locale" content="en_US">
 <meta property="og:title" content="Infinitus — your Claude fleet, never off the clock">
-<meta property="og:description" content="Free, open-source mission control for a fleet of Claude Code accounts: live usage gauges, auto-rotation on limits, session resume, a fleet wall, 15 themes. macOS &amp; Linux.">
+<meta property="og:description" content="Free, open-source mission control for a fleet of Claude Code accounts: live usage gauges, auto-rotation on limits, session resume, 15 themes. macOS &amp; Linux.">
 <meta property="og:image" content="https://infinitus.run/img/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -254,7 +254,7 @@
       "@id": "https://infinitus.run/#app",
       "name": "Infinitus",
       "url": "https://infinitus.run/",
-      "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, a full-screen fleet wall and 15 themes.",
+      "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges and 15 themes.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
       "softwareVersion": "0.4.4-alpha.2",
@@ -265,7 +265,6 @@
       "installUrl": "https://infinitus.run/#install",
       "screenshot": [
         "https://infinitus.run/img/og.png",
-        "https://infinitus.run/img/wall.png",
         "https://infinitus.run/img/themes/rpg.png"
       ],
       "image": "https://infinitus.run/img/icon128.png",
@@ -274,7 +273,6 @@
         "Automatic rotation to the freshest account when a limit hits",
         "Resume nudges that restart stopped Claude Code sessions after a switch",
         "Session progress: what each running agent is doing, todo counts, retries",
-        "Full-screen fleet wall with hero gauges and a session board",
         "15 themes with their own intro, death and revival effects",
         "Usage history and utilization estimates",
         "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
@@ -323,7 +321,6 @@
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#themes">Themes</a>
-      <a href="#wall">The wall</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
     </nav>
@@ -524,11 +521,8 @@
         as spoken with a note asking for an English reply. The
         recognizer knows your session's terms.</p></div>
     </div>
-    <h3 class="group">Wall &amp; history</h3>
+    <h3 class="group">Themes &amp; history</h3>
     <div class="grid">
-      <div class="card"><h3><span class="dot">●</span>Fleet wall</h3>
-        <p>A full-screen mission-control layout for the spare display:
-        hero gauges, revival countdowns, a bench of every account.</p></div>
       <div class="card"><h3><span class="dot">●</span>Themes</h3>
         <p>RPG HP bars, tactical-espionage flavor, or plain minimal —
         the fleet reads at a glance either way.</p></div>
@@ -574,9 +568,6 @@
       <div class="card"><h3><span class="dot">●</span>swapd (preview)</h3>
         <p>The new multi-provider engine runs beside cswap — one fleet per
         provider it holds, and igniting an account refreshes it at once.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Playground</h3>
-        <p>Simulate empty fleets, all-dead nights, and switch storms
-        without burning real quota.</p></div>
     </div>
   </div>
 </section>
@@ -586,7 +577,7 @@
     <h2>Fifteen skins, one fleet</h2>
     <p class="sub">Every theme renames the windows, restyles the gauges,
       and brings its own intro, death, and revival effects. Pick one in
-      Settings, or audition them all in the playground.</p>
+      Settings.</p>
     <div class="themes">
       <div><b>Off</b><span>plain numbers</span>
         <img src="/img/themes/off.png" loading="lazy" width="1600" height="439"
@@ -637,22 +628,6 @@
   </div>
 </section>
 
-<section id="wall" class="wall">
-  <div class="wrap inner">
-    <div>
-      <h2>The wall</h2>
-      <p class="sub" style="margin-bottom:18px">Point a spare display at your
-        fleet. When agents are working, a session board shows each one's
-        repo, current task, and todo progress. When everything is limited,
-        the revival countdown takes the room. When nothing is happening —
-        it's dark, on purpose.</p>
-      <p class="sub" style="margin-bottom:0">You only need to look when
-        something is moving. That's the whole idea.</p>
-    </div>
-    <img class="screen" src="/img/wall.png" width="3600" height="2338"
-         alt="Infinitus fleet wall: hero gauges for the active account, a session board of working agents, and a bench of every other account">
-  </div>
-</section>
 
 <section id="install">
   <div class="wrap">

@@ -56,7 +56,7 @@ jobs:
           test "${{ needs.test-core.result }}" = success && test "${{ needs.test-team.result }}" = success
   # End-to-end + performance gate (#18): the debug app against the demo
   # engine, driven through infinitusctl; fails on a broken command, a
-  # missing pop-out, or idle CPU / RSS over budget (tools/e2e.sh).
+  # missing window, or idle CPU / RSS over budget (tools/e2e.sh).
   e2e:
     runs-on: macos-26
     steps:

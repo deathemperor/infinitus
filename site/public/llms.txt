@@ -14,11 +14,9 @@
 - Rotates to the best candidate account automatically when a limit binds, via the `claude-swap` CLI (`cswap`). Infinitus never modifies Claude Code and never reads the engine's internal files; every engine touchpoint is a `cswap … --json` subprocess.
 - Resume nudges: after a switch, stopped Claude Code sessions are nudged back to work (peer socket / PTY based, lives in Infinitus).
 - Session progress: what each running agent is doing right now, todo counts, retries, quiet minutes, the session's goal — parsed from Claude Code's own transcript files.
-- Fleet wall: a full-screen board with hero gauges for the active account, a session board, and a bench of every other account.
 - All-dead countdown: when every account is limited, a large countdown to the next recovery.
 - Usage history and utilization estimates (usage-cost figures are estimates, never billing truth).
 - 15 themes (Off, RPG, Cyber, MGS, Sci-fi, Cosmo, Ocean, Earth, Gothic, Hades, Movie, Musical, Agent, SWE, West) each renaming the windows and bringing its own intro, death and revival effects.
-- Playground window to audition themes and effects with a mock fleet.
 - Team (preview): a team lives on any git remote you already have — a leader creates it from Settings › Team on an empty repo with a push token (a fine-grained PAT scoped to that repo, or an ssh URL); that token rides inside every invite link and team code, so those are shared like passwords.
 - Team (preview), joining and sharing: join by invite link, QR, team code, `infinitus://join` or same-network discovery, from the Mac or the phone's Team tab; Linux and Windows members need only `infinitusctl team` (`request`, `fetch`, `publish` on a timer — `packaging/linux`, `packaging/windows`). Everything a member publishes — stats, sessions, chosen transcripts, their fleet (every account with tier, state and headroom; never the email) — is end-to-end encrypted to the readers that member picked; the git host sees file names and sizes only. Leaders get comparison, blockers, headroom, cost and hours insights.
 - Team (preview), Nearby and sharing: a leader invites a discoverable Mac over the LAN and the invitee accepts from Invitations; the phone's Team tab has its own Nearby (scan, request to join, invite, accept) — the same CLI verbs work headless (`infinitusctl team nearby invite`, `team invites`, `team accept`, `team ignore`). Sharing a kind as "off" (`infinitusctl team share <kind> off`) keeps it on that machine entirely; the Mac picks which recent sessions' transcripts go out, shows a publish's progress, and caps the plaintext copies it keeps at 1 GB.
@@ -41,4 +39,4 @@
 
 ## Pages
 
-- [Landing page](https://infinitus.run/): how it works, features, themes, wall, install, FAQ.
+- [Landing page](https://infinitus.run/): how it works, features, themes, install, FAQ.

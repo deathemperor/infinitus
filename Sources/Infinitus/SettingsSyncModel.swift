@@ -26,11 +26,11 @@ final class SettingsSyncModel: ObservableObject {
     private let defaults = UserDefaults.standard
     private weak var model: AppModel?
 
-    /// Display prefs that travel. Per-machine state (pinned popup, debug
-    /// menu, update bookkeeping, the sync toggle itself) stays home.
+    /// Display prefs that travel. Per-machine state (debug menu, update
+    /// bookkeeping, the sync toggle itself) stays home.
     static let boolKeys: Set<String> = [
         "show_account_name", "title_scoped", "title_remaining", "title_icon_only",
-        "compact_rows", "footer_actions_hidden",
+        "compact_rows",
         "update_auto_check", "update_auto_install", "keep_awake", "keep_awake_display",
         "sort_headroom",
         "push_sessions_done", "push_all_dead", "push_last_alive",

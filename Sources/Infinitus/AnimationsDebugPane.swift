@@ -7,7 +7,6 @@ import InfinitusUI
 /// real switch, snapshot delta, or a window's final ten minutes.
 struct AnimationsDebugPane: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var usage: UsageModel
     @State private var sampleFlash = 0
     @State private var samplePulse = 0
     @State private var resetDemo = Date().addingTimeInterval(605)
@@ -17,15 +16,6 @@ struct AnimationsDebugPane: View {
 
     var body: some View {
         Form {
-            Section {
-                Button("Open Playground") {
-                    Playground.show(usage: usage)
-                }
-            } footer: {
-                Text("A resizable window with the self-contained demos — "
-                     + "burn styles side by side, the drop, refills — at a "
-                     + "size you can actually see.")
-            }
             Section {
                 Picker("Content entrance", selection: $model.introStyle) {
                     Text("Slide from top").tag("top")
