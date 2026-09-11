@@ -398,6 +398,23 @@ public enum StatsScanner {
         /// every other day is this, as it was.
         var sums: [String: Stats.Day]?
         public init() {}
+
+        /// Drops the decoded corpus between passes (#499): the app calls
+        /// it after a pass nobody watched — no `stats` lease, the team
+        /// publish alone read it — so the Day maps, tallies and file
+        /// entries (~40 MB on a year of transcripts) stop sitting resident
+        /// for the half hour until the next one. A corpus that moved since
+        /// its last write reaches disk first; the next pass re-reads the
+        /// file and sums every day again (one decode, one full fold).
+        public func release(to cacheURL: URL?) {
+            if dirty, let cache, let cacheURL {
+                StatsScanner.writeCache(cache, to: cacheURL, fm: .default)
+                lastWrite = Date()
+                dirty = false
+            }
+            cache = nil
+            sums = nil
+        }
     }
     public static let checkpointInterval: TimeInterval = 30
     /// A handle held across refreshes (the app's `StatsModel` keeps one
