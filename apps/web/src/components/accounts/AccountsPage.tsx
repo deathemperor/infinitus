@@ -45,6 +45,7 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { AccountsEmpty } from "./AccountsEmpty";
 import { AccountsUnavailable } from "./AccountsUnavailable";
 import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAccount.logic";
 import { FleetSection, type FleetSignIn } from "./FleetSection";
@@ -586,7 +587,7 @@ function AccountsBody({
   if (state === "empty") {
     return (
       <div className="flex flex-col gap-6">
-        <p className="text-muted-foreground text-sm">No engines report accounts on this host.</p>
+        <AccountsEmpty status={snapshot.status} />
         {signInsSection}
       </div>
     );
