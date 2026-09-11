@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   formatCountdown,
+  lanPairingOrigin,
   pairPhoneCardModel,
   phonePairingUrl,
   type PhonePairingLink,
@@ -27,51 +28,72 @@ describe("pairPhoneCardModel", () => {
   it("encodes the tunnel origin while the tunnel is up", () => {
     const model = pairPhoneCardModel({
       forkTunnel: tunnel("up", TUNNEL_URL),
-      pageOrigin: null,
+      lanOrigin: null,
+      reach: "tunnel",
       link,
       nowMs: NOW,
     });
     expect(model.tunnel).toBe("up");
     expect(model.tunnelNotice).toBeNull();
+    expect(model.lanNotice).toBeNull();
+    expect(model.reachChoice).toBe(false);
     expect(model.origin).toEqual({ kind: "tunnel", url: TUNNEL_URL });
     expect(model.link).toEqual({
       kind: "active",
       url: `${TUNNEL_URL}/pair#token=fixture-token`,
+      host: "example-words.trycloudflare.com",
       secondsLeft: 300,
     });
   });
 
-  it("prefers the tunnel over the page's LAN origin", () => {
-    const model = pairPhoneCardModel({
+  it("offers the choice while the tunnel is up and the network reaches the server", () => {
+    const input = {
       forkTunnel: tunnel("up", TUNNEL_URL),
-      pageOrigin: "http://192.168.1.20:3773",
-      link: null,
+      lanOrigin: "http://192.168.1.20:3773",
+      link,
       nowMs: NOW,
+    };
+    const internet = pairPhoneCardModel({ ...input, reach: "tunnel" });
+    expect(internet.reachChoice).toBe(true);
+    expect(internet.origin).toEqual({ kind: "tunnel", url: TUNNEL_URL });
+    expect(internet.lanNotice).toBeNull();
+
+    const sameNetwork = pairPhoneCardModel({ ...input, reach: "lan" });
+    expect(sameNetwork.origin).toEqual({ kind: "lan", url: "http://192.168.1.20:3773" });
+    expect(sameNetwork.lanNotice).toMatch(/only works for phones on your network/);
+    expect(sameNetwork.link).toMatchObject({
+      kind: "active",
+      url: "http://192.168.1.20:3773/pair#token=fixture-token",
+      host: "192.168.1.20:3773",
     });
-    expect(model.origin?.kind).toBe("tunnel");
   });
 
-  it("falls back to a LAN origin while the tunnel is off, and says so", () => {
+  it("falls back to the LAN origin while the tunnel is off, and says so", () => {
     const model = pairPhoneCardModel({
       forkTunnel: tunnel("off"),
-      pageOrigin: "http://192.168.1.20:3773",
+      lanOrigin: "http://192.168.1.20:3773",
+      reach: "tunnel",
       link,
       nowMs: NOW,
     });
     expect(model.tunnel).toBe("off");
     expect(model.tunnelNotice).toMatch(/Turn on the Cloudflare quick tunnel/);
+    expect(model.reachChoice).toBe(false);
     expect(model.origin).toEqual({ kind: "lan", url: "http://192.168.1.20:3773" });
+    expect(model.lanNotice).toMatch(/only works for phones on your network/);
     expect(model.link.kind).toBe("active");
   });
 
-  it("offers no link at all from a loopback page with the tunnel off", () => {
+  it("offers no link at all, and points at Network access, when nothing on the network can be dialled", () => {
     const model = pairPhoneCardModel({
       forkTunnel: tunnel("off"),
-      pageOrigin: null,
+      lanOrigin: null,
+      reach: "tunnel",
       link,
       nowMs: NOW,
     });
     expect(model.origin).toBeNull();
+    expect(model.lanNotice).toMatch(/Network access is on under Settings › Connections/);
     expect(model.link).toEqual({ kind: "none" });
   });
 
@@ -80,7 +102,8 @@ describe("pairPhoneCardModel", () => {
     for (const phase of phases) {
       const model = pairPhoneCardModel({
         forkTunnel: tunnel(phase),
-        pageOrigin: null,
+        lanOrigin: null,
+        reach: "tunnel",
         link: null,
         nowMs: NOW,
       });
@@ -91,7 +114,8 @@ describe("pairPhoneCardModel", () => {
     expect(
       pairPhoneCardModel({
         forkTunnel: tunnel("invalidPort"),
-        pageOrigin: null,
+        lanOrigin: null,
+        reach: "tunnel",
         link: null,
         nowMs: NOW,
       }).tunnelNotice,
@@ -101,7 +125,8 @@ describe("pairPhoneCardModel", () => {
   it("treats a status without the tunnel as an older build", () => {
     const model = pairPhoneCardModel({
       forkTunnel: undefined,
-      pageOrigin: "http://192.168.1.20:3773",
+      lanOrigin: "http://192.168.1.20:3773",
+      reach: "tunnel",
       link: null,
       nowMs: NOW,
     });
@@ -114,7 +139,8 @@ describe("pairPhoneCardModel", () => {
   it("keeps a state a newer build adds out of the known phases", () => {
     const model = pairPhoneCardModel({
       forkTunnel: tunnel("reconnecting"),
-      pageOrigin: null,
+      lanOrigin: null,
+      reach: "tunnel",
       link: null,
       nowMs: NOW,
     });
@@ -124,8 +150,13 @@ describe("pairPhoneCardModel", () => {
 
   it("counts the link down and expires it", () => {
     const at = (nowMs: number) =>
-      pairPhoneCardModel({ forkTunnel: tunnel("up", TUNNEL_URL), pageOrigin: null, link, nowMs })
-        .link;
+      pairPhoneCardModel({
+        forkTunnel: tunnel("up", TUNNEL_URL),
+        lanOrigin: null,
+        reach: "tunnel",
+        link,
+        nowMs,
+      }).link;
     expect(at(NOW + 298_000)).toMatchObject({ kind: "active", secondsLeft: 2 });
     expect(at(NOW + 299_400)).toEqual({ kind: "expired" });
     expect(at(NOW + 400_000)).toEqual({ kind: "expired" });
@@ -134,7 +165,8 @@ describe("pairPhoneCardModel", () => {
   it("drops the link when the tunnel goes down under it", () => {
     const model = pairPhoneCardModel({
       forkTunnel: tunnel("stopped"),
-      pageOrigin: null,
+      lanOrigin: null,
+      reach: "tunnel",
       link,
       nowMs: NOW,
     });
@@ -148,6 +180,35 @@ describe("phonePairingUrl", () => {
     expect(url.pathname).toBe("/pair");
     expect(url.search).toBe("");
     expect(url.hash).toBe("#token=fixture-token");
+  });
+});
+
+describe("lanPairingOrigin", () => {
+  const exposure = (mode: "local-only" | "network-accessible", endpointUrl: string | null) => ({
+    mode,
+    endpointUrl,
+    advertisedHost: endpointUrl === null ? null : new URL(endpointUrl).hostname,
+    tailscaleServeEnabled: false,
+    tailscaleServePort: 3773,
+  });
+
+  it("takes the desktop server's advertised address while Network access is on", () => {
+    expect(
+      lanPairingOrigin({
+        serverExposure: exposure("network-accessible", "http://192.168.1.20:3773"),
+        pageOrigin: null,
+      }),
+    ).toBe("http://192.168.1.20:3773");
+  });
+
+  it("falls back to the page's own origin when the server is local-only or unknown", () => {
+    expect(
+      lanPairingOrigin({
+        serverExposure: exposure("local-only", null),
+        pageOrigin: "http://192.168.1.20:7422",
+      }),
+    ).toBe("http://192.168.1.20:7422");
+    expect(lanPairingOrigin({ serverExposure: null, pageOrigin: null })).toBeNull();
   });
 });
 

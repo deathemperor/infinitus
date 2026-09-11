@@ -10,6 +10,7 @@ const { fake } = vi.hoisted(() => ({
     create: vi.fn(),
     revoke: vi.fn(),
     loopback: true,
+    exposure: null as { mode: string; endpointUrl: string | null } | null,
   },
 }));
 
@@ -26,6 +27,12 @@ vi.mock("~/environments/primary", () => ({
 }));
 vi.mock("~/environments/primary/target", () => ({
   isLoopbackHostname: () => fake.loopback,
+}));
+vi.mock("~/state/desktopNetworkAccess", () => ({ desktopNetworkAccessStateAtom: "atom" }));
+vi.mock("~/state/query", () => ({
+  useEnvironmentQuery: (atom: unknown) => ({
+    data: atom === null || fake.exposure === null ? null : { serverExposureState: fake.exposure },
+  }),
 }));
 vi.mock("../settingsLayout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../settingsLayout")>()),
@@ -91,6 +98,7 @@ describe("InfinitusPairPhoneCard", () => {
     vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
     fake.snapshot = null;
     fake.loopback = true;
+    fake.exposure = null;
     fake.create.mockReset();
     fake.revoke.mockReset();
     fake.revoke.mockResolvedValue(undefined);
@@ -188,4 +196,80 @@ describe("InfinitusPairPhoneCard", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("points a loopback page at Network access when the desktop server is local-only", () => {
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
+    fake.exposure = { mode: "local-only", endpointUrl: null };
+    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
+    try {
+      renderer = mount();
+
+      expect(text(renderer)).toContain("Network access is on under Settings › Connections");
+      expect(buttons(renderer)).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("encodes the desktop server's LAN address, and reveals host and code for typing on request", async () => {
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
+    fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
+    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
+    fake.create.mockResolvedValue({
+      id: "link-1",
+      credential: "fixture-token",
+      expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
+    });
+    try {
+      renderer = mount();
+      const [show] = buttons(renderer);
+      await act(async () => {
+        show?.props.onClick();
+      });
+
+      const svg = renderer.root.findAll((node) => node.type === "svg");
+      expect(svg).toHaveLength(1);
+      expect(text(renderer)).not.toContain("fixture-token");
+      const reveal = buttons(renderer).find((node) => text0(node) === "Type it instead");
+      act(() => reveal?.props.onClick());
+      expect(text(renderer)).toContain("host 192.168.1.20:3773, code fixture-token.");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("lets the user pick the same network over the tunnel when both reach the server", async () => {
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
+    fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
+    fake.snapshot = snapshot({ enabled: true, port: 3773, state: "up", url: TUNNEL_URL });
+    fake.create.mockResolvedValue({
+      id: "link-1",
+      credential: "fixture-token",
+      expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
+    });
+    try {
+      renderer = mount();
+      expect(text(renderer)).toContain("Pair overInternetSame network");
+      expect(text(renderer)).not.toContain("only works for phones on your network");
+
+      const sameNetwork = buttons(renderer).find((node) => text0(node) === "Same network");
+      act(() => sameNetwork?.props.onClick());
+      expect(text(renderer)).toContain("only works for phones on your network");
+
+      const show = buttons(renderer).find((node) => text0(node) === "Show QR");
+      await act(async () => {
+        show?.props.onClick();
+      });
+      const svg = renderer.root.findAll((node) => node.type === "svg");
+      expect(svg[0]?.props.role ?? svg).toBeDefined();
+      const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
+      expect(qr[0]?.props.value).toBe("http://192.168.1.20:3773/pair#token=fixture-token");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
+
+function text0(node: { children: ReadonlyArray<unknown> }): string {
+  return node.children.map((child) => (typeof child === "string" ? child : "")).join("");
+}

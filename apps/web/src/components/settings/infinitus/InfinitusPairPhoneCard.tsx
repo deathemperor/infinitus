@@ -12,12 +12,20 @@ import { useCallback, useEffect, useState } from "react";
 import { createServerPairingCredential, revokeServerPairingLink } from "~/environments/primary";
 import { isLoopbackHostname } from "~/environments/primary/target";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { desktopNetworkAccessStateAtom } from "~/state/desktopNetworkAccess";
+import { useEnvironmentQuery } from "~/state/query";
 
 import { Button } from "../../ui/button";
 import { QRCodeSvg } from "../../ui/qr-code";
 import { SettingsSection, useRelativeTimeTick } from "../settingsLayout";
 import { useInfinitusEnvironment } from "./InfinitusPrefsPanel";
-import { formatCountdown, pairPhoneCardModel, type PhonePairingLink } from "./pairPhone.logic";
+import {
+  formatCountdown,
+  lanPairingOrigin,
+  pairPhoneCardModel,
+  type PairPhoneReach,
+  type PhonePairingLink,
+} from "./pairPhone.logic";
 
 const PAIRING_LABEL = "Infinitus phone";
 
@@ -32,12 +40,23 @@ export function InfinitusPairPhoneCard() {
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [reach, setReach] = useState<PairPhoneReach>("tunnel");
+  const [codeShown, setCodeShown] = useState(false);
   // The countdown ticks only while there is one to draw.
   const nowMs = useRelativeTimeTick(link === null ? 60_000 : 1_000);
+  // The desktop app knows the server's LAN address (Settings › Connections ›
+  // Network access); a browser has only its own origin to go on.
+  const desktopNetworkAccess = useEnvironmentQuery(
+    typeof window !== "undefined" && window.desktopBridge ? desktopNetworkAccessStateAtom : null,
+  );
 
   const model = pairPhoneCardModel({
     forkTunnel: snapshot?.status?.forkTunnel,
-    pageOrigin: pageOrigin(),
+    lanOrigin: lanPairingOrigin({
+      serverExposure: desktopNetworkAccess.data?.serverExposureState ?? null,
+      pageOrigin: pageOrigin(),
+    }),
+    reach,
     link,
     nowMs,
   });
@@ -46,6 +65,7 @@ export function InfinitusPairPhoneCard() {
     setMinting(true);
     setError(null);
     setCopied(false);
+    setCodeShown(false);
     const previous = link;
     try {
       const created = await createServerPairingCredential({ label: PAIRING_LABEL });
@@ -88,13 +108,28 @@ export function InfinitusPairPhoneCard() {
             {model.tunnelNotice}
           </p>
         )}
+        {model.lanNotice === null ? null : (
+          <p className="text-muted-foreground">{model.lanNotice}</p>
+        )}
+        {model.reachChoice ? (
+          <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Reach">
+            <span className="text-muted-foreground">Pair over</span>
+            {(["tunnel", "lan"] as const).map((option) => (
+              <Button
+                key={option}
+                role="radio"
+                aria-checked={reach === option}
+                variant={reach === option ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setReach(option)}
+              >
+                {option === "tunnel" ? "Internet" : "Same network"}
+              </Button>
+            ))}
+          </div>
+        ) : null}
         {model.origin === null ? null : (
           <>
-            {model.origin.kind === "lan" ? (
-              <p className="text-muted-foreground">
-                Until the tunnel is up, this link only works for phones on your network.
-              </p>
-            ) : null}
             {model.link.kind === "active" ? (
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 <div className="rounded-xl border border-border/60 bg-white p-3">
@@ -126,7 +161,17 @@ export function InfinitusPairPhoneCard() {
                     >
                       New link
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCodeShown((v) => !v)}>
+                      {codeShown ? "Hide code" : "Type it instead"}
+                    </Button>
                   </div>
+                  {codeShown && link !== null ? (
+                    <p className="text-muted-foreground">
+                      In the app, add a connection by hand: host{" "}
+                      <span className="font-mono text-foreground">{model.link.host}</span>, code{" "}
+                      <span className="font-mono text-foreground">{link.credential}</span>.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : (
