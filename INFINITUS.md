@@ -278,16 +278,18 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `forkCreateFields` — a side fork is titled "Side question: <title>", asks in
   plan mode and is `sideOf` the source. Web: `apps/web/src/rightPanelStore.ts`
   — the `side-question` surface (`openSideQuestion`, storage v14);
-  `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only
-  turn-attributed messages show; the imported history has none; "Bring to
-  main" appends the latest answer to the main composer's draft);
+  `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only what
+  was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
+  drops the imported history by the ids the fork minted; "Bring to main"
+  appends the latest answer to the main composer's draft);
   `ChatView.tsx` `askSideQuestion` forks the latest completed turn with
   `side: true` and opens the drawer, gated on a Claude session and
   `capabilities.infinitus`; the button sits after the mode toggle in
   `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in
-  `CompactComposerControlsMenu.tsx`; `Sidebar.tsx` and `CommandPalette.tsx`
-  skip `sideOf` threads. Tests: `ThreadFork.test.ts` (`forkCreateFields`),
-  `ProjectionPipeline.babysit.test.ts` (the column), `rightPanelStore.test.ts`.
+  `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and
+  `getLatestThreadForProject` skip `sideOf` threads. Tests:
+  `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts`
+  (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in

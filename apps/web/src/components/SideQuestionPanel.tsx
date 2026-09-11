@@ -11,6 +11,7 @@ import { useComposerDraftStore, type ComposerThreadTarget } from "../composerDra
 import { cn } from "../lib/utils";
 import { newMessageId } from "../lib/utils";
 import { useThread } from "../state/entities";
+import { isSideQuestionMessage } from "./SideQuestionPanel.logic";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import ChatMarkdown from "./ChatMarkdown";
@@ -23,9 +24,9 @@ import { Textarea } from "./ui/textarea";
  * Fork (#269 C): the drawer of a side question. The thread behind it is a
  * fork of the main thread at its latest completed turn (`sideOf` set, plan
  * mode), so it answers from the main thread's context without touching it,
- * even while the main turn runs. Only what was asked here is shown: the
- * imported history carries no turn. "Bring to main" appends the latest
- * answer to the main composer's draft.
+ * even while the main turn runs. Only what was asked here is shown (the
+ * imported history is told apart by `isSideQuestionMessage`). "Bring to
+ * main" appends the latest answer to the main composer's draft.
  */
 export function SideQuestionPanel({
   environmentId,
@@ -44,14 +45,8 @@ export function SideQuestionPanel({
   const [error, setError] = useState<string | null>(null);
 
   const messages = useMemo(
-    () =>
-      (thread?.messages ?? []).filter(
-        (message) =>
-          message.turnId !== null &&
-          (message.role === "user" || message.role === "assistant") &&
-          message.text.trim().length > 0,
-      ),
-    [thread?.messages],
+    () => (thread?.messages ?? []).filter((message) => isSideQuestionMessage(threadId, message)),
+    [thread?.messages, threadId],
   );
   const running = (thread?.session?.activeTurnId ?? null) !== null;
   const busy = sending || running;

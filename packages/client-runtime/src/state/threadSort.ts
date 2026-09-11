@@ -141,11 +141,16 @@ export function getLatestThreadForProject<
     readonly id: string;
     readonly projectId: ProjectId;
     readonly archivedAt: string | null;
+    /** Fork (#269 C): a side question lives in its thread's drawer, never as a page. */
+    readonly sideOf?: string | null | undefined;
   } & ThreadSortInput,
 >(threads: readonly T[], projectId: ProjectId, sortOrder: SidebarThreadSortOrder): T | null {
   return (
     sortThreads(
-      threads.filter((thread) => thread.projectId === projectId && thread.archivedAt === null),
+      threads.filter(
+        (thread) =>
+          thread.projectId === projectId && thread.archivedAt === null && thread.sideOf == null,
+      ),
       sortOrder,
     )[0] ?? null
   );
