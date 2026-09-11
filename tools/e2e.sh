@@ -676,6 +676,9 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
     | expect "sorted(r['outcome'] for r in d)==['delivered','noGrant']" || fail "acks (got: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 300))"
 "$CTL" team revoke "$ANN_GRANT" | expect "d['removed']" || fail "ann revoke"
 "$CTL" events --limit 100 | expect "d and all(e['id'] and e['kind'] for e in d) and any(e['kind']=='team-control' and e['icon']=='person.2' for e in d)" || fail "events rows carry id and kind (#615)"
+LAST_EVENT=$("$CTL" events --limit 100 | python3 -c "import json,sys; print(json.load(sys.stdin)[-1]['id'])")
+"$CTL" events --after "$LAST_EVENT" | expect "d['known'] is True and d['after']=='$LAST_EVENT' and d['rows']==[]" || fail "events --after the newest id is known with no rows (#346)"
+"$CTL" events --after nope --limit 3 | expect "d['known'] is False and len(d['rows'])==3" || fail "events --after an unknown id re-seeds with the full tail (#346)"
 echo "team control: ok (grantor + store-lane driver)"
 
 # --- performance --------------------------------------------------------
