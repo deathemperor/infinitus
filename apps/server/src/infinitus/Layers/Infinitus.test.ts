@@ -2,6 +2,7 @@ import {
   InfinitusCommandFailed,
   InfinitusUnavailable,
   type InfinitusSnapshot,
+  type InfinitusSubscribeInput,
 } from "@t3tools/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -184,10 +185,13 @@ const NOT_POLLED_REASON = "the socket has not been polled yet";
  * adjusting a clock is what makes these tests deterministic: the take cannot
  * complete until the subscriber fiber has run and the poller has published.
  */
-const subscribe = Effect.fn("subscribe")(function* (infinitus: InfinitusService["Service"]) {
+const subscribe = Effect.fn("subscribe")(function* (
+  infinitus: InfinitusService["Service"],
+  input?: InfinitusSubscribeInput,
+) {
   const queue = yield* Queue.unbounded<InfinitusSnapshot>();
   const fiber = yield* Effect.forkChild(
-    Stream.runForEach(infinitus.changes, (snapshot) => Queue.offer(queue, snapshot)),
+    Stream.runForEach(infinitus.changes(input), (snapshot) => Queue.offer(queue, snapshot)),
   );
   const first = yield* Queue.take(queue);
   return { queue, fiber, first } as const;
@@ -531,6 +535,43 @@ describe("the lease", () => {
       expect(bodies.every((body) => body.ttlMs === 45_000)).toBe(true);
 
       yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("holds stats only while a subscriber needs it (#659)", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithLease());
+      yield* stub.setResult("client-activity", { clientId: "t3-server-x" });
+      const infinitus = yield* InfinitusService;
+      const plain = yield* subscribe(infinitus);
+      expect((yield* leaseBodies(stub))[0]?.scopes).toEqual([
+        { type: "sessions" },
+        { type: "fleets" },
+      ]);
+
+      // A stats watcher joins: the next fast tick re-leases with the scope,
+      // not the 25 s schedule.
+      const stats = yield* subscribe(infinitus, { needs: ["stats"] });
+      yield* TestClock.adjust(FAST);
+      let bodies = yield* leaseBodies(stub);
+      expect(bodies).toHaveLength(2);
+      expect(bodies[1]?.scopes).toEqual([
+        { type: "sessions" },
+        { type: "fleets" },
+        { type: "stats" },
+      ]);
+
+      // It leaves while the plain subscriber stays: the scope leaves the body
+      // on the next tick, and the lease itself is not released.
+      yield* Fiber.interrupt(stats.fiber);
+      yield* TestClock.adjust(FAST);
+      bodies = yield* leaseBodies(stub);
+      expect(bodies).toHaveLength(3);
+      expect(bodies[2]?.ttlMs).toBe(45_000);
+      expect(bodies[2]?.scopes).toEqual([{ type: "sessions" }, { type: "fleets" }]);
+
+      yield* Fiber.interrupt(plain.fiber);
     }).pipe(Effect.provide(TestLayer)),
   );
 

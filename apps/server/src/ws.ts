@@ -3023,10 +3023,14 @@ const makeWsRpcLayer = (
           ),
         // The stream itself is what makes the server poll the control socket,
         // so this must stay the only way a client reads Infinitus.
-        [WS_METHODS.subscribeInfinitus]: (_input) =>
-          observeRpcStreamEffect(WS_METHODS.subscribeInfinitus, Effect.succeed(infinitus.changes), {
-            "rpc.aggregate": "infinitus",
-          }),
+        [WS_METHODS.subscribeInfinitus]: (input) =>
+          observeRpcStreamEffect(
+            WS_METHODS.subscribeInfinitus,
+            Effect.succeed(infinitus.changes(input)),
+            {
+              "rpc.aggregate": "infinitus",
+            },
+          ),
         [WS_METHODS.infinitusCommand]: (input) =>
           observeRpcEffect(
             WS_METHODS.infinitusCommand,

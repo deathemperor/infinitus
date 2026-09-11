@@ -30,6 +30,7 @@ import {
   InfinitusLaunchResult,
   InfinitusProtocolError,
   InfinitusSnapshot,
+  InfinitusSubscribeInput,
   InfinitusUnavailable,
 } from "./infinitus.ts";
 import {
@@ -1294,7 +1295,7 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
     every change. Unreachability is a snapshot with `available: false`, never a
     stream failure: the app comes and goes while a client stays subscribed. */
 const WsSubscribeInfinitusRpc = Rpc.make(WS_METHODS.subscribeInfinitus, {
-  payload: Schema.Struct({}),
+  payload: InfinitusSubscribeInput,
   success: InfinitusSnapshot,
   error: EnvironmentAuthorizationError,
   stream: true,

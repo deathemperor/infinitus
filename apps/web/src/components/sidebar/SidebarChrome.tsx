@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  ChartLineIcon,
   ChartNoAxesColumnIcon,
   GitPullRequestIcon,
   SettingsIcon,
@@ -140,7 +141,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               ? "pull-requests"
               : location.pathname === "/accounts"
                 ? "accounts"
-                : null,
+                : location.pathname === "/stats"
+                  ? "stats"
+                  : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
@@ -173,6 +176,11 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleAccountsClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/accounts" });
+  }, [closeMobileSidebar, navigate]);
+
+  const handleStatsClick = useCallback(() => {
+    closeMobileSidebar();
+    void navigate({ to: "/stats" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUsageClick = useCallback(() => {
@@ -220,6 +228,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               label="Accounts"
               onClick={handleAccountsClick}
             />
+          ) : null}
+          {accountsSupported ? (
+            <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
           ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}

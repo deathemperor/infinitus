@@ -206,6 +206,22 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
   section ("All accounts exhausted · next revival HH:MM (account)", the
   time in the user's timestamp format), replacing the pop-out's reviver band.
+- `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the
+  `/stats` page (#659): the pop-out's Stats pane in the fork — period picker
+  (localStorage `infinitus.statsPeriod`), the tile groups (Throughput,
+  Messages & sessions, Autonomy, Friction, Limits, Cost — value, delta vs
+  the previous period, sparkline), session lengths, and the effort tables
+  (activities, models, engines, effort). Sidebar "Stats" beside Accounts.
+  Its read model is `packages/client-runtime/src/state/infinitusStats.ts`
+  (exported as `@t3tools/client-runtime/state/infinitusStats`): the `stats
+--period p` reply decoded defensively and folded like native
+  `StatsPresentation`. The read goes through `infinitusEnvironment.stats`, a
+  query atom re-read every 5 min and dropped a minute after the page leaves,
+  so nothing is requested unmounted; the page subscribes to the snapshot with
+  `needs: ["stats"]` (`InfinitusSubscribeInput`, `subscribeInfinitus`'s
+  payload), which the server ref-counts into the `client-activity` lease's
+  `stats` scope only while a page holds it (#587 step 2, minimal form; #625
+  had dropped the scope for good reason). Estimates, never billing truth.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud

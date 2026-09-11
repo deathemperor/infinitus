@@ -14,6 +14,7 @@ import {
   type InfinitusManifestCommand,
   type InfinitusProtocolError,
   type InfinitusSnapshot,
+  type InfinitusSubscribeInput,
   type InfinitusUnavailable,
 } from "@t3tools/contracts/infinitus";
 import * as Clock from "effect/Clock";
@@ -64,6 +65,8 @@ const LEASE_COMMAND = "client-activity";
 const LEASE_INTERVAL = Duration.seconds(25);
 const LEASE_TTL_MS = 45_000;
 const LEASE_SCOPES = [{ type: "sessions" }, { type: "fleets" }] as const;
+/** Held on top of `LEASE_SCOPES` while a subscriber needs `stats` (#659). */
+const STATS_SCOPE = { type: "stats" } as const;
 /** Straight to the JSON string the `--body` option carries. */
 const encodeLeaseBody = Schema.encodeSync(Schema.fromJsonString(InfinitusClientActivityReport));
 
@@ -138,6 +141,9 @@ const makeInfinitus = Effect.gen(function* () {
   const generation = yield* Ref.make(0);
   const warnedCommands = yield* Ref.make<ReadonlySet<string>>(new Set());
   const subscribers = yield* Ref.make(0);
+  /** Subscribers whose `needs` include `stats`: the scope rides in the lease
+      while this is above zero (#587 step 2, minimal form). */
+  const statsWatchers = yield* Ref.make(0);
   /** Serializes the polling cycle against the refresh a write schedules, so
       the two never interleave their reads into one snapshot. */
   const pollLock = yield* Semaphore.make(1);
@@ -177,12 +183,13 @@ const makeInfinitus = Effect.gen(function* () {
   /** One lease report. Never fails: a refused or unreachable lease leaves the
       snapshot alone and logs once per generation like any other bad reply. */
   const sendLease = Effect.fn("Infinitus.sendLease")(function* (ttlMs: number) {
+    const wantsStats = (yield* Ref.get(statsWatchers)) > 0;
     const body = encodeLeaseBody({
       clientId: leaseClientId,
       visible: true,
       focused: true,
       recentlyInteracted: true,
-      scopes: LEASE_SCOPES,
+      scopes: wantsStats ? [...LEASE_SCOPES, STATS_SCOPE] : LEASE_SCOPES,
       ttlMs,
     });
     yield* client.request({ command: LEASE_COMMAND, args: [], options: { body } }).pipe(
@@ -338,35 +345,53 @@ const makeInfinitus = Effect.gen(function* () {
     Effect.asVoid,
   );
 
-  const startPolling = lifecycleLock.withPermits(1)(
-    Effect.gen(function* () {
-      const count = yield* Ref.updateAndGet(subscribers, (previous) => previous + 1);
-      if (count > 1) return;
-      // A returning first subscriber leases at once, whatever the last cycle's
-      // schedule said before the release.
-      yield* Ref.set(nextLeaseAtMillis, 0);
-      // `startImmediately` is what makes the first subscriber's poll immediate
-      // rather than one scheduler turn away.
-      yield* FiberHandle.run(pollHandle, pollLoop, { startImmediately: true });
-    }),
-  );
+  const needsStats = (input: InfinitusSubscribeInput | undefined) =>
+    input?.needs?.includes("stats") === true;
 
-  const stopPolling = lifecycleLock.withPermits(1)(
-    Effect.gen(function* () {
-      const count = yield* Ref.updateAndGet(subscribers, (previous) => Math.max(0, previous - 1));
-      if (count > 0) return;
-      yield* FiberHandle.clear(pollHandle);
-      // Nobody is watching: hand the lease back rather than let it run out,
-      // detached so the last unsubscribe never waits on the socket.
-      const knownCommands = yield* Ref.get(commands);
-      if (
-        knownCommands.some((entry) => entry.name === LEASE_COMMAND) &&
-        (yield* snapshot).available
-      ) {
-        yield* Effect.forkDetach(sendLease(0));
-      }
-    }),
-  );
+  const startPolling = (input: InfinitusSubscribeInput | undefined) =>
+    lifecycleLock.withPermits(1)(
+      Effect.gen(function* () {
+        if (needsStats(input)) {
+          const watchers = yield* Ref.updateAndGet(statsWatchers, (previous) => previous + 1);
+          // The first stats watcher changes the lease body: re-lease on the
+          // next tick rather than up to 25 s later.
+          if (watchers === 1) yield* Ref.set(nextLeaseAtMillis, 0);
+        }
+        const count = yield* Ref.updateAndGet(subscribers, (previous) => previous + 1);
+        if (count > 1) return;
+        // A returning first subscriber leases at once, whatever the last cycle's
+        // schedule said before the release.
+        yield* Ref.set(nextLeaseAtMillis, 0);
+        // `startImmediately` is what makes the first subscriber's poll immediate
+        // rather than one scheduler turn away.
+        yield* FiberHandle.run(pollHandle, pollLoop, { startImmediately: true });
+      }),
+    );
+
+  const stopPolling = (input: InfinitusSubscribeInput | undefined) =>
+    lifecycleLock.withPermits(1)(
+      Effect.gen(function* () {
+        if (needsStats(input)) {
+          const watchers = yield* Ref.updateAndGet(statsWatchers, (previous) =>
+            Math.max(0, previous - 1),
+          );
+          // The last stats watcher leaving narrows the lease for whoever stays.
+          if (watchers === 0) yield* Ref.set(nextLeaseAtMillis, 0);
+        }
+        const count = yield* Ref.updateAndGet(subscribers, (previous) => Math.max(0, previous - 1));
+        if (count > 0) return;
+        yield* FiberHandle.clear(pollHandle);
+        // Nobody is watching: hand the lease back rather than let it run out,
+        // detached so the last unsubscribe never waits on the socket.
+        const knownCommands = yield* Ref.get(commands);
+        if (
+          knownCommands.some((entry) => entry.name === LEASE_COMMAND) &&
+          (yield* snapshot).available
+        ) {
+          yield* Effect.forkDetach(sendLease(0));
+        }
+      }),
+    );
 
   // A `SubscriptionRef` replays its current value, which before the first
   // cycle is `None` — dropped here. So whether the loop's immediate cycle
@@ -377,12 +402,13 @@ const makeInfinitus = Effect.gen(function* () {
     Stream.changes,
   );
 
-  const changes = Stream.unwrap(
-    Effect.gen(function* () {
-      yield* Effect.acquireRelease(startPolling, () => stopPolling);
-      return observed;
-    }),
-  );
+  const changes = (input?: InfinitusSubscribeInput) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        yield* Effect.acquireRelease(startPolling(input), () => stopPolling(input));
+        return observed;
+      }),
+    );
 
   const command = Effect.fn("Infinitus.command")(function* (
     input: InfinitusCommandInput,
