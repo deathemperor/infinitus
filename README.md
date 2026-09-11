@@ -12,7 +12,7 @@ May your limits never bind.
 ![Infinitus demo — layouts, compact mode, pop-out, live theme switching](docs/demo.gif)
 
 A native macOS menu bar app (Swift/SwiftUI) over the
-[claude-swap](https://github.com/deathemperor/claude-swap) engine: live
+[swapd](https://github.com/deathemperor/swapd) engine: live
 usage gauges for a whole fleet of Claude accounts, auto-switch awareness,
 and a one-click rotate — wrapped in themes from RPG to Wild West.
 
@@ -26,7 +26,7 @@ a glance and swaps before you stall.
 
 ## Install
 
-Infinitus is alpha software (0.4.4-alpha.2): it runs its author's fleet
+Infinitus is alpha software (0.4.5-alpha.1): it runs its author's fleet
 all day, but expect rough edges — please file issues.
 
 ### Homebrew
@@ -75,6 +75,8 @@ uv tool install claude-swap                  # or straight from PyPI
 
 Arch users can build from [`packaging/aur/PKGBUILD`](packaging/aur/) —
 `cswap` in a terminal is the same account switching, Omarchy-style.
+(The Linux tray still drives the `cswap` CLI; its move to swapd is the
+second half of #756.)
 
 > **Container-tested only.** The PyPI install (`python:3.12` image), the
 > PKGBUILD (`archlinux` image, `makepkg -s`) and the static
@@ -86,9 +88,9 @@ Arch users can build from [`packaging/aur/PKGBUILD`](packaging/aur/) —
 ### Requirements
 
 - macOS 14+ (best on macOS 26 — the glass chrome uses it)
-- the `cswap` CLI on PATH (`uv tool install claude-swap` /
-  `pipx install claude-swap`) — the app's first-run card installs it
-  for you
+- the `swapd` CLI on PATH
+  (`cargo install --git https://github.com/deathemperor/swapd swapd`) —
+  the app's first-run card shows the line and adds your first account
 
 Setting it up with a coding agent? Hand it
 [docs/guides/agent-setup.md](docs/guides/agent-setup.md) — install,
@@ -123,8 +125,11 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Start a session from the phone** — a repository, the engine, a first prompt; the Mac opens cmux or Terminal and the chat follows. Siri too.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
-- **Three engines** — cswap, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs.
-- **swapd (preview)** — the new multi-provider engine runs beside cswap: one fleet per provider it holds, and igniting an account refreshes it at once.
+- **Three engines** — swapd, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs. swapd is multi-provider: one fleet per provider it holds (Claude, Gemini CLI…), and igniting an account refreshes it at once.
+- **Priority mode** — `hold` or `interrupt` gives every fleet a headroom verdict (abundant / low / critical, with hysteresis on the active account's fullest window), so a client can pause background work before a window binds.
+- **Preferences over the socket** — `infinitusctl prefs` lists every setting with its type, choices, range and effect; `prefs set` changes one live, from the CLI, the phone or the desktop app.
+- **Devices** — every phone that has paired, with its route, when it was last seen and what it holds on this Mac, each with Forget.
+- **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`, `team-*`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats** — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **Sessions, named and narrated** — unnamed sessions get a Haiku title that follows the work; the phone opens on what's waiting, with Continue.
@@ -170,7 +175,7 @@ Everything stays on your machine (the phone talks straight to your Mac
 over routes you enable; the only thing that ever touches infinitus.run
 is a quick tunnel's URL, keyed by a hash of the pairing token — never
 the token, never usage). The app talks to the engine through
-`cswap … --json` subprocesses and never reads its files (resume nudges
+`swapd … --json` subprocesses and never reads its files (resume nudges
 read Claude Code's own session records and transcripts, nothing of the
 engine's); usage-cost
 figures are estimates, never billing truth; push-notification secrets
@@ -286,7 +291,7 @@ new bundled apps (see the script header).
 ## Architecture rule
 
 Everything is Swift; the engine stays fully isolated behind
-`cswap … --json` subprocesses. The app never reads engine internals from
+`swapd … --json` subprocesses. The app never reads engine internals from
 disk.
 
 ## Themes
