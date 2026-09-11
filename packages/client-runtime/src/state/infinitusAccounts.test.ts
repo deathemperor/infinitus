@@ -47,7 +47,7 @@ function account(overrides: Partial<InfinitusAccount> = {}): InfinitusAccount {
 function fleet(overrides: Partial<InfinitusFleet> = {}): InfinitusFleet {
   return {
     key: "claude",
-    engineID: "cswap",
+    engineID: "swapd",
     provider: "claude",
     capabilities: ALL_CAPABILITIES,
     accounts: [account()],
@@ -95,7 +95,7 @@ describe("fleet sections", () => {
   });
 
   it("titles the section with the engine only when it differs from the provider", () => {
-    expect(buildFleetSection(twoAccounts).title).toBe("claude (cswap)");
+    expect(buildFleetSection(twoAccounts).title).toBe("claude (swapd)");
     expect(buildFleetSection(fleet({ engineID: "claude" })).title).toBe("claude");
   });
 
@@ -274,7 +274,7 @@ describe("add account and re-login", () => {
 
   it("offers add on a fleet with the in-app sign-in, never off the engine's name", () => {
     expect(buildFleetSection(fleet({ capabilities: ["addOAuth"] })).canAdd).toBe(true);
-    expect(buildFleetSection(fleet({ engineID: "cswap", capabilities: [] })).canAdd).toBe(false);
+    expect(buildFleetSection(fleet({ engineID: "swapd", capabilities: [] })).canAdd).toBe(false);
     expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
   });
 
@@ -309,9 +309,9 @@ describe("add account and re-login", () => {
   });
 
   it("shapes add and the short wait-add poll", () => {
-    expect(addAccountCommandArgs("cswap/claude")).toEqual({
+    expect(addAccountCommandArgs("swapd/claude")).toEqual({
       command: "add",
-      args: ["cswap/claude"],
+      args: ["swapd/claude"],
       options: {},
     });
     expect(waitAddCommandArgs(5)).toEqual({

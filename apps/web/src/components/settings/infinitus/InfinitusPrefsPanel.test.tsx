@@ -80,7 +80,7 @@ const CATALOG = {
       choices: ["wide", "stacked", "hstack"],
     },
     {
-      key: "engine_cswap_enabled",
+      key: "engine_swapd_enabled",
       type: "bool" as const,
       default: true,
       value: true,
@@ -108,8 +108,8 @@ function snapshot(
   } as InfinitusSnapshot;
 }
 
-/** PREF_COPY's wording for `engine_cswap_enabled`, the restart-effect row. */
-const CSWAP_LABEL = "cswap engine on (credential swap under Claude Code)";
+/** PREF_COPY's wording for `engine_swapd_enabled`, the restart-effect row. */
+const SWAPD_LABEL = "swapd engine on (swaps the login under each provider's CLI)";
 
 let renderer: ReactTestRenderer | undefined;
 
@@ -234,7 +234,7 @@ describe("InfinitusPrefsPanel writes", () => {
   it("holds a restart-effect write until the relaunch is confirmed", async () => {
     await renderPanel();
     await act(async () => {
-      (control(CSWAP_LABEL).props as { onCheckedChange: (next: boolean) => void }).onCheckedChange(
+      (control(SWAPD_LABEL).props as { onCheckedChange: (next: boolean) => void }).onCheckedChange(
         false,
       );
     });
@@ -247,7 +247,7 @@ describe("InfinitusPrefsPanel writes", () => {
     });
     expect(fake.run).toHaveBeenCalledWith({
       environmentId: "env-1",
-      input: { command: "prefs", args: ["set", "engine_cswap_enabled", "false"], options: {} },
+      input: { command: "prefs", args: ["set", "engine_swapd_enabled", "false"], options: {} },
     });
   });
 
@@ -277,14 +277,14 @@ describe("InfinitusPrefsPanel writes", () => {
       cause: Cause.fail(
         new InfinitusCommandFailed({
           command: "prefs",
-          error: "cswap is not installed",
+          error: "swapd is not installed",
           restarting: false,
         }),
       ),
     });
     await renderPanel();
     await act(async () => {
-      (control(CSWAP_LABEL).props as { onCheckedChange: (next: boolean) => void }).onCheckedChange(
+      (control(SWAPD_LABEL).props as { onCheckedChange: (next: boolean) => void }).onCheckedChange(
         false,
       );
     });
@@ -292,7 +292,7 @@ describe("InfinitusPrefsPanel writes", () => {
       renderer!.root.findByType(RestartConfirmDialog).props.onConfirm();
     });
     const output = rendered();
-    expect(output).toContain("cswap is not installed");
+    expect(output).toContain("swapd is not installed");
     expect(output).not.toContain("Infinitus is relaunching");
   });
 });

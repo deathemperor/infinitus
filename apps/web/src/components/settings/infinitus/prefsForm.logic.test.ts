@@ -350,8 +350,8 @@ describe("reducePrefWrite", () => {
 
   it("stops waiting for a relaunch the app refused to start", () => {
     const refused = run([
-      submit("engine_cswap_enabled", false, true),
-      { type: "failed", key: "engine_cswap_enabled", error: "cswap is not installed" },
+      submit("engine_swapd_enabled", false, true),
+      { type: "failed", key: "engine_swapd_enabled", error: "swapd is not installed" },
       { type: "relaunchAborted" },
     ]);
 
@@ -359,7 +359,7 @@ describe("reducePrefWrite", () => {
     expect(refused.sawUnavailable).toBe(false);
     expect(refused.pending.size).toBe(0);
     // The refusal itself still has to be readable under the row.
-    expect(refused.errors.get("engine_cswap_enabled")).toBe("cswap is not installed");
+    expect(refused.errors.get("engine_swapd_enabled")).toBe("swapd is not installed");
   });
 });
 

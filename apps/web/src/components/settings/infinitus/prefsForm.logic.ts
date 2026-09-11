@@ -163,11 +163,10 @@ export const PREF_COPY: Readonly<
     description: "Zero pushes tok/min with other changes only.",
   },
   // Engines.
-  engine_cswap_enabled: { label: "cswap engine on (credential swap under Claude Code)" },
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
   engine_9router_enabled: { label: "9Router engine on (rotates behind its own endpoint)" },
-  // About. The two update toggles are the cswap engine's, which the Mac shows
+  // About. The two update toggles are the engine updater's, which the Mac shows
   // under Engines even though the catalog files them here.
   update_auto_check: { label: "Check for engine updates automatically" },
   update_auto_install: { label: "Install engine updates automatically" },

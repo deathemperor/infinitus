@@ -110,7 +110,7 @@ const readySnapshot: InfinitusSnapshot = {
   fleets: [
     {
       key: "claude",
-      engineID: "cswap",
+      engineID: "swapd",
       provider: "Claude",
       capabilities: ["switch", "hold", "prefer", "rename"],
       caveat: "Usage readings lag the engine by a minute.",
@@ -331,7 +331,7 @@ describe("AccountsPage", () => {
   it("offers add account and re-login only where the build and the fleet allow it", () => {
     testState.snapshot = addableSnapshot;
     const markup = renderToStaticMarkup(<AccountsPage />);
-    expect(markup).toContain("Add account: Claude (cswap)");
+    expect(markup).toContain("Add account: Claude (swapd)");
     expect(markup).not.toContain("Add account: OpenAI (cliproxy)");
     expect(markup).toContain("Sign in again as spare");
 
@@ -358,7 +358,7 @@ describe("AccountsPage", () => {
     const markup = renderToStaticMarkup(<AccountsPage />);
     expect(markup).toContain("A sign-in is already running in Infinitus.");
     expect(markup).toContain(
-      'aria-label="Add account: Claude (cswap)" aria-busy="true" disabled=""',
+      'aria-label="Add account: Claude (swapd)" aria-busy="true" disabled=""',
     );
   });
 
@@ -380,7 +380,7 @@ describe("AccountsPage", () => {
       renderer = create(<AccountsPage />);
     });
     const button = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
     )[0]!;
 
     await act(async () => {
@@ -439,7 +439,7 @@ describe("AccountsPage", () => {
       renderer = create(<AccountsPage />);
     });
     const button = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
     )[0]!;
     await act(async () => {
       button.props.onClick();
@@ -516,7 +516,7 @@ describe("AccountsPage", () => {
       renderer = create(<AccountsPage />);
     });
     const button = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
     )[0]!;
     await act(async () => {
       button.props.onClick();
@@ -541,7 +541,7 @@ describe("AccountsPage", () => {
     // The code field is up while the app waits for the paste; the code goes
     // to the shell, never through a command.
     const field = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Sign-in code: Claude (cswap)",
+      (node) => node.props["aria-label"] === "Sign-in code: Claude (swapd)",
     );
     if (field.length > 0) {
       const form = renderer.root.findAll((node) => node.type === "form")[0]!;
@@ -609,7 +609,7 @@ describe("AccountsPage", () => {
       label: "Sign in again — spare",
     });
     const cancel = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Cancel sign-in: Claude (cswap)",
+      (node) => node.props["aria-label"] === "Cancel sign-in: Claude (swapd)",
     )[0]!;
     await act(async () => {
       cancel.props.onClick();

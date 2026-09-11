@@ -14,7 +14,7 @@ import {
 } from "./signIn.logic";
 
 const flow = (over: Partial<SignInFlow>): SignInFlow => ({
-  fleetKey: "cswap/claude",
+  fleetKey: "swapd/claude",
   target: null,
   flowId: "f1",
   pasteCode: true,
@@ -43,12 +43,12 @@ describe("snapshotOffersSignIn / signInBridge", () => {
 
 describe("command args and replies", () => {
   it("begins with the fleet and the re-login email as an option", () => {
-    expect(signInBeginCommandArgs("cswap/claude", null)).toEqual({
+    expect(signInBeginCommandArgs("swapd/claude", null)).toEqual({
       command: "signin-begin",
-      args: ["cswap/claude"],
+      args: ["swapd/claude"],
       options: {},
     });
-    expect(signInBeginCommandArgs("cswap/claude", "two@example.com").options).toEqual({
+    expect(signInBeginCommandArgs("swapd/claude", "two@example.com").options).toEqual({
       relogin: "two@example.com",
     });
     expect(signInStatusCommandArgs("f1")).toEqual({

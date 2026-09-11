@@ -59,7 +59,7 @@ const account = (
 const snapshotWith = (accounts: ReadonlyArray<InfinitusAccount>): InfinitusSnapshot => ({
   available: true,
   fleets: [
-    { key: "cswap/claude", engineID: "cswap", provider: "claude", capabilities: [], accounts },
+    { key: "swapd/claude", engineID: "swapd", provider: "claude", capabilities: [], accounts },
   ],
   sessions: [],
   commands: [],

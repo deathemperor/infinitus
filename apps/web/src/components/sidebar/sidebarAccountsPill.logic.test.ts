@@ -21,7 +21,7 @@ function account(overrides: Partial<InfinitusAccount> = {}): InfinitusAccount {
 function fleet(overrides: Partial<InfinitusFleet> = {}): InfinitusFleet {
   return {
     key: "claude",
-    engineID: "cswap",
+    engineID: "swapd",
     provider: "claude",
     capabilities: ["switch"],
     accounts: [account()],

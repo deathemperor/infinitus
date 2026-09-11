@@ -67,7 +67,7 @@ const manifestCommand = (name: string, effect: "read" | "write" | "restart") => 
 
 const fleet = (key: string) => ({
   key,
-  engineID: "cswap",
+  engineID: "swapd",
   provider: "claude",
   capabilities: ["switch"],
   accounts: [],
@@ -80,7 +80,7 @@ const status = {
   badge: "none",
   playground: false,
   signInRunning: false,
-  engines: { cswap: { enabled: true, registered: true } },
+  engines: { swapd: { enabled: true, registered: true } },
 };
 
 /** What every command answers with unless a test rewrites it. */
@@ -97,11 +97,11 @@ const defaultResults = (): Record<string, unknown> => ({
       manifestCommand("prefs", "read"),
     ],
   },
-  fleets: [fleet("cswap/claude")],
+  fleets: [fleet("swapd/claude")],
   sessions: [],
   forecast: { forecast: null },
   prefs: { sections: [{ slug: "display", name: "Display" }], prefs: [] },
-  switch: { fleet: "cswap/claude" },
+  switch: { fleet: "swapd/claude" },
 });
 
 interface ControlStubShape {
@@ -250,7 +250,7 @@ describe("InfinitusService", () => {
 
       expect(first.available).toBe(true);
       expect(first.status?.version).toBe("0.4.3");
-      expect(first.fleets.map((entry) => entry.key)).toEqual(["cswap/claude"]);
+      expect(first.fleets.map((entry) => entry.key)).toEqual(["swapd/claude"]);
       const calls = yield* stub.calls;
       expect(calls).toContain("status");
       expect(calls).toContain("manifest");
@@ -292,18 +292,18 @@ describe("InfinitusService", () => {
       const infinitus = yield* InfinitusService;
       const { queue, fiber } = yield* subscribe(infinitus);
 
-      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* stub.setResult("fleets", [fleet("swapd/codex")]);
       yield* TestClock.adjust(FAST);
       const changed = yield* Queue.take(queue);
-      expect(changed.fleets.map((entry) => entry.key)).toEqual(["cswap/codex"]);
+      expect(changed.fleets.map((entry) => entry.key)).toEqual(["swapd/codex"]);
 
       // Same reply on the next tick: nothing may reach the queue, so the take
       // below has to skip it and land on the tick after.
       yield* TestClock.adjust(FAST);
-      yield* stub.setResult("fleets", [fleet("cswap/gemini")]);
+      yield* stub.setResult("fleets", [fleet("swapd/gemini")]);
       yield* TestClock.adjust(FAST);
       const next = yield* Queue.take(queue);
-      expect(next.fleets.map((entry) => entry.key)).toEqual(["cswap/gemini"]);
+      expect(next.fleets.map((entry) => entry.key)).toEqual(["swapd/gemini"]);
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),
@@ -332,10 +332,10 @@ describe("InfinitusService", () => {
 
       // One of two leaving must not stop the loop the other is watching.
       yield* Fiber.interrupt(first.fiber);
-      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* stub.setResult("fleets", [fleet("swapd/codex")]);
       yield* TestClock.adjust(FAST);
       const seen = yield* Queue.take(second.queue);
-      expect(seen.fleets.map((entry) => entry.key)).toEqual(["cswap/codex"]);
+      expect(seen.fleets.map((entry) => entry.key)).toEqual(["swapd/codex"]);
 
       yield* Fiber.interrupt(second.fiber);
       yield* stub.resetCalls;
@@ -381,11 +381,11 @@ describe("InfinitusService", () => {
       const infinitus = yield* InfinitusService;
       const { fiber } = yield* subscribe(infinitus);
 
-      yield* stub.setResult("switch", { fleet: "cswap/claude" });
+      yield* stub.setResult("switch", { fleet: "swapd/claude" });
       const spans = yield* collectSpans(
         infinitus.command({
           command: "switch",
-          args: ["cswap/claude", "2"],
+          args: ["swapd/claude", "2"],
           options: { yes: "true", token: "s3cret-value" },
         }),
       );
@@ -393,7 +393,7 @@ describe("InfinitusService", () => {
       const span = spans.find((entry) => entry.name === "Infinitus.command");
       expect(span?.attributes).toMatchObject({
         "infinitus.command": "switch",
-        "infinitus.args": "cswap/claude 2",
+        "infinitus.args": "swapd/claude 2",
         "infinitus.options": "yes token",
         "infinitus.effect": "write",
       });
@@ -435,17 +435,17 @@ describe("InfinitusService", () => {
       const { queue, fiber } = yield* subscribe(infinitus);
 
       yield* stub.resetCalls;
-      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* stub.setResult("fleets", [fleet("swapd/codex")]);
       const result = yield* infinitus.command({
         command: "switch",
-        args: ["cswap/claude", "2"],
+        args: ["swapd/claude", "2"],
         options: { yes: "true" },
       });
 
-      expect(result).toEqual({ fleet: "cswap/claude" });
+      expect(result).toEqual({ fleet: "swapd/claude" });
       // The refresh runs detached; the emission it publishes is the proof.
       const refreshed = yield* Queue.take(queue);
-      expect(refreshed.fleets.map((entry) => entry.key)).toEqual(["cswap/codex"]);
+      expect(refreshed.fleets.map((entry) => entry.key)).toEqual(["swapd/codex"]);
       const calls = yield* stub.calls;
       expect(calls[0]).toBe("switch");
       expect(calls).toContain("fleets");
@@ -460,7 +460,7 @@ describe("InfinitusService", () => {
       const stub = yield* ControlStub;
       const infinitus = yield* InfinitusService;
 
-      yield* stub.setResult("fleets", [{ key: 7, engineID: "cswap" }]);
+      yield* stub.setResult("fleets", [{ key: 7, engineID: "swapd" }]);
       const { fiber, first } = yield* subscribe(infinitus);
 
       expect(first.available).toBe(true);
@@ -479,12 +479,12 @@ describe("InfinitusService", () => {
       const { queue, fiber } = yield* subscribe(infinitus);
 
       yield* stub.resetCalls;
-      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* stub.setResult("fleets", [fleet("swapd/codex")]);
       yield* TestClock.adjust(FAST);
       yield* Queue.take(queue);
       expect(yield* stub.calls).not.toContain("forecast");
 
-      yield* stub.setResult("fleets", [fleet("cswap/gemini")]);
+      yield* stub.setResult("fleets", [fleet("swapd/gemini")]);
       yield* TestClock.adjust(SLOW);
       yield* Queue.take(queue);
       expect(yield* stub.calls).toContain("forecast");
@@ -520,7 +520,7 @@ describe("InfinitusService", () => {
 
       expect(first.unavailableReason).not.toBe(NOT_POLLED_REASON);
       expect(first.available).toBe(true);
-      expect(first.fleets.map((entry) => entry.key)).toEqual(["cswap/claude"]);
+      expect(first.fleets.map((entry) => entry.key)).toEqual(["swapd/claude"]);
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(AsyncTestLayer)),
@@ -685,11 +685,11 @@ describe("the lease", () => {
       expect(first.available).toBe(true);
       expect((yield* stub.calls).filter((call) => call === "client-activity")).toHaveLength(1);
 
-      yield* stub.setResult("fleets", [fleet("cswap/codex")]);
+      yield* stub.setResult("fleets", [fleet("swapd/codex")]);
       yield* TestClock.adjust(FAST);
       const next = yield* Queue.take(queue);
       expect(next.available).toBe(true);
-      expect(next.fleets.map((entry) => entry.key)).toEqual(["cswap/codex"]);
+      expect(next.fleets.map((entry) => entry.key)).toEqual(["swapd/codex"]);
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),

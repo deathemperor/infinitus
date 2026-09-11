@@ -38,8 +38,8 @@ const claudeInstance = ProviderInstanceId.make("claude-1");
 const codexInstance = ProviderInstanceId.make("codex-1");
 
 const fleet = (overrides: Partial<InfinitusFleet> = {}): InfinitusFleet => ({
-  key: "cswap/claude",
-  engineID: "cswap",
+  key: "swapd/claude",
+  engineID: "swapd",
   provider: "claude",
   capabilities: [],
   accounts: [
