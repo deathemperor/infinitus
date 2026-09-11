@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Infinitus — Claude Code account fleet manager for macOS &amp; Linux</title>
 <meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, 15 themes. macOS and Linux (Omarchy / Arch).">
-<meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, claude-swap, Claude Code rate limit, 5-hour window, weekly limit, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, session resume">
+<meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, Claude Code rate limit, 5-hour window, weekly limit, swapd, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, session resume">
 <meta name="author" content="deathemperor">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="theme-color" content="#0a0d11">
@@ -257,7 +257,7 @@
       "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges and 15 themes.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
-      "softwareVersion": "0.4.4-alpha.2",
+      "softwareVersion": "0.4.5-alpha.1",
       "license": "https://github.com/deathemperor/infinitus/blob/main/LICENSE",
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -275,6 +275,7 @@
         "Session progress: what each running agent is doing, todo counts, retries",
         "15 themes with their own intro, death and revival effects",
         "Usage history and utilization estimates",
+        "Priority mode: a headroom verdict per fleet so clients pause background work before a window binds",
         "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
         "Session chat from the phone: streamed replies, prompts answered, photo and file attachments, Share sheet from any app",
         "infinitusctl control CLI and an onboarding brief for coding agents",
@@ -297,13 +298,13 @@
         { "@type": "Question", "name": "What is Infinitus?",
           "acceptedAnswer": { "@type": "Answer", "text": "Infinitus is a free, open-source menu bar app for macOS (and a tray daemon plus panel plugin for Linux) that manages a fleet of Claude Code accounts. It shows every account's 5-hour, weekly and per-model usage, rotates to the freshest account when a limit hits, and nudges stopped sessions back to work." } },
         { "@type": "Question", "name": "Does Infinitus work with Claude Code?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus reads Claude Code's own local files to show session progress and drives account switching through the claude-swap CLI. It never modifies Claude Code itself." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus reads Claude Code's own local files to show session progress and drives account switching through the swapd CLI. It never modifies Claude Code itself." } },
         { "@type": "Question", "name": "Which platforms does Infinitus support?",
           "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. An iOS companion app is in progress." } },
         { "@type": "Question", "name": "Is Infinitus free?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
         { "@type": "Question", "name": "How do I install Infinitus?",
-          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The claude-swap CLI must be on your PATH." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
         { "@type": "Question", "name": "Are the usage numbers Infinitus shows exact?",
           "acceptedAnswer": { "@type": "Answer", "text": "Usage percentages come from Anthropic's own limits reporting; usage-cost figures in the app are estimates, never billing truth." } }
       ]
@@ -342,9 +343,9 @@
     so an agent run survives the five-hour wall without you.
   </p>
   <div class="cta">
-    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.4-alpha.2/Infinitus-0.4.4-alpha.2.zip">Download for macOS</a>
+    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/Infinitus-0.4.5-alpha.1.zip">Download for macOS</a>
     <a class="btn" href="https://github.com/deathemperor/infinitus">Source on GitHub</a>
-    <span class="note">v0.4.4-alpha.2 · alpha · macOS menu bar + Linux panel · free &amp; open source</span>
+    <span class="note">v0.4.5-alpha.1 · alpha · macOS menu bar + Linux panel · free &amp; open source</span>
   </div>
   <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
           title="Copy to clipboard" aria-label="Copy the Homebrew install command">
@@ -352,12 +353,12 @@
     <span class="k">copy</span>
   </button>
   <p class="also">Signed and notarized — it opens like any other app.
-    Needs the <a href="https://github.com/deathemperor/claude-swap">claude-swap</a> CLI
+    Needs the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI
     on your PATH — Infinitus walks you through the first account.</p>
   <p class="also">Also for
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.4-alpha.2/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.4-alpha.2/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.4-alpha.2/infinitus-omarchy.tar.gz">Omarchy</a>
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
+    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/infinitus-omarchy.tar.gz">Omarchy</a>
     — or <a href="#install">brew / AUR / source</a>.</p>
 </header>
 
@@ -372,8 +373,8 @@
 <section id="how">
   <div class="wrap">
     <h2>How it works</h2>
-    <p class="sub">A native Swift app over the <a href="https://github.com/deathemperor/claude-swap"><b>claude-swap</b></a> engine.
-      Every engine touchpoint is an isolated <code>cswap --json</code>
+    <p class="sub">A native Swift app over the <a href="https://github.com/deathemperor/swapd"><b>swapd</b></a> engine.
+      Every engine touchpoint is an isolated <code>swapd --json</code>
       subprocess — Infinitus never touches your credentials directly.</p>
     <div class="steps">
       <div class="step"><span class="n">01 · WATCH</span>
@@ -565,9 +566,14 @@
         <p>Fleets behind a proxy plug in as more engines — CLIProxyAPI's
         management API, 9Router's dashboard (Claude, Kiro credits, Codex,
         Gemini) — stacked with aligned columns.</p></div>
-      <div class="card"><h3><span class="dot">●</span>swapd (preview)</h3>
-        <p>The new multi-provider engine runs beside cswap — one fleet per
-        provider it holds, and igniting an account refreshes it at once.</p></div>
+      <div class="card"><h3><span class="dot">●</span>swapd</h3>
+        <p>The multi-provider engine behind the fleet — one fleet per
+        provider it holds (Claude, Gemini CLI…), its own auto-switch daemon,
+        and igniting an account refreshes it at once.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Priority mode</h3>
+        <p><em>hold</em> or <em>interrupt</em> gives every fleet a headroom
+        verdict — abundant, low, critical — so a client pauses background
+        work before a window binds, not after.</p></div>
     </div>
   </div>
 </section>
@@ -647,7 +653,8 @@
 <span class="g">git</span> clone https://github.com/deathemperor/infinitus
 <span class="g">cd</span> infinitus &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
         <p class="fineprint">Releases are Developer ID signed and notarized
-        (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/claude-swap">claude-swap</a> CLI on your PATH;
+        (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI on your PATH
+        (<code>cargo install --git https://github.com/deathemperor/swapd swapd</code>);
         Infinitus walks you through first-account setup.</p>
       </div>
       <div>
@@ -676,7 +683,7 @@
         that put stopped sessions back to work.</dd>
       <dt>Does it work with Claude Code?</dt>
       <dd>Yes. It reads Claude Code's own local session files to show progress
-        and switches accounts through the <a href="https://github.com/deathemperor/claude-swap"><code>claude-swap</code></a> CLI. It
+        and switches accounts through the <a href="https://github.com/deathemperor/swapd"><code>swapd</code></a> CLI. It
         never modifies Claude Code.</dd>
       <dt>Which platforms?</dt>
       <dd>macOS 14+ on Apple silicon (Homebrew cask), and Linux — a static
@@ -696,7 +703,7 @@
   <div class="wrap">
     <h2>Keep the agents running.</h2>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.4-alpha.2/Infinitus-0.4.4-alpha.2.zip">Download for macOS</a>
+      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.4.5-alpha.1/Infinitus-0.4.5-alpha.1.zip">Download for macOS</a>
       <a class="btn" href="#install">Linux &amp; source</a>
     </div>
     <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
