@@ -48,6 +48,7 @@ import {
 } from "../../hooks/useSettings";
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";
 import { ProjectActionsList } from "./ProjectActionsList";
+import { ProjectPromptSnippetsSection } from "../prompts/ProjectPromptSnippetsSection";
 import { isElectron } from "../../env";
 import {
   decodeProjectScriptKeybindingRule,
@@ -519,6 +520,24 @@ function ProjectDetail({
       }),
     );
   }, []);
+
+  // Prompt snippets (#270 G, fork): the representative first, then the
+  // other checkouts; a save writes each one.
+  const promptSnippetTargets = useMemo(
+    () =>
+      [representative, ...group.memberProjects.filter((member) => member !== representative)].map(
+        (member) => {
+          const environment = environmentById.get(member.environmentId);
+          return {
+            environmentId: member.environmentId,
+            projectId: member.id,
+            label: environment?.label ?? "this machine",
+            connected: environment?.connection.phase === "connected",
+          };
+        },
+      ),
+    [environmentById, group.memberProjects, representative],
+  );
 
   // Group-shared fields live on each physical project record, so a
   // group-level edit fans out to every member.
@@ -1239,6 +1258,12 @@ function ProjectDetail({
             }
           />
         </SettingsSection>
+
+        <ProjectPromptSnippetsSection
+          representative={promptSnippetTargets[0]!}
+          members={promptSnippetTargets}
+          reportFailure={reportFailure}
+        />
 
         <SettingsSection title="Checkout">
           {hasMultipleCheckouts ? (

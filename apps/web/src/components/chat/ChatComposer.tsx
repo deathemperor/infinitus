@@ -103,6 +103,10 @@ import { ComposerCapturesMenu } from "../captures/ComposerCapturesMenu";
 import { useCapturesUiStore } from "../captures/capturesUiStore";
 import { openCaptureCount } from "../captures/captures.logic";
 import { useActiveProjectRef, useCapturesShortcuts } from "../captures/useCaptures";
+import { ComposerPromptsBadge } from "../prompts/ComposerPromptsBadge";
+import { ComposerPromptsMenu } from "../prompts/ComposerPromptsMenu";
+import { usePromptsUiStore } from "../prompts/promptsUiStore";
+import { useProjectPromptSnippets } from "../prompts/useProjectPromptSnippets";
 import { captures as capturesAtoms } from "../../state/captures";
 import { useEnvironmentQuery } from "../../state/query";
 import { useComposerMenuState } from "./useComposerMenuState";
@@ -4298,6 +4302,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }),
   );
   useCapturesShortcuts({ keybindings, terminalOpen, modelPickerOpen: isComposerModelPickerOpen });
+  // Prompts (#270 G, fork): the project's saved snippets and the popover's
+  // open state; the menu inserts through `insertComposerTextAtEnd`.
+  const promptSnippets = useProjectPromptSnippets(capturesProject);
+  const isPromptsMenuOpen = usePromptsUiStore((store) => store.open);
+  const togglePromptsMenu = usePromptsUiStore((store) => store.toggle);
+  const closePromptsMenu = usePromptsUiStore((store) => store.close);
 
   // Close the stash menu whenever the trigger-driven command menu opens so
   // the two popovers never stack in the same layer, and when the user
@@ -5179,6 +5189,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             onToggleMenu={toggleCapturesMenu}
           />
         ) : null}
+        {!isComposerApprovalState && capturesProject !== null ? (
+          <ComposerPromptsBadge
+            count={promptSnippets.snippets.length}
+            menuOpen={isPromptsMenuOpen}
+            onToggleMenu={togglePromptsMenu}
+          />
+        ) : null}
       </ComposerBanner.Dock>
       <div className="relative">
         <ComposerSurface.Main
@@ -5278,6 +5295,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               )}
 
               {isCapturesMenuOpen &&
+                !isPromptsMenuOpen &&
                 !isStashMenuOpen &&
                 !composerMenuOpen &&
                 !isComposerApprovalState && (
@@ -5289,6 +5307,22 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })
                       }
                       onClose={closeCapturesMenu}
+                    />
+                  </ComposerCommandMenuLayer>
+                )}
+
+              {isPromptsMenuOpen &&
+                !isStashMenuOpen &&
+                !composerMenuOpen &&
+                !isComposerApprovalState && (
+                  <ComposerCommandMenuLayer anchor={composerMenuAnchor}>
+                    <ComposerPromptsMenu
+                      snippets={promptSnippets.snippets}
+                      projectKey={promptSnippets.projectKey}
+                      onInsert={(text) =>
+                        insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })
+                      }
+                      onClose={closePromptsMenu}
                     />
                   </ComposerCommandMenuLayer>
                 )}
