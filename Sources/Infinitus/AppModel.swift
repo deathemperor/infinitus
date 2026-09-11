@@ -2535,9 +2535,20 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// The last "no-switch" line logged: the engine repeats "no switch —
+    /// already consuming soonest" after every minute's poll, and the
+    /// poll itself says nothing, so neither reaches the Activity tail or
+    /// the durable log until the reason changes (Infi4, 2026-09-11).
+    private var lastNoSwitch: String?
+
     private func consume(_ line: EventLine) {
         switch line {
         case .event(let event):
+            if event.kind == "poll" { return }
+            if event.kind == "no-switch" {
+                if event.summary == lastNoSwitch { return }
+                lastNoSwitch = event.summary
+            }
             logEvent(Self.eventKind(event.kind), icon: event.icon, event.summary)
             switch event.kind {
             case "switch":
