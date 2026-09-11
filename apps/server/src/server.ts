@@ -73,6 +73,7 @@ import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
+import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -81,7 +82,6 @@ import { OrchestrationReactorLive } from "./orchestration/Layers/OrchestrationRe
 import { RuntimeReceiptBusLive } from "./orchestration/Layers/RuntimeReceiptBus.ts";
 import { ProviderRuntimeIngestionLive } from "./orchestration/Layers/ProviderRuntimeIngestion.ts";
 import { ProviderCommandReactorLive } from "./orchestration/Layers/ProviderCommandReactor.ts";
-import { TurnStartGatePassthrough } from "./orchestration/Services/TurnStartGate.ts";
 import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.ts";
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
 import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
@@ -312,6 +312,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#616): the TurnStartGate every provider turn start passes — holds a
+  // background thread's start while its fleet's headroom reads low.
+  Layer.provideMerge(InfinitusSessionHoldLayers),
 );
 
 const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(
@@ -566,9 +569,6 @@ const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
   // The pairing-approval store (#710) mints through the same auth service the
   // QR flow uses; the phone reaches it over HTTP, the desktop over WebSocket.
   Layer.provideMerge(InfinitusPairingLive.pipe(Layer.provide(AuthLayerLive))),
-  // Fork (#616): every provider turn start passes this gate; passthrough until
-  // session priority mode's hold layer replaces it.
-  Layer.provideMerge(TurnStartGatePassthrough),
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(ExternalLauncher.layer),

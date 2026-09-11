@@ -27,6 +27,11 @@ import { describe, expect } from "vite-plus/test";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import {
+  TurnStartGate,
+  TurnStartGatePassthrough,
+  type TurnStartGateShape,
+} from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
@@ -129,78 +134,85 @@ interface Harness {
   readonly watchers: Effect.Effect<number>;
 }
 
-const makeHarness = Effect.gen(function* () {
-  const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
-  const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
-  const current = yield* Ref.make<InfinitusSnapshot>(stale);
-  const enabled = yield* Ref.make(true);
-  const interrupts = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>([]);
-  const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
-  const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
-  const watchers = yield* Ref.make(0);
+/** Fork (#616): the gate a resume passes through; passthrough by default. */
+const makeHarnessWith = (gate?: TurnStartGateShape) =>
+  Effect.gen(function* () {
+    const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
+    const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
+    const current = yield* Ref.make<InfinitusSnapshot>(stale);
+    const enabled = yield* Ref.make(true);
+    const interrupts = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>([]);
+    const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
+    const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
+    const watchers = yield* Ref.make(0);
 
-  const layer = InfinitusResumeOnLimitLive.pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Layer.mock(ProviderService)({
-          get streamEvents() {
-            return Stream.fromPubSub(events);
-          },
-          interruptTurn: (input) =>
-            Ref.update(interrupts, (previous) => [
-              ...previous,
-              { threadId: input.threadId, ...(input.turnId ? { turnId: input.turnId } : {}) },
-            ]),
-          sendTurn: (input) =>
-            Ref.update(turns, (previous) => [
-              ...previous,
-              { threadId: input.threadId, ...(input.input ? { input: input.input } : {}) },
-            ]).pipe(Effect.as({ turnId, resumeCursor: null } as never)),
-        }),
-        Layer.mock(OrchestrationEngineService)({
-          dispatch: (command) =>
-            Ref.update(dispatched, (previous) => [...previous, command]).pipe(
-              Effect.as({ sequence: 1 }),
+    const layer = InfinitusResumeOnLimitLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          gate === undefined ? TurnStartGatePassthrough : Layer.succeed(TurnStartGate, gate),
+          Layer.mock(ProviderService)({
+            get streamEvents() {
+              return Stream.fromPubSub(events);
+            },
+            interruptTurn: (input) =>
+              Ref.update(interrupts, (previous) => [
+                ...previous,
+                { threadId: input.threadId, ...(input.turnId ? { turnId: input.turnId } : {}) },
+              ]),
+            sendTurn: (input) =>
+              Ref.update(turns, (previous) => [
+                ...previous,
+                { threadId: input.threadId, ...(input.input ? { input: input.input } : {}) },
+              ]).pipe(Effect.as({ turnId, resumeCursor: null } as never)),
+          }),
+          Layer.mock(OrchestrationEngineService)({
+            dispatch: (command) =>
+              Ref.update(dispatched, (previous) => [...previous, command]).pipe(
+                Effect.as({ sequence: 1 }),
+              ),
+          }),
+          Layer.mock(ProjectionSnapshotQuery)({
+            getThreadShellById: () => Effect.succeed(Option.some(shell)),
+            getThreadRuntimeContext: () =>
+              Effect.succeed(Option.some({ id: threadId, title: "Thread", session })),
+          }),
+          Layer.mock(ServerSettingsService)({
+            getSettings: Ref.get(enabled).pipe(
+              Effect.map((value) => ({
+                ...DEFAULT_SERVER_SETTINGS,
+                infinitusResumeOnLimit: value,
+              })),
             ),
-        }),
-        Layer.mock(ProjectionSnapshotQuery)({
-          getThreadShellById: () => Effect.succeed(Option.some(shell)),
-          getThreadRuntimeContext: () =>
-            Effect.succeed(Option.some({ id: threadId, title: "Thread", session })),
-        }),
-        Layer.mock(ServerSettingsService)({
-          getSettings: Ref.get(enabled).pipe(
-            Effect.map((value) => ({ ...DEFAULT_SERVER_SETTINGS, infinitusResumeOnLimit: value })),
-          ),
-        }),
-        Layer.mock(InfinitusService)({
-          snapshot: Ref.get(current),
-          changes: () =>
-            Stream.unwrap(
-              Effect.acquireRelease(
-                Ref.update(watchers, (n) => n + 1),
-                () => Ref.update(watchers, (n) => n - 1),
-              ).pipe(Effect.as(Stream.fromQueue(snapshots))),
-            ),
-          observed: Stream.empty,
-        }),
-        Layer.succeed(Crypto.Crypto, testCrypto),
+          }),
+          Layer.mock(InfinitusService)({
+            snapshot: Ref.get(current),
+            changes: () =>
+              Stream.unwrap(
+                Effect.acquireRelease(
+                  Ref.update(watchers, (n) => n + 1),
+                  () => Ref.update(watchers, (n) => n - 1),
+                ).pipe(Effect.as(Stream.fromQueue(snapshots))),
+              ),
+            observed: Stream.empty,
+          }),
+          Layer.succeed(Crypto.Crypto, testCrypto),
+        ),
       ),
-    ),
-  );
-  yield* Layer.build(layer);
+    );
+    yield* Layer.build(layer);
 
-  return {
-    emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
-    poll: (snapshot) => Queue.offer(snapshots, snapshot).pipe(Effect.asVoid),
-    setCurrent: (snapshot) => Ref.set(current, snapshot),
-    setEnabled: (value) => Ref.set(enabled, value),
-    interrupts: Ref.get(interrupts),
-    turns: Ref.get(turns),
-    dispatched: Ref.get(dispatched),
-    watchers: Ref.get(watchers),
-  } satisfies Harness;
-});
+    return {
+      emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
+      poll: (snapshot) => Queue.offer(snapshots, snapshot).pipe(Effect.asVoid),
+      setCurrent: (snapshot) => Ref.set(current, snapshot),
+      setEnabled: (value) => Ref.set(enabled, value),
+      interrupts: Ref.get(interrupts),
+      turns: Ref.get(turns),
+      dispatched: Ref.get(dispatched),
+      watchers: Ref.get(watchers),
+    } satisfies Harness;
+  });
+const makeHarness = makeHarnessWith();
 
 /** Lets the worker's fibers run until `check` holds; the clock is a test one,
     so this yields rather than sleeps. */
@@ -218,6 +230,45 @@ const settle = <A>(read: Effect.Effect<A>, check: (value: A) => boolean) =>
 const at = (offsetSeconds: number) => DateTime.formatIso(DateTime.makeUnsafe(offsetSeconds * 1000));
 
 describe("InfinitusResumeOnLimitLive", () => {
+  effectIt.effect(
+    "hands the resume to the TurnStartGate: a holding gate resumes nothing until the start runs (#616)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const kept: Array<{ threadId: ThreadId; run: Effect.Effect<void> }> = [];
+          const h = yield* makeHarnessWith({
+            start: ({ threadId: held, run }) =>
+              Effect.sync(() => {
+                kept.push({ threadId: held, run: run as Effect.Effect<void> });
+                return "held" as const;
+              }),
+          });
+          yield* TestClock.adjust(Duration.seconds(100));
+          yield* h.emit(parkedWarning());
+          yield* settle(h.watchers, (n) => n === 1);
+
+          yield* h.poll(swapped(at(150)));
+          yield* settle(
+            Effect.sync(() => kept.length),
+            (n) => n === 1,
+          );
+          expect(kept[0]?.threadId).toBe(threadId);
+          expect(yield* h.turns).toEqual([]);
+          expect(yield* h.interrupts).toEqual([]);
+          expect(yield* h.dispatched).toEqual([]);
+
+          // Released later: the resume runs then, on the account live now.
+          yield* kept[0]!.run;
+          expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+          expect(yield* h.interrupts).toEqual([{ threadId, turnId }]);
+          expect((yield* h.dispatched).map((command) => command.type)).toEqual([
+            "thread.activity.append",
+            "thread.session.set",
+          ]);
+        }),
+      ),
+  );
+
   effectIt.effect("resumes a parked turn once the swapped-to account is probed ok", () =>
     Effect.scoped(
       Effect.gen(function* () {
