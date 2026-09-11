@@ -44,6 +44,9 @@ export interface AccountRowModel {
   readonly scoped: ReadonlyArray<UsageWindowBar>;
   readonly freshness: string | null;
   readonly actions: ReadonlyArray<AccountAction>;
+  /** The engine says the stored sign-in expired and the fleet can run a new
+      one: the row offers "Sign in again" (native's "Sign-In Needed" chip). */
+  readonly reloginNeeded: boolean;
 }
 
 /** One fleet's section. `key` is what every account command takes as
@@ -53,6 +56,9 @@ export interface FleetSectionModel {
   readonly title: string;
   readonly caveat: string | null;
   readonly rows: ReadonlyArray<AccountRowModel>;
+  /** The fleet runs an in-app sign-in (`add <fleet>`), so the section offers
+      "Add account". Read off the capabilities, never the engine's name. */
+  readonly canAdd: boolean;
 }
 
 /** The fleet-wide run-rate projection. Estimates, never billing truth. */
@@ -156,6 +162,18 @@ function rowActions(
   return actions;
 }
 
+/** The capability the native `add <fleet>` verb acts on: the in-app OAuth
+    sign-in (cswap declares every capability, the proxy this one). A fleet with
+    only `addToken` pastes a token in the Mac app and is not offered here. */
+const ADD_CAPABILITY = "addOAuth";
+
+/** The usage status the engines report for a stored sign-in that expired. */
+const RELOGIN_USAGE_STATUS = "relogin_required";
+
+function fleetCanAdd(fleet: InfinitusFleet): boolean {
+  return fleet.capabilities.includes(ADD_CAPABILITY);
+}
+
 function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowModel {
   const { windows, scoped } = usageBars(account);
   return {
@@ -170,6 +188,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
     scoped,
     freshness: freshnessLabel(account),
     actions: rowActions(fleet, account),
+    reloginNeeded: fleetCanAdd(fleet) && account.usageStatus === RELOGIN_USAGE_STATUS,
   };
 }
 
@@ -197,6 +216,7 @@ export function buildFleetSection(fleet: InfinitusFleet): FleetSectionModel {
     rows: [...fleet.accounts]
       .sort((left, right) => left.number - right.number)
       .map((account) => buildRow(fleet, account)),
+    canAdd: fleetCanAdd(fleet),
   };
 }
 
@@ -258,6 +278,65 @@ export function accountCommandArgs(
     return { command: "prefer", args: [...target, row.preferred ? "off" : "on"] };
   }
   return { command: action, args: target };
+}
+
+/*
+ * Add account / re-login: the native `add <fleet>` verb opens the app's own
+ * sign-in (a system sheet or a private window on the Mac — never the fork's
+ * browser); `wait-add` blocks until it ends. Re-login is the same flow: the
+ * verb takes no account, so the page only names who to sign in as.
+ */
+
+/** Whether the running build has the verb at all; an older app answers
+    "unknown command", so the buttons stay hidden without it. */
+export function snapshotOffersAdd(snapshot: InfinitusSnapshot): boolean {
+  return snapshot.commands.some((command) => command.name === "add");
+}
+
+/** The app's own word on whether a sign-in is running — started from here,
+    from another client or from the Mac app itself. `add` is refused while
+    one runs, so every add/re-login button waits on it. */
+export function snapshotSignInRunning(snapshot: InfinitusSnapshot): boolean {
+  return snapshot.status?.signInRunning === true;
+}
+
+/** `add <fleet>`: answers `{started:true}` once the sign-in is on screen. */
+export function addAccountCommandArgs(fleetKey: string): {
+  command: string;
+  args: ReadonlyArray<string>;
+  options: Record<string, string>;
+} {
+  return { command: "add", args: [fleetKey], options: {} };
+}
+
+/** `wait-add --timeout <s>`: one short poll. The server's socket client gives
+    a command ten seconds, so the page polls in steps rather than asking the
+    app for the whole five-minute wait. */
+export function waitAddCommandArgs(timeoutSeconds: number): {
+  command: string;
+  args: ReadonlyArray<string>;
+  options: Record<string, string>;
+} {
+  return { command: "wait-add", args: [], options: { timeout: String(timeoutSeconds) } };
+}
+
+/** The refusal text native answers a `wait-add` whose window closed while the
+    sign-in still runs ("timed out after 5s"); the page keeps polling on it.
+    Any other refusal is the sign-in's own failure. */
+export const WAIT_ADD_STILL_RUNNING = /^timed out/;
+
+const WaitAddPayload = Schema.Struct({
+  done: Schema.Boolean,
+  error: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+
+const decodeWaitAdd = Schema.decodeUnknownOption(WaitAddPayload);
+
+/** What a `wait-add` reply's `result` says, or null when it is not one. */
+export function waitAddOutcome(result: unknown): { done: boolean; error: string | null } | null {
+  const decoded = decodeWaitAdd(result);
+  if (decoded._tag !== "Some") return null;
+  return { done: decoded.value.done, error: decoded.value.error ?? null };
 }
 
 /*

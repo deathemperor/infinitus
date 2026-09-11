@@ -2,10 +2,14 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   accountCommandArgs,
   accountsPageState,
+  addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
   buildSignInRows,
   signInCommandArgs,
+  snapshotOffersAdd,
+  snapshotSignInRunning,
+  waitAddCommandArgs,
   type AccountAction,
   type AccountRowModel,
   type SignInRowModel,
@@ -15,7 +19,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import { ChevronDownIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
@@ -39,6 +43,7 @@ import {
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { AccountsUnavailable } from "./AccountsUnavailable";
+import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAccount.logic";
 import { FleetSection } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
 import { SignInsSection } from "./SignInsSection";
@@ -98,6 +103,16 @@ export function AccountsPage() {
   const [pendingSignIn, setPendingSignIn] = useState<PendingSignIn | null>(null);
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [addFlow, setAddFlow] = useState<AddAccountFlow | null>(null);
+  // Each add/re-login gets a run number; a newer run or an unmount retires
+  // the polling loop of the one before it.
+  const addRunRef = useRef(0);
+  useEffect(
+    () => () => {
+      addRunRef.current += 1;
+    },
+    [],
+  );
 
   const infinitusEnvironments = useMemo(
     () =>
@@ -176,6 +191,43 @@ export function AccountsPage() {
     }
     setPendingSignIn(null);
     setSignInFailure({ key: row.key, message: commandErrorMessage(result.cause) });
+  };
+
+  // `add <fleet>` puts the app's own sign-in on the Mac's screen; the page then
+  // polls `wait-add` in short steps until the app says the flow ended. The new
+  // account arrives through the snapshot: the server re-reads the fleets after
+  // every forwarded command.
+  const startAdd = async (fleetKey: string, target: AccountRowModel | null) => {
+    if (environmentId === null) return;
+    const run = ++addRunRef.current;
+    const live = () => addRunRef.current === run;
+    const targetLabel = target?.label ?? null;
+    const phase = (next: AddAccountFlow["phase"]) => {
+      if (live()) setAddFlow({ fleetKey, target: targetLabel, phase: next });
+    };
+    phase({ kind: "starting" });
+    const started = await runCommand({ environmentId, input: addAccountCommandArgs(fleetKey) });
+    if (started._tag === "Failure") {
+      phase({ kind: "failed", message: commandErrorMessage(started.cause) });
+      return;
+    }
+    phase({ kind: "waiting" });
+    const startedAt = Date.now();
+    while (live()) {
+      const answer = await runCommand({
+        environmentId,
+        input: waitAddCommandArgs(WAIT_ADD_STEP_SECONDS),
+      });
+      const step = waitAddStep(
+        answer._tag === "Success"
+          ? { result: answer.value.result }
+          : { failure: commandErrorMessage(answer.cause) },
+        Date.now() - startedAt,
+      );
+      if (step.kind === "poll") continue;
+      phase(step.kind === "done" ? step : { kind: "failed", message: step.message });
+      return;
+    }
   };
 
   const refresh = async () => {
@@ -260,11 +312,13 @@ export function AccountsPage() {
               failure={failure}
               pendingSignIn={signInInFlight}
               signInFailure={signInFailure}
+              addFlow={addFlow}
               onRetry={snapshotQuery.refresh}
               onAction={(fleetKey, row, action, alias) =>
                 void dispatch(fleetKey, row, action, alias)
               }
               onSignIn={(row) => void signIn(row)}
+              onAdd={(fleetKey, target) => void startAdd(fleetKey, target)}
             />
           </WorkspacePageContainer>
         </ScrollArea>
@@ -281,9 +335,11 @@ function AccountsBody({
   failure,
   pendingSignIn,
   signInFailure,
+  addFlow,
   onRetry,
   onAction,
   onSignIn,
+  onAdd,
 }: {
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
@@ -292,6 +348,7 @@ function AccountsBody({
   readonly failure: (CommandTarget & { message: string }) | null;
   readonly pendingSignIn: string | null;
   readonly signInFailure: { readonly key: string; readonly message: string } | null;
+  readonly addFlow: AddAccountFlow | null;
   readonly onRetry: () => void;
   readonly onAction: (
     fleetKey: string,
@@ -300,6 +357,7 @@ function AccountsBody({
     alias?: string,
   ) => void;
   readonly onSignIn: (row: SignInRowModel) => void;
+  readonly onAdd: (fleetKey: string, target: AccountRowModel | null) => void;
 }) {
   if (state === "unsupported") {
     return (
@@ -342,6 +400,8 @@ function AccountsBody({
   }
 
   const forecast = buildForecast(snapshot);
+  const offersAdd = snapshotOffersAdd(snapshot);
+  const signInRunning = snapshotSignInRunning(snapshot);
   return (
     <div className="flex flex-col gap-6">
       {forecast === null ? null : <ForecastStrip forecast={forecast} />}
@@ -362,7 +422,11 @@ function AccountsBody({
                 ? { number: failure.number, message: failure.message }
                 : null
             }
+            offersAdd={offersAdd}
+            addFlow={addFlow?.fleetKey === section.key ? addFlow : null}
+            signInRunning={signInRunning}
             onAction={(row, action, alias) => onAction(section.key, row, action, alias)}
+            onAdd={(target) => onAdd(section.key, target)}
           />
         );
       })}

@@ -108,11 +108,18 @@ export function AccountRow({
   pendingAction,
   failure,
   onAction,
+  onRelogin,
+  reloginBusy = false,
 }: {
   readonly row: AccountRowModel;
   readonly pendingAction: AccountAction | null;
   readonly failure: string | null;
   readonly onAction: (action: AccountAction, alias?: string) => void;
+  /** Starts the fleet's sign-in for this lapsed account; absent when the row
+      needs none or the build has no `add` verb. */
+  readonly onRelogin?: (() => void) | undefined;
+  /** A sign-in is already running (here or in the Mac app), so no second one. */
+  readonly reloginBusy?: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [alias, setAlias] = useState(row.label);
@@ -184,6 +191,17 @@ export function AccountRow({
         <span className="ms-auto flex items-center gap-2">
           {freshness === null ? null : (
             <span className="text-muted-foreground text-xs">{freshness}</span>
+          )}
+          {onRelogin === undefined ? null : (
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={busy || reloginBusy}
+              aria-label={`Sign in again as ${row.label}`}
+              onClick={onRelogin}
+            >
+              Sign in again
+            </Button>
           )}
           {row.actions.map((action) => {
             const Icon = ACTION_ICON[action];
