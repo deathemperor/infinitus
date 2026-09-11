@@ -894,7 +894,25 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
 
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
-  prerelease (upstream's release.yml stays disabled and untouched).
+  prerelease (upstream's release.yml stays disabled and untouched). It nests
+  the native menu bar app as a login item (#777): `apps/desktop/native-helper.json`
+  (`{"tag", "sha256"}`, bumped by PR; the `native_helper_tag` dispatch input
+  tries a tag before pinning it) names the native release whose
+  `Infinitus-<version>.zip` the run downloads, checks (bundle id
+  `run.infinitus`; on signed builds Developer ID from team `Q783W6B4FA`,
+  hardened runtime, `stapler validate`) and hands to the build script as
+  `T3CODE_DESKTOP_NATIVE_HELPER` / `--native-helper`. The script `ditto`s it
+  into the stage (`NATIVE_HELPER_STAGE_DIR`), electron-builder's `extraFiles`
+  places it at `Contents/Library/LoginItems/Infinitus Menu Bar.app` (the one
+  path `SMAppService.loginItem` accepts) before the outer bundle is signed,
+  and `signIgnore` keeps `scripts/sign-macos.ts` off it, so the helper keeps
+  the native release's signature, entitlements and stapled ticket while the
+  outer seal records it as nested code; the one built-in notarization covers
+  both. "Verify nested helper" proves the nested seal survived packaging and
+  that Electron's `allow-jit` entitlement never reached it. No pin and no
+  input: nothing is nested, as for local and upstream builds. The helper is
+  never rebuilt in this workflow (macOS 26 SDK, Swift toolchain and a second
+  sign/notarize path for an artifact the native branch already publishes).
 
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,

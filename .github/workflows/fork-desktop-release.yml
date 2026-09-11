@@ -12,6 +12,10 @@ on:
         description: "Publish a prerelease (off = build only, DMG as a workflow artifact)"
         type: boolean
         default: true
+      native_helper_tag:
+        description: "Native release tag to nest as the menu bar helper (blank = the pin in apps/desktop/native-helper.json, none = nest nothing)"
+        type: string
+        default: ""
 
 jobs:
   build_mac_arm64:
@@ -51,6 +55,64 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
+
+      # The native Infinitus menu bar app rides inside the desktop bundle as a
+      # login item (#777). It is never rebuilt here: the native branch's
+      # release.yml signs, notarizes and staples the .app, so the fetched zip
+      # already carries a helper that passes Gatekeeper on its own. The pin
+      # (`{"tag": "v1.2.3", "sha256": "…"}`) is bumped by PR; a dispatch may
+      # try another tag before pinning it.
+      - name: Resolve native helper
+        id: native_helper_pin
+        shell: bash
+        env:
+          TAG_OVERRIDE: ${{ inputs.native_helper_tag }}
+        run: |
+          set -euo pipefail
+          tag="$TAG_OVERRIDE"
+          sha256=""
+          if [[ -z "$tag" && -f apps/desktop/native-helper.json ]]; then
+            tag=$(jq -r '.tag // ""' apps/desktop/native-helper.json)
+            sha256=$(jq -r '.sha256 // ""' apps/desktop/native-helper.json)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          if [[ -z "$tag" ]]; then
+            echo "No native helper pinned; the desktop nests no menu bar app." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fetch native helper
+        id: native_helper
+        if: ${{ steps.native_helper_pin.outputs.tag != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.native_helper_pin.outputs.tag }}
+          SHA256: ${{ steps.native_helper_pin.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/native-helper"
+          mkdir -p "$dir"
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'Infinitus-*.zip' -D "$dir"
+          zip=$(ls "$dir"/Infinitus-*.zip)
+          if [[ -n "$SHA256" ]]; then
+            echo "$SHA256  $zip" | shasum -a 256 -c -
+          fi
+          ditto -x -k "$zip" "$dir/unpacked"
+          app=$(find "$dir/unpacked" -maxdepth 2 -name '*.app' -type d | head -n 1)
+          if [[ -z "$app" || ! -f "$app/Contents/Info.plist" ]]; then
+            echo "The native release $TAG carries no app bundle." >&2
+            exit 1
+          fi
+          bundle_id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
+          if [[ "$bundle_id" != "run.infinitus" ]]; then
+            echo "The native app's bundle id is $bundle_id, not run.infinitus." >&2
+            exit 1
+          fi
+          echo "path=$app" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Nesting the native Infinitus $version ($TAG) as the menu bar helper." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve fork release version
         id: version
@@ -124,6 +186,29 @@ jobs:
           echo "signed=true" >> "$GITHUB_OUTPUT"
           echo "macOS signing enabled (Developer ID + notarytool)." >> "$GITHUB_STEP_SUMMARY"
 
+      # A signed desktop can only nest a helper notarytool accepts: Developer
+      # ID from the same team, hardened runtime, and its own stapled ticket
+      # (the nested code keeps that ticket; the outer bundle gets its own).
+      # Fail here, naming the tag, rather than in notarization.
+      - name: Verify native helper signature
+        if: ${{ steps.native_helper.outputs.path != '' && steps.signing.outputs.signed == 'true' }}
+        shell: bash
+        env:
+          APP: ${{ steps.native_helper.outputs.path }}
+          TAG: ${{ steps.native_helper_pin.outputs.tag }}
+        run: |
+          set -euo pipefail
+          details=$(codesign -dv --verbose=2 "$APP" 2>&1)
+          for want in "Authority=Developer ID Application" "TeamIdentifier=Q783W6B4FA" "flags=0x10000(runtime)"; do
+            if ! grep -qF "$want" <<<"$details"; then
+              echo "The native release $TAG is not signed for nesting (missing: $want); cut a Developer ID release first." >&2
+              echo "$details" >&2
+              exit 1
+            fi
+          done
+          codesign --verify --strict --verbose=2 "$APP"
+          xcrun stapler validate "$APP"
+
       - name: Build desktop artifact
         shell: bash
         env:
@@ -137,6 +222,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
           APPLE_TEAM_ID: Q783W6B4FA
+          T3CODE_DESKTOP_NATIVE_HELPER: ${{ steps.native_helper.outputs.path }}
         run: |
           set -euo pipefail
           args=(
@@ -153,6 +239,35 @@ jobs:
           fi
 
           vp run dist:desktop:artifact "${args[@]}"
+
+      # The helper must come out of packaging with its own seal intact and
+      # its own entitlements, not Electron's: electron-builder's signIgnore
+      # keeps the fork's signer off it, and this proves that held.
+      - name: Verify nested helper
+        if: ${{ steps.native_helper.outputs.path != '' }}
+        shell: bash
+        env:
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          # The zip is what electron-updater installs, so verify that, not
+          # the stage (the build script copies only files to release/).
+          ditto -x -k release/Infinitus-*.zip "$RUNNER_TEMP/nested-check"
+          app=$(find "$RUNNER_TEMP/nested-check" -maxdepth 1 -name '*.app' -type d | head -n 1)
+          nested="$app/Contents/Library/LoginItems/Infinitus Menu Bar.app"
+          if [[ ! -f "$nested/Contents/Info.plist" ]]; then
+            echo "The packaged app carries no nested helper at $nested." >&2
+            find "$app/Contents" -maxdepth 2 >&2
+            exit 1
+          fi
+          codesign --verify --strict --verbose=2 "$nested"
+          if codesign -d --entitlements :- "$nested" 2>/dev/null | grep -q "com.apple.security.cs.allow-jit"; then
+            echo "The nested helper was re-signed with Electron's entitlements." >&2
+            exit 1
+          fi
+          if [[ "$SIGNED" == "true" ]]; then
+            codesign --verify --deep --strict --verbose=2 "$app"
+          fi
 
       - name: Remove the signing keychain
         if: ${{ always() && steps.signing.outputs.keychain != '' }}
@@ -199,12 +314,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          HELPER_VERSION: ${{ steps.native_helper.outputs.version }}
+          HELPER_TAG: ${{ steps.native_helper_pin.outputs.tag }}
         run: |
           set -euo pipefail
+          HELPER_NOTE=""
+          if [[ -n "$HELPER_VERSION" ]]; then
+            HELPER_NOTE=" Nests the native Infinitus menu bar app ${HELPER_VERSION} (${HELPER_TAG}) as a login item."
+          fi
           gh release create "$TAG" \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Infinitus Desktop ${VERSION} (${GITHUB_SHA::7})" \
-            --notes "Fork desktop build of main at ${GITHUB_SHA::7}; installs beside T3 Code and auto-updates on the infinitus channel." \
+            --notes "Fork desktop build of main at ${GITHUB_SHA::7}; installs beside T3 Code and auto-updates on the infinitus channel.${HELPER_NOTE}" \
             release-publish/*
           echo "Published prerelease $TAG." >> "$GITHUB_STEP_SUMMARY"

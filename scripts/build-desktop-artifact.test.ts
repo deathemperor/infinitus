@@ -29,6 +29,10 @@ import {
   LINUX_CAPTURE_EXTRA_RESOURCES,
   LINUX_BROWSER_SECRET_EXTRA_RESOURCES,
   MAC_FILE_EXCLUSIONS,
+  NATIVE_HELPER_BUNDLE_PATH,
+  NATIVE_HELPER_SIGN_IGNORE,
+  NATIVE_HELPER_STAGE_DIR,
+  NATIVE_HELPER_STAGE_ROOT,
   InvalidMacPasskeyRpDomainError,
   InvalidMacPasskeyPublishableKeyError,
   InvalidMockUpdateServerPortError,
@@ -614,6 +618,48 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       },
     ]);
   });
+
+  it.effect("nests the native helper as a login item that keeps its own signature (#777)", () =>
+    Effect.gen(function* () {
+      const nested = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3",
+        false,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+        NATIVE_HELPER_STAGE_DIR,
+      );
+      const mac = nested.mac as { extraFiles?: unknown; signIgnore?: unknown };
+      assert.deepStrictEqual(mac.extraFiles, [
+        { from: NATIVE_HELPER_STAGE_DIR, to: NATIVE_HELPER_BUNDLE_PATH },
+      ]);
+      // The helper arrives signed and notarized by the native release; the
+      // fork's identity and Electron's entitlements never touch it.
+      assert.deepStrictEqual(mac.signIgnore, [NATIVE_HELPER_SIGN_IGNORE]);
+      // The staged copy is nested by extraFiles, never packed into app.asar.
+      assert.include(nested.files as string[], `!${NATIVE_HELPER_STAGE_ROOT}`);
+      assert.include(nested.files as string[], `!${NATIVE_HELPER_STAGE_ROOT}/**/*`);
+
+      const plain = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3",
+        false,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+      );
+      assert.notProperty(plain.mac as object, "extraFiles");
+      assert.notProperty(plain.mac as object, "signIgnore");
+      assert.notInclude(plain.files as string[], `!${NATIVE_HELPER_STAGE_ROOT}`);
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
 
   it.effect("applies platform-specific packaging to the build config", () =>
     Effect.gen(function* () {
@@ -2268,6 +2314,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         mockUpdates: Option.none(),
         mockUpdateServerPort: Option.none(),
         wslPrebuild: Option.none(),
+        nativeHelper: Option.none(),
       }).pipe(
         Effect.provide(
           Layer.mergeAll(
@@ -2308,6 +2355,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             mockUpdates: Option.none(),
             mockUpdateServerPort: Option.none(),
             wslPrebuild: Option.none(),
+            nativeHelper: Option.none(),
           }),
         );
 
@@ -2332,6 +2380,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         mockUpdates: Option.some(false),
         mockUpdateServerPort: Option.none(),
         wslPrebuild: Option.none(),
+        nativeHelper: Option.none(),
       }).pipe(
         Effect.provide(
           ConfigProvider.layer(
