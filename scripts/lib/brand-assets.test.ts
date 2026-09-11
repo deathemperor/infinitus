@@ -81,6 +81,14 @@ describe("brand-assets", () => {
   it("maps package versions to web asset brands", () => {
     expect(resolveWebAssetBrandForPackageVersion("0.0.29")).toBe("production");
     expect(resolveWebAssetBrandForPackageVersion("0.0.29-nightly.20260723.882")).toBe("nightly");
+    expect(resolveWebAssetBrandForPackageVersion("0.0.40-infinitus.20260911.8")).toBe("infinitus");
+  });
+
+  it("maps fork web assets to the Infinitus icons", () => {
+    expect(resolveWebIconOverrides("infinitus", "apps/web/dist")).toContainEqual({
+      sourceRelativePath: BRAND_ASSET_PATHS.infinitusWebFaviconIco,
+      targetRelativePath: "apps/web/dist/favicon.ico",
+    });
   });
 
   it("keeps development, nightly, and production icon families separate", () => {
