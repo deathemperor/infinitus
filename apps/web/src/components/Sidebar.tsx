@@ -130,6 +130,7 @@ import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../s
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
 import { useEnvironmentQuery } from "../state/query";
+import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
   buildThreadRouteParams,
@@ -957,6 +958,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // rows. The marker can unpin the thread when the server supports pinning.
   pinningSupported: boolean;
   isPinned: boolean;
+  // True on environments whose server speaks to Infinitus: the row then
+  // reads whether its turn start is held for headroom (#741).
+  infinitusSupported: boolean;
   // Present on rows whose server supports every drop outcome: dnd-kit
   // sortable bag applied to the row root so the whole row drags (the
   // pointer sensor's distance constraint keeps plain clicks working).
@@ -1084,7 +1088,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Same semantics as the legacy sidebar (never-visited counts as read):
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  const status = resolveSidebarThreadStatus(thread);
+  const heldSummary = useInfinitusHeldSummary(
+    thread.environmentId,
+    thread.id,
+    props.infinitusSupported,
+  );
+  const status = resolveSidebarThreadStatus(thread, { held: heldSummary !== null });
   const isInFlight =
     status === "working" || status === "monitoring" || status === "approval" || status === "input";
   // A woken thread reappears at its original position (the sort is
@@ -1133,37 +1142,45 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             icon: null,
             className: "text-sky-600 dark:text-sky-400",
           }
-        : status === "approval"
+        : status === "held"
           ? {
-              label: "Approval",
+              // Held (#741): waiting for headroom, nothing in motion, so no
+              // color — the held row's line rides the title.
+              label: "Held",
               icon: null,
-              className: "text-amber-700 dark:text-amber-300",
+              className: "text-muted-foreground",
             }
-          : status === "input"
+          : status === "approval"
             ? {
-                label: "Input",
+                label: "Approval",
                 icon: null,
-                className: "text-indigo-600 dark:text-indigo-300",
+                className: "text-amber-700 dark:text-amber-300",
               }
-            : status === "failed"
+            : status === "input"
               ? {
-                  label: "Failed",
+                  label: "Input",
                   icon: null,
-                  className: "text-red-700 dark:text-red-300",
+                  className: "text-indigo-600 dark:text-indigo-300",
                 }
-              : isWoke
+              : status === "failed"
                 ? {
-                    label: "Woke",
-                    icon: "woke" as const,
-                    className: "text-amber-700 dark:text-amber-300",
+                    label: "Failed",
+                    icon: null,
+                    className: "text-red-700 dark:text-red-300",
                   }
-                : isUnread
+                : isWoke
                   ? {
-                      label: "Done",
-                      icon: "done" as const,
-                      className: "text-emerald-700 dark:text-emerald-300",
+                      label: "Woke",
+                      icon: "woke" as const,
+                      className: "text-amber-700 dark:text-amber-300",
                     }
-                  : null;
+                  : isUnread
+                    ? {
+                        label: "Done",
+                        icon: "done" as const,
+                        className: "text-emerald-700 dark:text-emerald-300",
+                      }
+                    : null;
   const isWokeStatus = topStatus?.icon === "woke";
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
@@ -1801,6 +1818,22 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                             }
                           />
                           <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
+                        </Tooltip>
+                      ) : status === "held" ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1 font-medium",
+                                  topStatus.className,
+                                )}
+                              />
+                            }
+                          >
+                            <span role="status">{topStatus.label}</span>
+                          </TooltipTrigger>
+                          <TooltipPopup side="top">{heldSummary}</TooltipPopup>
                         </Tooltip>
                       ) : (
                         <span
@@ -4679,6 +4712,10 @@ export default function Sidebar() {
                                 .threadPinning === true
                             }
                             isPinned={thread.pinnedAt != null}
+                            infinitusSupported={
+                              serverConfigs.get(thread.environmentId)?.environment.capabilities
+                                .infinitus === true
+                            }
                             sortable={sortable}
                             dropVerb={
                               dragState?.activeKey === threadKey

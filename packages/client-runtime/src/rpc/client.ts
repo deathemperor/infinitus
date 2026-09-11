@@ -54,6 +54,7 @@ export type EnvironmentSubscriptionRpcTag =
   | typeof WS_METHODS.subscribeDeviceState
   | typeof WS_METHODS.subscribeResourceTelemetry
   | typeof WS_METHODS.subscribeInfinitus
+  | typeof WS_METHODS.subscribeInfinitusHolds
   | typeof WS_METHODS.subscribeInfinitusPairing
   | typeof WS_METHODS.subscribeCaptures
   | typeof WS_METHODS.pullRequestsSubscribeRefreshes

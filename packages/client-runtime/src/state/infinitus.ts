@@ -92,6 +92,14 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     }),
     // "Run now" for a held thread (#616): the released marker row and the
     // session starting show through the thread's own subscription.
+    /** The threads held for headroom (#741): whole lists, so the atom's
+        value is the latest one. Same idle grace as the snapshot. */
+    holds: createEnvironmentSubscriptionAtomFamily(runtime, {
+      label: "environment-data:infinitus:holds",
+      idleTtlMs: INFINITUS_SNAPSHOT_IDLE_TTL_MS,
+      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusHolds>) =>
+        subscribe(WS_METHODS.subscribeInfinitusHolds, input),
+    }),
     releaseThread: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:infinitus:releaseThread",
       tag: WS_METHODS.infinitusReleaseThread,

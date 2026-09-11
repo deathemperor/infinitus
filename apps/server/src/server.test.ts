@@ -791,6 +791,7 @@ const buildAppUnderTest = (options?: {
           // Nothing is ever held here; the hold layer has its own tests (#616).
           Layer.mock(InfinitusSessionHold)({
             release: () => Effect.succeed({ released: false, reason: "nothing is held" }),
+            held: Stream.empty,
             ...options?.layers?.infinitusSessionHold,
           }),
           // Nothing is ever waiting for approval here; the store has its own tests.
@@ -4289,6 +4290,28 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.deepEqual(result, { released: true });
         assert.deepEqual(released, ["thread-held"]);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("subscribeInfinitusHolds streams the threads the hold layer keeps (#741)", () =>
+    Effect.gen(function* () {
+      const held = {
+        threadId: ThreadId.make("thread-held"),
+        since: "2026-09-11T10:00:00.000Z",
+        summary: "Held for headroom on claude, 5h window 84 %",
+      };
+      yield* buildAppUnderTest({
+        layers: { infinitusSessionHold: { held: Stream.make([held]) } },
+      });
+
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const first = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) =>
+          client[WS_METHODS.subscribeInfinitusHolds]({}).pipe(Stream.runHead),
+        ),
+      );
+
+      assert.deepEqual(first, Option.some([held]));
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
   it.effect("includes CORS headers on remote auth success responses", () =>

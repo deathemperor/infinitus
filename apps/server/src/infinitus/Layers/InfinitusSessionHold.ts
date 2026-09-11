@@ -1,5 +1,9 @@
 import { CommandId, EventId, type OrchestrationEvent, type ThreadId } from "@t3tools/contracts";
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type {
+  InfinitusFleet,
+  InfinitusHeldThread,
+  InfinitusSnapshot,
+} from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -10,6 +14,7 @@ import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
+import * as SubscriptionRef from "effect/SubscriptionRef";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -40,7 +45,22 @@ interface Held {
   readonly threadId: ThreadId;
   readonly provider: string;
   readonly run: Effect.Effect<void>;
+  /** When this start was held, and the hold row's line (#741). */
+  readonly since: string;
+  readonly summary: string;
 }
+
+/** The published view: one entry per thread, oldest first (#741). */
+const heldView = (held: ReadonlyArray<Held>): ReadonlyArray<InfinitusHeldThread> => {
+  const seen = new Set<ThreadId>();
+  const view: InfinitusHeldThread[] = [];
+  for (const entry of held) {
+    if (seen.has(entry.threadId)) continue;
+    seen.add(entry.threadId);
+    view.push({ threadId: entry.threadId, since: entry.since, summary: entry.summary });
+  }
+  return view;
+};
 
 type Input =
   | { readonly kind: "hold"; readonly held: Held; readonly fleet: InfinitusFleet }
@@ -91,6 +111,12 @@ const InfinitusSessionHoldLive = Layer.effect(
     const eventId = crypto.randomUUIDv4.pipe(Effect.map(EventId.make));
 
     let held: ReadonlyArray<Held> = [];
+    const published = yield* SubscriptionRef.make<ReadonlyArray<InfinitusHeldThread>>([]);
+    /** Every change to `held` goes through here so subscribers see it. */
+    const setHeld = (next: ReadonlyArray<Held>) => {
+      held = next;
+      return SubscriptionRef.set(published, heldView(next));
+    };
     const watch = yield* FiberHandle.make();
 
     const appendMarker = (
@@ -149,7 +175,7 @@ const InfinitusSessionHoldLive = Layer.effect(
             .getThreadShellById(threadId)
             .pipe(Effect.option, Effect.map(Option.flatten));
           const mine = held.filter((entry) => entry.threadId === threadId);
-          held = held.filter((entry) => entry.threadId !== threadId);
+          yield* setHeld(held.filter((entry) => entry.threadId !== threadId));
           if (Option.isNone(shell) || shell.value.archivedAt !== null) continue;
           const provider = mine[0]!.provider;
           yield* appendMarker(
@@ -176,7 +202,7 @@ const InfinitusSessionHoldLive = Layer.effect(
 
     const forget = (threadId: ThreadId) =>
       Effect.gen(function* () {
-        held = held.filter((entry) => entry.threadId !== threadId);
+        yield* setHeld(held.filter((entry) => entry.threadId !== threadId));
         if (held.length === 0) yield* stopWatching;
       });
 
@@ -206,7 +232,7 @@ const InfinitusSessionHoldLive = Layer.effect(
               return;
             }
             const first = !held.some((entry) => entry.threadId === input.held.threadId);
-            held = [...held, input.held];
+            yield* setHeld([...held, input.held]);
             if (first) {
               const headroom = input.fleet.headroom;
               yield* appendMarker(
@@ -333,6 +359,8 @@ const InfinitusSessionHoldLive = Layer.effect(
             held: {
               threadId: input.threadId,
               provider: decision.provider,
+              since: DateTime.formatIso(yield* DateTime.now),
+              summary: holdMarkerSummary(decision.fleet),
               // Run later, nobody awaits the start: its failure is a log line.
               run: input.run.pipe(
                 Effect.provideContext(context),
@@ -348,6 +376,7 @@ const InfinitusSessionHoldLive = Layer.effect(
           });
           return "held" as const;
         }),
+      held: SubscriptionRef.changes(published),
       release: (threadId) =>
         Effect.gen(function* () {
           const reply = yield* Deferred.make<InfinitusSessionHoldRelease>();

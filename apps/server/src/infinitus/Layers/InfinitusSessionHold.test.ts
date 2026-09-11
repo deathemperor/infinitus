@@ -7,7 +7,11 @@ import {
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type {
+  InfinitusFleet,
+  InfinitusHeldThread,
+  InfinitusSnapshot,
+} from "@t3tools/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -188,6 +192,7 @@ const makeHarness = Effect.gen(function* () {
       Ref.update(shells, (map) => new Map([...map, [shell.id, shell]])),
     emit: (event: OrchestrationEvent) => PubSub.publish(domainEvents, event).pipe(Effect.asVoid),
     release: hold.release,
+    held: hold.held,
     ran: Ref.get(ran),
     dispatched: Ref.get(dispatched),
     markers: Ref.get(dispatched).pipe(
@@ -455,6 +460,36 @@ describe("InfinitusSessionHoldLayers", () => {
           expect(ran).toEqual(["thread-1"]);
           expect(yield* h.markers).toEqual([]);
           yield* settle(h.watchers, (n) => n === 0);
+        }),
+      ),
+  );
+
+  effectIt.effect(
+    "publishes the held threads: the list now, then again on every change (#741)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarness;
+          const seen = yield* Ref.make<ReadonlyArray<ReadonlyArray<InfinitusHeldThread>>>([]);
+          yield* Effect.forkScoped(
+            Stream.runForEach(h.held, (list) => Ref.update(seen, (lists) => [...lists, list])),
+          );
+          expect(yield* settle(Ref.get(seen), (lists) => lists.length === 1)).toEqual([[]]);
+
+          yield* h.start(one);
+          const afterHold = yield* settle(Ref.get(seen), (lists) => lists.length === 2);
+          expect(afterHold[1]).toEqual([
+            {
+              threadId: one,
+              since: expect.any(String),
+              summary: "Held for headroom on claude, 5h window 84 %",
+            },
+          ]);
+
+          yield* h.poll(abundant);
+          const afterRelease = yield* settle(Ref.get(seen), (lists) => lists.length === 3);
+          expect(afterRelease[2]).toEqual([]);
+          expect(yield* h.ran).toEqual(["thread-1"]);
         }),
       ),
   );

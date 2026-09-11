@@ -353,6 +353,18 @@ describe("hasUnseenCompletion", () => {
 });
 
 describe("shouldRecedeSidebarThread", () => {
+  it("recedes a held thread like a working one: nothing is happening in it yet (#741)", () => {
+    expect(
+      shouldRecedeSidebarThread({
+        status: "held",
+        isUnread: false,
+        isWoke: false,
+        isActive: false,
+        isSelected: false,
+      }),
+    ).toBe(true);
+  });
+
   it.each(["working", "monitoring"] as const)(
     "recedes an inactive %s thread even when it is unread and woke",
     (status) => {
@@ -750,6 +762,15 @@ describe("resolveSidebarThreadStatus", () => {
     expect(resolveSidebarThreadStatus({ ...idle, hasPendingApprovals: true, session })).toBe(
       "approval",
     );
+  });
+
+  it("reads held while the server keeps the start for headroom, below approval and input (#741)", () => {
+    expect(resolveSidebarThreadStatus({ ...idle, session }, { held: true })).toBe("held");
+    expect(resolveSidebarThreadStatus({ ...idle, session: null }, { held: true })).toBe("held");
+    expect(
+      resolveSidebarThreadStatus({ ...idle, hasPendingApprovals: true, session }, { held: true }),
+    ).toBe("approval");
+    expect(resolveSidebarThreadStatus({ ...idle, session }, { held: false })).toBe("working");
   });
 
   it("prioritizes awaiting input over a running session, below approval", () => {

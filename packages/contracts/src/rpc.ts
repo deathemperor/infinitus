@@ -32,6 +32,7 @@ import {
   InfinitusCommandFailed,
   InfinitusCommandInput,
   InfinitusCommandResult,
+  InfinitusHeldThread,
   InfinitusLaunchResult,
   InfinitusProtocolError,
   InfinitusReleaseThreadInput,
@@ -447,6 +448,7 @@ export const WS_METHODS = {
   infinitusCommand: "infinitus.command",
   infinitusLaunch: "infinitus.launch",
   infinitusReleaseThread: "infinitus.releaseThread",
+  subscribeInfinitusHolds: "subscribeInfinitusHolds",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
   // Captures (#433)
@@ -1347,6 +1349,15 @@ const WsInfinitusLaunchRpc = Rpc.make(WS_METHODS.infinitusLaunch, {
 
 /** Fork (#616): "Run now" for a thread session priority mode is holding. Never
     fails: nothing held is a `released: false` with the reason. */
+/** The threads whose turn start the server holds for headroom (#616, #741):
+    the list on subscribe, the whole list again on every change. */
+const WsSubscribeInfinitusHoldsRpc = Rpc.make(WS_METHODS.subscribeInfinitusHolds, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(InfinitusHeldThread),
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
 const WsInfinitusReleaseThreadRpc = Rpc.make(WS_METHODS.infinitusReleaseThread, {
   payload: InfinitusReleaseThreadInput,
   success: InfinitusReleaseThreadResult,
@@ -1530,6 +1541,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusCommandRpc,
   WsInfinitusLaunchRpc,
   WsInfinitusReleaseThreadRpc,
+  WsSubscribeInfinitusHoldsRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
   WsSubscribeCapturesRpc,

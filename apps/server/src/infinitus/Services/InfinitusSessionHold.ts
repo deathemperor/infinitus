@@ -1,6 +1,8 @@
 import type { ThreadId } from "@t3tools/contracts";
+import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+import type * as Stream from "effect/Stream";
 
 import type { TurnStartGateShape } from "../../orchestration/Services/TurnStartGate.ts";
 
@@ -17,6 +19,9 @@ export interface InfinitusSessionHoldShape {
   readonly start: TurnStartGateShape["start"];
   /** Runs the thread's held starts now, whatever the fleet reads ("Run now"). */
   readonly release: (threadId: ThreadId) => Effect.Effect<InfinitusSessionHoldRelease>;
+  /** The threads held right now, oldest first: the list on subscribe, then
+      the whole list again on every change (#741). */
+  readonly held: Stream.Stream<ReadonlyArray<InfinitusHeldThread>>;
 }
 
 export class InfinitusSessionHold extends Context.Service<
