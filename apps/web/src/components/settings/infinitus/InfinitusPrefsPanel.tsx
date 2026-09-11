@@ -133,6 +133,8 @@ function PrefControlField({
           disabled={disabled}
           value={control.value}
           step={control.integer ? 1 : 0.1}
+          {...(control.min === undefined ? {} : { min: control.min })}
+          {...(control.max === undefined ? {} : { max: control.max })}
           size="sm"
           className="w-28"
           onValueCommitted={(value) => {
@@ -321,6 +323,13 @@ export function InfinitusPrefsPanel({
         <p role="status" className="px-3 text-[13px] text-muted-foreground sm:px-4">
           Infinitus is relaunching — this page picks up again when it answers.
         </p>
+      ) : null}
+      {sections.length === 0 && children === undefined && footer === undefined ? (
+        <SettingsSection id={`infinitus-${sectionSlugs[0] ?? "prefs"}`} title={title}>
+          <InfinitusPanelNotice
+            message={`This Infinitus build has no ${title.toLowerCase()} settings yet; they appear here once it does.`}
+          />
+        </SettingsSection>
       ) : null}
       {sections.map((section) => (
         <SettingsSection key={section.slug} id={`infinitus-${section.slug}`} title={section.name}>

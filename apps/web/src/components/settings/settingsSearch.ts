@@ -12,6 +12,8 @@ export type SettingsPath =
   | "/settings/source-control"
   | "/settings/connections"
   | "/settings/infinitus"
+  | "/settings/infinitus/themes"
+  | "/settings/infinitus/animations"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
@@ -69,6 +71,8 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
   // catalog page is named for what it holds, the menu bar and popup prefs.
   "/settings/infinitus": "Menu bar",
+  "/settings/infinitus/themes": "Themes",
+  "/settings/infinitus/animations": "Animations",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
@@ -618,7 +622,23 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus",
     targetId: "infinitus-display",
     infinitusOnly: true,
-    searchTerms: ["menu bar popup theme sessions startup about updates gamification"],
+    searchTerms: ["menu bar popup sessions startup about updates"],
+  },
+  {
+    id: "infinitus-themes",
+    title: "Infinitus themes",
+    to: "/settings/infinitus/themes",
+    targetId: "infinitus-themes",
+    infinitusOnly: true,
+    searchTerms: ["theme gamification style rpg movie hades picker look"],
+  },
+  {
+    id: "infinitus-animations",
+    title: "Infinitus animations",
+    to: "/settings/infinitus/animations",
+    targetId: "infinitus-animations",
+    infinitusOnly: true,
+    searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
   },
   {
     id: "infinitus-push",

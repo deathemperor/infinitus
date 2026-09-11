@@ -232,7 +232,14 @@ export const InfinitusPref = Schema.Struct({
   value: Schema.Unknown,
   section: Schema.String,
   effect: InfinitusPrefEffect,
+  /** Bare values (`"rpg"`, `30`) or `{id, name}` objects (#747: the theme
+      picker's dynamic list, the animation styles); the web writes the id and
+      shows the name. */
   choices: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.Unknown))),
+  /** A numeric row's range when the native side bounds it (#747: `intro_speed`
+      0.4–2); absent when unbounded. */
+  min: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  max: Schema.optionalKey(Schema.NullOr(Schema.Number)),
 });
 export type InfinitusPref = typeof InfinitusPref.Type;
 

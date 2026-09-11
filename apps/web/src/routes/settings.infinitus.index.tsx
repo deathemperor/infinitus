@@ -7,7 +7,7 @@ import { InfinitusResumeCard } from "../components/settings/infinitus/InfinitusR
 function SettingsInfinitusRoute() {
   return (
     <InfinitusPrefsPanel
-      sectionSlugs={["display", "themes", "about"]}
+      sectionSlugs={["display", "about"]}
       title="Menu bar"
       footer={
         <>

@@ -16,7 +16,7 @@ import * as Schema from "effect/Schema";
 export type PrefControl =
   | { kind: "switch"; value: boolean }
   | { kind: "select"; value: string; options: ReadonlyArray<{ value: string; label: string }> }
-  | { kind: "number"; value: number; integer: boolean }
+  | { kind: "number"; value: number; integer: boolean; min?: number; max?: number }
   | { kind: "text"; value: string };
 
 export interface PrefRowModel {
@@ -215,9 +215,30 @@ function typedValue(pref: InfinitusPref, raw: unknown): boolean | number | strin
   }
 }
 
-function choicesOf(pref: InfinitusPref): ReadonlyArray<unknown> | null {
+/** One choice as the catalog sends it: a bare value (`"rpg"`, `30`) or, for a
+    list the native side names (#747), `{id, name}`. `value` is what is
+    written; `name` is the catalog's label when it carries one. */
+interface Choice {
+  readonly value: string;
+  readonly name: string | null;
+}
+
+function choiceOf(raw: unknown): Choice {
+  if (raw !== null && typeof raw === "object" && "id" in raw) {
+    const { id, name } = raw as { id: unknown; name?: unknown };
+    return { value: String(id), name: typeof name === "string" && name !== "" ? name : null };
+  }
+  return { value: String(raw), name: null };
+}
+
+function choicesOf(pref: InfinitusPref): ReadonlyArray<Choice> | null {
   const choices = pref.choices;
-  return choices == null || choices.length === 0 ? null : choices;
+  return choices == null || choices.length === 0 ? null : choices.map(choiceOf);
+}
+
+/** The catalog's bound when it is a finite number; null otherwise. */
+function boundOf(raw: number | null | undefined): number | null {
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
 function controlFor(pref: InfinitusPref, raw: unknown): PrefControl {
@@ -227,19 +248,27 @@ function controlFor(pref: InfinitusPref, raw: unknown): PrefControl {
     return {
       kind: "select",
       value: String(typedValue(pref, raw)),
-      options: choices.map((choice) => {
-        const value = String(choice);
-        return { value, label: labels?.[value] ?? value };
-      }),
+      options: choices.map((choice) => ({
+        value: choice.value,
+        label: labels?.[choice.value] ?? choice.name ?? choice.value,
+      })),
     };
   }
   switch (pref.type) {
     case "bool":
       return { kind: "switch", value: boolOf(pref, raw) };
     case "int":
-      return { kind: "number", value: numberOf(pref, raw), integer: true };
-    case "double":
-      return { kind: "number", value: numberOf(pref, raw), integer: false };
+    case "double": {
+      const min = boundOf(pref.min);
+      const max = boundOf(pref.max);
+      return {
+        kind: "number",
+        value: numberOf(pref, raw),
+        integer: pref.type === "int",
+        ...(min === null ? {} : { min }),
+        ...(max === null ? {} : { max }),
+      };
+    }
     case "string":
       return { kind: "text", value: stringOf(pref, raw) };
   }
@@ -297,7 +326,8 @@ export function prefWriteArgs(
  * A control's raw string turned into the pref's own type, or the reason it is
  * not a value this pref can take. Rejection is the point: an int pref must not
  * accept "1.5" or "" (which `Number` reads as 0), and a pref with `choices`
- * must not accept anything outside them.
+ * must not accept anything outside them, nor a bounded number outside its
+ * `min`/`max`.
  */
 export function parseControlInput(
   pref: InfinitusPref,
@@ -334,11 +364,21 @@ export function parseControlInput(
     }
   }
   const choices = choicesOf(pref);
-  if (choices !== null && !choices.some((choice) => String(choice) === String(value))) {
+  if (choices !== null && !choices.some((choice) => choice.value === String(value))) {
     return {
       ok: false,
-      reason: `"${raw}" is not one of ${choices.map(String).join(", ")}.`,
+      reason: `"${raw}" is not one of ${choices.map((choice) => choice.value).join(", ")}.`,
     };
+  }
+  if (typeof value === "number") {
+    const min = boundOf(pref.min);
+    const max = boundOf(pref.max);
+    if ((min !== null && value < min) || (max !== null && value > max)) {
+      return {
+        ok: false,
+        reason: `Expected a number between ${min ?? "−∞"} and ${max ?? "∞"}, not "${raw}".`,
+      };
+    }
   }
   return { ok: true, value };
 }
