@@ -39,16 +39,17 @@ private final class LineAssembler: @unchecked Sendable {
     }
 }
 
-/// Supervises the cswap engine's auto-switch child, `cswap auto --json`
-/// (spec §2 — the app hosts no engine of its own; other engines, like
-/// the CLIProxy, run as their own service and need no supervisor).
+/// Supervises an engine's auto-switch daemon, `swapd auto --json` under
+/// `SWAPD_SUPERVISED=1` (spec §2 — the app hosts no engine of its own;
+/// other engines, like the CLIProxy, run as their own service and need
+/// no supervisor).
 ///
 /// Restarts on exit with SupervisorBackoff. Lines stream to `onLine` on an
 /// arbitrary thread; the UI layer marshals. `engine-refused` means another
-/// host (TUI, a stray `cswap auto`) already owns the store's engine mutex —
+/// host (a stray `swapd auto`) already owns the store's engine mutex —
 /// surfaced as a state, not retried hot, since the refusal is instant and
 /// hammering it would spin.
-public actor CswapSupervisor {
+public actor EngineSupervisor {
     public enum State: Sendable, Equatable {
         case stopped
         case running(pid: Int32)
@@ -69,13 +70,12 @@ public actor CswapSupervisor {
     /// dying child's mutex not yet released, not a foreign holder.
     private var lastOwnExit: Date = .distantPast
 
-    /// `arguments` and `environmentFlag` default to cswap's; swapd speaks
-    /// the same NDJSON stream under `SWAPD_SUPERVISED=1`, so it needs this
-    /// supervisor, not a second one.
+    /// `environmentFlag` is set to 1 in the child's environment so the
+    /// daemon knows it is supervised (it exits on stdin EOF).
     public init(
         binaryPath: String,
         arguments: [String] = ["auto", "--json"],
-        environmentFlag: String = "CSWAP_SUPERVISED",
+        environmentFlag: String = "SWAPD_SUPERVISED",
         onLine: @escaping @Sendable (EventLine) -> Void,
         onState: @escaping @Sendable (State) -> Void
     ) {
@@ -158,7 +158,7 @@ public actor CswapSupervisor {
         guard !stopping else { return }
         if refused {
             // Instant exit by design — but not terminal. The other holder
-            // (TUI, stray `cswap auto`, an orphan from a killed app) can go
+            // (a stray `swapd auto`, an orphan from a killed app) can go
             // away, and the 2026-08-28 orphan did exactly that: the fresh
             // app sat refused forever while nobody held a live engine. A
             // slow paced retry (60s) self-heals without spinning on the

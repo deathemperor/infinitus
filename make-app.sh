@@ -21,7 +21,6 @@ cp "$(dirname "$BIN")/infinitusctl" "$APP/Contents/MacOS/infinitusctl"
 ln -s infinitusctl "$APP/Contents/MacOS/ictl"
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-cp tools/demo-cswap "$APP/Contents/Resources/demo-cswap"
 cp tools/demo-swapd "$APP/Contents/Resources/demo-swapd"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

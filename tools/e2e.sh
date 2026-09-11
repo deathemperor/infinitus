@@ -1,6 +1,6 @@
 #!/bin/sh
 # End-to-end + performance gate (#18). Launches the DEBUG app against the
-# demo engine (tools/demo-cswap: fabricated fleet, no credentials, no
+# demo engine (tools/demo-swapd: fabricated fleet, no credentials, no
 # network), drives it through infinitusctl on a private control socket,
 # and fails on:
 #   - any command that errors, a missing window, a wrong fleet shape
@@ -18,7 +18,7 @@
 # Runs on a dev Mac (`tools/e2e.sh`) and in CI (ci.yml e2e job). The
 # real app, if running, is untouched: separate socket, separate defaults
 # suite (the executable name "Infinitus" from .build → domain "Infinitus",
-# never run.infinitus), INFINITUS_CSWAP pinned to the demo script.
+# never run.infinitus), INFINITUS_SWAPD_CLI pinned to the demo script.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -41,7 +41,7 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
-export INFINITUS_CSWAP="$PWD/tools/demo-cswap"
+export INFINITUS_SWAPD_CLI="$PWD/tools/demo-swapd"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
 # Spec §11 e2e: the app is a team leader on a bare repo in $SOCKDIR with
 # its own team dir (file secrets, no keychain), and publishes a fixture
@@ -61,17 +61,17 @@ cleanup() {
     # The supervised demo engine outlives its app (four orphans found
     # sleeping from earlier runs, 2026-09-03). Foundation's Process spawns
     # it with the path's /private prefix stripped (a /private/tmp
-    # worktree's demo-cswap runs as /tmp/…/demo-cswap), so the pattern is
+    # worktree's demo-swapd runs as /tmp/…/demo-swapd), so the pattern is
     # the stripped form — a substring of both (42 orphans from one day's
     # scratchpad runs, 2026-09-11).
-    pkill -f "${INFINITUS_CSWAP#/private} auto" 2>/dev/null || true
+    pkill -f "${INFINITUS_SWAPD_CLI#/private} auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
     pkill -f "nc -l 127.0.0.1 4[0-9]{4}$" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
-    "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
+    "$INFINITUS_SWAPD_CLI" reset >/dev/null 2>&1 || true
     defaults delete "$DOMAIN" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -112,55 +112,14 @@ if bad or not ($1):
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
 popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
 
-"$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
+"$INFINITUS_SWAPD_CLI" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
 
 # Worst-case prefs: pop-out restored on launch, RPG theme, ember burn.
 defaults write "$DOMAIN" popout_shown -bool true
 defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
-defaults write "$DOMAIN" mock_mode -bool true
-defaults write "$DOMAIN" engine_swapd_enabled -bool true   # the swapd engine beside cswap (preview)
-
-# --- swapd stub (must exist before launch: the binary is located at start) --
-# The app's ONLY swapd touchpoint is `swapd … --json`, so this script is
-# the whole contract under test. Two accounts, slot 1 active. `list`
-# carries slot 1's window as it stood BEFORE an ignite; `refresh` and
-# `ignite` carry the one a forced fetch saw — which is how the ignite
-# assertion below tells the two calls apart.
-cat >"$SOCKDIR/swapd" <<'STUB'
-#!/bin/sh
-payload() {   # $1 = slot 1's 5h resetsAt
-    cat <<JSON
-{"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"activeSlot":1,
- "nextCandidate":2,"accounts":[
-  {"slot":1,"email":"one@swapd.test","organizationName":"Swapd E2E","organizationUuid":"org-1",
-   "plan":"Max 20x","alias":"swapd one","active":true,"disabled":false,"preferred":false,
-   "usageStatus":"ok","fetchedAt":"2026-09-09T01:00:00Z","ageSeconds":12,
-   "windows":[{"kind":"5h","pct":4,"resetsAt":"$1"},
-              {"kind":"7d","pct":18,"resetsAt":"2030-01-08T00:00:00Z",
-               "pace":{"expectedPct":20,"ahead":false,"lastsToReset":true}}]},
-  {"slot":2,"email":"two@swapd.test","organizationName":"Swapd E2E","organizationUuid":"org-2",
-   "active":false,"disabled":false,"preferred":false,"usageStatus":"ok",
-   "windows":[{"kind":"5h","pct":61,"resetsAt":"2030-01-01T03:00:00Z"}]}]}]}
-JSON
-}
-case "$1" in
-    version) echo '{"schemaVersion":1,"version":"0.1.0-e2e"}' ;;
-    doctor)  echo '{"schemaVersion":1,"home":"/tmp/swapd-e2e","providers":[{"provider":"claude","installed":true,"path":"/usr/bin/true"}]}' ;;
-    list)    payload "2030-01-01T00:00:00Z" ;;
-    refresh|ignite) payload "2030-06-01T05:59:59Z" ;;
-    auto)
-        # The supervised-daemon contract: events on stdout, exit on stdin EOF.
-        echo '{"schemaVersion":1,"event":"poll","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"threshold":10}'
-        echo '{"schemaVersion":1,"event":"sleep","ts":"2026-09-09T01:00:00Z","provider":"claude","active":{"number":1,"slot":1,"email":"one@swapd.test"},"summary":"sleep","threshold":10}'
-        cat >/dev/null
-        ;;
-    *) echo '{"schemaVersion":1,"error":{"code":"unsupported","message":"stub swapd: no such verb"}}'; exit 1 ;;
-esac
-STUB
-chmod +x "$SOCKDIR/swapd"
-export INFINITUS_SWAPD_CLI="$SOCKDIR/swapd"
+defaults write "$DOMAIN" mock_mode -bool true   # demo fleet: the swapd engine is $INFINITUS_SWAPD_CLI (the locator honours it)
 
 # --- AWS sign-in fixtures (must exist before launch: env is read at start) --
 # A stub `aws` in place of the real CLI: `login --remote --profile P`
@@ -316,74 +275,74 @@ echo "aws: orphan login wrapper swept at launch"
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
 "$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
-"$CTL" status | json "d['engines']['cswap']['registered']" | grep -q True || fail "cswap not registered"
+"$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
 sleep 4   # first demo snapshot
 N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
 [ "$N" -ge 5 ] || fail "expected the demo fleet (>=5 accounts), got $N"
-"$CTL" fleets | json "d[0]['key']" | grep -q '^cswap/claude$' || fail "primary fleet key"
-"$CTL" remove cswap/claude 1 >/dev/null 2>&1 && fail "remove without --yes must be refused"
+"$CTL" fleets | json "d[0]['key']" | grep -q '^swapd/claude$' || fail "primary fleet key"
+"$CTL" remove swapd/claude 1 >/dev/null 2>&1 && fail "remove without --yes must be refused"
 "$CTL" switch nope/x 1 >/dev/null 2>&1 && fail "unknown fleet must be refused"
 popout_visible || fail "pop-out window not visible (popout_shown restore)"
 echo "functional: ok ($N demo accounts, pop-out visible)"
 
 # --- state round-trips through the demo engine ---------------------------
 # Each write replies with the refreshed fleet; the change must be in it.
-"$CTL" switch cswap/claude 2 | expect "d['fleet']['activeNumber']==2 and $(acct 2)['active']" || fail "switch 2 didn't take"
-"$CTL" hold cswap/claude 3 | expect "$(acct 3).get('disabled')==True" || fail "hold 3 didn't take"
-"$CTL" unhold cswap/claude 3 | expect "not $(acct 3).get('disabled')" || fail "unhold 3 didn't take"
-"$CTL" rename cswap/claude 3 "E2E Alias" | expect "$(acct 3).get('alias')=='E2E Alias'" || fail "rename didn't take"
-"$CTL" rename cswap/claude 3 "" | expect "$(acct 3).get('alias')!='E2E Alias'" || fail "rename clear didn't take"   # demo accounts carry default aliases
-"$CTL" prefer cswap/claude 2 on | expect "$(acct 2).get('preferred')==True" || fail "prefer 2 didn't take"
-"$CTL" prefer cswap/claude 2 off | expect "$(acct 2).get('preferred')==False" || fail "unprefer 2 didn't take"
+"$CTL" switch swapd/claude 2 | expect "d['fleet']['activeNumber']==2 and $(acct 2)['active']" || fail "switch 2 didn't take"
+"$CTL" hold swapd/claude 3 | expect "$(acct 3).get('disabled')==True" || fail "hold 3 didn't take"
+"$CTL" unhold swapd/claude 3 | expect "not $(acct 3).get('disabled')" || fail "unhold 3 didn't take"
+"$CTL" rename swapd/claude 3 "E2E Alias" | expect "$(acct 3).get('alias')=='E2E Alias'" || fail "rename didn't take"
+"$CTL" rename swapd/claude 3 "" | expect "$(acct 3).get('alias')!='E2E Alias'" || fail "rename clear didn't take"   # demo accounts carry default aliases
+"$CTL" prefer swapd/claude 2 on | expect "$(acct 2).get('preferred')==True" || fail "prefer 2 didn't take"
+"$CTL" prefer swapd/claude 2 off | expect "$(acct 2).get('preferred')==False" || fail "unprefer 2 didn't take"
 NEXT="$("$CTL" fleets | json "d[0]['nextCandidate']")"
-"$CTL" rotate cswap/claude | expect "d['fleet']['activeNumber']==$NEXT" || fail "rotate didn't land on the next candidate ($NEXT)"
+"$CTL" rotate swapd/claude | expect "d['fleet']['activeNumber']==$NEXT" || fail "rotate didn't land on the next candidate ($NEXT)"
 ORDER="$("$CTL" fleets | json "' '.join(str(a['number']) for a in d[0]['accounts'])")"
 REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
-"$CTL" reorder cswap/claude $REV | expect "[a['number'] for a in d['fleet']['accounts']]==[int(x) for x in '$REV'.split()]" || fail "reorder didn't take"
-"$CTL" reorder cswap/claude 1 >/dev/null 2>&1 && fail "partial reorder must be refused"
-"$CTL" reorder cswap/claude $ORDER | expect "[a['number'] for a in d['fleet']['accounts']]==[int(x) for x in '$ORDER'.split()]" || fail "reorder restore didn't take"
-"$CTL" switch cswap/claude 1 | expect "d['fleet']['activeNumber']==1" || fail "switch back to 1"
+"$CTL" reorder swapd/claude $REV | expect "[a['number'] for a in d['fleet']['accounts']]==[int(x) for x in '$REV'.split()]" || fail "reorder didn't take"
+"$CTL" reorder swapd/claude 1 >/dev/null 2>&1 && fail "partial reorder must be refused"
+"$CTL" reorder swapd/claude $ORDER | expect "[a['number'] for a in d['fleet']['accounts']]==[int(x) for x in '$ORDER'.split()]" || fail "reorder restore didn't take"
+"$CTL" switch swapd/claude 1 | expect "d['fleet']['activeNumber']==1" || fail "switch back to 1"
 # Every account gets a distinct themed name in one command.
-"$CTL" randomize-names cswap/claude | expect "len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts']) and len(d['names'])==len(d['fleet']['accounts'])" || fail "randomize-names didn't give every account its own name"
+"$CTL" randomize-names swapd/claude | expect "len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts']) and len(d['names'])==len(d['fleet']['accounts'])" || fail "randomize-names didn't give every account its own name"
 # One account re-rolls alone (#145): one name, worn by that account, still distinct from every other.
-"$CTL" randomize-names cswap/claude 2 | expect "len(d['names'])==1 and [a for a in d['fleet']['accounts'] if a['number']==2][0].get('alias')==d['names'][0] and len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts'])" || fail "randomize-names <n> didn't re-roll account 2 alone"
+"$CTL" randomize-names swapd/claude 2 | expect "len(d['names'])==1 and [a for a in d['fleet']['accounts'] if a['number']==2][0].get('alias')==d['names'][0] and len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts'])" || fail "randomize-names <n> didn't re-roll account 2 alone"
 "$CTL" profile-set e2e-review --cwd /tmp --mode acceptEdits --model opus --allow "Edit, Bash git" | expect "d['profile']['name']=='e2e-review' and d['profile']['permissionMode']=='acceptEdits' and d['profile']['model']=='opus' and d['profile']['allowTools']==['Edit','Bash git']" || fail "profile-set didn't save the fields"
 "$CTL" profiles | expect "[p['name'] for p in d['profiles']]==['e2e-review']" || fail "profiles didn't list the saved profile"
 "$CTL" profile-remove e2e-review | expect "d['removed'] is True" || fail "profile-remove didn't remove"
 "$CTL" past-sessions --limit 3 | expect "isinstance(d['sessions'], list) and len(d['sessions'])<=3" || fail "past-sessions didn't list"
 echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions, profiles)"
 "$CTL" plan | expect "'plan' in d and (d['plan'] is None or 'steps' in d['plan'])" || fail "plan verb"
-"$CTL" ignite cswap/claude 2 | expect "'fleet' in d" || fail "ignite verb"
+"$CTL" ignite swapd/claude 2 | expect "'fleet' in d" || fail "ignite verb"
 
-# --- swapd: the second engine runs beside cswap ------------------------
-"$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
-"$CTL" fleets | expect "[f['key'] for f in d][0]=='cswap/claude' and any(f['key']=='swapd/claude' for f in d)" \
-    || fail "swapd/claude missing, or it displaced cswap as the primary fleet"
-"$CTL" fleets | expect "'refreshAccount' in [f for f in d if f['key']=='swapd/claude'][0]['capabilities']" \
+# --- swapd: the engine's own capabilities --------------------------------
+"$CTL" fleets | expect "'refreshAccount' in d[0]['capabilities']" \
     || fail "swapd must advertise refreshAccount"
 # The point of the capability: ignite publishes the account it just
 # refreshed, so the reply carries the window the run opened (#338) —
-# the stub's refresh reset, never the one `list` was serving before it.
-"$CTL" ignite swapd/claude 1 | expect "[a for a in d['fleet']['accounts'] if a['number']==1][0]['usage']['fiveHour']['resetsAt']=='2030-06-01T05:59:59Z'" \
+# the demo's forced fetch (a fresh 5h clock at 0%), never the one `list`
+# was serving before it.
+"$CTL" ignite swapd/claude 1 | expect "[a for a in d['fleet']['accounts'] if a['number']==1][0]['usage']['fiveHour']['pct']==0" \
     || fail "ignite didn't publish the refreshed window"
-echo "swapd: registered beside cswap, ignite published the refreshed window"
+echo "swapd: ignite published the refreshed window"
 # #475: an enabled engine runs its own `auto` under the supervisor.
-pgrep -f "$SOCKDIR/swapd auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
+pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto must run under the supervisor while the engine is on"
 "$CTL" events | expect "not any((e.get('summary') or '') in ('poll', 'sleep') for e in (d if isinstance(d, list) else d.get('events', [])))" \
     || fail "the supervisor must drop the poll/sleep heartbeats (#475)"
 # #616: the headroom verdict rides `fleets` only while priority_mode is on;
-# the stub's active slot sits at 5h 4% / 7d 18%, so 7d binds.
+# the demo's active slot (alpha) sits at 5h 37% / 7d 22% / Fable 18%, so 5h binds
+# — once a plain `list` replaces the ignite reply above (a fresh 5h at 0%).
+"$CTL" refresh >/dev/null || fail "refresh before the headroom checks"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must be absent while priority_mode is off"
 "$CTL" prefs set priority_mode hold | expect "d['value']=='hold'" || fail "prefs set priority_mode"
-"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['window']=='7d' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['pct']==18" \
-    || fail "headroom must judge the fullest window abundant at 18%"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['window']=='5h' and [f for f in d if f['key']=='swapd/claude'][0]['headroom']['pct']==37" \
+    || fail "headroom must judge the fullest window abundant at 37%"
 "$CTL" prefs set priority_low_pct 15 | expect "d['value']==15" || fail "prefs set priority_low_pct"
-"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='low'" || fail "headroom must go low once 7d is at or above priority_low_pct"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='low'" || fail "headroom must go low once 5h is at or above priority_low_pct"
 "$CTL" prefs set priority_low_pct 80 | expect "d['value']==80" || fail "prefs set priority_low_pct back"
-"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant'" || fail "headroom must release at 18% under priority_abundant_pct"
+"$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant'" || fail "headroom must release at 37% under priority_abundant_pct"
 "$CTL" prefs set priority_mode off | expect "d['value']=='off'" || fail "prefs set priority_mode off"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
-echo "headroom: absent off, 7d binds, low/abundant follow the thresholds (#616)"
+echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
@@ -412,7 +371,7 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 
 # The preference catalog (#558): the table with values, and `get` narrowed.
 "$CTL" prefs | expect "any(s['slug']=='display' and s['name']=='Display' for s in d['sections']) and any(p['key']=='popup_layout' and p['section']=='display' and p['effect']=='live' for p in d['prefs'])" || fail "prefs"
-"$CTL" prefs get popup_layout engine_cswap_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_cswap_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
+"$CTL" prefs get popup_layout engine_swapd_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_swapd_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
 # A key with no window behind it: a layout swap here would re-lay the
 # pop-out twice and leave ~45 MB resident before the RSS gate (2026-09-10).
 "$CTL" prefs set revive_lead_minutes 15 | expect "d['key']=='revive_lead_minutes' and d['value']==15" || fail "prefs set"
@@ -454,7 +413,7 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
-"$INFINITUS_CSWAP" simulate alldead >/dev/null
+"$INFINITUS_SWAPD_CLI" simulate alldead >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is None and d[0].get('nextRecovery') is not None" \
     || fail "all-dead scenario not reflected in fleets"
 sleep 2
@@ -471,7 +430,7 @@ RB="$("$CTL" perf | json "d['cpuSeconds']")"
 RPCT="$(python3 -c "print(round(($RB-$RA)/12*100,1))")"
 echo "all-dead CPU with the reviver band: ${RPCT}%"
 python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
-"$INFINITUS_CSWAP" simulate off >/dev/null
+"$INFINITUS_SWAPD_CLI" simulate off >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is not None" || fail "fleet didn't recover after simulate off"
 echo "scenarios: ok (all-dead and back)"
 
@@ -753,6 +712,6 @@ while [ "$(ps -o stat= -p "$APP_PID" 2>/dev/null | cut -c1)" ] \
     sleep 0.1
 done
 wait "$APP_PID" 2>/dev/null
-pgrep -f "$SOCKDIR/swapd auto" >/dev/null && fail "swapd auto outlived the app (#475)"
+pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null && fail "swapd auto outlived the app (#475)"
 echo "quit: ok (exited after $((i / 10)).$((i % 10))s)"
 echo "E2E PASS"

@@ -151,6 +151,7 @@ publishes the matching section as the GitHub release body.
 - The spend estimate (`cswap usage`) runs only while the cswap engine is on; with it off the Usage pane says so instead of showing stale numbers (#475).
 - The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
 - Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
+- cswap is gone from the Mac app: swapd is the one credential-swap engine (on by default), Add Account, re-login and the switch history run on it, and the cswap tab, spend estimate, push channels and uv installer are retired (#756).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

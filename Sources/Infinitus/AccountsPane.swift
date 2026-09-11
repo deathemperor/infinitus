@@ -16,8 +16,8 @@ private let addAccountFooter =
 /// only token can't join an account slot (it minted a junk
 /// "setup-token-7@" account, user screenshot 2026-08-31) — shows the
 /// OAuth URL in a private sheet/window, takes the pasted code, then
-/// runs the engine's blessed pair: `cswap add` captures the new live
-/// credential into its slot, `cswap switch <previous>` restores the
+/// runs the engine's blessed pair: `swapd add` captures the new live
+/// credential into its slot, `swapd switch <previous>` restores the
 /// account that was active, undoing the login's clobber in seconds.
 @MainActor final class TokenFlow: ObservableObject {
     /// One app-wide flow: the popup's "re-login needed" note starts it
@@ -30,7 +30,7 @@ private let addAccountFooter =
         case launching
         case awaitingLogin      // URL captured; web window is up
         case waitingForToken    // code submitted; CLI finishing
-        case registering        // token captured; cswap add-token runs
+        case registering        // token captured; the engine adopts it
         case done(String)       // masked token tail
         case failed(String)
     }
@@ -389,14 +389,14 @@ private let addAccountFooter =
         let restoreTo = previousActive
         Task {
             do {
-                guard let cli = model.cswap else {
+                guard let engine = model.currentLoginEngine else {
                     throw SignInFailure(sentence: "The engine isn't running. Start it under Engines, then try again.")
                 }
                 // The blessed pair: capture the fresh credential into
                 // its slot, then restore whoever was active before.
-                try await cli.addCurrent()
+                try await engine.addCurrent()
                 if let n = restoreTo {
-                    try? await cli.switchTo(n)
+                    try? await engine.switchTo(fleet: .claude, number: n)
                 }
                 await model.refreshSnapshot()
                 // Bind the web session to its account for future
@@ -798,9 +798,11 @@ private struct FleetAccountsSection: View {
     /// @ScaledMetric here only looked like it answered the critique.
     private let rowHeight: CGFloat = 30
 
-    private var isCswap: Bool { fleet.engineID == CswapEngine.engineID }
     private var caps: EngineCapabilities { fleet.capabilities }
-    private var canRelogin: Bool { isCswap || caps.contains(.addOAuth) }
+    /// The engine adopts Claude Code's current login (`.addCurrent`), so
+    /// the app's own sign-in flow (TokenFlow) is the way in.
+    private var hostsLogin: Bool { caps.contains(.addCurrent) }
+    private var canRelogin: Bool { hostsLogin || caps.contains(.addOAuth) }
     /// The rows' name fields by slot number, so Tab in one can hand
     /// first-responder to the next row's field directly (user 2026-09-06:
     /// "press tab -> go to rename next account").
@@ -818,7 +820,7 @@ private struct FleetAccountsSection: View {
     var body: some View {
         Section {
             if fleet.accounts.isEmpty {
-                if isCswap || caps.contains(.addOAuth) {
+                if hostsLogin || caps.contains(.addOAuth) {
                     Text("No accounts yet \u{2014} add the first one below.")
                         .foregroundStyle(.secondary)
                 }
@@ -876,14 +878,14 @@ private struct FleetAccountsSection: View {
                 Text(footerText).font(.caption2).foregroundStyle(.secondary)
             }
         }
-        if isCswap || caps.contains(.addOAuth) {
+        if hostsLogin || caps.contains(.addOAuth) {
             // A group's primary action sits in its own trailing group, the
             // way System Settings puts "Add Account…" under a Users list —
             // so it can be the prominent button without shouting over the
             // rows, and so it can carry its own one-clause footer.
             Section {
-                if isCswap {
-                    CswapAddFlow(model: model, flow: flow)
+                if hostsLogin {
+                    LoginAddFlow(model: model, flow: flow)
                 } else {
                     OAuthAddRow(model: model, engineID: fleet.engineID, provider: fleet.provider)
                 }
@@ -1064,13 +1066,13 @@ private struct FleetAccountsSection: View {
         if starred {
             return "The engine lands on this account first when it switches."
         }
-        return isCswap
+        return hostsLogin
             ? "Switches to this account now, and the engine lands on it first from then on."
             : "Switches to this account now, and the engine drains it before unstarred ones."
     }
 
     private var switchHint: String {
-        isCswap ? "Makes this the account Claude Code uses, right now."
+        hostsLogin ? "Makes this the account Claude Code uses, right now."
                 : "Makes this the credential the engine serves first."
     }
 
@@ -1198,9 +1200,9 @@ private struct OAuthAddRow: View {
     }
 }
 
-/// cswap's add-account flow, phase by phase (the PTY-hosted
-/// `claude auth login` + paste-back described on TokenFlow).
-private struct CswapAddFlow: View {
+/// The credential-swap engine's add-account flow, phase by phase (the
+/// PTY-hosted `claude auth login` + paste-back described on TokenFlow).
+private struct LoginAddFlow: View {
     @ObservedObject var model: AppModel
     @ObservedObject var flow: TokenFlow
 
@@ -1311,7 +1313,7 @@ private final class ClickToEditField: NSTextField {
 /// must hop to the NEXT account's field and SwiftUI's TextField lets the
 /// field editor swallow Tab before any key handler sees it. Committed on
 /// Enter, Tab or focus loss — never on every keystroke (each commit is a
-/// `cswap alias` subprocess + snapshot refresh).
+/// `swapd alias` subprocess + snapshot refresh).
 private struct RenameField: NSViewRepresentable {
     @ObservedObject var fleet: FleetState
     let account: Account
@@ -1367,7 +1369,7 @@ private struct RenameField: NSViewRepresentable {
 }
 
 /// Backup and restore for an engine that can hand its accounts over
-/// (`.backup`; cswap `export` / `import`). Absent that capability the
+/// (`.backup`; swapd `export` / `import`). Absent that capability the
 /// row never appears — the proxy holds keys it will not reveal.
 ///
 /// Two things make this unlike the other rows in this pane:
@@ -1381,6 +1383,15 @@ private struct RenameField: NSViewRepresentable {
 ///    which is the common case and safe; replacing live accounts is the
 ///    rare one and gets a confirmation naming what it will overwrite.
 private struct BackupRow: View {
+    /// Whether the engine refused a plain import because a slot already
+    /// holds that account — the one case the pane offers `--force`. Text
+    /// match on the engine's message: a reworded error degrades to
+    /// "here's what it said", never to an unasked-for destructive retry.
+    static func importNeedsForce(_ message: String) -> Bool {
+        let text = message.lowercased()
+        return text.contains("--force") || text.contains("already exists")
+    }
+
     @ObservedObject var fleet: FleetState
     @State private var full = false
     @State private var confirmRestore: URL?
@@ -1455,7 +1466,7 @@ private struct BackupRow: View {
                 result = "Restored from \(url.lastPathComponent)."
                 return
             }
-            if CswapCLI.importNeedsForce(error) {
+            if Self.importNeedsForce(error) {
                 confirmRestore = url
                 return
             }

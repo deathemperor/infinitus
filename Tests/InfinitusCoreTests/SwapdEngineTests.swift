@@ -175,7 +175,7 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(account.lastGoodAgeSeconds, 90000)
     }
 
-    func testSentinelStatusesTakeCswapsSpelling() {
+    func testSentinelStatusesTakeTheAppsSpelling() {
         XCTAssertEqual(SwapdMapping.usageStatus("relogin-required"), "relogin_required")
         XCTAssertEqual(SwapdMapping.usageStatus("token-expired"), "token_expired")
         XCTAssertEqual(SwapdMapping.usageStatus("no-credentials"), "no_credentials")
@@ -465,9 +465,6 @@ final class SwapdEngineTests: XCTestCase {
         } catch let error as EngineError {
             XCTAssertEqual(error, .unsupported("costReport"))
         }
-        // The default the protocol gives every other engine.
-        XCTAssertFalse(CswapEngine(cli: CswapCLI(binaryPath: "/bin/true"))
-            .capabilities.contains(.refreshAccount))
     }
 }
 #endif

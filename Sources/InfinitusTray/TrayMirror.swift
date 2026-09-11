@@ -22,7 +22,7 @@ enum TrayMirror {
                         now: Date = Date()) {
         // The demo engine's fabricated fleet must not reach the mobile
         // companion (same gate TrayHistory uses).
-        guard !enginePath.hasSuffix("demo-cswap") else { return }
+        guard !enginePath.hasSuffix("demo-swapd") else { return }
         let last = (try? String(contentsOf: stampURL, encoding: .utf8))
             .flatMap { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
             .map { Date(timeIntervalSince1970: $0) }

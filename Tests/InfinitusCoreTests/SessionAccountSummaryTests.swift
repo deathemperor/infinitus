@@ -8,21 +8,21 @@ final class SessionAccountSummaryTests: XCTestCase {
                 usage: Usage(fiveHour: UsageWindow(pct: fiveHourPct)), disabled: disabled)
     }
 
-    func testCswapSessionReportsTheActiveAccount() {
+    func testSwapdSessionReportsTheActiveAccount() {
         let session = SessionDetail(pid: 42, cwd: "/tmp", status: "busy", kind: "interactive", startedAt: 0)
-        let fleet = EngineFleet(engineID: "cswap", provider: .claude,
+        let fleet = EngineFleet(engineID: "swapd", provider: .claude,
                                  accounts: [account(1, email: "a@x.com"), account(2, email: "b@x.com", active: true)],
                                  activeNumber: 2,
                                  liveSessions: LiveSessions(busy: 1, total: 1, sessions: [session]))
         let summary = SessionAccountLookup.summarize(pid: 42, fleets: [fleet])
-        XCTAssertEqual(summary?.kind, .cswap)
+        XCTAssertEqual(summary?.kind, .swap)
         XCTAssertEqual(summary?.account?.number, 2)
     }
 
     func testCLIProxySessionReportsPerRequestRoutingWithEveryAccount() {
         // CLIProxyAPI fleets never populate liveSessions (ProxyMapping) —
         // a session found nowhere else falls back to the primary fleet,
-        // which is what actually happens today (only cswap ever reports
+        // which is what actually happens today (only swapd ever reports
         // liveSessions per SessionsScreen.fleetsWithSessions).
         let proxyFleet = EngineFleet(engineID: CLIProxyEngine.engineID, provider: .claude,
                                       accounts: [account(1, email: "a@x.com", fiveHourPct: 10),

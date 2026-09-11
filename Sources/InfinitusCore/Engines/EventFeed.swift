@@ -1,6 +1,6 @@
 import Foundation
 
-/// One NDJSON line from `cswap auto --json`.
+/// One NDJSON line from `swapd auto --json`.
 ///
 /// Deliberately generic — `kind` plus the raw object — because the engine's
 /// vocabulary grows (engine-refused arrived 2026-08-28) and an unknown kind
@@ -88,7 +88,7 @@ public enum EventFeed {
     }
 }
 
-/// Restart pacing for the supervised `cswap auto` child (spec §2):
+/// Restart pacing for the supervised `swapd auto` child (spec §2):
 /// exponential 1s→60s, reset by five clean minutes.
 public struct SupervisorBackoff: Sendable {
     public init() {}

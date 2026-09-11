@@ -32,6 +32,23 @@ public struct SwapdProviderView: Decodable, Sendable {
     public let accounts: [SwapdAccountView]
 }
 
+/// `swapd history --json`: the switch log, newest last.
+public struct SwapdHistory: Decodable, Sendable {
+    public struct Party: Decodable, Sendable {
+        public let slot: Int
+        public let email: String
+    }
+    public struct Switch: Decodable, Sendable {
+        /// ISO-8601 UTC, second precision ("2026-09-11T10:50:15Z").
+        public let ts: String
+        public let from: Party?
+        public let to: Party
+        public let trigger: String?
+    }
+    public let schemaVersion: Int
+    public let switches: [Switch]
+}
+
 public struct SwapdRecovery: Decodable, Sendable {
     public let slot: Int
     public let at: String

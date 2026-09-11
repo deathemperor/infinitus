@@ -9,7 +9,7 @@ struct ActivityPane: View {
     var body: some View {
         Form {
             Section {
-                SwitchHistoryView(cli: model.cswap, names: accountNames)
+                SwitchHistoryView(cli: model.swapd, names: accountNames)
             } header: {
                 Text("Switch history")
             } footer: {
