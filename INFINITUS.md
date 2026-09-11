@@ -190,6 +190,52 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
   — the user-row revert button is a menu: "Revert files and chat" /
   "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Restore files, keep the chat (#269 E, Cursor's default checkpoint
+  action): `thread.checkpoint.revert` and its `-requested` event carry
+  `keepChat?: boolean`; `CheckpointReactor.handleRevertRequested` with it
+  restores the checkpoint and refreshes the workspace index, then stops:
+  no provider rollback (so no rollback-support guard), no later-checkpoint
+  ref deletion, no `thread.revert.complete` — one `checkpoint.restored`
+  info activity ("Files restored to turn N", `turnId: null`) instead, and
+  the span carries `keepChat`. Web: `TimelineRevertMode` `restore-files`,
+  the menu's "Restore files only" between the full revert and the chat
+  rewind, its own confirm text, and the mode skips the conversation-rollback
+  check. Test beside the E1 one.
+- Server-side message queue (#806, the server half of #270 F):
+  `packages/contracts/src/baseSchemas.ts` — `QueueId`;
+  `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,
+  `queuedTurns?` on `OrchestrationThread` and `OrchestrationThreadShell`
+  (optional; absent when empty so pre-queue payloads still decode), the
+  commands `thread.turn.queue` (client variant carries uploads like
+  `thread.turn.start`'s), `.queue.update`, `.queue.remove`, `.queue.move`,
+  `queuedFrom?` on both turn-start commands, and the events
+  `thread.turn-queued` / `-queue-updated` / `-queue-removed` (`reason:
+user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
+  fractional key helpers moved out of `client-runtime` `threadSort.ts` (which
+  re-exports them as `pinOrderKeyBetween` / `generateSpreadPinOrderKeys`) so
+  the decider validates and defaults a key; `apps/server/src/orchestration/decider.ts`
+  — the four cases (queue is idempotent by re-emission, update/move refuse a
+  missing row, remove re-emits) and the turn start's `queuedFrom` removal in
+  the same batch (a row already gone changes nothing); `projector.ts`,
+  `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
+  the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
+  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`),
+  dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
+  every thread read (snapshot, command read model, shells, detail);
+  `Normalizer.ts` — the queue commands' uploads stored like a sent
+  message's; `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
+  `ReactorLayerLive` above the interrupt and hold layers it consumes;
+  `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
+  hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
+  (+ `infinitusTurnQueue.logic.ts`, test) — the drain: sends a thread's
+  first row as `thread.turn.start {queuedFrom}` when the thread is idle
+  (`queueDrainVerdict`: no turn running, starting or pending, not held,
+  not paused, not archived, no send of its own in flight; `error` sessions
+  never, see #832), one send per thread at a time; wakes on session-set,
+  the queue events, unarchive, a failed start, a hold or pause letting the
+  thread go, and once at boot after the hold and interrupt layers have
+  published their first lists (5 s cap). A send the decider rejects leaves
+  the row; a provider failure after the send has already consumed it.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
@@ -221,24 +267,31 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
 - `packages/contracts/src/settings.ts` — `ComposerSendMode` and
   `composerSendMode` (`queue` default, `steer`) on `ClientSettings` and its
   patch (#270 F); `settings.test.ts` covers the default.
-- Queue vs steer (#270 F): `apps/web/src/promptStashStore.ts` — entries
-  carry `queuedFor` (a scoped thread key), the cap never evicts a queued
-  entry (refuses instead) and `moveEntry` reorders within one thread's
-  queue; `apps/web/src/composer-logic.ts` — `composerSendModeForEnter` (⌘↩
-  on a non-draft thread flips the mode; drafts keep ⌘↩ = background);
-  `apps/web/src/components/chat/ChatComposer.tsx` — `submitComposer` takes
-  the mode, parks the prompt through `stashCurrentPrompt({queuedFor})` while
-  `phase === "running"` (never for a question or approval answer), and the
-  drain (`shouldDrainSendQueue`: ready, not held, no send in flight, empty
-  composer, images saved) restores the head entry then submits once the
-  composer shows it; `ComposerPrimaryActions.tsx` — `runningSendMode` keeps
-  the send button beside Stop while running, labelled "Queue message" /
-  "Send now"; `ChatView.tsx` passes `isHeld` from the hold banner (#616 /
-  #743); `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a
-  turn runs" row. Fork-only: `components/chat/ComposerSendQueue.tsx` (the
-  rows under the composer: send now, edit, reorder, remove) and
-  `composerSendQueue.logic.ts` (+ test). The queue drains only while its
-  thread is open (client-side; server-side queue is a follow-up issue).
+- Queue vs steer (#270 F; the queue lives on the server since #806):
+  `apps/web/src/composer-logic.ts` — `ComposerSubmissionIntent` has `queue`
+  and `composerSendModeForEnter` (⌘↩ on a non-draft thread flips the mode;
+  drafts keep ⌘↩ = background); `ChatComposer.tsx` — `submitComposer`
+  resolves the intent to `queue` while `phase === "running"` (never for a
+  question or approval answer) and hands it to `ChatView.onSend`, which runs
+  the usual preflight and uploads then dispatches `thread.turn.queue`
+  instead of `thread.turn.start` (no optimistic row, no local dispatch, no
+  title step; runtime/interaction mode still persist so the drain reads
+  them); `components/chat/useQueuedTurnActions.ts` — the rows from
+  `thread.queuedTurns` and their actions (send now = `thread.turn.start`
+  with `queuedFrom`; edit = fetch the attachments back through the asset
+  URL, `.queue.remove`, text and files into the composer; move =
+  `.queue.move` with `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
+  renders them; `composerSendQueue.logic.ts` (+ test) — `orderedQueuedTurns`,
+  `queuedTurnSnippet`, `queuedTurnEditableText`, `queuedTurnMoveKey`, and
+  the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
+  `routes/_chat.tsx`) — moves entries the stash still holds with `queuedFor`
+  (#270 F, pre-#806) to the server once, ids derived from the entry, a
+  refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
+  `ComposerPrimaryActions.tsx` — `runningSendMode` keeps the send button
+  beside Stop while running, labelled "Queue message" / "Send now";
+  `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a turn
+  runs" row. Client-runtime: `operations/commands.ts` + `state/threadCommands.ts`
+  — `queueTurn` / `updateQueuedTurn` / `removeQueuedTurn` / `moveQueuedTurn`.
 - `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
   methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
@@ -332,7 +385,11 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   and `resolveWebAssetBrandForPackageVersion` mapping `-infinitus.` versions to it.
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
-  TypeScript); the dev-only bundle id stays `com.t3tools.*`.
+  TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
+  and its helpers are named "Infinitus (Dev)" and the macOS usage prompts say
+  Infinitus (#823 layer 1); `apps/desktop/package.json`'s `productName` is
+  "Infinitus (Dev)" too (packaged builds get theirs from
+  `scripts/build-desktop-artifact.ts`).
 - `apps/web/src/components/settings/SettingsPanels.tsx` (+ `.logic.ts`) —
   `resolveDesktopUpdateTrackRow`: an `infinitus` build shows its own track
   read-only instead of "Stable" with a one-way switch to upstream's releases.
@@ -383,7 +440,15 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
   feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation).
+  queued creation), and prepends `usePullRequestHeaderItem`'s menu to the
+  iOS header's git items with its `version` in `optionsVersion` (#269 F: the
+  PR's phase from the linked snapshot, Open pull request / View checks / Mark
+  ready for review over `pullRequests.runAction`;
+  `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
+- `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
+  active row whose current linked PR is open, out of draft, with green (or
+  no) checks and no verdict reads "Ready for review" in place of its time
+  (`useThreadReadyForReview`, #269 F); settled rows keep their stamp.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
@@ -648,6 +713,16 @@ configured}` and drawn as the configured row with Forget token, which is
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
   `resolveNextAttentionThreadId` + tests.
+- `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx` (+
+  `sidebarNeedsAttention.logic.ts` + test) — the "Needs attention" section
+  above the sidebar's list (#269 D): every thread whose status is approval,
+  input, held or limited, across all projects and environments, in that
+  order and longest wait first (`collectNeedsAttention`; a hold's `since`, else the
+  thread's `updatedAt`), hidden when empty, collapsible (localStorage
+  `t3code:sidebar:needs-attention-expanded`, open by default, the count in
+  the collapsed header). One derived atom reads every Infinitus
+  environment's `infinitusEnvironment.holds` (the same family the rows
+  subscribe to); rows click through `handleThreadClick` like the list.
 - `apps/web/src/components/deepLinks/` — the desktop's deep links landing
   (#270 D): `DeepLinkCoordinator` pulls the shell's latest link once the
   primary environment is connected and on every `onDeepLinkPending` ping;
@@ -1121,6 +1196,20 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   with the body (no trailing space); `ThreadComposer.tsx` feeds it the
   thread's project, `NewTaskDraftScreen.tsx` the picked project. Editing
   stays on the desktop.
+- `apps/mobile/modules/infinitus-markup/` (fork-owned local Expo module, iOS) —
+  `InfinitusMarkup.markUpImage(uri, title)`: Quick Look with editing on over a
+  private temporary copy of a draft image; resolves with the edited file's URL
+  or null (#269 I). `apps/mobile/src/features/infinitus/markup.ts` binds it
+  (`requireOptionalNativeModule`, so a build without the module shows no
+  pencil); `markupAttachment.logic.ts` picks the source bytes, sizes and
+  renames the result, and swaps it into the draft's list in place;
+  `useMarkUpDraftImage` runs the flow and replaces the attachment under a new
+  id through `replaceComposerDraftAttachments`, so it uploads again.
+  Registration: `ComposerAttachmentStrip.tsx` takes an optional `onMarkUp`
+  and draws a pencil badge on image tiles; `ThreadComposer.tsx` supplies it
+  (idle while voice input is busy). `apps/mobile/.swiftlint.yml` lists the
+  module's `ios/` directory. Android and the new-task draft screen are
+  unchanged.
 - `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`)
   — the phone outbox's queue rule (#807, #270 F): `queueBehindRunningTurn`
   turns an existing thread's `send` into `wait` while the thread's session is
@@ -1195,7 +1284,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `apps/mobile/src/widgets/InfinitusRevival.tsx`,
   `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
   Mac-driven Live Activity: layouts (content = native's activity states),
-  token registration, settings.
+  token registration, settings. `testCard.logic.ts` (#845) backs the
+  section's "Show a test card" row (iOS, under the Live Activity switch):
+  one press starts `InfinitusWorking` locally with a fabricated state, no
+  APNs in the loop, so a blank card blames the widget and a refusal
+  (ActivityKit's message in an alert) blames the phone's settings; with
+  working cards live the same row reads "End the working card(s)" and ends
+  them all — the Mac cannot end a card it never got an update token for.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
@@ -1225,9 +1320,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   asserts: every fork page with the one text marker only its populated render
   shows (a pref row label, the fixture's team or profile name, "Re-lock",
   "Session lengths"…) and the empty-state phrases that must not appear
-  (`ALWAYS_ABSENT`: "not answering", "Still connecting", "This Infinitus build
-  has no", "could not be read"; per route "No projection yet", "Reading the
-  team"…). The test pins the route list, checks no marker is a substring of a
+  (`ALWAYS_ABSENT`: "not answering", "T3 Code" (#823: the upstream name never
+  reaches a screen), "Still connecting", "This Infinitus build has no", "could
+  not be read"; per route "No projection yet", "Reading the team"…). The test pins the route list, checks no marker is a substring of a
   nav label or card title (those print on a dead page too), and mirrors the
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out

@@ -13,6 +13,7 @@ import {
   EventId,
   IsoDateTime,
   MessageId,
+  QueueId,
   NonNegativeInt,
   PositiveInt,
   ProjectId,
@@ -693,6 +694,24 @@ export const ThreadPullRequestLink = Schema.Struct({
 });
 export type ThreadPullRequestLink = typeof ThreadPullRequestLink.Type;
 
+/**
+ * Fork (#806): a message queued on the server for a thread. Not a timeline
+ * message: nothing of it shows as sent until the queue drain dispatches
+ * `thread.turn.start` for it (with `queuedFrom`), which removes the row in
+ * the same event batch. Rows sort by `orderKey` (`@t3tools/shared/orderKeys`).
+ */
+export const OrchestrationQueuedTurn = Schema.Struct({
+  queueId: QueueId,
+  messageId: MessageId,
+  text: Schema.String,
+  attachments: Schema.Array(ChatAttachment),
+  modelSelection: Schema.optional(ModelSelection),
+  orderKey: TrimmedNonEmptyString,
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export type OrchestrationQueuedTurn = typeof OrchestrationQueuedTurn.Type;
+
 export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
@@ -741,6 +760,9 @@ export const OrchestrationThread = Schema.Struct({
   // Manual Active placement. Keyless threads retain their creation/re-entry
   // order above the arranged run. Settling clears this slot.
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+  // Fork (#806): the server-side message queue, in queue order. Optional so
+  // payloads from pre-queue servers still decode.
+  queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -810,6 +832,9 @@ export const OrchestrationThreadShell = Schema.Struct({
   pinnedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+  // Fork (#806): the server-side message queue, in queue order. Optional so
+  // payloads from pre-queue servers still decode.
+  queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   session: Schema.NullOr(OrchestrationSession),
   latestUserMessageAt: Schema.NullOr(IsoDateTime),
@@ -1219,6 +1244,9 @@ export const ThreadTurnStartCommand = Schema.Struct({
   ),
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  // Fork (#806): the queued row this send came from. The decider removes it in
+  // the same batch as the send; a row that is already gone changes nothing.
+  queuedFrom: Schema.optional(QueueId),
   createdAt: IsoDateTime,
 });
 
@@ -1238,7 +1266,84 @@ const ClientThreadTurnStartCommand = Schema.Struct({
   interactionMode: ProviderInteractionMode,
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  // Fork (#806): the queued row this send came from. The decider removes it in
+  // the same batch as the send; a row that is already gone changes nothing.
+  queuedFrom: Schema.optional(QueueId),
   createdAt: IsoDateTime,
+});
+
+/**
+ * Fork (#806): the server-side message queue. `thread.turn.queue` parks a
+ * message on the thread without sending it; `.update`, `.remove` and `.move`
+ * edit the row; the queue drain (`InfinitusTurnQueue`) sends it as a
+ * `thread.turn.start` with `queuedFrom` once the thread is idle. The client
+ * variant carries uploads the way `thread.turn.start`'s does.
+ */
+const QueuedTurnMessage = Schema.Struct({
+  messageId: MessageId,
+  role: Schema.Literal("user"),
+  text: Schema.String,
+  attachments: Schema.Array(ChatAttachment),
+});
+const ClientQueuedTurnMessage = Schema.Struct({
+  messageId: MessageId,
+  role: Schema.Literal("user"),
+  text: Schema.String,
+  attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+});
+
+export const ThreadTurnQueueCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+  message: QueuedTurnMessage,
+  modelSelection: Schema.optional(ModelSelection),
+  // Fractional index; absent means "after the last row".
+  orderKey: Schema.optional(TrimmedNonEmptyString),
+  createdAt: IsoDateTime,
+});
+const ClientThreadTurnQueueCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+  message: ClientQueuedTurnMessage,
+  modelSelection: Schema.optional(ModelSelection),
+  orderKey: Schema.optional(TrimmedNonEmptyString),
+  createdAt: IsoDateTime,
+});
+
+export const ThreadTurnQueueUpdateCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue.update"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+  message: QueuedTurnMessage,
+  createdAt: IsoDateTime,
+});
+const ClientThreadTurnQueueUpdateCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue.update"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+  message: ClientQueuedTurnMessage,
+  createdAt: IsoDateTime,
+});
+
+const ThreadTurnQueueRemoveCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue.remove"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+});
+
+const ThreadTurnQueueMoveCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.queue.move"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  queueId: QueueId,
+  orderKey: TrimmedNonEmptyString,
 });
 
 const ThreadTurnInterruptCommand = Schema.Struct({
@@ -1284,6 +1389,9 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   turnCount: NonNegativeInt,
+  /** Fork (#269 E): restore the files only; the chat and the later
+      checkpoints stay. Absent or false is the full revert. */
+  keepChat: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -1336,6 +1444,10 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadRuntimeModeSetCommand,
   ThreadInteractionModeSetCommand,
   ThreadTurnStartCommand,
+  ThreadTurnQueueCommand,
+  ThreadTurnQueueUpdateCommand,
+  ThreadTurnQueueRemoveCommand,
+  ThreadTurnQueueMoveCommand,
   ThreadTurnInterruptCommand,
   ThreadApprovalRespondCommand,
   ThreadUserInputRespondCommand,
@@ -1369,6 +1481,10 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadRuntimeModeSetCommand,
   ThreadInteractionModeSetCommand,
   ClientThreadTurnStartCommand,
+  ClientThreadTurnQueueCommand,
+  ClientThreadTurnQueueUpdateCommand,
+  ThreadTurnQueueRemoveCommand,
+  ThreadTurnQueueMoveCommand,
   ThreadTurnInterruptCommand,
   ThreadApprovalRespondCommand,
   ThreadUserInputRespondCommand,
@@ -1539,6 +1655,10 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.interaction-mode-set",
   "thread.message-sent",
   "thread.turn-start-requested",
+  "thread.turn-queued",
+  "thread.turn-queue-updated",
+  "thread.turn-queue-removed",
+  "thread.turn-queue-moved",
   "thread.turn-interrupt-requested",
   "thread.approval-response-requested",
   "thread.user-input-response-requested",
@@ -1670,6 +1790,30 @@ export const ThreadPinReorderedPayload = Schema.Struct({
   updatedAt: IsoDateTime,
 });
 
+// Fork (#806): the server-side message queue.
+export const ThreadTurnQueuedPayload = Schema.Struct({
+  threadId: ThreadId,
+  queuedTurn: OrchestrationQueuedTurn,
+});
+export const ThreadTurnQueueUpdatedPayload = Schema.Struct({
+  threadId: ThreadId,
+  queuedTurn: OrchestrationQueuedTurn,
+});
+export const ThreadTurnQueueRemovedPayload = Schema.Struct({
+  threadId: ThreadId,
+  queueId: QueueId,
+  // `sent`: the drain (or "Send now") turned the row into a turn start;
+  // `user`: removed without sending.
+  reason: Schema.Literals(["user", "sent"]),
+  removedAt: IsoDateTime,
+});
+export const ThreadTurnQueueMovedPayload = Schema.Struct({
+  threadId: ThreadId,
+  queueId: QueueId,
+  orderKey: TrimmedNonEmptyString,
+  updatedAt: IsoDateTime,
+});
+
 export const ThreadMetaUpdatedPayload = Schema.Struct({
   threadId: ThreadId,
   // Order updates use this existing event so older clients can ignore the
@@ -1779,6 +1923,8 @@ const ThreadUserInputResponseRequestedPayload = Schema.Struct({
 export const ThreadCheckpointRevertRequestedPayload = Schema.Struct({
   threadId: ThreadId,
   turnCount: NonNegativeInt,
+  /** Fork (#269 E): files only, see `thread.checkpoint.revert`. */
+  keepChat: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -1923,6 +2069,26 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.pin-reordered"),
     payload: ThreadPinReorderedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-queued"),
+    payload: ThreadTurnQueuedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-queue-updated"),
+    payload: ThreadTurnQueueUpdatedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-queue-removed"),
+    payload: ThreadTurnQueueRemovedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-queue-moved"),
+    payload: ThreadTurnQueueMovedPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

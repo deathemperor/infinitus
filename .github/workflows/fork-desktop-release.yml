@@ -127,7 +127,7 @@ jobs:
           version="${base}-infinitus.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          echo "Building Infinitus Desktop $version." >> "$GITHUB_STEP_SUMMARY"
+          echo "Building Infinitus $version." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Align package versions to release version
         run: node scripts/update-release-package-versions.ts "${{ steps.version.outputs.version }}"
@@ -329,7 +329,7 @@ jobs:
           gh release create "$TAG" \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Infinitus Desktop ${VERSION} (${GITHUB_SHA::7})" \
-            --notes "Fork desktop build of main at ${GITHUB_SHA::7}; installs beside T3 Code and auto-updates on the infinitus channel.${HELPER_NOTE}" \
+            --title "Infinitus ${VERSION} (${GITHUB_SHA::7})" \
+            --notes "Infinitus desktop build of main at ${GITHUB_SHA::7}; auto-updates on the infinitus channel.${HELPER_NOTE}" \
             release-publish/*
           echo "Published prerelease $TAG." >> "$GITHUB_STEP_SUMMARY"

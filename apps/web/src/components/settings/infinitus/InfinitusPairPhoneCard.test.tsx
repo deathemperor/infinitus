@@ -183,7 +183,7 @@ describe("InfinitusPairPhoneCard", () => {
     fake.snapshot = snapshot(undefined);
     renderer = mount();
 
-    expect(text(renderer)).toContain("no fork tunnel");
+    expect(text(renderer)).toContain("build has no tunnel");
     expect(buttons(renderer)).toHaveLength(0);
   });
 

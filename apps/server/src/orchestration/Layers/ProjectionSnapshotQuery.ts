@@ -21,6 +21,7 @@ import {
   type OrchestrationMessage,
   type OrchestrationProjectShell,
   type OrchestrationProposedPlan,
+  type OrchestrationQueuedTurn,
   type OrchestrationProject,
   type OrchestrationSession,
   type OrchestrationThreadActivity,
@@ -59,6 +60,7 @@ import { ProjectionThreadActivity } from "../../persistence/Services/ProjectionT
 import { ProjectionThreadMessage } from "../../persistence/Services/ProjectionThreadMessages.ts";
 import { ProjectionThreadProposedPlan } from "../../persistence/Services/ProjectionThreadProposedPlans.ts";
 import { ProjectionThreadPullRequest } from "../../persistence/ProjectionThreadPullRequests.ts";
+import { ProjectionThreadQueuedTurnDbRow } from "../../persistence/ProjectionThreadQueuedTurns.ts";
 import { ProjectionThreadSession } from "../../persistence/Services/ProjectionThreadSessions.ts";
 import { ProjectionThread } from "../../persistence/Services/ProjectionThreads.ts";
 import {
@@ -441,6 +443,42 @@ function groupPullRequestRowsByThread(
   return byThread;
 }
 
+// Fork (#806): the server-side message queue, read with the thread.
+type QueuedTurnDbRow = Schema.Schema.Type<typeof ProjectionThreadQueuedTurnDbRow>;
+
+function mapQueuedTurnRow(row: QueuedTurnDbRow): OrchestrationQueuedTurn {
+  return {
+    queueId: row.queueId,
+    messageId: row.messageId,
+    text: row.text,
+    attachments: row.attachments,
+    ...(row.modelSelection === null ? {} : { modelSelection: row.modelSelection }),
+    orderKey: row.orderKey,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** The field only while the thread has rows: an empty queue is the absent
+    field, so payloads stay what pre-queue clients and tests expect. */
+function queuedTurnsField(rows: ReadonlyArray<OrchestrationQueuedTurn> | undefined): {
+  readonly queuedTurns?: ReadonlyArray<OrchestrationQueuedTurn>;
+} {
+  return rows === undefined || rows.length === 0 ? {} : { queuedTurns: rows };
+}
+
+function groupQueuedTurnRowsByThread(
+  rows: ReadonlyArray<QueuedTurnDbRow>,
+): Map<string, Array<OrchestrationQueuedTurn>> {
+  const byThread = new Map<string, Array<OrchestrationQueuedTurn>>();
+  for (const row of rows) {
+    const queued = byThread.get(row.threadId) ?? [];
+    queued.push(mapQueuedTurnRow(row));
+    byThread.set(row.threadId, queued);
+  }
+  return byThread;
+}
+
 /**
  * The link array plus the legacy single-link field derived from it, so clients
  * from before `pullRequests` keep seeing the thread's current pull request.
@@ -720,6 +758,26 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           stack_json AS "stack"
         FROM projection_thread_pull_requests
         ORDER BY thread_id ASC, linked_at ASC, number ASC
+      `,
+  });
+
+  const listThreadQueuedTurnRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: ProjectionThreadQueuedTurnDbRow,
+    execute: () =>
+      sql`
+        SELECT
+          thread_id AS "threadId",
+          queue_id AS "queueId",
+          message_id AS "messageId",
+          text,
+          attachments_json AS "attachments",
+          model_selection_json AS "modelSelection",
+          order_key AS "orderKey",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM projection_thread_queued_turns
+        ORDER BY thread_id ASC, order_key ASC, created_at ASC
       `,
   });
 
@@ -1327,6 +1385,27 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         FROM projection_thread_proposed_plans
         WHERE thread_id = ${threadId}
         ORDER BY created_at ASC, plan_id ASC
+      `,
+  });
+
+  const listThreadQueuedTurnRowsByThread = SqlSchema.findAll({
+    Request: ThreadIdLookupInput,
+    Result: ProjectionThreadQueuedTurnDbRow,
+    execute: ({ threadId }) =>
+      sql`
+        SELECT
+          thread_id AS "threadId",
+          queue_id AS "queueId",
+          message_id AS "messageId",
+          text,
+          attachments_json AS "attachments",
+          model_selection_json AS "modelSelection",
+          order_key AS "orderKey",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM projection_thread_queued_turns
+        WHERE thread_id = ${threadId}
+        ORDER BY order_key ASC, created_at ASC
       `,
   });
 
@@ -2003,6 +2082,14 @@ pending_approval_requests AS (
               ),
             ),
           ),
+          listThreadQueuedTurnRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getSnapshot:listThreadQueuedTurns:query",
+                "ProjectionSnapshotQuery.getSnapshot:listThreadQueuedTurns:decodeRows",
+              ),
+            ),
+          ),
           listThreadActivityRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2053,6 +2140,7 @@ pending_approval_requests AS (
             messageRows,
             proposedPlanRows,
             pullRequestRows,
+            queuedTurnRows,
             activityRows,
             sessionRows,
             checkpointRows,
@@ -2063,6 +2151,7 @@ pending_approval_requests AS (
               const messagesByThread = new Map<string, Array<OrchestrationMessage>>();
               const proposedPlansByThread = new Map<string, Array<OrchestrationProposedPlan>>();
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const queuedTurnsByThread = groupQueuedTurnRowsByThread(queuedTurnRows);
               const activitiesByThread = new Map<string, Array<OrchestrationThreadActivity>>();
               const checkpointsByThread = new Map<string, Array<OrchestrationCheckpointSummary>>();
               const sessionsByThread = new Map<string, OrchestrationSession>();
@@ -2242,6 +2331,7 @@ pending_approval_requests AS (
                 pinnedAt: row.pinnedAt,
                 pinOrderKey: row.pinOrderKey ?? null,
                 activeOrderKey: row.activeOrderKey ?? null,
+                ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
                 titleRegeneration: mapTitleRegeneration(row),
                 deletedAt: row.deletedAt,
                 messages: messagesByThread.get(row.threadId) ?? [],
@@ -2309,6 +2399,14 @@ pending_approval_requests AS (
               ),
             ),
           ),
+          listThreadQueuedTurnRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getCommandReadModel:listThreadQueuedTurns:query",
+                "ProjectionSnapshotQuery.getCommandReadModel:listThreadQueuedTurns:decodeRows",
+              ),
+            ),
+          ),
           listThreadSessionRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2342,6 +2440,7 @@ pending_approval_requests AS (
             threadRows,
             proposedPlanRows,
             pullRequestRows,
+            queuedTurnRows,
             sessionRows,
             latestTurnRows,
             stateRows,
@@ -2434,6 +2533,7 @@ pending_approval_requests AS (
               }
               const proposedPlansByThread = new Map<string, Array<OrchestrationProposedPlan>>();
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const queuedTurnsByThread = groupQueuedTurnRowsByThread(queuedTurnRows);
               const sessionByThread = new Map<string, OrchestrationSession>();
 
               for (let index = 0; index < sessionRows.length; index += 1) {
@@ -2486,6 +2586,7 @@ pending_approval_requests AS (
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
+                  ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
                   titleRegeneration: mapTitleRegeneration(row),
                   deletedAt: row.deletedAt,
                   messages: [],
@@ -2548,6 +2649,14 @@ pending_approval_requests AS (
               ),
             ),
           ),
+          listThreadQueuedTurnRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getShellSnapshot:listThreadQueuedTurns:query",
+                "ProjectionSnapshotQuery.getShellSnapshot:listThreadQueuedTurns:decodeRows",
+              ),
+            ),
+          ),
           listActiveLatestTurnRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2568,7 +2677,15 @@ pending_approval_requests AS (
       )
       .pipe(
         Effect.flatMap(
-          ([projectRows, threadRows, sessionRows, pullRequestRows, latestTurnRows, stateRows]) =>
+          ([
+            projectRows,
+            threadRows,
+            sessionRows,
+            pullRequestRows,
+            queuedTurnRows,
+            latestTurnRows,
+            stateRows,
+          ]) =>
             Effect.gen(function* () {
               let updatedAt: string | null = null;
               for (const row of projectRows) {
@@ -2602,6 +2719,7 @@ pending_approval_requests AS (
                 sessionRows.map((row) => [row.threadId, mapSessionRow(row)] as const),
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const queuedTurnsByThread = groupQueuedTurnRowsByThread(queuedTurnRows);
 
               const snapshot = {
                 snapshotSequence: computeSnapshotSequence(stateRows),
@@ -2641,6 +2759,7 @@ pending_approval_requests AS (
                         pinnedAt: row.pinnedAt,
                         pinOrderKey: row.pinOrderKey ?? null,
                         activeOrderKey: row.activeOrderKey ?? null,
+                        ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
                         titleRegeneration: mapTitleRegeneration(row),
                         session: sessionByThread.get(row.threadId) ?? null,
                         latestUserMessageAt: row.latestUserMessageAt,
@@ -2710,6 +2829,14 @@ pending_approval_requests AS (
               ),
             ),
           ),
+          listThreadQueuedTurnRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getArchivedShellSnapshot:listThreadQueuedTurns:query",
+                "ProjectionSnapshotQuery.getArchivedShellSnapshot:listThreadQueuedTurns:decodeRows",
+              ),
+            ),
+          ),
           listArchivedLatestTurnRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2730,7 +2857,15 @@ pending_approval_requests AS (
       )
       .pipe(
         Effect.flatMap(
-          ([projectRows, threadRows, sessionRows, pullRequestRows, latestTurnRows, stateRows]) =>
+          ([
+            projectRows,
+            threadRows,
+            sessionRows,
+            pullRequestRows,
+            queuedTurnRows,
+            latestTurnRows,
+            stateRows,
+          ]) =>
             Effect.gen(function* () {
               let updatedAt: string | null = null;
               for (const row of projectRows) {
@@ -2756,6 +2891,7 @@ pending_approval_requests AS (
               }
 
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const queuedTurnsByThread = groupQueuedTurnRowsByThread(queuedTurnRows);
               const activeProjectIds = new Set(threadRows.map((row) => row.projectId));
               const repositoryIdentities = yield* resolveRepositoryIdentitiesForProjects(
                 projectRows.filter((row) => activeProjectIds.has(row.projectId)),
@@ -2803,6 +2939,7 @@ pending_approval_requests AS (
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
+                  ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
                   titleRegeneration: mapTitleRegeneration(row),
                   session: sessionByThread.get(row.threadId) ?? null,
                   latestUserMessageAt: row.latestUserMessageAt,
@@ -3070,40 +3207,49 @@ pending_approval_requests AS (
 
   const getThreadShellById: ProjectionSnapshotQueryShape["getThreadShellById"] = (threadId) =>
     Effect.gen(function* () {
-      const [threadRow, latestTurnRow, sessionRow, pullRequestRows] = yield* Effect.all([
-        getActiveThreadRowById({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getThread:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getThread:decodeRow",
+      const [threadRow, latestTurnRow, sessionRow, pullRequestRows, queuedTurnRows] =
+        yield* Effect.all([
+          getActiveThreadRowById({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getThread:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getThread:decodeRow",
+              ),
             ),
           ),
-        ),
-        getLatestTurnRowByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:decodeRow",
+          getLatestTurnRowByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:decodeRow",
+              ),
             ),
           ),
-        ),
-        getThreadSessionRowByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getSession:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getSession:decodeRow",
+          getThreadSessionRowByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getSession:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getSession:decodeRow",
+              ),
             ),
           ),
-        ),
-        listThreadPullRequestRowsByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:query",
-              "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:decodeRows",
+          listThreadPullRequestRowsByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:query",
+                "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:decodeRows",
+              ),
             ),
           ),
-        ),
-      ]);
+          listThreadQueuedTurnRowsByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:listQueuedTurns:query",
+                "ProjectionSnapshotQuery.getThreadShellById:listQueuedTurns:decodeRows",
+              ),
+            ),
+          ),
+        ]);
 
       if (Option.isNone(threadRow)) {
         return Option.none<OrchestrationThreadShell>();
@@ -3139,6 +3285,7 @@ pending_approval_requests AS (
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,
+        ...queuedTurnsField(queuedTurnRows.map(mapQueuedTurnRow)),
         titleRegeneration: mapTitleRegeneration(threadRow.value),
         session: Option.isSome(sessionRow) ? mapSessionRow(sessionRow.value) : null,
         latestUserMessageAt: threadRow.value.latestUserMessageAt,
@@ -3335,6 +3482,7 @@ pending_approval_requests AS (
         messageRows,
         proposedPlanRows,
         pullRequestRows,
+        queuedTurnRows,
         activities,
         checkpointRows,
         latestTurnRow,
@@ -3372,6 +3520,14 @@ pending_approval_requests AS (
             toPersistenceSqlOrDecodeError(
               "ProjectionSnapshotQuery.getThreadDetailById:listPullRequests:query",
               "ProjectionSnapshotQuery.getThreadDetailById:listPullRequests:decodeRows",
+            ),
+          ),
+        ),
+        listThreadQueuedTurnRowsByThread({ threadId }).pipe(
+          Effect.mapError(
+            toPersistenceSqlOrDecodeError(
+              "ProjectionSnapshotQuery.getThreadDetailById:listQueuedTurns:query",
+              "ProjectionSnapshotQuery.getThreadDetailById:listQueuedTurns:decodeRows",
             ),
           ),
         ),
@@ -3436,6 +3592,7 @@ pending_approval_requests AS (
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,
+        ...queuedTurnsField(queuedTurnRows.map(mapQueuedTurnRow)),
         titleRegeneration: mapTitleRegeneration(threadRow.value),
         deletedAt: null,
         messages: messageRows.map((row) => {

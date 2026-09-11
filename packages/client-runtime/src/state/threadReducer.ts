@@ -2,6 +2,7 @@ import { pipe } from "effect/Function";
 import * as Arr from "effect/Array";
 import * as O from "effect/Order";
 import type {
+  OrchestrationQueuedTurn,
   MessageId,
   OrchestrationCheckpointSummary,
   OrchestrationEvent,
@@ -77,6 +78,17 @@ const activityIdIndex = new WeakMap<
  * finite, non-negative `usedTokens` are skipped during the consumer's backward
  * walk, so they must not replace an earlier resolvable row here.
  */
+/** The queue with `row` in place of any row sharing its id, in key order (#806). */
+function upsertQueuedTurn(
+  rows: ReadonlyArray<OrchestrationQueuedTurn> | undefined,
+  row: OrchestrationQueuedTurn,
+): OrchestrationQueuedTurn[] {
+  return [...(rows ?? []).filter((entry) => entry.queueId !== row.queueId), row].sort(
+    (left, right) =>
+      left.orderKey.localeCompare(right.orderKey) || left.createdAt.localeCompare(right.createdAt),
+  );
+}
+
 function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity): boolean {
   if (activity.kind !== "context-window.updated") {
     return false;
@@ -248,6 +260,46 @@ export function applyThreadDetailEvent(
           updatedAt: event.payload.updatedAt,
         },
       };
+
+    // ── Server-side message queue (fork #806) ───────────────────────
+    case "thread.turn-queued":
+    case "thread.turn-queue-updated":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          queuedTurns: upsertQueuedTurn(thread.queuedTurns, event.payload.queuedTurn),
+        },
+      };
+
+    case "thread.turn-queue-removed":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          queuedTurns: (thread.queuedTurns ?? []).filter(
+            (row) => row.queueId !== event.payload.queueId,
+          ),
+        },
+      };
+
+    case "thread.turn-queue-moved": {
+      const row = (thread.queuedTurns ?? []).find(
+        (entry) => entry.queueId === event.payload.queueId,
+      );
+      if (row === undefined) return { kind: "unchanged" };
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          queuedTurns: upsertQueuedTurn(thread.queuedTurns, {
+            ...row,
+            orderKey: event.payload.orderKey,
+            updatedAt: event.payload.updatedAt,
+          }),
+        },
+      };
+    }
 
     // ── Thread metadata ─────────────────────────────────────────────
     case "thread.meta-updated":

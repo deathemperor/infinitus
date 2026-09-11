@@ -68,6 +68,7 @@ import {
   useThreadGitRightHeaderItems,
 } from "./ThreadGitControls";
 import { GitOverviewSheet } from "./git/GitOverviewSheet";
+import { usePullRequestHeaderItem } from "../infinitus/usePullRequestHeaderItem";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git-actions";
 import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-state";
@@ -661,8 +662,24 @@ function ThreadRouteContent(
     onPull: gitActions.onPullSelectedThreadBranch,
     onRunAction: gitActions.onRunSelectedThreadGitAction,
   };
-  const threadCenterHeaderItems = useThreadGitCenterHeaderItems(threadGitControlProps);
-  const compactRightHeaderItems = useThreadGitRightHeaderItems(threadGitControlProps);
+  const gitCenterHeaderItems = useThreadGitCenterHeaderItems(threadGitControlProps);
+  const gitRightHeaderItems = useThreadGitRightHeaderItems(threadGitControlProps);
+  // Infinitus (#269): the thread's pull request leads the header when it has one.
+  const pullRequestHeader = usePullRequestHeaderItem(selectedThread);
+  const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
+    () =>
+      pullRequestHeader.item
+        ? [pullRequestHeader.item, ...gitCenterHeaderItems]
+        : gitCenterHeaderItems,
+    [gitCenterHeaderItems, pullRequestHeader.item],
+  );
+  const compactRightHeaderItems = useMemo<NativeHeaderItems>(
+    () =>
+      pullRequestHeader.item
+        ? [pullRequestHeader.item, ...gitRightHeaderItems]
+        : gitRightHeaderItems,
+    [gitRightHeaderItems, pullRequestHeader.item],
+  );
   const splitLeftHeaderItems = useMemo<NativeHeaderItems>(
     () => [
       {
@@ -924,7 +941,7 @@ function ThreadRouteContent(
     <>
       {activeInspectorRenderer ? <InspectorPaneRoleActivation /> : null}
       <NativeStackScreenOptions
-        optionsVersion={threadGitControlProps.projectScripts}
+        optionsVersion={[threadGitControlProps.projectScripts, pullRequestHeader.version]}
         options={{
           // Android draws its own in-flow header (AndroidScreenHeader below);
           // the native stack header stays iOS-only.

@@ -81,6 +81,7 @@ describe("routeFailures", () => {
     expect(routeFailures(team, `Lighthouse ${ALWAYS_ABSENT[0]}`)).toEqual([
       `shows "${ALWAYS_ABSENT[0]}"`,
     ]);
+    expect(routeFailures(team, "Lighthouse · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
   });
 });
 

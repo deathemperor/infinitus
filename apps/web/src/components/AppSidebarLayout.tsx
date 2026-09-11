@@ -7,11 +7,12 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
+import { mouseHistoryIntent } from "../lib/backNavigation";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
@@ -149,6 +150,29 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // Settings routes show the settings nav in place of whichever thread
   // sidebar is active.
   const pathname = useLocation({ select: (location) => location.pathname });
+  const canGoBack = useCanGoBack();
+  // A mouse's back button (Logitech MX and the like, Chromium `button` 3)
+  // goes back on the pages whose header shows the back arrow; its forward
+  // button (4) goes forward anywhere. Electron hands them to the renderer
+  // as plain mouse events with no default action, so this is the whole path.
+  useEffect(() => {
+    const onMouseUp = (event: MouseEvent) => {
+      const intent = mouseHistoryIntent(event.button, pathname);
+      if (intent === null) return;
+      event.preventDefault();
+      if (intent === "forward") {
+        window.history.forward();
+        return;
+      }
+      if (canGoBack) {
+        window.history.back();
+        return;
+      }
+      void navigate({ to: "/" });
+    };
+    window.addEventListener("mouseup", onMouseUp);
+    return () => window.removeEventListener("mouseup", onMouseUp);
+  }, [canGoBack, navigate, pathname]);
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");

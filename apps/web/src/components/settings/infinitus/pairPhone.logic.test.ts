@@ -132,7 +132,7 @@ describe("pairPhoneCardModel", () => {
       nowMs: NOW,
     });
     expect(model.tunnel).toBe("unsupported");
-    expect(model.tunnelNotice).toMatch(/no fork tunnel/);
+    expect(model.tunnelNotice).toMatch(/no tunnel/);
     // A LAN page can still pair on the network, tunnel or not.
     expect(model.origin?.kind).toBe("lan");
   });

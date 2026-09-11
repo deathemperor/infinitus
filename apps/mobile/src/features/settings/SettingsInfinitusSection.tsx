@@ -2,8 +2,8 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useMemo } from "react";
-import { Platform } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, Platform } from "react-native";
 
 import { ControlPillMenu } from "../../components/ControlPill";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
@@ -12,9 +12,22 @@ import { environmentServerConfigsAtom } from "../../state/server";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
+import { testCardLabel, toggleTestCard } from "../infinitus/testCard.logic";
+import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
+
+/** The working cards live on this phone right now, none off iOS or when
+    the widgets module is not there. */
+function countLiveCards(): number {
+  if (Platform.OS !== "ios") return 0;
+  try {
+    return InfinitusWorking.getInstances().length;
+  } catch {
+    return 0;
+  }
+}
 
 /** Settings › Infinitus (fork, #572): the Live Activity toggle, the Mac
     alerts toggle (#702) and the reset / swap alarms toggle (both ask for the
@@ -32,6 +45,16 @@ export function SettingsInfinitusSection() {
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
   const pushAlertsEnabled = loaded && preferences.value.infinitusPushAlertsEnabled === true;
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
+  // The test-card row (#845): how many working cards are live, re-read
+  // after every press; the count is what the row offers to end.
+  const [liveCards, setLiveCards] = useState(countLiveCards);
+  const pressTestCard = useCallback(async () => {
+    const outcome = await toggleTestCard(InfinitusWorking);
+    setLiveCards(countLiveCards());
+    if (outcome.action === "failed") {
+      Alert.alert("No card", `iOS refused the Live Activity: ${outcome.message}`);
+    }
+  }, []);
   const macActions = useMemo<MenuAction[]>(
     () =>
       macs.map((mac) => ({
@@ -58,6 +81,15 @@ export function SettingsInfinitusSection() {
         value={enabled}
         onValueChange={(value) => savePreferences({ infinitusLiveActivityEnabled: value })}
       />
+      {Platform.OS === "ios" ? (
+        <SettingsRow
+          icon="rectangle.badge.checkmark"
+          label={testCardLabel(liveCards)}
+          value={liveCards === 0 ? "No push involved" : `${liveCards} live`}
+          disabled={!enabled}
+          onPress={() => void pressTestCard()}
+        />
+      ) : null}
       <SettingsSwitchRow
         icon="bell.badge"
         label="Alerts from Mac"

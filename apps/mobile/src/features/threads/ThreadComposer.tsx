@@ -87,6 +87,7 @@ import {
   ComposerDictationToolbar,
 } from "../voice-input/ComposerDictationControl";
 import { useVoiceInputController } from "../voice-input/useVoiceInputController";
+import { useMarkUpDraftImage } from "../infinitus/useMarkUpDraftImage";
 import { resolveVoiceComposerPresentation } from "../voice-input/voiceInputPresentation";
 import {
   type ExistingThreadSettingsRouteSession,
@@ -400,6 +401,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     onExpandedChange?.(isExpanded);
   }, [isExpanded, onExpandedChange]);
 
+  const onMarkUpDraftImage = useMarkUpDraftImage(props.environmentId, props.selectedThread.id);
   const onPressPreview = useCallback(
     (source: FilePreviewSource) => {
       wasExpandedBeforePreviewRef.current = isFocused;
@@ -668,6 +670,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   onRemove={voiceInput.isBusy ? () => undefined : props.onRemoveDraftImage}
                   onPressPreview={voiceInput.isBusy ? undefined : onPressPreview}
                   onPressVideo={voiceInput.isBusy ? undefined : onPressVideo}
+                  onMarkUp={voiceInput.isBusy ? undefined : onMarkUpDraftImage}
                 />
               </Animated.View>
             ) : null}

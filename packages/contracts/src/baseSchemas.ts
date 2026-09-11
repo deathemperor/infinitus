@@ -117,6 +117,9 @@ export const EventId = makeEntityId("EventId");
 export type EventId = typeof EventId.Type;
 export const MessageId = makeEntityId("MessageId");
 export type MessageId = typeof MessageId.Type;
+/** Fork (#806): a message queued on the server for a thread. */
+export const QueueId = makeEntityId("QueueId");
+export type QueueId = typeof QueueId.Type;
 export const TurnId = makeEntityId("TurnId");
 export type TurnId = typeof TurnId.Type;
 export const AuthSessionId = makeEntityId("AuthSessionId");
