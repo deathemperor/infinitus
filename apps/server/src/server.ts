@@ -73,6 +73,7 @@ import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
+import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
@@ -215,31 +216,6 @@ const DesktopAppUpdateLayerLive = DesktopAppUpdate.layer.pipe(
 const BackgroundLayerLive = BackgroundPolicy.layer.pipe(
   Layer.provide(HostPowerMonitorLayerLive),
   Layer.provideMerge(ServerSettingsLayerLive),
-);
-
-// The client is private to these four: everything else reaches Infinitus
-// through `InfinitusService`, which is the only thing that polls the socket;
-// the port layer writes one pref once the server is listening and again when
-// a watched app comes back; the companion opens the app when the socket stays
-// quiet at startup and on `infinitus.launch`.
-// InfinitusSecretLive (#747) is the one secret-carrying path: a code, a key or
-// a token to a verb the manifest says takes one, on the request line, never
-// kept. It reads the manifest through the same service and socket client.
-// InfinitusUsageAttributionLive (#779) reads the app's `history` verb once per
-// usage scan so `/usage` can split Claude spend by account.
-const InfinitusLayerLive = Layer.mergeAll(
-  InfinitusServerPortLive,
-  InfinitusCompanionLive,
-  InfinitusSecretLive,
-  InfinitusUsageAttributionLive,
-).pipe(
-  Layer.provideMerge(InfinitusLive),
-  Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
-);
-
-const UsageLayerLive = UsageService.layer.pipe(
-  Layer.provide(ServerSettingsLayerLive),
-  Layer.provide(InfinitusLayerLive),
 );
 
 const ResourceDiagnosticsLayerLive = Layer.mergeAll(
@@ -468,6 +444,33 @@ const AuthLayerLive = EnvironmentAuth.layer.pipe(
   Layer.provide(ServerSecretStore.layer),
 );
 
+// The client is private to these four: everything else reaches Infinitus
+// through `InfinitusService`, which is the only thing that polls the socket;
+// the port layer writes one pref once the server is listening and again when
+// a watched app comes back; the companion opens the app when the socket stays
+// quiet at startup and on `infinitus.launch`.
+// InfinitusSecretLive (#747) is the one secret-carrying path: a code, a key or
+// a token to a verb the manifest says takes one, on the request line, never
+// kept. It reads the manifest through the same service and socket client.
+// InfinitusUsageAttributionLive (#779) reads the app's `history` verb once per
+// usage scan so `/usage` can split Claude spend by account.
+const InfinitusLayerLive = Layer.mergeAll(
+  // The port publish also mints infinitusctl's session (#822), so it needs
+  // the auth service — which is why this block sits below AuthLayerLive.
+  InfinitusServerPortLive.pipe(Layer.provide(AuthLayerLive)),
+  InfinitusCompanionLive,
+  InfinitusSecretLive,
+  InfinitusUsageAttributionLive,
+).pipe(
+  Layer.provideMerge(InfinitusLive),
+  Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
+);
+
+const UsageLayerLive = UsageService.layer.pipe(
+  Layer.provide(ServerSettingsLayerLive),
+  Layer.provide(InfinitusLayerLive),
+);
+
 const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
   RelayClientLive,
   CloudManagedEndpointRuntime.layer.pipe(
@@ -613,6 +616,7 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(pullRequestHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(infinitusPairingHttpApiLayer),
+      Layer.provide(infinitusHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
     otlpTracesProxyRouteLayer,

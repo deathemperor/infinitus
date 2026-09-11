@@ -31,6 +31,11 @@ import {
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
+import {
+  InfinitusHeldThread,
+  InfinitusReleaseThreadInput,
+  InfinitusReleaseThreadResult,
+} from "./infinitus.ts";
 import { InfinitusPairingHttpApi } from "./infinitusPairing.ts";
 import {
   ClientOrchestrationCommand,
@@ -615,6 +620,37 @@ class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
     }),
   ) {}
 
+/**
+ * Infinitus fork (#822): one row of the CLI's holds read. The WS holds stream
+ * carries `held` and `limited`; this read adds `paused`, a turn the server
+ * paused for headroom (#743), so `infinitusctl threads --status held` needs
+ * one request and no socket.
+ */
+export const InfinitusHoldRow = Schema.Struct({
+  ...InfinitusHeldThread.fields,
+  kind: Schema.optionalKey(Schema.Literals(["held", "limited", "paused"])),
+});
+export type InfinitusHoldRow = typeof InfinitusHoldRow.Type;
+
+/** Infinitus fork (#822): the two reads `infinitusctl` has no WebSocket for.
+    Both need the operate scope, like their WS twins. */
+class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
+  .add(
+    HttpApiEndpoint.get("holds", "/api/infinitus/holds", {
+      headers: OptionalBearerHeaders,
+      success: Schema.Array(InfinitusHoldRow),
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("releaseThread", "/api/infinitus/release-thread", {
+      headers: OptionalBearerHeaders,
+      payload: InfinitusReleaseThreadInput,
+      success: InfinitusReleaseThreadResult,
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -622,4 +658,6 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentPullRequestsHttpApi)
   .add(EnvironmentConnectHttpApi)
   // Infinitus fork: the approve-on-Mac pairing routes (#710).
-  .add(InfinitusPairingHttpApi) {}
+  .add(InfinitusPairingHttpApi)
+  // Infinitus fork: infinitusctl's holds read and release (#822).
+  .add(InfinitusHttpApi) {}

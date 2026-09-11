@@ -47,6 +47,12 @@ interface Tracked {
   readonly provider: string;
 }
 
+/** A paused turn also remembers when and why, for the holds read (#822). */
+interface Paused extends Tracked {
+  readonly since: string;
+  readonly summary: string;
+}
+
 type Input =
   | { readonly kind: "runtime"; readonly event: ProviderRuntimeEvent }
   | { readonly kind: "snapshot"; readonly snapshot: InfinitusSnapshot }
@@ -105,7 +111,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
 
     /** Insertion order is age: `paused` continues oldest first. */
     const running = new Map<ThreadId, Tracked>();
-    const paused = new Map<ThreadId, Tracked>();
+    const paused = new Map<ThreadId, Paused>();
     const watch = yield* FiberHandle.make();
 
     const shellOf = (threadId: ThreadId) =>
@@ -196,7 +202,7 @@ export const InfinitusSessionInterruptLive = Layer.effect(
           );
         if (!interrupted) return;
         running.delete(threadId);
-        paused.set(threadId, entry);
+        paused.set(threadId, { ...entry, since: createdAt, summary: pauseMarkerSummary(fleet) });
         const headroom = fleet.headroom;
         yield* appendMarker(threadId, PAUSE_MARKER_KIND, pauseMarkerSummary(fleet), {
           fleet: fleet.key,
@@ -411,6 +417,14 @@ export const InfinitusSessionInterruptLive = Layer.effect(
           yield* worker.enqueue({ kind: "resume", threadId, reply });
           return yield* Deferred.await(reply);
         }),
+      paused: Effect.sync(() =>
+        [...paused.entries()].map(([threadId, entry]) => ({
+          threadId,
+          since: entry.since,
+          summary: entry.summary,
+          kind: "paused" as const,
+        })),
+      ),
     });
   }),
 );
