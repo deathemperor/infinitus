@@ -763,6 +763,11 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   code: `missingPairingInput` in `pairing.ts` names the missing field
   ("Enter a pairing code.") in the banner, since a bare host built into a
   pairing URL would otherwise read as "Pairing URL is invalid."
+  Follow-up (#661): a found row's Host is the server's own first
+  `lanHttpBaseUrls` address (#757) when it reports one, rows are one per
+  environment id (a Mac on two interfaces answers twice), and after "Use"
+  the Add button waits for a pairing code with a hint under the code field
+  (`pickedHostNeedsCode`); approve-on-Mac keeps its own button.
 - `apps/mobile/src/features/infinitus/pairingApproval.logic.ts` (+ `pairingApproval.ts`,
   `InfinitusAskToApprove.tsx`) — "Ask this Mac to approve" under the code
   field (#710, PR 3): the phone POSTs a request with a random secret to the

@@ -13,6 +13,7 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { InfinitusAskToApprove } from "../infinitus/InfinitusAskToApprove";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
+import { PICKED_HOST_HINT, pickedHostNeedsCode } from "../infinitus/lanDiscovery.logic";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
 import {
   buildPairingUrl,
@@ -57,10 +58,13 @@ export function ConnectionsNewRouteScreen({
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannerLocked, setScannerLocked] = useState(false);
   const attemptedAutoConnectRef = useRef<string | null>(null);
+  // The Host a found Mac filled (#651): Add then waits for the code.
+  const [pickedHost, setPickedHost] = useState<string | null>(null);
 
   const headerIconColor = useUniwindTheme()["--color-icon"];
 
-  const connectDisabled = isSubmitting || hostInput.trim().length === 0;
+  const needsCode = pickedHostNeedsCode({ pickedHost, hostInput, codeInput });
+  const connectDisabled = isSubmitting || hostInput.trim().length === 0 || needsCode;
 
   useEffect(() => {
     const { host, code } = parsePairingUrl(connectionPairingUrl);
@@ -93,6 +97,14 @@ export function ConnectionsNewRouteScreen({
     setCodeInput(value);
     setFormError(null);
   }, []);
+
+  const handleNearbyPick = useCallback(
+    (host: string) => {
+      handleHostChange(host);
+      setPickedHost(host);
+    },
+    [handleHostChange],
+  );
 
   const openScanner = useCallback(async () => {
     if (cameraPermission?.granted) {
@@ -287,7 +299,7 @@ export function ConnectionsNewRouteScreen({
             )
           ) : (
             <View collapsable={false} className="gap-4 rounded-[24px] bg-card p-4">
-              <InfinitusNearbyServers onPick={handleHostChange} />
+              <InfinitusNearbyServers onPick={handleNearbyPick} />
               <View collapsable={false} className="gap-1.5">
                 <Text className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
                   Host
@@ -315,6 +327,11 @@ export function ConnectionsNewRouteScreen({
                   onChangeText={handleCodeChange}
                   className="rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground"
                 />
+                {needsCode ? (
+                  <Text accessibilityLiveRegion="polite" className="text-xs text-foreground-muted">
+                    {PICKED_HOST_HINT}
+                  </Text>
+                ) : null}
               </View>
               <InfinitusAskToApprove
                 host={hostInput}

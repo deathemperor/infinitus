@@ -11,8 +11,9 @@ type Phase = "idle" | "scanning" | "done";
 
 /**
  * "Find Macs on this network" on the add-connection form (#651): sweeps the
- * phone's Wi‑Fi for desktop servers and fills the Host field with a tap. The
- * one-time code from the Mac's Devices card is still typed by hand.
+ * phone's Wi‑Fi for desktop servers and fills the Host field with a tap — the
+ * server's own LAN address when it reports one (#757). The one-time code from
+ * the Mac's Devices card is still typed by hand; the form says so after a pick.
  */
 export function InfinitusNearbyServers(props: { readonly onPick: (host: string) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -45,7 +46,10 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
       signal: controller.signal,
       onFound: (server) =>
         setFound((current) =>
-          current.some((item) => item.host === server.host) ? current : [...current, server],
+          // One row per server: a Mac on two interfaces answers twice.
+          current.some((item) => item.environmentId === server.environmentId)
+            ? current
+            : [...current, server],
         ),
     });
     if (!controller.signal.aborted) setPhase("done");
@@ -72,7 +76,7 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
       ) : null}
       {found.map((server) => (
         <Pressable
-          key={server.host}
+          key={server.environmentId}
           accessibilityRole="button"
           onPress={() => props.onPick(server.host)}
           className="flex-row items-center justify-between rounded-[14px] border border-input-border bg-input px-4 py-3 active:opacity-70"

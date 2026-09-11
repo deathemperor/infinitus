@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { nearbyServerFromDescriptor, probeUrl, subnetCandidates } from "./lanDiscovery.logic";
+import {
+  nearbyServerFromDescriptor,
+  pickedHostNeedsCode,
+  preferredHost,
+  probeUrl,
+  subnetCandidates,
+} from "./lanDiscovery.logic";
 
 describe("subnetCandidates", () => {
   it("lists every other host of a private /24", () => {
@@ -32,15 +38,57 @@ describe("nearbyServerFromDescriptor", () => {
         label: "HyperNovae",
         capabilities: { infinitus: true },
       }),
-    ).toEqual({ host: "192.168.2.19:3773", label: "HyperNovae", infinitus: true });
+    ).toEqual({
+      environmentId: "env-1",
+      host: "192.168.2.19:3773",
+      label: "HyperNovae",
+      infinitus: true,
+    });
     expect(
       nearbyServerFromDescriptor("192.168.2.19", { environmentId: "env-1", label: "Plain" }),
-    ).toEqual({ host: "192.168.2.19:3773", label: "Plain", infinitus: false });
+    ).toEqual({
+      environmentId: "env-1",
+      host: "192.168.2.19:3773",
+      label: "Plain",
+      infinitus: false,
+    });
+  });
+
+  it("prefers the LAN address the server reports for itself (#757), else the one that answered", () => {
+    expect(
+      nearbyServerFromDescriptor("192.168.2.19", {
+        environmentId: "env-1",
+        label: "HyperNovae",
+        lanHttpBaseUrls: ["http://192.168.2.5:3773", "http://10.0.0.5:3773"],
+      })?.host,
+    ).toBe("192.168.2.5:3773");
+    expect(preferredHost("192.168.2.19", 3773, ["http://192.168.2.5"])).toBe("192.168.2.5:80");
+    expect(preferredHost("192.168.2.19", 3773, ["https://mac.example.com:3773"])).toBe(
+      "192.168.2.19:3773",
+    );
+    expect(preferredHost("192.168.2.19", 3773, [])).toBe("192.168.2.19:3773");
+    expect(preferredHost("192.168.2.19", 3773, undefined)).toBe("192.168.2.19:3773");
   });
 
   it("ignores anything else listening on that port", () => {
     expect(nearbyServerFromDescriptor("192.168.2.7", null)).toBeNull();
     expect(nearbyServerFromDescriptor("192.168.2.7", "<html>")).toBeNull();
     expect(nearbyServerFromDescriptor("192.168.2.7", { label: "no id" })).toBeNull();
+  });
+});
+
+describe("pickedHostNeedsCode", () => {
+  it("waits for the code only while the Host is the one a found Mac filled", () => {
+    const picked = "192.168.2.5:3773";
+    expect(pickedHostNeedsCode({ pickedHost: picked, hostInput: picked, codeInput: "" })).toBe(
+      true,
+    );
+    expect(pickedHostNeedsCode({ pickedHost: picked, hostInput: picked, codeInput: " abc " })).toBe(
+      false,
+    );
+    expect(
+      pickedHostNeedsCode({ pickedHost: picked, hostInput: "10.0.0.9:3773", codeInput: "" }),
+    ).toBe(false);
+    expect(pickedHostNeedsCode({ pickedHost: null, hostInput: picked, codeInput: "" })).toBe(false);
   });
 });
