@@ -16,6 +16,10 @@ const testState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../env", () => ({ isElectron: false }));
+vi.mock("./signIn.logic", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./signIn.logic")>()),
+  SIGN_IN_POLL_MS: 0,
+}));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () =>
     new Map([["test-environment", { environment: { capabilities: { infinitus: true } } }]]),
@@ -444,6 +448,179 @@ describe("AccountsPage", () => {
     expect(status.children.join("")).toBe("Sign-in failed: a sign-in is already running");
     expect(testState.command).toHaveBeenCalledTimes(1);
     renderer.unmount();
+  });
+
+  const signInSnapshot: InfinitusSnapshot = {
+    ...addableSnapshot,
+    commands: [...addableSnapshot.commands, { ...addCommand, name: "signin-begin" }],
+  };
+
+  /** The desktop shell's sign-in methods on `window`, undone after the test. */
+  const installBridge = (bridge: Record<string, unknown> | undefined) => {
+    const host = globalThis as unknown as { window: Record<string, unknown> | undefined };
+    const had = host.window;
+    host.window = { ...had, desktopBridge: bridge };
+    return () => {
+      host.window = had;
+    };
+  };
+
+  const bridgeStub = () => ({
+    openInfinitusSignIn: vi.fn().mockResolvedValue(undefined),
+    closeInfinitusSignIn: vi.fn().mockResolvedValue(undefined),
+    submitInfinitusSignInCode: vi.fn().mockResolvedValue({ ok: true }),
+  });
+
+  it("on a build with signin-begin, a client without the shell points at the Mac", () => {
+    const restore = installBridge(undefined);
+    testState.snapshot = signInSnapshot;
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<AccountsPage />);
+    });
+    const labels = renderer.root
+      .findAll((node) => typeof node.props["aria-label"] === "string")
+      .map((node) => node.props["aria-label"] as string);
+    expect(labels.some((label) => label.startsWith("Add account:"))).toBe(false);
+    expect(JSON.stringify(renderer.toJSON())).toContain("Sign in from the Mac.");
+    renderer.unmount();
+    restore();
+  });
+
+  it("runs the sign-in inside the app: begin, the shell's window, the pasted code, done", async () => {
+    const bridge = bridgeStub();
+    const restore = installBridge(bridge);
+    testState.snapshot = signInSnapshot;
+    const begun = {
+      flowId: "f1",
+      url: "https://claude.ai/oauth",
+      pasteCode: true,
+      label: "Add account",
+    };
+    testState.command = vi
+      .fn()
+      .mockResolvedValueOnce({ _tag: "Success", value: { result: begun } })
+      .mockResolvedValueOnce({
+        _tag: "Success",
+        value: { result: { flowId: "f1", phase: "waitingForCode", pasteCode: true } },
+      })
+      .mockResolvedValueOnce({
+        _tag: "Success",
+        value: {
+          result: { flowId: "f1", phase: "done", pasteCode: true, account: "two@example.com" },
+        },
+      })
+      .mockResolvedValue({ _tag: "Success", value: {} });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    expect(testState.command).toHaveBeenNthCalledWith(1, {
+      environmentId,
+      input: { command: "signin-begin", args: ["claude"], options: {} },
+    });
+    expect(bridge.openInfinitusSignIn).toHaveBeenCalledWith({
+      flowId: "f1",
+      url: "https://claude.ai/oauth",
+      label: "Add account",
+    });
+    expect(testState.command).toHaveBeenNthCalledWith(2, {
+      environmentId,
+      input: { command: "signin-status", args: ["f1"], options: {} },
+    });
+    // The code field is up while the app waits for the paste; the code goes
+    // to the shell, never through a command.
+    const field = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Sign-in code: Claude (cswap)",
+    );
+    if (field.length > 0) {
+      const form = renderer.root.findAll((node) => node.type === "form")[0]!;
+      await act(async () => {
+        form.props.onSubmit({
+          preventDefault: () => {},
+          currentTarget: { elements: { namedItem: () => null } },
+        });
+      });
+    }
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    expect(bridge.closeInfinitusSignIn).toHaveBeenCalledWith("f1");
+    expect(testState.command).toHaveBeenNthCalledWith(4, {
+      environmentId,
+      input: { command: "refresh", args: [], options: {} },
+    });
+    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
+    expect(status.children.join("")).toBe("Signed in as two@example.com.");
+    expect(
+      testState.command.mock.calls.some(
+        (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
+      ),
+    ).toBe(false);
+    renderer.unmount();
+    restore();
+  });
+
+  it("signs a lapsed account in again inside the app, naming its email to the app", async () => {
+    const bridge = bridgeStub();
+    const restore = installBridge(bridge);
+    testState.snapshot = signInSnapshot;
+    testState.command = vi
+      .fn()
+      .mockResolvedValueOnce({
+        _tag: "Success",
+        value: {
+          result: {
+            flowId: "f2",
+            url: "https://x",
+            pasteCode: false,
+            label: "Sign in again — spare",
+          },
+        },
+      })
+      .mockReturnValue(new Promise(() => undefined));
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const relogin = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Sign in again as spare",
+    )[0]!;
+    await act(async () => {
+      relogin.props.onClick();
+    });
+    expect(testState.command).toHaveBeenNthCalledWith(1, {
+      environmentId,
+      input: { command: "signin-begin", args: ["claude"], options: { relogin: "two@example.com" } },
+    });
+    expect(bridge.openInfinitusSignIn).toHaveBeenCalledWith({
+      flowId: "f2",
+      url: "https://x",
+      label: "Sign in again — spare",
+    });
+    const cancel = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Cancel sign-in: Claude (cswap)",
+    )[0]!;
+    await act(async () => {
+      cancel.props.onClick();
+    });
+    expect(bridge.closeInfinitusSignIn).toHaveBeenCalledWith("f2");
+    expect(testState.command).toHaveBeenLastCalledWith({
+      environmentId,
+      input: { command: "signin-cancel", args: ["f2"], options: {} },
+    });
+    renderer.unmount();
+    restore();
   });
 
   it("leaves the sign-ins section out when nothing lapsed", () => {

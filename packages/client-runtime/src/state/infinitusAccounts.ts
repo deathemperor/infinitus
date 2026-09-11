@@ -35,6 +35,8 @@ export interface UsageWindowBar {
 export interface AccountRowModel {
   readonly number: number;
   readonly label: string;
+  /** The account's email — what a re-login names to the app. */
+  readonly email: string;
   readonly plan: string | null;
   readonly active: boolean;
   readonly next: boolean;
@@ -179,6 +181,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
   return {
     number: account.number,
     label: infinitusAccountLabel(account),
+    email: account.email,
     plan: account.plan ?? null,
     active: account.active || fleet.activeNumber === account.number,
     next: fleet.nextCandidate === account.number,

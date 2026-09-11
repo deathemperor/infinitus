@@ -15,6 +15,24 @@ import {
   type AddAccountFlow,
 } from "./addAccount.logic";
 import { ExhaustedBand } from "./ExhaustedBand";
+import {
+  SIGN_IN_FROM_MAC,
+  signInBusy,
+  signInEnded,
+  signInStatusText,
+  type SignInFlow,
+} from "./signIn.logic";
+
+/** The in-app sign-in (#677) as the page hands it to a fleet: whether the
+    build offers it, whether this client can show it, the flow on this fleet. */
+export interface FleetSignIn {
+  readonly offers: boolean;
+  readonly inApp: boolean;
+  readonly flow: SignInFlow | null;
+  readonly onStart: (target: AccountRowModel | null) => void;
+  readonly onCancel: () => void;
+  readonly onSubmitCode: (code: string) => void;
+}
 
 /** One engine's fleet: what it is, the warning it carries, and its accounts. */
 export function FleetSection({
@@ -25,6 +43,7 @@ export function FleetSection({
   offersAdd,
   addFlow,
   signInRunning,
+  signIn,
   onAction,
   onAdd,
 }: {
@@ -39,18 +58,41 @@ export function FleetSection({
   readonly addFlow: AddAccountFlow | null;
   /** The app's word that some sign-in is running right now. */
   readonly signInRunning: boolean;
+  readonly signIn: FleetSignIn;
   readonly onAction: (row: AccountRowModel, action: AccountAction, alias?: string) => void;
   /** Starts the fleet's sign-in: a new account, or the row to sign in again as. */
   readonly onAdd: (target: AccountRowModel | null) => void;
 }) {
-  const canAdd = offersAdd && section.canAdd;
-  const busy = addAccountBusy(addFlow, signInRunning);
-  const status = canAdd ? addAccountStatus(addFlow, signInRunning) : null;
+  // The in-app sign-in when the build and this client both have it; a build
+  // with it but a client without (the phone, the tunnel) points at the Mac;
+  // an older build keeps the sign-in on the Mac (#672).
+  const inApp = signIn.offers && signIn.inApp && section.canAdd;
+  const fromMac = signIn.offers && !signIn.inApp && section.canAdd;
+  const canAdd = !signIn.offers && offersAdd && section.canAdd;
+  const busy = inApp
+    ? signInBusy(signIn.flow) || signInRunning
+    : addAccountBusy(addFlow, signInRunning);
+  const status = inApp
+    ? signIn.flow === null
+      ? signInRunning
+        ? "A sign-in is already running in Infinitus."
+        : null
+      : signInStatusText(signIn.flow)
+    : canAdd
+      ? addAccountStatus(addFlow, signInRunning)
+      : null;
+  const failed = inApp ? signIn.flow?.phase === "failed" : addFlow?.phase.kind === "failed";
+  const onStart = inApp ? signIn.onStart : onAdd;
+  const codeField =
+    inApp && signIn.flow !== null && signIn.flow.phase === "waitingForCode" && signIn.flow.pasteCode
+      ? signIn.flow
+      : null;
+  const cancellable = inApp && signIn.flow !== null && !signInEnded(signIn.flow.phase);
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="font-medium text-foreground text-sm">{section.title}</h2>
-        {canAdd ? (
+        {canAdd || inApp ? (
           <Button
             className="ms-auto"
             size="xs"
@@ -58,27 +100,74 @@ export function FleetSection({
             aria-label={`${addAccountButtonLabel(null)}: ${section.title}`}
             aria-busy={busy}
             disabled={busy}
-            onClick={() => onAdd(null)}
+            onClick={() => onStart(null)}
           >
-            {addFlow !== null && busy ? <Spinner className="size-3" /> : null}
+            {(inApp ? signIn.flow !== null : addFlow !== null) && busy ? (
+              <Spinner className="size-3" />
+            ) : null}
             {addAccountButtonLabel(null)}
           </Button>
         ) : null}
+        {cancellable ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-label={`Cancel sign-in: ${section.title}`}
+            onClick={signIn.onCancel}
+          >
+            Cancel
+          </Button>
+        ) : null}
       </div>
+      {fromMac ? <p className="text-muted-foreground text-xs">{SIGN_IN_FROM_MAC}</p> : null}
       {section.caveat === null ? null : (
         <p className="text-muted-foreground text-xs">{section.caveat}</p>
       )}
       {status === null ? null : (
         <p
           role="status"
-          className={
-            addFlow?.phase.kind === "failed"
-              ? "text-destructive text-xs"
-              : "text-muted-foreground text-xs"
-          }
+          className={failed ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
         >
           {status}
         </p>
+      )}
+      {codeField === null ? null : (
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const field = event.currentTarget.elements.namedItem("code");
+            if (field instanceof HTMLInputElement) {
+              signIn.onSubmitCode(field.value);
+              field.value = "";
+            }
+          }}
+        >
+          <input
+            name="code"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={`Sign-in code: ${section.title}`}
+            placeholder="Paste the code"
+            disabled={codeField.codeBusy}
+            className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 font-mono text-xs"
+          />
+          <Button
+            type="submit"
+            size="xs"
+            disabled={codeField.codeBusy}
+            aria-busy={codeField.codeBusy}
+          >
+            {codeField.codeBusy ? <Spinner className="size-3" /> : null}
+            Submit code
+          </Button>
+          {codeField.codeError === null ? null : (
+            <p role="alert" className="basis-full text-destructive text-xs">
+              {codeField.codeError}
+            </p>
+          )}
+        </form>
       )}
       {band === null ? null : <ExhaustedBand band={band} />}
       <div className="flex flex-col">
@@ -89,7 +178,7 @@ export function FleetSection({
             pendingAction={pending?.number === row.number ? pending.action : null}
             failure={failure?.number === row.number ? failure.message : null}
             onAction={(action, alias) => onAction(row, action, alias)}
-            onRelogin={canAdd && row.reloginNeeded ? () => onAdd(row) : undefined}
+            onRelogin={(canAdd || inApp) && row.reloginNeeded ? () => onStart(row) : undefined}
             reloginBusy={busy}
           />
         ))}

@@ -63,7 +63,13 @@ import {
 import * as PreviewIpc from "./methods/preview.ts";
 import * as AppActivationIpc from "./methods/appActivation.ts";
 import { getWslState, setWslBackendEnabled, setWslDistro, setWslOnly } from "./methods/wsl.ts";
-import { getInfinitusDesktopPrefs, setInfinitusQuitWithApp } from "./methods/infinitus.ts";
+import {
+  closeInfinitusSignIn,
+  getInfinitusDesktopPrefs,
+  openInfinitusSignIn,
+  setInfinitusQuitWithApp,
+  submitInfinitusSignInCode,
+} from "./methods/infinitus.ts";
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
@@ -118,6 +124,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
 
   yield* ipc.handle(getInfinitusDesktopPrefs);
   yield* ipc.handle(setInfinitusQuitWithApp);
+  yield* ipc.handle(openInfinitusSignIn);
+  yield* ipc.handle(closeInfinitusSignIn);
+  yield* ipc.handle(submitInfinitusSignInCode);
 
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(pickProjectFavicon);

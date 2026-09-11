@@ -145,6 +145,12 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.GET_INFINITUS_DESKTOP_PREFS_CHANNEL),
   setInfinitusQuitWithApp: (enabled) =>
     ipcRenderer.invoke(IpcChannels.SET_INFINITUS_QUIT_WITH_APP_CHANNEL, enabled),
+  openInfinitusSignIn: (input) =>
+    ipcRenderer.invoke(IpcChannels.OPEN_INFINITUS_SIGN_IN_CHANNEL, input),
+  closeInfinitusSignIn: (flowId) =>
+    ipcRenderer.invoke(IpcChannels.CLOSE_INFINITUS_SIGN_IN_CHANNEL, flowId),
+  submitInfinitusSignInCode: (input) =>
+    ipcRenderer.invoke(IpcChannels.SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL, input),
   pickFolder: (options) => ipcRenderer.invoke(IpcChannels.PICK_FOLDER_CHANNEL, options),
   pickProjectFavicon: (initialPath) =>
     ipcRenderer.invoke(IpcChannels.PICK_PROJECT_FAVICON_CHANNEL, initialPath),

@@ -98,7 +98,12 @@ import type {
 import { AuthAccessTokenResult, AuthSessionState, AuthWebSocketTicketResult } from "./auth.ts";
 import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
-import type { InfinitusDesktopPrefs } from "./infinitus.ts";
+import type {
+  InfinitusDesktopPrefs,
+  InfinitusSignInCodeInput,
+  InfinitusSignInCodeResult,
+  InfinitusSignInWindowInput,
+} from "./infinitus.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
 import type { EditorId } from "./editor.ts";
 import type {
@@ -1288,6 +1293,17 @@ export interface DesktopBridge {
    */
   getInfinitusDesktopPrefs?: () => Promise<InfinitusDesktopPrefs>;
   setInfinitusQuitWithApp?: (enabled: boolean) => Promise<InfinitusDesktopPrefs>;
+  /**
+   * Fork (#677): a fleet's sign-in inside this app — the provider's page in a
+   * child window per flow, the pasted code handed to the menu-bar app over its
+   * control socket by the shell itself. Optional: without them the web client
+   * falls back to the sign-in on the Mac.
+   */
+  openInfinitusSignIn?: (input: InfinitusSignInWindowInput) => Promise<void>;
+  closeInfinitusSignIn?: (flowId: string) => Promise<void>;
+  submitInfinitusSignInCode?: (
+    input: InfinitusSignInCodeInput,
+  ) => Promise<InfinitusSignInCodeResult>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;

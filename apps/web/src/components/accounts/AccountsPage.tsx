@@ -44,8 +44,20 @@ import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { AccountsUnavailable } from "./AccountsUnavailable";
 import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAccount.logic";
-import { FleetSection } from "./FleetSection";
+import { FleetSection, type FleetSignIn } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
+import {
+  SIGN_IN_POLL_MS,
+  signInBeginCommandArgs,
+  signInBeginReply,
+  signInBridge,
+  signInCancelCommandArgs,
+  signInEnded,
+  signInStatusCommandArgs,
+  signInStatusReply,
+  snapshotOffersSignIn,
+  type SignInFlow,
+} from "./signIn.logic";
 import { SignInsSection } from "./SignInsSection";
 
 /** How long a command may hold its row's spinner when no snapshot follows it. */
@@ -104,12 +116,21 @@ export function AccountsPage() {
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [addFlow, setAddFlow] = useState<AddAccountFlow | null>(null);
+  const [signInFlow, setSignInFlow] = useState<SignInFlow | null>(null);
+  /** Bumped on every start and on unmount: a poll from an earlier flow stops. */
+  const signInRunRef = useRef(0);
+  // The bridge is a window global fixed for the page's life.
+  const bridge = useMemo(
+    () => signInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
+    [],
+  );
   // Each add/re-login gets a run number; a newer run or an unmount retires
   // the polling loop of the one before it.
   const addRunRef = useRef(0);
   useEffect(
     () => () => {
       addRunRef.current += 1;
+      signInRunRef.current += 1;
     },
     [],
   );
@@ -230,6 +251,117 @@ export function AccountsPage() {
     }
   };
 
+  // The in-app sign-in (#677): `signin-begin` on the app, the provider's page
+  // in the shell's child window, `signin-status` every two seconds until the
+  // app says it ended. Only this Mac's own app can show the window, so the
+  // path exists for the primary environment in the desktop client alone.
+  const inAppSignIn =
+    bridge !== null && environmentId !== null && environmentId === primaryEnvironmentId;
+
+  const startSignIn = async (fleetKey: string, target: AccountRowModel | null) => {
+    if (environmentId === null || bridge === null) return;
+    const run = ++signInRunRef.current;
+    const live = () => signInRunRef.current === run;
+    const base: SignInFlow = {
+      fleetKey,
+      target: target?.label ?? null,
+      flowId: null,
+      pasteCode: false,
+      phase: "starting",
+      error: null,
+      account: null,
+      codeError: null,
+      codeBusy: false,
+    };
+    setSignInFlow(base);
+    const begun = await runCommand({
+      environmentId,
+      input: signInBeginCommandArgs(fleetKey, target?.email ?? null),
+    });
+    if (!live()) return;
+    const reply = begun._tag === "Success" ? signInBeginReply(begun.value.result) : null;
+    if (reply === null) {
+      setSignInFlow({
+        ...base,
+        phase: "failed",
+        error:
+          begun._tag === "Failure"
+            ? commandErrorMessage(begun.cause)
+            : "Infinitus answered unexpectedly.",
+      });
+      return;
+    }
+    const begunFlow: SignInFlow = { ...base, flowId: reply.flowId, pasteCode: reply.pasteCode };
+    setSignInFlow(begunFlow);
+    await bridge.open({ flowId: reply.flowId, url: reply.url, label: reply.label }).catch(() => {});
+    while (live()) {
+      await new Promise((resolve) => setTimeout(resolve, SIGN_IN_POLL_MS));
+      if (!live()) return;
+      const answer = await runCommand({
+        environmentId,
+        input: signInStatusCommandArgs(reply.flowId),
+      });
+      if (!live()) return;
+      const status = answer._tag === "Success" ? signInStatusReply(answer.value.result) : null;
+      // Every status answer is the whole of where the flow stands, so each
+      // step starts from the begun flow, never from the previous step.
+      const flow: SignInFlow =
+        status === null
+          ? {
+              ...begunFlow,
+              phase: "failed",
+              error:
+                answer._tag === "Failure"
+                  ? commandErrorMessage(answer.cause)
+                  : "Infinitus answered unexpectedly.",
+            }
+          : { ...begunFlow, phase: status.phase, error: status.error, account: status.account };
+      setSignInFlow((current) =>
+        current === null
+          ? current
+          : { ...flow, codeError: current.codeError, codeBusy: current.codeBusy },
+      );
+      if (signInEnded(flow.phase)) {
+        await bridge.close(reply.flowId).catch(() => {});
+        if (flow.phase === "done") {
+          await runCommand({ environmentId, input: { command: "refresh", args: [], options: {} } });
+        }
+        return;
+      }
+    }
+  };
+
+  const cancelSignIn = async () => {
+    if (environmentId === null || signInFlow === null) return;
+    signInRunRef.current += 1;
+    if (signInFlow.flowId !== null) {
+      await bridge?.close(signInFlow.flowId).catch(() => {});
+      await runCommand({ environmentId, input: signInCancelCommandArgs(signInFlow.flowId) });
+    }
+    setSignInFlow(null);
+  };
+
+  const submitSignInCode = async (code: string) => {
+    if (bridge === null || signInFlow === null || signInFlow.flowId === null) return;
+    const flowId = signInFlow.flowId;
+    setSignInFlow((current) =>
+      current === null ? current : { ...current, codeBusy: true, codeError: null },
+    );
+    const result = await bridge.submitCode({ flowId, code }).catch((cause: unknown) => ({
+      ok: false,
+      error: cause instanceof Error ? cause.message : String(cause),
+    }));
+    setSignInFlow((current) =>
+      current === null || current.flowId !== flowId
+        ? current
+        : {
+            ...current,
+            codeBusy: false,
+            codeError: result.ok ? null : (result.error ?? "The code was not accepted."),
+          },
+    );
+  };
+
   const refresh = async () => {
     if (environmentId === null || isRefreshing) return;
     setIsRefreshing(true);
@@ -313,6 +445,14 @@ export function AccountsPage() {
               pendingSignIn={signInInFlight}
               signInFailure={signInFailure}
               addFlow={addFlow}
+              signIn={{
+                offers: false,
+                inApp: inAppSignIn,
+                flow: signInFlow,
+                onCancel: () => void cancelSignIn(),
+                onSubmitCode: (code) => void submitSignInCode(code),
+              }}
+              onStartSignIn={(fleetKey, target) => void startSignIn(fleetKey, target)}
               onRetry={snapshotQuery.refresh}
               onAction={(fleetKey, row, action, alias) =>
                 void dispatch(fleetKey, row, action, alias)
@@ -336,6 +476,8 @@ function AccountsBody({
   pendingSignIn,
   signInFailure,
   addFlow,
+  signIn,
+  onStartSignIn,
   onRetry,
   onAction,
   onSignIn,
@@ -349,6 +491,9 @@ function AccountsBody({
   readonly pendingSignIn: string | null;
   readonly signInFailure: { readonly key: string; readonly message: string } | null;
   readonly addFlow: AddAccountFlow | null;
+  /** The in-app sign-in, before the page's fleet and `offers` are known. */
+  readonly signIn: Omit<FleetSignIn, "onStart">;
+  readonly onStartSignIn: (fleetKey: string, target: AccountRowModel | null) => void;
   readonly onRetry: () => void;
   readonly onAction: (
     fleetKey: string,
@@ -401,6 +546,7 @@ function AccountsBody({
 
   const forecast = buildForecast(snapshot);
   const offersAdd = snapshotOffersAdd(snapshot);
+  const offersSignIn = snapshotOffersSignIn(snapshot);
   const signInRunning = snapshotSignInRunning(snapshot);
   return (
     <div className="flex flex-col gap-6">
@@ -425,6 +571,12 @@ function AccountsBody({
             offersAdd={offersAdd}
             addFlow={addFlow?.fleetKey === section.key ? addFlow : null}
             signInRunning={signInRunning}
+            signIn={{
+              ...signIn,
+              offers: offersSignIn,
+              flow: signIn.flow?.fleetKey === section.key ? signIn.flow : null,
+              onStart: (target) => onStartSignIn(section.key, target),
+            }}
             onAction={(row, action, alias) => onAction(section.key, row, action, alias)}
             onAdd={(target) => onAdd(section.key, target)}
           />
