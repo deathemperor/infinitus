@@ -55,6 +55,7 @@ import { InfinitusTeamPanel } from "./InfinitusTeamPanel";
 const TEAM_COMMANDS = [
   { name: "team-status" },
   { name: "team-join", stdin: "secret" },
+  { name: "team-create", stdin: "secret" },
   { name: "team-approve" },
 ].map((entry) => ({
   args: [],
@@ -215,6 +216,61 @@ describe("InfinitusTeamPanel", () => {
     const output = rendered();
     expect(output).toContain("that code has expired");
     expect(output).not.toContain("secret-code");
+  });
+
+  async function fillCreate(token: string) {
+    const type = (label: string, value: string) =>
+      act(async () => {
+        (byLabel(label).props as { onChange: (event: unknown) => void }).onChange({
+          currentTarget: { value },
+        });
+      });
+    await type("Team name", "Alpha");
+    await type("Your name as leader", "Me");
+    await type("Empty private repo URL", "https://host/o/r.git");
+    if (token !== "") await type("Write token (optional)", token);
+    // The create form is the second form on the page (Join comes first).
+    const createForm = renderer!.root.findAll((node) => node.type === "form")[1]!;
+    await act(async () => {
+      (createForm.props as { onSubmit: (event: unknown) => void }).onSubmit({
+        preventDefault: () => undefined,
+      });
+    });
+  }
+
+  it("creates a team with a token on the secret channel only", async () => {
+    fake.run = vi.fn().mockResolvedValue(ok(null));
+    await renderPanel();
+    await fillCreate("ghp_secret");
+    expect(fake.secret).toHaveBeenCalledTimes(1);
+    const input = fake.secret.mock.calls[0]![0] as {
+      input: { command: string; args: Record<string, string>; secret: Redacted.Redacted<string> };
+    };
+    expect(input.input.command).toBe("team-create");
+    expect(input.input.args).toEqual({ name: "Alpha", remote: "https://host/o/r.git", as: "Me" });
+    expect(Redacted.value(input.input.secret)).toBe("ghp_secret");
+    expect(rendered()).not.toContain("ghp_secret");
+    expect(rendered()).toContain("Alpha");
+  });
+
+  it("creates a team without a token over the plain command", async () => {
+    fake.run = vi
+      .fn()
+      .mockResolvedValueOnce(ok(null))
+      .mockResolvedValueOnce(ok(null))
+      .mockResolvedValue(ok(TEAM));
+    await renderPanel();
+    await fillCreate("");
+    expect(fake.secret).not.toHaveBeenCalled();
+    expect(fake.run).toHaveBeenLastCalledWith({
+      environmentId: "env-1",
+      input: {
+        command: "team-create",
+        args: ["Alpha"],
+        options: { remote: "https://host/o/r.git", as: "Me" },
+      },
+    });
+    expect(rendered()).toContain("Alpha");
   });
 
   it("refuses on a build without team-status", async () => {

@@ -27,6 +27,11 @@ export function teamJoinSupported(commands: ReadonlyArray<InfinitusManifestComma
   return commands.some((command) => command.name === "team-join" && command.stdin === "secret");
 }
 
+/** `team-create` with the remote's write token on stdin (native #788). */
+export function teamCreateSupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+  return commands.some((command) => command.name === "team-create" && command.stdin === "secret");
+}
+
 const TeamMember = Schema.Struct({
   kid: Schema.String,
   name: Schema.String,
@@ -114,6 +119,47 @@ export function teamMemberName(raw: string): string | null {
  */
 export function teamJoinSecretArgs(name: string): Omit<InfinitusSecretInput, "secret"> {
   return { command: "team-join", args: { "your name": name } };
+}
+
+export interface TeamCreateDraft {
+  readonly name: string;
+  readonly leader: string;
+  readonly remote: string;
+}
+
+/**
+ * The create form's three text fields, trimmed; null when one is blank or
+ * longer than the secret layer's 128-character argument cap.
+ */
+export function teamCreateDraft(
+  name: string,
+  leader: string,
+  remote: string,
+): TeamCreateDraft | null {
+  const fields = [name.trim(), leader.trim(), remote.trim()];
+  if (fields.some((field) => field.length === 0 || field.length > 128)) return null;
+  return { name: fields[0]!, leader: fields[1]!, remote: fields[2]! };
+}
+
+/**
+ * `team-create <name> --remote <url> --as <your name>` over `infinitus.secret`
+ * when the remote needs a write token: the manifest's names are the args keys
+ * (`name`, `remote`, `as`); the token goes on `secret`, never here.
+ */
+export function teamCreateSecretArgs(draft: TeamCreateDraft): Omit<InfinitusSecretInput, "secret"> {
+  return {
+    command: "team-create",
+    args: { name: draft.name, remote: draft.remote, as: draft.leader },
+  };
+}
+
+/** The same verb over `infinitus.command` when there is no token: an ssh remote, or a credential-less one. */
+export function teamCreateCommandInput(draft: TeamCreateDraft): InfinitusCommandInput {
+  return {
+    command: "team-create",
+    args: [draft.name],
+    options: { remote: draft.remote, as: draft.leader },
+  };
 }
 
 /** "leader" → "Leader", anything else capitalised the same way. */

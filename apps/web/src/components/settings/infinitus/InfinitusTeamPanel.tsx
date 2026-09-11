@@ -2,9 +2,13 @@
  * Settings › Infinitus › Team (#747): the team this Mac is in, read over the
  * control socket's `team-status`, with Fetch now / Publish now and, for a
  * leader, the pending requests' Approve / Decline. With no team the page
- * offers Join: this Mac's roster name as the argument, the team code or
- * invite link on `infinitus.secret` (`type="password"`, never remembered,
- * cleared on submit; the Mac's own error verbatim, the code never in it).
+ * offers Join — this Mac's roster name as the argument, the team code or
+ * invite link on `infinitus.secret` — and Create: team name, your name, an
+ * empty private repo's URL, and the remote's write token on the secret
+ * channel when it needs one (an ssh remote needs none and goes over
+ * `infinitus.command`). Every secret field is `type="password"`, never
+ * remembered, cleared on submit; the Mac's own error verbatim, the value
+ * never in it.
  *
  * @module InfinitusTeamPanel
  */
@@ -30,6 +34,10 @@ import {
   parseTeamStatus,
   relativeUnix,
   teamCommandInput,
+  teamCreateCommandInput,
+  teamCreateDraft,
+  teamCreateSecretArgs,
+  teamCreateSupported,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
@@ -50,7 +58,7 @@ export function InfinitusTeamPanel() {
   /** `undefined` before the first read; null once the Mac says it is in no team. */
   const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<TeamAction["type"] | "join" | null>(null);
+  const [busy, setBusy] = useState<TeamAction["type"] | "join" | "create" | null>(null);
   const [joinName, setJoinName] = useState("");
   /** The code, a secret (#747): in memory only, cleared on submit, gone with the page. */
   // A join link the desktop received (infinitus://join/…) lands here as the
@@ -66,10 +74,17 @@ export function InfinitusTeamPanel() {
     [],
   );
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [createName, setCreateName] = useState("");
+  const [createLeader, setCreateLeader] = useState("");
+  const [createRemote, setCreateRemote] = useState("");
+  /** The remote's write token, a secret (#747): in memory only, cleared on submit. */
+  const [createToken, setCreateToken] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const supported =
     snapshot !== null && snapshot.available && teamStatusSupported(snapshot.commands);
   const joinSupported = snapshot !== null && teamJoinSupported(snapshot.commands);
+  const createSupported = snapshot !== null && teamCreateSupported(snapshot.commands);
 
   const applyStatus = useCallback((result: unknown) => {
     const parsed = parseTeamStatus(result);
@@ -143,6 +158,40 @@ export function InfinitusTeamPanel() {
     setBusy(null);
     if (result._tag === "Failure") {
       setJoinError(infinitusSecretFailure(result.cause));
+      return;
+    }
+    applyStatus(result.value.result);
+  };
+
+  const create = async () => {
+    if (environmentId === null) return;
+    const draft = teamCreateDraft(createName, createLeader, createRemote);
+    const token = createToken.trim();
+    setCreateToken("");
+    if (draft === null) {
+      setCreateError(
+        "Fill in the team name, your name and the repo URL (each under 128 characters).",
+      );
+      return;
+    }
+    setBusy("create");
+    setCreateError(null);
+    // A token rides the secret channel; without one the verb needs no stdin
+    // and goes over the plain command like every other write.
+    const result =
+      token.length === 0
+        ? await runCommand({ environmentId, input: teamCreateCommandInput(draft) })
+        : await runSecret({
+            environmentId,
+            input: { ...teamCreateSecretArgs(draft), secret: Redacted.make(token) },
+          });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setCreateError(
+        token.length === 0
+          ? infinitusCommandFailure(result.cause).message
+          : infinitusSecretFailure(result.cause),
+      );
       return;
     }
     applyStatus(result.value.result);
@@ -312,6 +361,76 @@ export function InfinitusTeamPanel() {
             </form>
           ) : (
             <InfinitusPanelNotice message="This Infinitus build does not take a team code from here; join from the Mac's Settings › Team." />
+          )}
+        </SettingsSection>
+      )}
+      {team !== null ? null : (
+        <SettingsSection id="infinitus-team-create" title="Create a team">
+          {createSupported ? (
+            <form
+              className="flex flex-col gap-2 px-3 py-2 sm:px-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void create();
+              }}
+            >
+              <Input
+                size="sm"
+                aria-label="Team name"
+                placeholder="Team name"
+                autoComplete="off"
+                value={createName}
+                disabled={busy !== null}
+                onChange={(event) => setCreateName(event.currentTarget.value)}
+              />
+              <Input
+                size="sm"
+                aria-label="Your name as leader"
+                placeholder="Your name in the roster"
+                autoComplete="off"
+                value={createLeader}
+                disabled={busy !== null}
+                onChange={(event) => setCreateLeader(event.currentTarget.value)}
+              />
+              <Input
+                size="sm"
+                aria-label="Empty private repo URL"
+                placeholder="Empty private repo URL"
+                autoComplete="off"
+                spellCheck={false}
+                value={createRemote}
+                disabled={busy !== null}
+                onChange={(event) => setCreateRemote(event.currentTarget.value)}
+              />
+              {/* The token is a secret (#747): masked, never remembered, cleared on submit. */}
+              <Input
+                type="password"
+                size="sm"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Write token (optional)"
+                placeholder="Write token (optional; stays in the Mac's keychain)"
+                value={createToken}
+                disabled={busy !== null}
+                onChange={(event) => setCreateToken(event.currentTarget.value)}
+              />
+              <p className="text-[13px] text-muted-foreground">
+                Paste the URL of an empty private repo and a token that can push to it, or an ssh
+                URL your Mac can already use. The only out-of-app step.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button type="submit" size="sm" disabled={busy !== null}>
+                  {busy === "create" ? "Creating…" : "Create team"}
+                </Button>
+              </div>
+              {createError === null ? null : (
+                <p role="alert" className="text-[13px] text-destructive">
+                  {createError}
+                </p>
+              )}
+            </form>
+          ) : (
+            <InfinitusPanelNotice message="This Infinitus build does not create a team from here; use the Mac's Settings › Team." />
           )}
         </SettingsSection>
       )}
