@@ -23,6 +23,9 @@ final class NamedTunnel: ObservableObject {
     @Published private(set) var status: String?
     /// Set by AppModel so tunnel events land in the popup's event log.
     var log: ((String, String) -> Void)?
+    /// Fires when the hostname starts (true) or stops (false) answering —
+    /// cloudflared's own edge events, never a `stop()` the app asked for.
+    var onConnected: ((Bool) -> Void)?
 
     static let hostnameKey = "mirror_named_tunnel_host"
     static let enabledKey = "mirror_named_tunnel_enabled"
@@ -169,6 +172,7 @@ final class NamedTunnel: ObservableObject {
         connected = true
         status = "https://\(hostname)"
         log?("🌐", "named tunnel up at https://\(hostname)")
+        onConnected?(true)
     }
 
     private func ended() {
@@ -179,5 +183,6 @@ final class NamedTunnel: ObservableObject {
         // A rejected token already explains the exit; keep that line.
         if status?.hasPrefix("Cloudflare rejected") != true { status = "the named tunnel stopped" }
         log?("⚠️", "named tunnel stopped")
+        onConnected?(false)
     }
 }
