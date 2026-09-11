@@ -1,3 +1,4 @@
+import type { AgentSessionImportResult, ThreadId } from "@t3tools/contracts";
 import type {
   InfinitusManifestCommand,
   InfinitusSession,
@@ -215,4 +216,51 @@ export function nudgeOutcome(result: unknown): {
     nudged: reply.nudged === true,
     reason: typeof reply.reason === "string" && reply.reason !== "" ? reply.reason : null,
   };
+}
+
+/**
+ * Moving a session into a thread (#648): the transcript Claude Code keeps
+ * under `~/.claude/projects/<cwd>/<sessionId>.jsonl` is imported as a T3
+ * thread through `agentSessionsImport` with the row's id in
+ * `providerSessionIds`. The terminal session is never touched — the copy
+ * asks the person to close it once the thread is open.
+ */
+
+/** A row can move only when the build sends its session id (#612): that id
+    is the transcript name the import looks for. */
+export function canMoveSession(row: SessionRowModel): boolean {
+  return row.sessionId !== null;
+}
+
+/** "Move all idle": the moveable rows whose Claude is idle. A working one is
+    mid-turn, a waiting one wants a person, and a shell or unknown one is a
+    live REPL whose transcript may still be moving — all left alone. */
+export function idleMoveableRows(rows: ReadonlyArray<SessionRowModel>): SessionRowModel[] {
+  return rows.filter((row) => row.state === "idle" && canMoveSession(row));
+}
+
+/** One import call per folder: the sessions of each cwd together, in row order. */
+export interface SessionMoveBatch {
+  readonly cwd: string;
+  readonly sessionIds: ReadonlyArray<string>;
+}
+
+export function sessionMoveBatches(rows: ReadonlyArray<SessionRowModel>): SessionMoveBatch[] {
+  const byCwd = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.sessionId === null) continue;
+    const ids = byCwd.get(row.cwd);
+    if (ids === undefined) byCwd.set(row.cwd, [row.sessionId]);
+    else ids.push(row.sessionId);
+  }
+  return Array.from(byCwd, ([cwd, sessionIds]) => ({ cwd, sessionIds }));
+}
+
+/** The thread a requested session landed in (imported now or earlier), or
+    null when the import found no transcript of it under that project. */
+export function movedThreadId(
+  result: AgentSessionImportResult,
+  sessionId: string,
+): ThreadId | null {
+  return result.threads?.find((entry) => entry.providerSessionId === sessionId)?.threadId ?? null;
 }

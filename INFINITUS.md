@@ -266,7 +266,28 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `nudge <pid>` and the `session-mode` radio in its menu (#612). Its row model
   is `packages/client-runtime/src/state/infinitusSessions.ts` (exported as
   `@t3tools/client-runtime/state/infinitusSessions`; account, age from
-  `startedAt`, `needs` chips) so mobile draws the same rows.
+  `startedAt`, `needs` chips) so mobile draws the same rows. "Move to a
+  thread" in the row menu (rows with a session id) and "Move idle" beside the
+  header (#648) turn a tracked terminal session into a T3 thread: the cwd
+  becomes a project when it is not one (`projectEnvironment.create` +
+  `waitForProject`), `agentSessionsImport` runs with the row's id in
+  `providerSessionIds`, the thread opens and the row shows a link plus "close
+  the terminal session". Nothing is sent to the Infinitus socket; the
+  terminal session is never killed or typed into. The pure parts
+  (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
+  shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
+  the row-model module for mobile later.
+
+- `packages/contracts/src/agentSessions.ts`,
+  `apps/server/src/project/AgentSessionScanner.ts`,
+  `apps/server/src/project/AgentSessionImporter.ts` — fork extension of
+  upstream's session import (#648): `AgentSessionImportInput.providerSessionIds`
+  (optional) filters the scanner to those transcript names before any budget
+  is spent (filtered-out files are neither imported nor counted as skipped),
+  and `AgentSessionImportResult.threads` (present only with a filter) lists
+  `{providerSessionId, threadId}` for each requested session that now has a
+  thread, imported now or earlier. Without the field the RPC behaves exactly
+  as upstream.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default

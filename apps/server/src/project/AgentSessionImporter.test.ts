@@ -184,12 +184,16 @@ const runImport = (input: {
   readonly directory: ProviderSessionDirectory.ProviderSessionDirectory["Service"];
   readonly snapshots: ReturnType<typeof makeSnapshotsLayer>;
   readonly expectedWorkspaceRoot?: string;
+  readonly providerSessionIds?: ReadonlyArray<string>;
 }) =>
   importRecentAgentThreads({
     projectId: PROJECT_ID,
     ...(input.expectedWorkspaceRoot === undefined
       ? {}
       : { expectedWorkspaceRoot: input.expectedWorkspaceRoot }),
+    ...(input.providerSessionIds === undefined
+      ? {}
+      : { providerSessionIds: input.providerSessionIds }),
   }).pipe(
     Effect.provideService(AgentSessionScanner.AgentSessionScanner, input.scanner),
     Effect.provideService(OrchestrationEngine.OrchestrationEngineService, input.engine),
@@ -315,6 +319,64 @@ it.layer(NodeServices.layer)("AgentSessionImporter", (it) => {
 
         expect(error).toEqual(new AgentSessionImportProjectChangedError({ projectId: PROJECT_ID }));
         expect(recentThreads).not.toHaveBeenCalled();
+      }),
+    );
+
+    // Infinitus (fork): a single-session move names its sessions and learns
+    // which thread each one landed in, imported now or earlier.
+    it.effect("passes requested session ids to the scanner and reports their threads", () =>
+      Effect.gen(function* () {
+        const claudeThread = makeThread("claudeAgent");
+        const codexOutcome = makeThreadOutcome(makeThread("codex"));
+        let requested: ReadonlySet<string> | undefined;
+        const scanner = AgentSessionScanner.AgentSessionScanner.of({
+          scan: Effect.die("unused"),
+          recentThreads: (_workspaceRoot, _completed, options) => {
+            requested = options?.providerSessionIds;
+            return Stream.fromIterable([
+              makeThreadOutcome(claudeThread),
+              { _tag: "AlreadyImported", source: codexOutcome.source },
+            ]);
+          },
+        });
+        const engine = OrchestrationEngine.OrchestrationEngineService.of({
+          dispatch: () => Effect.succeed({ sequence: 1 }),
+          readEvents: () => Stream.empty,
+          readThreadEvents: () => Stream.empty,
+          getThreadReplayStats: () => Effect.die("unused"),
+          streamDomainEvents: Stream.empty,
+          subscribeDomainEvents: Effect.succeed(Stream.empty),
+          latestSequence: Effect.succeed(0),
+        });
+        const directory = ProviderSessionDirectory.ProviderSessionDirectory.of({
+          upsert: () => Effect.void,
+          getProvider: () => Effect.die("unused"),
+          recordImportedTranscript: () => Effect.void,
+          getBinding: () => Effect.succeed(Option.none()),
+          listThreadIds: () => Effect.die("unused"),
+          listBindings: () => Effect.die("unused"),
+        });
+
+        const result = yield* runImport({
+          scanner,
+          engine,
+          directory,
+          snapshots: makeSnapshotsLayer({ project: makeProject() }),
+          providerSessionIds: [CLAUDE_SESSION_ID, "codex-session"],
+        });
+
+        expect(requested).toEqual(new Set([CLAUDE_SESSION_ID, "codex-session"]));
+        expect(result).toEqual({
+          importedCount: 2,
+          skippedCount: 0,
+          threads: [
+            {
+              providerSessionId: CLAUDE_SESSION_ID,
+              threadId: `import:claudeAgent:${CLAUDE_SESSION_ID}`,
+            },
+            { providerSessionId: "codex-session", threadId: "import:codex:codex-session" },
+          ],
+        });
       }),
     );
 

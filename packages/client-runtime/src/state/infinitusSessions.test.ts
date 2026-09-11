@@ -6,12 +6,16 @@ import type {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  canMoveSession,
   formatAge,
+  idleMoveableRows,
+  movedThreadId,
   needLabel,
   nudgeCommandArgs,
   nudgeOutcome,
   sessionActions,
   sessionModeCommandArgs,
+  sessionMoveBatches,
   sessionRow,
   sessionRows,
   sessionState,
@@ -184,5 +188,50 @@ describe("nudgeOutcome", () => {
     );
     expect(nudgeOutcome(undefined)).toEqual({ nudged: false, reason: null });
     expect(nudgeOutcome("x")).toEqual({ nudged: false, reason: null });
+  });
+});
+
+describe("moving sessions into threads", () => {
+  const rows = sessionRows(
+    snapshot([
+      session({ pid: 1, sessionId: "idle-a", status: "idle", cwd: "/w/one" }),
+      session({ pid: 2, sessionId: "busy-b", status: "busy", cwd: "/w/one" }),
+      session({ pid: 3, sessionId: "wait-c", status: "waiting", cwd: "/w/two" }),
+      session({ pid: 4, sessionId: "idle-d", status: "idle", cwd: "/w/two" }),
+      session({ pid: 5, status: "idle", cwd: "/w/two" }),
+      session({ pid: 6, sessionId: "shell-f", status: "shell", cwd: "/w/two" }),
+      session({ pid: 7, sessionId: "idle-g", status: "idle", cwd: "/w/one" }),
+    ]),
+    NOW,
+  );
+
+  it("moves only rows that carry a session id", () => {
+    expect(rows.filter(canMoveSession).map((row) => row.pid)).toEqual([3, 2, 1, 7, 4, 6]);
+  });
+
+  it("moves all idle: idle rows with an id, never busy, waiting, shell or id-less ones", () => {
+    expect(idleMoveableRows(rows).map((row) => row.sessionId)).toEqual([
+      "idle-a",
+      "idle-g",
+      "idle-d",
+    ]);
+  });
+
+  it("batches the rows by folder in row order, dropping id-less rows", () => {
+    expect(sessionMoveBatches(rows)).toEqual([
+      { cwd: "/w/two", sessionIds: ["wait-c", "idle-d", "shell-f"] },
+      { cwd: "/w/one", sessionIds: ["busy-b", "idle-a", "idle-g"] },
+    ]);
+  });
+
+  it("reads the thread a session landed in, or null when the import had none", () => {
+    const result = {
+      importedCount: 1,
+      skippedCount: 0,
+      threads: [{ providerSessionId: "idle-a", threadId: "import:claudeAgent:idle-a" }],
+    };
+    expect(movedThreadId(result as never, "idle-a")).toBe("import:claudeAgent:idle-a");
+    expect(movedThreadId(result as never, "idle-g")).toBeNull();
+    expect(movedThreadId({ importedCount: 0, skippedCount: 0 }, "idle-a")).toBeNull();
   });
 });
