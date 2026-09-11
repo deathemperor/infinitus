@@ -1,0 +1,536 @@
+# The one Infinitus release (#823 layer 3): a `v<version>` tag builds the
+# menu bar app (apps/mac, both bundles), nests the Menu Bar build in the
+# desktop DMG from the same sha, builds the Linux tray, and publishes all of
+# it as one GitHub release. The version is the root VERSION file; the tag
+# must match it. Upstream's release.yml (npm, AUR, web, marketing) stays
+# disabled and untouched, hence this file's name. The rolling `nightly`
+# prerelease is mac-nightly.yml's.
+name: Infinitus release
+on:
+  push:
+    tags: ["v*"]
+  # Dispatch is the dry run: every job builds and uploads its artifacts,
+  # nothing is published.
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  # The Swift app on the macOS 26 image (the glass chrome needs its SDK).
+  # Two bundles from one sha: the standalone `Infinitus-<v>.zip` (the cask's)
+  # and `Infinitus-Menu-Bar-<v>.zip` (CFBundleName "Infinitus Menu Bar", no
+  # infinitus:// URL type), which the desktop job nests as a login item.
+  # Signed, notarized and stapled here so the nested copy carries its own
+  # ticket into the desktop bundle (#777).
+  mac:
+    name: Build menu bar app
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/mac
+    env:
+      # secrets can't be referenced in `if:` directly; job env is the
+      # documented bridge (step-local env is invisible to its own `if`).
+      # Only a derived boolean rides job-wide — the raw secret stays
+      # step-local to the import step.
+      HAS_DEVID: ${{ secrets.DEVELOPER_ID_P12_BASE64 != '' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve release version
+        id: version
+        working-directory: .
+        run: |
+          set -euo pipefail
+          version="$(head -1 VERSION | tr -cd '0-9A-Za-z.-')"
+          case "$GITHUB_REF" in
+            refs/tags/*)
+              if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+                echo "Tag $GITHUB_REF_NAME does not match VERSION ($version); bump VERSION in the release PR first." >&2
+                exit 1
+              fi;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building Infinitus $version." >> "$GITHUB_STEP_SUMMARY"
+      # Developer ID + notarization run only when the secrets exist
+      # (docs/RELEASING.md); without them the build is ad-hoc signed as
+      # before. Order matters: sign → notarize the app → staple the app →
+      # THEN zip, because the staple lives on the .app, not the archive.
+      - name: Import Developer ID certificate
+        if: env.HAS_DEVID == 'true'
+        env:
+          DEVID_P12: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/sign.keychain-db"
+          security create-keychain -p "" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "" "$KEYCHAIN"
+          echo "$DEVID_P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KEYCHAIN" \
+            -P "$DEVID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+      # Two bundles from one build (#777): the standalone app, and the copy
+      # Infinitus desktop nests at Contents/Library/LoginItems — named
+      # "Infinitus Menu Bar", no infinitus:// URL type (the desktop owns
+      # the scheme). make-app.sh writes a fixed Infinitus.app, so each is
+      # moved into out/ before the next.
+      - name: Build app bundles
+        run: |
+          mkdir out
+          ./make-app.sh
+          mv Infinitus.app out/
+          INFINITUS_BUNDLE_NAME="Infinitus Menu Bar" ./make-app.sh
+          mv Infinitus.app "out/Infinitus Menu Bar.app"
+      - name: Notarize and staple
+        if: env.HAS_DEVID == 'true'
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+        run: |
+          echo "$NOTARY_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          for APP in out/Infinitus.app "out/Infinitus Menu Bar.app"; do
+            ditto -c -k --keepParent "$APP" notarize.zip
+            xcrun notarytool submit notarize.zip --wait \
+              --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" \
+              --issuer "$NOTARY_ISSUER_ID"
+            xcrun stapler staple "$APP"
+            spctl --assess --type execute -vv "$APP"
+            rm notarize.zip
+          done
+      - name: Zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ditto -c -k --keepParent out/Infinitus.app "Infinitus-${VERSION}.zip"
+          ditto -c -k --keepParent "out/Infinitus Menu Bar.app" "Infinitus-Menu-Bar-${VERSION}.zip"
+          shasum -a 256 "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip"
+      # The ditto zips travel as the run artifact (symlinks and the staple
+      # survive; the artifact wrapper is unpacked by the consumers).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-bundles
+          path: |
+            apps/mac/Infinitus-*.zip
+          if-no-files-found: error
+
+  desktop:
+    name: Build desktop macOS arm64
+    needs: mac
+    runs-on: macos-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      - name: Install desktop dependencies
+        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+
+      - name: Cache resource monitor
+        id: resource_monitor_cache
+        uses: actions/cache@v6
+        with:
+          path: native/resource-monitor/target/aarch64-apple-darwin/release/t3-resource-monitor
+          key: resource-monitor-aarch64-apple-darwin-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
+
+      - name: Setup Rust
+        if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      # The menu bar app rides inside the desktop bundle as a login item
+      # (#777). It is never rebuilt here: the mac job of this same run
+      # signed, notarized and stapled it, so the zip already carries a
+      # helper that passes Gatekeeper on its own.
+      - name: Download native helper
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-bundles
+          path: ${{ runner.temp }}/native-helper
+
+      - name: Unpack native helper
+        id: native_helper
+        shell: bash
+        env:
+          VERSION: ${{ needs.mac.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/native-helper"
+          # The mac job uploads two bundles: the standalone `Infinitus-<v>.zip`
+          # (CFBundleName "Infinitus", the infinitus:// URL type) and the nested
+          # build `Infinitus-Menu-Bar-<v>.zip` ("Infinitus Menu Bar", no URL type).
+          # Only the second is nested.
+          zip=$(ls "$dir"/Infinitus-Menu-Bar-*.zip)
+          ditto -x -k "$zip" "$dir/unpacked"
+          app=$(find "$dir/unpacked" -maxdepth 2 -name '*.app' -type d | head -n 1)
+          if [[ -z "$app" || ! -f "$app/Contents/Info.plist" ]]; then
+            echo "The mac job's artifact carries no app bundle." >&2
+            exit 1
+          fi
+          bundle_id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
+          if [[ "$bundle_id" != "run.infinitus" ]]; then
+            echo "The native app's bundle id is $bundle_id, not run.infinitus." >&2
+            exit 1
+          fi
+          if [[ "$version" != "$VERSION" ]]; then
+            echo "The menu bar app says $version, the release is $VERSION." >&2
+            exit 1
+          fi
+          echo "path=$app" >> "$GITHUB_OUTPUT"
+          echo "Nesting the menu bar app $version as the login item helper." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        env:
+          VERSION: ${{ needs.mac.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Align package versions to release version
+        run: node scripts/update-release-package-versions.ts "${{ steps.version.outputs.version }}"
+
+      # The certificate and its password reach electron-builder through the
+      # build step's own env; only the notary key needs a file on disk, and
+      # `security cms` never sees it — notarytool reads the .p8 directly.
+      - name: Prepare macOS signing
+        id: signing
+        shell: bash
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEVELOPER_ID_P12_BASE64" || -z "$DEVELOPER_ID_P12_PASSWORD" ]]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "macOS signing disabled (no Developer ID certificate secret); building unsigned." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ -z "$NOTARY_KEY_BASE64" || -z "$NOTARY_KEY_ID" || -z "$NOTARY_ISSUER_ID" ]]; then
+            echo "A Developer ID certificate is configured but the notary key secrets are not." >&2
+            exit 1
+          fi
+
+          key_path="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 -D > "$key_path"
+          chmod 600 "$key_path"
+          echo "notary_key_path=$key_path" >> "$GITHUB_OUTPUT"
+
+          # Import the certificate into a keychain of our own and hand
+          # electron-builder that keychain (CSC_KEYCHAIN) instead of the p12
+          # (CSC_LINK): electron-builder 26.15's own import creates the
+          # keychain with a random password but then runs
+          # `set-key-partition-list -k <p12 password>` against it, which fails
+          # with "passphrase you entered is not correct" (run 34488667586).
+          # Same sequence as the native branch's release workflow.
+          keychain="$RUNNER_TEMP/fork-sign.keychain-db"
+          p12_path="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 -D > "$p12_path"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$p12_path" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '"')
+          rm -f "$p12_path"
+          if ! security find-identity -v -p codesigning "$keychain" | grep -q "Developer ID Application"; then
+            echo "The imported certificate carries no Developer ID Application identity." >&2
+            exit 1
+          fi
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "macOS signing enabled (Developer ID + notarytool)." >> "$GITHUB_STEP_SUMMARY"
+
+      # A signed desktop can only nest a helper notarytool accepts: Developer
+      # ID from the same team, hardened runtime, and its own stapled ticket
+      # (the nested code keeps that ticket; the outer bundle gets its own).
+      # Fail here, naming the tag, rather than in notarization.
+      - name: Verify native helper signature
+        if: ${{ steps.native_helper.outputs.path != '' && steps.signing.outputs.signed == 'true' }}
+        shell: bash
+        env:
+          APP: ${{ steps.native_helper.outputs.path }}
+          TAG: v${{ needs.mac.outputs.version }}
+        run: |
+          set -euo pipefail
+          details=$(codesign -dv --verbose=2 "$APP" 2>&1)
+          for want in "Authority=Developer ID Application" "TeamIdentifier=Q783W6B4FA" "flags=0x10000(runtime)"; do
+            if ! grep -qF "$want" <<<"$details"; then
+              echo "The native release $TAG is not signed for nesting (missing: $want); cut a Developer ID release first." >&2
+              echo "$details" >&2
+              exit 1
+            fi
+          done
+          codesign --verify --strict --verbose=2 "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Build desktop artifact
+        shell: bash
+        env:
+          # The updater feed is this repo, so the published release is the
+          # one an installed build finds on the `infinitus` channel.
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
+          T3CODE_APPLE_TEAM_ID: Q783W6B4FA
+          CSC_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+          APPLE_API_KEY: ${{ steps.signing.outputs.notary_key_path }}
+          APPLE_API_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          APPLE_TEAM_ID: Q783W6B4FA
+          T3CODE_DESKTOP_NATIVE_HELPER: ${{ steps.native_helper.outputs.path }}
+        run: |
+          set -euo pipefail
+          args=(
+            --platform mac
+            --target dmg
+            --arch arm64
+            --build-version "${{ steps.version.outputs.version }}"
+            --verbose
+          )
+          if [[ "${{ steps.signing.outputs.signed }}" == "true" ]]; then
+            args+=(--signed)
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+
+          vp run dist:desktop:artifact "${args[@]}"
+
+      # The helper must come out of packaging with its own seal intact and
+      # its own entitlements, not Electron's: electron-builder's signIgnore
+      # keeps the fork's signer off it, and this proves that held.
+      - name: Verify nested helper
+        if: ${{ steps.native_helper.outputs.path != '' }}
+        shell: bash
+        env:
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          # The zip is what electron-updater installs, so verify that, not
+          # the stage (the build script copies only files to release/).
+          ditto -x -k release/Infinitus-*.zip "$RUNNER_TEMP/nested-check"
+          app=$(find "$RUNNER_TEMP/nested-check" -maxdepth 1 -name '*.app' -type d | head -n 1)
+          nested="$app/Contents/Library/LoginItems/Infinitus Menu Bar.app"
+          if [[ ! -f "$nested/Contents/Info.plist" ]]; then
+            echo "The packaged app carries no nested helper at $nested." >&2
+            find "$app/Contents" -maxdepth 2 >&2
+            exit 1
+          fi
+          codesign --verify --strict --verbose=2 "$nested"
+          if codesign -d --entitlements :- "$nested" 2>/dev/null | grep -q "com.apple.security.cs.allow-jit"; then
+            echo "The nested helper was re-signed with Electron's entitlements." >&2
+            exit 1
+          fi
+          if [[ "$SIGNED" == "true" ]]; then
+            codesign --verify --deep --strict --verbose=2 "$app"
+          fi
+
+      - name: Remove the signing keychain
+        if: ${{ always() && steps.signing.outputs.keychain != '' }}
+        shell: bash
+        run: security delete-keychain "${{ steps.signing.outputs.keychain }}" || true
+
+      # The DMG installs the app; the zip and `infinitus-mac.yml` are what
+      # electron-updater downloads for an in-place update on the `infinitus`
+      # channel. One arch, so no per-arch manifest renaming or merging.
+      - name: Collect release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-publish
+
+          shopt -s nullglob
+          for pattern in \
+            "release/*.dmg" \
+            "release/*.zip" \
+            "release/*.blockmap" \
+            "release/infinitus-mac.yml"; do
+            for file in $pattern; do
+              cp "$file" release-publish/
+            done
+          done
+
+          if [[ ! -f release-publish/infinitus-mac.yml ]]; then
+            echo "electron-builder wrote no infinitus-mac.yml; the update feed would be broken." >&2
+            ls -1 release >&2
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-mac-arm64
+          path: release-publish/*
+          if-no-files-found: error
+
+  # The Omarchy/Linux face: `infinitus-tray` built self-contained
+  # (-static-stdlib: Swift runtime linked in, glibc dynamic — runs on
+  # Arch without the toolchain) for both architectures, plus the
+  # packaging/omarchy dir (Quickshell plugin + Waybar config) as one
+  # tarball. Build is container-side; publishing runs on the plain
+  # runner because `gh` doesn't exist in the swift image.
+  linux:
+    name: Build Linux tray
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    container: swift:6.1
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+      # A tag build reports its number (#486); a dispatch dry run stays "dev".
+      - run: |
+          case "$GITHUB_REF" in
+            refs/tags/*)
+                V="$(head -1 ../../VERSION | tr -cd '0-9A-Za-z.-')"
+                sed -i "s/static let string = \"dev\"/static let string = \"$V\"/" Sources/InfinitusTray/BuiltVersion.swift
+                grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift;;
+          esac
+      - run: swift build -c release -Xswiftc -static-stdlib
+      - run: swift test
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp .build/release/infinitus-tray "dist/infinitus-tray-linux-${{ matrix.arch }}"
+          tar -C packaging -czf dist/infinitus-omarchy.tar.gz omarchy
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: apps/mac/dist/
+
+  # One release for the tag: the DMG, its zip, blockmaps and
+  # `infinitus-mac.yml` (what electron-updater installs on the `infinitus`
+  # channel), both menu bar zips, the Linux binaries. A prerelease while the
+  # version carries a prerelease tag (`-alpha.N`, `-beta.N`, `-rc.N`), a full
+  # release otherwise, so `releases/latest` is the one-app release once a
+  # plain version ships. Notes are that version's section of
+  # apps/mac/CHANGELOG.md; a tag without notes cannot ship.
+  publish:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [mac, desktop, linux]
+    runs-on: macos-latest
+    env:
+      HAS_DEVID: ${{ secrets.DEVELOPER_ID_P12_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect release assets
+        env:
+          VERSION: ${{ needs.desktop.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir assets
+          cp artifacts/mac-bundles/*.zip assets/
+          cp artifacts/desktop-mac-arm64/* assets/
+          cp artifacts/linux-x86_64/infinitus-tray-linux-x86_64 \
+             artifacts/linux-aarch64/infinitus-tray-linux-aarch64 \
+             artifacts/linux-x86_64/infinitus-omarchy.tar.gz assets/
+          for want in "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
+                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" infinitus-mac.yml; do
+            [[ -f "assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 assets >&2; exit 1; }
+          done
+          ls -l assets
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.desktop.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v v="$VERSION" '
+            $0 == "## " v { grab = 1; next }
+            grab && /^## /  { exit }
+            grab            { print }
+          ' apps/mac/CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then
+            echo "apps/mac/CHANGELOG.md has no '## $VERSION' section; a release ships with notes." >&2
+            exit 1
+          fi
+          args=(--title "Infinitus $VERSION" --notes-file notes.md --target "$GITHUB_SHA")
+          if [[ "$VERSION" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" "${args[@]}" assets/*
+          echo "Published $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
+      # Auto-bump the tap cask (CodexBar-style release->tap dispatch, done
+      # here with a repo-scoped deploy key instead of a PAT).
+      - name: Bump Homebrew cask
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+          VERSION: ${{ needs.desktop.outputs.version }}
+        run: |
+          SHA=$(shasum -a 256 "assets/Infinitus-${VERSION}.zip" | cut -d' ' -f1)
+          mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+          echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key && chmod 600 ~/.ssh/tap_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
+          git clone git@github.com:deathemperor/homebrew-tap.git tap
+          cd tap
+          sed -i '' -e "s/^  version \".*\"/  version \"${VERSION}\"/" \
+                    -e "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" Casks/infinitus.rb
+          # infinitusctl (agent control CLI, bundled since 0.4) onto PATH —
+          # added once, on the first release that ships it; idempotent.
+          grep -q '^  binary ' Casks/infinitus.rb || perl -0pi -e \
+            's|^  app "Infinitus.app"\n|  app "Infinitus.app"\n  binary "#{appdir}/Infinitus.app/Contents/MacOS/infinitusctl"\n|m' \
+            Casks/infinitus.rb
+          # `ictl`, the short name for the same binary; same once-only rule.
+          grep -q 'MacOS/ictl"' Casks/infinitus.rb || perl -0pi -e \
+            's|^(  binary "#\{appdir\}/Infinitus.app/Contents/MacOS/infinitusctl"\n)|$1  binary "#{appdir}/Infinitus.app/Contents/MacOS/ictl"\n|m' \
+            Casks/infinitus.rb
+          # The caveats follow the build: a Developer ID + notarized
+          # release needs no Gatekeeper workaround, an ad-hoc one (no
+          # signing secrets) keeps it. Rewritten whole every release so
+          # the cask can't drift — 0.4.3 and 0.4.4-alpha.1 shipped
+          # notarized while the cask still said "ad-hoc, not notarized".
+          if [ "$HAS_DEVID" = "true" ]; then
+            GATE=""
+          else
+            GATE=$'Builds are ad-hoc signed, not notarized. If Gatekeeper refuses the\nfirst launch:\n  xattr -dr com.apple.quarantine "/Applications/Infinitus.app"\nor install with --no-quarantine.\n\n'
+          fi
+          CAVEATS="${GATE}The app drives the swapd engine:"$'\n'"  cargo install --git https://github.com/deathemperor/swapd swapd" \
+            perl -0pi -e 's|^  caveats <<~EOS\n.*?^  EOS\n|"  caveats <<~EOS\n" . join("", map { $_ eq "" ? "\n" : "    $_\n" } split(/\n/, $ENV{CAVEATS})) . "  EOS\n"|mse' \
+            Casks/infinitus.rb
+          git -c user.name="infinitus-release" \
+              -c user.email="actions@github.com" \
+              commit -am "infinitus ${VERSION}"
+          git push

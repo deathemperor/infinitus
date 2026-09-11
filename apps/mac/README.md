@@ -26,7 +26,7 @@ a glance and swaps before you stall.
 
 ## Install
 
-Infinitus is alpha software (0.4.5-alpha.1): it runs its author's fleet
+Infinitus is alpha software (0.5.0-alpha.1): it runs its author's fleet
 all day, but expect rough edges — please file issues.
 
 ### Homebrew

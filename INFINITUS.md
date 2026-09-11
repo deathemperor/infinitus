@@ -34,34 +34,44 @@ makes wrong, in its own PR.
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
   (read it when working there), its own CHANGELOG/VERSION, path-filtered
   CI jobs (`mac-*` in ci.yml) and its own workflows (`mac-nightly.yml`,
-  `mac-linux-sanitize.yml`, `mac-release.yml`). It came in as a subtree
+  `mac-linux-sanitize.yml`; releases are `infinitus-release.yml`, below).
+  It came in as a subtree
   (`git subtree add`) from the frozen `native` branch, history included
   (the merge's second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
   `swift test`, `/bin/sh tools/e2e.sh`. infinitus.run is `apps/mac/site`,
   deployed by hand with wrangler from that directory.
-- **Fork releases are GitHub prereleases with their own tag scheme.**
-  Installed native apps poll `releases/latest` and the `nightly` tag; those
-  stay the Mac app's until layer 3 makes the one-app release the latest.
-  The Mac app's tags are `mac-v<version>` (release.yml fires on every
-  `v*.*.*` tag, so mac-release.yml needs its own prefix; asset names are
-  unchanged and AboutPane strips the prefix). Never publish a fork release as latest, never tag `nightly` from
-  the desktop's builds. The fork's desktop releases are prereleases tagged
-  `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
-  channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
-  On that channel an available update downloads itself
+- **One release (#823 layer 3).** A `v<version>` tag on `main` runs
+  `.github/workflows/infinitus-release.yml` (upstream's `release.yml` stays
+  disabled and untouched, hence the name): the `mac` job builds, signs,
+  notarizes and staples both Swift bundles on `macos-26`; `desktop` nests
+  that run's `Infinitus-Menu-Bar-<v>.zip` and builds the DMG with
+  `--build-version "$VERSION"`; `linux` builds the tray; `publish` creates
+  the one GitHub release — DMG, zip, blockmaps, `infinitus-mac.yml`, both
+  menu bar zips, the Linux binaries — titled `Infinitus <version>`, notes
+  from the `## <version>` section of `apps/mac/CHANGELOG.md` (no section, no
+  release), `--prerelease` iff the version carries a prerelease tag, then
+  bumps the cask from the standalone zip. The tag must equal
+  `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
+  published). Installed menu bar apps poll `releases/latest` and the
+  `nightly` tag: `latest` becomes the one-app release with the first plain
+  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build. Desktop
+  updates ride the `infinitus` channel (manifest `infinitus-mac.yml`); on it
+  an available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
-  behind a click, and a click that raced a relaunch started over.
+  behind a click, and a click that raced a relaunch started over. History:
+  before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
+  prereleases from "Fork desktop release" and the Mac app from
+  `mac-v<version>` tags with a `native-helper.json` pin.
 - **One version (#823 layer 3).** The root `VERSION` file (one line,
   `0.5.0-alpha.N`) is the only place the product version is written:
-  `apps/mac/make-app.sh` reads it for `CFBundleShortVersionString`, the one
-  release workflow (part B) passes it as `--build-version` — until then
-  "Fork desktop release" still ships `0.0.40-infinitus.<date>.<run>` from
-  `package.json`, and one such bridge build must be installed before the
-  first `v0.5.0-alpha.N` tag: an older client maps that version to `latest`
-  and `handleUpdateAvailable` drops updates off its channel — and
+  `apps/mac/make-app.sh` reads it for `CFBundleShortVersionString`,
+  `infinitus-release.yml` passes it as `--build-version`, and
   `apps/mobile/app.config.ts` carries it as `extra.productVersion` for the
   phone's Settings (the store's `version` stays a dotted-integer marketing
-  version, and cannot go down).
+  version, and cannot go down). A client older than the rule below maps
+  `0.5.0-alpha.1` to `latest` and `handleUpdateAvailable` drops updates off
+  its channel, which is why one `0.0.40-infinitus.<date>.<run>` bridge build
+  carrying the rule shipped before the first `v0.5.0-alpha.N` tag.
   `apps/desktop/package.json`'s version is upstream's and never edited. The
   `infinitus` channel id is internal and follows from the version, not a
   flag: every version that is not an upstream nightly
@@ -1462,17 +1472,13 @@ pair` (token masked, server log never uploaded), screenshots every route in
 < /dev/null &` — and probe with `curl --max-time`, or the step holds the job
   to its timeout.
 
-- `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
-  manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
-  prerelease (upstream's release.yml stays disabled and untouched). It nests
-  the native menu bar app as a login item (#777): `apps/desktop/native-helper.json`
-  (`{"tag", "version", "asset", "sha256"}`, `v0.4.5-alpha.1` first, bumped
-  by PR; the `native_helper_tag` dispatch input tries a tag before pinning
-  it) names the native release whose `Infinitus-Menu-Bar-<version>.zip` (the
-  nested build: CFBundleName "Infinitus Menu Bar", no `infinitus://` URL
-  type; the standalone `Infinitus-<version>.zip` beside it is the cask's)
-  the run downloads, checks (bundle id
-  `run.infinitus`; on signed builds Developer ID from team `Q783W6B4FA`,
+- `.github/workflows/infinitus-release.yml` — the one release (see
+  "One release" above). Its `desktop` job nests the menu bar app as a login
+  item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`
+  (the nested build: CFBundleName "Infinitus Menu Bar", no `infinitus://` URL
+  type; the standalone `Infinitus-<version>.zip` beside it is the cask's),
+  which `desktop` unpacks, checks (bundle id `run.infinitus`, version equal
+  to the release's; on signed builds Developer ID from team `Q783W6B4FA`,
   hardened runtime, `stapler validate`) and hands to the build script as
   `T3CODE_DESKTOP_NATIVE_HELPER` / `--native-helper`. The script `ditto`s it
   into the stage (`NATIVE_HELPER_STAGE_DIR`), electron-builder's `extraFiles`
@@ -1482,10 +1488,10 @@ pair` (token masked, server log never uploaded), screenshots every route in
   the native release's signature, entitlements and stapled ticket while the
   outer seal records it as nested code; the one built-in notarization covers
   both. "Verify nested helper" proves the nested seal survived packaging and
-  that Electron's `allow-jit` entitlement never reached it. No pin and no
-  input: nothing is nested, as for local and upstream builds. The helper is
-  never rebuilt in this workflow (macOS 26 SDK, Swift toolchain and a second
-  sign/notarize path for an artifact the native branch already publishes).
+  that Electron's `allow-jit` entitlement never reached it. Local and
+  upstream builds pass no helper and nest nothing. The helper is never
+  rebuilt in the desktop job (macOS 26 SDK, Swift toolchain and a second
+  sign/notarize path for a bundle the `mac` job already sealed).
 
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,
