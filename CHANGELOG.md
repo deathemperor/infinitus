@@ -142,6 +142,7 @@ publishes the matching section as the GitHub release body.
 - `INFINITUS_DEFAULTS_SUITE=<name>` gives a dev or e2e instance its own preferences domain, so unbundled runs stop sharing (and clobbering) one another's settings (#690).
 - The app no longer dies silently when a login CLI or engine quits mid-write: SIGPIPE is ignored, so the write fails and is handled instead (#637).
 - `infinitusctl activities-token --forget <deviceId>/<kind>` withdraws one push registration, so a phone that switches its alerts off stops getting them (#572).
+- The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
 
 ### Phone
