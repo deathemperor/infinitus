@@ -379,7 +379,11 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
   feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation).
+  queued creation), and prepends `usePullRequestHeaderItem`'s menu to the
+  iOS header's git items with its `version` in `optionsVersion` (#269 F: the
+  PR's phase from the linked snapshot, Open pull request / View checks / Mark
+  ready for review over `pullRequests.runAction`;
+  `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
