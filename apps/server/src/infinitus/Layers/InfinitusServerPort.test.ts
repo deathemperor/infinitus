@@ -143,7 +143,7 @@ const watch = Effect.fn("watch")(function* () {
   const infinitus = yield* InfinitusService;
   const queue = yield* Queue.unbounded<InfinitusSnapshot>();
   const fiber = yield* Effect.forkChild(
-    Stream.runForEach(infinitus.changes, (snapshot) => Queue.offer(queue, snapshot)),
+    Stream.runForEach(infinitus.changes(), (snapshot) => Queue.offer(queue, snapshot)),
   );
   return { queue, fiber } as const;
 });

@@ -504,6 +504,19 @@ export const InfinitusRevivalActivityState = Schema.Struct({
 });
 export type InfinitusRevivalActivityState = typeof InfinitusRevivalActivityState.Type;
 
+/** What a snapshot subscriber needs beyond the fast set (#587 step 2, #659):
+    `stats` puts the `stats` scope in the server's lease while at least one
+    subscriber asks for it, which moves the Mac's transcript rescan from every
+    30 min to every 5 — the one heavy job over there (#625), so it runs only
+    while a Stats page is actually mounted. */
+export const InfinitusNeed = Schema.Literals(["stats"]);
+export type InfinitusNeed = typeof InfinitusNeed.Type;
+
+export const InfinitusSubscribeInput = Schema.Struct({
+  needs: Schema.optional(Schema.Array(InfinitusNeed)),
+});
+export type InfinitusSubscribeInput = typeof InfinitusSubscribeInput.Type;
+
 /** One command call a client asks the server to forward. The same triple the
     control request carries, minus `secret`: material read from stdin never
     crosses the RPC boundary. */
