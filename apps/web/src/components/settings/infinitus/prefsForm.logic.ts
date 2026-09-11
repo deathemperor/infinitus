@@ -174,6 +174,27 @@ export const PREF_COPY: Readonly<
     label: "Update channel",
     choices: { stable: "Stable", nightly: "Nightly" },
   },
+  // Sessions: session priority mode (#616 hold, #743 interrupt). The verdict
+  // itself is native's; these are the knobs it reads.
+  priority_mode: {
+    label: "Session priority",
+    description:
+      "What happens to background threads (not pinned) while the fleet they spend on is low on headroom.",
+    choices: {
+      off: "Off — every thread runs",
+      hold: "Hold — new turns wait for headroom",
+      interrupt: "Interrupt — running turns pause too",
+    },
+  },
+  priority_low_pct: {
+    label: "Low above",
+    description: "Usage of the binding window, in percent, at or above which headroom reads low.",
+  },
+  priority_abundant_pct: {
+    label: "Abundant below",
+    description:
+      "Usage, in percent, at or below which headroom reads abundant again and waiting threads continue.",
+  },
 };
 
 /** "push_all_dead" → "Push all dead", for a key the native app has added since

@@ -260,12 +260,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the seven Infinitus
-  `SettingsPath`s and their labels (Themes and Animations since #747 step 1), the `infinitusOnly` search flag with the
+- `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
+  `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
+  Sessions since #743), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all seven where no
+  Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -274,11 +275,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
   marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
   instead of the pairing form, so the browser does not spend a phone's token.
-- `apps/web/src/routes/settings.infinitus*.tsx` (seven new files in upstream's
+- `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
-  the catalog's `themes` / `animations` sections, #747 step 1 — the Menu bar
-  page keeps `display` + `about`; a section the build lacks renders "no …
-  settings yet") and `apps/web/src/routeTree.gen.ts` — regenerated with
+  the catalog's `themes` / `animations` sections, #747 step 1, and Sessions
+  over its `sessions` section (#743: `priority_mode` with the `interrupt`
+  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
+  the Menu bar page keeps `display` + `about`; a section the build lacks
+  renders "no … settings yet") and `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
