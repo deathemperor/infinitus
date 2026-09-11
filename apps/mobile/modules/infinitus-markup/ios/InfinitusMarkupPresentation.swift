@@ -68,11 +68,10 @@ final class InfinitusMarkupPresentation: NSObject, QLPreviewControllerDataSource
     try? FileManager.default.removeItem(at: destination)
     // Never hand Quick Look's own temp path back: the caller deletes the edited
     // file's parent directory, which must always be the private one.
-    if (try? FileManager.default.moveItem(at: modifiedContentsURL, to: destination)) != nil
+    let adopted =
+      (try? FileManager.default.moveItem(at: modifiedContentsURL, to: destination)) != nil
       || (try? FileManager.default.copyItem(at: modifiedContentsURL, to: destination)) != nil
-    {
-      edited = destination
-    }
+    if adopted { edited = destination }
   }
 
   func previewControllerDidDismiss(_ controller: QLPreviewController) { finish() }
