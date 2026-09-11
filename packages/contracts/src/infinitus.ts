@@ -1,6 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import { ForwardCompatibleOptional } from "./baseSchemas.ts";
+
 /**
  * Wire contracts for the Infinitus control socket: one JSON line per request,
  * one per reply, one request per connection. The native app's command table is
@@ -125,8 +127,26 @@ export const InfinitusAccount = Schema.Struct({
 });
 export type InfinitusAccount = typeof InfinitusAccount.Type;
 
+/** The app's headroom verdict for one fleet (#616, session priority mode):
+    `low` and `critical` both hold background threads, `abundant` releases
+    them. Native computes it with its own hysteresis and forecast; the fork
+    never recomputes. `window` names the binding usage window, `pct` its used
+    percent, `reason` a line for people. Omitted while the mode is off. */
+export const InfinitusHeadroomState = Schema.Literals(["abundant", "low", "critical"]);
+export type InfinitusHeadroomState = typeof InfinitusHeadroomState.Type;
+
+export const InfinitusHeadroom = Schema.Struct({
+  state: InfinitusHeadroomState,
+  window: Schema.optionalKey(Schema.String),
+  pct: Schema.optionalKey(Schema.Number),
+  reason: Schema.optionalKey(Schema.String),
+});
+export type InfinitusHeadroom = typeof InfinitusHeadroom.Type;
+
 /** One fleet from the `fleets` / `refresh` reply. `key` is what fleet-targeting
-    commands take as `<fleet>`; gate UI on `capabilities`, never on `engineID`. */
+    commands take as `<fleet>`; gate UI on `capabilities`, never on `engineID`.
+    `headroom` is forward-compatible: a state a newer app adds decodes as
+    absent rather than costing the snapshot. */
 export const InfinitusFleet = Schema.Struct({
   key: Schema.String,
   engineID: Schema.String,
@@ -137,6 +157,7 @@ export const InfinitusFleet = Schema.Struct({
   nextCandidate: Schema.optionalKey(Schema.Number),
   candidateOrder: Schema.optionalKey(Schema.Array(Schema.Number)),
   nextRecovery: Schema.optionalKey(Schema.Struct({ number: Schema.Number, at: Schema.String })),
+  headroom: ForwardCompatibleOptional(InfinitusHeadroom),
   accounts: Schema.Array(InfinitusAccount),
 });
 export type InfinitusFleet = typeof InfinitusFleet.Type;

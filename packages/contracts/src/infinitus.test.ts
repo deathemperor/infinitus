@@ -184,6 +184,34 @@ describe("InfinitusFleet", () => {
 
     expect(decoded.accounts[0]?.email).toBe("alpha@example.com");
   });
+
+  it("decodes the headroom verdict the app publishes for the fleet (#616)", () => {
+    const decoded = decodeFleet({
+      ...fleet,
+      headroom: { state: "low", window: "5h", pct: 84, reason: "session window 84 %" },
+    });
+
+    expect(decoded.headroom).toEqual({
+      state: "low",
+      window: "5h",
+      pct: 84,
+      reason: "session window 84 %",
+    });
+  });
+
+  it("leaves headroom absent on a build or a mode that publishes none", () => {
+    expect(decodeFleet(fleet).headroom).toBeUndefined();
+    expect(decodeFleet({ ...fleet, headroom: { state: "abundant" } }).headroom).toEqual({
+      state: "abundant",
+    });
+  });
+
+  it("decodes a headroom state this build does not know as absent, never failing the fleet", () => {
+    const decoded = decodeFleet({ ...fleet, headroom: { state: "starving", window: "5h" } });
+
+    expect(decoded.headroom).toBeUndefined();
+    expect(decoded.key).toBe("cswap/claude");
+  });
 });
 
 describe("InfinitusForecast", () => {
