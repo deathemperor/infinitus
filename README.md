@@ -9,6 +9,8 @@ May your limits never bind.
 [![Homebrew](https://img.shields.io/badge/homebrew-deathemperor%2Ftap-orange)](https://github.com/deathemperor/homebrew-tap)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+![Infinitus demo — layouts, compact mode, pop-out, live theme switching](docs/demo.gif)
+
 A native macOS menu bar app (Swift/SwiftUI) over the
 [claude-swap](https://github.com/deathemperor/claude-swap) engine: live
 usage gauges for a whole fleet of Claude accounts, auto-switch awareness,
@@ -112,7 +114,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
 - **Push notifications** — switch and limit events to Slack, Discord, Telegram or a webhook; secrets over stdin, shown masked.
-- **One app** — the Infinitus desktop app (the T3 Code fork) is the client; the menu bar keeps the status glyph, its menu (Open Infinitus, rotate, refresh, Settings, quit) and the Settings window. The native pop-out, wall, workspace and session windows are retired (#654).
+- **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
 - **Sessions by name** — `/rename` names label the rows on the Mac and the phone, with branch, model, kind and output size.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
@@ -313,9 +315,8 @@ tokens/minute chip.
 
 ### Gallery
 
-The same five-account demo fleet under every theme, captured in the
-native pop-out before its retirement (#654; charlie is out of their
-weekly window). The themes now style the menu bar glyph and Settings.
+The same five-account demo fleet under every theme (pop-out window,
+wide layout; charlie is out of their weekly window).
 
 **Off — plain numbers**
 

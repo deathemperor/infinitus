@@ -789,10 +789,11 @@ final class ControlServer {
                 throw Fail("no status item yet")
             }
             switch r.args.first {
+            case "popout": controller.showPinnedWindow()
             case "settings": controller.showSettingsWindow()
-            case "popout", "wall", "workspace", "session":
-                throw Fail("retired: the pop-out, wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: show settings")
+            case "wall", "workspace", "session":
+                throw Fail("retired: the wall, workspace and session windows moved to the Infinitus desktop app")
+            default: throw Fail("usage: show popout|settings")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
@@ -843,10 +844,11 @@ final class ControlServer {
                 throw Fail("no status item yet")
             }
             switch r.args.first {
+            case "popout": controller.hidePinnedWindow()
             case "settings": controller.hideSettingsWindow()
-            case "popout", "workspace":
-                throw Fail("retired: the pop-out, wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: hide settings")
+            case "workspace":
+                throw Fail("retired: the workspace window moved to the Infinitus desktop app")
+            default: throw Fail("usage: hide popout|settings")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 

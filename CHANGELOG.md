@@ -130,10 +130,10 @@ publishes the matching section as the GitHub release body.
 - The control-socket watchdog also checks that its own socket still answers, so a listener that died under the app is re-bound within a refresh instead of refusing every call until a relaunch (#637).
 - The fork server can ride the companion's named Cloudflare tunnel on a stable hostname (`fork_tunnel_hostname`), so a relaunch no longer mints a fresh trycloudflare name under the phone (#650).
 - `infinitusctl quit` ends the menu-bar app gracefully, and the status item menu gains "Open Infinitus" when the fork desktop app is installed (#654).
-- The native pop-out, wall, workspace and session windows are retired — the Infinitus desktop app is the client; the menu bar keeps the status glyph, its menu and Settings (#654).
 - Restart Infinitus (and a relaunch asked by a pref with restart effect) no longer wedges the app on a Mac in a team — the team's sign-off runs before terminate, as quit's does.
 - Resume nudges leave SDK-entered sessions alone — the desktop app and the app's own sessions resume theirs (#648).
 - `infinitusctl signin-begin|signin-status|signin-code|signin-cancel` run a fleet's sign-in with no window on the Mac, so the Infinitus desktop app can host the OAuth page itself (#677).
+- The wall, workspace, session chat, revival countdown and playground windows are retired — the Infinitus desktop app is the client; the pop-out stays (#654).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

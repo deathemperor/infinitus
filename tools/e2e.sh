@@ -8,10 +8,9 @@
 #     into `fleets`
 #   - the all-dead scenario not producing the no-candidate fleet, or not
 #     recovering
-#   - idle CPU above IDLE_BUDGET_PCT with Settings open, or with no
-#     window open at all (the native pop-out, wall, workspace and
-#     session windows are retired, #654 — the Infinitus desktop app is
-#     the client)
+#   - idle CPU above IDLE_BUDGET_PCT with the pop-out open on the RPG
+#     theme (the worst case: every effect armed — the 2026-09-03
+#     regression idled at 39%)
 #   - RSS above RSS_BUDGET_MB, or the live heap growing faster than
 #     GROWTH_BUDGET_KB_MIN while idle (the 2026-09-03 per-second
 #     numericText countdown grew the glyph cache ~2 MB/min for as long
@@ -70,7 +69,7 @@ cleanup() {
     rm -rf "$SOCKDIR"
     "$INFINITUS_CSWAP" reset >/dev/null 2>&1 || true
     # Leave the dev domain as we found it for the keys we touched.
-    for k in gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port fork_tunnel_hostname; do
+    for k in popout_shown popover_pinned gamification_style burn_style mock_mode engine_swapd_enabled fork_tunnel_enabled fork_server_port fork_tunnel_hostname; do
         defaults delete "$DOMAIN" "$k" >/dev/null 2>&1 || true
     done
 }
@@ -81,10 +80,13 @@ json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
 # expect <python-bool-over-d> — the reply on stdin must satisfy it.
 expect() { python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($1) else 1)"; }
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
+popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
 
 "$INFINITUS_CSWAP" reset >/dev/null   # pristine demo fleet: account 1 active, nothing held or aliased
 
-# Worst-case prefs: RPG theme, ember burn.
+# Worst-case prefs: pop-out restored on launch, RPG theme, ember burn.
+defaults write "$DOMAIN" popout_shown -bool true
+defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
 defaults write "$DOMAIN" mock_mode -bool true
@@ -290,7 +292,8 @@ N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
 "$CTL" fleets | json "d[0]['key']" | grep -q '^cswap/claude$' || fail "primary fleet key"
 "$CTL" remove cswap/claude 1 >/dev/null 2>&1 && fail "remove without --yes must be refused"
 "$CTL" switch nope/x 1 >/dev/null 2>&1 && fail "unknown fleet must be refused"
-echo "functional: ok ($N demo accounts)"
+popout_visible || fail "pop-out window not visible (popout_shown restore)"
+echo "functional: ok ($N demo accounts, pop-out visible)"
 
 # --- state round-trips through the demo engine ---------------------------
 # Each write replies with the refreshed fleet; the change must be in it.
@@ -340,9 +343,9 @@ echo "swapd: registered beside cswap, ignite published the refreshed window"
 # --- windows: Settings open idles too ------------------------------------
 # The Settings-open case sat at 18% for a week (#346: transcript reads,
 # the past-sessions walk, the team publish and the machine sampler all
-# ran on behind it) while the idle gate elsewhere read 0.5%; this is the
-# gate that would have caught it. Settle first: the window builds its
-# tabs on the first open.
+# ran on behind it) while the pop-out gate read 0.5%; this is the gate
+# that would have caught it. Settle first: the window builds its tabs on
+# the first open.
 settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
 "$CTL" show settings | expect "d['shown']=='settings'" || fail "show settings"
 sleep 3
@@ -400,6 +403,20 @@ echo "body verbs: ok"
 "$INFINITUS_CSWAP" simulate alldead >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is None and d[0].get('nextRecovery') is not None" \
     || fail "all-dead scenario not reflected in fleets"
+sleep 2
+popout_visible || fail "pop-out lost during all-dead"
+# The reviver band (#227) is a CA breath on the pop-out: once the re-sort
+# has settled, the all-dead state must idle like any other — a per-frame
+# regression shows up here, not only in the long idle gate at the end.
+# Settle first: the re-sort's tail and a loaded runner's scheduling noise
+# read as 14 % over a 6 s window (#428).
+sleep 8
+RA="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep 12
+RB="$("$CTL" perf | json "d['cpuSeconds']")"
+RPCT="$(python3 -c "print(round(($RB-$RA)/12*100,1))")"
+echo "all-dead CPU with the reviver band: ${RPCT}%"
+python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$INFINITUS_CSWAP" simulate off >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is not None" || fail "fleet didn't recover after simulate off"
 echo "scenarios: ok (all-dead and back)"
@@ -632,11 +649,9 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
 "$CTL" events --limit 100 | expect "d and all(e['id'] and e['kind'] for e in d) and any(e['kind']=='team-control' and e['icon']=='person.2' for e in d)" || fail "events rows carry id and kind (#615)"
 echo "team control: ok (grantor + store-lane driver)"
 
-# --- performance ----------------------------------------------------------
+# --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window
-# or a scenario swap shows up as idle cost. No window is open here (the
-# pop-out, wall, workspace and session windows are retired, #654) —
-# this is the app's baseline idle cost, and a phone lease reports 0.
+# or a scenario swap shows up as idle cost.
 sleep 10  # animations settle, launch-time caches land
 A="$("$CTL" perf | json "d['cpuSeconds']")"
 HEAP_A="$("$CTL" perf | json "int(d['heapBytes']/1024)")"
@@ -646,10 +661,26 @@ HEAP_B="$("$CTL" perf | json "int(d['heapBytes']/1024)")"
 RSS="$("$CTL" perf | json "int(d['rssBytes']/1048576)")"
 PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
 GROWTH="$(python3 -c "print(int(($HEAP_B-$HEAP_A)*60/$WINDOW_S))")"
-echo "idle CPU with no window open (rpg + ember): ${PCT}%  rss: ${RSS} MB  heap growth: ${GROWTH} KB/min  (budgets ${IDLE_BUDGET_PCT}% / ${RSS_BUDGET_MB} MB / ${GROWTH_BUDGET_KB_MIN} KB/min)"
+echo "idle CPU with pop-out open (rpg + ember): ${PCT}%  rss: ${RSS} MB  heap growth: ${GROWTH} KB/min  (budgets ${IDLE_BUDGET_PCT}% / ${RSS_BUDGET_MB} MB / ${GROWTH_BUDGET_KB_MIN} KB/min)"
 python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
 [ "$RSS" -le "$RSS_BUDGET_MB" ] || fail "RSS ${RSS} MB over budget ${RSS_BUDGET_MB} MB"
 [ "$GROWTH" -le "$GROWTH_BUDGET_KB_MIN" ] || fail "idle heap growth ${GROWTH} KB/min over budget ${GROWTH_BUDGET_KB_MIN} KB/min"
+
+# --- no lease (#223 phase 5) --------------------------------------------
+# The Mac's own pop-out is a client-activity lease; with it closed and no
+# phone reporting, nothing per-session runs, so idle must match the gate.
+"$CTL" hide popout | expect "d['hidden']=='popout'" || fail "hide popout"
+popout_visible && fail "pop-out still visible for the no-lease window"
+"$CTL" perf | expect "d.get('leases', 0) == 0" || fail "the local lease survives hide popout"
+sleep 5
+A="$("$CTL" perf | json "d['cpuSeconds']")"
+sleep "$WINDOW_S"
+B="$("$CTL" perf | json "d['cpuSeconds']")"
+PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
+echo "idle CPU with no lease (pop-out closed, no phone): ${PCT}%  (budget ${IDLE_BUDGET_PCT}%)"
+python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU with no lease ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
+"$CTL" show popout >/dev/null || fail "show popout (restore)"
+popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,
 # then leaves on its own (tunnels, terminals, owned sessions first). This
 # instance leads a team with a git remote, and applicationShouldTerminate

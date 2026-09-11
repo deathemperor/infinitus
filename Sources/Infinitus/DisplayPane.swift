@@ -135,6 +135,7 @@ struct DisplayPane: View {
             .accessibilityLabel("Size")
             glassSlider("Transparency", value: $model.glassFocused)
             Toggle("Compact rows", isOn: $model.compactRows)
+            Toggle("Hide the action buttons", isOn: $model.footerActionsHidden)
             Picker("Sort rows by", selection: $model.popupSort) {
                 Text("Engine order").tag(PopupSort.engine)
                 Text("Headroom").tag(PopupSort.headroom)
@@ -148,7 +149,8 @@ struct DisplayPane: View {
                  + "shifts with focus, and a bright app behind it is "
                  + "capped to a legible level at every setting. Compact "
                  + "rows put each account on one line with icon-only "
-                 + "controls. "
+                 + "controls. Hiding the action buttons leaves everything "
+                 + "they did in the menu bar icon's right-click menu. "
                  + "Sorting by headroom puts the active account first, "
                  + "then the next candidate, then the fullest; sorting by "
                  + "candidates puts the active account first and the rest "
@@ -305,7 +307,7 @@ private struct PickTile<Art: View>: View {
 /// to and flashes its group.
 extension DisplayPane {
     static let searchEntries: [SettingsSearchEntry] = {
-        let menuBar = "Menu bar", popup = "Popup", wall = "Fleet wall"
+        let menuBar = "Menu bar", popup = "Popup"
         let sessions = "Sessions"
         // The last group is headed "Refresh and startup", but its anchor
         // stays "Display/Startup": renaming a header must never move the
@@ -334,9 +336,6 @@ extension DisplayPane {
             entry(popup, "Compact rows", ["compact", "one line", "dense"]),
             entry(popup, "Hide the action buttons", ["actions", "buttons", "footer", "chips"]),
             entry(popup, "Sort rows by headroom", ["order", "sort", "headroom", "next"]),
-            entry(popup, "Floating countdown when every account is out", ["revival", "panel", "floating", "all out"]),
-            entry(wall, "Screen", ["wall", "monitor", "external", "full screen"]),
-            entry(wall, "Enter Full-Screen Fleet Wall", ["wall", "full screen", "kiosk"]),
             entry(sessions, "Checkpoint the repository at every prompt", ["checkpoint", "git", "restore", "diff", "undo"]),
             entry(sessions, "Name unnamed sessions with Claude Haiku", ["haiku", "name", "title", "auto name"]),
             entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host", "headless", "owned"]),
