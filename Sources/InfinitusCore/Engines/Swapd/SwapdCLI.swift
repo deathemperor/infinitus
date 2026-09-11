@@ -144,9 +144,16 @@ public struct SwapdCLI: Sendable {
     }
 
     /// The provider's switch log, newest last; the view takes the tail.
-    public func history(provider: Provider) async throws -> SwapdHistory {
-        try JSONDecoder().decode(SwapdHistory.self, from: await run(
-            ["history", "--json", "--provider", Self.providerID(provider)]))
+    public func history(provider: Provider, limit: Int? = nil) async throws -> SwapdHistory {
+        try JSONDecoder().decode(SwapdHistory.self, from: await historyData(provider: provider, limit: limit))
+    }
+
+    /// The engine's own history JSON, untouched — the `history` control
+    /// verb hands it on as-is (#779), so a new field reaches the fork
+    /// without a Mac release in between.
+    public func historyData(provider: Provider, limit: Int? = nil) async throws -> Data {
+        try await run(["history", "--json", "--provider", Self.providerID(provider)]
+                      + (limit.map { ["--limit", String($0)] } ?? []))
     }
 
     /// Force one usage fetch past the engine's serve floor (`--slot n`), or

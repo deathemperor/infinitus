@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- `history <fleet> [--limit n]` hands the engine's own switch log to the fork — swapd's `{schemaVersion, switches:[{ts, from?, to, trigger?}]}` untouched (#779).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)
