@@ -115,7 +115,9 @@ struct InfinitusApp: App {
         _settingsModel = StateObject(wrappedValue: settingsModel)
         let notifyModel = NotifyModel(cli: model.cswap)
         _notifyModel = StateObject(wrappedValue: notifyModel)
-        let usage = UsageModel(cli: model.cswap)
+        // The spend estimate is `cswap usage`: with the engine off the
+        // app must not shell cswap at all (#475, the swapd cutover).
+        let usage = UsageModel(cli: model.cswapEnabled ? model.cswap : nil)
         _usageModel = StateObject(wrappedValue: usage)
         model.usageModel = usage   // the cswap fleet's cash column
         let utilization = UtilizationModel()

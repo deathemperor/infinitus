@@ -24,6 +24,12 @@ final class UsageModel: ObservableObject {
 
     init(cli: CswapCLI?) {
         self.cli = cli
+        // No engine to rescan with: say so instead of showing last run's
+        // cached numbers as if they were live.
+        guard cli != nil else {
+            error = "The cswap engine is off — the spend estimate needs it."
+            return
+        }
         // Same instant-render treatment as the account snapshot: the
         // cash column otherwise pops in seconds after launch (user
         // 2026-08-30: "cache doesn't seem to have cash data").
