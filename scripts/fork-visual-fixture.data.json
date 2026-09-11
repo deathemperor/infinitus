@@ -1,0 +1,1155 @@
+{
+  "manifest": {
+    "commands": [
+      {
+        "args": [],
+        "effect": "read",
+        "name": "manifest",
+        "options": [],
+        "replyShape": "{schemaVersion, commands:[ControlCommand]}",
+        "summary": "This table as JSON, plus schemaVersion."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "status",
+        "options": [],
+        "replyShape": "{version, sha, engines:{swapd:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground, forkTunnel:{enabled, port, state, url?, hostname?}}",
+        "summary": "App version, which engines are on, engine badge, whether a sign-in is running, the fork server's tunnel (Mac only; state off|invalidPort|blocked|unavailable|starting|up|stopped, url while up — the stable fork_tunnel_hostname on the named tunnel when set, else a quick tunnel)."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "fleets",
+        "options": [],
+        "replyShape": "[{key, engineID, provider, capabilities:[String], caveat?, activeNumber?, nextCandidate?, candidateOrder?, nextRecovery?, accounts:[Account], headroom?:{state:abundant|low|critical, window, pct, reason}}]",
+        "summary": "Every fleet with accounts, usage, active/next, the engine's capabilities and, while priority_mode is on, its headroom verdict (#616: absent = mode off or no usage seen yet; a transient usage gap keeps the last verdict; #743: the interrupt mode says critical where hold says low)."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "plan",
+        "options": [],
+        "replyShape": "{plan: {bindAt, steps:[{at, action, number, why}]} | null}",
+        "summary": "The reset battle plan (#7) the planner proposes right now — ignite / switch / hold / reset steps with epoch instants — or null when there is nothing to plan."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "forecast",
+        "options": [],
+        "replyShape": "{forecast: {computedAt, active: <line> | null, accounts: [<line>], allDeadAt, drainOrder: [number], basis} | null} where <line> = {number, email, alias, active, disabled, windows:[{name, pct, ratePctPerHour, resetsAt, hitsAt}]}",
+        "summary": "Run-rate projection: per account and window the measured pct/hour and the epoch instant it hits 100% (null when the reset lands first or the pace is unknown), the active account's line, and when the fleet's weekly headroom is gone at the active pace with the drain order assumed. Estimates."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "refresh",
+        "options": [],
+        "replyShape": "same as fleets",
+        "summary": "Poll every engine now; replies like `fleets`."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "quit",
+        "options": [],
+        "replyShape": "{quitting: true}",
+        "summary": "Quit the menu-bar app gracefully: tunnels, terminals, the engine supervisor and owned sessions are stopped first (#654, the fork's quit-with-window setting)."
+      },
+      {
+        "args": ["<fleet>", "<n>"],
+        "effect": "write",
+        "name": "switch",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "switch",
+        "summary": "Make account n the active one (proxy: top priority tier)."
+      },
+      {
+        "args": ["<fleet>"],
+        "effect": "write",
+        "name": "rotate",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "rotate",
+        "summary": "Switch to the engine's next candidate — what auto-rotation would do now."
+      },
+      {
+        "args": ["<fleet>", "<n>"],
+        "effect": "write",
+        "name": "hold",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "hold",
+        "summary": "Take account n out of rotation."
+      },
+      {
+        "args": ["<fleet>", "<n>"],
+        "effect": "write",
+        "name": "unhold",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "hold",
+        "summary": "Return account n to rotation."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "crashes",
+        "options": [],
+        "replyShape": "{crashes: [{id, platform, device, at, kind, reason, frames}]}",
+        "summary": "Crash reports of the phone app (MetricKit, over the mirror) and this Mac app, newest first, without the raw diagnostic."
+      },
+      {
+        "args": ["<fleet>", "[n]"],
+        "effect": "write",
+        "name": "randomize-names",
+        "options": [],
+        "replyShape": "{fleet, names}",
+        "requires": "rename",
+        "summary": "Give every account in the fleet — or only account n, skipping the names the fleet already wears — a fresh name from the current theme's pool (every built-in's when the theme has none)."
+      },
+      {
+        "args": ["<fleet>", "<n>", "<alias>"],
+        "effect": "write",
+        "name": "rename",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "rename",
+        "summary": "Set (empty string clears) the alias every frontend shows."
+      },
+      {
+        "args": ["<fleet>", "<n>", "on|off"],
+        "effect": "write",
+        "name": "prefer",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "prefer",
+        "summary": "Star/unstar an account: the engine lands on starred ones first when it switches (swapd prefer; proxy priority tier). Refused when the engine reports no flag for the account."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "aws-logins",
+        "options": [],
+        "replyShape": "{logins: [{profile, provider?, flow, pid, sessionLabel, state: {phase, url, userCode, message, startedAt} | null}]}",
+        "summary": "Sessions whose AWS or gcloud sign-in lapsed (the expired-credentials signature in their newest tool results), each with the flow the phone would start and any login in flight; `provider` is \"gcloud\" for gcloud items and absent for AWS."
+      },
+      {
+        "args": ["<profile>"],
+        "effect": "human",
+        "name": "aws-login",
+        "options": ["--pid <session pid>", "--local", "--remote", "--status"],
+        "replyShape": "{state: {profile, flow, phase, url, userCode, message}}",
+        "summary": "Run the AWS sign-in for a profile and report the URL to open on another device: the relay flow (plain `aws login`, the phone's browser intercepts the localhost callback → `aws-login-callback`), the SSO device-code flow for sso_session profiles, or --remote (`aws login --remote`, code pasted back via `aws-login-code`); --local opens this Mac's browser instead; --status only reports the profile's login and starts nothing. Watch `aws-logins` for the state."
+      },
+      {
+        "args": ["<profile>"],
+        "effect": "write",
+        "name": "aws-login-callback",
+        "options": [],
+        "replyShape": "{state}",
+        "stdin": "secret",
+        "summary": "Relay flow: feed the redirect the phone's browser intercepted (read from stdin) to the waiting login — `http://127.0.0.1:<port>/oauth/callback?code=…` for `aws login`, `http://localhost:8085/?code=…` for `gcloud auth login`; the Mac replays it against the CLI's own listener."
+      },
+      {
+        "args": ["<profile>"],
+        "effect": "write",
+        "name": "aws-login-code",
+        "options": [],
+        "replyShape": "{state}",
+        "stdin": "secret",
+        "summary": "Feed the authorization code read from stdin to the waiting `aws login --remote` for that profile."
+      },
+      {
+        "args": ["<account|default|application-default>"],
+        "effect": "human",
+        "name": "gcloud-login",
+        "options": ["--pid <session pid>", "--local", "--remote", "--status"],
+        "replyShape": "{state: {profile, provider, flow, phase, url, message}}",
+        "summary": "Run the gcloud sign-in for an account (`gcloud auth login`, or `auth application-default login` for application-default) and report the URL to open on another device: the relay flow (the phone's browser intercepts the localhost:8085 callback → `aws-login-callback`), or --remote (`--no-launch-browser`, the page ends with a verification code pasted back via `gcloud-login-code`); --local opens this Mac's browser instead; --status only reports the login and starts nothing. Watch `aws-logins` for the state (provider \"gcloud\")."
+      },
+      {
+        "args": ["<account|default|application-default>"],
+        "effect": "write",
+        "name": "gcloud-login-code",
+        "options": [],
+        "replyShape": "{state}",
+        "stdin": "secret",
+        "summary": "Feed the verification code read from stdin to the waiting `gcloud auth login` for that account."
+      },
+      {
+        "args": ["<fleet>", "<n>"],
+        "effect": "write",
+        "name": "ignite",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "ignite",
+        "summary": "Start account n's 5h window now with one tiny request (swapd ignite, #7); the active account is untouched. Costs ~1K weekly tokens on n."
+      },
+      {
+        "args": ["<fleet>", "<n>..."],
+        "effect": "write",
+        "name": "reorder",
+        "options": [],
+        "replyShape": "{fleet}",
+        "requires": "reorder",
+        "summary": "Set the rotation order: every account number exactly once, top first."
+      },
+      {
+        "args": ["<fleet>", "<n>"],
+        "effect": "destructive",
+        "name": "remove",
+        "options": ["--yes"],
+        "replyShape": "{fleet}",
+        "requires": "remove",
+        "summary": "Delete the credential from the engine. Refused without --yes."
+      },
+      {
+        "args": ["<fleet>"],
+        "effect": "human",
+        "name": "add",
+        "options": [],
+        "replyShape": "{started:true}",
+        "requires": "addOAuth|addToken",
+        "summary": "Open the in-app sign-in for this fleet. A human completes it in the Infinitus window; poll with wait-add."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "wait-add",
+        "options": ["--timeout <seconds, default 300>"],
+        "replyShape": "{done:Bool, error?, fleets}",
+        "summary": "Block until the running sign-in finishes."
+      },
+      {
+        "args": ["<fleet>"],
+        "effect": "human",
+        "name": "signin-begin",
+        "options": ["--relogin <email>"],
+        "replyShape": "{flowId, url, pasteCode:Bool, label}",
+        "requires": "addOAuth|addToken",
+        "summary": "Start this fleet's sign-in with no window on the Mac: the reply carries the OAuth URL for the caller to show (the desktop app, #677). Poll signin-status; hand the code back with signin-code."
+      },
+      {
+        "args": ["<flowId>"],
+        "effect": "read",
+        "name": "signin-status",
+        "options": [],
+        "replyShape": "{flowId, phase: starting|waitingForCode|waitingForToken|registering|done|failed, error?, url?, pasteCode:Bool, account?}",
+        "summary": "Where the sign-in stands; error carries the CLI's own rejection wording."
+      },
+      {
+        "args": ["<flowId>"],
+        "effect": "write",
+        "name": "signin-code",
+        "options": [],
+        "replyShape": "{ok:Bool, error?}",
+        "stdin": "secret",
+        "summary": "Hand the code from the OAuth success page (stdin, never argv) to the waiting sign-in; ok:false carries the CLI's rejection."
+      },
+      {
+        "args": ["<flowId>"],
+        "effect": "write",
+        "name": "signin-cancel",
+        "options": [],
+        "replyShape": "{cancelled:true}",
+        "summary": "Stop the sign-in and close its CLI."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "windows",
+        "options": [],
+        "replyShape": "[{number, title, class, visible, occluded, level, size:[w,h], content}]",
+        "summary": "Every AppKit window the app owns: title, class, visible, occluded, content view — the e2e/perf probe."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "events",
+        "options": ["limit", "after"],
+        "replyShape": "[{id, at, kind, icon, text}] | with --after {after, known, rows:[…]}",
+        "summary": "The app's event log (switches, deaths, revivals, nudges…), oldest first — what the Activity pane shows. Last 100 kept. --after <event id> returns only the rows past that event; known:false means the id is gone (app relaunched or aged out) and rows is the full tail."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "stats",
+        "options": ["period"],
+        "replyShape": "{period, from, to, total:{humanMessages, phoneMessages, agentMessages, commits, linesAdded, linesRemoved, prsOpened, prsMerged, sessionTally, toolCalls:{name:n}, waitingSeconds, switches, limitStops, usd, …}, previous:{…}, daily:[{key, day}], streak}",
+        "summary": "Engineering metrics for a period (day|week|month|year, default week): commits, lines, PRs, human/phone/agent messages, sessions, tool calls, waiting time, switches, cost — Stats tab data."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "perf",
+        "options": [],
+        "replyShape": "{cpuSeconds, rssBytes, heapBytes, threads, uptimeSeconds, leases, leaseScopes: {clientId: [scope]}}",
+        "summary": "Process cost: CPU seconds so far, RSS + live heap bytes, thread count — sample twice for an idle % and a heap growth rate (perf gate)."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "lock-status",
+        "options": [],
+        "replyShape": "{enabled, locked, relock: immediately|5 min|1 h|on sleep}",
+        "summary": "Biometric lock (Settings › Lock): whether the setting is on, whether the pop-out and Settings are locked right now, and the re-lock choice. Off by default."
+      },
+      {
+        "args": ["on|off|now|relock", "[immediately|5m|1h|sleep]"],
+        "effect": "write",
+        "name": "lock",
+        "options": ["--yes"],
+        "replyShape": "lock-status",
+        "summary": "Biometric lock: `on` runs the unlock prompt on the Mac once and turns the setting on; `off` turns it off (--yes while in a team); `now` locks the pop-out and Settings; `relock <choice>` sets the re-lock delay."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "unlock",
+        "options": [],
+        "replyShape": "lock-status",
+        "summary": "Run the unlock prompt on the Mac (Touch ID or password) and unlock the pop-out and Settings; refused with the reason when it fails or is cancelled."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "team-status",
+        "options": [],
+        "replyShape": "{id, name, remote (masked), kid, role: leader|member|pending, rev, members: [{kid, name, role, isMe, founder, lastPublished, kinds, sessionsNow, blockers, crashes, todayUSD, todayMessages, todayCommits, fleet, controls}], requests: [{kid, name, platform, devices, at}], lastFetch, lastPublish, lastError} | null",
+        "summary": "Settings › Team: the team this Mac is in — members with what they last published, today's effort and blockers, pending requests, the loop's last fetch/publish — or null when there is none."
+      },
+      {
+        "args": ["<name>"],
+        "effect": "write",
+        "name": "team-create",
+        "options": ["--remote <url>", "--as <your name>"],
+        "replyShape": "team-status",
+        "stdin": "secret",
+        "summary": "Create a team on an empty git remote; the remote's write token, if it needs one, comes on stdin (empty stdin: none)."
+      },
+      {
+        "args": ["<your name>"],
+        "effect": "write",
+        "name": "team-join",
+        "options": [],
+        "replyShape": "team-status",
+        "stdin": "secret",
+        "summary": "Request to join a team: the team code or invite link on stdin, this Mac's name in the roster as the argument."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "team-hostname",
+        "options": ["--zone <zone>", "--label <label>", "--clear"],
+        "replyShape": "{zone, label, configured}",
+        "stdin": "secret",
+        "summary": "Settings › Team › Hostnames: keep the Cloudflare zone and label member hostnames are minted under, with the API token on stdin (checked against the zone before it is kept); --clear forgets the token."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "team-code",
+        "options": ["--days <n>", "--invite"],
+        "replyShape": "{code}",
+        "summary": "Mint a team code (leaders): `infinitus://join/…`, valid --days (default 7); --invite adds a one-time nonce the app auto-approves when Settings › Team's switch is on (off by default). Carries the store credential when one is set."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "team-fetch",
+        "options": [],
+        "replyShape": "team-status",
+        "summary": "Pull the store now (roster, members' files, requests) and rebuild the snapshot."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "team-publish",
+        "options": [],
+        "replyShape": "{published: [path], transcriptChunks, skipped}",
+        "summary": "Publish this Mac's data now (what the 5-minute loop does), then rebuild the snapshot."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "team-compact",
+        "options": [],
+        "replyShape": "team-status",
+        "summary": "Rewrite your own member branch to a single commit without the pre-split transcript history — the one force-push the spec allows, explicit and once; teammates' mirrors follow on their next fetch."
+      },
+      {
+        "args": ["<kid>"],
+        "effect": "write",
+        "name": "team-approve",
+        "options": [],
+        "replyShape": "team-status",
+        "summary": "Approve a join request (leaders)."
+      },
+      {
+        "args": ["<kid>"],
+        "effect": "write",
+        "name": "team-decline",
+        "options": [],
+        "replyShape": "team-status",
+        "summary": "Decline a join request (leaders)."
+      },
+      {
+        "args": ["popout|settings"],
+        "effect": "write",
+        "name": "show",
+        "options": [],
+        "replyShape": "{shown}",
+        "summary": "Open a window: the pinned pop-out or Settings. The wall, workspace and session windows are retired — the Infinitus desktop app is the client."
+      },
+      {
+        "args": ["[get <key>...]"],
+        "effect": "read",
+        "name": "prefs",
+        "options": [],
+        "replyShape": "{sections:[{slug,name}], prefs:[{key,type,default,value,section,effect,choices?,min?,max?}]}",
+        "summary": "The preference catalog with current values: key, type, default, section (slug + name), live/restart effect, choices; `get` narrows it to the named keys."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "activities-token",
+        "options": ["--body <json>", "--forget <deviceId>/<kind>"],
+        "replyShape": "{slot} | with --forget {slot, forgotten}",
+        "summary": "Register a phone's push token — the body `POST /activities/token` takes: {kind, token, deviceId, deviceName, environment, themeID?, macId?}. Without --body the CLI reads the JSON from stdin. `--forget <deviceId>/<kind>` withdraws that one registration instead (the phone's alerts switched off); forgotten is false when none was held."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "client-activity",
+        "options": ["--body <json>"],
+        "replyShape": "{clientId}",
+        "summary": "A client's visibility report — the body `POST /client-activity` takes: {clientId, visible, focused, recentlyInteracted, scopes:[{type:sessions|session|fleets|stats, pid?}], ttlMs}. Leases the scopes it watches."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "crash-report",
+        "options": ["--body <json>"],
+        "replyShape": "{id}",
+        "summary": "File a client's crash or hang — the body `POST /crashes` takes: {id, platform, device, appVersion, osVersion, at (ISO-8601), kind, reason, frames, raw?}; `crashes` lists it."
+      },
+      {
+        "args": ["<key>", "<value>"],
+        "effect": "write",
+        "name": "prefs-set",
+        "options": [],
+        "replyShape": "{key,type,default,value,section,effect,choices?}",
+        "summary": "Set one preference (`prefs set <key> <value>` is the same): the value is JSON, or a bare word for a string; refused when it is the wrong type or off the pref's choices. A `restart` pref relaunches the app after the reply, as `engine` does."
+      },
+      {
+        "args": ["popout|settings"],
+        "effect": "write",
+        "name": "hide",
+        "options": [],
+        "replyShape": "{hidden}",
+        "summary": "Close the pinned pop-out (the e2e no-lease window) or Settings."
+      },
+      {
+        "args": ["swapd|cliproxy|9router", "on|off"],
+        "effect": "restart",
+        "name": "engine",
+        "options": [],
+        "replyShape": "{restarting:true}",
+        "summary": "Turn an engine on or off. The app relaunches."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "proxy",
+        "options": [],
+        "replyShape": "{baseURL, keyPresent, routingStrategy?, error?}",
+        "summary": "CLIProxyAPI settings: base URL, whether a key is stored, routing strategy."
+      },
+      {
+        "args": [],
+        "effect": "restart",
+        "name": "proxy-key",
+        "options": ["--url <base URL, default http://127.0.0.1:8317>"],
+        "replyShape": "{restarting:true}",
+        "stdin": "secret",
+        "summary": "Store the management key read from stdin in the keychain. Empty stdin clears it. The app relaunches."
+      },
+      {
+        "args": [],
+        "effect": "restart",
+        "name": "9router-password",
+        "options": ["--url <base URL, default http://127.0.0.1:20128>"],
+        "replyShape": "{restarting:true}",
+        "stdin": "secret",
+        "summary": "Store the 9Router dashboard password read from stdin in the keychain. Empty stdin clears it. The app relaunches."
+      },
+      {
+        "args": ["fill-first|round-robin|weighted-round-robin"],
+        "effect": "write",
+        "name": "proxy-routing",
+        "options": [],
+        "replyShape": "{routingStrategy}",
+        "summary": "PUT the proxy's routing strategy."
+      },
+      {
+        "args": ["on|off"],
+        "effect": "write",
+        "name": "team-discoverable",
+        "options": [],
+        "replyShape": "{discoverable}",
+        "summary": "Advertise this Mac to teams on the LAN (TXT d=1, /team/key and /team/request), or hide it."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "event",
+        "options": [],
+        "replyShape": "{pid?}",
+        "stdin": "payload",
+        "summary": "A Claude Code hook payload on stdin (the plugin's Notification/Stop hooks): a prompt is pushed the moment it appears, then the fleet refreshes."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "approve",
+        "options": [],
+        "replyShape": "{decision}",
+        "stdin": "payload",
+        "summary": "A PreToolUse hook payload on stdin: {decision: allow} when the phone allowed that tool for this session, else {decision: ask}."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "sessions",
+        "options": [],
+        "replyShape": "[{pid, name?, cwd, status?, kind, profile?, permissionMode?, sessionId, account?, startedAt?, needs}]",
+        "summary": "The live Claude Code sessions: pid, name, folder, status, session id, the account alias they run on, start time (ISO 8601) and pending sign-in needs (`aws-login:<profile>`, `gcloud-login:<account>`)."
+      },
+      {
+        "args": ["<pid|name>"],
+        "effect": "write",
+        "name": "nudge",
+        "options": [],
+        "replyShape": "{pid, nudged, channel?, reason?}",
+        "summary": "Sends one session the resume nudge by hand (peer socket first, then its terminal); {nudged: false, reason} when its transcript does not end in a limit stop or it cannot be reached."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "profiles",
+        "options": [],
+        "replyShape": "{profiles: [{name, cwd?, engine?, permissionMode?, model?, systemPrompt?, prompt?, allowTools?}]}",
+        "summary": "The saved session profiles (Settings › Profiles): name, folder, engine, permission mode, model, system prompt, first prompt."
+      },
+      {
+        "args": ["<name>"],
+        "effect": "write",
+        "name": "profile-set",
+        "options": [
+          "--cwd <folder>",
+          "--engine claude|codex",
+          "--mode acceptEdits|auto|bypassPermissions",
+          "--model <model>",
+          "--system <appended system prompt>",
+          "--prompt <first prompt>",
+          "--allow <\"Edit, Bash git\">"
+        ],
+        "replyShape": "{profile}",
+        "summary": "Creates or replaces a session profile with exactly the fields given (an omitted field is cleared). --allow lists tools a session born from it runs without asking (the plugin's PreToolUse hook)."
+      },
+      {
+        "args": ["<name>"],
+        "effect": "write",
+        "name": "profile-remove",
+        "options": [],
+        "replyShape": "{removed}",
+        "summary": "Deletes a session profile."
+      },
+      {
+        "args": ["<pid|name>"],
+        "effect": "read",
+        "name": "checkpoints",
+        "options": [],
+        "replyShape": "{sessionId, cwd, checkpoints: [{n, sha, at, subject}]}",
+        "summary": "The session's per-prompt workspace checkpoints (hidden git refs), oldest first."
+      },
+      {
+        "args": ["<pid|name>", "<n>", "[m]"],
+        "effect": "read",
+        "name": "checkpoint-diff",
+        "options": [],
+        "replyShape": "{from, to?, stat, patch, truncated}",
+        "summary": "Checkpoint n against checkpoint m, or against the working tree now (untracked files included): a --stat and the patch (capped at 200 KB)."
+      },
+      {
+        "args": ["<pid|name>", "<n>"],
+        "effect": "destructive",
+        "name": "checkpoint-restore",
+        "options": ["--yes"],
+        "replyShape": "{restored: {n, sha, at, subject}, backup?: {n, sha, at, subject}}",
+        "summary": "Puts the repository's files back to checkpoint n (the current state is checkpointed first, so it is undoable). Needs --yes."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "past-sessions",
+        "options": ["--limit <n, default 50>", "--search <text>"],
+        "replyShape": "{sessions: [{sessionId, cwd, repo, firstMessage, lastActivityAt, bytes, live}]}",
+        "summary": "Every Claude Code session this Mac has run, newest first (default 50): id, folder, opening prompt, last activity, whether it is live. --search filters that newest set by repo, folder or prompt."
+      },
+      {
+        "args": ["<sessionId>"],
+        "effect": "write",
+        "name": "resume-session",
+        "options": ["--fork"],
+        "replyShape": "{outcome, detail?, host?, pid?}",
+        "summary": "Opens a new terminal in the folder that past session ran in and resumes it there (claude --resume), like the phone's Start session. --fork continues from the transcript under a new session id (claude --fork-session), leaving the original alone — allowed on a live session."
+      },
+      {
+        "args": ["<pid|name>", "<supervised|acceptEdits|bypassPermissions>"],
+        "effect": "write",
+        "name": "session-mode",
+        "options": [],
+        "replyShape": "{mode?, label}",
+        "summary": "Moves a running session's permission mode for the plugin's PreToolUse hook: Auto-accept edits allows the editing tools, Full access every tool, supervised clears it. A mode set at start is a floor — it cannot be narrowed from here."
+      },
+      {
+        "args": ["<pid|name>"],
+        "effect": "write",
+        "name": "send",
+        "options": [],
+        "replyShape": "{outcome, channel?, detail?}",
+        "stdin": "payload",
+        "summary": "Text on stdin goes to that session as if typed into its prompt (peer socket first, then its terminal)."
+      },
+      {
+        "args": [],
+        "effect": "read",
+        "name": "machine",
+        "options": [],
+        "replyShape": "MachineReport | {sampling:true}",
+        "summary": "The machine-health guardian's last sample (#115): load, swap, processes, hooks with live instances, runaway processes, residue counts, session health, warnings. Triggers a sample when none has run yet."
+      },
+      {
+        "args": ["<pid>"],
+        "effect": "destructive",
+        "name": "machine-kill",
+        "options": ["--yes"],
+        "replyShape": "{result}",
+        "summary": "SIGTERM a runaway the last `machine` report flagged (its own process group when it has one, never a session's), SIGKILL after 3 s if it's still alive. Refused without --yes."
+      },
+      {
+        "args": [],
+        "effect": "destructive",
+        "name": "machine-reclaim",
+        "options": ["--yes"],
+        "replyShape": "{result}",
+        "summary": "Remove stale cc-socks, stale session-env dirs, and temp files older than an hour that no process holds open. Refused without --yes."
+      },
+      {
+        "args": ["disable|restore|kill", "<owner>"],
+        "effect": "destructive",
+        "name": "machine-hook",
+        "options": ["--yes"],
+        "replyShape": "{result}",
+        "stdin": "payload",
+        "summary": "disable: move a tool's hook registrations out of ~/.claude/settings.json (a timestamped backup is written beside it); restore: put them back; kill: SIGTERM every live instance of its hooks and their helpers from the last `machine` sample (never a session's own pid), SIGKILL the survivors after 3 s. Refused without --yes."
+      }
+    ],
+    "schemaVersion": 1
+  },
+  "prefs": {
+    "prefs": [
+      {
+        "default": true,
+        "effect": "live",
+        "key": "show_account_name",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "choices": ["off", "5h", "7d", "both"],
+        "default": "both",
+        "effect": "live",
+        "key": "title_pct",
+        "section": "display",
+        "type": "string",
+        "value": "both"
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "title_scoped",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "title_remaining",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "choices": ["off", "countdown", "clock"],
+        "default": "countdown",
+        "effect": "live",
+        "key": "title_reset",
+        "section": "display",
+        "type": "string",
+        "value": "countdown"
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "title_icon_only",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "choices": [30, 60, 300],
+        "default": 60,
+        "effect": "live",
+        "key": "refresh_interval",
+        "section": "display",
+        "type": "int",
+        "value": 60
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "menubar_themed",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "menubar_effects",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "choices": ["wide", "stacked", "hstack"],
+        "default": "wide",
+        "effect": "live",
+        "key": "popup_layout",
+        "section": "display",
+        "type": "string",
+        "value": "wide"
+      },
+      {
+        "choices": ["default", "large", "xlarge", "huge"],
+        "default": "default",
+        "effect": "live",
+        "key": "popup_text_size",
+        "section": "display",
+        "type": "string",
+        "value": "default"
+      },
+      {
+        "choices": ["engine", "headroom", "candidates"],
+        "default": "headroom",
+        "effect": "live",
+        "key": "popup_sort",
+        "section": "display",
+        "type": "string",
+        "value": "headroom"
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "compact_rows",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "footer_actions_hidden",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": 0.7,
+        "effect": "live",
+        "key": "glass_focused",
+        "section": "display",
+        "type": "double",
+        "value": 0.7
+      },
+      {
+        "choices": ["compact", "strip", "hud"],
+        "default": "compact",
+        "effect": "live",
+        "key": "chat_header",
+        "section": "display",
+        "type": "string",
+        "value": "compact"
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "session_auto_names",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "choices": ["auto", "cmux", "terminal", "owned"],
+        "default": "auto",
+        "effect": "live",
+        "key": "session_host",
+        "section": "display",
+        "type": "string",
+        "value": "auto"
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "checkpoints_enabled",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "keep_awake",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "keep_awake_display",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "choices": [
+          {
+            "id": "off",
+            "name": "Off — plain numbers"
+          },
+          {
+            "id": "rpg",
+            "name": "RPG — HP/MP gauges + gold"
+          },
+          {
+            "id": "movie",
+            "name": "Movie — reels & box office"
+          },
+          {
+            "id": "hades",
+            "name": "Hades — blades & darkness"
+          },
+          {
+            "id": "mgs",
+            "name": "Metal Gear — tactical espionage"
+          },
+          {
+            "id": "agent",
+            "name": "AI Agentic — tokens & context"
+          },
+          {
+            "id": "swe",
+            "name": "Classic SWE — hand-written, no AI"
+          },
+          {
+            "id": "scifi",
+            "name": "Sci-Fi — warp cores & shields"
+          },
+          {
+            "id": "west",
+            "name": "Wild West — six-guns & gold rush"
+          },
+          {
+            "id": "cyber",
+            "name": "Cyberpunk — chrome & neon"
+          },
+          {
+            "id": "gothic",
+            "name": "Gothic — candles & cathedrals"
+          },
+          {
+            "id": "musical",
+            "name": "Musical — tempo & encores"
+          },
+          {
+            "id": "earth",
+            "name": "Planet Earth — wild documentary"
+          },
+          {
+            "id": "cosmo",
+            "name": "Cosmos — stars & black holes"
+          },
+          {
+            "id": "ocean",
+            "name": "Ocean — tides & deep water"
+          }
+        ],
+        "default": "off",
+        "effect": "live",
+        "key": "gamification_style",
+        "section": "themes",
+        "type": "string",
+        "value": "off"
+      },
+      {
+        "choices": ["top", "bottom", "fade", "rows"],
+        "default": "top",
+        "effect": "live",
+        "key": "intro_style",
+        "section": "animations",
+        "type": "string",
+        "value": "top"
+      },
+      {
+        "choices": ["zoom", "slam", "spin", "off"],
+        "default": "zoom",
+        "effect": "live",
+        "key": "intro_title",
+        "section": "animations",
+        "type": "string",
+        "value": "zoom"
+      },
+      {
+        "default": 1,
+        "effect": "live",
+        "key": "intro_speed",
+        "max": 2,
+        "min": 0.4,
+        "section": "animations",
+        "type": "double",
+        "value": 1
+      },
+      {
+        "choices": ["off", "ember", "flame", "limit"],
+        "default": "ember",
+        "effect": "live",
+        "key": "burn_style",
+        "section": "animations",
+        "type": "string",
+        "value": "ember"
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_sessions_done",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_all_dead",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_last_alive",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_waiting",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_aws_login",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "push_revived",
+        "section": "push",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": 10,
+        "effect": "live",
+        "key": "revive_lead_minutes",
+        "section": "push",
+        "type": "int",
+        "value": 10
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "mirror_lan_enabled",
+        "section": "devices",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "mirror_tunnel_enabled",
+        "section": "devices",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": true,
+        "effect": "live",
+        "key": "mirror_rendezvous_enabled",
+        "section": "devices",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": 5,
+        "effect": "live",
+        "key": "live_activity_rate_seconds",
+        "section": "devices",
+        "type": "int",
+        "value": 5
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "fork_tunnel_enabled",
+        "section": "devices",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": 3773,
+        "effect": "live",
+        "key": "fork_server_port",
+        "section": "devices",
+        "type": "int",
+        "value": 3773
+      },
+      {
+        "default": "",
+        "effect": "live",
+        "key": "fork_tunnel_hostname",
+        "section": "devices",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "default": true,
+        "effect": "restart",
+        "key": "engine_swapd_enabled",
+        "section": "engines",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "default": false,
+        "effect": "restart",
+        "key": "engine_cliproxy_enabled",
+        "section": "engines",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "default": false,
+        "effect": "restart",
+        "key": "engine_9router_enabled",
+        "section": "engines",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "choices": ["stable", "nightly"],
+        "default": "stable",
+        "effect": "live",
+        "key": "update_channel",
+        "section": "about",
+        "type": "string",
+        "value": "stable"
+      },
+      {
+        "choices": ["off", "hold", "interrupt"],
+        "default": "off",
+        "effect": "live",
+        "key": "priority_mode",
+        "section": "sessions",
+        "type": "string",
+        "value": "off"
+      },
+      {
+        "default": 80,
+        "effect": "live",
+        "key": "priority_low_pct",
+        "section": "sessions",
+        "type": "int",
+        "value": 80
+      },
+      {
+        "default": 50,
+        "effect": "live",
+        "key": "priority_abundant_pct",
+        "section": "sessions",
+        "type": "int",
+        "value": 50
+      }
+    ],
+    "sections": [
+      {
+        "name": "Display",
+        "slug": "display"
+      },
+      {
+        "name": "Themes",
+        "slug": "themes"
+      },
+      {
+        "name": "Animations",
+        "slug": "animations"
+      },
+      {
+        "name": "Push",
+        "slug": "push"
+      },
+      {
+        "name": "Devices",
+        "slug": "devices"
+      },
+      {
+        "name": "Engines",
+        "slug": "engines"
+      },
+      {
+        "name": "About",
+        "slug": "about"
+      },
+      {
+        "name": "Sessions",
+        "slug": "sessions"
+      }
+    ]
+  }
+}

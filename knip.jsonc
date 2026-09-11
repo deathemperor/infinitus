@@ -14,8 +14,14 @@
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option, not a source import;
-      // the fork's visual pass is run by hand (INFINITUS.md).
-      "entry": ["knip-schemas.ts", "fork-visual-pass.mjs"],
+      // the fork's visual pass (harness, fixture, check) is run by hand and by
+      // .github/workflows/fork-visual-pass.yml (INFINITUS.md).
+      "entry": [
+        "knip-schemas.ts",
+        "fork-visual-pass.mjs",
+        "fork-visual-fixture.mjs",
+        "fork-visual-check.ts",
+      ],
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.
