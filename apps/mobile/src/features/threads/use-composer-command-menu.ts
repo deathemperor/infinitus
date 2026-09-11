@@ -1,4 +1,9 @@
-import type { EnvironmentId, ProviderInteractionMode, ServerProvider } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  PromptSnippet,
+  ProviderInteractionMode,
+  ServerProvider,
+} from "@t3tools/contracts";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
   detectComposerTrigger,
@@ -25,8 +30,10 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { useComposerPathSearch } from "../../state/queries";
 import type { ComposerCommandItem } from "./ComposerCommandPopover";
 import { matchesSlashSkillQuery } from "./composerSlashSkillSearch";
+import { promptSnippetCommandItems } from "./promptSnippetItems";
 
 const WORKSPACE_SNAPSHOT_RETRY_COOLDOWN_MS = 10_000;
+const NO_PROMPT_SNIPPETS: readonly PromptSnippet[] = [];
 
 function composerSelectionAtEnd(draftMessage: string): ComposerEditorSelection {
   return { start: draftMessage.length, end: draftMessage.length };
@@ -135,6 +142,9 @@ export function resolveComposerCommandSelection(input: {
     replacement = `/${item.command} `;
   } else if (item.type === "provider-slash-command") {
     replacement = `/${item.command.name} `;
+  } else if (item.type === "prompt-snippet") {
+    // Fork (#270 G): the body replaces the `/query` as saved, no trailing space.
+    replacement = item.snippet.text;
   }
   return {
     ...replaceTextRange(draftMessage, trigger.rangeStart, trigger.rangeEnd, replacement),
@@ -153,6 +163,7 @@ export function useComposerCommandMenu({
   hasCompactableConversation,
   offersUsageLimits = false,
   enabled = true,
+  promptSnippets = NO_PROMPT_SNIPPETS,
   onChangeDraftMessage,
   onUpdateInteractionMode,
   onUsageLimits,
@@ -167,6 +178,8 @@ export function useComposerCommandMenu({
   /** Whether T3 itself offers /usage-limits for the selected provider. */
   readonly offersUsageLimits?: boolean;
   readonly enabled?: boolean;
+  /** Fork (#270 G): the project's saved prompts, offered by the `/` menu. */
+  readonly promptSnippets?: readonly PromptSnippet[];
   readonly onChangeDraftMessage: (value: string) => void;
   readonly onUpdateInteractionMode?: (mode: ProviderInteractionMode) => void;
   /** Picking /usage-limits is the action itself; the draft keeps nothing of it. */
@@ -296,7 +309,8 @@ export function useComposerCommandMenu({
           description: skill.shortDescription ?? skill.description ?? "",
         }));
 
-      return [...commandItems, ...skillItems];
+      // Fork (#270 G): the project's saved prompts, by name, after the rest.
+      return [...commandItems, ...skillItems, ...promptSnippetCommandItems(promptSnippets, q)];
     }
 
     if (trigger.kind === "skill") {
@@ -402,6 +416,7 @@ export function useComposerCommandMenu({
     hasCompactableConversation,
     onUpdateInteractionMode,
     pathSearch.entries,
+    promptSnippets,
     selectedProviderStatus,
     skills,
     trigger,

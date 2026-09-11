@@ -77,6 +77,7 @@ import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
+import { useProjectPromptSnippets } from "./usePromptSnippets";
 import {
   ComposerDictationCancelAction,
   ComposerDictationDraftContent,
@@ -343,6 +344,11 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     return report !== null;
   }, [currentModelSelection.instanceId, onShowUsageLimits, props.serverConfig]);
 
+  // Fork (#270 G): the thread's project's saved prompts for the `/` menu.
+  const promptSnippets = useProjectPromptSnippets(
+    props.environmentId,
+    props.selectedThread.projectId,
+  );
   const composerMenu = useComposerCommandMenu({
     draftMessage: props.draftMessage,
     ownerKey: composerOwnerKey,
@@ -350,6 +356,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     projectCwd: props.projectCwd,
     selectedProviderStatus,
     hasThread: true,
+    promptSnippets,
     hasCompactableConversation: props.hasCompactableConversation,
     onChangeDraftMessage: props.onChangeDraftMessage,
     onUpdateInteractionMode:
