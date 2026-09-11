@@ -84,8 +84,14 @@ final class AppReleaseModel: ObservableObject {
                     return
                 }
                 let release = try JSONDecoder().decode(Release.self, from: data)
-                tag = release.tag_name.hasPrefix("v")
-                    ? String(release.tag_name.dropFirst()) : release.tag_name
+                // Mac releases are tagged mac-v<version> since #823 (main's
+                // v*.*.* tags belong to the desktop); older ones were v<version>.
+                var name = release.tag_name
+                for prefix in ["mac-v", "v"] where name.hasPrefix(prefix) {
+                    name = String(name.dropFirst(prefix.count))
+                    break
+                }
+                tag = name
                 via = "on GitHub"
             }
             latest = tag

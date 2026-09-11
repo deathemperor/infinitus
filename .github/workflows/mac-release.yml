@@ -1,13 +1,14 @@
 name: Mac release
-# Tag push (v*, the Mac app's own numbers — never the desktop's
-# v*-infinitus.* prereleases) builds apps/mac on the macOS 26 image (the
-# glass chrome needs its SDK to compile) and publishes the zips on the
-# release. Same tags and asset names as before #823, so the installed
-# apps' releases/latest poll and the desktop's native-helper.json pin
-# keep resolving.
+# Tag push (mac-v*, the Mac app's own numbers; main's release.yml owns
+# every v*.*.* tag, so the Mac app's tags carry a prefix until #823
+# layer 3 folds it into the one-app release) builds apps/mac on the
+# macOS 26 image (the glass chrome needs its SDK to compile) and
+# publishes the zips on the release. Asset names stay as before #823,
+# so the installed apps' releases/latest poll (AboutPane strips the
+# prefix) and the desktop's native-helper.json pin keep resolving.
 on:
   push:
-    tags: ["v*"]
+    tags: ["mac-v*"]
   # Dispatch builds the Linux artifacts without a tag (CI dry run);
   # nothing is published from a dispatch.
   workflow_dispatch:
@@ -19,8 +20,8 @@ defaults:
 jobs:
   release:
     # Tag pushes only — a workflow_dispatch dry run must not try to
-    # `gh release create` from a branch — and never the desktop's tags.
-    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-infinitus.')
+    # `gh release create` from a branch.
+    if: startsWith(github.ref, 'refs/tags/mac-v')
     runs-on: macos-26
     env:
       # secrets can't be referenced in `if:` directly; job env is the
@@ -84,7 +85,7 @@ jobs:
           done
       - name: Zip
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#mac-v}"
           ditto -c -k --keepParent out/Infinitus.app "Infinitus-${VERSION}.zip"
           ditto -c -k --keepParent "out/Infinitus Menu Bar.app" "Infinitus-Menu-Bar-${VERSION}.zip"
           shasum -a 256 "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip"
@@ -92,7 +93,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#mac-v}"
           # Composed notes from CHANGELOG.md (the "## <version>" section);
           # --generate-notes only as the fallback when a tag has no entry.
           awk -v v="$VERSION" '
@@ -102,10 +103,10 @@ jobs:
           ' CHANGELOG.md > notes.md
           if [ -s notes.md ]; then
             gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
-              --title "Infinitus $GITHUB_REF_NAME" --notes-file notes.md
+              --title "Infinitus v$VERSION" --notes-file notes.md
           else
             gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
-              --title "Infinitus $GITHUB_REF_NAME" --generate-notes
+              --title "Infinitus v$VERSION" --generate-notes
           fi
       # Auto-bump the tap cask (CodexBar-style release->tap dispatch, done
       # here with a repo-scoped deploy key instead of a PAT).
@@ -113,7 +114,7 @@ jobs:
         env:
           TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#mac-v}"
           SHA=$(shasum -a 256 "Infinitus-${VERSION}.zip" | cut -d' ' -f1)
           mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
           echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key && chmod 600 ~/.ssh/tap_key
@@ -171,7 +172,7 @@ jobs:
       # A tag build reports its number (#486); a dispatch dry run stays "dev".
       - run: |
           case "$GITHUB_REF_NAME" in
-            v*) V="$(printf '%s' "${GITHUB_REF_NAME#v}" | tr -cd '0-9A-Za-z.-')"
+            mac-v*) V="$(printf '%s' "${GITHUB_REF_NAME#mac-v}" | tr -cd '0-9A-Za-z.-')"
                 sed -i "s/static let string = \"dev\"/static let string = \"$V\"/" Sources/InfinitusTray/BuiltVersion.swift
                 grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift;;
           esac
@@ -193,7 +194,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: apps/mac/dist
       - name: Upload to release
         env:
           GH_TOKEN: ${{ github.token }}

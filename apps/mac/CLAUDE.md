@@ -46,8 +46,10 @@ before that the `native` branch). Split out of
   upstream PR). Before that (#555, 2026-09-10 → 2026-09-12) it was the
   `native` branch; that branch is frozen and read-only for a fallback
   window, then deleted. Base Mac work on `origin/main`; a Mac PR is an
-  ordinary main PR. The Mac app's releases keep their own `v<version>`
-  tags and `releases/latest` + the `nightly` tag (AboutPane polls them);
+  ordinary main PR. The Mac app's releases are tagged `mac-v<version>`
+  (main's release.yml owns every `v*.*.*` tag, so the prefix keeps the
+  two pipelines apart until layer 3 unifies them; AboutPane strips it)
+  and keep `releases/latest` + the `nightly` tag (AboutPane polls them);
   the desktop's are the `v*-infinitus.*` prereleases.
 - **`main` takes commits only through pull requests** (GitHub ruleset
   "main via pull requests"; the native one retires with the branch):

@@ -42,8 +42,9 @@ makes wrong, in its own PR.
 - **Fork releases are GitHub prereleases with their own tag scheme.**
   Installed native apps poll `releases/latest` and the `nightly` tag; those
   stay the Mac app's until layer 3 makes the one-app release the latest.
-  The Mac app's tags stay `v<version>` (mac-release.yml skips `-infinitus.`
-  tags). Never publish a fork release as latest, never tag `nightly` from
+  The Mac app's tags are `mac-v<version>` (release.yml fires on every
+  `v*.*.*` tag, so mac-release.yml needs its own prefix; asset names are
+  unchanged and AboutPane strips the prefix). Never publish a fork release as latest, never tag `nightly` from
   the desktop's builds. The fork's desktop releases are prereleases tagged
   `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
   channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
