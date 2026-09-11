@@ -134,6 +134,7 @@ publishes the matching section as the GitHub release body.
 - Resume nudges leave SDK-entered sessions alone — the desktop app and the app's own sessions resume theirs (#648).
 - `infinitusctl signin-begin|signin-status|signin-code|signin-cancel` run a fleet's sign-in with no window on the Mac, so the Infinitus desktop app can host the OAuth page itself (#677).
 - The wall, workspace, session chat, revival countdown and playground windows are retired — the Infinitus desktop app is the client; the pop-out stays (#654).
+- The About pane's Homebrew upgrade relaunches the way Restart does, so it no longer wedges a Mac in a team; write-effect control commands are logged by verb for the next incident.
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

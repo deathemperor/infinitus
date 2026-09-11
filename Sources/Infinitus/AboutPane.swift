@@ -255,6 +255,11 @@ final class BrewUpdater: ObservableObject {
     enum Channel: String { case source, stable, nightly }
     @Published var running = false
     @Published var status: String?
+    /// The app wires this to AppModel.relaunchApp, which waits for this
+    /// pid to exit before `open` and quits the way the menu does: a bare
+    /// terminate(nil) from a Task parks a team member in
+    /// applicationShouldTerminate's nested loop (#654, the #673 lesson).
+    var relaunch: () -> Void = { NSApplication.shared.terminate(nil) }
 
     static let brewPath: String? =
         ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
@@ -333,12 +338,7 @@ final class BrewUpdater: ObservableObject {
                 self?.running = false
                 if done {
                     self?.status = "done — relaunching…"
-                    let sh = Process()
-                    sh.executableURL = URL(fileURLWithPath: "/bin/sh")
-                    sh.arguments = ["-c",
-                        "sleep 0.8; /usr/bin/open /Applications/Infinitus.app"]
-                    try? sh.run()
-                    NSApplication.shared.terminate(nil)
+                    self?.relaunch()
                 } else {
                     self?.status = "brew failed: \(detail)"
                 }
