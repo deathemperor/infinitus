@@ -126,11 +126,18 @@ import {
   useProjects,
   useThreadShells,
 } from "../state/entities";
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
+import * as Option from "effect/Option";
+import { AsyncResult } from "effect/unstable/reactivity";
+import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
+import { heldSummaryFor } from "./sidebar/infinitusHeld.logic";
+import { onNextAttentionThreadRequest } from "./sidebar/nextAttentionBus";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
   buildThreadRouteParams,
@@ -159,6 +166,8 @@ import {
   planSidebarThreadDrop,
   reduceSidebarProjectScopeMenuState,
   resolveAdjacentThreadId,
+  resolveAttentionRank,
+  resolveNextAttentionThreadId,
   resolveSidebarDropTarget,
   resolveSidebarDropVerb,
   type SidebarDropVerb,
@@ -4232,6 +4241,40 @@ export default function Sidebar() {
       ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
+  // The next-attention key (#270 C) ranks the rendered list at press time:
+  // approval, input, failed, held, then an unseen completion, ties in sidebar
+  // order after the current thread. Holds are read straight from the atoms
+  // the rows already subscribe to (only Infinitus-capable environments have
+  // one), so the press costs no subscription of its own.
+  const resolveNextAttentionThreadKey = useCallback((): string | null => {
+    const lastVisitedAtById = useUiStateStore.getState().threadLastVisitedAtById;
+    const holdsByEnvironment = new Map<string, ReadonlyArray<InfinitusHeldThread> | null>();
+    const entries = orderedThreads.map((thread) => {
+      const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+      let holds = holdsByEnvironment.get(thread.environmentId);
+      if (holds === undefined) {
+        const supported =
+          serverConfigs.get(thread.environmentId)?.environment.capabilities.infinitus === true;
+        holds = supported
+          ? Option.getOrNull(
+              AsyncResult.value(
+                appAtomRegistry.get(
+                  infinitusEnvironment.holds({ environmentId: thread.environmentId, input: {} }),
+                ),
+              ),
+            )
+          : null;
+        holdsByEnvironment.set(thread.environmentId, holds);
+      }
+      const status = resolveSidebarThreadStatus(thread, {
+        held: heldSummaryFor(holds, thread.id) !== null,
+      });
+      const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt: lastVisitedAtById[key] });
+      return { id: key, rank: resolveAttentionRank({ status, isUnread }) };
+    });
+    return resolveNextAttentionThreadId({ entries, currentThreadId: routeThreadKey });
+  }, [orderedThreads, routeThreadKey, serverConfigs]);
+
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
@@ -4265,6 +4308,10 @@ export default function Sidebar() {
         );
         return;
       }
+      if (command === "thread.nextAttention") {
+        navigateToThreadKey(resolveNextAttentionThreadKey());
+        return;
+      }
       const jumpIndex = threadJumpIndexFromCommand(command ?? "");
       if (jumpIndex === null) return;
       navigateToThreadKey(orderedThreadKeys[jumpIndex] ?? null);
@@ -4275,10 +4322,24 @@ export default function Sidebar() {
     keybindings,
     navigateToThread,
     orderedThreadKeys,
+    resolveNextAttentionThreadKey,
     routeTerminalOpen,
     routeThreadKey,
     threadByKey,
   ]);
+
+  // The palette's "Jump to next waiting thread" action reaches the same
+  // resolver over the bus; a press with nothing waiting is a no-op.
+  useEffect(
+    () =>
+      onNextAttentionThreadRequest(() => {
+        const targetThread = threadByKey.get(resolveNextAttentionThreadKey() ?? "");
+        if (targetThread) {
+          navigateToThread(scopeThreadRef(targetThread.environmentId, targetThread.id));
+        }
+      }),
+    [navigateToThread, resolveNextAttentionThreadKey, threadByKey],
+  );
 
   // Same predicate as v1: hints show only while the held modifiers exactly
   // match a thread-jump binding. Adding Shift (screenshots) or Alt no
