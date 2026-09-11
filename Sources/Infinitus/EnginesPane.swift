@@ -123,17 +123,7 @@ struct ClaudeEnginePane: View {
         return URL(string: "https://github.com/realiti4/claude-swap/releases")!
     }
 
-    private var stateText: some View {
-        Group {
-            switch model.cswapState {
-            case .running: Text("Running").foregroundStyle(.green)
-            case .stopped: Text("Stopped").foregroundStyle(.secondary)
-            case .refused: Text("Held Elsewhere").foregroundStyle(.orange)
-            case .backingOff(let s): Text("Retrying in \(Int(s))s")
-            case .schemaMismatch: Text("Update the App")
-            }
-        }.font(.caption)
-    }
+    private var stateText: some View { EngineStateText(state: model.cswapState) }
 
     /// Stop opens the confirmation, so it wears the ellipsis; Start acts.
     private var toggleTitle: String { rotating ? "Stop\u{2026}" : "Start" }
@@ -150,6 +140,22 @@ struct ClaudeEnginePane: View {
         case .running, .stopped, .backingOff: return true
         case .refused, .schemaMismatch: return false
         }
+    }
+}
+
+/// One supervised daemon's state, as the cswap and swapd panes both show it.
+struct EngineStateText: View {
+    let state: CswapSupervisor.State
+    var body: some View {
+        Group {
+            switch state {
+            case .running: Text("Running").foregroundStyle(.green)
+            case .stopped: Text("Stopped").foregroundStyle(.secondary)
+            case .refused: Text("Held Elsewhere").foregroundStyle(.orange)
+            case .backingOff(let s): Text("Retrying in \(Int(s))s")
+            case .schemaMismatch: Text("Update the App")
+            }
+        }.font(.caption)
     }
 }
 
@@ -496,6 +502,10 @@ struct SwapdEnginePane: View {
                 }
                 if let err = model.engineErrors[SwapdEngine.engineID] {
                     Text(err).font(.caption).foregroundStyle(.orange)
+                }
+                if model.swapdEnabled {
+                    // #475: the engine's own `auto`, one daemon per enabled engine.
+                    LabeledContent("Daemon") { EngineStateText(state: model.swapdState) }
                 }
             } header: {
                 Text("Binary")
