@@ -10,7 +10,9 @@ import type {
   ServerConfig,
 } from "@t3tools/contracts";
 import { Atom } from "effect/unstable/reactivity";
+import { useMemo } from "react";
 
+import { isSideQuestion, withoutSideQuestions } from "../features/infinitus/sideQuestions";
 import { appAtomRegistry } from "./atom-registry";
 import { environmentProjects } from "./projects";
 import { environmentServerConfigsAtom, serverEnvironment } from "./server";
@@ -61,7 +63,9 @@ export function waitForProject(
 }
 
 export function useThreadShells(): ReadonlyArray<EnvironmentThreadShell> {
-  return useAtomValue(environmentThreadShells.threadShellsAtom);
+  const threads = useAtomValue(environmentThreadShells.threadShellsAtom);
+  // Fork (#269 C): side questions live in their thread's drawer, not in a list.
+  return useMemo(() => withoutSideQuestions(threads), [threads]);
 }
 
 export function useProject(ref: ScopedProjectRef | null): EnvironmentProject | null {
@@ -69,9 +73,11 @@ export function useProject(ref: ScopedProjectRef | null): EnvironmentProject | n
 }
 
 export function useThreadShell(ref: ScopedThreadRef | null): EnvironmentThreadShell | null {
-  return useAtomValue(
+  const thread = useAtomValue(
     ref === null ? EMPTY_THREAD_SHELL_ATOM : environmentThreadShells.threadShellAtom(ref),
   );
+  // Fork (#269 C): a side question never opens as a page on the phone.
+  return thread !== null && isSideQuestion(thread) ? null : thread;
 }
 
 export function useEnvironmentServerConfig(

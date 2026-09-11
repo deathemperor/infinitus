@@ -527,6 +527,12 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
   (`useThreadReadyForReview`, #269 F); settled rows keep their stamp.
+- `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
+  questions (`sideOf != null`, #269 C) and `useThreadShell` answers null for
+  one, so a side question is in no phone list and never opens as a page;
+  `apps/mobile/src/features/archive/ArchivedThreadsRouteScreen.tsx` filters
+  the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
+  #863).
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
