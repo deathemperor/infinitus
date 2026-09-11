@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import { UsageAggregator } from "./usageAggregation.ts";
-import type { RateTable } from "./usagePricing.ts";
+import { priceUsage, type RateTable } from "./usagePricing.ts";
 import type { UsageRecord } from "./usageTranscripts.ts";
 
 const rates: RateTable = new Map([
@@ -200,5 +200,77 @@ describe("UsageAggregator", () => {
     ]);
 
     expect(result.buckets).toHaveLength(3);
+  });
+
+  it("attributes Claude records to the account the hook names, the rest to unattributed or notClaude", () => {
+    const oneRecordUsd = priceUsage(rates, record().model, record().totals, null).costUsd;
+    const aggregator = new UsageAggregator({
+      timeZone: "UTC",
+      sinceDay: "2026-08-01",
+      untilDay: "2026-08-31",
+      rates,
+      attribute: (timestampMs) =>
+        timestampMs < Date.parse("2026-08-07T04:05:13Z") ? "one@example.invalid" : null,
+    });
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:12Z") }));
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:12Z"), dedupeKey: "a" }));
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:13Z") }));
+    aggregator.add(record({ provider: "codex", model: "gpt-5.6-sol" }));
+    aggregator.add(record({ timestampMs: Date.parse("2026-07-01T12:00:00Z") }));
+    const result = aggregator.finish();
+
+    expect(result.attribution).toEqual({
+      lines: [
+        {
+          email: "one@example.invalid",
+          totals: {
+            uncachedInputTokens: 200,
+            cachedInputTokens: 2000,
+            cacheCreationTokens: 20,
+            outputTokens: 100,
+            reasoningTokens: 0,
+          },
+          costUsd: expect.closeTo(oneRecordUsd * 2, 9),
+          records: 2,
+        },
+      ],
+      unattributed: {
+        totals: {
+          uncachedInputTokens: 100,
+          cachedInputTokens: 1000,
+          cacheCreationTokens: 10,
+          outputTokens: 50,
+          reasoningTokens: 0,
+        },
+        costUsd: expect.closeTo(oneRecordUsd, 9),
+        records: 1,
+      },
+      notClaude: { costUsd: 0, records: 1 },
+    });
+    // Unchanged: the buckets never learn about accounts.
+    expect(result.buckets).toHaveLength(2);
+  });
+
+  it("orders attributed lines by cost, highest first", () => {
+    const aggregator = new UsageAggregator({
+      timeZone: "UTC",
+      sinceDay: "2026-08-01",
+      untilDay: "2026-08-31",
+      rates,
+      attribute: (timestampMs) =>
+        timestampMs % 2 === 0 ? "small@example.invalid" : "big@example.invalid",
+    });
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:12.000Z") }));
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:12.001Z") }));
+    aggregator.add(record({ timestampMs: Date.parse("2026-08-07T04:05:12.003Z") }));
+
+    expect(aggregator.finish().attribution?.lines.map((line) => line.email)).toEqual([
+      "big@example.invalid",
+      "small@example.invalid",
+    ]);
+  });
+
+  it("carries no attribution without a hook", () => {
+    expect(aggregate([record()]).attribution).toBeUndefined();
   });
 });

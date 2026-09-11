@@ -188,6 +188,41 @@ export const UsageSummaryInput = Schema.Struct({
 });
 export type UsageSummaryInput = typeof UsageSummaryInput.Type;
 
+/**
+ * Per-account spend (#779): Claude records attributed to the account that was
+ * active when they were written, from the swap engine's own history. Estimates,
+ * like every cost here. `unattributed` holds the records written in a swap's
+ * own second or before the first logged swap; `notClaude` the other providers,
+ * so the three reconcile with the page total.
+ */
+export const UsageAccountTotals = Schema.Struct({
+  totals: UsageTokenTotals,
+  costUsd: Schema.Number,
+  records: NonNegativeInt,
+});
+export type UsageAccountTotals = typeof UsageAccountTotals.Type;
+
+export const UsageAccountLine = Schema.Struct({
+  ...UsageAccountTotals.fields,
+  email: TrimmedNonEmptyString,
+  /** The account's current slot number, absent once it left the fleet. */
+  number: Schema.optional(NonNegativeInt),
+  /** The app's display name for the account: alias, else the email. */
+  label: TrimmedNonEmptyString,
+});
+export type UsageAccountLine = typeof UsageAccountLine.Type;
+
+export const UsageAccountAttribution = Schema.Struct({
+  lines: Schema.Array(UsageAccountLine),
+  unattributed: UsageAccountTotals,
+  notClaude: Schema.Struct({ costUsd: Schema.Number, records: NonNegativeInt }),
+  /** Swaps whose instant fell inside the window. */
+  switchesInWindow: NonNegativeInt,
+  /** Where the timeline came from, for the footer. */
+  basis: TrimmedNonEmptyString,
+});
+export type UsageAccountAttribution = typeof UsageAccountAttribution.Type;
+
 export const UsageSummary = Schema.Struct({
   contractVersion: Schema.Number,
   readAt: Schema.String,
@@ -199,6 +234,8 @@ export const UsageSummary = Schema.Struct({
   pricing: UsagePricing,
   /** Wall-clock cost of the scan, surfaced in diagnostics. */
   scanDurationMs: NonNegativeInt,
+  /** Only from a server with a swap history at hand (#779). */
+  accounts: Schema.optional(UsageAccountAttribution),
 });
 export type UsageSummary = typeof UsageSummary.Type;
 

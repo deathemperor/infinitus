@@ -472,6 +472,23 @@ this file adds the fork's own rules. Plan and history: issue #555.
   is dropped alone). The history chart and the run-rate table follow the
   `utilization --days` verb native is adding. Sidebar "Utilization" beside
   Machine.
+- `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
+  on upstream's `/usage` (#779): Claude spend split by the account that was
+  active when each record was written. The server joins at scan time:
+  `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads
+  the app's `history <fleet>` verb once per scan — swapd's own append-only
+  switch log, whole, through the control client directly (the `command`
+  path would poll after it) — for the Claude fleet whose engine has the
+  `history` capability; `infinitusUsageAttribution.logic.ts` turns it into
+  `accountAt(ms)` (join on email, never slot: compaction renumbers slots) and
+  `UsageAggregator`'s optional `attribute` hook sums a per-account sibling
+  of the buckets. A record in a swap's own second or before the first logged
+  swap is "Unattributed", other providers "Other providers", so the table
+  reconciles with the page total. `UsageSummary.accounts` is optional, the
+  contract version unchanged; no Infinitus, no verb, or a refused reply means
+  no `accounts` and the section stays hidden. Primary environment only.
+  Emails travel in the summary as they do in `fleets`; never in logs, spans
+  or fixtures.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
