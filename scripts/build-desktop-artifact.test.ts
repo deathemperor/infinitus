@@ -1699,7 +1699,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it.effect("rasterizes the stable DMG background under the infinitus channel name", () =>
+  it.effect("rasterizes the fork's own DMG background for the infinitus channel", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -1709,10 +1709,10 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         });
         const dmgDir = path.join(stageResourcesDir, "dmg");
         yield* fs.makeDirectory(dmgDir, { recursive: true });
-        const sourcePath = path.join(dmgDir, "dmg-background-latest.svg");
+        const sourcePath = path.join(dmgDir, "dmg-background-infinitus.svg");
         yield* fs.writeFileString(
           sourcePath,
-          '<svg xmlns="http://www.w3.org/2000/svg"><text>Drag T3 Code into Applications</text></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg"><text>Drag Infinitus into Applications</text></svg>',
         );
         const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> =
           [];
@@ -1721,16 +1721,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           Effect.provide(iconResizeSpawnerLayer(commands, [0, 0])),
         );
 
-        const brandedPath = path.join(dmgDir, "dmg-background-infinitus.svg");
         assert.deepStrictEqual(
           commands.map((command) => command.args.slice(-3)),
           [
-            [brandedPath, "--out", path.join(dmgDir, "dmg-background-infinitus.png")],
-            [brandedPath, "--out", path.join(dmgDir, "dmg-background-infinitus@2x.png")],
+            [sourcePath, "--out", path.join(dmgDir, "dmg-background-infinitus.png")],
+            [sourcePath, "--out", path.join(dmgDir, "dmg-background-infinitus@2x.png")],
           ],
         );
-        assert.include(yield* fs.readFileString(brandedPath), "Drag Infinitus into Applications");
-        assert.include(yield* fs.readFileString(sourcePath), "Drag T3 Code into Applications");
       }),
     ),
   );

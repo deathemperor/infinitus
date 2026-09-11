@@ -32,10 +32,16 @@ const clientLayer = (available: Ref.Ref<boolean>, socketPath: string | null = SO
       }),
   } satisfies InfinitusControlClientShape);
 
-/** `open` that records each run and exits with `exitCode`. */
-const openStub = (opens: Ref.Ref<number>, exitCode: number | InfinitusOpenFailed = 0) =>
+/** `open` that records each run and exits with `exitCode`, printing `stderr`. */
+const openStub = (
+  opens: Ref.Ref<number>,
+  exitCode: number | InfinitusOpenFailed = 0,
+  stderr = "",
+) =>
   Ref.update(opens, (n) => n + 1).pipe(
-    Effect.andThen(typeof exitCode === "number" ? Effect.succeed(exitCode) : Effect.fail(exitCode)),
+    Effect.andThen(
+      typeof exitCode === "number" ? Effect.succeed({ exitCode, stderr }) : Effect.fail(exitCode),
+    ),
   );
 
 describe("launchInfinitus", () => {
@@ -96,11 +102,36 @@ describe("launchInfinitus", () => {
         runOpen: openStub(opens, 1),
       }).pipe(Effect.provide(clientLayer(available)));
       expect(exited).toEqual({ launched: false, reason: "open exited 1" });
+      const chatty = yield* launchInfinitus({
+        platform: "darwin",
+        runOpen: openStub(opens, 2, "open: something else\nmore\n"),
+      }).pipe(Effect.provide(clientLayer(available)));
+      expect(chatty).toEqual({ launched: false, reason: "open exited 2: open: something else" });
       const failed = yield* launchInfinitus({
         platform: "darwin",
         runOpen: openStub(opens, new InfinitusOpenFailed({ cause: new Error("spawn ENOENT") })),
       }).pipe(Effect.provide(clientLayer(available)));
       expect(failed).toEqual({ launched: false, reason: "open failed: spawn ENOENT" });
+    }),
+  );
+
+  effectIt.effect("reads LaunchServices' unknown bundle id as 'not installed' (#731)", () =>
+    Effect.gen(function* () {
+      const opens = yield* Ref.make(0);
+      const available = yield* Ref.make(false);
+      const result = yield* launchInfinitus({
+        platform: "darwin",
+        runOpen: openStub(
+          opens,
+          1,
+          "LSCopyApplicationURLsForBundleIdentifier() failed while trying to determine the application with bundle identifier run.infinitus.\n",
+        ),
+      }).pipe(Effect.provide(clientLayer(available)));
+      expect(result).toEqual({
+        launched: false,
+        installed: false,
+        reason: "No Infinitus app is installed on this Mac.",
+      });
     }),
   );
 });

@@ -9,6 +9,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { ServerConfig } from "../../config.ts";
 import { forkParked } from "../../serverActivation.ts";
+import { collectUint8StreamText } from "../../stream/collectUint8StreamText.ts";
 import {
   InfinitusCompanion,
   type InfinitusCompanionShape,
@@ -34,11 +35,17 @@ export class InfinitusOpenFailed extends Schema.TaggedError<InfinitusOpenFailed>
   }
 }
 
+/** One finished run of `open`: its exit code and what it printed to stderr. */
+export interface InfinitusOpenOutcome {
+  readonly exitCode: number;
+  readonly stderr: string;
+}
+
 /** What the startup probe and `launch` share: the host platform, and one run
-    of `open -g -b run.infinitus` answering with its exit code. */
+    of `open -g -b run.infinitus` answering with its exit code and stderr. */
 export interface InfinitusLaunchDeps {
   readonly platform: NodeJS.Platform;
-  readonly runOpen: Effect.Effect<number, InfinitusOpenFailed>;
+  readonly runOpen: Effect.Effect<InfinitusOpenOutcome, InfinitusOpenFailed>;
 }
 
 /** Whether `status` answered. Any reply — a failed command included — means
@@ -52,12 +59,33 @@ const probeInfinitus = Effect.fn("Infinitus.probe")(function* () {
   );
 });
 
-/** Runs `open` once and reads its exit code into a result. */
+/** Reads one `open` run into a result. A non-zero exit whose stderr names the
+    bundle id is LaunchServices saying no such app is installed (#731); any
+    other failure keeps its first stderr line so the user reads more than an
+    exit code. */
+const launchResultFromOpen = (outcome: InfinitusOpenOutcome): InfinitusLaunchResult => {
+  if (outcome.exitCode === 0) return { launched: true };
+  if (outcome.stderr.includes(INFINITUS_BUNDLE_ID)) {
+    return {
+      launched: false,
+      installed: false,
+      reason: "No Infinitus app is installed on this Mac.",
+    };
+  }
+  const detail = outcome.stderr.trim().split("\n")[0] ?? "";
+  return {
+    launched: false,
+    reason:
+      detail === ""
+        ? `open exited ${outcome.exitCode}`
+        : `open exited ${outcome.exitCode}: ${detail}`,
+  };
+};
+
+/** Runs `open` once and reads its outcome into a result. */
 const openInfinitus = (runOpen: InfinitusLaunchDeps["runOpen"]) =>
   runOpen.pipe(
-    Effect.map((exitCode): InfinitusLaunchResult =>
-      exitCode === 0 ? { launched: true } : { launched: false, reason: `open exited ${exitCode}` },
-    ),
+    Effect.map(launchResultFromOpen),
     Effect.catch((error) =>
       Effect.succeed<InfinitusLaunchResult>({ launched: false, reason: error.message }),
     ),
@@ -112,10 +140,15 @@ const makeRunOpen = Effect.gen(function* () {
         ChildProcess.make("open", ["-g", "-b", INFINITUS_BUNDLE_ID], {
           shell: false,
           stdout: "ignore",
-          stderr: "ignore",
         }),
       );
-      return Number(yield* child.exitCode);
+      // stderr is where `open` says why it could not (#731); read it alongside
+      // the exit so a chatty child never blocks on a full pipe.
+      const [stderr, exitCode] = yield* Effect.all(
+        [collectUint8StreamText({ stream: child.stderr, maxBytes: 4_096 }), child.exitCode],
+        { concurrency: "unbounded" },
+      );
+      return { exitCode: Number(exitCode), stderr: stderr.text } satisfies InfinitusOpenOutcome;
     }).pipe(Effect.mapError((cause) => new InfinitusOpenFailed({ cause }))),
   );
 });

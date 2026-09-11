@@ -479,7 +479,7 @@ export class DesktopIconSourceMissingError extends Schema.TaggedError<DesktopIco
 export class DesktopDmgBackgroundSourceMissingError extends Schema.TaggedError<DesktopDmgBackgroundSourceMissingError>()(
   "DesktopDmgBackgroundSourceMissingError",
   {
-    channel: Schema.Literals(["latest", "nightly"]),
+    channel: Schema.Literals(["latest", "nightly", "infinitus"]),
     sourcePath: Schema.String,
   },
 ) {
@@ -2430,24 +2430,11 @@ export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  // The fork ships no artwork of its own; its DMG reuses the stable background,
-  // rasterized under the channel's own name because the build config asks for
-  // `dmg-background-<channel>.png`.
-  const sourceChannel = channel === "infinitus" ? "latest" : channel;
-  let sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${sourceChannel}.svg`);
+  // Every channel has artwork of its own under `dmg/dmg-background-<channel>.svg`;
+  // the fork's says Infinitus and wears its mark (#732).
+  const sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
   if (!(yield* fs.exists(sourcePath))) {
-    return yield* new DesktopDmgBackgroundSourceMissingError({
-      channel: sourceChannel,
-      sourcePath,
-    });
-  }
-  if (channel !== sourceChannel) {
-    // The stable artwork letters upstream's name ("Drag T3 Code into
-    // Applications"); the fork's copy says its own.
-    const brandedPath = path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
-    const artwork = yield* fs.readFileString(sourcePath);
-    yield* fs.writeFileString(brandedPath, artwork.replaceAll("T3 Code", DESKTOP_PRODUCT_NAME));
-    sourcePath = brandedPath;
+    return yield* new DesktopDmgBackgroundSourceMissingError({ channel, sourcePath });
   }
 
   for (const output of [

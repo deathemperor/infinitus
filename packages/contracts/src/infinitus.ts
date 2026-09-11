@@ -369,6 +369,9 @@ export type InfinitusSnapshot = typeof InfinitusSnapshot.Type;
 export const InfinitusLaunchResult = Schema.Struct({
   launched: Schema.Boolean,
   reason: Schema.optionalKey(Schema.String),
+  /** `false` when LaunchServices knows no app by the menu-bar app's bundle id
+      (#731): the button then points at the download instead of "open exited 1". */
+  installed: Schema.optionalKey(Schema.Boolean),
 });
 export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
 
