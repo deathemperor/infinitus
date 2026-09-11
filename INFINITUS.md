@@ -133,7 +133,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
   (name `Infinitus`, schemes `infinitus` / `infinitus-dev`);
   `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the
-  `infinitus` artwork for fork versions.
+  `infinitus` artwork for fork versions; the Screen Recording usage text and
+  the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
+  `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
+  into Applications") for the `infinitus` channel before rasterizing (#601).
+- `apps/desktop/gnome-extension/metadata.json` — the bundled extension is
+  named "Infinitus SnapShots" (uuid `snap-shot@t3.codes` unchanged), matching
+  the setup copy that tells the user to find it; `KdeSnapShot.ts`'s desktop
+  entry `Name=` follows `PRODUCT_NAME` the same way (#601).
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
   and `resolveWebAssetBrandForPackageVersion` mapping `-infinitus.` versions to it.
@@ -176,7 +183,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
   (active account + fullest window of the Mac the list follows, plus its
-  waiting-session count) before the filter button, in the Android header.
+  waiting-session count) before the filter button, in the Android header; its
+  brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
+  `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
   `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
@@ -357,8 +366,7 @@ this file adds the fork's own rules. Plan and history: issue #555.
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
   `production` variants keep their upstream names (they build the real T3 Code
   app side by side), the `t3code` URL scheme and bundle ids stay, and the
-  compact title still draws upstream's T3 wordmark glyph (an asset, not a
-  string).
+  T3 wordmark glyph remains only as the work log's own-step icon (as on web).
 - `packages/contracts`, `packages/shared`, `packages/ssh`,
   `packages/client-runtime` — rule: schema descriptions, error messages, the
   askpass failure lines and the relay API title read `${PRODUCT_NAME}`; doc

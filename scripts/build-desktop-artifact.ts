@@ -2434,12 +2434,20 @@ export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(
   // rasterized under the channel's own name because the build config asks for
   // `dmg-background-<channel>.png`.
   const sourceChannel = channel === "infinitus" ? "latest" : channel;
-  const sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${sourceChannel}.svg`);
+  let sourcePath = path.join(stageResourcesDir, "dmg", `dmg-background-${sourceChannel}.svg`);
   if (!(yield* fs.exists(sourcePath))) {
     return yield* new DesktopDmgBackgroundSourceMissingError({
       channel: sourceChannel,
       sourcePath,
     });
+  }
+  if (channel !== sourceChannel) {
+    // The stable artwork letters upstream's name ("Drag T3 Code into
+    // Applications"); the fork's copy says its own.
+    const brandedPath = path.join(stageResourcesDir, "dmg", `dmg-background-${channel}.svg`);
+    const artwork = yield* fs.readFileString(sourcePath);
+    yield* fs.writeFileString(brandedPath, artwork.replaceAll("T3 Code", DESKTOP_PRODUCT_NAME));
+    sourcePath = brandedPath;
   }
 
   for (const output of [
@@ -2752,8 +2760,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
       extendInfo: {
-        NSScreenCaptureUsageDescription:
-          "T3 Code captures the active window when you use the window capture shortcut.",
+        NSScreenCaptureUsageDescription: `${DESKTOP_PRODUCT_NAME} captures the active window when you use the window capture shortcut.`,
       },
       protocols: [
         {
@@ -3816,7 +3823,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     t3codeCommitHash: commitHash,
     private: true,
     packageManager: rootPackageJson.packageManager,
-    description: "T3 Code desktop build",
+    description: `${DESKTOP_PRODUCT_NAME} desktop build`,
     author: "T3 Tools",
     main: "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(

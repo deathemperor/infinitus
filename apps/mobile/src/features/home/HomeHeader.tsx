@@ -11,10 +11,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { InfinitusHomeChip } from "../accounts/InfinitusHomeChip";
 import { SymbolView } from "../../components/AppSymbol";
-import { T3Wordmark } from "../../components/T3Wordmark";
 import { HOME_HORIZONTAL_INSET } from "../../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../../lib/mobileBranding";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { useThreadListV2Enabled } from "../threads/use-thread-list-v2-enabled";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
 import { withNativeGlassHeaderItem } from "../layout/native-glass-header-items";
@@ -222,10 +222,9 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               onPress={props.onOpenEnvironments}
               brand={
                 <View className="flex-row items-center gap-2">
-                  {/* Mirrors the desktop SidebarBrand: T3 mark + muted "Code". */}
-                  <T3Wordmark colorClassName="accent-icon" height={15} />
-                  <RNText className="-ml-0.5 text-[21px] font-t3-medium tracking-[-0.5px] text-foreground-muted">
-                    Code
+                  {/* Mirrors the desktop sidebar mark: the product name + stage pill. */}
+                  <RNText className="text-[21px] font-t3-medium tracking-[-0.5px] text-foreground">
+                    {PRODUCT_NAME}
                   </RNText>
                   <View className="rounded-full bg-subtle px-2 py-0.75">
                     <RNText className="text-[11px] font-t3-bold tracking-[1.1px] text-foreground-muted uppercase">
