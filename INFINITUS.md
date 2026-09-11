@@ -266,6 +266,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   from the shared subscription, deduped by id
   (`packages/client-runtime/src/state/infinitusActivity.ts`, exported as
   `@t3tools/client-runtime/state/infinitusActivity`) — no polling of its own.
+  The engine poller's per-minute `poll` / `no switch — …` lines (kind `other`
+  on native; `isPollRow` reads the text) stay in the store but are hidden until
+  the header's "Show polls" toggle, persisted like the Stats period (#696).
   Sidebar "Activity" beside Stats.
 - `apps/web/src/routes/machine.tsx`, `apps/web/src/components/machine/` — the
   `/machine` page (#659): the pop-out's Machine pane in the fork, read-only —
