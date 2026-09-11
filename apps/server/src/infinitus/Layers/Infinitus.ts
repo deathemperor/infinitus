@@ -90,7 +90,10 @@ const EventsReply = Schema.Union([
   }),
 ]);
 const decodeEvents = Schema.decodeUnknownEffect(EventsReply);
-const EVENTS_AFTER_OPTION = "--after";
+const EVENTS_AFTER_OPTION = "after";
+/** The manifest names an option bare (`after`) — older builds spelled it `--after <event id>`. */
+const offersOption = (command: InfinitusManifestCommand, name: string): boolean =>
+  command.options.some((option) => option.replace(/^-+/, "").split(/\s/, 1)[0] === name);
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
 /** See `eventCursor`. */
@@ -363,7 +366,7 @@ const makeInfinitus = Effect.gen(function* () {
       // 5 s poll no longer re-serialises the whole log).
       const cursor = yield* Ref.get(eventCursor);
       const after =
-        eventsCommand.options.some((option) => option.startsWith(EVENTS_AFTER_OPTION)) &&
+        offersOption(eventsCommand, EVENTS_AFTER_OPTION) &&
         Option.isSome(cursor) &&
         cursor.value.kind === "ids"
           ? cursor.value.lastId
