@@ -2643,6 +2643,7 @@ final class AppModel: ObservableObject {
         let bundle = Bundle.main.bundleURL.path
         let old = supervisor
         supervisor = nil
+        let team = team
         Task {
             await old?.stop()
             let p = Process()
@@ -2661,7 +2662,18 @@ final class AppModel: ObservableObject {
                 : wait + "exec \"\(exe)\""
             p.arguments = ["-c", cmd]
             try? p.run()
-            await MainActor.run { NSApplication.shared.terminate(nil) }
+            // Same as shutdown() (#656): the team's now.json delete runs
+            // here, so applicationShouldTerminate answers .terminateNow.
+            // From inside a Task, .terminateLater parks the main thread in
+            // AppKit's nested event loop and the reply never runs — the
+            // bundle sat wedged in this very call for 30 minutes on
+            // 2026-09-11 (sampled), its control socket accepting and never
+            // answering, the reopen shell waiting on a pid that never left.
+            await team.quit()
+            await MainActor.run {
+                AppDelegate.teamQuitDone = true
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 
