@@ -738,6 +738,53 @@ export function resolveAdjacentThreadId<T>(input: {
   return currentIndex < threadIds.length - 1 ? (threadIds[currentIndex + 1] ?? null) : null;
 }
 
+/** Where a thread sits in the "needs you next" order (#270 C): the rank the
+    keybinding minimises, or null when the thread asks nothing of the user.
+    Approval outranks input outranks a failed session outranks a held start
+    (the status resolver's own precedence); an unseen completion trails them
+    all. Working, monitoring and read rows never qualify. */
+export function resolveAttentionRank(input: {
+  status: SidebarThreadStatus;
+  isUnread: boolean;
+}): number | null {
+  switch (input.status) {
+    case "approval":
+      return 0;
+    case "input":
+      return 1;
+    case "failed":
+      return 2;
+    case "held":
+      return 3;
+    case "ready":
+      return input.isUnread ? 4 : null;
+    default:
+      return null;
+  }
+}
+
+/** The thread the next-attention key lands on: the lowest rank among the
+    entries, ties broken by sidebar order starting just after the current
+    thread and wrapping — so repeated presses walk every waiting thread of one
+    rank before dropping to the next. The current thread is never the answer
+    (nothing to jump to) and the order is never changed (threadSort's rule). */
+export function resolveNextAttentionThreadId<T>(input: {
+  entries: ReadonlyArray<{ readonly id: T; readonly rank: number | null }>;
+  currentThreadId: T | null;
+}): T | null {
+  const { currentThreadId, entries } = input;
+  const currentIndex =
+    currentThreadId === null ? -1 : entries.findIndex((entry) => entry.id === currentThreadId);
+  let best: { id: T; rank: number } | null = null;
+  for (let step = 1; step <= entries.length; step += 1) {
+    const entry = entries[(currentIndex + step) % entries.length];
+    if (entry === undefined || entry.rank === null || entry.id === currentThreadId) continue;
+    if (best === null || entry.rank < best.rank) best = { id: entry.id, rank: entry.rank };
+    if (best.rank === 0) break;
+  }
+  return best?.id ?? null;
+}
+
 export function isContextMenuPointerDown(input: {
   button: number;
   ctrlKey: boolean;

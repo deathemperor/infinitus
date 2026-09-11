@@ -85,7 +85,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
   — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
-  `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way.
+  `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way;
+  `thread.nextAttention` (`mod+shift+l`, `!terminalFocus`) in
+  `THREAD_KEYBINDING_COMMANDS` (#270 C).
+- `apps/web/src/components/Sidebar.tsx` — `resolveNextAttentionThreadKey`
+  (ranks the rendered list: approval, input, failed, held, unseen
+  completion; holds read from the rows' atoms via `appAtomRegistry`), the
+  `thread.nextAttention` branch of the keydown handler and the
+  `onNextAttentionThreadRequest` listener (#270 C).
+- `apps/web/src/components/CommandPalette.tsx` — the "Jump to next waiting
+  thread" action (`requestNextAttentionThread`) and its keydown match (#270 C).
 - `apps/web/src/components/chat/ChatComposer.tsx` — one block of hooks
   (`useActiveProjectRef`, the captures UI store, the list query,
   `useCapturesShortcuts`) beside the stash effects, `ComposerCapturesBadge`
@@ -213,7 +222,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   hand, nothing imports it).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
-  `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
+  `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
+  `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
+  to the iOS associated domains and an `autoVerify` intent filter for
+  `https://infinitus.run/pair` on Android (the site serves the AASA
+  `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`).
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
@@ -221,7 +234,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
   `SettingsInfinitusSection` (Accounts row, Live Activity / Mac alerts /
   reset alarms toggles, pusher Mac) after General.
-- `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
+- `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
+  link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
+  `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
+  `subscribe`, `features/connection/universalPairLink.logic.ts`, #724): the
+  Mac's origin travels in the fragment the site never sees, `to` is taken as
+  a bare http(s) origin only, and the sheet fills Host and code like a
+  scanned QR (#746) — the same rewrite runs on the in-app scanner's payload
+  and on the route's `pairingUrl`. Mounts `InfinitusLiveActivityBridge` (Live
   Activity token registration with the Mac), `InfinitusAlarmsBridge`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
   token, so the Mac's pushes reach the phone as banners; both bridges
@@ -388,6 +408,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   until a thread with a project is open, and toasts `empty` / `failed`
   (the Accessibility fix by name). `useAddCapture` is shared with the
   shortcuts.
+- `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
+  event the palette uses to ask the sidebar for the next waiting thread
+  (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
+  `resolveNextAttentionThreadId` + tests.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
@@ -472,6 +496,23 @@ this file adds the fork's own rules. Plan and history: issue #555.
   is dropped alone). The history chart and the run-rate table follow the
   `utilization --days` verb native is adding. Sidebar "Utilization" beside
   Machine.
+- `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
+  on upstream's `/usage` (#779): Claude spend split by the account that was
+  active when each record was written. The server joins at scan time:
+  `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads
+  the app's `history <fleet>` verb once per scan — swapd's own append-only
+  switch log, whole, through the control client directly (the `command`
+  path would poll after it) — for the Claude fleet whose engine has the
+  `history` capability; `infinitusUsageAttribution.logic.ts` turns it into
+  `accountAt(ms)` (join on email, never slot: compaction renumbers slots) and
+  `UsageAggregator`'s optional `attribute` hook sums a per-account sibling
+  of the buckets. A record in a swap's own second or before the first logged
+  swap is "Unattributed", other providers "Other providers", so the table
+  reconciles with the page total. `UsageSummary.accounts` is optional, the
+  contract version unchanged; no Infinitus, no verb, or a refused reply means
+  no `accounts` and the section stays hidden. Primary environment only.
+  Emails travel in the summary as they do in `fleets`; never in logs, spans
+  or fixtures.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
@@ -860,7 +901,25 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
 
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
-  prerelease (upstream's release.yml stays disabled and untouched).
+  prerelease (upstream's release.yml stays disabled and untouched). It nests
+  the native menu bar app as a login item (#777): `apps/desktop/native-helper.json`
+  (`{"tag", "sha256"}`, bumped by PR; the `native_helper_tag` dispatch input
+  tries a tag before pinning it) names the native release whose
+  `Infinitus-<version>.zip` the run downloads, checks (bundle id
+  `run.infinitus`; on signed builds Developer ID from team `Q783W6B4FA`,
+  hardened runtime, `stapler validate`) and hands to the build script as
+  `T3CODE_DESKTOP_NATIVE_HELPER` / `--native-helper`. The script `ditto`s it
+  into the stage (`NATIVE_HELPER_STAGE_DIR`), electron-builder's `extraFiles`
+  places it at `Contents/Library/LoginItems/Infinitus Menu Bar.app` (the one
+  path `SMAppService.loginItem` accepts) before the outer bundle is signed,
+  and `signIgnore` keeps `scripts/sign-macos.ts` off it, so the helper keeps
+  the native release's signature, entitlements and stapled ticket while the
+  outer seal records it as nested code; the one built-in notarization covers
+  both. "Verify nested helper" proves the nested seal survived packaging and
+  that Electron's `allow-jit` entitlement never reached it. No pin and no
+  input: nothing is nested, as for local and upstream builds. The helper is
+  never rebuilt in this workflow (macOS 26 SDK, Swift toolchain and a second
+  sign/notarize path for an artifact the native branch already publishes).
 
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,

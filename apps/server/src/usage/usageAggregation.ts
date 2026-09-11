@@ -56,6 +56,22 @@ interface MutableBucket {
   sessions: Set<string>;
 }
 
+/** Per-account spend (#779): what one Claude account's records added up to. */
+export interface AttributedTotals {
+  readonly totals: UsageTokenTotals;
+  readonly costUsd: number;
+  readonly records: number;
+}
+
+export interface AttributionResult {
+  /** One line per account the hook named, highest cost first. */
+  readonly lines: readonly (AttributedTotals & { readonly email: string })[];
+  /** Claude records the hook could not place (`null`). */
+  readonly unattributed: AttributedTotals;
+  /** Records of other providers: counted so the table reconciles with the page. */
+  readonly notClaude: { readonly costUsd: number; readonly records: number };
+}
+
 export interface AggregateOptions {
   readonly timeZone: string;
   readonly sinceDay: string;
@@ -65,6 +81,12 @@ export interface AggregateOptions {
   readonly resolution?: UsageResolution;
   readonly sinceTimeMs?: number;
   readonly untilTimeMs?: number;
+  /**
+   * Names the Claude account (by email) active when a record was written, or
+   * `null` when that is unknown. Only Claude records are asked; set only when
+   * a swap history is at hand (#779).
+   */
+  readonly attribute?: (timestampMs: number) => string | null;
 }
 
 export interface AggregateResult {
@@ -73,6 +95,22 @@ export interface AggregateResult {
   readonly duplicatesDropped: number;
   /** Records whose day fell outside the requested window. */
   readonly outOfWindow: number;
+  /** Present only when `attribute` was given. */
+  readonly attribution?: AttributionResult;
+}
+
+interface MutableAttributed {
+  totals: UsageTokenTotals;
+  costUsd: number;
+  records: number;
+}
+
+const emptyAttributed = (): MutableAttributed => ({ totals: EMPTY_TOTALS, costUsd: 0, records: 0 });
+
+function attributedOf(into: MutableAttributed, record: UsageRecord, costUsd: number): void {
+  into.totals = addTotals(into.totals, record.totals);
+  into.costUsd += costUsd;
+  into.records += 1;
 }
 
 /**
@@ -88,6 +126,9 @@ export class UsageAggregator {
   readonly #toDay: (timestampMs: number) => string;
   readonly #hourlyWindow: { readonly sinceTimeMs: number; readonly untilTimeMs: number } | null;
   readonly #options: AggregateOptions;
+  readonly #accounts = new Map<string, MutableAttributed>();
+  readonly #unattributed = emptyAttributed();
+  readonly #notClaude = { costUsd: 0, records: 0 };
   #duplicatesDropped = 0;
   #outOfWindow = 0;
 
@@ -181,6 +222,25 @@ export class UsageAggregator {
     if (priced.costSource === "unpriced") bucket.unpricedRecords += 1;
     if (priced.costSource === "providerReported") bucket.providerReportedRecords += 1;
     if (record.sessionId.length > 0) bucket.sessions.add(record.sessionId);
+
+    if (this.#options.attribute !== undefined) {
+      if (record.provider !== "claude") {
+        this.#notClaude.costUsd += priced.costUsd;
+        this.#notClaude.records += 1;
+      } else {
+        const email = this.#options.attribute(record.timestampMs);
+        if (email === null) {
+          attributedOf(this.#unattributed, record, priced.costUsd);
+        } else {
+          let account = this.#accounts.get(email);
+          if (account === undefined) {
+            account = emptyAttributed();
+            this.#accounts.set(email, account);
+          }
+          attributedOf(account, record, priced.costUsd);
+        }
+      }
+    }
     return true;
   }
 
@@ -215,6 +275,18 @@ export class UsageAggregator {
       buckets,
       duplicatesDropped: this.#duplicatesDropped,
       outOfWindow: this.#outOfWindow,
+      ...(this.#options.attribute === undefined ? {} : { attribution: this.#attribution() }),
+    };
+  }
+
+  #attribution(): AttributionResult {
+    const lines = [...this.#accounts]
+      .map(([email, account]) => ({ email, ...account }))
+      .sort((a, b) => b.costUsd - a.costUsd || a.email.localeCompare(b.email));
+    return {
+      lines,
+      unattributed: { ...this.#unattributed },
+      notClaude: { ...this.#notClaude },
     };
   }
 }

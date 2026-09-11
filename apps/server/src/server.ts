@@ -72,6 +72,7 @@ import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
 import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
+import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
@@ -216,9 +217,7 @@ const BackgroundLayerLive = BackgroundPolicy.layer.pipe(
   Layer.provideMerge(ServerSettingsLayerLive),
 );
 
-const UsageLayerLive = UsageService.layer.pipe(Layer.provide(ServerSettingsLayerLive));
-
-// The client is private to these three: everything else reaches Infinitus
+// The client is private to these four: everything else reaches Infinitus
 // through `InfinitusService`, which is the only thing that polls the socket;
 // the port layer writes one pref once the server is listening and again when
 // a watched app comes back; the companion opens the app when the socket stays
@@ -226,13 +225,21 @@ const UsageLayerLive = UsageService.layer.pipe(Layer.provide(ServerSettingsLayer
 // InfinitusSecretLive (#747) is the one secret-carrying path: a code, a key or
 // a token to a verb the manifest says takes one, on the request line, never
 // kept. It reads the manifest through the same service and socket client.
+// InfinitusUsageAttributionLive (#779) reads the app's `history` verb once per
+// usage scan so `/usage` can split Claude spend by account.
 const InfinitusLayerLive = Layer.mergeAll(
   InfinitusServerPortLive,
   InfinitusCompanionLive,
   InfinitusSecretLive,
+  InfinitusUsageAttributionLive,
 ).pipe(
   Layer.provideMerge(InfinitusLive),
   Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
+);
+
+const UsageLayerLive = UsageService.layer.pipe(
+  Layer.provide(ServerSettingsLayerLive),
+  Layer.provide(InfinitusLayerLive),
 );
 
 const ResourceDiagnosticsLayerLive = Layer.mergeAll(

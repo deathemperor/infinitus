@@ -41,6 +41,7 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 
 import { ServerConfig } from "../config.ts";
 import { expandHomePath } from "../pathExpansion.ts";
+import { UsageAttribution } from "../infinitus/Services/UsageAttribution.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { resolveClaudeHomePath } from "../provider/Drivers/ClaudeHome.ts";
 import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
@@ -133,6 +134,9 @@ export const layerTest = Layer.succeed(
 );
 
 export const make = Effect.gen(function* () {
+  // Per-account spend (#779) needs a swap timeline only a server next to
+  // Infinitus can have; without the service the summary simply has no accounts.
+  const attribution = yield* Effect.serviceOption(UsageAttribution);
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig;
@@ -458,13 +462,23 @@ export const make = Effect.gen(function* () {
     }
     const windowStartMs =
       (hourlyWindow?.sinceTimeMs ?? DateTime.toEpochMillis(windowStart.value)) - MTIME_SLACK_MS;
+    // Where the window ends for the swap count (#779): the hourly bound, or
+    // the last instant `untilDay` can still be that day in any zone (UTC-12
+    // ends it 36 h after UTC midnight). Days here are the client's zone, so
+    // this is a bound, not a boundary; the caption says "in this window".
+    const windowEndMs =
+      hourlyWindow?.untilTimeMs ?? Date.parse(`${input.untilDay}T00:00:00Z`) + 36 * 60 * 60 * 1000;
 
     // Pricing only matters once records are aggregated, so the rate table
     // loads while transcripts stream instead of gating them: a cold rates
     // fetch on a slow network no longer delays the scan by its own timeout.
-    const [, scannedDirs] = yield* Effect.all(
-      [ensureRates(false), collectDirs(windowStartMs, settings)],
-      { concurrency: 2 },
+    const [, scannedDirs, timeline] = yield* Effect.all(
+      [
+        ensureRates(false),
+        collectDirs(windowStartMs, settings),
+        attribution._tag === "Some" ? attribution.value.resolve : Effect.succeed(null),
+      ],
+      { concurrency: 3 },
     );
 
     const aggregator = new UsageAggregator({
@@ -475,6 +489,7 @@ export const make = Effect.gen(function* () {
       ...hourlyWindow,
       rates,
       priceOverrides: createOverrideRateTable(settings.usagePriceOverrides),
+      ...(timeline === null ? {} : { attribute: timeline.accountAt }),
     });
 
     const sources: UsageSource[] = [];
@@ -552,6 +567,22 @@ export const make = Effect.gen(function* () {
       sources,
       pricing: pricing(),
       scanDurationMs: Math.max(0, finishedAtMs - startedAtMs),
+      ...(timeline === null || aggregated.attribution === undefined
+        ? {}
+        : {
+            accounts: {
+              lines: aggregated.attribution.lines.map((line) => ({
+                ...line,
+                ...timeline.describe(line.email),
+              })),
+              unattributed: aggregated.attribution.unattributed,
+              notClaude: aggregated.attribution.notClaude,
+              switchesInWindow: timeline.switchesAtMs.filter(
+                (atMs) => atMs >= windowStartMs + MTIME_SLACK_MS && atMs < windowEndMs,
+              ).length,
+              basis: timeline.basis,
+            },
+          }),
     } satisfies UsageSummary;
   });
 

@@ -126,6 +126,9 @@ const VARIANT_CONFIG = {
     androidPackage: "run.infinitus.mobile",
     appleTeamId: "Q783W6B4FA",
     relyingParty: "clerk.t3.codes",
+    // Fork (#724): the Devices card's QR is `https://infinitus.run/pair#…`, so
+    // a Camera scan opens this app (AASA `applinks` + assetlinks on the site).
+    universalLinkHost: "infinitus.run",
     assets: INFINITUS_ASSETS,
   },
 } as const;
@@ -238,6 +241,7 @@ const config: ExpoConfig = {
     associatedDomains: [
       `applinks:${variant.relyingParty}`,
       `webcredentials:${variant.relyingParty}`,
+      ...("universalLinkHost" in variant ? [`applinks:${variant.universalLinkHost}`] : []),
     ],
     entitlements: {
       "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],
@@ -284,6 +288,20 @@ const config: ExpoConfig = {
     // JS back handling survives it via react-native's Android 16 shim plus
     // withAndroidPredictiveBackCompat on Android 13-15.
     predictiveBackGestureEnabled: true,
+    ...("universalLinkHost" in variant
+      ? {
+          // Fork (#724): the site's /pair opens the app; verified against
+          // `/.well-known/assetlinks.json` on that host.
+          intentFilters: [
+            {
+              action: "VIEW",
+              autoVerify: true,
+              data: [{ scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" }],
+              category: ["BROWSABLE", "DEFAULT"],
+            },
+          ],
+        }
+      : {}),
   },
   web: {
     favicon: variant.assets.appIcon,

@@ -171,6 +171,7 @@ interface BuildCliInput {
   readonly mockUpdates: Option.Option<boolean>;
   readonly mockUpdateServerPort: Option.Option<number>;
   readonly wslPrebuild: Option.Option<string>;
+  readonly nativeHelper: Option.Option<string>;
 }
 
 function detectHostBuildPlatform(hostPlatform: string): typeof BuildPlatform.Type | undefined {
@@ -639,6 +640,17 @@ export class MissingDesktopBuildInputError extends Schema.TaggedError<MissingDes
   }
 }
 
+export class NativeHelperNotFoundError extends Schema.TaggedError<NativeHelperNotFoundError>()(
+  "NativeHelperNotFoundError",
+  {
+    nativeHelperPath: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `Native helper is not an app bundle (no Contents/Info.plist): ${this.nativeHelperPath}`;
+  }
+}
+
 export class MacProvisioningProfileNotFoundError extends Schema.TaggedError<MacProvisioningProfileNotFoundError>()(
   "MacProvisioningProfileNotFoundError",
   {
@@ -940,6 +952,7 @@ interface ResolvedBuildOptions {
   readonly mockUpdates: boolean;
   readonly mockUpdateServerPort: number | undefined;
   readonly wslPrebuild: string | undefined;
+  readonly nativeHelper: string | undefined;
 }
 
 interface StagePackageJson {
@@ -961,6 +974,22 @@ interface StagePackageJson {
 
 export const STAGE_INSTALL_ARGS = ["install", "--prod"] as const;
 export const DESKTOP_ELECTRON_LANGUAGES = ["en-US"] as const;
+/**
+ * The native Infinitus menu bar app rides inside the desktop bundle as a
+ * login item (#777): `Contents/Library/LoginItems/` is the one place
+ * `SMAppService.loginItem` accepts. The build copies the helper into the
+ * stage under NATIVE_HELPER_STAGE_ROOT, electron-builder's `extraFiles` moves
+ * it into place before the outer bundle is signed, and `signIgnore` keeps the
+ * fork's identity and Electron's entitlements off it: the helper keeps the
+ * Developer ID signature, hardened runtime and stapled ticket of the native
+ * release it came from, and the outer seal records it as nested code.
+ */
+export const NATIVE_HELPER_STAGE_ROOT = "native-helper";
+export const NATIVE_HELPER_STAGE_DIR = `${NATIVE_HELPER_STAGE_ROOT}/Infinitus Menu Bar.app`;
+export const NATIVE_HELPER_BUNDLE_PATH = "Library/LoginItems/Infinitus Menu Bar.app";
+/** electron-builder tests its `signIgnore` patterns against absolute paths. */
+export const NATIVE_HELPER_SIGN_IGNORE = "/Contents/Library/LoginItems/";
+
 export const DESKTOP_FILE_EXCLUSIONS = [
   // T3 Code always passes the user's installed Claude executable to the SDK,
   // so the SDK's optional platform packages (each a ~200MB bundled executable)
@@ -1608,6 +1637,10 @@ const BuildEnvConfig = Config.all({
   // into the staged node-pty so the WSL backend ships a ready binary and never
   // compiles on the user's machine.
   wslPrebuild: Config.string("T3CODE_DESKTOP_WSL_PREBUILD").pipe(Config.option),
+  // Path to a signed native Infinitus.app to nest as the desktop's login item
+  // (#777, macOS only). The release workflow downloads it from the pinned
+  // native release; local and upstream builds leave it unset and nest nothing.
+  nativeHelper: Config.string("T3CODE_DESKTOP_NATIVE_HELPER").pipe(Config.option),
 });
 
 const MockUpdateServerPortSchema = Schema.NumberFromString.check(
@@ -1701,6 +1734,11 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
 
   const wslPrebuild =
     Option.getOrUndefined(input.wslPrebuild) ?? Option.getOrUndefined(env.wslPrebuild);
+  // A workflow env line is always set, so an empty value means "none".
+  const nativeHelper =
+    (
+      Option.getOrUndefined(input.nativeHelper) ?? Option.getOrUndefined(env.nativeHelper)
+    )?.trim() || undefined;
 
   return {
     platform,
@@ -1715,6 +1753,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     mockUpdates,
     mockUpdateServerPort,
     wslPrebuild,
+    nativeHelper,
   } satisfies ResolvedBuildOptions;
 });
 
@@ -2396,6 +2435,31 @@ function generateMacIconSet(
   });
 }
 
+/**
+ * Copy the native helper into the stage with `ditto`, which keeps what a
+ * signed bundle needs and a plain file copy loses: symlinks (`ictl` →
+ * `infinitusctl`), modes, and the resource fork order the seal hashes.
+ * Returns the project-relative path electron-builder nests from.
+ */
+export const stageNativeHelper = Effect.fn("stageNativeHelper")(function* (
+  nativeHelperPath: string,
+  stageAppDir: string,
+  verbose: boolean,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  if (!(yield* fs.exists(path.join(nativeHelperPath, "Contents/Info.plist")))) {
+    return yield* new NativeHelperNotFoundError({ nativeHelperPath });
+  }
+  const destination = path.join(stageAppDir, NATIVE_HELPER_STAGE_DIR);
+  yield* fs.makeDirectory(path.dirname(destination), { recursive: true });
+  yield* runCommand(ChildProcess.make({})`ditto ${nativeHelperPath} ${destination}`, {
+    label: "ditto native helper",
+    verbose,
+  });
+  return NATIVE_HELPER_STAGE_DIR;
+});
+
 function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: boolean) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -2697,6 +2761,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   // whose source file was never written fails the electron-builder step.
   wslRuntimeBundled = false,
   arch?: typeof BuildArch.Type,
+  // macOS only: the staged native helper, project-relative (see
+  // NATIVE_HELPER_STAGE_DIR); undefined nests nothing.
+  nativeHelperDir?: string,
 ) {
   const buildConfig: Record<string, unknown> = {
     appId: DESKTOP_APP_ID,
@@ -2706,6 +2773,11 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
       ...(platform === "mac" ? resolveMacFileExclusions(arch) : []),
+      // The staged helper is nested by extraFiles below, never packed into
+      // app.asar as well.
+      ...(nativeHelperDir === undefined
+        ? []
+        : [`!${NATIVE_HELPER_STAGE_ROOT}`, `!${NATIVE_HELPER_STAGE_ROOT}/**/*`]),
     ],
     directories: {
       buildResources: "apps/desktop/resources",
@@ -2756,6 +2828,12 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
+      ...(nativeHelperDir === undefined
+        ? {}
+        : {
+            extraFiles: [{ from: nativeHelperDir, to: NATIVE_HELPER_BUNDLE_PATH }],
+            signIgnore: [NATIVE_HELPER_SIGN_IGNORE],
+          }),
       ...(macPasskeySigning
         ? {
             entitlements: macPasskeySigning.entitlementsPath,
@@ -3738,6 +3816,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const stageProdResourcesDir = path.join(stageAppDir, "apps/desktop/prod-resources");
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
+  const nativeHelperDir =
+    options.platform === "mac" && options.nativeHelper !== undefined
+      ? yield* stageNativeHelper(options.nativeHelper, stageAppDir, options.verbose)
+      : undefined;
+
   const configuredMacPasskeySigning =
     options.platform === "mac" && options.signed
       ? yield* Effect.try({
@@ -3828,6 +3911,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
         : undefined,
       bundlesWslRuntime({ arch: options.arch, prebuildPath: options.wslPrebuild }),
       options.arch,
+      nativeHelperDir,
     ),
     dependencies: stageDependencies,
     devDependencies: {
@@ -4077,6 +4161,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
   wslPrebuild: Flag.string("wsl-prebuild").pipe(
     Flag.withDescription(
       "Path to a prebuilt Linux node-pty (pty.node) for the target arch, staged for the WSL backend (env: T3CODE_DESKTOP_WSL_PREBUILD).",
+    ),
+    Flag.optional,
+  ),
+  nativeHelper: Flag.string("native-helper").pipe(
+    Flag.withDescription(
+      "Path to a signed native Infinitus.app to nest as the macOS login item (env: T3CODE_DESKTOP_NATIVE_HELPER).",
     ),
     Flag.optional,
   ),
