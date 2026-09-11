@@ -27,6 +27,7 @@ import { relativeTime } from "../../lib/time";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
+import { useThreadReadyForReview } from "../infinitus/useThreadReadyForReview";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
 import {
@@ -62,6 +63,11 @@ const STATUS_LABEL_BY_STATUS: Partial<
   input: { label: "Input", className: "text-foreground-secondary" },
   working: { label: "Working", className: "text-adaptive-sky-600-400" },
   failed: { label: "Failed", className: "text-danger-foreground" },
+};
+
+const READY_FOR_REVIEW_LABEL = {
+  label: "Ready for review",
+  className: "text-adaptive-emerald-600-400",
 };
 
 function threadTimeLabel(thread: EnvironmentThreadShell): string {
@@ -456,7 +462,13 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     : screenColor;
 
   const status = resolveThreadListV2Status(thread);
-  const statusLabel = STATUS_LABEL_BY_STATUS[status];
+  // Infinitus (#269 F): an idle active row whose PR waits on a reviewer says so
+  // instead of its time. Settled rows keep the stamp they sort by.
+  const readyForReview = useThreadReadyForReview(thread);
+  const statusLabel =
+    status === "ready" && variant === "card" && readyForReview
+      ? READY_FOR_REVIEW_LABEL
+      : STATUS_LABEL_BY_STATUS[status];
   // Settled rows label by the same stamp they sort by, so order and label
   // can't disagree. updatedAt is always present, so the resolver never
   // returns null here.

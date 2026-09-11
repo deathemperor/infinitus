@@ -419,6 +419,10 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`;
   `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
+- `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
+  active row whose current linked PR is open, out of draft, with green (or
+  no) checks and no verdict reads "Ready for review" in place of its time
+  (`useThreadReadyForReview`, #269 F); settled rows keep their stamp.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
