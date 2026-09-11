@@ -9,6 +9,7 @@ import type {
   VcsPullInput,
   VcsPullResult,
   VcsRemoveWorktreeInput,
+  VcsRemoveWorktreeResult,
   VcsSwitchRefInput,
   VcsSwitchRefResult,
   GitPreparePullRequestThreadInput,
@@ -1571,7 +1572,7 @@ export interface EnvironmentApi {
   vcs: {
     listRefs: (input: VcsListRefsInput) => Promise<VcsListRefsResult>;
     createWorktree: (input: VcsCreateWorktreeInput) => Promise<VcsCreateWorktreeResult>;
-    removeWorktree: (input: VcsRemoveWorktreeInput) => Promise<void>;
+    removeWorktree: (input: VcsRemoveWorktreeInput) => Promise<VcsRemoveWorktreeResult>;
     createRef: (input: VcsCreateRefInput) => Promise<VcsCreateRefResult>;
     switchRef: (input: VcsSwitchRefInput) => Promise<VcsSwitchRefResult>;
     init: (input: VcsInitInput) => Promise<void>;

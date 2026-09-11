@@ -56,6 +56,21 @@ this file adds the fork's own rules. Plan and history: issue #555.
   pairing, #710) the same way, contracts in `infinitusPairing.ts`;
   `subscribeCaptures` / `captures.apply` (#433) the same way, contracts in
   `captures.ts`.
+- `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`,
+  `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding
+  (#270 A). `VcsRemoveWorktreeInput` gains `keepWork` (commit whatever the
+  worktree holds uncommitted to its branch, `wip: work saved when the thread
+  was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
+  after the remove, skipped whenever `keepWork` had to commit: that commit
+  is the work's only copy), and answers `VcsRemoveWorktreeResult`
+  `{branch, savedWorkCommit, branchDeleted}`. The thread delete flow always
+  sends `keepWork`, asks "Also delete branch …?" as a second confirm (off by
+  default, like Conductor's delete-branch-on-archive) when the thread has a
+  branch, and toasts the saved commit. `createWorktree` seeds the new tree
+  with the parent's untracked files that `.worktreeinclude` at the project
+  root names (gitignore syntax, matched by `git ls-files --others --ignored
+  --exclude-from`), or `.env*` when the file is absent; best-effort, logged,
+  never rolls back the worktree, and runs before the setup script.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), so the typed HTTP clients carry them.
