@@ -37,6 +37,7 @@ import { Route as ConnectCallbackRouteImport } from './routes/connect_.callback'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
 import { Route as SettingsInfinitusThemesRouteImport } from './routes/settings.infinitus.themes'
+import { Route as SettingsInfinitusTeamRouteImport } from './routes/settings.infinitus.team'
 import { Route as SettingsInfinitusSessionsRouteImport } from './routes/settings.infinitus.sessions'
 import { Route as SettingsInfinitusProfilesRouteImport } from './routes/settings.infinitus.profiles'
 import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
@@ -186,6 +187,11 @@ const SettingsInfinitusThemesRoute = SettingsInfinitusThemesRouteImport.update({
   path: '/infinitus/themes',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsInfinitusTeamRoute = SettingsInfinitusTeamRouteImport.update({
+  id: '/infinitus/team',
+  path: '/infinitus/team',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsInfinitusSessionsRoute =
   SettingsInfinitusSessionsRouteImport.update({
     id: '/infinitus/sessions',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
+  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
@@ -312,6 +319,7 @@ export interface FileRoutesByTo {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
+  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus': typeof SettingsInfinitusIndexRoute
 }
@@ -352,6 +360,7 @@ export interface FileRoutesById {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/profiles': typeof SettingsInfinitusProfilesRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
+  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
+    | '/settings/infinitus/team'
     | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesByTo: FileRoutesByTo
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
+    | '/settings/infinitus/team'
     | '/settings/infinitus/themes'
     | '/settings/infinitus'
   id:
@@ -469,6 +480,7 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/profiles'
     | '/settings/infinitus/sessions'
+    | '/settings/infinitus/team'
     | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesById: FileRoutesById
@@ -687,6 +699,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsInfinitusThemesRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/infinitus/team': {
+      id: '/settings/infinitus/team'
+      path: '/infinitus/team'
+      fullPath: '/settings/infinitus/team'
+      preLoaderRoute: typeof SettingsInfinitusTeamRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/infinitus/sessions': {
       id: '/settings/infinitus/sessions'
       path: '/infinitus/sessions'
@@ -788,6 +807,7 @@ interface SettingsRouteChildren {
   SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
   SettingsInfinitusProfilesRoute: typeof SettingsInfinitusProfilesRoute
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
+  SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
   SettingsInfinitusThemesRoute: typeof SettingsInfinitusThemesRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
 }
@@ -811,6 +831,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
   SettingsInfinitusProfilesRoute: SettingsInfinitusProfilesRoute,
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
+  SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
   SettingsInfinitusThemesRoute: SettingsInfinitusThemesRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
 }

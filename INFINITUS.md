@@ -324,9 +324,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the nine Infinitus
+- `apps/web/src/components/settings/settingsSearch.ts` — the ten Infinitus
   `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
+  Sessions since #743, Lock and Team since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
@@ -344,7 +344,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   capture sound, and the `completion-sound` search item in
   `settingsSearch.ts`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all nine where no
+  Infinitus path and the capability filter that hides all ten where no
   connected server reaches an Infinitus app.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -353,13 +353,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
 - `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
   marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
   instead of the pairing form, so the browser does not spend a phone's token.
-- `apps/web/src/routes/settings.infinitus*.tsx` (nine new files in upstream's
+- `apps/web/src/routes/settings.infinitus*.tsx` (ten new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Sessions
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
   the Menu bar page keeps `display` + `about`; a section the build lacks
-  renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3) and
+  renders "no … settings yet"; Lock is `InfinitusLockPanel` and Team
+  `InfinitusTeamPanel`, #747 step 3) and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
@@ -464,6 +465,21 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
   carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
+- `apps/web/src/components/settings/infinitus/InfinitusTeamPanel.tsx` (+
+  `team.logic.ts`, route `settings.infinitus.team.tsx`) — Settings › Infinitus
+  › Team (#747 step 3): `team-status` over `infinitus.command` (null = no
+  team) drawn as the team row (name, role, masked remote, last fetch /
+  publish, Fetch now → `team-fetch`, Publish now → `team-publish` then a
+  read), the Members roster, and for a leader the Requests with Approve /
+  Decline (`team-approve` / `team-decline <kid>`). With no team, Join: this
+  Mac's roster name as the manifest's `<your name>` positional (so the
+  `infinitus.secret` args key is literally `"your name"`), the team code or
+  invite link on `secret` — a `type="password"` `autoComplete="off"` field
+  held in memory only, cleared on submit and gone with the page; the Mac's
+  error verbatim and the code never interpolated. The server's four secret
+  refusals get a plain sentence each (`infinitusSecretFailure`). Gated on
+  `team-status`; Join also on `team-join` with `stdin: "secret"`. Create and
+  Hostnames follow in their own PRs.
 - `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
   the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
   shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
