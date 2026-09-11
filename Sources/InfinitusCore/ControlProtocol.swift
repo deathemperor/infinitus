@@ -143,15 +143,22 @@ public struct ControlCommand: Codable, Sendable, Equatable {
     public let requires: String?
     public let summary: String
     public let replyShape: String
+    /// What the request line's `secret` field (the CLI's stdin) carries:
+    /// `"secret"` — a credential or code, never logged, never echoed;
+    /// `"payload"` — a message or hook body; nil — nothing is read. A
+    /// client must not send a secret to a verb that does not declare
+    /// `"secret"` (#747).
+    public let stdin: String?
 
     public init(name: String, args: [String] = [], options: [String] = [],
-                effect: Effect, requires: String? = nil,
+                effect: Effect, requires: String? = nil, stdin: String? = nil,
                 summary: String, replyShape: String) {
         self.name = name
         self.args = args
         self.options = options
         self.effect = effect
         self.requires = requires
+        self.stdin = stdin
         self.summary = summary
         self.replyShape = replyShape
     }
@@ -208,17 +215,17 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        effect: .human,
                        summary: "Run the AWS sign-in for a profile and report the URL to open on another device: the relay flow (plain `aws login`, the phone's browser intercepts the localhost callback → `aws-login-callback`), the SSO device-code flow for sso_session profiles, or --remote (`aws login --remote`, code pasted back via `aws-login-code`); --local opens this Mac's browser instead; --status only reports the profile's login and starts nothing. Watch `aws-logins` for the state.",
                        replyShape: "{state: {profile, flow, phase, url, userCode, message}}"),
-        ControlCommand(name: "aws-login-callback", args: ["<profile>"], effect: .write,
+        ControlCommand(name: "aws-login-callback", args: ["<profile>"], effect: .write, stdin: "secret",
                        summary: "Relay flow: feed the redirect the phone's browser intercepted (read from stdin) to the waiting login — `http://127.0.0.1:<port>/oauth/callback?code=…` for `aws login`, `http://localhost:8085/?code=…` for `gcloud auth login`; the Mac replays it against the CLI's own listener.",
                        replyShape: "{state}"),
-        ControlCommand(name: "aws-login-code", args: ["<profile>"], effect: .write,
+        ControlCommand(name: "aws-login-code", args: ["<profile>"], effect: .write, stdin: "secret",
                        summary: "Feed the authorization code read from stdin to the waiting `aws login --remote` for that profile.",
                        replyShape: "{state}"),
         ControlCommand(name: "gcloud-login", args: ["<account|default|application-default>"], options: ["--pid <session pid>", "--local", "--remote", "--status"],
                        effect: .human,
                        summary: "Run the gcloud sign-in for an account (`gcloud auth login`, or `auth application-default login` for application-default) and report the URL to open on another device: the relay flow (the phone's browser intercepts the localhost:8085 callback → `aws-login-callback`), or --remote (`--no-launch-browser`, the page ends with a verification code pasted back via `gcloud-login-code`); --local opens this Mac's browser instead; --status only reports the login and starts nothing. Watch `aws-logins` for the state (provider \"gcloud\").",
                        replyShape: "{state: {profile, provider, flow, phase, url, message}}"),
-        ControlCommand(name: "gcloud-login-code", args: ["<account|default|application-default>"], effect: .write,
+        ControlCommand(name: "gcloud-login-code", args: ["<account|default|application-default>"], effect: .write, stdin: "secret",
                        summary: "Feed the verification code read from stdin to the waiting `gcloud auth login` for that account.",
                        replyShape: "{state}"),
         ControlCommand(name: "ignite", args: ["<fleet>", "<n>"], effect: .write, requires: "ignite",
@@ -244,7 +251,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "signin-status", args: ["<flowId>"], effect: .read,
                        summary: "Where the sign-in stands; error carries the CLI's own rejection wording.",
                        replyShape: "{flowId, phase: starting|waitingForCode|waitingForToken|registering|done|failed, error?, url?, pasteCode:Bool, account?}"),
-        ControlCommand(name: "signin-code", args: ["<flowId>"], effect: .write,
+        ControlCommand(name: "signin-code", args: ["<flowId>"], effect: .write, stdin: "secret",
                        summary: "Hand the code from the OAuth success page (stdin, never argv) to the waiting sign-in; ok:false carries the CLI's rejection.",
                        replyShape: "{ok:Bool, error?}"),
         ControlCommand(name: "signin-cancel", args: ["<flowId>"], effect: .write,
@@ -315,11 +322,11 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "CLIProxyAPI settings: base URL, whether a key is stored, routing strategy.",
                        replyShape: "{baseURL, keyPresent, routingStrategy?, error?}"),
         ControlCommand(name: "proxy-key", options: ["--url <base URL, default http://127.0.0.1:8317>"],
-                       effect: .restart,
+                       effect: .restart, stdin: "secret",
                        summary: "Store the management key read from stdin in the keychain. Empty stdin clears it. The app relaunches.",
                        replyShape: "{restarting:true}"),
         ControlCommand(name: "9router-password", options: ["--url <base URL, default http://127.0.0.1:20128>"],
-                       effect: .restart,
+                       effect: .restart, stdin: "secret",
                        summary: "Store the 9Router dashboard password read from stdin in the keychain. Empty stdin clears it. The app relaunches.",
                        replyShape: "{restarting:true}"),
         ControlCommand(name: "proxy-routing", args: ["fill-first|round-robin|weighted-round-robin"],
@@ -329,10 +336,10 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "team-discoverable", args: ["on|off"], effect: .write,
                        summary: "Advertise this Mac to teams on the LAN (TXT d=1, /team/key and /team/request), or hide it.",
                        replyShape: "{discoverable}"),
-        ControlCommand(name: "event", effect: .write,
+        ControlCommand(name: "event", effect: .write, stdin: "payload",
                        summary: "A Claude Code hook payload on stdin (the plugin's Notification/Stop hooks): a prompt is pushed the moment it appears, then the fleet refreshes.",
                        replyShape: "{pid?}"),
-        ControlCommand(name: "approve", effect: .read,
+        ControlCommand(name: "approve", effect: .read, stdin: "payload",
                        summary: "A PreToolUse hook payload on stdin: {decision: allow} when the phone allowed that tool for this session, else {decision: ask}.",
                        replyShape: "{decision}"),
         ControlCommand(name: "sessions", effect: .read,
@@ -372,7 +379,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "session-mode", args: ["<pid|name>", "<supervised|acceptEdits|bypassPermissions>"], effect: .write,
                        summary: "Moves a running session's permission mode for the plugin's PreToolUse hook: Auto-accept edits allows the editing tools, Full access every tool, supervised clears it. A mode set at start is a floor — it cannot be narrowed from here.",
                        replyShape: "{mode?, label}"),
-        ControlCommand(name: "send", args: ["<pid|name>"], effect: .write,
+        ControlCommand(name: "send", args: ["<pid|name>"], effect: .write, stdin: "payload",
                        summary: "Text on stdin goes to that session as if typed into its prompt (peer socket first, then its terminal).",
                        replyShape: "{outcome, channel?, detail?}"),
         ControlCommand(name: "machine", effect: .read,
@@ -384,7 +391,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "machine-reclaim", options: ["--yes"], effect: .destructive,
                        summary: "Remove stale cc-socks, stale session-env dirs, and temp files older than an hour that no process holds open. Refused without --yes.",
                        replyShape: "{result}"),
-        ControlCommand(name: "machine-hook", args: ["disable|restore|kill", "<owner>"], options: ["--yes"], effect: .destructive,
+        ControlCommand(name: "machine-hook", args: ["disable|restore|kill", "<owner>"], options: ["--yes"], effect: .destructive, stdin: "payload",
                        summary: "disable: move a tool's hook registrations out of ~/.claude/settings.json (a timestamped backup is written beside it); restore: put them back; kill: SIGTERM every live instance of its hooks and their helpers from the last `machine` sample (never a session's own pid), SIGKILL the survivors after 3 s. Refused without --yes.",
                        replyShape: "{result}"),
     ]
