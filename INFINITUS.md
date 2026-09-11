@@ -139,7 +139,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
   `InfinitusNearbyServers` above the Host field (#651) and
   `InfinitusAskToApprove` under the code field (#710), whose approved
-  credential goes through the screen's own `connectAndClose`.
+  credential goes through the screen's own `connectAndClose`.; and its
+  deep-link prefill goes through `pairPrefill.logic.ts` (#724): host and code
+  fill in for the Infinitus variant outside `__DEV__` too, auto-connect stays
+  development-only.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`.
 - `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
