@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
@@ -6,7 +7,7 @@ import { usePrimaryEnvironment } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useAtomCommand } from "../state/use-atom-command";
-import { eventRepeatKey, eventToast, showCommandArgs } from "./infinitusEventToasts.logic";
+import { eventRepeatKey, eventToast, toastAction } from "./infinitusEventToasts.logic";
 
 /** Ids remembered before the oldest are forgotten; the snapshot only ever
     carries a poll's worth, so this is far more than a page will meet. */
@@ -23,7 +24,8 @@ interface Watched {
 
 /**
  * Turns the Infinitus host's new events into the app's toasts: an account
- * switch, every account exhausted, a session waiting for an answer. Nothing
+ * switch, every account exhausted, a session waiting for an answer — each
+ * with one Open action (`toastAction`). Nothing
  * from the first snapshot after mount (no replay on reload), nothing twice
  * (by the server's id), and a line the app re-emits unchanged only once. It
  * shares the sidebar accounts pill's subscription; on a page without the pill
@@ -40,6 +42,7 @@ export function useInfinitusEventToasts(): void {
   );
   const snapshot = query.data;
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const navigate = useNavigate();
   const watched = useRef<Watched | null>(null);
 
   useEffect(() => {
@@ -71,25 +74,22 @@ export function useInfinitusEventToasts(): void {
           type: toast.type,
           title: toast.title,
           ...(toast.description === undefined ? {} : { description: toast.description }),
-          ...(toast.action === "show-popout"
-            ? {
-                actionProps: {
-                  children: "Show",
-                  onClick: () => {
-                    void runCommand({
-                      environmentId,
-                      input: {
-                        command: "show",
-                        args: [...showCommandArgs(toast, snapshot.commands)],
-                        options: {},
-                      },
-                    });
-                  },
-                },
+          actionProps: {
+            children: "Open",
+            onClick: () => {
+              const action = toastAction(toast, snapshot.commands);
+              if (action.kind === "navigate") {
+                void navigate({ to: action.to });
+                return;
               }
-            : {}),
+              void runCommand({
+                environmentId,
+                input: { command: "show", args: [...action.args], options: {} },
+              });
+            },
+          },
         }),
       );
     }
-  }, [snapshot, environmentId, supported, runCommand]);
+  }, [snapshot, environmentId, supported, runCommand, navigate]);
 }

@@ -11,6 +11,14 @@ const testState = vi.hoisted(() => ({
   capability: true as boolean | undefined,
   addToast: vi.fn(),
   command: vi.fn(),
+  navigate: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate:
+    () =>
+    (...args: ReadonlyArray<unknown>) =>
+      testState.navigate(...args),
 }));
 
 vi.mock("../components/ui/toast", () => ({
@@ -85,6 +93,7 @@ beforeEach(() => {
   testState.capability = true;
   testState.addToast = vi.fn();
   testState.command = vi.fn().mockResolvedValue({ _tag: "Success", value: {} });
+  testState.navigate = vi.fn().mockResolvedValue(undefined);
 });
 
 describe("InfinitusEventToasts", () => {
@@ -138,7 +147,7 @@ describe("InfinitusEventToasts", () => {
     renderer.unmount();
   });
 
-  it("offers Show on a waiting session, which opens the pop-out on a host without show session", async () => {
+  it("offers Open on a waiting session, which goes to /activity when the host's show takes no session (#670)", async () => {
     testState.snapshot = snapshotWith([]);
     const renderer = await mount();
     await deliver(renderer, snapshotWith([waiting("w1")]));
@@ -148,17 +157,28 @@ describe("InfinitusEventToasts", () => {
       actionProps: { children: string; onClick: () => void };
     };
     expect(toast.type).toBe("warning");
-    expect(toast.actionProps.children).toBe("Show");
+    expect(toast.actionProps.children).toBe("Open");
 
     toast.actionProps.onClick();
-    expect(testState.command).toHaveBeenCalledWith({
-      environmentId,
-      input: { command: "show", args: ["popout"], options: {} },
-    });
+    expect(testState.navigate).toHaveBeenCalledWith({ to: "/activity" });
+    expect(testState.command).not.toHaveBeenCalled();
     renderer.unmount();
   });
 
-  it("Show opens the waiting session's own window when the host's show takes a session (#612)", async () => {
+  it("Open on account news goes to /accounts, never to the host", async () => {
+    testState.snapshot = snapshotWith([]);
+    const renderer = await mount();
+    await deliver(renderer, snapshotWith([exhausted("x1")]));
+    const toast = testState.addToast.mock.calls[0]![0] as {
+      actionProps: { onClick: () => void };
+    };
+    toast.actionProps.onClick();
+    expect(testState.navigate).toHaveBeenCalledWith({ to: "/accounts" });
+    expect(testState.command).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it("Open shows the waiting session's own window when the host's show takes a session (#612)", async () => {
     const showSession = {
       name: "show",
       args: [

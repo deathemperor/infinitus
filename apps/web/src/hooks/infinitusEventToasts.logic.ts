@@ -1,13 +1,13 @@
 import type { InfinitusEventRow, InfinitusManifestCommand } from "@t3tools/contracts/infinitus";
 
-/** What one event becomes on screen. `action` names the one follow-up a
-    toast can offer: opening the waiting session's window on the Infinitus
-    host — `pid` is the session the event names, when its text carries one. */
+/** What one event becomes on screen. `kind` is the news it carries (what
+    `toastAction` opens for it); `pid` is the session the event names, when
+    its text carries one. */
 export interface EventToast {
   readonly type: "error" | "warning" | "info";
   readonly title: string;
   readonly description?: string;
-  readonly action?: "show-popout";
+  readonly kind: "limit" | "switch" | "waiting";
   readonly pid?: number;
 }
 
@@ -43,10 +43,10 @@ export function eventToast(
 ): EventToast | null {
   const kind = event.kind ?? kindFromIcon(event.icon);
   if (kind === "limit") {
-    return { type: "error", title: "All accounts exhausted", description: event.text };
+    return { type: "error", title: "All accounts exhausted", description: event.text, kind };
   }
   if (kind === "switch") {
-    return { type: "info", title: "Switched accounts", description: event.text };
+    return { type: "info", title: "Switched accounts", description: event.text, kind };
   }
   if (
     kind === "other" &&
@@ -58,23 +58,32 @@ export function eventToast(
       type: "warning",
       title: "A session is waiting for you",
       description: event.text,
-      action: "show-popout",
+      kind: "waiting",
       ...(Number.isInteger(pid) && pid > 0 ? { pid } : {}),
     };
   }
   return null;
 }
 
-/** The Show action's command: the session's own window (`show session <pid>`,
-    #612) when the toast names a session and this build's `show` takes one, else
-    the pop-out. */
-export function showCommandArgs(
-  toast: Pick<EventToast, "pid">,
+/** The toast's one follow-up. The waiting session's own window on the Mac
+    (`show session <pid>`, #612) while this build's `show` still takes one;
+    otherwise a page of this app — the pop-out and the session windows are
+    retired (#670), so `show` is never sent without a session. Account news
+    (a limit, a switch) opens /accounts, a waiting session /activity. */
+export type ToastAction =
+  | { readonly kind: "command"; readonly args: ReadonlyArray<string> }
+  | { readonly kind: "navigate"; readonly to: "/accounts" | "/activity" };
+
+export function toastAction(
+  toast: Pick<EventToast, "kind" | "pid">,
   commands: ReadonlyArray<Pick<InfinitusManifestCommand, "name" | "args">>,
-): ReadonlyArray<string> {
+): ToastAction {
   const show = commands.find((command) => command.name === "show");
   const hasSession = show !== undefined && show.args.some((arg) => arg.includes("session"));
-  return toast.pid !== undefined && hasSession ? ["session", String(toast.pid)] : ["popout"];
+  if (toast.pid !== undefined && hasSession) {
+    return { kind: "command", args: ["session", String(toast.pid)] };
+  }
+  return { kind: "navigate", to: toast.kind === "waiting" ? "/activity" : "/accounts" };
 }
 
 /** What makes two events the same news: an `all-exhausted` re-emitted every
