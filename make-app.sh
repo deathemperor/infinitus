@@ -22,6 +22,18 @@ ln -s infinitusctl "$APP/Contents/MacOS/ictl"
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp tools/demo-swapd "$APP/Contents/Resources/demo-swapd"
+# The infinitus:// scheme belongs to the Infinitus desktop app once this
+# bundle is nested inside it (#270, #777): a nested build (the bundle-name
+# knob set) declares no URL type, so LaunchServices has one claimant; the
+# standalone build keeps join/pair links as before.
+if [ -z "${INFINITUS_BUNDLE_NAME:-}" ]; then
+URL_TYPES='    <key>CFBundleURLTypes</key><array><dict>
+        <key>CFBundleURLName</key><string>run.infinitus.join</string>
+        <key>CFBundleURLSchemes</key><array><string>infinitus</string></array>
+    </dict></array>'
+else
+URL_TYPES=""
+fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -39,17 +51,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
          ban acquired in the 2026-08-29 MenuBarExtra insert/evict war.
          Never change casually. -->
     <key>CFBundleIdentifier</key><string>run.infinitus</string>
-    <key>CFBundleName</key><string>Infinitus</string>
+    <!-- INFINITUS_BUNDLE_NAME (#777): the desktop nests this app as its
+         login item under "Infinitus Menu Bar" so Login Items and
+         Notification Center never show two "Infinitus"; the id stays. -->
+    <key>CFBundleName</key><string>${INFINITUS_BUNDLE_NAME:-Infinitus}</string>
+    <key>CFBundleDisplayName</key><string>${INFINITUS_BUNDLE_NAME:-Infinitus}</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION:-0.0.0}</string>
     <key>CFBundleVersion</key><string>${SHA}</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
-    <key>CFBundleURLTypes</key><array><dict>
-        <key>CFBundleURLName</key><string>run.infinitus.join</string>
-        <key>CFBundleURLSchemes</key><array><string>infinitus</string></array>
-    </dict></array>
+${URL_TYPES}
     <key>LSUIElement</key><true/>
     <key>NSLocalNetworkUsageDescription</key><string>Infinitus advertises the fleet snapshot to the Infinitus iPhone app on your local network (Sync → Phone companion).</string>
     <key>NSBonjourServices</key><array><string>_infinitus._tcp</string></array>

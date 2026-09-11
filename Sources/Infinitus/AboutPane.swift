@@ -33,6 +33,7 @@ final class AppReleaseModel: ObservableObject {
     /// Launch + every 6h: check when a day has passed — same cadence as
     /// the engine's own checker; the popup chip is what surfaces it.
     func startAutoCheck() {
+        guard !Nesting.isNested else { return }   // #777: the desktop updates the pair
         Task { [weak self] in
             while !Task.isCancelled {
                 if let self {
@@ -48,6 +49,7 @@ final class AppReleaseModel: ObservableObject {
     }
 
     func check() async {
+        if Nesting.isNested { status = "updates arrive with Infinitus desktop"; return }
         status = "checking…"
         updateAvailable = false
         struct Release: Decodable {
@@ -115,7 +117,8 @@ final class AppReleaseModel: ObservableObject {
 @MainActor
 final class BrewUpdater: ObservableObject {
     /// Raw value is the phone's `app.updateChannel` label (#121).
-    enum Channel: String { case source, stable, nightly }
+    /// `nested` (#777): inside the Infinitus desktop bundle, which updates it.
+    enum Channel: String { case source, stable, nightly, nested }
     @Published var running = false
     @Published var status: String?
     /// The app wires this to AppModel.relaunchApp, which waits for this
@@ -129,6 +132,7 @@ final class BrewUpdater: ObservableObject {
             .first { FileManager.default.isExecutableFile(atPath: $0) }
 
     static let channel: Channel = {
+        if Nesting.isNested { return .nested }
         // A dev build (unbundled, or built into the repo) must never
         // read the Caskroom as "this process came from brew" — only the
         // /Applications copy is the cask's.
@@ -152,6 +156,7 @@ final class BrewUpdater: ObservableObject {
         case .source: return "source build"
         case .stable: return "Homebrew"
         case .nightly: return "Homebrew (nightly)"
+        case .nested: return "bundled with Infinitus desktop"
         }
     }
 
@@ -261,6 +266,13 @@ struct AboutPane: View {
             }
 
             Section {
+              if BrewUpdater.channel == .nested {
+                LabeledContent {
+                    Text("Updates arrive with Infinitus desktop").font(.caption).foregroundStyle(.secondary)
+                } label: {
+                    Text("Infinitus \(appVersion) · \(brew.channelLabel)")
+                }
+              } else {
                 LabeledContent {
                     HStack {
                         if appRelease.updateAvailable, BrewUpdater.channel == .stable {
@@ -299,6 +311,7 @@ struct AboutPane: View {
                     }
                     .disabled(brew.running)
                 }
+              }
             } header: {
                 Text("Software Update")
             } footer: {

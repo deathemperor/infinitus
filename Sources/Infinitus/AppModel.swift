@@ -903,15 +903,18 @@ final class AppModel: ObservableObject {
     /// the fleet refreshes right after, so a turn's end shows up as fast
     /// as its prompts. Returns the session's pid when the record is known.
     func handleHookEvent(_ event: HookEvent) -> Int? {
-        let pid = event.sessionId.flatMap { id in
-            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                .first { $0.sessionId == id }.map { Int($0.pid) }
+        let record = event.sessionId.flatMap { id in
+            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.sessionId == id }
         }
+        let pid = record.map { Int($0.pid) }
+        // #777: nested in the desktop, the fork's own threads (SDK-entered,
+        // #648) are its to announce; terminal sessions stay the helper's.
+        let forkDriven = Nesting.isNested && (record?.resumedElsewhere ?? false)
         if event.name == "UserPromptSubmit", checkpointsEnabled, !isPlayground,
            let sessionId = event.sessionId, let cwd = event.cwd {
             recordCheckpoint(sessionId: sessionId, cwd: cwd, subject: event.prompt ?? "")
         }
-        if let line = event.pushLine, !isPlayground {
+        if let line = event.pushLine, !isPlayground, !forkDriven {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
             if let pid { pushTriggers.announceWaiting(pid: pid) }
             if pushWaiting { push(line) }
@@ -1713,6 +1716,9 @@ final class AppModel: ObservableObject {
     /// update, reusing the same BrewUpdater the About pane's button
     /// drives so the two never run two upgrades at once.
     private func triggerAppUpdate() -> AppUpdate.Reply {
+        guard BrewUpdater.channel != .nested else {
+            return AppUpdate.Reply(outcome: "unavailable", detail: "updates arrive with Infinitus desktop")
+        }
         guard BrewUpdater.channel != .source else {
             return AppUpdate.Reply(outcome: "unavailable",
                                    detail: "this Mac runs a source build — rebuild from the repo")
@@ -3061,13 +3067,27 @@ final class AppModel: ObservableObject {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
+        // #777: nested in the desktop, the fork's own threads (SDK-entered,
+        // #648) leave the "sessions done" and waiting counts — the desktop
+        // announces those itself; terminal sessions stay the helper's.
+        var live = list.liveSessions
+        if Nesting.isNested, let all = live, let details = all.sessions {
+            let forkPids = Set(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                .filter(\.resumedElsewhere).map { Int($0.pid) })
+            let fork = details.filter { forkPids.contains($0.pid) }
+            if !fork.isEmpty {
+                live = LiveSessions(busy: all.busy - fork.filter { $0.status == "busy" }.count,
+                                    total: all.total - fork.count,
+                                    sessions: details.filter { !forkPids.contains($0.pid) })
+            }
+        }
         let pushes = pushTriggers.tick(
-            busy: list.liveSessions?.busy, total: list.liveSessions?.total,
+            busy: live?.busy, total: live?.total,
             accounts: health,
             flags: .init(sessionsDone: pushSessionsDone,
                          allDead: pushAllDead, lastAlive: pushLastAlive,
                          waiting: pushWaiting, awsLogin: pushAwsLogin),
-            sessions: list.liveSessions?.sessions,
+            sessions: live?.sessions,
             awsLogins: awsLoginsScanned ? awsLogins : nil,
             now: Date())
         if pushTriggers.memory != persistedPushMemory {

@@ -97,6 +97,9 @@ struct InfinitusApp: App {
         // Menu bar app: no Dock icon, no main window.
         NSApplication.shared.setActivationPolicy(.accessory)
         Lifecycle.armed()
+        // #777: before AppModel — its ControlServer would unlink the
+        // running instance's socket.
+        if Nesting.yieldsToRunningTwin() { exit(0) }
         #if DEBUG
         // Hot reload (docs/guides/hot-reload.md): opt in per launch so the
         // playground/shots instances never dial the injection server.

@@ -1131,6 +1131,10 @@ final class ControlServer {
         let playground: Bool
         let socket: String
         let forkTunnel: ForkTunnelStatus
+        /// #777: where this process runs from, and whether that is inside
+        /// the desktop bundle — the desktop's reconcile quits only its own.
+        let bundlePath: String
+        let nested: Bool
     }
 
     private func status() -> Status {
@@ -1152,7 +1156,9 @@ final class ControlServer {
             signInRunning: TokenFlow.shared.running || model.addingFirstAccount,
             playground: model.isPlayground,
             socket: ControlProtocol.socketURL().path,
-            forkTunnel: model.forkTunnelStatus)
+            forkTunnel: model.forkTunnelStatus,
+            bundlePath: Nesting.bundlePath,
+            nested: Nesting.isNested)
     }
 
     static func names(_ caps: EngineCapabilities) -> [String] {
