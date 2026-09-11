@@ -236,13 +236,18 @@ describe("InfinitusResumeOnLimitLive", () => {
     () =>
       Effect.scoped(
         Effect.gen(function* () {
-          const kept: Array<{ threadId: ThreadId; run: Effect.Effect<void> }> = [];
+          const kept: Array<{
+            threadId: ThreadId;
+            replacesActiveTurn: boolean | undefined;
+            run: Effect.Effect<void>;
+          }> = [];
           const h = yield* makeHarnessWith({
-            start: <E, R>({ threadId: held, run }: TurnStartInput<E, R>) =>
+            start: <E, R>({ threadId: held, replacesActiveTurn, run }: TurnStartInput<E, R>) =>
               Effect.gen(function* () {
                 // What the real hold does: bind the caller's context, own the failures.
                 const context = yield* Effect.context<R>();
                 kept.push({
+                  replacesActiveTurn,
                   threadId: held,
                   run: run.pipe(Effect.provideContext(context), Effect.orDie),
                 });
@@ -259,6 +264,8 @@ describe("InfinitusResumeOnLimitLive", () => {
             (n) => n === 1,
           );
           expect(kept[0]?.threadId).toBe(threadId);
+          // The parked turn is still the thread's active one; the hold must not read it as a steer.
+          expect(kept[0]?.replacesActiveTurn).toBe(true);
           expect(yield* h.turns).toEqual([]);
           expect(yield* h.interrupts).toEqual([]);
           expect(yield* h.dispatched).toEqual([]);

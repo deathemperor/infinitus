@@ -14,7 +14,7 @@ import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
-import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
+import { TurnStartGate, type TurnStartInput } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
@@ -287,12 +287,12 @@ const InfinitusSessionHoldLive = Layer.effect(
     /** Whether this start waits: the fleet it spends on and the verdict, or
         null for a start that runs now. Anything unreadable runs now — a hold
         is never the safe default. */
-    const decide = (threadId: ThreadId) =>
+    const decide = (threadId: ThreadId, replacesActiveTurn: boolean) =>
       Effect.gen(function* () {
         const shell = yield* projectionSnapshotQuery.getThreadShellById(threadId);
         if (Option.isNone(shell) || shell.value.archivedAt !== null) return null;
         if (shell.value.pinnedAt != null) return null;
-        if (shell.value.session?.activeTurnId != null) return null;
+        if (!replacesActiveTurn && shell.value.session?.activeTurnId != null) return null;
         const info = yield* providerService.getInstanceInfo(shell.value.modelSelection.instanceId);
         const provider = fleetProviderForDriver(info.driverKind);
         if (provider === null) return null;
@@ -315,12 +315,9 @@ const InfinitusSessionHoldLive = Layer.effect(
       );
 
     return InfinitusSessionHold.of({
-      start: <E, R>(input: {
-        readonly threadId: ThreadId;
-        readonly run: Effect.Effect<void, E, R>;
-      }) =>
+      start: <E, R>(input: TurnStartInput<E, R>) =>
         Effect.gen(function* () {
-          const decision = yield* decide(input.threadId);
+          const decision = yield* decide(input.threadId, input.replacesActiveTurn === true);
           if (decision === null) {
             yield* input.run;
             return "started" as const;

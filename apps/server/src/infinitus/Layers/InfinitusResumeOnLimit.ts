@@ -208,6 +208,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           // its fleet reads low; run later, it resumes on the account live then.
           yield* turnStartGate.start({
             threadId: stop.threadId,
+            replacesActiveTurn: stop.kind === "parked",
             run: Effect.gen(function* () {
               const current = resumeTarget(stop, yield* infinitus.snapshot) ?? target;
               yield* resume(stop, current);

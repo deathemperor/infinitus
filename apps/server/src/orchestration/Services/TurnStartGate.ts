@@ -15,6 +15,10 @@ import * as Layer from "effect/Layer";
  */
 export interface TurnStartInput<E, R> {
   readonly threadId: ThreadId;
+  /** The send interrupts the thread's active turn and takes its place (a
+      resume of a parked turn): a gate that never holds a send into a running
+      turn (that is a steer) judges this one like a fresh start. */
+  readonly replacesActiveTurn?: boolean;
   /** The send itself, including its own failure handling. A start that runs
       now fails the way it always did; a gate that keeps it owns its later
       failures. It may need the caller's services (a scope to fork into, the

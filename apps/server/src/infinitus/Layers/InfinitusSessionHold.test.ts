@@ -166,6 +166,12 @@ const makeHarness = Effect.gen(function* () {
   return {
     start: (threadId: ThreadId, label: string = String(threadId)) =>
       gate.start({ threadId, run: Ref.update(ran, (list) => [...list, label]) }),
+    startReplacing: (threadId: ThreadId) =>
+      gate.start({
+        threadId,
+        replacesActiveTurn: true,
+        run: Ref.update(ran, (list) => [...list, String(threadId)]),
+      }),
     poll: (snapshot: InfinitusSnapshot) => Queue.offer(snapshots, snapshot).pipe(Effect.asVoid),
     setCurrent: (snapshot: InfinitusSnapshot) => Ref.set(current, snapshot),
     setShell: (shell: OrchestrationThreadShell) =>
@@ -255,6 +261,22 @@ describe("InfinitusSessionHoldLayers", () => {
         expect(yield* h.ran).toEqual(["thread-1"]);
         expect(yield* h.markers).toEqual([]);
         expect(yield* h.watchers).toBe(0);
+      }),
+    ),
+  );
+
+  effectIt.effect("holds a start that replaces the active turn (a resume of a parked turn)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.setShell(
+          shellFor(one, {
+            session: { activeTurnId: TurnId.make("turn-parked"), status: "running" } as never,
+          }),
+        );
+
+        expect(yield* h.startReplacing(one)).toBe("held");
+        expect(yield* h.ran).toEqual([]);
       }),
     ),
   );
