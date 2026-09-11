@@ -108,6 +108,16 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   completion; holds read from the rows' atoms via `appAtomRegistry`), the
   `thread.nextAttention` branch of the keydown handler and the
   `onNextAttentionThreadRequest` listener (#270 C).
+- `packages/shared/src/projectScripts.ts` — `projectScriptPortBlock` and the
+  `T3CODE_PORT`…`T3CODE_PORT_END` keys `projectScriptRuntimeEnv` adds: ten
+  ports per checkout, FNV-1a of the worktree path (the project root for a
+  local-checkout thread) into 10000–29999, `extraEnv` still overriding
+  (#270 J; test `projectScripts.test.ts`). Surfaced by the hint under the
+  Command field in `apps/web/src/components/projectScriptEditor.tsx` and the
+  `command` description in `packages/contracts/src/t3ProjectFile.ts` (the
+  published `t3.json` schema); the two exact-env assertions in
+  `apps/server/src/project/ProjectSetupScriptRunner.test.ts` became
+  `expect.objectContaining`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Jump to next waiting
   thread" action (`requestNextAttentionThread`) and its keydown match (#270 C).
 - `apps/web/src/components/chat/ChatComposer.tsx` — one block of hooks

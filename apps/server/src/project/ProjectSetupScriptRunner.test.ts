@@ -109,7 +109,10 @@ describe("ProjectSetupScriptRunner", () => {
         terminalId: "setup-default-setup",
         cwd: "/repo/worktrees/a",
         worktreePath: "/repo/worktrees/a",
-        env: { T3CODE_PROJECT_ROOT: "/repo/project", T3CODE_WORKTREE_PATH: "/repo/worktrees/a" },
+        env: expect.objectContaining({
+          T3CODE_PROJECT_ROOT: "/repo/project",
+          T3CODE_WORKTREE_PATH: "/repo/worktrees/a",
+        }),
       });
       expect(write).toHaveBeenCalledWith({
         threadId: "thread-1",
@@ -205,10 +208,10 @@ describe("ProjectSetupScriptRunner", () => {
           terminalId: "setup-setup",
           cwd: "/repo/worktrees/a",
           worktreePath: "/repo/worktrees/a",
-          env: {
+          env: expect.objectContaining({
             T3CODE_PROJECT_ROOT: "/repo/project",
             T3CODE_WORKTREE_PATH: "/repo/worktrees/a",
-          },
+          }),
         });
         expect(write).toHaveBeenCalledWith({
           threadId: "thread-1",

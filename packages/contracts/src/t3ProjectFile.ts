@@ -30,7 +30,7 @@ export const T3ProjectFileScript = Schema.Struct({
     description: `Display name for the script, shown in the ${PRODUCT_NAME} scripts menu.`,
   }),
   command: trimmedNonEmpty({
-    description: `Shell command executed in a ${PRODUCT_NAME} terminal at the project root.`,
+    description: `Shell command executed in a ${PRODUCT_NAME} terminal at the project root. The environment carries T3CODE_PROJECT_ROOT, T3CODE_WORKTREE_PATH (worktree threads) and T3CODE_PORT…T3CODE_PORT_END, ten ports derived from the checkout.`,
   }),
   icon: Schema.optionalKey(
     ProjectScriptIcon.annotate({
