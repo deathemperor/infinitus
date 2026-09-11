@@ -177,6 +177,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
   (active account + fullest window of the Mac the list follows, plus its
   waiting-session count) before the filter button, in the Android header.
+- `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
+  `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
+  explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
+  500 ms default is spent by a cold JavaScript regex engine compiling its
+  patterns, which fused the first line into one token on loaded CI (#610).
 - `apps/web/src/components/settings/settingsSearch.ts` — the five Infinitus
   `SettingsPath`s and their labels, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
@@ -484,6 +489,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
+- `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
+  — the #610 regression: a mocked regex engine whose first scan outlives
+  shiki's default per-line budget must still tokenize the whole line.
 
 - `scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over
   CDP pairs with a running web app, clicks through the first-run wizard, then
