@@ -12,6 +12,7 @@ import { environmentServerConfigsAtom } from "../../state/server";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
+import { noteLocalLiveActivityStart } from "../infinitus/liveActivityStarts";
 import { testCardLabel, toggleTestCard } from "../infinitus/testCard.logic";
 import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { SettingsRow } from "./components/SettingsRow";
@@ -51,6 +52,8 @@ export function SettingsInfinitusSection() {
   const pressTestCard = useCallback(async () => {
     const outcome = await toggleTestCard(InfinitusWorking);
     setLiveCards(countLiveCards());
+    // The bridge re-scans and files the new card's update token with the Mac.
+    if (outcome.action === "started") noteLocalLiveActivityStart();
     if (outcome.action === "failed") {
       Alert.alert("No card", `iOS refused the Live Activity: ${outcome.message}`);
     }
