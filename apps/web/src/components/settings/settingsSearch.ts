@@ -66,13 +66,13 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/integrations": "Integrations",
   "/settings/source-control": "Source Control",
   "/settings/connections": "Connections",
-  // The nav is flat, so every Infinitus page carries the prefix that would
-  // otherwise be a group header.
-  "/settings/infinitus": "Infinitus",
-  "/settings/infinitus/notifications": "Infinitus Notifications",
-  "/settings/infinitus/devices": "Infinitus Devices",
-  "/settings/infinitus/engines": "Infinitus Engines",
-  "/settings/infinitus/profiles": "Infinitus Profiles",
+  // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
+  // catalog page is named for what it holds, the menu bar and popup prefs.
+  "/settings/infinitus": "Menu bar",
+  "/settings/infinitus/notifications": "Notifications",
+  "/settings/infinitus/devices": "Devices",
+  "/settings/infinitus/engines": "Engines",
+  "/settings/infinitus/profiles": "Profiles",
   "/settings/archived": "Archive",
 };
 

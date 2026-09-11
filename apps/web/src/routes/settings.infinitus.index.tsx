@@ -8,7 +8,7 @@ function SettingsInfinitusRoute() {
   return (
     <InfinitusPrefsPanel
       sectionSlugs={["display", "themes", "about"]}
-      title="Infinitus"
+      title="Menu bar"
       footer={
         <>
           <InfinitusResumeCard />
