@@ -32,7 +32,7 @@ public struct CLIError: Error, Sendable {
 }
 
 /// Thin async wrapper over Process for one-shot cswap commands.
-/// The supervised `cswap auto` child is CswapSupervisor's job, not this.
+/// The supervised `cswap auto` child is EngineSupervisor's job, not this.
 public struct CswapCLI: Sendable {
     public let binaryPath: String
 

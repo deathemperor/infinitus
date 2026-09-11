@@ -132,13 +132,10 @@ public enum PrefCatalog {
         Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),
         Entry("fork_tunnel_hostname", .string, .string(""), devices),
         // Engines: the `engine` command relaunches the app for these.
-        Entry("engine_cswap_enabled", .bool, .bool(true), engines, effect: .restart),
-        Entry("engine_swapd_enabled", .bool, .bool(false), engines, effect: .restart),
+        Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_cliproxy_enabled", .bool, .bool(false), engines, effect: .restart),
         Entry("engine_9router_enabled", .bool, .bool(false), engines, effect: .restart),
         // About: updates.
-        Entry("update_auto_check", .bool, .bool(true), about),
-        Entry("update_auto_install", .bool, .bool(false), about),
         Entry("update_channel", .string, .string("stable"), about, choices: strings(["stable", "nightly"])),
         // Sessions: the headroom mode (#616) — `hold` publishes a per-fleet
         // verdict on `fleets` that holds background sessions while low.

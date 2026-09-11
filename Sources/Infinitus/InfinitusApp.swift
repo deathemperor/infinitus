@@ -87,12 +87,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
-    @StateObject private var settingsModel: SettingsModel
     @StateObject private var reliabilityModel: ResumeReliabilityModel
-    @StateObject private var notifyModel: NotifyModel
-    @StateObject private var usageModel: UsageModel
     @StateObject private var utilizationModel = UtilizationModel()
-    @StateObject private var updateModel: UpdateModel
     @StateObject private var appRelease: AppReleaseModel
     @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -114,22 +110,8 @@ struct InfinitusApp: App {
         RenameMigration.run()   // before anything reads App Support
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
-        let settingsModel = SettingsModel(cli: model.cswap)
-        _settingsModel = StateObject(wrappedValue: settingsModel)
-        let notifyModel = NotifyModel(cli: model.cswap)
-        _notifyModel = StateObject(wrappedValue: notifyModel)
-        // The spend estimate is `cswap usage`: with the engine off the
-        // app must not shell cswap at all (#475, the swapd cutover).
-        let usage = UsageModel(cli: model.cswapEnabled ? model.cswap : nil)
-        _usageModel = StateObject(wrappedValue: usage)
-        model.usageModel = usage   // the cswap fleet's cash column
         let utilization = UtilizationModel()
         _utilizationModel = StateObject(wrappedValue: utilization)
-        let update = UpdateModel(cli: model.cswap)
-        _updateModel = StateObject(wrappedValue: update)
-        update.restartEngine = { [weak model] in model?.restartEngine() }
-        update.startAutoCheck()
-        model.updateModel = update
         let release = AppReleaseModel()
         _appRelease = StateObject(wrappedValue: release)
         release.onUpdate = { [weak model] in model?.appUpdateVersion = $0 }
@@ -144,21 +126,16 @@ struct InfinitusApp: App {
         brew.relaunch = { model.relaunchApp() }
         let reliabilityModel = ResumeReliabilityModel()
         _reliabilityModel = StateObject(wrappedValue: reliabilityModel)
-        // Warm the multi-second transcript scan at launch so the Usage tab
-        // and the gamified gold column open onto data, not a spinner.
-        usage.loadIfNeeded()
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
             appDelegate?.statusHolder = StatusItemHolder(
-                model: model, usage: usage,
+                model: model,
                 settingsTabs: {
                     settingsTabs(
-                        model: model, settingsModel: settingsModel,
-                        reliabilityModel: reliabilityModel,
-                        notifyModel: notifyModel, usageModel: usage,
+                        model: model, reliabilityModel: reliabilityModel,
                         utilizationModel: utilization,
                         statsModel: model.statsModel,
-                        updateModel: update, appRelease: release, brew: brew)
+                        appRelease: release, brew: brew)
                 })
         }
         model.startFeeds()
@@ -185,12 +162,10 @@ struct InfinitusApp: App {
         // macOS 15+, and SceneBuilder takes no #available branch.)
         Settings {
             SettingsRoot(tabs: settingsTabs(
-                model: model, settingsModel: settingsModel,
-                reliabilityModel: reliabilityModel,
-                notifyModel: notifyModel, usageModel: usageModel,
+                model: model, reliabilityModel: reliabilityModel,
                 utilizationModel: utilizationModel,
                 statsModel: model.statsModel,
-                updateModel: updateModel, appRelease: appRelease, brew: brew))
+                appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
         // would hide it again — "opened and closed immediately", user
@@ -211,12 +186,10 @@ struct InfinitusApp: App {
 /// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
-    model: AppModel, settingsModel: SettingsModel,
-    reliabilityModel: ResumeReliabilityModel,
-    notifyModel: NotifyModel, usageModel: UsageModel,
+    model: AppModel, reliabilityModel: ResumeReliabilityModel,
     utilizationModel: UtilizationModel,
     statsModel: StatsModel,
-    updateModel: UpdateModel, appRelease: AppReleaseModel, brew: BrewUpdater
+    appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
     // "reorder the settings"): everyday looks first, plumbing after,
@@ -237,11 +210,8 @@ struct InfinitusApp: App {
                     view: AnyView(ThemesPane(model: model))),
         SettingsTab(title: "Push", symbol: "antenna.radiowaves.left.and.right",
                     tint: .red,
-                    keywords: ["slack", "telegram", "webhook", "notification"],
-                    view: AnyView(NotifyPane(model: notifyModel, app: model))),
-        SettingsTab(title: "Usage", symbol: "chart.bar", tint: .green,
-                    keywords: ["spend", "cost", "tokens", "estimate"],
-                    view: AnyView(UsagePane(model: usageModel))),
+                    keywords: ["push", "phone", "notification", "sessions", "accounts"],
+                    view: AnyView(NotifyPane(app: model))),
         SettingsTab(title: "Utilization", symbol: "chart.xyaxis.line",
                     tint: .mint,
                     keywords: ["history", "utilization", "waste", "window",
@@ -292,26 +262,17 @@ struct InfinitusApp: App {
                     image: AboutPane.infinitusIcon,
                     view: AnyView(AboutPane(appRelease: appRelease, brew: brew))),
         // Providers under everything, CodexBar-style (user 2026-08-30).
-        // The engine is cswap; Claude is what it drives (user 2026-08-30:
+        // The engine is swapd; Claude is what it drives (user 2026-08-30:
         // "claude is not an engine, cswap is").
-        SettingsTab(title: "cswap", symbol: "asterisk",
-                    keywords: ["engine", "auto switch", "interval", "config",
-                               "threshold", "rotate", "claude", "provider",
-                               "update", "upgrade", "pypi",
-                               "nudge", "resume", "wake", "session"],
-                    // "on" = the engine is enabled and found; whether its
-                    // auto-switch child runs is the tab's own business.
-                    provider: ProviderBadge(live: model.cswapRegistered),
-                    view: AnyView(ClaudeEnginePane(model: model,
-                                                   settings: settingsModel,
-                                                   update: updateModel,
-                                                   reliability: reliabilityModel))),
         SettingsTab(title: "swapd", symbol: "bolt.horizontal",
-                    keywords: ["swapd", "engine", "provider", "claude", "codex",
-                               "kiro", "gemini", "preview", "rust"],
+                    keywords: ["swapd", "engine", "auto switch", "rotate", "provider",
+                               "claude", "codex", "kiro", "gemini", "rust",
+                               "nudge", "resume", "wake", "session", "demo", "mock"],
+                    // "on" = the engine is enabled and found; whether its
+                    // auto-switch daemon runs is the tab's own business.
                     provider: ProviderBadge(live: model.swapdRegistered
                                             && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model))),
+                    view: AnyView(SwapdEnginePane(model: model, reliability: reliabilityModel))),
         SettingsTab(title: "CLIProxyAPI", symbol: "network",
                     keywords: ["proxy", "cliproxy", "router", "management",
                                "key", "engine", "provider", "claude"],
@@ -526,7 +487,6 @@ struct SettingsRoot: View {
 
 struct MenuContent: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var usage: UsageModel
     /// False in the pop-out: PinnedRoot already wears the header as its
     /// drag strip, and two of them would stack.
     var showHeader = true
@@ -991,7 +951,7 @@ struct MenuContent: View {
     private var engineTip: String {
         switch model.engineState {
         case .running: return "auto-switch running — click to stop"
-        case .refused: return "Another auto-switch engine (TUI or cswap auto) holds the mutex."
+        case .refused: return "Another auto-switch daemon (a stray swapd auto) holds the engine's mutex."
         case .backingOff(let s): return "engine retrying in \(Int(s))s — click to stop"
         case .schemaMismatch: return "update the app"
         case .stopped: return "auto-switch off — click to start"
@@ -1053,9 +1013,9 @@ private struct PopupScale: ViewModifier {
 // with the iOS app.
 
 
-/// First-run card when no cswap binary exists (todo 2026-08-30):
-/// explains the engine, offers a one-click install (uv), never
-/// auto-installs. The rest of the popup chrome stays functional.
+/// First-run card when no swapd binary exists (todo 2026-08-30):
+/// explains the engine and quotes its install line. The rest of the
+/// popup chrome stays functional.
 /// The onboarding cards' text column. A fixed width, not `maxWidth`:
 /// the popup measures its content under two-axis `fixedSize()`, where a
 /// `maxWidth` cap proposes an unbounded width and the text measures as
@@ -1069,12 +1029,12 @@ struct OnboardingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if model.cswap != nil {
-                // Installed, but every engine is switched off (cswap
+            if model.swapd != nil {
+                // Installed, but every engine is switched off (swapd
                 // toggled off, no proxy key) — nothing to install.
                 Text("All engines are off")
                     .font(.headline)
-                Text("cswap is installed but switched off, and no "
+                Text("swapd is installed but switched off, and no "
                      + "CLIProxyAPI key is saved. Turn one on to see "
                      + "your accounts.")
                     .font(.caption)
@@ -1096,36 +1056,20 @@ struct OnboardingCard: View {
     @ViewBuilder private var installCopy: some View {
         Text("Welcome to Infinitus")
             .font(.headline)
-        Text("The claude-swap engine isn't installed — it does the "
+        Text("The swapd engine isn't installed — it does the "
              + "account switching and usage reading. Infinitus is "
-             + "the cockpit; cswap is the engine.")
+             + "the cockpit; swapd is the engine.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-        HStack(spacing: 8) {
-            Button {
-                model.installEngine()
-            } label: {
-                if model.installingEngine {
-                    HStack(spacing: 5) {
-                        ProgressView().controlSize(.small)
-                        Text("Installing…")
-                    }
-                } else {
-                    Label("Install engine", systemImage: "arrow.down.circle")
-                }
-            }
-            .disabled(model.installingEngine)
-            Text("or run: uv tool install claude-swap")
-                .font(.caption).monospaced()
-                .foregroundStyle(.tertiary)
-                .textSelection(.enabled)
-        }
-        if let msg = model.installMessage {
-            Text(msg).font(.caption).foregroundStyle(.secondary)
-        }
-        Text("Then add your first account:  cswap add")
+        Text("Install it, then relaunch:  \(OnboardingBrief.swapdInstallCommand)")
+            .font(.caption).monospaced()
+            .foregroundStyle(.tertiary)
+            .textSelection(.enabled)
+            .frame(width: onboardingTextWidth, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+        Text("Then add your first account:  swapd add")
             .font(.caption).monospaced()
             .foregroundStyle(.tertiary)
             .textSelection(.enabled)
@@ -1161,7 +1105,7 @@ struct OnboardingBriefButton: View {
 }
 
 /// Engine present, fleet empty: adopt whatever this machine already has
-/// (todo 2026-09-01). `cswap add` registers Claude Code's current login.
+/// (todo 2026-09-01). `swapd add` registers Claude Code's current login.
 struct FirstAccountCard: View {
     @ObservedObject var model: AppModel
 
@@ -1197,7 +1141,7 @@ struct FirstAccountCard: View {
                     .frame(width: onboardingTextWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Sign in with Claude Code first, then:  cswap add")
+                Text("Sign in with Claude Code first, then:  swapd add")
                     .font(.caption).monospaced()
                     .foregroundStyle(.tertiary)
                     .textSelection(.enabled)

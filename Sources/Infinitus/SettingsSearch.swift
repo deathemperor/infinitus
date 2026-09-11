@@ -25,7 +25,6 @@ enum SettingsSearchCatalog {
         switch pane {
         case "Display": return DisplayPane.searchEntries
         case "Themes": return ThemesPane.searchEntries
-        case "Usage": return UsagePane.searchEntries
         case "Utilization": return UtilizationPane.searchEntries
         case "Stats": return StatsPane.searchEntries
         case "Machine": return MachinePane.searchEntries

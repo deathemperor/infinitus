@@ -99,6 +99,32 @@ public struct SessionDetail: Codable, Sendable, Hashable {
 }
 
 extension LiveSessions {
+    /// The app's own scan of Claude Code's session records, in the shape
+    /// the engine feed used to carry (#756: cswap's `list --json` scanned
+    /// them engine-side; swapd reports none, so the app fills the primary
+    /// fleet's block itself). Busy rows first; a record with no status
+    /// counts as unknown.
+    public init(records: [ClaudeSessionRecord]) {
+        var counts: [String: Int] = [:]
+        let rows = records.map { r -> SessionDetail in
+            let status = r.status ?? "unknown"
+            counts[status, default: 0] += 1
+            return SessionDetail(pid: Int(r.pid), cwd: r.cwd, status: status, kind: r.kind,
+                                 startedAt: (r.startedAt?.timeIntervalSince1970 ?? 0) * 1000,
+                                 sessionId: r.sessionId.isEmpty ? nil : r.sessionId)
+        }
+        let order = ["busy": 0, "waiting": 1, "idle": 2, "shell": 3]
+        let sorted = rows.enumerated().sorted { a, b in
+            let ra = order[a.element.status] ?? 4, rb = order[b.element.status] ?? 4
+            return ra != rb ? ra < rb : a.offset < b.offset
+        }.map(\.element)
+        self.init(busy: counts["busy"] ?? 0, total: rows.count,
+                  idle: counts["idle"] ?? 0, waiting: counts["waiting"] ?? 0, shell: counts["shell"] ?? 0,
+                  unknown: rows.count - (counts["busy"] ?? 0) - (counts["idle"] ?? 0)
+                      - (counts["waiting"] ?? 0) - (counts["shell"] ?? 0),
+                  sessions: sorted)
+    }
+
     /// The same list with `status(pid)` overriding a session's status
     /// where it answers — an owned session's actor knows busy/idle/
     /// waiting, the roster record the engine scanned says nothing (#151),

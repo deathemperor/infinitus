@@ -1,7 +1,7 @@
 import XCTest
 @testable import InfinitusCore
 
-/// CswapSupervisor against a scripted fake `cswap` — real process spawning,
+/// EngineSupervisor against a scripted fake `swapd` — real process spawning,
 /// no real engine (running one here would fight the user's live menubar for
 /// the store mutex).
 final class SupervisorProcessTests: XCTestCase {
@@ -9,9 +9,9 @@ final class SupervisorProcessTests: XCTestCase {
 
     private func writeScript(_ body: String) throws {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cswapbar-tests-\(UUID().uuidString)")
+            .appendingPathComponent("infinitus-supervisor-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        scriptURL = dir.appendingPathComponent("cswap")
+        scriptURL = dir.appendingPathComponent("swapd")
         try "#!/bin/sh\n\(body)\n".write(to: scriptURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
@@ -29,7 +29,7 @@ final class SupervisorProcessTests: XCTestCase {
         // before `wait` returns (flaked ~1 in 3 full runs, 2026-09-03).
         gotPoll.assertForOverFulfill = false
         backedOff.assertForOverFulfill = false
-        let supervisor = CswapSupervisor(
+        let supervisor = EngineSupervisor(
             binaryPath: scriptURL.path,
             onLine: { line in
                 if case .event(let e) = line, e.kind == "poll" { gotPoll.fulfill() }
@@ -49,7 +49,7 @@ final class SupervisorProcessTests: XCTestCase {
         exit 1
         """)
         let refused = expectation(description: "refused state")
-        let supervisor = CswapSupervisor(
+        let supervisor = EngineSupervisor(
             binaryPath: scriptURL.path,
             onLine: { _ in },
             onState: { state in
@@ -65,7 +65,7 @@ final class SupervisorProcessTests: XCTestCase {
         try writeScript("sleep 30")
         let running = expectation(description: "running")
         let stopped = expectation(description: "stopped")
-        let supervisor = CswapSupervisor(
+        let supervisor = EngineSupervisor(
             binaryPath: scriptURL.path,
             onLine: { _ in },
             onState: { state in

@@ -31,7 +31,7 @@ final class SettingsSyncModel: ObservableObject {
     static let boolKeys: Set<String> = [
         "show_account_name", "title_scoped", "title_remaining", "title_icon_only",
         "compact_rows", "footer_actions_hidden",
-        "update_auto_check", "update_auto_install", "keep_awake", "keep_awake_display",
+        "keep_awake", "keep_awake_display",
         "sort_headroom",
         "push_sessions_done", "push_all_dead", "push_last_alive",
     ]
@@ -64,7 +64,7 @@ final class SettingsSyncModel: ObservableObject {
     /// strategy (2026-09-03 "my cswap config kept getting reverted").
     static var isDevInstance: Bool {
         ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] != nil
-            || ProcessInfo.processInfo.environment["INFINITUS_CSWAP"] != nil
+            || ProcessInfo.processInfo.environment["INFINITUS_SWAPD_CLI"] != nil
             || AppDefaults.standard.bool(forKey: "mock_mode")
             || Bundle.main.bundleIdentifier == nil
     }
@@ -166,13 +166,9 @@ final class SettingsSyncModel: ObservableObject {
                 app[key] = .string(s)
             }
         }
-        var engine: [String: String] = [:]
-        if let cli = model?.cswap, let cfg = try? await cli.configList() {
-            for entry in cfg.settings where entry.isSet {
-                engine[entry.key] = entry.value.editableText
-            }
-        }
-        return SyncSnapshot(app: app, themes: RowTheme.loadCustom(), engine: engine)
+        // Engine settings rode along as `cswap config` text; the Mac
+        // stops filling the field until a `swapd config` port (#756).
+        return SyncSnapshot(app: app, themes: RowTheme.loadCustom(), engine: [:])
     }
 
     private func apply(_ snap: SyncSnapshot, engine applyEngine: Bool = true) async {
@@ -190,19 +186,6 @@ final class SettingsSyncModel: ObservableObject {
         if snap.themes != RowTheme.loadCustom() {
             try? RowTheme.saveCustom(snap.themes)
             model?.reloadCustomThemes()
-        }
-        // Engine settings: set what differs, unset what the snapshot lost —
-        // without the unset leg two Macs ping-pong a removed key forever.
-        if applyEngine, let cli = model?.cswap, let current = try? await cli.configList() {
-            for entry in current.settings {
-                let want = snap.engine[entry.key]
-                let have = entry.isSet ? entry.value.editableText : nil
-                if let want, want != have {
-                    _ = try? await cli.run(["config", "set", entry.key, want])
-                } else if want == nil, entry.isSet {
-                    _ = try? await cli.run(["config", "unset", entry.key])
-                }
-            }
         }
     }
 }
