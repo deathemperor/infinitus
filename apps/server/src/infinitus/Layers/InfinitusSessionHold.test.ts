@@ -11,8 +11,10 @@ import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infin
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
@@ -109,6 +111,9 @@ const makeHarness = Effect.gen(function* () {
   const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
   const watchers = yield* Ref.make(0);
   const refreshes = yield* Ref.make(0);
+  /** Set, a snapshot read parks here: the decision is "still being read". */
+  const snapshotGate = yield* Ref.make<Deferred.Deferred<void> | null>(null);
+  const snapshotReads = yield* Ref.make(0);
 
   const layer = InfinitusSessionHoldLayers.pipe(
     Layer.provide(
@@ -143,7 +148,12 @@ const makeHarness = Effect.gen(function* () {
             Ref.get(shells).pipe(Effect.map((map) => Option.fromNullishOr(map.get(threadId)))),
         }),
         Layer.mock(InfinitusService)({
-          snapshot: Ref.get(current),
+          snapshot: Effect.gen(function* () {
+            yield* Ref.update(snapshotReads, (n) => n + 1);
+            const gate = yield* Ref.get(snapshotGate);
+            if (gate !== null) yield* Deferred.await(gate);
+            return yield* Ref.get(current);
+          }),
           changes: () =>
             Stream.unwrap(
               Effect.acquireRelease(
@@ -197,6 +207,8 @@ const makeHarness = Effect.gen(function* () {
     ),
     watchers: Ref.get(watchers),
     refreshes: Ref.get(refreshes),
+    gateSnapshot: (gate: Deferred.Deferred<void> | null) => Ref.set(snapshotGate, gate),
+    snapshotReads: Ref.get(snapshotReads),
   };
 });
 
@@ -419,6 +431,32 @@ describe("InfinitusSessionHoldLayers", () => {
         yield* settle(h.watchers, (n) => n === 0);
       }),
     ),
+  );
+
+  effectIt.effect(
+    "a pin that lands while the start's decision is still being read runs it instead of holding it",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarness;
+          const reading = yield* Deferred.make<void>();
+          yield* h.gateSnapshot(reading);
+          const start = yield* Effect.forkChild(h.start(one));
+          yield* settle(h.snapshotReads, (n) => n === 1);
+
+          // The pin arrives, and its event is handled, before the decision lands.
+          yield* h.setShell(shellFor(one, { pinnedAt: "2026-09-11T10:00:00Z" }));
+          yield* h.emit(domainEvent("thread.pinned", one));
+          for (let i = 0; i < 50; i += 1) yield* Effect.yieldNow;
+
+          yield* Deferred.succeed(reading, undefined);
+          yield* Fiber.join(start);
+          const ran = yield* settle(h.ran, (list) => list.length === 1);
+          expect(ran).toEqual(["thread-1"]);
+          expect(yield* h.markers).toEqual([]);
+          yield* settle(h.watchers, (n) => n === 0);
+        }),
+      ),
   );
 
   effectIt.effect("releases on the user's word, once", () =>

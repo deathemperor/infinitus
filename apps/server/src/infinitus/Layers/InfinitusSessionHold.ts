@@ -193,6 +193,18 @@ const InfinitusSessionHoldLive = Layer.effect(
       Effect.gen(function* () {
         switch (input.kind) {
           case "hold": {
+            // A pin that landed while the decision was being read was handled
+            // before this hold existed; it releases nothing, so honour it here.
+            const shell = yield* projectionSnapshotQuery
+              .getThreadShellById(input.held.threadId)
+              .pipe(Effect.catchCause(() => Effect.succeed(Option.none())));
+            if (Option.isSome(shell) && shell.value.pinnedAt != null) {
+              yield* Effect.logInfo("infinitus.session-hold.pinned-meanwhile", {
+                threadId: input.held.threadId,
+              });
+              yield* input.held.run;
+              return;
+            }
             const first = !held.some((entry) => entry.threadId === input.held.threadId);
             held = [...held, input.held];
             if (first) {
