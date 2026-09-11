@@ -6,6 +6,7 @@ import {
   buildFleetSection,
   buildForecast,
   buildSignInRows,
+  infinitusCapabilityAcross,
   signInCommandArgs,
   snapshotOffersAdd,
   snapshotSignInRunning,
@@ -150,10 +151,14 @@ export function AccountsPage() {
       ?.environmentId ??
     infinitusEnvironments[0]?.environmentId ??
     null;
-  const capability =
-    environmentId === null
-      ? undefined
-      : serverConfigs.get(environmentId)?.environment.capabilities.infinitus;
+  // Across every environment, not the chosen one: a server that answered
+  // `false` is unsupported even though it never becomes `environmentId`.
+  const capability = infinitusCapabilityAcross(
+    environments.map(
+      (environment) =>
+        serverConfigs.get(environment.environmentId)?.environment.capabilities.infinitus,
+    ),
+  );
 
   const snapshotQuery = useEnvironmentQuery(
     environmentId === null ? null : infinitusEnvironment.snapshot({ environmentId, input: {} }),

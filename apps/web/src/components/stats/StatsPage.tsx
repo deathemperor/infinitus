@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { infinitusPageState } from "@t3tools/client-runtime/state/infinitusAccounts";
 import {
   ACTIVITY_FOOTNOTE,
   activityRows,
@@ -116,7 +117,8 @@ export function StatsPage() {
   );
 
   let body: ReactNode;
-  if (capability !== true) {
+  const gate = infinitusPageState({ capability, snapshot });
+  if (gate === "unsupported") {
     body = (
       <section className="max-w-xl rounded-lg border p-4">
         <p className="text-muted-foreground text-sm">
@@ -124,9 +126,9 @@ export function StatsPage() {
         </p>
       </section>
     );
-  } else if (snapshot === null) {
+  } else if (gate === "loading" || snapshot === null) {
     body = <StatsSkeleton />;
-  } else if (!snapshot.available) {
+  } else if (gate === "unavailable") {
     body = (
       <AccountsUnavailable
         reason={snapshot.unavailableReason ?? null}

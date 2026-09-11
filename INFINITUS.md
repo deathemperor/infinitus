@@ -290,7 +290,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
   nothing lapsed); row/section/sign-in models come from
-  `packages/client-runtime/src/state/infinitusAccounts.ts`. Add account and
+  `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
+  `infinitusPageState` gates Accounts, Stats, Activity and Machine alike (#693):
+  only a server that answered `false` gets the missing-adapter copy; an
+  unanswered capability waits like a missing snapshot, and Accounts folds every
+  environment's answer together with `infinitusCapabilityAcross`. Add account and
   re-login (#671): a fleet whose capabilities carry `addOAuth` gets "Add
   account" in its header and "Sign in again" on a `relogin_required` row, both
   native's `add <fleet>` (the sign-in opens on the Mac), then the page polls
