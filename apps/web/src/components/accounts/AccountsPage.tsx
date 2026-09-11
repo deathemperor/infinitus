@@ -7,6 +7,7 @@ import {
   buildForecast,
   buildSignInRows,
   infinitusCapabilityAcross,
+  infinitusCapabilityOf,
   signInCommandArgs,
   snapshotOffersAdd,
   snapshotSignInRunning,
@@ -154,9 +155,8 @@ export function AccountsPage() {
   // Across every environment, not the chosen one: a server that answered
   // `false` is unsupported even though it never becomes `environmentId`.
   const capability = infinitusCapabilityAcross(
-    environments.map(
-      (environment) =>
-        serverConfigs.get(environment.environmentId)?.environment.capabilities.infinitus,
+    environments.map((environment) =>
+      infinitusCapabilityOf(serverConfigs.get(environment.environmentId)?.environment.capabilities),
     ),
   );
 

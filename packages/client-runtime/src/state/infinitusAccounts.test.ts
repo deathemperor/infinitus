@@ -14,6 +14,7 @@ import {
   buildFleetSection,
   buildForecast,
   infinitusCapabilityAcross,
+  infinitusCapabilityOf,
   infinitusPageState,
   buildSignInRows,
   signInCommandArgs,
@@ -405,6 +406,13 @@ describe("page state", () => {
       "unavailable",
     );
     expect(infinitusPageState({ capability: true, snapshot: snapshot() })).toBe("ready");
+  });
+
+  it("reads one server's answer: no config is unknown, an absent field is false", () => {
+    expect(infinitusCapabilityOf(undefined)).toBeUndefined();
+    expect(infinitusCapabilityOf({})).toBe(false);
+    expect(infinitusCapabilityOf({ infinitus: false })).toBe(false);
+    expect(infinitusCapabilityOf({ infinitus: true })).toBe(true);
   });
 
   it("folds every environment's answer into one capability", () => {

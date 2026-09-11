@@ -1,3 +1,4 @@
+import type { ExecutionEnvironmentCapabilities } from "@t3tools/contracts";
 import type {
   InfinitusAccount,
   InfinitusAwsLogin,
@@ -210,6 +211,17 @@ export function infinitusPageState(input: {
   if (input.capability === undefined || input.snapshot === null) return "loading";
   if (!input.snapshot.available) return "unavailable";
   return "ready";
+}
+
+/** One server's answer. No config yet is "not known yet"; a config that
+    arrived without the field is a server without the adapter at all (an
+    upstream one), which must show the missing-adapter copy, never a skeleton
+    for good. */
+export function infinitusCapabilityOf(
+  capabilities: Pick<ExecutionEnvironmentCapabilities, "infinitus"> | undefined,
+): boolean | undefined {
+  if (capabilities === undefined) return undefined;
+  return capabilities.infinitus ?? false;
 }
 
 /** One capability for the Accounts page, which spans every environment: any

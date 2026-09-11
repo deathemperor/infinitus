@@ -1,5 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import { infinitusPageState } from "@t3tools/client-runtime/state/infinitusAccounts";
+import {
+  infinitusCapabilityOf,
+  infinitusPageState,
+} from "@t3tools/client-runtime/state/infinitusAccounts";
 import {
   ACTIVITY_FOOTNOTE,
   activityRows,
@@ -56,7 +59,9 @@ const ESTIMATE_NOTE = "Estimates from transcripts and repos on the Mac, never bi
  */
 export function StatsPage() {
   const environmentId = usePrimaryEnvironmentId();
-  const capability = useAtomValue(primaryServerConfigAtom)?.environment.capabilities.infinitus;
+  const capability = infinitusCapabilityOf(
+    useAtomValue(primaryServerConfigAtom)?.environment.capabilities,
+  );
   const [period, setPeriod] = useLocalStorage<StatsPeriod, string>(
     PERIOD_KEY,
     "week",

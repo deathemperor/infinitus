@@ -1,5 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import { infinitusPageState } from "@t3tools/client-runtime/state/infinitusAccounts";
+import {
+  infinitusCapabilityOf,
+  infinitusPageState,
+} from "@t3tools/client-runtime/state/infinitusAccounts";
 import {
   bytesText,
   decodeMachineReply,
@@ -49,7 +52,9 @@ const SAMPLING_RETRY_MS = 5_000;
  */
 export function MachinePage() {
   const environmentId = usePrimaryEnvironmentId();
-  const capability = useAtomValue(primaryServerConfigAtom)?.environment.capabilities.infinitus;
+  const capability = infinitusCapabilityOf(
+    useAtomValue(primaryServerConfigAtom)?.environment.capabilities,
+  );
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const minute = useNowMinute();
   const ready = capability === true && environmentId !== null;
