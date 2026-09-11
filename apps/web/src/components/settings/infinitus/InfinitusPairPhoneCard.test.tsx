@@ -11,6 +11,7 @@ const { fake } = vi.hoisted(() => ({
     revoke: vi.fn(),
     loopback: true,
     exposure: null as { mode: string; endpointUrl: string | null } | null,
+    lan: [] as ReadonlyArray<string>,
   },
 }));
 
@@ -19,6 +20,7 @@ vi.mock("./InfinitusPrefsPanel", () => ({
     environmentId: "env-1",
     capability: true,
     snapshot: fake.snapshot,
+    serverLanOrigins: fake.lan,
   }),
 }));
 vi.mock("~/environments/primary", () => ({
@@ -99,6 +101,7 @@ describe("InfinitusPairPhoneCard", () => {
     fake.snapshot = null;
     fake.loopback = true;
     fake.exposure = null;
+    fake.lan = [];
     fake.create.mockReset();
     fake.revoke.mockReset();
     fake.revoke.mockResolvedValue(undefined);
@@ -193,7 +196,7 @@ describe("InfinitusPairPhoneCard", () => {
     try {
       renderer = mount();
 
-      expect(text(renderer)).toContain("only works for phones on your network");
+      expect(text(renderer)).toContain("only works for phones on your Wi‑Fi");
       expect(text(renderer)).toContain("Show QR");
     } finally {
       vi.unstubAllGlobals();
@@ -252,12 +255,12 @@ describe("InfinitusPairPhoneCard", () => {
     });
     try {
       renderer = mount();
-      expect(text(renderer)).toContain("Pair overInternetSame network");
-      expect(text(renderer)).not.toContain("only works for phones on your network");
+      expect(text(renderer)).toContain("Pair overInternetSame Wi‑Fi");
+      expect(text(renderer)).not.toContain("only works for phones on your Wi‑Fi");
 
-      const sameNetwork = buttons(renderer).find((node) => text0(node) === "Same network");
+      const sameNetwork = buttons(renderer).find((node) => text0(node) === "Same Wi‑Fi");
       act(() => sameNetwork?.props.onClick());
-      expect(text(renderer)).toContain("only works for phones on your network");
+      expect(text(renderer)).toContain("only works for phones on your Wi‑Fi");
 
       const show = buttons(renderer).find((node) => text0(node) === "Show QR");
       await act(async () => {
@@ -268,6 +271,31 @@ describe("InfinitusPairPhoneCard", () => {
       const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
       expect(qr[0]?.props.value).toBe(
         "http://192.168.1.20:3773/pair#token=fixture-token&for=phone",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("encodes the address the server reports when there is no desktop bridge and no tunnel (#651)", async () => {
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" } });
+    fake.lan = ["http://192.168.1.20:3773", "http://10.0.0.7:3773"];
+    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
+    fake.create.mockResolvedValue({
+      id: "link-1",
+      credential: "fixture-token",
+      expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
+    });
+    try {
+      renderer = mount();
+      expect(text(renderer)).toContain("only works for phones on your Wi‑Fi");
+      expect(text(renderer)).not.toContain("Network access is on under Settings › Connections");
+      const show = buttons(renderer).find((node) => text0(node) === "Show QR");
+      await act(async () => {
+        show?.props.onClick();
+      });
+      const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
+      expect(qr[0]?.props.value).toMatch(
+        /^http:\/\/192\.168\.1\.20:3773\/pair#token=fixture-token/,
       );
     } finally {
       vi.unstubAllGlobals();

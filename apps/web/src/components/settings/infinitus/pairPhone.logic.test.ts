@@ -61,7 +61,7 @@ describe("pairPhoneCardModel", () => {
 
     const sameNetwork = pairPhoneCardModel({ ...input, reach: "lan" });
     expect(sameNetwork.origin).toEqual({ kind: "lan", url: "http://192.168.1.20:3773" });
-    expect(sameNetwork.lanNotice).toMatch(/only works for phones on your network/);
+    expect(sameNetwork.lanNotice).toMatch(/only works for phones on your Wi‑Fi/);
     expect(sameNetwork.link).toMatchObject({
       kind: "active",
       url: "http://192.168.1.20:3773/pair#token=fixture-token&for=phone",
@@ -81,7 +81,7 @@ describe("pairPhoneCardModel", () => {
     expect(model.tunnelNotice).toMatch(/Turn on the Cloudflare quick tunnel/);
     expect(model.reachChoice).toBe(false);
     expect(model.origin).toEqual({ kind: "lan", url: "http://192.168.1.20:3773" });
-    expect(model.lanNotice).toMatch(/only works for phones on your network/);
+    expect(model.lanNotice).toMatch(/only works for phones on your Wi‑Fi/);
     expect(model.link.kind).toBe("active");
   });
 
@@ -213,7 +213,18 @@ describe("lanPairingOrigin", () => {
     expect(
       lanPairingOrigin({
         serverExposure: exposure("network-accessible", "http://192.168.1.20:3773"),
+        serverLanOrigins: ["http://10.0.0.7:3773"],
         pageOrigin: null,
+      }),
+    ).toBe("http://192.168.1.20:3773");
+  });
+
+  it("takes the first address the server reports when there is no desktop bridge (#651)", () => {
+    expect(
+      lanPairingOrigin({
+        serverExposure: null,
+        serverLanOrigins: ["http://192.168.1.20:3773", "http://10.0.0.7:3773"],
+        pageOrigin: "http://192.168.1.20:7422",
       }),
     ).toBe("http://192.168.1.20:3773");
   });
@@ -222,10 +233,13 @@ describe("lanPairingOrigin", () => {
     expect(
       lanPairingOrigin({
         serverExposure: exposure("local-only", null),
+        serverLanOrigins: [],
         pageOrigin: "http://192.168.1.20:7422",
       }),
     ).toBe("http://192.168.1.20:7422");
-    expect(lanPairingOrigin({ serverExposure: null, pageOrigin: null })).toBeNull();
+    expect(
+      lanPairingOrigin({ serverExposure: null, serverLanOrigins: [], pageOrigin: null }),
+    ).toBeNull();
   });
 });
 

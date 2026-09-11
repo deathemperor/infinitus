@@ -72,9 +72,9 @@ export interface PairPhoneCardModel {
   readonly link: PairPhoneLinkState;
 }
 
-const LAN_ONLY_NOTICE = "This link only works for phones on your network.";
+const LAN_ONLY_NOTICE = "This link only works for phones on your Wi‑Fi.";
 const LAN_UNAVAILABLE_NOTICE =
-  "Phones on your network can pair once Network access is on under Settings › Connections.";
+  "Phones on your Wi‑Fi can pair once Network access is on under Settings › Connections.";
 
 /** The Infinitus build that first reports the tunnel (native #588). */
 const FORK_TUNNEL_MIN_BUILD = "3bdc03cca";
@@ -133,20 +133,23 @@ export function isPhonePairingLink(url: URL): boolean {
 }
 
 /**
- * The origin a phone on the Mac's network can dial: the desktop server's
- * advertised LAN address while its Network access is on, else the page's own
- * origin when that is not loopback (a browser on another machine). A phone
- * can never dial the Mac's loopback, so a loopback-only setup yields null.
+ * The origin a phone on the Mac's Wi‑Fi can dial: the desktop server's
+ * advertised LAN address while its Network access is on, else the first
+ * address the server itself reports (`lanHttpBaseUrls`, #651 — a browser or
+ * a dev server has no desktop bridge), else the page's own origin when that
+ * is not loopback. A phone can never dial the Mac's loopback, so a
+ * loopback-only setup yields null.
  */
 export function lanPairingOrigin(input: {
   readonly serverExposure: DesktopServerExposureState | null;
+  readonly serverLanOrigins: ReadonlyArray<string>;
   readonly pageOrigin: string | null;
 }): string | null {
   const exposure = input.serverExposure;
   if (exposure?.mode === "network-accessible" && exposure.endpointUrl !== null) {
     return exposure.endpointUrl;
   }
-  return input.pageOrigin;
+  return input.serverLanOrigins[0] ?? input.pageOrigin;
 }
 
 export function pairPhoneCardModel(input: {

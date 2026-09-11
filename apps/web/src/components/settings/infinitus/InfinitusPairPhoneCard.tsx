@@ -1,11 +1,13 @@
 /**
  * "Pair a phone" on Settings › Infinitus › Devices: a QR of a one-time pairing
- * link whose host is the Mac's Cloudflare quick tunnel while it is up (else
- * this page's own LAN origin), so a phone off the network can reach this
- * server. The token is minted by upstream's pairing-token endpoint with the
- * standard scopes and TTL; nothing here adds an auth surface. The link carries
- * the phone marker, so a Camera-app scan that lands in Safari is told to use
- * the app instead of spending the code (#724).
+ * link whose host is the Mac's Cloudflare quick tunnel while it is up, else
+ * the server's own address on the Mac's Wi‑Fi (the desktop's advertised
+ * address, or what the server reports in `lanHttpBaseUrls`, #651), so a phone
+ * off the network or beside the Mac can reach this server. The token is
+ * minted by upstream's pairing-token endpoint with the standard scopes and
+ * TTL; nothing here adds an auth surface. The link carries the phone marker,
+ * so a Camera-app scan that lands in Safari is told to use the app instead
+ * of spending the code (#724).
  *
  * @module InfinitusPairPhoneCard
  */
@@ -38,7 +40,7 @@ function pageOrigin(): string | null {
 }
 
 export function InfinitusPairPhoneCard() {
-  const { snapshot } = useInfinitusEnvironment();
+  const { snapshot, serverLanOrigins } = useInfinitusEnvironment();
   const [link, setLink] = useState<PhonePairingLink | null>(null);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export function InfinitusPairPhoneCard() {
     forkTunnel: snapshot?.status?.forkTunnel,
     lanOrigin: lanPairingOrigin({
       serverExposure: desktopNetworkAccess.data?.serverExposureState ?? null,
+      serverLanOrigins,
       pageOrigin: pageOrigin(),
     }),
     reach,
@@ -126,7 +129,7 @@ export function InfinitusPairPhoneCard() {
                 size="sm"
                 onClick={() => setReach(option)}
               >
-                {option === "tunnel" ? "Internet" : "Same network"}
+                {option === "tunnel" ? "Internet" : "Same Wi‑Fi"}
               </Button>
             ))}
           </div>
