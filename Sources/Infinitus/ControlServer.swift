@@ -503,6 +503,20 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
+        case "history":
+            let fleet = try fleet(r)
+            guard fleet.capabilities.contains(.history), let swapd = fleet.engine as? SwapdEngine else {
+                throw Fail("\(fleet.id) keeps no switch history")
+            }
+            var limit: Int?
+            if let raw = r.options["limit"] {
+                guard let n = Int(raw), n > 0 else { throw Fail("usage: history <fleet> [--limit <n>]") }
+                limit = n
+            }
+            let history = try JSONDecoder().decode(JSONValue.self,
+                from: try await swapd.cli.historyData(provider: fleet.provider, limit: limit))
+            return ControlReply(ok: true, result: .object(["fleet": .string(fleet.id), "history": history]))
+
         case "reorder":
             let fleet = try fleet(r)
             guard fleet.capabilities.contains(.reorder) else { throw Fail("\(fleet.id) has no rotation order") }
@@ -742,6 +756,21 @@ final class ControlServer {
             // Compacted: `DayPoint.day` carries the 168-slot histogram
             // and the session set, which made `--period year` ~0.5 MB.
             return ControlReply(ok: true, result: try .of(summary.compacted()))
+
+        case "utilization":
+            // #747: the Utilization pane's figures, computed here, for the
+            // desktop app's page — history is file IO, so off the main actor.
+            let days = r.options["days"].flatMap(Int.init) ?? 7
+            guard (1...90).contains(days) else { throw Fail("usage: utilization [--days <1|7|30>]") }
+            let now = Date().timeIntervalSince1970
+            var snap = await Task.detached(priority: .utility) {
+                var snap = UtilizationModel.compute(days: days, now: now)
+                snap.rates = TokenRateScanner.scan(projectsDir: TokenRateScanner.defaultProjectsDir(),
+                                                   cacheURL: UtilizationModel.ratesCacheURL)
+                return snap
+            }.value
+            snap.liveRate = LiveForecastRelay.shared.tokenRate
+            return ControlReply(ok: true, result: try .of(snap))
 
         case "perf":
             var usage = rusage()

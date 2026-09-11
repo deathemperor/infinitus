@@ -304,6 +304,8 @@ echo "functional: ok ($N demo accounts, pop-out visible)"
 "$CTL" prefer swapd/claude 2 off | expect "$(acct 2).get('preferred')==False" || fail "unprefer 2 didn't take"
 NEXT="$("$CTL" fleets | json "d[0]['nextCandidate']")"
 "$CTL" rotate swapd/claude | expect "d['fleet']['activeNumber']==$NEXT" || fail "rotate didn't land on the next candidate ($NEXT)"
+"$CTL" history swapd/claude --limit 5 | expect "d['fleet']=='swapd/claude' and d['history']['schemaVersion']==1 and d['history']['switches'][0]['to']['slot']==2 and d['history']['switches'][0]['trigger']=='at-limit'" || fail "history hands the engine's switch log on"
+"$CTL" history swapd/claude --limit 0 >/dev/null 2>&1 && fail "history must refuse --limit 0"
 ORDER="$("$CTL" fleets | json "' '.join(str(a['number']) for a in d[0]['accounts'])")"
 REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
 "$CTL" reorder swapd/claude $REV | expect "[a['number'] for a in d['fleet']['accounts']]==[int(x) for x in '$REV'.split()]" || fail "reorder didn't take"
@@ -366,6 +368,8 @@ printf '123456:ABCdef' | "$CTL" push-telegram 2>&1 | grep -q "usage: push-telegr
 printf 'http://hooks.example/x' | "$CTL" push-slack 2>&1 | grep -q "https URL" || fail "push-slack must want https"
 "$CTL" push-slack </dev/null | expect "d['slack'] is False and d['telegram'] is False" || fail "push-slack with empty stdin forgets"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
+"$CTL" utilization --days 7 | expect "d['days']==7 and d['bucketSeconds']==1800 and isinstance(d['samples'], list) and d['windows'][:2]==['5h','7d'] and 'switches' in d['replay']" || fail "utilization verb (#747)"
+"$CTL" utilization --days 400 >/dev/null 2>&1 && fail "utilization must refuse an out-of-range day count"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
 # --- windows: Settings open idles too ------------------------------------
