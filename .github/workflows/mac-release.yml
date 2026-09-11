@@ -1,6 +1,10 @@
-name: Release
-# Tag push (v*) builds the app on the macOS 26 image (the glass chrome
-# needs its SDK to compile) and publishes the zip on the release.
+name: Mac release
+# Tag push (v*, the Mac app's own numbers — never the desktop's
+# v*-infinitus.* prereleases) builds apps/mac on the macOS 26 image (the
+# glass chrome needs its SDK to compile) and publishes the zips on the
+# release. Same tags and asset names as before #823, so the installed
+# apps' releases/latest poll and the desktop's native-helper.json pin
+# keep resolving.
 on:
   push:
     tags: ["v*"]
@@ -9,11 +13,14 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+defaults:
+  run:
+    working-directory: apps/mac
 jobs:
   release:
     # Tag pushes only — a workflow_dispatch dry run must not try to
-    # `gh release create` from a branch.
-    if: startsWith(github.ref, 'refs/tags/')
+    # `gh release create` from a branch — and never the desktop's tags.
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-infinitus.')
     runs-on: macos-26
     env:
       # secrets can't be referenced in `if:` directly; job env is the
@@ -22,7 +29,7 @@ jobs:
       # step-local to the import step.
       HAS_DEVID: ${{ secrets.DEVELOPER_ID_P12_BASE64 != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Developer ID + notarization run only when the secrets exist
       # (docs/RELEASING.md); without them the build is ad-hoc signed as
       # before. Order matters: sign → notarize the app → staple the app →
@@ -149,6 +156,7 @@ jobs:
   # tarball. Build is container-side; publishing runs on the plain
   # runner because `gh` doesn't exist in the swift image.
   linux-build:
+    if: "!contains(github.ref, '-infinitus.')"
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -159,7 +167,7 @@ jobs:
             arch: aarch64
     container: swift:6.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # A tag build reports its number (#486); a dispatch dry run stays "dev".
       - run: |
           case "$GITHUB_REF_NAME" in
@@ -177,12 +185,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
-          path: dist/
+          path: apps/mac/dist/
   linux-publish:
     needs: [release, linux-build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
           path: dist

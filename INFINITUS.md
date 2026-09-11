@@ -29,15 +29,22 @@ makes wrong, in its own PR.
   new files, new routes, new settings sections; edits to upstream files stay
   at registration points so merges stay small. The list of upstream files we
   edit on purpose is in "Registration points" below — keep it current.
-- **`native` is the Swift app.** Today's native Infinitus (menu bar,
-  engines, team, tunnels, mirror API, control socket, PTY host, Linux tray)
-  lives on the `native` branch with its own CLAUDE.md, CI and releases.
-  Never merge `main` into a native branch or `native` into `main` (unrelated
-  histories).
+- **`apps/mac` is the Swift app** (#823 layer 2, 2026-09-12). Today's
+  native Infinitus (menu bar, engines, team, tunnels, mirror API, control
+  socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
+  (read it when working there), its own CHANGELOG/VERSION, path-filtered
+  CI jobs (`mac-*` in ci.yml) and its own workflows (`mac-nightly.yml`,
+  `mac-linux-sanitize.yml`, `mac-release.yml`). It came in by `git subtree
+  add` from the frozen `native` branch, history included (the merge's
+  second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
+  `swift test`, `/bin/sh tools/e2e.sh`. infinitus.run is `apps/mac/site`,
+  deployed by hand with wrangler from that directory.
 - **Fork releases are GitHub prereleases with their own tag scheme.**
   Installed native apps poll `releases/latest` and the `nightly` tag; those
-  stay native forever. Never publish a fork release as latest, never tag
-  `nightly` from `main`. The fork's desktop releases are prereleases tagged
+  stay the Mac app's until layer 3 makes the one-app release the latest.
+  The Mac app's tags stay `v<version>` (mac-release.yml skips `-infinitus.`
+  tags). Never publish a fork release as latest, never tag `nightly` from
+  the desktop's builds. The fork's desktop releases are prereleases tagged
   `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
   channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
   On that channel an available update downloads itself

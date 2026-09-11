@@ -1,17 +1,21 @@
-name: Nightly
-# Daily build of main published on the rolling "nightly" prerelease.
-# The nightly cask is version :latest — update via `brew reinstall`.
+name: Mac nightly
+# Daily build of the Mac app (apps/mac) published on the rolling "nightly"
+# prerelease. The nightly cask is version :latest — update via `brew
+# reinstall`. Scheduled here directly since #823 moved the app into main.
 on:
   schedule:
     - cron: "0 17 * * *"   # 17:00 UTC = midnight GMT+7
   workflow_dispatch:
 permissions:
   contents: write
+defaults:
+  run:
+    working-directory: apps/mac
 jobs:
   nightly:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build app bundle
         run: ./make-app.sh
       - name: Zip
@@ -29,6 +33,6 @@ jobs:
           else
             gh release create nightly Infinitus-nightly.zip \
               --title "Nightly $(date -u +%Y-%m-%d) ($(git rev-parse --short HEAD))" \
-              --notes "Rolling build of main. brew reinstall infinitus@nightly to update." \
+              --notes "Rolling build of the Mac app. brew reinstall infinitus@nightly to update." \
               --prerelease
           fi

@@ -345,3 +345,221 @@ jobs:
 
       - name: Exercise release-only workflow steps
         run: node scripts/release-smoke.ts
+
+  # ---------------------------------------------------------------- apps/mac
+  # The native Swift app (menu bar, infinitusctl, the Linux tray) lives in
+  # apps/mac since #823 (layer 2). Its jobs are path-filtered: the job
+  # always runs and reports (so mac-test, mac-e2e and mac-linux can be
+  # required checks on main), but every step is skipped unless something
+  # under apps/mac/ or this workflow changed. macOS minutes bill ~6.7x a
+  # Linux minute, so a server-only PR pays nothing here.
+  mac_changes:
+    name: Mac Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+    steps:
+      - name: Detect Mac app changes
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -uo pipefail
+
+          fail_open() {
+            echo "$* Running the Mac jobs."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          count_rows() {
+            printf '%s\n' "$1" | grep -c . || true
+          }
+
+          row='[.filename, (.previous_filename // empty)] | @tsv'
+
+          if [[ -n "${PR_NUMBER}" ]]; then
+            expected=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.changed_files') \
+              || fail_open "Could not read the pull request."
+            rows=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq ".[] | ${row}") \
+              || fail_open "Could not resolve changed files."
+
+            listed=$(count_rows "$rows")
+            if [[ "$listed" -lt "$expected" ]]; then
+              fail_open "GitHub listed only ${listed} of ${expected} changed files."
+            fi
+          else
+            rows=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${GITHUB_SHA}" --jq ".files[]? | ${row}") \
+              || fail_open "Could not resolve changed files."
+
+            listed=$(count_rows "$rows")
+            if [[ "$listed" -ge 300 ]]; then
+              fail_open "GitHub listed ${listed} changed files, the compare endpoint maximum."
+            fi
+          fi
+
+          paths=$(tr '\t' '\n' <<< "$rows")
+
+          pattern='^apps/mac/|^\.github/workflows/ci\.yml$'
+
+          if grep -qE "$pattern" <<< "$paths"; then
+            echo "Mac app sources changed:"
+            grep -E "$pattern" <<< "$paths"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Mac app sources changed."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The unit tests run as two halves on two runners: the Team suites
+  # drive real git (a publish is dozens of subprocesses) and took 17 of
+  # the old single job's 20 minutes (2026-09-07). Both halves run test
+  # classes in parallel. `mac-test` is the one check the ruleset requires;
+  # it just needs both halves green.
+  mac-test-core:
+    name: mac-test-core
+    needs: mac_changes
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.mac_changes.outputs.changed != 'false'
+      - uses: actions/cache@v4
+        with:
+          path: apps/mac/.build
+          # Per-commit key: actions/cache never overwrites an existing key,
+          # so a key on the manifest hash alone froze .build at its first
+          # save and every later run rebuilt from that (2026-09-03).
+          key: spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-
+            spm-mac-${{ runner.os }}-
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift build
+        if: needs.mac_changes.outputs.changed != 'false'
+      - name: generated files are current
+        run: tools/t3ref/check-generated.sh
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift test --parallel --skip Team
+        if: needs.mac_changes.outputs.changed != 'false'
+  mac-test-team:
+    name: mac-test-team
+    needs: mac_changes
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.mac_changes.outputs.changed != 'false'
+      - uses: actions/cache@v4
+        with:
+          path: apps/mac/.build
+          # Per-commit key: actions/cache never overwrites an existing key,
+          # so a key on the manifest hash alone froze .build at its first
+          # save and every later run rebuilt from that (2026-09-03).
+          key: spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-
+            spm-mac-${{ runner.os }}-
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift build
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift test --parallel --filter Team
+        if: needs.mac_changes.outputs.changed != 'false'
+  mac-test:
+    name: mac-test
+    runs-on: ubuntu-24.04
+    needs: [mac-test-core, mac-test-team]
+    if: always()
+    steps:
+      - run: |
+          test "${{ needs.mac-test-core.result }}" = success && test "${{ needs.mac-test-team.result }}" = success
+  # End-to-end + performance gate (#18): the debug app against the demo
+  # engine, driven through infinitusctl; fails on a broken command, a
+  # missing pop-out, or idle CPU / RSS over budget (apps/mac/tools/e2e.sh).
+  mac-e2e:
+    name: mac-e2e
+    needs: mac_changes
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.mac_changes.outputs.changed != 'false'
+      - uses: actions/cache@v4
+        with:
+          path: apps/mac/.build
+          # Per-commit key: actions/cache never overwrites an existing key,
+          # so a key on the manifest hash alone froze .build at its first
+          # save and every later run rebuilt from that (2026-09-03).
+          key: spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-
+            spm-mac-${{ runner.os }}-
+        if: needs.mac_changes.outputs.changed != 'false'
+      # Plain `swift build`: with two --product flags SwiftPM builds only
+      # the LAST one, so the app binary here was the stale one from the
+      # first cached .build on every run (2026-09-03).
+      - run: swift build
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: tools/e2e.sh
+        if: needs.mac_changes.outputs.changed != 'false'
+  # The Omarchy/Waybar face (apps/mac/packaging/omarchy): core + tray must
+  # keep building on Linux. The manifest gates the AppKit target off
+  # non-macOS hosts.
+  mac-linux:
+    name: mac-linux
+    needs: mac_changes
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift build
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: swift test
+        if: needs.mac_changes.outputs.changed != 'false'
+  # Known red today: CZlib's module map includes <zlib.h>, which no
+  # Windows toolchain provides, so InfinitusCore does not build there
+  # (apps/mac/docs/superpowers/specs/2026-09-05-team-design.md §9). The
+  # job runs to show when that changes; failures don't block a merge.
+  mac-windows:
+    name: mac-windows
+    needs: mac_changes
+    runs-on: windows-2022
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: apps/mac
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.mac_changes.outputs.changed != 'false'
+      - uses: compnerd/gha-setup-swift@v0.4.1
+        if: needs.mac_changes.outputs.changed != 'false'
+        with:
+          branch: swift-6.1-release
+          tag: 6.1-RELEASE
+      - run: vcpkg install zlib:x64-windows
+        if: needs.mac_changes.outputs.changed != 'false'
+      - run: >
+          swift build --product infinitusctl
+          -Xcc -IC:/vcpkg/installed/x64-windows/include
+          -Xswiftc -LC:/vcpkg/installed/x64-windows/lib
+        if: needs.mac_changes.outputs.changed != 'false'

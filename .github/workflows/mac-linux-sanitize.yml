@@ -1,4 +1,4 @@
-name: Linux sanitize
+name: Mac linux sanitize
 # Reproducer for #510: the linux job dies with signal 11 inside
 # TeamClientTests on x86_64 about one run in five — thread 0 in libc
 # (an AVX memcpy tail), the fault at a page boundary of the brk heap,
@@ -9,7 +9,7 @@ name: Linux sanitize
 on:
   # Nightly on main, before the nightly build: a leak or over-read that
   # needs a long run to surface (#510 took ~1,300 descriptors) is found
-  # here, not on a random PR's linux job.
+  # here, not on a random PR's mac-linux job.
   schedule:
     - cron: "0 16 * * *"   # 16:00 UTC = 23:00 GMT+7, an hour before nightly.yml
   workflow_dispatch:
@@ -21,9 +21,12 @@ on:
         description: swift test --filter (empty = every test)
         default: ""
   pull_request:
-    paths: [.github/workflows/linux-sanitize.yml]
+    paths: [.github/workflows/mac-linux-sanitize.yml]
+defaults:
+  run:
+    working-directory: apps/mac
 concurrency:
-  group: linux-sanitize-${{ github.ref }}
+  group: mac-linux-sanitize-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   asan:
@@ -38,7 +41,7 @@ jobs:
       ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
       SWIFT_BACKTRACE: enable=no
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: swift build --build-tests --sanitize=address
       - name: Run the suite under ASan
         run: |

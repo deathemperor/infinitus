@@ -1,6 +1,7 @@
 # Infinitus — project rules
 
-Native macOS menu bar app for the claude-swap engine. Split out of
+Native macOS menu bar app (`apps/mac` of the Infinitus repo since #823;
+before that the `native` branch). Split out of
 `~/death/claude-swap/swift/CswapBar` on 2026-08-29 with history.
 
 ## Non-negotiables
@@ -40,20 +41,23 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   option. Still ask before destructive or irreversible actions (a
   history rewrite, a force-push, deleting user data).
 - **Push nothing to any remote** unless explicitly asked. Commit locally.
-- **Branch layout since 2026-09-10 (#555):** this repo's `main` is the
-  T3 Code fork (TypeScript, never an upstream PR); the native Swift app
-  lives on `native`. Base native work on `origin/native`; never `git
-  pull`/merge `main` into a native branch (unrelated history). Fork
-  releases are GitHub prereleases with their own tags — `releases/latest`
-  and the `nightly` tag stay native (AboutPane polls them).
-- **`native` takes commits only through pull requests** (GitHub ruleset
-  "native via pull requests", user 2026-09-04): no direct push, no
-  force-push, no deletion; 0 required approvals (solo repo); required
-  checks test, e2e, linux, ios green on the PR head (never windows,
-  2026-09-06, #206). Work on a branch, `gh pr create --base native`, merge with
-  `gh pr merge --squash` (or `--merge` when the branch history matters)
-  once tests pass; `--auto` queues the merge behind the checks. PRs get
-  `size:*` and `vouch:*` labels automatically.
+- **Layout since #823 (layer 2):** the Mac app lives in `apps/mac` of
+  this repo's `main`, beside the T3 Code fork (TypeScript, never an
+  upstream PR). Before that (#555, 2026-09-10 → 2026-09-12) it was the
+  `native` branch; that branch is frozen and read-only for a fallback
+  window, then deleted. Base Mac work on `origin/main`; a Mac PR is an
+  ordinary main PR. The Mac app's releases keep their own `v<version>`
+  tags and `releases/latest` + the `nightly` tag (AboutPane polls them);
+  the desktop's are the `v*-infinitus.*` prereleases.
+- **`main` takes commits only through pull requests** (GitHub ruleset
+  "main via pull requests"; the native one retires with the branch):
+  0 required approvals (solo repo); the Mac checks required on a PR head
+  are mac-test, mac-e2e, mac-linux (never mac-windows, 2026-09-06, #206) —
+  path-filtered, so a server-only PR passes them at once. Work on a
+  branch, `gh pr create` (base main), merge with `gh pr merge --squash`
+  (or `--merge` when the branch history matters) once tests pass;
+  `--auto` queues the merge behind the checks. PRs get `size:*` and
+  `vouch:*` labels automatically.
 - **Every commit carries `Co-Authored-By: Claude Code
   <noreply@anthropic.com>`** (user 2026-09-04: "some commits still
   missing Claude in author"). `tools/githooks/prepare-commit-msg`
@@ -143,15 +147,17 @@ Native macOS menu bar app for the claude-swap engine. Split out of
   `swift build --target X` may not relink — use `--product`, ONE per
   invocation: with two `--product` flags SwiftPM builds only the last
   (CI's e2e ran a stale app binary for a day, 2026-09-03).
-- Two Claude sessions work this repo (since 2026-09-02 evening): the
-  second one lives in its OWN worktree `../limitless-e2` on branch `e2`
-  (one `cd` there; separate `.build`). Main (`~/death/limitless`) is
-  merge-only and owned by the first session, which also owns
-  `Infinitus.app` rebuild/relaunch (always from a clean worktree at a
-  native sha) and the PRs. Ship flow: e2 commits → "merge e2 at <sha>" →
-  push `e2` → `gh pr create --base native --head e2` → tests → `gh pr
-  merge --merge` → `git pull` native → rebuild → relaunch. Never edit the
-  other session's tree; in either tree stage by explicit path.
+- Several Claude sessions work this repo: each in its OWN worktree
+  (one `cd` there; separate `apps/mac/.build`). The main checkout
+  (`~/death/limitless`) is merge-only (`git pull --ff-only origin main`)
+  and owned by the coordinating session. Since 2026-09-12 the user's
+  menu bar is the helper nested in Infinitus desktop
+  (`/Applications/Infinitus.app/Contents/Library/LoginItems`), so nothing
+  relaunches a local `Infinitus.app` on the real control socket: Mac
+  changes reach the user through a Mac release + the desktop's
+  `native-helper.json` pin (#777). Dev instances run on
+  `INFINITUS_CONTROL_SOCKET`. Never edit another session's tree; in any
+  tree stage by explicit path.
 - Linux corelibs `Process`: one waited on through its `terminationHandler`
   alone is never freed — its run-loop source retains it back and
   `CFRunLoopSourceInvalidate` keeps that context on purpose; only
