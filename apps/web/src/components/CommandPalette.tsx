@@ -40,11 +40,15 @@ import {
 import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import {
+  ActivityIcon,
   ArrowLeftIcon,
+  ChartLineIcon,
   CornerLeftUpIcon,
+  CpuIcon,
   FileSearchIcon,
   FolderIcon,
   FolderPlusIcon,
+  GaugeIcon,
   GitPullRequestArrowIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -1856,6 +1860,50 @@ function OpenCommandPaletteDialog(props: {
         await navigate({ to: "/accounts" });
       },
     });
+    // The Infinitus dashboards (#747): reachable from the palette like the
+    // pages above, no shortcut of their own.
+    actionItems.push(
+      {
+        kind: "action",
+        value: "action:open-stats",
+        searchTerms: ["stats", "infinitus", "metrics", "commits", "streak", "cost"],
+        title: "Open stats",
+        icon: <ChartLineIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/stats" });
+        },
+      },
+      {
+        kind: "action",
+        value: "action:open-activity",
+        searchTerms: ["activity", "infinitus", "events", "switches", "log"],
+        title: "Open activity",
+        icon: <ActivityIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/activity" });
+        },
+      },
+      {
+        kind: "action",
+        value: "action:open-machine",
+        searchTerms: ["machine", "infinitus", "health", "load", "hooks", "processes"],
+        title: "Open machine",
+        icon: <CpuIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/machine" });
+        },
+      },
+      {
+        kind: "action",
+        value: "action:open-utilization",
+        searchTerms: ["utilization", "infinitus", "forecast", "pace", "binds", "headroom"],
+        title: "Open utilization",
+        icon: <GaugeIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/utilization" });
+        },
+      },
+    );
   }
 
   if (capturesProject !== null) {
