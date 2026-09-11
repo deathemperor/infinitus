@@ -116,11 +116,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
   `infinitusAlarmsEnabled` keys (interface and sanitizer).
-- `apps/mobile/src/features/home/HomeScreen.tsx` — `InfinitusSignIns` in the
-  thread list's header (lapsed AWS / gcloud sign-ins of paired Macs).
+- `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
+  the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
+  `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
   (active account + fullest window of the Mac the list follows, plus its
-  waiting-session count) before the filter button.
+  waiting-session count) before the filter button, in the Android header.
 - `apps/web/src/components/settings/settingsSearch.ts` — the five Infinitus
   `SettingsPath`s and their labels, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
