@@ -907,6 +907,31 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   autocomplete off, cleared on submit/unmount, never interpolated into a
   message, sensitive read replies like `team-code`/`pair-status` rendered
   and never logged) bind their PRs (#747).
+- `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential
+  step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus`
+  group in `packages/contracts/src/environmentHttp.ts` — the server half of
+  `infinitusctl`'s desktop verbs (#822). Right after `prefs set
+fork_server_port`, on an app whose manifest lists `desktop-credential` with
+  `stdin: "secret"`, the port publisher revokes any session with subject
+  `infinitusctl`, mints one (`EnvironmentAuth.issueSession`: scopes
+  `orchestration:read orchestration:operate access:read`, label
+  "infinitusctl on <Mac>", 90 days, no refresh) and hands the token to the app
+  on the request line's `secret` field with `{origin, expiresAt}` as options —
+  one "infinitusctl on <Mac>" row in Settings › Devices, replaced on every
+  publish, revocable there (the next CLI request gets 401 until the next
+  publish). A refused write revokes the new session again. Withheld exactly
+  where the port is (dev runner, isolated socket, worktree `.t3`); the token
+  reaches no log or span. Two HTTP routes for a CLI with no WebSocket, both
+  behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
+  list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
+  from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
+  #743) and `POST /api/infinitus/release-thread` (`{threadId}` →
+  `{released, reason?}`, the WS `infinitus.releaseThread` word for word).
+  Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the
+  port layer (which is why that block sits below `AuthLayerLive` in
+  `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. Queue-behind-a-
+  turn is #806, not this; `thread show`, `send`, `new`, `interrupt` and
+  `--wait` use routes that already existed.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
