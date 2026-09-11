@@ -37,7 +37,13 @@ jobs:
           if git merge-base --is-ancestor upstream/main HEAD; then
             echo "state=uptodate" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          branch="upstream-sync-$(date -u +%Y%m%d)"
+          # Named after the upstream sha, not the date: a second run on one
+          # day (or a redo after the first branch merged) must not collide.
+          branch="upstream-sync-$(git rev-parse --short upstream/main)"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "branch $branch already exists; a sync for this upstream sha is pending"
+            echo "state=uptodate" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           git checkout -b "$branch"
           if git merge --no-edit upstream/main; then
             echo "state=clean" >> "$GITHUB_OUTPUT"
@@ -69,9 +75,11 @@ jobs:
             gh pr create --base main --head "${{ steps.merge.outputs.branch }}" \
               --title "chore: merge upstream T3 Code ($sha)" \
               --body "Daily upstream sync, merged clean. Checks decide."
-            gh pr merge --squash --auto "${{ steps.merge.outputs.branch }}" || true
+            # A merge commit, never a squash: squashing #657 lost the
+            # merge-base and made the next sync conflict on every upstream file.
+            gh pr merge --merge --auto "${{ steps.merge.outputs.branch }}" || true
           else
             gh pr create --base main --head "${{ steps.merge.outputs.branch }}" \
               --title "chore: merge upstream T3 Code ($sha) — CONFLICTS to resolve" \
-              --body "$(printf 'Daily upstream sync hit conflicts; the merge commit carries the markers. Files:\n\n```\n%s\n```\nResolve on this branch, then let the checks merge it.' "$(cat /tmp/conflicts.txt)")"
+              --body "$(printf 'Daily upstream sync hit conflicts; the merge commit carries the markers. Files:\n\n```\n%s\n```\nResolve on this branch, then merge with a merge commit (never squash: it drops the merge-base).' "$(cat /tmp/conflicts.txt)")"
           fi
