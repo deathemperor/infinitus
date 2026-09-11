@@ -15,7 +15,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as Tracer from "effect/Tracer";
-import { describe, expect } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   InfinitusControlClient,
