@@ -305,8 +305,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`, `server.test.ts`,
   `build-desktop-artifact.test.ts`, and the web fixtures that stub a desktop
   origin) use the fork's scheme.
-- `knip.jsonc` — `scripts/fork-visual-pass.mjs` as a scripts entry (run by
-  hand, nothing imports it).
+- `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
+  `fork-visual-check.ts` as scripts entries (run by hand and by the
+  fork-visual-pass workflow; nothing imports them).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
@@ -1149,6 +1150,27 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/infinitus`
   (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the
   token is never printed). No dependencies; node ≥ 22.
+- `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
+  Infinitus control socket the visual pass runs against in CI: a Node net
+  server speaking the one-line protocol that answers `manifest`, `status`,
+  `fleets`, `sessions`, `forecast`, `prefs`, `profiles`, `stats`, `events`,
+  `aws-logins`, `client-activity`, `lock-status` and `team-status` with canned
+  data. The manifest and the pref catalog are `infinitusctl` captures (every
+  value reset to its default); the accounts (`ada-fixture`…), the session,
+  the team ("Lighthouse"), the profiles (`nightly-review`) and the stats are
+  made up. Every write and every unknown verb is refused with `ok: false`;
+  only verb names are logged. `--socket <short /tmp path>`.
+- `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
+  asserts: every fork page with the one text marker only its populated render
+  shows (a pref row label, the fixture's team or profile name, "Re-lock",
+  "Session lengths"…) and the empty-state phrases that must not appear
+  (`ALWAYS_ABSENT`: "not answering", "Still connecting", "This Infinitus build
+  has no", "could not be read"; per route "No projection yet", "Reading the
+  team"…). The test pins the route list, checks no marker is a substring of a
+  nav label or card title (those print on a dead page too), and mirrors the
+  harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
+  it: `--routes` prints the routes for the harness's argument list, `--out
+  <dir>` reads the captures and exits 1 on the first miss.
 
 - `apps/web/src/components/sidebar/SidebarInfinitusSessions.tsx` (+
   `sidebarInfinitusSessions.logic.ts`) — the footer's collapsible Sessions
@@ -1183,6 +1205,18 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
   branch).
+
+- `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR
+  to `main` and by hand: builds the web app, starts `fork-visual-fixture.mjs`
+  on `/tmp/inf-vp.sock`, runs the server from source (`bin.ts start
+--no-browser`, `--base-dir` under the runner's temp dir,
+  `INFINITUS_CONTROL_SOCKET` at the fixture — the override also withholds the
+  companion's `open` and the port publish), mints a pairing URL with `bin.ts
+pair` (token masked, server log never uploaded), screenshots every route in
+  `fork-visual-routes.ts` with the runner's Chrome through
+  `fork-visual-pass.mjs`, then `fork-visual-check.ts` fails the job on a
+  missing marker or an empty state. The PNGs and text captures upload as the
+  `fork-visual-pass` artifact, on failure too.
 
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel

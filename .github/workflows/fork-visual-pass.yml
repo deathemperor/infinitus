@@ -1,0 +1,110 @@
+name: Fork visual pass
+
+# Every fork page rendered against a canned Infinitus (scripts/fork-visual-
+# fixture.mjs) on each PR to main: the server runs from source with an isolated
+# state dir and INFINITUS_CONTROL_SOCKET pointed at the fixture, a headless
+# Chrome pairs through `t3 pair` and screenshots each route
+# (scripts/fork-visual-pass.mjs), and scripts/fork-visual-check.ts fails the
+# job on the first route whose marker is missing or whose empty state shows.
+# The PNGs and text captures are the artifact; the pairing token never leaves
+# the step (masked, and the server log is not uploaded).
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-visual-pass-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  visual-pass:
+    name: Visual pass
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      INFINITUS_CONTROL_SOCKET: /tmp/inf-vp.sock
+      SERVER_PORT: "3791"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: |
+            args:
+              - --filter=@t3tools/scripts...
+              - --filter=@t3tools/server...
+              - --filter=@t3tools/web...
+
+      - name: Check the route table
+        working-directory: scripts
+        run: vp test run fork-visual-routes.test.ts
+
+      - name: Build the web app
+        run: vp run --filter @t3tools/web build
+
+      - name: Start the fixture and the server
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/fork-visual-fixture.mjs --socket "$INFINITUS_CONTROL_SOCKET" \
+            > "$RUNNER_TEMP/fixture.log" 2>&1 &
+          for _ in $(seq 1 50); do [ -S "$INFINITUS_CONTROL_SOCKET" ] && break; sleep 0.2; done
+          [ -S "$INFINITUS_CONTROL_SOCKET" ] || { cat "$RUNNER_TEMP/fixture.log"; exit 1; }
+
+          node apps/server/src/bin.ts start --no-browser --host 127.0.0.1 \
+            --port "$SERVER_PORT" --base-dir "$RUNNER_TEMP/t3home" \
+            > "$RUNNER_TEMP/server.log" 2>&1 &
+          for _ in $(seq 1 120); do
+            curl -sf "http://127.0.0.1:$SERVER_PORT/.well-known/t3/environment" > /dev/null && break
+            sleep 1
+          done
+          curl -sf "http://127.0.0.1:$SERVER_PORT/.well-known/t3/environment" > /dev/null || {
+            echo "server did not come up" >&2
+            grep -v -i 'pairingUrl\|token' "$RUNNER_TEMP/server.log" | tail -80 >&2
+            exit 1
+          }
+
+      - name: Screenshot every fork route
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CHROME_BIN="${CHROME_BIN:-$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser)}"
+          pair_url="$(node apps/server/src/bin.ts pair --base-dir "$RUNNER_TEMP/t3home" | sed -n 's/^Pairing URL: //p')"
+          [ -n "$pair_url" ] || { echo "no pairing URL minted" >&2; exit 1; }
+          echo "::add-mask::${pair_url#*token=}"
+          # shellcheck disable=SC2046
+          node scripts/fork-visual-pass.mjs --pair-url "$pair_url" --out "$RUNNER_TEMP/visual" \
+            --settle-ms 8000 $(node scripts/fork-visual-check.ts --routes)
+
+      - name: Assert every route rendered
+        run: node scripts/fork-visual-check.ts --out "$RUNNER_TEMP/visual"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fork-visual-pass
+          path: ${{ runner.temp }}/visual/
+          if-no-files-found: warn
+
+      - name: Fixture and server logs
+        if: failure()
+        shell: bash
+        run: |
+          echo "--- fixture"; cat "$RUNNER_TEMP/fixture.log" || true
+          echo "--- server"; grep -v -i 'pairingUrl\|token' "$RUNNER_TEMP/server.log" | tail -120 || true
