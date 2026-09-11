@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)
