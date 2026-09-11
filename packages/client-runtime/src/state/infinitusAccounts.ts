@@ -1,3 +1,4 @@
+import type { ExecutionEnvironmentCapabilities } from "@t3tools/contracts";
 import type {
   InfinitusAccount,
   InfinitusAwsLogin,
@@ -70,8 +71,11 @@ export interface ForecastModel {
   readonly computedAt: string | null;
 }
 
-/** What the page shows before it can show rows. */
-export type AccountsPageState = "unsupported" | "loading" | "unavailable" | "empty" | "ready";
+/** What every Infinitus page shows before it can show its own body. */
+export type InfinitusPageState = "unsupported" | "loading" | "unavailable" | "ready";
+
+/** What the Accounts page shows before it can show rows. */
+export type AccountsPageState = InfinitusPageState | "empty";
 
 /**
  * The native usage payload, which the contract leaves opaque. Decoded here
@@ -195,17 +199,54 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
   };
 }
 
-/** Which of the page's five shapes to draw. The capability answers first: an
-    environment without Infinitus never reaches a snapshot at all. */
+/** The gate every Infinitus page passes before drawing its own body. Only a
+    server that answered `false` lacks the adapter; `undefined` is a server
+    whose config has not arrived yet, so the page waits for it the way it waits
+    for the snapshot (#693). */
+export function infinitusPageState(input: {
+  capability: boolean | undefined;
+  snapshot: InfinitusSnapshot | null;
+}): InfinitusPageState {
+  if (input.capability === false) return "unsupported";
+  if (input.capability === undefined || input.snapshot === null) return "loading";
+  if (!input.snapshot.available) return "unavailable";
+  return "ready";
+}
+
+/** One server's answer. No config yet is "not known yet"; a config that
+    arrived without the field is a server without the adapter at all (an
+    upstream one), which must show the missing-adapter copy, never a skeleton
+    for good. */
+export function infinitusCapabilityOf(
+  capabilities: Pick<ExecutionEnvironmentCapabilities, "infinitus"> | undefined,
+): boolean | undefined {
+  if (capabilities === undefined) return undefined;
+  return capabilities.infinitus ?? false;
+}
+
+/** One capability for the Accounts page, which spans every environment: any
+    server with the adapter counts, a page that heard only `false` lacks it,
+    and one nobody has answered yet stays `undefined`. */
+export function infinitusCapabilityAcross(
+  capabilities: Iterable<boolean | undefined>,
+): boolean | undefined {
+  let answer: boolean | undefined;
+  for (const capability of capabilities) {
+    if (capability === true) return true;
+    if (capability === false) answer = false;
+  }
+  return answer;
+}
+
+/** Which of the page's five shapes to draw: the shared gate, then `empty` for a
+    host that answered with no fleets. */
 export function accountsPageState(input: {
   capability: boolean | undefined;
   snapshot: InfinitusSnapshot | null;
 }): AccountsPageState {
-  if (input.capability !== true) return "unsupported";
-  if (input.snapshot === null) return "loading";
-  if (!input.snapshot.available) return "unavailable";
-  if (input.snapshot.fleets.length === 0) return "empty";
-  return "ready";
+  const gate = infinitusPageState(input);
+  if (gate !== "ready" || input.snapshot === null) return gate;
+  return input.snapshot.fleets.length === 0 ? "empty" : "ready";
 }
 
 /** One fleet's section, rows in account-number order. The title names the
