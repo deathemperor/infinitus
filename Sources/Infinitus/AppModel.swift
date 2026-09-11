@@ -3222,12 +3222,22 @@ final class AppModel: ObservableObject {
         terminalHost.closeAll()
         let supervisor = supervisor
         let owned = ownedBox.existing
+        let team = team
         Task {
             await supervisor?.stop()
             // Owned Claude sessions are this process's children (#151):
             // they don't outlive the app either (the #274 lesson).
             await owned?.stopAll()
-            await MainActor.run { NSApplication.shared.terminate(nil) }
+            // The team's now.json delete here, not in applicationShouldTerminate:
+            // from inside a Task, `.terminateLater` parks the main thread in
+            // AppKit's nested event loop and the reply never runs (#654: the
+            // e2e's quit sat there past 30s; sampled 2026-09-11). Bounded by
+            // TeamModel.quitBound.
+            await team.quit()
+            await MainActor.run {
+                AppDelegate.teamQuitDone = true
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 
