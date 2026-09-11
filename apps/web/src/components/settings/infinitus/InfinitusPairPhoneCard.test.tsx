@@ -143,7 +143,7 @@ describe("InfinitusPairPhoneCard", () => {
     expect(svg).toHaveLength(1);
     expect(text(renderer)).toContain("Expires in 5:00");
     expect(text(renderer)).toContain("Scan with the Camera app on a phone that has Infinitus");
-    expect(text(renderer)).toContain("The Camera app opens a web page instead");
+    expect(text(renderer)).toContain("In a browser the link only explains");
     expect(text(renderer)).not.toContain("Scan with the Infinitus app");
     expect(text(renderer)).toContain("Copy link");
     // The token never lands in the DOM as text — only inside the QR.
