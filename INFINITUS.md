@@ -243,7 +243,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
   `usePinAtCreation` runs once a queued creation is delivered, right after the
-  "delivered" outcome is recorded.
+  "delivered" outcome is recorded (its test, `use-thread-outbox-drain.test.ts`,
+  mocks `./preferences` so the drain's module graph stays clear of
+  expo-secure-store).
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
