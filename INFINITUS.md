@@ -1422,6 +1422,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (ActivityKit's message in an alert) blames the phone's settings; with
   working cards live the same row reads "End the working card(s)" and ends
   them all — the Mac cannot end a card it never got an update token for.
+  A started test card bumps `liveActivityStarts.ts`'s atom, which
+  `InfinitusLiveActivityBridge` watches to re-scan the live cards and file
+  the new card's `working` update token with the Mac (the bridge otherwise
+  scans only at mount and on foreground); `pushRegistration.ts` logs a
+  refused `activities-token` (`[infinitus-push]`) since the bridges send
+  with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
