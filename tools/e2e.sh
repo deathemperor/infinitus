@@ -361,6 +361,10 @@ echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 "$CTL" prefs set priority_mode off | expect "d['value']=='off'" || fail "prefs set priority_mode off (interrupt)"
 echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
+# #756: the app's own away channels; a token with no chat is refused, empty stdin forgets.
+printf '123456:ABCdef' | "$CTL" push-telegram 2>&1 | grep -q "usage: push-telegram --chat" || fail "push-telegram must want a chat"
+printf 'http://hooks.example/x' | "$CTL" push-slack 2>&1 | grep -q "https URL" || fail "push-slack must want https"
+"$CTL" push-slack </dev/null | expect "d['slack'] is False and d['telegram'] is False" || fail "push-slack with empty stdin forgets"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
