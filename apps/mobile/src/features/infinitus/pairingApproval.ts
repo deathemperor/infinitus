@@ -10,6 +10,7 @@ import {
   PAIRING_APPROVAL_POLL_PATH,
   POLL_INTERVAL_MS,
   pollReplyFromBody,
+  WAIT_CAP_MS,
 } from "./pairingApproval.logic";
 
 /** One JSON POST: the status and the decoded body (null when not JSON).
@@ -55,6 +56,7 @@ export type AskResult =
       readonly kind: "asked";
       readonly id: string;
       readonly matchCode: string;
+      /** When `waitForDecision` gives up, on the phone's clock. */
       readonly deadlineMillis: number;
     }
   | { readonly kind: "refused" }
@@ -68,8 +70,10 @@ export async function askForApproval(input: {
   readonly secret: string;
   readonly signal: AbortSignal;
   readonly post?: Post;
+  readonly now?: () => number;
 }): Promise<AskResult> {
   const post = input.post ?? fetchPost;
+  const now = input.now ?? Date.now;
   let reply: Awaited<ReturnType<Post>>;
   try {
     reply = await post(
@@ -82,7 +86,9 @@ export async function askForApproval(input: {
   }
   if (reply.status === 429) return { kind: "refused" };
   const created = reply.status === 200 ? createdFromReply(reply.body) : null;
-  return created === null ? { kind: "unreachable" } : { kind: "asked", ...created };
+  return created === null
+    ? { kind: "unreachable" }
+    : { kind: "asked", ...created, deadlineMillis: now() + WAIT_CAP_MS };
 }
 
 /**

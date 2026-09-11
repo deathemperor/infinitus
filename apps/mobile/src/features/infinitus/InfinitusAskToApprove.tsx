@@ -12,7 +12,8 @@ import { approvalOrigin, deviceLabel, outcomeMessage } from "./pairingApproval.l
 type Phase =
   | { readonly kind: "idle" }
   | { readonly kind: "asking" }
-  | { readonly kind: "waiting"; readonly matchCode: string };
+  /** `host` is the one asked — the field may change while the poll runs. */
+  | { readonly kind: "waiting"; readonly host: string; readonly matchCode: string };
 
 /**
  * "Ask this Mac to approve" on the add-connection form (#710): instead of
@@ -61,7 +62,7 @@ export function InfinitusAskToApprove(props: {
       setPhase({ kind: "idle" });
       return;
     }
-    setPhase({ kind: "waiting", matchCode: asked.matchCode });
+    setPhase({ kind: "waiting", host, matchCode: asked.matchCode });
     const outcome = await waitForDecision({
       origin,
       id: asked.id,
@@ -91,8 +92,8 @@ export function InfinitusAskToApprove(props: {
         <View className="flex-row items-center gap-2">
           <ActivityIndicator colorClassName="accent-icon" size="small" />
           <Text className="shrink text-sm text-foreground">
-            Waiting for the Mac at {host.trim()}. In its Devices card, approve the request showing
-            this code:
+            Waiting for the Mac at {phase.host.trim()}. In its Devices card, approve the request
+            showing this code:
           </Text>
         </View>
         <Text

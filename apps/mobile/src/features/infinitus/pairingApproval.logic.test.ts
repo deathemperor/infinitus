@@ -4,7 +4,6 @@ import {
   approvalOrigin,
   createdFromReply,
   deviceLabel,
-  EXPIRY_GRACE_MS,
   outcomeMessage,
   pollReplyFromBody,
 } from "./pairingApproval.logic";
@@ -33,22 +32,19 @@ describe("deviceLabel", () => {
 });
 
 describe("createdFromReply", () => {
-  it("reads the id, the match code and a deadline with grace past expiresAt", () => {
+  it("reads the id and the match code from the server's reply", () => {
     const created = createdFromReply({
       id: "req-1",
       matchCode: "AB12",
       expiresAt: "2026-09-11T10:02:00.000Z",
     });
-    expect(created).toEqual({
-      id: "req-1",
-      matchCode: "AB12",
-      deadlineMillis: Date.parse("2026-09-11T10:02:00.000Z") + EXPIRY_GRACE_MS,
-    });
+    expect(created).toEqual({ id: "req-1", matchCode: "AB12" });
   });
 
   it("is null for anything else", () => {
     expect(createdFromReply(null)).toBeNull();
-    expect(createdFromReply({ id: "req-1" })).toBeNull();
+    expect(createdFromReply({ id: "req-1", matchCode: "AB12" })).toBeNull();
+    expect(createdFromReply({ id: "req-1", matchCode: "AB12", expiresAt: "soon" })).toBeNull();
     expect(createdFromReply("<html>")).toBeNull();
   });
 });

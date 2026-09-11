@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { askForApproval, type Post, waitForDecision } from "./pairingApproval";
-import { EXPIRY_GRACE_MS, POLL_INTERVAL_MS } from "./pairingApproval.logic";
+import { POLL_INTERVAL_MS, WAIT_CAP_MS } from "./pairingApproval.logic";
 
 const ORIGIN = "http://192.168.2.19:3773";
 const SECRET = "0123456789abcdef0123456789abcdef";
@@ -35,7 +35,7 @@ function fakeClock(start = 1_000_000) {
 }
 
 describe("askForApproval", () => {
-  it("posts the phone's request and returns the match code with a deadline", async () => {
+  it("posts the phone's request and returns the match code with a deadline on the phone's clock", async () => {
     const { post, requests } = server([
       {
         status: 200,
@@ -49,12 +49,13 @@ describe("askForApproval", () => {
       secret: SECRET,
       signal: new AbortController().signal,
       post,
+      now: () => 1_000_000,
     });
     expect(asked).toEqual({
       kind: "asked",
       id: "req-1",
       matchCode: "AB12",
-      deadlineMillis: Date.parse("2026-09-11T10:02:00.000Z") + EXPIRY_GRACE_MS,
+      deadlineMillis: 1_000_000 + WAIT_CAP_MS,
     });
     expect(requests).toEqual([
       {

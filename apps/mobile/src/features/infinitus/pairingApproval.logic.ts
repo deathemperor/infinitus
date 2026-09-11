@@ -14,7 +14,7 @@ import {
   PairingApprovalCreated,
   PairingApprovalPollResult,
 } from "@t3tools/contracts/infinitusPairing";
-import { DateTime, Option, Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import { buildPairingUrl } from "../connection/pairing";
 
@@ -23,10 +23,11 @@ export const PAIRING_APPROVAL_POLL_PATH = "/api/infinitus/pairing-approval/poll"
 
 /** Between polls while the request is pending. */
 export const POLL_INTERVAL_MS = 2000;
-/** Polled past the server's `expiresAt` this long before an unreachable server
-    counts as expired — the server's own 404 is the real verdict; this is only
-    the safety net. */
-export const EXPIRY_GRACE_MS = 30_000;
+/** How long the phone keeps polling when nothing answers: the server's 2 min
+    TTL plus slack. Measured on the phone's own clock, so a phone and a Mac that
+    disagree on the time cannot end the wait early — the server's 404 is the
+    real verdict, this is only the safety net. */
+export const WAIT_CAP_MS = 150_000;
 
 const DEVICE_NAME_MAX = 64;
 
@@ -61,14 +62,10 @@ const decodePollResult = Schema.decodeUnknownOption(Schema.toCodecJson(PairingAp
 /** A create reply as the waiting state needs it, or null for anything else. */
 export function createdFromReply(
   body: unknown,
-): { readonly id: string; readonly matchCode: string; readonly deadlineMillis: number } | null {
+): { readonly id: string; readonly matchCode: string } | null {
   const created = decodeCreated(body);
   if (Option.isNone(created)) return null;
-  return {
-    id: created.value.id,
-    matchCode: created.value.matchCode,
-    deadlineMillis: DateTime.toEpochMillis(created.value.expiresAt) + EXPIRY_GRACE_MS,
-  };
+  return { id: created.value.id, matchCode: created.value.matchCode };
 }
 
 export type PollReply =
