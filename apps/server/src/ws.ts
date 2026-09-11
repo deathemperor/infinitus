@@ -88,6 +88,7 @@ import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
+import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -541,6 +542,7 @@ const makeWsRpcLayer = (
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
+      const infinitusSessionHold = yield* InfinitusSessionHold;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
@@ -3064,6 +3066,12 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
             "rpc.aggregate": "infinitus",
           }),
+        [WS_METHODS.infinitusReleaseThread]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusReleaseThread,
+            infinitusSessionHold.release(input.threadId),
+            { "rpc.aggregate": "infinitus", "thread.id": input.threadId },
+          ),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
           observeRpcStreamEffect(
             WS_METHODS.subscribeInfinitusPairing,

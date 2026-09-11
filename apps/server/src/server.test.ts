@@ -114,6 +114,7 @@ import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
+import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -511,6 +512,7 @@ const buildAppUnderTest = (options?: {
     keybindings?: Partial<Keybindings.Keybindings["Service"]>;
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
     infinitus?: Partial<InfinitusService["Service"]>;
+    infinitusSessionHold?: Partial<InfinitusSessionHold["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     usageLimitSources?: Partial<UsageLimitSources.UsageLimitSources["Service"]>;
     providerService?: Partial<ProviderService.ProviderService["Service"]>;
@@ -785,6 +787,11 @@ const buildAppUnderTest = (options?: {
           }),
           Layer.mock(InfinitusCompanion)({
             launch: Effect.succeed({ launched: false, reason: "no Infinitus in tests" }),
+          }),
+          // Nothing is ever held here; the hold layer has its own tests (#616).
+          Layer.mock(InfinitusSessionHold)({
+            release: () => Effect.succeed({ released: false, reason: "nothing is held" }),
+            ...options?.layers?.infinitusSessionHold,
           }),
           // Nothing is ever waiting for approval here; the store has its own tests.
           Layer.mock(InfinitusPairing)({
@@ -4253,6 +4260,35 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.equal(rpcError.requiredScope, "orchestration:read");
       }
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "infinitus.releaseThread runs a held thread now and answers what the hold did (#616)",
+    () =>
+      Effect.gen(function* () {
+        const released: Array<string> = [];
+        yield* buildAppUnderTest({
+          layers: {
+            infinitusSessionHold: {
+              release: (threadId) =>
+                Effect.sync(() => {
+                  released.push(threadId);
+                  return { released: true };
+                }),
+            },
+          },
+        });
+
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const result = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[WS_METHODS.infinitusReleaseThread]({ threadId: ThreadId.make("thread-held") }),
+          ),
+        );
+
+        assert.deepEqual(result, { released: true });
+        assert.deepEqual(released, ["thread-held"]);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
   it.effect("includes CORS headers on remote auth success responses", () =>
