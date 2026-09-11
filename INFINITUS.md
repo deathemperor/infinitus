@@ -228,7 +228,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
-  and the fork-port publisher (`prefs set fork_server_port` at startup).
+  and the fork-port publisher (`prefs set fork_server_port` at startup —
+  withheld, with one log line, from a dev-runner server or one whose home is
+  a worktree-local `.t3`, so a dev run never takes the installed desktop's
+  tunnel, #640).
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
