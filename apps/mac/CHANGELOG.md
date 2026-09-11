@@ -5,6 +5,11 @@ links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
 publishes the matching section as the GitHub release body.
 
+## Unreleased
+
+### Mac
+- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
+
 ## 0.5.0-alpha.1
 
 ### Release

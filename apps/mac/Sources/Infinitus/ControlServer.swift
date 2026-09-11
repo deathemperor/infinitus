@@ -447,6 +447,15 @@ final class ControlServer {
             let pid = model.handleHookEvent(event)
             return ControlReply(ok: true, result: .object(["pid": pid.map { .number(Double($0)) } ?? .null]))
 
+        case "push":
+            // #269 G: the desktop's thread phase changes ride the Mac's
+            // own pusher, so they get its gating and every channel on.
+            guard let payload = r.secret, let push = ThreadPhasePush.parse(payload) else {
+                throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} is expected on stdin")
+            }
+            model.push(push.line)
+            return ControlReply(ok: true, result: .object(["pushed": .bool(true)]))
+
         case "switch", "hold", "unhold", "rename", "remove":
             let (fleet, n) = try target(r)
             let need: EngineCapabilities = ["switch": .switch, "hold": .hold, "unhold": .hold,
