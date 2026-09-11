@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+## 0.4.5-alpha.1
+
 ### Team (preview)
 - Teammates' data and transcript branches are fetched at their tip only, not with every chunk ever published behind them, and a removed member's branch disappears from the mirror; the roster keeps its history for the trust walk (#414).
 - A member's publish deletes the pre-split transcript chunks still sitting in its `m/<kid>` branch, so a new member's first fetch no longer downloads 1.3 GB of stale chunks (#414).
@@ -33,40 +35,14 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - A Cloudflare quick tunnel can front the T3 Code fork server's port (`fork_tunnel_enabled`, `fork_server_port` under Devices), and `infinitusctl status` reports its state and public URL for the fork's pairing QR (#572).
 - swapd engine: a Gemini CLI fleet shows beside the Claude one when swapd reports it, its per-model quota as named gauges.
-- Workspace: a terminal drawer under the thread, resizable, showing the same shells as the Terminal tab.
-- Workspace: a plan's Refine and a sidebar file drop reach the composer every time, not only when it happened to redraw.
-- Workspace: the Terminal tab holds several shells per thread — "+" opens another, the strip switches and closes them.
-- Workspace: the Terminal tab splits — up to four shells side by side or stacked.
-- Workspace: the right panel's Agents tab follows the thread's subagents and workflow runs.
-- Workspace: Files tab rows offer Copy mention and Add to chat, drag into the composer as a mention, and the listing re-reads after a turn.
 - swapd engine: a switch in flight keeps the previous active account on screen instead of flashing "no active account" (#476).
-- Workspace: the right panel's Terminal tab opens a shell in the thread's project.
-- Workspace: the right panel's Diff tab shows the session's changes from its checkpoints.
-- Workspace and phone: image files in the Files tab preview as images, over the mirror wire too.
-- Workspace: clicking a file in the Files tab previews it.
-- Workspace: the right panel's Pull request tab lists the project's open pull requests through gh.
-- Workspace: the Pull request and Agents tabs use the reference's exact violet and grey stops and its semibold weight.
 - The phone can open a terminal in a session's project over the mirror wire (terminal capability).
-- Workspace: the right panel's Files tab browses the thread's project.
-- Workspace: a minimap of the thread's turns at the timeline's edge, with previous/next-turn arrows.
 - swapd engine (preview): the app can run the new multi-provider engine beside cswap; ignite refreshes the account at once.
 - The phone can browse and read a session's project files over the mirror wire (files capability).
 - The project list and the composer strip read the branch from the repo's HEAD file instead of spawning git, so a checkout shows on the next pump (#346).
 - A debug or fixture instance keeps its mirror snapshot in its own state dir instead of overwriting the app's (INFINITUS_MIRROR_SNAPSHOT).
 - The past-session scan remembers each transcript's head instead of re-reading 200 of them every minute (#346).
-- Workspace: a newly opened window no longer races the app's first refresh into an empty sidebar (#468).
 - Clicking Infinitus in the Dock while Settings is open brings Settings back instead of the pop-out.
-- Workspace: a working thread's status reads in sky, the colour the reference uses.
-- Workspace: drop files onto a sidebar thread to open it with them attached.
-- Workspace: a "Scroll to end" button above the composer while the thread is scrolled away from its newest message.
-- Workspace: the new-thread project picker lists each project with its own icon.
-- Workspace: an open drawer tucks under the composer the way the reference's does.
-- Workspace: links in replies carry the reference's favicon slot.
-- Workspace: reply links take the reference's blue with no underline.
-- Workspace: inline code in replies wears the reference's chip.
-- Workspace: a thread whose session ends stays open with "This session has ended." instead of vanishing.
-- Workspace: sidebar rows show their branch and provider, the scope row and top bar carry the reference's controls, and the composer's placeholder follows the thread.
-- Workspace: the thread's timestamp row, code-fence header, sidebar search and the git line under the composer now match the reference.
 - Settings › Devices lists every phone that has paired — name, route, last seen, what it holds on this Mac — across relaunches, any number of phones, each with Forget.
 - gcloud sign-in like AWS: a session whose `gcloud` credentials lapsed (user account or application default) shows the need, the phone or the Mac runs `gcloud auth login` and the session is told to continue (#367).
 - The workspace window no longer spawns a git call per project on every fleet tick: branch names are kept a minute per folder and the session list is read once per refresh (#384).
@@ -82,16 +58,10 @@ publishes the matching section as the GitHub release body.
 - Launch and the hourly machine sample no longer burn ~40 CPU-seconds sizing the transcript, plugin-cache and claude-mem trees: the walk reads one size per file instead of a full attribute dictionary, ~12x faster on 240k files (#346).
 - `infinitusctl` builds on Windows again: the POSIX signal calls behind owned sessions and the team's git feed are Darwin/Linux-only, and Windows probes and ends an orphaned child through its process handle (#406).
 - `ictl` is the short name for `infinitusctl`: the same binary, shipped beside it in the bundle, and its usage text follows whichever name you typed.
-- Workspace groundwork: timeline messages carry updatedAt, tool rows carry their command, slash-command discovery.
 - The phone's working Live Activity gets its tok/min pushed on its own beat, every 5 s by default and adjustable in Settings › Sync › Phone lock screen.
-- Open workspace: a new window over your sessions, from the popup, ⌘⇧T, or infinitusctl show workspace.
-- Workspace: sidebar with project groups, pinned/snoozed/settled shelves, and the thread header bar.
-- Workspace: the thread view — timeline, work groups, approvals and questions answered in place, richer markdown.
-- Workspace: composer with slash commands, @-file mentions, attachments, new-thread drafts and the ⌘K thread switcher.
 - Settings › Team's Syncing line stays one line: git's progress can no longer spill over the pane.
 - Team stats days are keyed by the Gregorian date on every Mac, so a member on the Buddhist calendar counts toward today instead of the year 2569 (#409).
 - Closing a chat window or switching workspace threads stops its transcript poll within a second instead of up to 25 s later (#399).
-- Workspace: a denial with a reason now shows in the activity log like every other answer.
 - A streaming session's transcript is read incrementally: each watcher tick parses the lines appended since the last, not the whole 512 KB tail (#346).
 - The machine sample groups the process table once for all hook registrations instead of once per hook (#346).
 - The resume tick probes the last 64 KB of a transcript before reading 512 KB, and a sub-agent's meta file is decoded once, not on every feed read (#346).
