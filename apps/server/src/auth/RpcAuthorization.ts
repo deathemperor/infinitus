@@ -168,6 +168,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.infinitusReleaseThread]: AuthOrchestrationOperateScope,
   // Held threads are thread state, read like the snapshot.
   [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
+  // A secret to the app (a sign-in code, a key, a token) is administrative:
+  // the same scope that mints a pairing credential, never a paired browser's.
+  [WS_METHODS.infinitusSecret]: AuthAccessWriteScope,
   // Pending pairing requests are pairing metadata, like the pairing-links
   // list; deciding one mints a pairing credential, like creating a link.
   [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,

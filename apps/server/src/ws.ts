@@ -88,6 +88,7 @@ import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
+import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
@@ -543,6 +544,7 @@ const makeWsRpcLayer = (
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusSessionHold = yield* InfinitusSessionHold;
+      const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
@@ -3071,6 +3073,13 @@ const makeWsRpcLayer = (
             WS_METHODS.subscribeInfinitusHolds,
             Effect.succeed(infinitusSessionHold.held),
             { "rpc.aggregate": "infinitus" },
+          ),
+        [WS_METHODS.infinitusSecret]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusSecret,
+            infinitusSecret.forward({ ...input, sessionId: currentSession.sessionId }),
+            // The verb only: never the args, never the value (#747).
+            { "rpc.aggregate": "infinitus", "infinitus.command": input.command },
           ),
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(

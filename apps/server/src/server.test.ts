@@ -65,6 +65,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
@@ -114,6 +115,7 @@ import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
+import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -513,6 +515,7 @@ const buildAppUnderTest = (options?: {
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
     infinitus?: Partial<InfinitusService["Service"]>;
     infinitusSessionHold?: Partial<InfinitusSessionHold["Service"]>;
+    infinitusSecret?: Partial<InfinitusSecret["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     usageLimitSources?: Partial<UsageLimitSources.UsageLimitSources["Service"]>;
     providerService?: Partial<ProviderService.ProviderService["Service"]>;
@@ -793,6 +796,11 @@ const buildAppUnderTest = (options?: {
             release: () => Effect.succeed({ released: false, reason: "nothing is held" }),
             held: Stream.empty,
             ...options?.layers?.infinitusSessionHold,
+          }),
+          // No secret ever leaves here; the layer has its own tests (#747).
+          Layer.mock(InfinitusSecret)({
+            forward: () => Effect.succeed({}),
+            ...options?.layers?.infinitusSecret,
           }),
           // Nothing is ever waiting for approval here; the store has its own tests.
           Layer.mock(InfinitusPairing)({
@@ -4312,6 +4320,51 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
       assert.deepEqual(first, Option.some([held]));
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "infinitus.secret hands the layer a Redacted value with the session and answers the verb's reply (#747)",
+    () =>
+      Effect.gen(function* () {
+        const seen: Array<{ command: string; args: unknown; secret: string; sessionId: string }> =
+          [];
+        yield* buildAppUnderTest({
+          layers: {
+            infinitusSecret: {
+              forward: (input) =>
+                Effect.sync(() => {
+                  // Only the layer ever unwraps it; anything that prints the input sees this.
+                  assert.equal(String(input.secret), "<redacted>");
+                  seen.push({
+                    command: input.command,
+                    args: input.args,
+                    secret: Redacted.value(input.secret),
+                    sessionId: input.sessionId,
+                  });
+                  return { result: { ok: true } };
+                }),
+            },
+          },
+        });
+
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const result = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[WS_METHODS.infinitusSecret]({
+              command: "signin-code",
+              args: { flowId: "flow-7" },
+              secret: Redacted.make("s3cret"),
+            }),
+          ),
+        );
+
+        assert.deepEqual(result, { result: { ok: true } });
+        assert.equal(seen.length, 1);
+        assert.equal(seen[0]!.command, "signin-code");
+        assert.deepEqual(seen[0]!.args, { flowId: "flow-7" });
+        assert.equal(seen[0]!.secret, "s3cret");
+        assert.ok(seen[0]!.sessionId.length > 0);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
   it.effect("includes CORS headers on remote auth success responses", () =>

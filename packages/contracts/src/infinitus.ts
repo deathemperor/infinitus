@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { ForwardCompatibleOptional, ThreadId } from "./baseSchemas.ts";
+import { ForwardCompatibleOptional, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
  * Wire contracts for the Infinitus control socket: one JSON line per request,
@@ -55,6 +55,12 @@ export const InfinitusManifestCommand = Schema.Struct({
   requires: Schema.optionalKey(Schema.String),
   summary: Schema.String,
   replyShape: Schema.String,
+  /** What the request line's `secret` field carries for this verb (#747):
+      `"secret"` (stdin material: a code, a token, a key), `"payload"` (a
+      message or hook body), absent or null for none. A string rather than
+      literals so a value a newer app adds decodes; only `"secret"` opens
+      `infinitus.secret`. */
+  stdin: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusManifestCommand = typeof InfinitusManifestCommand.Type;
 
@@ -612,6 +618,52 @@ export const InfinitusCommandResult = Schema.Struct({
   result: Schema.optionalKey(Schema.Unknown),
 });
 export type InfinitusCommandResult = typeof InfinitusCommandResult.Type;
+
+/** One argument of a secret-carrying call (#747): an identifier, never the
+    material itself — a flow id, a profile, a base URL, a name. Short, no
+    control characters, no surrounding whitespace. */
+export const InfinitusSecretArg = TrimmedNonEmptyString.check(
+  Schema.isMaxLength(128),
+  Schema.isPattern(/^\P{Cc}*$/u),
+);
+
+/** The fork's one secret-carrying path (#747): `secret` rides the request
+    line's `secret` field to `command`, and only to a verb whose manifest entry
+    says `stdin: "secret"`. `args` is keyed by the manifest's argument and
+    option names for that verb (a positional by its name, an option by its
+    bare name); the server orders them. The value decodes into a `Redacted`
+    the moment it arrives, so nothing that prints the input can show it. */
+export const InfinitusSecretInput = Schema.Struct({
+  command: Schema.String,
+  args: Schema.Record(Schema.String, InfinitusSecretArg),
+  secret: Schema.RedactedFromValue(Schema.String),
+});
+export type InfinitusSecretInput = typeof InfinitusSecretInput.Type;
+
+/** The verb's reply, opaque like `InfinitusCommandResult`: that it never
+    echoes the secret is the verb's own contract. */
+export const InfinitusSecretResult = Schema.Struct({
+  result: Schema.optionalKey(Schema.Unknown),
+});
+export type InfinitusSecretResult = typeof InfinitusSecretResult.Type;
+
+/** Why a secret call never reached the socket: the manifest has not been
+    read, the verb takes no secret, an argument the verb does not name (or one
+    it needs is missing), or this session asked too often. */
+export const InfinitusSecretRefusal = Schema.Literals([
+  "no_manifest",
+  "no_secret",
+  "bad_args",
+  "too_many_attempts",
+]);
+export class InfinitusSecretRefused extends Schema.TaggedError<InfinitusSecretRefused>()(
+  "InfinitusSecretRefused",
+  {
+    command: Schema.String,
+    reason: InfinitusSecretRefusal,
+    detail: Schema.String,
+  },
+) {}
 
 /** The control socket could not be reached at `path`. */
 export class InfinitusUnavailable extends Schema.TaggedError<InfinitusUnavailable>()(

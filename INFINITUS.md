@@ -548,6 +548,26 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   "Pin on create" under a draft's composer (per-browser, off by default);
   ChatView pins the thread right after the send that creates it. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
+- `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+
+  `Services/InfinitusSecret.ts`) — the fork's one secret-carrying path (#747,
+  the only exception to "secrets never over the fork RPC"): `infinitus.secret`
+  (`access:write`; `{command, args, secret}` → `{result?}`) puts `secret` on
+  the control request line's `secret` field — where stdin material always
+  travels — for a verb whose manifest entry says `stdin: "secret"` (native
+  #766), and refuses everything else before the socket: no manifest read yet,
+  another verb (`"payload"`, none, unknown), an `args` key the verb's manifest
+  `args`/`options` do not name or a positional it names missing, a sixth
+  attempt by one auth session at one verb inside a minute. `args` is keyed by
+  those names (identifiers, ≤128 chars, no control characters), the layer
+  orders them. The value is `Schema.RedactedFromValue` on the wire, a
+  `Redacted` from decode to the socket call (prints `<redacted>`), lives in
+  that one request, is kept nowhere; the span carries the verb only. The
+  reply passes through opaque; that it never echoes the secret is each verb's
+  contract. A successful call refreshes the snapshot, detached, like a write.
+  `infinitus.command` stays secret-free. The panes' rules (password input,
+  autocomplete off, cleared on submit/unmount, never interpolated into a
+  message, sensitive read replies like `team-code`/`pair-status` rendered
+  and never logged) bind their PRs (#747).
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
