@@ -50,14 +50,23 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `CLAUDE.md` — adds `@INFINITUS.md`.
 - `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
-  `WsRpcGroup`.
+  `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an
+  Anthropic-compatible proxy's models) the same way.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
   `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663).
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` in
   `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts it.
 - `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
-  and answers the two Infinitus methods.
+  and answers the two Infinitus methods; answers `provider.proxyModels` with
+  `fetchProxyModels` over the server's `HttpClient`.
+- `packages/client-runtime/src/state/server.ts` — `serverEnvironment.proxyModels`
+  command (single-flight per base URL).
+- `apps/web/src/components/settings/AddProviderInstanceDialog.tsx` — the Claude
+  Config step renders `ProxyProviderFields` ("Route through a proxy"); on save
+  `applyProxyDraft` adds the ANTHROPIC_* environment variables (the key marked
+  sensitive), a dedicated `homePath` (`~/.claude-proxy/<instanceId>` unless one
+  was typed) and the picker model as a custom model.
 - `apps/server/src/auth/RpcAuthorization.ts` — a scope for each of them; the
   table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
   type error.
@@ -522,3 +531,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `.github/workflows/fork-desktop-release.yml` — "Fork desktop release": the
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
   prerelease (upstream's release.yml stays disabled and untouched).
+
+- `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
+  `apps/web/src/components/settings/proxyProvider.ts`,
+  `apps/web/src/components/settings/ProxyProviderFields.tsx` — "Route through a
+  proxy" for a Claude instance: 9Router / CLIProxyAPI / custom presets, model
+  slots picked from the proxy's `GET <baseUrl>/models`, everything stored on
+  the ordinary instance (env vars + CLAUDE_CONFIG_DIR), no settings file written.

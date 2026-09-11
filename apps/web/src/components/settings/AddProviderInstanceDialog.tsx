@@ -29,6 +29,13 @@ import {
   type WizardNavigation,
 } from "./AddProviderInstanceDialog.logic";
 import { AddProviderInstanceWizardSteps } from "./AddProviderInstanceWizardSteps";
+import { ProxyProviderFields } from "./ProxyProviderFields";
+import {
+  applyProxyDraft,
+  EMPTY_PROXY_DRAFT,
+  validateProxyDraft,
+  type ProxyDraft,
+} from "./proxyProvider";
 
 const PROVIDER_ACCENT_SWATCHES = [
   "#2563eb",
@@ -62,6 +69,7 @@ function deriveInstanceId(driver: ProviderDriverKind, label: string): string {
 
 const INSTANCE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
+const CLAUDE_DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
 const DEFAULT_DRIVER_OPTION = DRIVER_OPTIONS[0]!;
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
 interface ComingSoonDriverOption {
@@ -132,6 +140,8 @@ export function AddProviderInstanceDialog({
   // Driver-specific config drafts keyed by driver so toggling between drivers
   // during the same dialog session does not lose in-progress input.
   const [configByDriver, setConfigByDriver] = useState<Record<string, Record<string, unknown>>>({});
+  // Fork: "Route through a proxy" on the Claude Config step.
+  const [proxyDraft, setProxyDraft] = useState<ProxyDraft>(EMPTY_PROXY_DRAFT);
   // Errors are suppressed until the user has tried to submit once. After that
   // they update live so fixing the problem clears the message in place.
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -148,6 +158,8 @@ export function AddProviderInstanceDialog({
     [driverOption],
   );
   const instanceIdError = validateInstanceId(instanceId, existingIds);
+  const isClaude = driver === CLAUDE_DRIVER_KIND;
+  const proxyError = isClaude ? validateProxyDraft(proxyDraft) : null;
   const showInstanceIdError = hasAttemptedSubmit && instanceIdError !== null;
   const previewLabel = label.trim() || `${driverOption.label} Workspace`;
   const wizardStepSummaries = [driverOption.label, previewLabel, null] as const;
@@ -182,9 +194,13 @@ export function AddProviderInstanceDialog({
 
   const handleSave = () => {
     setHasAttemptedSubmit(true);
-    if (instanceIdError !== null) return;
+    if (instanceIdError !== null || proxyError !== null) return;
 
-    const config = configByDriver[driver] ?? {};
+    const draftConfig = configByDriver[driver] ?? {};
+    const applied = isClaude
+      ? applyProxyDraft(proxyDraft, instanceId, draftConfig)
+      : { config: draftConfig, environment: undefined };
+    const config = applied.config;
     const hasConfig = Object.keys(config).length > 0;
     const normalizedAccentColor = normalizeProviderAccentColor(accentColor);
 
@@ -194,6 +210,7 @@ export function AddProviderInstanceDialog({
       ...(label.trim().length > 0 ? { displayName: label.trim() } : {}),
       ...(normalizedAccentColor ? { accentColor: normalizedAccentColor } : {}),
       ...(hasConfig ? { config } : {}),
+      ...(applied.environment ? { environment: applied.environment } : {}),
     };
     // `ProviderInstanceId.make` revalidates the slug; we've already checked
     // it via `validateInstanceId`, but going through the brand constructor
@@ -384,6 +401,14 @@ export function AddProviderInstanceDialog({
 
           {driverSettingsFields.length > 0 ? (
             <div className={cn("grid gap-4", wizardStep !== 2 && "hidden")}>
+              {isClaude ? (
+                <ProxyProviderFields
+                  environmentId={environmentId}
+                  draft={proxyDraft}
+                  error={hasAttemptedSubmit ? proxyError : null}
+                  onChange={setProxyDraft}
+                />
+              ) : null}
               <ProviderSettingsForm
                 definition={driverOption}
                 value={configDraft}
