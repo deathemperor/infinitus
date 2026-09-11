@@ -3796,7 +3796,12 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    // electron-builder derives the updater cache directory from this name
+    // (`<name>-updater`), and Electron seeds `app.name` from it before
+    // `setPath("userData")` runs; both must differ from the installed T3 Code's
+    // (`t3code-updater`, `t3code`) or the fork downloads its updates into the
+    // real app's cache (#600).
+    name: "infinitus-desktop",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
