@@ -88,6 +88,7 @@ import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
+import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import {
@@ -539,6 +540,7 @@ const makeWsRpcLayer = (
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
+      const infinitusPairing = yield* InfinitusPairing;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
@@ -3060,6 +3062,19 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
             "rpc.aggregate": "infinitus",
           }),
+        [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
+          observeRpcStreamEffect(
+            WS_METHODS.subscribeInfinitusPairing,
+            Effect.succeed(infinitusPairing.pending),
+            { "rpc.aggregate": "infinitus" },
+          ),
+        [WS_METHODS.infinitusPairingDecide]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusPairingDecide,
+            infinitusPairing.decide({ ...input, approverScopes: currentSession.scopes }),
+            // The request id only: the match code and the secret stay off spans.
+            { "rpc.aggregate": "infinitus", "infinitus.pairing.request": input.id },
+          ),
       });
     }),
   );

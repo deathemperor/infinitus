@@ -39,6 +39,12 @@ import {
   InfinitusUnavailable,
 } from "./infinitus.ts";
 import {
+  PairingApprovalDecideInput,
+  PairingApprovalDecideResult,
+  PairingApprovalIssueFailed,
+  PairingApprovalPendingRequests,
+} from "./infinitusPairing.ts";
+import {
   FilesystemBrowseInput,
   FilesystemBrowseResult,
   FilesystemBrowseError,
@@ -430,6 +436,8 @@ export const WS_METHODS = {
   // Infinitus methods
   infinitusCommand: "infinitus.command",
   infinitusLaunch: "infinitus.launch",
+  subscribeInfinitusPairing: "subscribeInfinitusPairing",
+  infinitusPairingDecide: "infinitus.pairingDecide",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -1323,6 +1331,24 @@ const WsInfinitusLaunchRpc = Rpc.make(WS_METHODS.infinitusLaunch, {
   error: EnvironmentAuthorizationError,
 });
 
+/** The requests waiting for this desktop's approval (#710): the current list,
+    then the whole list again on every change. Metadata only. */
+const WsSubscribeInfinitusPairingRpc = Rpc.make(WS_METHODS.subscribeInfinitusPairing, {
+  payload: Schema.Struct({}),
+  success: PairingApprovalPendingRequests,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
+/** Approves or denies one pending request. Approving mints the one-time
+    pairing credential the phone then collects by polling; it never rides
+    this reply. */
+const WsInfinitusPairingDecideRpc = Rpc.make(WS_METHODS.infinitusPairingDecide, {
+  payload: PairingApprovalDecideInput,
+  success: PairingApprovalDecideResult,
+  error: Schema.Union([EnvironmentAuthorizationError, PairingApprovalIssueFailed]),
+});
+
 /** Forwards one command from the manifest to the control socket. */
 const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
   payload: InfinitusCommandInput,
@@ -1464,6 +1490,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeInfinitusRpc,
   WsInfinitusCommandRpc,
   WsInfinitusLaunchRpc,
+  WsSubscribeInfinitusPairingRpc,
+  WsInfinitusPairingDecideRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetWorkflowScriptRpc,
   WsOrchestrationGetTurnDiffRpc,

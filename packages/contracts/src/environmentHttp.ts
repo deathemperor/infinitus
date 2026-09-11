@@ -31,6 +31,7 @@ import {
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
+import { InfinitusPairingHttpApi } from "./infinitusPairing.ts";
 import {
   ClientOrchestrationCommand,
   DispatchResult,
@@ -619,4 +620,6 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentAuthHttpApi)
   .add(EnvironmentOrchestrationHttpApi)
   .add(EnvironmentPullRequestsHttpApi)
-  .add(EnvironmentConnectHttpApi) {}
+  .add(EnvironmentConnectHttpApi)
+  // Infinitus fork: the approve-on-Mac pairing routes (#710).
+  .add(InfinitusPairingHttpApi) {}
