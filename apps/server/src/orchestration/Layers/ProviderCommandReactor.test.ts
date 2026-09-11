@@ -842,44 +842,43 @@ describe("ProviderCommandReactor", () => {
     }),
   );
 
-  it("hands a turn start to the TurnStartGate: a gate that holds starts no session and sends nothing (#616)", async () => {
-    const held: ThreadId[] = [];
-    const harness = await createHarness({
-      turnStartGate: {
-        start: ({ threadId }) =>
-          Effect.sync(() => {
-            held.push(threadId);
-            return "held" as const;
+  effectIt.effect(
+    "hands a turn start to the TurnStartGate: a gate that holds starts no session and sends nothing (#616)",
+    () =>
+      Effect.gen(function* () {
+        const held = yield* Deferred.make<ThreadId>();
+        const harness = yield* Effect.promise(() =>
+          createHarness({
+            turnStartGate: {
+              start: ({ threadId }) => Deferred.succeed(held, threadId).pipe(Effect.as("held")),
+            },
           }),
-      },
-    });
+        );
 
-    await Effect.runPromise(
-      harness.engine.dispatch({
-        type: "thread.turn.start",
-        commandId: CommandId.make("cmd-turn-start-held"),
-        threadId: ThreadId.make("thread-1"),
-        message: {
-          messageId: asMessageId("user-message-held"),
-          role: "user",
-          text: "hello, later",
-          attachments: [],
-        },
-        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
-        runtimeMode: "approval-required",
-        createdAt: "2026-01-01T00:00:00.000Z",
+        yield* harness.engine.dispatch({
+          type: "thread.turn.start",
+          commandId: CommandId.make("cmd-turn-start-held"),
+          threadId: ThreadId.make("thread-1"),
+          message: {
+            messageId: asMessageId("user-message-held"),
+            role: "user",
+            text: "hello, later",
+            attachments: [],
+          },
+          interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+          runtimeMode: "approval-required",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        });
+
+        expect(yield* Deferred.await(held)).toBe(ThreadId.make("thread-1"));
+        yield* Effect.promise(() => harness.drain());
+        expect(harness.startSession).not.toHaveBeenCalled();
+        expect(harness.sendTurn).not.toHaveBeenCalled();
+        const readModel = yield* Effect.promise(() => harness.readModel());
+        const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
+        expect(thread?.session ?? null).toBeNull();
       }),
-    );
-
-    await waitFor(() => held.length === 1);
-    await harness.drain();
-    expect(held).toEqual([ThreadId.make("thread-1")]);
-    expect(harness.startSession).not.toHaveBeenCalled();
-    expect(harness.sendTurn).not.toHaveBeenCalled();
-    const readModel = await harness.readModel();
-    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
-    expect(thread?.session ?? null).toBeNull();
-  });
+  );
 
   it("reacts to thread.turn.start by ensuring session and sending provider turn", async () => {
     const harness = await createHarness();

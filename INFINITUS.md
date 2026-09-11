@@ -408,10 +408,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   contract's request/reply schemas), shared by the server's control client
   and the desktop shell's quit-with-app hook so the protocol exists once.
 - `apps/server/src/orchestration/Services/TurnStartGate.ts` — the one seam a
-  provider turn start passes through (#616, session priority mode): `start({
-  threadId, run })` answers `started` (ran now) or `held` (kept for later; the
-  gate captures the caller's context and runs it under that later). The
-  passthrough layer is the server's default; the hold layer replaces it.
+  provider turn start passes through (#616, session priority mode). `start`
+  takes the thread and the send and answers `started` (ran now) or `held`
+  (kept for later; the gate captures the caller's context and runs it under
+  that later). The passthrough layer is the server's default; the hold layer
+  replaces it.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
