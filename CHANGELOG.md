@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
+- `history <fleet> [--limit n]` hands the engine's own switch log to the fork — swapd's `{schemaVersion, switches:[{ts, from?, to, trigger?}]}` untouched (#779).
 
 ## 0.4.5-alpha.1
 
