@@ -135,6 +135,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl signin-begin|signin-status|signin-code|signin-cancel` run a fleet's sign-in with no window on the Mac, so the Infinitus desktop app can host the OAuth page itself (#677).
 - The wall, workspace, session chat, revival countdown and playground windows are retired — the Infinitus desktop app is the client; the pop-out stays (#654).
 - The About pane's Homebrew upgrade relaunches the way Restart does, so it no longer wedges a Mac in a team; write-effect control commands are logged by verb for the next incident.
+- The desktop app's polls cost less on the Mac and no longer make `infinitusctl` answer "busy": read-only commands run alongside each other, timestamps share one formatter, and the engine keys' presence is read from the keychain once per run (#346).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
