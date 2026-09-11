@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,7 +19,9 @@ import { macSessionsView } from "../infinitus/sessions.logic";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { AccountRow } from "./AccountRow";
 import { type InfinitusMac, infinitusMacs, macAccountsModel } from "./accountsRoute.logic";
+import { ExhaustedBand } from "./ExhaustedBand";
 import { ForecastStrip } from "./ForecastStrip";
+import { useNowMinute } from "./useNowMinute";
 import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /** Settings › Accounts (#572): every paired Mac that runs Infinitus, its fleets
@@ -65,24 +67,14 @@ export function AccountsRouteScreen() {
   );
 }
 
-/** A minute clock for the session ages: read once on mount, then each minute. */
-function useNowMinute(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
-
 function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boolean }) {
   const { mac } = props;
   const navigation = useNavigation();
   const view = useEnvironmentQuery(
     infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
   );
-  const model = macAccountsModel(view.data);
   const now = useNowMinute();
+  const model = macAccountsModel(view.data, now);
   const sessions = macSessionsView(view.data, now);
   return (
     <View className="gap-3">
@@ -108,6 +100,9 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
       ) : null}
       {model.sections.map((section) => (
         <SettingsSection key={section.key} title={section.title} card>
+          {model.bands.has(section.key) ? (
+            <ExhaustedBand band={model.bands.get(section.key)!} nowMs={now} />
+          ) : null}
           {section.rows.map((row, index) => (
             <AccountRow
               key={row.number}
