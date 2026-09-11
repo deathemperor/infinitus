@@ -292,6 +292,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["new worktrees latest matching remote branch local"],
   },
   {
+    id: "worktree-limit",
+    title: "Worktree limit",
+    to: "/settings/general",
+    searchTerms: ["max worktrees count cap archived threads delete"],
+  },
+  {
     id: "add-project-starts-in",
     title: "Add project starts in",
     to: "/settings/general",

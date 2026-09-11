@@ -1434,6 +1434,79 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
     }),
   );
 
+  it.effect("counts worktree holders and names the oldest archived ones (#269 H)", () =>
+    Effect.gen(function* () {
+      const snapshotQuery = yield* ProjectionSnapshotQuery;
+      const sql = yield* SqlClient.SqlClient;
+
+      yield* sql`DELETE FROM projection_projects`;
+      yield* sql`DELETE FROM projection_threads`;
+
+      yield* sql`
+        INSERT INTO projection_projects (
+          project_id,
+          title,
+          workspace_root,
+          default_model_selection_json,
+          scripts_json,
+          created_at,
+          updated_at,
+          deleted_at
+        )
+        VALUES (
+          'project-wt',
+          'Worktree Project',
+          '/tmp/wt-workspace',
+          NULL,
+          '[]',
+          '2026-03-02T00:00:00.000Z',
+          '2026-03-02T00:00:01.000Z',
+          NULL
+        )
+      `;
+
+      // Live with a worktree, local (no worktree), two archived holders, one deleted holder.
+      yield* sql`
+        INSERT INTO projection_threads (
+          thread_id,
+          project_id,
+          title,
+          model_selection_json,
+          runtime_mode,
+          interaction_mode,
+          branch,
+          worktree_path,
+          latest_turn_id,
+          created_at,
+          updated_at,
+          archived_at,
+          deleted_at
+        )
+        VALUES
+          ('wt-live', 'project-wt', 'Live', '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default', 'a', '/tmp/wt/live', NULL, '2026-03-02T00:00:02.000Z', '2026-03-02T00:00:02.000Z', NULL, NULL),
+          ('wt-local', 'project-wt', 'Local', '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default', 'b', NULL, NULL, '2026-03-02T00:00:02.000Z', '2026-03-02T00:00:02.000Z', NULL, NULL),
+          ('wt-new', 'project-wt', 'Newer archive', '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default', 'c', '/tmp/wt/new', NULL, '2026-03-02T00:00:02.000Z', '2026-03-03T00:00:00.000Z', '2026-03-03T00:00:00.000Z', NULL),
+          ('wt-old', 'project-wt', 'Older archive', '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default', 'd', '/tmp/wt/old', NULL, '2026-03-02T00:00:02.000Z', '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', NULL),
+          ('wt-gone', 'project-wt', 'Deleted', '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default', 'e', '/tmp/wt/gone', NULL, '2026-03-02T00:00:02.000Z', '2026-02-02T00:00:00.000Z', '2026-02-01T00:00:00.000Z', '2026-02-02T00:00:00.000Z')
+      `;
+
+      const one = yield* snapshotQuery.getWorktreeHolders(1);
+      assert.equal(one.count, 3);
+      assert.deepEqual(one.oldestArchived, [
+        {
+          threadId: ThreadId.make("wt-old"),
+          title: "Older archive",
+          archivedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ]);
+      const three = yield* snapshotQuery.getWorktreeHolders(3);
+      assert.deepEqual(
+        three.oldestArchived.map((row) => row.threadId),
+        [ThreadId.make("wt-old"), ThreadId.make("wt-new")],
+      );
+    }),
+  );
+
   it.effect("keeps thread detail activity ordering consistent with shell snapshot ordering", () =>
     Effect.gen(function* () {
       const snapshotQuery = yield* ProjectionSnapshotQuery;

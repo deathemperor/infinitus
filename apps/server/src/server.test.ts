@@ -11555,6 +11555,88 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
+  it.effect(
+    "refuses a worktree bootstrap over the worktree limit before creating the thread (#269 H)",
+    () =>
+      Effect.gen(function* () {
+        const dispatchedCommands: Array<OrchestrationCommand> = [];
+        yield* buildAppUnderTest({
+          layers: {
+            serverSettings: {
+              getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, worktreeMaxCount: 2 }),
+            },
+            projectionSnapshotQuery: {
+              getWorktreeHolders: () =>
+                Effect.succeed({
+                  count: 2,
+                  oldestArchived: [
+                    {
+                      threadId: ThreadId.make("thread-old"),
+                      title: "Old spike",
+                      archivedAt: "2026-01-01T00:00:00.000Z",
+                    },
+                  ],
+                }),
+            },
+            orchestrationEngine: {
+              dispatch: (command) => {
+                dispatchedCommands.push(command);
+                return Effect.succeed({ sequence: dispatchedCommands.length });
+              },
+              readEvents: () => Stream.empty,
+            },
+          },
+        });
+
+        const createdAt = "2026-01-01T00:00:00.000Z";
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const result = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
+              type: "thread.turn.start",
+              commandId: CommandId.make("cmd-bootstrap-worktree-limit"),
+              threadId: ThreadId.make("thread-bootstrap-worktree-limit"),
+              message: {
+                messageId: MessageId.make("msg-bootstrap-worktree-limit"),
+                role: "user",
+                text: "hello",
+                attachments: [],
+              },
+              modelSelection: defaultModelSelection,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              bootstrap: {
+                createThread: {
+                  projectId: defaultProjectId,
+                  title: "Bootstrap Thread",
+                  modelSelection: defaultModelSelection,
+                  runtimeMode: "full-access",
+                  interactionMode: "default",
+                  branch: "main",
+                  worktreePath: null,
+                  createdAt,
+                },
+                prepareWorktree: {
+                  projectCwd: "/tmp/project",
+                  baseBranch: "main",
+                  branch: "t3code/bootstrap-limit",
+                },
+                runSetupScript: false,
+              },
+              createdAt,
+            }),
+          ).pipe(Effect.result),
+        );
+
+        assertTrue(result._tag === "Failure");
+        assertTrue(result.failure._tag === "OrchestrationDispatchCommandError");
+        assert.include(result.failure.message, "2 of 2 threads hold a worktree");
+        assert.include(result.failure.message, "Old spike");
+        assert.strictEqual(result.failure.bootstrapThreadDisposition, undefined);
+        assert.deepEqual(dispatchedCommands, []);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
   it.effect("routes websocket rpc terminal methods", () =>
     Effect.gen(function* () {
       const snapshot = {
