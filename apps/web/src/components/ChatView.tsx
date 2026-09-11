@@ -357,6 +357,7 @@ import {
   ProviderStatusBanner,
   shouldShowProviderStatusBanner,
 } from "./chat/ProviderStatusBanner";
+import { reconnectingNotice, ThreadReconnectingNotice } from "./chat/ThreadReconnectingNotice";
 import {
   dismissThreadErrorBannerForSession,
   getThreadErrorBannerKey,
@@ -3372,7 +3373,11 @@ export default function ChatView(props: ChatViewProps) {
   )
     ? activeProviderStatus
     : null;
-  const hasTimelineTopBanner = Boolean(visibleThreadError) || visibleProviderStatus !== null;
+  const visibleReconnectingNotice = reconnectingNotice(activeServerThread?.session);
+  const hasTimelineTopBanner =
+    Boolean(visibleThreadError) ||
+    visibleProviderStatus !== null ||
+    visibleReconnectingNotice !== null;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
@@ -8707,6 +8712,7 @@ export default function ChatView(props: ChatViewProps) {
                   setThreadErrorBannerDismissTick((tick) => tick + 1);
                 }}
               />
+              <ThreadReconnectingNotice notice={visibleReconnectingNotice} />
             </div>
             {/* Messages Wrapper */}
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
