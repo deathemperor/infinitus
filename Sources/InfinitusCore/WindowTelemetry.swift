@@ -15,7 +15,7 @@ import Foundation
 // window is also emitted, marked `closed: false`, since the planner
 // (layer 2) needs to know about the account's current window too.
 
-public struct FiveHourWindow: Sendable, Equatable, Identifiable {
+public struct FiveHourWindow: Sendable, Equatable, Identifiable, Encodable {
     public let email: String
     public let number: Int?
     public let start: Double
