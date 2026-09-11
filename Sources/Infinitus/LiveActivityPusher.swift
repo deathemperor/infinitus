@@ -101,6 +101,20 @@ final class LiveActivityPusher: ObservableObject {
         persist()
     }
 
+    /// One registration withdrawn by the phone itself (#572 G6: the
+    /// fork's "Alerts from Mac" switched off) — without this, the last
+    /// `alert` token kept getting banners until APNs rotated it. False
+    /// when nothing was registered under that slot.
+    @discardableResult
+    func forget(slot: String) -> Bool {
+        guard let gone = registrations.removeValue(forKey: slot) else { return false }
+        lastWorking[slot] = nil
+        lastRevival[slot] = nil
+        log?("📲", "\(gone.deviceName) withdrew its \(gone.kind.rawValue) push token")
+        persist()
+        return true
+    }
+
     private func persist() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
