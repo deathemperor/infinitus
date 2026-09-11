@@ -371,7 +371,7 @@ export function resolveDesktopUpdateTrackRow(
   if (channel === "infinitus") {
     return {
       label: PRODUCT_NAME,
-      description: `${PRODUCT_NAME} builds update from this fork's own releases.`,
+      description: `${PRODUCT_NAME} builds update from their own releases.`,
       switchable: false,
     };
   }

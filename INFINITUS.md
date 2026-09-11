@@ -296,7 +296,11 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   and `resolveWebAssetBrandForPackageVersion` mapping `-infinitus.` versions to it.
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
-  TypeScript); the dev-only bundle id stays `com.t3tools.*`.
+  TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
+  and its helpers are named "Infinitus (Dev)" and the macOS usage prompts say
+  Infinitus (#823 layer 1); `apps/desktop/package.json`'s `productName` is
+  "Infinitus (Dev)" too (packaged builds get theirs from
+  `scripts/build-desktop-artifact.ts`).
 - `apps/web/src/components/settings/SettingsPanels.tsx` (+ `.logic.ts`) —
   `resolveDesktopUpdateTrackRow`: an `infinitus` build shows its own track
   read-only instead of "Stable" with a one-way switch to upstream's releases.
@@ -1164,9 +1168,9 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   asserts: every fork page with the one text marker only its populated render
   shows (a pref row label, the fixture's team or profile name, "Re-lock",
   "Session lengths"…) and the empty-state phrases that must not appear
-  (`ALWAYS_ABSENT`: "not answering", "Still connecting", "This Infinitus build
-  has no", "could not be read"; per route "No projection yet", "Reading the
-  team"…). The test pins the route list, checks no marker is a substring of a
+  (`ALWAYS_ABSENT`: "not answering", "T3 Code" (#823: the upstream name never
+  reaches a screen), "Still connecting", "This Infinitus build has no", "could
+  not be read"; per route "No projection yet", "Reading the team"…). The test pins the route list, checks no marker is a substring of a
   nav label or card title (those print on a dead page too), and mirrors the
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out

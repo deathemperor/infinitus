@@ -25,6 +25,8 @@ export interface ForkVisualRoute {
     loading, or reports a build without the page's verb. */
 export const ALWAYS_ABSENT: ReadonlyArray<string> = [
   "not answering",
+  // #823: the product is Infinitus on every screen; the upstream name never shows.
+  "T3 Code",
   "Still connecting",
   "This Infinitus build has no",
   "could not be read",
