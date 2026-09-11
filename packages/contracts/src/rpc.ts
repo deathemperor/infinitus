@@ -45,6 +45,14 @@ import {
   PairingApprovalPendingRequests,
 } from "./infinitusPairing.ts";
 import {
+  CaptureList,
+  CaptureListFull,
+  CapturesApplyInput,
+  CapturesApplyResult,
+  CaptureStoreError,
+  CapturesSubscribeInput,
+} from "./captures.ts";
+import {
   FilesystemBrowseInput,
   FilesystemBrowseResult,
   FilesystemBrowseError,
@@ -438,6 +446,9 @@ export const WS_METHODS = {
   infinitusLaunch: "infinitus.launch",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
+  // Captures (#433)
+  subscribeCaptures: "subscribeCaptures",
+  capturesApply: "captures.apply",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -1349,6 +1360,23 @@ const WsInfinitusPairingDecideRpc = Rpc.make(WS_METHODS.infinitusPairingDecide, 
   error: Schema.Union([EnvironmentAuthorizationError, PairingApprovalIssueFailed]),
 });
 
+/** A project's capture list (#433): the current list, then the whole list
+    again after every change. */
+const WsSubscribeCapturesRpc = Rpc.make(WS_METHODS.subscribeCaptures, {
+  payload: CapturesSubscribeInput,
+  success: CaptureList,
+  error: Schema.Union([CaptureStoreError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+/** One change to a project's capture list; the new list rides the
+    subscription. */
+const WsCapturesApplyRpc = Rpc.make(WS_METHODS.capturesApply, {
+  payload: CapturesApplyInput,
+  success: CapturesApplyResult,
+  error: Schema.Union([CaptureListFull, CaptureStoreError, EnvironmentAuthorizationError]),
+});
+
 /** Forwards one command from the manifest to the control socket. */
 const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
   payload: InfinitusCommandInput,
@@ -1492,6 +1520,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusLaunchRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
+  WsSubscribeCapturesRpc,
+  WsCapturesApplyRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetWorkflowScriptRpc,
   WsOrchestrationGetTurnDiffRpc,

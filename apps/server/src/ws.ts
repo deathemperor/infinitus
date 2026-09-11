@@ -89,6 +89,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
+import { CaptureStore } from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import {
@@ -541,6 +542,7 @@ const makeWsRpcLayer = (
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusPairing = yield* InfinitusPairing;
+      const captureStore = yield* CaptureStore;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
@@ -3074,6 +3076,24 @@ const makeWsRpcLayer = (
             infinitusPairing.decide({ ...input, approverScopes: currentSession.scopes }),
             // The request id only: the match code and the secret stay off spans.
             { "rpc.aggregate": "infinitus", "infinitus.pairing.request": input.id },
+          ),
+        // Captures (#433): the project id names the list; a capture's text
+        // never reaches a span.
+        [WS_METHODS.subscribeCaptures]: (input) =>
+          observeRpcStreamEffect(
+            WS_METHODS.subscribeCaptures,
+            captureStore.subscribe(input.projectId),
+            { "rpc.aggregate": "captures", "captures.project": input.projectId },
+          ),
+        [WS_METHODS.capturesApply]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.capturesApply,
+            captureStore.apply(input.projectId, input.command).pipe(Effect.as({})),
+            {
+              "rpc.aggregate": "captures",
+              "captures.project": input.projectId,
+              "captures.command": input.command.type,
+            },
           ),
       });
     }),
