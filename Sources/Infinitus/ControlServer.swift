@@ -1025,6 +1025,21 @@ final class ControlServer {
             model.saveCLIProxy(baseURL: url, key: r.secret ?? "")
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
+        case "push-slack":
+            // #756: the away channel the engine used to post to, now the
+            // app's own; the webhook comes on stdin, empty forgets it.
+            if let why = model.awayPush.setSlack(r.secret ?? "") { throw Fail(why) }
+            return ControlReply(ok: true, result: try .of(awayPushReply()))
+
+        case "push-telegram":
+            let token = r.secret ?? ""
+            guard token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || (r.options["chat"].map { $0 != "true" && !$0.isEmpty } ?? false) else {
+                throw Fail("usage: push-telegram --chat <chat id or @channel>  (the bot token on stdin; empty stdin forgets it)")
+            }
+            if let why = model.awayPush.setTelegram(token: token, chat: r.options["chat"] ?? "") { throw Fail(why) }
+            return ControlReply(ok: true, result: try .of(awayPushReply()))
+
         case "9router-password":
             let url = r.options["url"] ?? model.nineRouterBaseURL
             model.saveNineRouter(baseURL: url, password: r.secret ?? "")
@@ -1102,6 +1117,12 @@ final class ControlServer {
             throw Fail("no fleet \(key); fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
         }
         return fleet
+    }
+
+    private struct AwayPushReply: Encodable { let slack: Bool, telegram: Bool, telegramChat: String? }
+    private func awayPushReply() -> AwayPushReply {
+        AwayPushReply(slack: model.awayPush.slackConfigured, telegram: model.awayPush.telegramConfigured,
+                      telegramChat: model.awayPush.telegramConfigured ? model.awayPush.telegramChat : nil)
     }
 
     private func target(_ r: ControlRequest) throws -> (FleetState, Int) {

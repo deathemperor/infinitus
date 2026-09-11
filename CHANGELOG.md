@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
 - `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
 - `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads over the credential it hands the app at port publish (#822).
 - `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).

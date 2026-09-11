@@ -832,7 +832,14 @@ final class AppModel: ObservableObject {
     /// swapd's `notify` only reports).
     func push(_ msg: String) {
         notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+        awayPush.send(msg)
     }
+    /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
+    lazy var awayPush: AwayPush = {
+        let push = AwayPush(defaults: defaults)
+        push.log = { [weak self] icon, text in self?.logEvent("other", icon: icon, text) }
+        return push
+    }()
 
     struct SessionRow {
         let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
