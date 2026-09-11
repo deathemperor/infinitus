@@ -1,4 +1,7 @@
 import type { ExpoConfig } from "expo/config";
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
 
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
@@ -205,6 +208,11 @@ const sharingPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
 // These aliases match the fonts' PostScript names on iOS. Register the same
 // names on Android so React Native and the native composer use one set of
 // family names without waiting for runtime font loading.
+
+const PRODUCT_VERSION = NodeFS.readFileSync(
+  NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "../../VERSION"),
+  "utf8",
+).trim();
 
 const config: ExpoConfig = {
   name: variant.appName,
@@ -441,6 +449,10 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+    // One product, one version (#823): the root VERSION file, shown in
+    // Settings. `version` above stays the store's dotted-integer marketing
+    // version (EAS owns the build numbers, `appVersionSource: remote`).
+    productVersion: PRODUCT_VERSION,
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
     relay: {
       url: repoEnv.T3CODE_RELAY_URL ?? null,

@@ -264,13 +264,14 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
 it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it("resolves the dedicated nightly updater channel from nightly versions", () => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
-    assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
   });
 
-  it("resolves the fork's own updater channel from infinitus versions", () => {
+  it("puts every other version on the infinitus channel (#823: one version, one channel)", () => {
+    assert.equal(resolveDesktopUpdateChannel("0.5.0-alpha.1"), "infinitus");
+    assert.equal(resolveDesktopUpdateChannel("0.5.0"), "infinitus");
     assert.equal(resolveDesktopUpdateChannel("0.0.40-infinitus.20260910.7"), "infinitus");
-    assert.equal(resolveDesktopUpdateChannel("0.0.40-infinitus.2026091.7"), "latest");
-    assert.equal(resolveDesktopUpdateChannel("0.0.40-alpha.2"), "latest");
+    assert.equal(resolveDesktopUpdateChannel("0.0.17"), "infinitus");
+    assert.equal(resolveDesktopUpdateChannel("0.0.40-alpha.2"), "infinitus");
   });
 
   it("switches desktop packaging product names to nightly for nightly builds", () => {
@@ -281,9 +282,9 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {
-      macIconPng: BRAND_ASSET_PATHS.productionMacIconPng,
-      linuxIconPng: BRAND_ASSET_PATHS.productionLinuxIconPng,
-      windowsIconIco: BRAND_ASSET_PATHS.productionWindowsIconIco,
+      macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.infinitusWindowsIconIco,
     });
 
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17-nightly.20260413.42"), {
@@ -293,7 +294,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
   });
 
-  it("packages the Infinitus artwork for fork versions", () => {
+  it("packages the Infinitus artwork for the product's versions", () => {
+    assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.5.0-alpha.1"), {
+      macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.infinitusWindowsIconIco,
+    });
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.40-infinitus.20260911.8"), {
       macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
       linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
@@ -303,7 +309,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   });
 
   it("switches the bundled splash and favicon branding for nightly versions", () => {
-    assert.equal(resolveDesktopWebAssetBrand("0.0.17"), "production");
+    assert.equal(resolveDesktopWebAssetBrand("0.0.17"), "infinitus");
     assert.equal(resolveDesktopWebAssetBrand("0.0.17-nightly.20260413.42"), "nightly");
   });
 
@@ -389,12 +395,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       );
 
       assert.notProperty(preview, "publish");
+      // Every release of this repo publishes on the infinitus channel (#823).
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
           owner: "pingdotgg",
           repo: "t3code",
-          releaseType: "release",
+          releaseType: "prerelease",
+          channel: "infinitus",
         },
       ]);
     }).pipe(
@@ -745,7 +753,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       ]);
       assert.deepStrictEqual(mac.dmg, {
         title: "Infinitus 1.2.3 Installer",
-        background: "dmg/dmg-background-latest.png",
+        background: "dmg/dmg-background-infinitus.png",
         window: { width: 640, height: 432 },
         contents: [
           { x: 166, y: 214, type: "file" },

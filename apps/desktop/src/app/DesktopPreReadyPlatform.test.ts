@@ -105,7 +105,7 @@ describe("DesktopPreReadyPlatform", () => {
             const identity = yield* Effect.promise(() => portalIdentity);
             assert.equal(identity.desktopName, "com.t3tools.T3Code.desktop");
             assert.include(identity.desktopEntry ?? "", 'Exec="/Applications/current.AppImage" %U');
-            assert.include(identity.desktopEntry ?? "", `Name=${PRODUCT_NAME} (Alpha)`);
+            assert.include(identity.desktopEntry ?? "", `Name=${PRODUCT_NAME}\n`);
             assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/infinitus;");
           }),
         ).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())));

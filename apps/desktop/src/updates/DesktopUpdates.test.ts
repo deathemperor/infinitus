@@ -18,6 +18,13 @@ import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopUpdates from "./DesktopUpdates.ts";
 import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
 
+// Every build of this repo defaults to the infinitus channel (#823), where an
+// available update downloads itself; these tests exercise upstream's
+// click-to-download channels, so they start on one.
+const UPSTREAM_CHANNEL = {
+  settings: { updateChannel: "nightly", updateChannelConfiguredByUser: true },
+} as const;
+
 describe("DesktopUpdates", () => {
   it("preserves complete causes for update poller and event failures", () => {
     const cause = Cause.combine(
@@ -109,19 +116,19 @@ describe("DesktopUpdates", () => {
   });
 
   it.effect("updates and broadcasts state from updater events", () => {
-    const harness = makeHarness();
+    const harness = makeHarness(UPSTREAM_CHANNEL);
 
     return Effect.scoped(
       Effect.gen(function* () {
         const updates = yield* DesktopUpdates.DesktopUpdates;
         yield* updates.configure;
 
-        harness.emit("update-available", { version: "1.2.4" });
+        harness.emit("update-available", { version: "1.2.4-nightly.20260901.1" });
         yield* flushCallbacks;
 
         const state = yield* updates.getState;
         assert.equal(state.status, "available");
-        assert.equal(state.availableVersion, "1.2.4");
+        assert.equal(state.availableVersion, "1.2.4-nightly.20260901.1");
         assert.isNotNull(state.checkedAt);
         assert.equal(harness.sentStates.at(-1)?.status, "available");
       }),
@@ -204,14 +211,14 @@ describe("DesktopUpdates", () => {
   });
 
   it.effect("keeps the download behind a click on upstream channels", () => {
-    const harness = makeHarness();
+    const harness = makeHarness(UPSTREAM_CHANNEL);
 
     return Effect.scoped(
       Effect.gen(function* () {
         const updates = yield* DesktopUpdates.DesktopUpdates;
         yield* updates.configure;
 
-        harness.emit("update-available", { version: "1.2.4" });
+        harness.emit("update-available", { version: "1.2.4-nightly.20260901.1" });
         yield* flushCallbacks;
         yield* flushCallbacks;
 
@@ -222,7 +229,7 @@ describe("DesktopUpdates", () => {
   });
 
   it.effect("checks for newer releases after an update has been downloaded", () => {
-    const harness = makeHarness();
+    const harness = makeHarness(UPSTREAM_CHANNEL);
 
     return Effect.scoped(
       Effect.gen(function* () {
@@ -230,36 +237,36 @@ describe("DesktopUpdates", () => {
         yield* updates.configure;
 
         harness.emit("update-available", {
-          version: "1.2.4",
+          version: "1.2.4-nightly.20260901.1",
           releaseNotes: "## What's changed\n- fix: queued update",
         });
         yield* flushCallbacks;
-        harness.emit("update-downloaded", { version: "1.2.4" });
+        harness.emit("update-downloaded", { version: "1.2.4-nightly.20260901.1" });
         yield* flushCallbacks;
 
         const result = yield* updates.check("poll");
         assert.isTrue(result.checked);
 
-        harness.emit("update-available", { version: "1.2.4" });
+        harness.emit("update-available", { version: "1.2.4-nightly.20260901.1" });
         yield* flushCallbacks;
 
         const unchangedState = yield* updates.getState;
         assert.equal(unchangedState.status, "downloaded");
-        assert.equal(unchangedState.downloadedVersion, "1.2.4");
+        assert.equal(unchangedState.downloadedVersion, "1.2.4-nightly.20260901.1");
         assert.deepEqual(unchangedState.releaseNotes, [
-          { version: "1.2.4", items: ["fix: queued update"], totalItems: 1 },
+          { version: "1.2.4-nightly.20260901.1", items: ["fix: queued update"], totalItems: 1 },
         ]);
         assert.equal(unchangedState.omittedReleaseCount, 0);
 
         const nextResult = yield* updates.check("poll");
         assert.isTrue(nextResult.checked);
 
-        harness.emit("update-available", { version: "1.2.5" });
+        harness.emit("update-available", { version: "1.2.5-nightly.20260901.1" });
         yield* flushCallbacks;
 
         const state = yield* updates.getState;
         assert.equal(state.status, "available");
-        assert.equal(state.availableVersion, "1.2.5");
+        assert.equal(state.availableVersion, "1.2.5-nightly.20260901.1");
         assert.isNull(state.downloadedVersion);
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
@@ -532,6 +539,7 @@ describe("DesktopUpdates", () => {
       const actionStarted = yield* Deferred.make<void>();
       let disableDifferentialCalls = 0;
       const harness = makeHarness({
+        ...UPSTREAM_CHANNEL,
         setDisableDifferentialDownload: Effect.suspend(() => {
           disableDifferentialCalls += 1;
           if (disableDifferentialCalls === 1) {
@@ -548,7 +556,7 @@ describe("DesktopUpdates", () => {
         Effect.gen(function* () {
           const updates = yield* DesktopUpdates.DesktopUpdates;
           yield* updates.configure;
-          harness.emit("update-available", { version: "1.2.4" });
+          harness.emit("update-available", { version: "1.2.4-nightly.20260901.1" });
           yield* flushCallbacks;
 
           const downloadFiber = yield* updates.download.pipe(Effect.forkScoped);
@@ -738,11 +746,11 @@ describe("DesktopUpdates", () => {
         const updates = yield* DesktopUpdates.DesktopUpdates;
         yield* updates.configure;
 
-        const state = yield* updates.setChannel("latest");
+        const state = yield* updates.setChannel("infinitus");
         const persistedSettings = yield* settings.get;
 
-        assert.equal(state.channel, "latest");
-        assert.equal(persistedSettings.updateChannel, "latest");
+        assert.equal(state.channel, "infinitus");
+        assert.equal(persistedSettings.updateChannel, "infinitus");
         assert.equal(persistedSettings.updateChannelConfiguredByUser, false);
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));

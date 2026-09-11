@@ -51,9 +51,9 @@ export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAss
   return channel === "nightly" ? "nightly" : "production";
 }
 
+/** Every build of this repo wears the Infinitus brand; only an upstream nightly keeps its own (#823). */
 export function resolveWebAssetBrandForPackageVersion(version: string): WebAssetBrand {
-  if (version.includes("-infinitus.")) return "infinitus";
-  return version.includes("-nightly.") ? "nightly" : "production";
+  return version.includes("-nightly.") ? "nightly" : "infinitus";
 }
 
 export interface IconOverride {

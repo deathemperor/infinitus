@@ -32,6 +32,7 @@ export interface UpdatesHarnessOptions {
   readonly stopBackend?: Effect.Effect<void>;
   readonly startBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
+  readonly settings?: Partial<DesktopAppSettings.DesktopSettings>;
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -200,7 +201,12 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
           applyWslWindowsFallback: Effect.die("unexpected WSL Windows fallback"),
           applyWslWindowsFallbackInMemory: Effect.die("unexpected WSL Windows fallback"),
         } satisfies DesktopAppSettings.DesktopAppSettings["Service"])
-      : DesktopAppSettings.layer;
+      : options.settings
+        ? DesktopAppSettings.layerTest({
+            ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
+            ...options.settings,
+          })
+        : DesktopAppSettings.layer;
 
   const layer = DesktopUpdates.layer.pipe(
     Layer.provideMerge(updaterLayer),

@@ -184,12 +184,13 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
-  it("titles a fork release plainly and keeps upstream's stage suffixes", () => {
+  it("titles every packaged build plainly; only dev and an upstream nightly carry a stage", () => {
     const branding = (isDevelopment: boolean, appVersion: string) =>
       DesktopEnvironment.resolveDesktopAppBranding({ isDevelopment, appVersion }).displayName;
+    assert.equal(branding(false, "0.5.0-alpha.1"), PRODUCT_NAME);
     assert.equal(branding(false, "0.0.40-infinitus.20260910.5"), PRODUCT_NAME);
-    assert.equal(branding(true, "0.0.40-infinitus.20260910.5"), `${PRODUCT_NAME} (Dev)`);
+    assert.equal(branding(false, "0.0.40"), PRODUCT_NAME);
+    assert.equal(branding(true, "0.5.0-alpha.1"), `${PRODUCT_NAME} (Dev)`);
     assert.equal(branding(false, "0.0.40-nightly.20260910.5"), `${PRODUCT_NAME} (Nightly)`);
-    assert.equal(branding(false, "0.0.40"), `${PRODUCT_NAME} (Alpha)`);
   });
 });
