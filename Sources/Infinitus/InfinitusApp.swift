@@ -136,6 +136,7 @@ struct InfinitusApp: App {
         let brew = BrewUpdater()
         _brew = StateObject(wrappedValue: brew)
         model.brewUpdater = brew
+        brew.relaunch = { model.relaunchApp() }
         let reliabilityModel = ResumeReliabilityModel()
         _reliabilityModel = StateObject(wrappedValue: reliabilityModel)
         // Warm the multi-second transcript scan at launch so the Usage tab

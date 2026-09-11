@@ -75,10 +75,34 @@ cleanup() {
 }
 trap cleanup EXIT
 
-fail() { echo "E2E FAIL: $*"; echo "--- app log"; tail -20 "$LOG"; exit 1; }
+# On a failure the log carries what #637 needs: the app's unix sockets
+# (is the listener fd still there?), the socket dir's inodes (did the path
+# change under it?) and one more `status` (is it refusing or just slow?).
+fail() {
+    echo "E2E FAIL: $*"
+    [ -s "$LOG.reply" ] && { echo "--- last rejected reply"; cat "$LOG.reply"; echo; }
+    echo "--- app log"; tail -20 "$LOG"
+    if [ -n "${APP_PID:-}" ]; then
+        echo "--- app unix sockets"; lsof -p "$APP_PID" -a -U 2>/dev/null | tail -n +2 | cut -c1-140 | head -12
+        echo "--- socket dir"; /bin/ls -li "$SOCKDIR" 2>/dev/null | head -8
+        echo "--- status retry"; "$CTL" status 2>&1 | head -c 300; echo
+    fi
+    exit 1
+}
 json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
-# expect <python-bool-over-d> — the reply on stdin must satisfy it.
-expect() { python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($1) else 1)"; }
+# expect <python-bool-over-d> — the reply on stdin must satisfy it. A miss
+# keeps the reply in $LOG.reply, which `fail` prints: the flake's evidence
+# lands in the log without every retry loop's expected miss doing so.
+expect() {
+  python3 -c "
+import json,sys
+raw=sys.stdin.read()
+try: d=json.loads(raw); bad=False
+except Exception: bad=True     # a JSON null is a legitimate reply (team-status before a team)
+if bad or not ($1):
+    open('$LOG.reply','w').write(raw[:800]); sys.exit(1)
+" && rm -f "$LOG.reply"
+}
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
 popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
 

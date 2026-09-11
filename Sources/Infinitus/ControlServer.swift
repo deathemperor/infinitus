@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import os
 import AppKit
 import InfinitusCore
 
@@ -153,12 +154,22 @@ final class ControlServer {
         }
     }
 
+    private static let log = Logger(subsystem: "run.infinitus", category: "control")
+
     private func handle(line: Data) async -> ControlReply {
         let request: ControlRequest
         do { request = try ControlCodec.decode(ControlRequest.self, from: line) }
         catch { return .failure("bad request: \(error)") }
-        guard ControlCommand.named(request.command) != nil else {
+        guard let command = ControlCommand.named(request.command) else {
             return .failure("unknown command \(request.command); run `infinitusctl manifest`")
+        }
+        if command.effect != .read, !(request.command == "prefs" && request.args.first == "get") {
+            // The verb and its target, never a value (`prefs set <key>`
+            // shows the key; secrets ride `secret`, not argv): a relaunch
+            // or a wedge can then be traced to its request from our side
+            // (#654: the 11:30 relaunch had no native record of its caller).
+            let shown = request.args.prefix(request.command == "prefs" ? 2 : 1).joined(separator: " ")
+            Self.log.notice("\(request.command, privacy: .public) \(shown, privacy: .public)")
         }
         guard !busy else { return .failure("busy: another control command is running") }
         busy = true
