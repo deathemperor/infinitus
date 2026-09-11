@@ -205,6 +205,7 @@ struct DisplayPane: View {
             }
             Toggle("Start at login",
                    isOn: Binding(get: { login.enabled }, set: { login.set($0) }))
+                .disabled(Nesting.isNested)
                 .onAppear { login.refresh() }
             if let note = login.note {
                 Text(note).font(.caption).foregroundStyle(.orange)
