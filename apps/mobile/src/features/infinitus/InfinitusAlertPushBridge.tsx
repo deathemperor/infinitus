@@ -14,6 +14,7 @@ import { supportsAgentAwarenessPush } from "../agent-awareness/capabilities";
 import { deviceTokenOf, isMacAlertResponse } from "./alertPush.logic";
 import { INFINITUS_ALARM_DEEP_LINK } from "./InfinitusAlarmsBridge";
 import { pusherMac } from "./liveActivity.logic";
+import { useForgetOnSwitchOff } from "./pushForget";
 import { tokenSender } from "./pushRegistration";
 
 /** Headless. Registers this phone's plain notification token with the Mac
@@ -21,7 +22,10 @@ import { tokenSender } from "./pushRegistration";
     waiting / AWS-login alerts reach the phone as banners; a tap opens
     Settings › Accounts. Re-sent when APNs rotates the token and on every
     foreground (throttled). iOS only, off until the toggle is on, and nothing
-    is sent until notifications are granted — the switch asks. */
+    is sent until notifications are granted — the switch asks. The switch
+    going off withdraws the registration from the Mac (#702). */
+const ALERT_KINDS = ["alert"] as const;
+
 export function InfinitusAlertPushBridge() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const configs = useAtomValue(environmentServerConfigsAtom);
@@ -35,6 +39,13 @@ export function InfinitusAlertPushBridge() {
     [configs, preferred, presentations],
   );
   const environmentId = mac?.environmentId ?? null;
+
+  useForgetOnSwitchOff({
+    enabled: Platform.OS === "ios" && loaded ? enabled : null,
+    environmentId,
+    kinds: ALERT_KINDS,
+    run,
+  });
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;

@@ -12,7 +12,12 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import InfinitusRevival from "../../widgets/InfinitusRevival";
 import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
-import { type LiveActivityTokenKind, pusherMac } from "./liveActivity.logic";
+import {
+  LIVE_ACTIVITY_TOKEN_KINDS,
+  type LiveActivityTokenKind,
+  pusherMac,
+} from "./liveActivity.logic";
+import { useForgetOnSwitchOff } from "./pushForget";
 import { tokenSender } from "./pushRegistration";
 
 const FACTORIES: ReadonlyArray<readonly [LiveActivityFactory<object>, LiveActivityTokenKind]> = [
@@ -25,7 +30,8 @@ const FACTORIES: ReadonlyArray<readonly [LiveActivityFactory<object>, LiveActivi
     and each running card's update token, re-read on every foreground because
     a Mac may have started a card while the app was closed. iOS only; nothing
     runs until the preferences have loaded, and nothing when the toggle is off
-    or no paired Mac runs Infinitus. */
+    or no paired Mac runs Infinitus. The toggle going off withdraws the four
+    registrations from the Mac (#702). */
 export function InfinitusLiveActivityBridge() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const configs = useAtomValue(environmentServerConfigsAtom);
@@ -39,6 +45,13 @@ export function InfinitusLiveActivityBridge() {
     [configs, preferred, presentations],
   );
   const environmentId = mac?.environmentId ?? null;
+
+  useForgetOnSwitchOff({
+    enabled: Platform.OS === "ios" && loaded ? enabled : null,
+    environmentId,
+    kinds: LIVE_ACTIVITY_TOKEN_KINDS,
+    run,
+  });
 
   useEffect(() => {
     if (Platform.OS !== "ios" || !enabled || environmentId === null) return;

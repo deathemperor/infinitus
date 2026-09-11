@@ -187,7 +187,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
   Activity token registration with the Mac), `InfinitusAlarmsBridge`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
-  token, so the Mac's pushes reach the phone as banners) and
+  token, so the Mac's pushes reach the phone as banners; both bridges
+  withdraw their kinds with `activities-token --forget <deviceId>/<kind>`
+  through `pushForget.ts` / `pushForget.logic.ts` when their switch goes off,
+  #702) and
   `InfinitusNotificationPresenter` (the app's one foreground notification
   handler: Infinitus notifications show as banners in-app, T3's keep the
   no-handler default).
