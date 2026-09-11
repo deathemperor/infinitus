@@ -406,6 +406,8 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 # instance named Infinitus is `blocked`, so enabling it here never runs
 # cloudflared — the gate is what this checks.
 "$CTL" status | expect "d['forkTunnel']['state']=='off' and d['forkTunnel']['port']==3773 and d['forkTunnel']['enabled'] is False and d['forkTunnel'].get('url') is None" || fail "fork tunnel must default to off on 3773"
+# #777: where the process runs from, and that a standalone one is not nested.
+"$CTL" status | expect "isinstance(d['bundlePath'], str) and d['bundlePath'] != '' and d['nested'] is False" || fail "status must carry bundlePath and nested"
 "$CTL" prefs set fork_tunnel_enabled true | expect "d['value'] is True" || fail "prefs set fork_tunnel_enabled"
 "$CTL" status | expect "d['forkTunnel']['state']=='blocked'" || fail "a mock instance must report the fork tunnel blocked, not run it"
 "$CTL" prefs set fork_server_port 70000 | expect "d['value']==70000" || fail "prefs set fork_server_port"

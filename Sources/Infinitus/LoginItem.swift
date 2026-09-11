@@ -12,6 +12,18 @@ final class LoginItemModel: ObservableObject {
 
     func refresh() {
         let status = SMAppService.mainApp.status
+        if Nesting.isNested {
+            // #777: the desktop registers its login item from the outer
+            // bundle; a toggle here would register the nested path as a
+            // second, orphan item. A registration under this id that is
+            // still enabled (the cask's, or the desktop's — SMAppService
+            // exposes no path to tell them apart) is left alone.
+            enabled = false
+            note = status == .enabled
+                ? "Start at login is Infinitus desktop's setting (Settings → General); a leftover Infinitus entry under System Settings → General → Login Items can be removed there."
+                : "Start at login is Infinitus desktop's setting (Settings → General)."
+            return
+        }
         enabled = status == .enabled
         note = status == .requiresApproval
             ? "Waiting for approval — allow Infinitus under System Settings → General → Login Items."
@@ -19,6 +31,7 @@ final class LoginItemModel: ObservableObject {
     }
 
     func set(_ wanted: Bool) {
+        guard !Nesting.isNested else { refresh(); return }
         // `swift run Infinitus` has no .app bundle; SMAppService would
         // register the bare executable and the item would never launch.
         guard Bundle.main.bundleURL.pathExtension == "app" else {
