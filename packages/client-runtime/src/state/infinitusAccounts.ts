@@ -226,7 +226,7 @@ export function infinitusCapabilityAcross(
   return answer;
 }
 
-/** Which of the page's six shapes to draw: the shared gate, then `empty` for a
+/** Which of the page's five shapes to draw: the shared gate, then `empty` for a
     host that answered with no fleets. */
 export function accountsPageState(input: {
   capability: boolean | undefined;
