@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pair your phone — Infinitus</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 17px/1.5 -apple-system, system-ui, sans-serif; background: #0d0f14; color: #e6e8ee; padding: 24px; box-sizing: border-box; }
+  main { max-width: 26rem; text-align: center; }
+  h1 { font-size: 1.35rem; margin: 0 0 .5rem; }
+  p { margin: .5rem 0; color: #aab0bf; }
+  a { color: #8ab4ff; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Opening Infinitus…</h1>
+  <p id="note">Hold on while this link hands you to your Mac.</p>
+</main>
+<script>
+// The Devices QR (#724): https://infinitus.run/pair#token=…&for=phone&to=<fork origin>.
+// On a phone with Infinitus installed the universal link never gets here —
+// the app takes it. Everyone else lands on this page, which reads the
+// fragment (never sent to the server) and forwards to the Mac's own /pair,
+// where a phone-marked token is refused for browser pairing (#744).
+(function () {
+  var params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  var token = params.get("token") || "";
+  var to = params.get("to") || "";
+  var origin = null;
+  try {
+    var u = new URL(to);
+    if ((u.protocol === "https:" || u.protocol === "http:") && u.username === "" && u.password === ""
+        && (u.pathname === "/" || u.pathname === "") && u.search === "" && u.hash === "") {
+      origin = u.origin;
+    }
+  } catch (e) { origin = null; }
+  if (token && origin) {
+    location.replace(origin + "/pair#token=" + encodeURIComponent(token) + "&for=phone");
+    return;
+  }
+  document.getElementById("title").textContent = "Open this link on your phone";
+  document.getElementById("note").textContent =
+    "Pairing links open in the Infinitus phone app. Scan the QR with the phone that has Infinitus installed, or use the app's own scanner.";
+})();
+</script>
+</body>
+</html>

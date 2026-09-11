@@ -147,14 +147,18 @@ publishes the matching section as the GitHub release body.
 - With `priority_mode` set to `hold`, every fleet on `fleets` carries a `headroom` verdict (abundant/low with hysteresis on the active account's fullest window), so the fork can hold background threads while headroom is low (#616).
 - The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
+- `infinitusctl prefs` carries the popup intro and burn prefs under a new `animations` section with the speed's range, and the theme pref lists every theme id with its name (#747).
 - The active account survives a swapd switch even on the app's first poll: swapd's own last-known slot carries it (#476).
 - The supervisor drops swapd's `sleep` heartbeat like cswap's `poll`, so the Activity log no longer gains a line a minute (#475).
 - The spend estimate (`cswap usage`) runs only while the cswap engine is on; with it off the Usage pane says so instead of showing stale numbers (#475).
 - The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
 - Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 - The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
+- Control verbs `lock on|off|now|relock`, `unlock`, `team-join`, `team-hostname` and a write token on `team-create` let the fork's Lock and Team panes drive the Mac, secrets on stdin (#747).
+- `infinitusctl` reads a secret or body from stdin only when something is piped in, so a bare verb at a terminal no longer waits for Ctrl-D.
 - Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
 - The app knows when it runs nested inside Infinitus desktop (`status` says `bundlePath`/`nested`): updates and Start at login defer to the desktop, a second copy yields to the one already running, the desktop's own threads are not announced twice, and `make-app.sh INFINITUS_BUNDLE_NAME` names the nested bundle and leaves the `infinitus://` scheme to the desktop (#777, #270).
+- infinitus.run serves the phone app's universal link: the Devices QR points at `infinitus.run/pair`, which the app takes on a phone that has it and a browser forwards to the Mac's own pairing page (#724).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
