@@ -689,9 +689,9 @@ configured}` and drawn as the configured row with Forget token, which is
   `resolveNextAttentionThreadId` + tests.
 - `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx` (+
   `sidebarNeedsAttention.logic.ts` + test) — the "Needs attention" section
-  above the sidebar's list (#269 D): every thread in `approval | input |
-  held | limited` across all projects and environments, in that order and
-  longest wait first (`collectNeedsAttention`; a hold's `since`, else the
+  above the sidebar's list (#269 D): every thread whose status is approval,
+  input, held or limited, across all projects and environments, in that
+  order and longest wait first (`collectNeedsAttention`; a hold's `since`, else the
   thread's `updatedAt`), hidden when empty, collapsible (localStorage
   `t3code:sidebar:needs-attention-expanded`, open by default, the count in
   the collapsed header). One derived atom reads every Infinitus
