@@ -26,6 +26,7 @@ import { CaptureGestureCoordinator } from "../components/captures/CaptureGesture
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
 import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
+import { DesktopNotificationCoordinator } from "../components/desktop/DesktopNotificationCoordinator";
 import { InfinitusCompletionSoundCoordinator } from "../components/desktop/InfinitusCompletionSoundCoordinator";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { SlowRpcRequestToastCoordinator } from "../components/SlowRpcRequestToastCoordinator";
@@ -203,6 +204,7 @@ function RootRouteView() {
           <SshPasswordPromptDialog />
           <SnapShotCoordinator />
           <InfinitusCompletionSoundCoordinator />
+          {primaryEnvironmentAuthenticated ? <DesktopNotificationCoordinator /> : null}
           <CaptureGestureCoordinator />
           <ConfirmDialogHost />
           <SlowRpcRequestToastCoordinator />

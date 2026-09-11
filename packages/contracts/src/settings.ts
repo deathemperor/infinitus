@@ -333,6 +333,18 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW)),
   ),
   /**
+   * Fork (#270 B): the desktop's OS notifications, one per thread that moves
+   * into a state waiting on the user (or fails, or finishes a turn), and the
+   * Dock badge counting the threads waiting. Completion is off by default:
+   * every turn end is a lot of banners.
+   */
+  desktopNotifyOnApproval: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  desktopNotifyOnInput: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  desktopNotifyOnHeld: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  desktopNotifyOnFailure: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  desktopNotifyOnCompletion: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  desktopBadgeAttention: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /**
    * User-created browser profiles. The built-in Default and Incognito profiles
    * are synthesized by `resolveBrowserProfiles`, not stored here, so they
    * cannot be renamed away or deleted.
@@ -1364,6 +1376,12 @@ export const ClientSettingsPatch = Schema.Struct({
   browserRecordingFrameRate: Schema.optionalKey(BrowserRecordingFrameRate),
   browserLinkTarget: Schema.optionalKey(BrowserLinkTarget),
   browserAutoShowFloatingPreview: Schema.optionalKey(Schema.Boolean),
+  desktopNotifyOnApproval: Schema.optionalKey(Schema.Boolean),
+  desktopNotifyOnInput: Schema.optionalKey(Schema.Boolean),
+  desktopNotifyOnHeld: Schema.optionalKey(Schema.Boolean),
+  desktopNotifyOnFailure: Schema.optionalKey(Schema.Boolean),
+  desktopNotifyOnCompletion: Schema.optionalKey(Schema.Boolean),
+  desktopBadgeAttention: Schema.optionalKey(Schema.Boolean),
   browserProfiles: Schema.optionalKey(Schema.Array(BrowserProfile)),
   browserDefaultProfileId: Schema.optionalKey(BrowserProfileId),
   confirmQuit: Schema.optionalKey(QuitConfirmationMode),

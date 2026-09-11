@@ -1,6 +1,7 @@
 import type {
   DesktopBridge,
   DesktopCaptureGestureEvent,
+  DesktopNotificationActivated,
   DesktopPreviewPointerEvent,
   DesktopPreviewRecordingFrame,
   DesktopPreviewTabState,
@@ -41,6 +42,12 @@ function isCaptureGestureEvent(value: unknown): value is DesktopCaptureGestureEv
   if (type === "captured") return typeof text === "string";
   if (type === "empty") return true;
   return type === "failed" && typeof reason === "string" && CAPTURE_GESTURE_FAILURES.has(reason);
+}
+
+function isNotificationActivated(value: unknown): value is DesktopNotificationActivated {
+  if (typeof value !== "object" || value === null) return false;
+  const { environmentId, threadId } = value as { environmentId?: unknown; threadId?: unknown };
+  return typeof environmentId === "string" && typeof threadId === "string";
 }
 
 exposeClerkBridge({ passkeys: true });
@@ -167,6 +174,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.OPEN_INFINITUS_SIGN_IN_CHANNEL, input),
   closeInfinitusSignIn: (flowId) =>
     ipcRenderer.invoke(IpcChannels.CLOSE_INFINITUS_SIGN_IN_CHANNEL, flowId),
+  postNotification: (input) => ipcRenderer.invoke(IpcChannels.POST_NOTIFICATION_CHANNEL, input),
+  setBadgeCount: (count) => ipcRenderer.invoke(IpcChannels.SET_BADGE_COUNT_CHANNEL, count),
   submitInfinitusSignInCode: (input) =>
     ipcRenderer.invoke(IpcChannels.SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL, input),
   consumePendingDeepLink: () =>
@@ -215,6 +224,17 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IpcChannels.SNAP_SHOT_EVENT_CHANNEL, wrappedListener);
     return () => {
       ipcRenderer.removeListener(IpcChannels.SNAP_SHOT_EVENT_CHANNEL, wrappedListener);
+    };
+  },
+  onNotificationActivated: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, event: unknown) => {
+      if (!isNotificationActivated(event)) return;
+      listener(event);
+    };
+
+    ipcRenderer.on(IpcChannels.NOTIFICATION_ACTIVATED_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.NOTIFICATION_ACTIVATED_CHANNEL, wrappedListener);
     };
   },
   onCaptureGestureEvent: (listener) => {
