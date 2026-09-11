@@ -35,11 +35,11 @@ import {
 } from "./infinitusSessionHold.logic.ts";
 
 /** One start kept for later: the thread, the fleet provider it spends on,
-    and the send itself bound to the caller's context. */
+    and the send itself bound to the caller's context, its failures logged. */
 interface Held {
   readonly threadId: ThreadId;
   readonly provider: string;
-  readonly run: Effect.Effect<void, unknown>;
+  readonly run: Effect.Effect<void>;
 }
 
 type Input =
@@ -168,14 +168,7 @@ const InfinitusSessionHoldLive = Layer.effect(
             starts: mine.length,
           });
           for (const entry of mine) {
-            yield* entry.run.pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning("infinitus.session-hold.start-failed", {
-                  threadId,
-                  cause: Cause.pretty(cause),
-                }),
-              ),
-            );
+            yield* entry.run;
           }
         }
         if (held.length === 0) yield* stopWatching;
@@ -328,7 +321,16 @@ const InfinitusSessionHoldLive = Layer.effect(
             held: {
               threadId: input.threadId,
               provider: decision.provider,
-              run: input.run.pipe(Effect.provideContext(context)),
+              // Run later, nobody awaits the start: its failure is a log line.
+              run: input.run.pipe(
+                Effect.provideContext(context),
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("infinitus.session-hold.start-failed", {
+                    threadId: input.threadId,
+                    cause: Cause.pretty(cause),
+                  }),
+                ),
+              ),
             },
             fleet: decision.fleet,
           });
