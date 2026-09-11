@@ -261,7 +261,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{period, from, to, total:{humanMessages, phoneMessages, agentMessages, commits, linesAdded, linesRemoved, prsOpened, prsMerged, sessionTally, toolCalls:{name:n}, waitingSeconds, switches, limitStops, usd, …}, previous:{…}, daily:[{key, day}], streak}"),
         ControlCommand(name: "perf", effect: .read,
                        summary: "Process cost: CPU seconds so far, RSS + live heap bytes, thread count — sample twice for an idle % and a heap growth rate (perf gate).",
-                       replyShape: "{cpuSeconds, rssBytes, heapBytes, threads, uptimeSeconds}"),
+                       replyShape: "{cpuSeconds, rssBytes, heapBytes, threads, uptimeSeconds, leases, leaseScopes: {clientId: [scope]}}"),
         ControlCommand(name: "lock-status", effect: .read,
                        summary: "Biometric lock (Settings › Lock): whether the setting is on, whether the pop-out and Settings are locked right now, and the re-lock choice. Off by default.",
                        replyShape: "{enabled, locked, relock: immediately|5 min|1 h|on sleep}"),
