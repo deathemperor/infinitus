@@ -3,6 +3,7 @@ import { memo, type ReactNode } from "react";
 import { EllipsisIcon } from "lucide-react";
 import {
   Menu,
+  MenuItem,
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
@@ -27,6 +28,8 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   hidden?: boolean;
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
+  /** Fork (#269 C): opens a read-only side question in the right panel. */
+  onAskSideQuestion?: (() => void) | undefined;
 }) {
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -81,6 +84,12 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           <MenuRadioItem value="auto">Auto</MenuRadioItem>
           <MenuRadioItem value="full-access">Full access</MenuRadioItem>
         </MenuRadioGroup>
+        {props.onAskSideQuestion ? (
+          <>
+            <MenuDivider />
+            <MenuItem onClick={props.onAskSideQuestion}>Ask a side question</MenuItem>
+          </>
+        ) : null}
       </MenuPopup>
     </Menu>
   );

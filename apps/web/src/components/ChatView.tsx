@@ -206,6 +206,7 @@ import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
+import { SideQuestionPanel } from "./SideQuestionPanel";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
@@ -4191,6 +4192,34 @@ export default function ChatView(props: ChatViewProps) {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "agents");
   }, [activeThreadRef]);
+  // Fork (#269 C): a side question forks the latest completed turn into a
+  // read-only sibling and opens it beside this thread; the running turn, if
+  // any, is left alone (the fork is its own Claude session).
+  const supportsSideQuestion =
+    supportsThreadFork && serverConfig?.environment.capabilities.infinitus === true;
+  const askSideQuestion = useCallback(async () => {
+    if (!activeThread || !activeThreadRef) return;
+    const turnCount = activeThread.checkpoints.at(-1)?.checkpointTurnCount;
+    if (turnCount === undefined) {
+      setThreadError(activeThread.id, "Ask a side question once a turn has completed.");
+      return;
+    }
+    setThreadError(activeThread.id, null);
+    const forked = await forkThreadAtTurn({
+      environmentId,
+      input: { threadId: activeThread.id, turnCount, side: true },
+    });
+    if (forked._tag === "Failure") {
+      if (isAtomCommandInterrupted(forked)) return;
+      const error = squashAtomCommandFailure(forked);
+      setThreadError(
+        activeThread.id,
+        error instanceof Error ? error.message : "Could not open a side question.",
+      );
+      return;
+    }
+    useRightPanelStore.getState().openSideQuestion(activeThreadRef, forked.value.threadId);
+  }, [activeThread, activeThreadRef, environmentId, forkThreadAtTurn, setThreadError]);
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
   const addPullRequestsSurface = useCallback(() => {
@@ -8405,6 +8434,13 @@ export default function ChatView(props: ChatViewProps) {
       />
     ) : renderedRightPanelSurface?.kind === "pull-requests" && activeThreadRef ? (
       <ThreadPullRequestsPanel threadRef={activeThreadRef} />
+    ) : renderedRightPanelSurface?.kind === "side-question" && activeThreadRef ? (
+      <SideQuestionPanel
+        key={renderedRightPanelSurface.id}
+        environmentId={activeThreadRef.environmentId}
+        threadId={renderedRightPanelSurface.threadId}
+        composerDraftTarget={composerDraftTarget}
+      />
     ) : renderedRightPanelSurface?.kind === "agents" ? (
       <AgentsPanel
         model={agentPanelModel}
@@ -8833,6 +8869,7 @@ export default function ChatView(props: ChatViewProps) {
                             onPageScrollKeyUp={onComposerPageScrollKeyUp}
                             onPageScrollRelease={onComposerPageScrollRelease}
                             onCompactContext={onCompactContext}
+                            onAskSideQuestion={supportsSideQuestion ? askSideQuestion : undefined}
                             onSend={onSend}
                             onInterrupt={onInterrupt}
                             onImplementPlanInNewThread={onImplementPlanInNewThread}

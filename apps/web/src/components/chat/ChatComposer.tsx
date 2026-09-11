@@ -865,6 +865,7 @@ import { toastManager } from "../ui/toast";
 import {
   BotIcon,
   CircleAlertIcon,
+  MessageCircleQuestionMarkIcon,
   PaperclipIcon,
   PencilRulerIcon,
   PlayIcon,
@@ -1049,6 +1050,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   hidden?: boolean;
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
+  /** Fork (#269 C): opens a read-only side question in the right panel. */
+  onAskSideQuestion?: (() => void) | undefined;
 }) {
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -1158,6 +1161,35 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
       </Tooltip>
 
       {interactionModeToggle}
+      {props.onAskSideQuestion ? (
+        <>
+          <ComposerControlSeparator size={size} />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <ComposerControl
+                  size={size}
+                  className={cn(
+                    "shrink-0 whitespace-nowrap",
+                    size === "xs" ? undefined : "text-secondary-label hover:text-foreground",
+                  )}
+                  type="button"
+                  onClick={props.onAskSideQuestion}
+                  aria-label="Ask a side question"
+                  data-testid="composer-side-question"
+                />
+              }
+            >
+              <ComposerControlIcon icon={MessageCircleQuestionMarkIcon} size={size} />
+              <span className="sr-only sm:not-sr-only">Aside</span>
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              Ask a side question: a read-only tangent in the right panel that leaves this turn
+              alone
+            </TooltipPopup>
+          </Tooltip>
+        </>
+      ) : null}
     </>
   );
 });
@@ -1408,6 +1440,8 @@ export interface ChatComposerProps {
 
   // Callbacks
   onCompactContext: () => void;
+  /** Fork (#269 C): absent when the thread cannot host a side question. */
+  onAskSideQuestion?: (() => void) | undefined;
   onSend: (e?: { preventDefault: () => void }, intent?: ComposerSubmissionIntent) => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
@@ -1515,6 +1549,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onPageScrollKeyUp,
     onPageScrollRelease,
     onCompactContext,
+    onAskSideQuestion,
     onSend,
     onInterrupt,
     onImplementPlanInNewThread,
@@ -4224,6 +4259,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           hidden={composerControlsHidden || restingHiddenBlockCount > 0}
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
+          onAskSideQuestion={onAskSideQuestion}
         />
       ),
     },
@@ -4311,6 +4347,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           traitsMenuContent={providerTraitsMenuContent}
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
+          onAskSideQuestion={onAskSideQuestion}
         />
       ) : (
         <>
@@ -4357,6 +4394,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 }
                 onToggleInteractionMode={toggleInteractionMode}
                 onRuntimeModeChange={handleRuntimeModeChange}
+                onAskSideQuestion={
+                  hiddenRestingBlockIds.includes("mode") ? onAskSideQuestion : undefined
+                }
               />
             </div>
           ) : null}

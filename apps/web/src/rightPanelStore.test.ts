@@ -414,6 +414,22 @@ describe("rightPanelStore", () => {
     ).toHaveLength(2);
   });
 
+  it("opens a side question as its own surface and returns to it (#269 C)", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "diff");
+    store.openSideQuestion(refA, ThreadId.make("side-1"));
+    store.openSideQuestion(refA, ThreadId.make("side-2"));
+    store.openSideQuestion(refA, ThreadId.make("side-1"));
+    const state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.surfaces.map((surface) => surface.id)).toEqual([
+      "diff",
+      "side-question:side-1",
+      "side-question:side-2",
+    ]);
+    expect(state.activeSurfaceId).toBe("side-question:side-1");
+    expect(state.isOpen).toBe(true);
+  });
+
   it("reopening an inactive singleton activates its existing surface", () => {
     useRightPanelStore.getState().open(refA, "diff");
     useRightPanelStore.getState().open(refA, "agents");
