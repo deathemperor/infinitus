@@ -28,7 +28,10 @@ const CLIENT_PRESENTATION_LAYER = Layer.succeed(
 
 function pairingHttpLayer(
   calls: Array<{ readonly url: string; readonly init: RequestInit }>,
-  options?: { readonly failDescriptor?: boolean },
+  options?: {
+    readonly failDescriptor?: boolean;
+    readonly alternateHttpBaseUrls?: ReadonlyArray<string>;
+  },
 ) {
   const fetchFn = ((input, init = {}) => {
     const url = String(input);
@@ -52,6 +55,9 @@ function pairingHttpLayer(
           capabilities: {
             repositoryIdentity: true,
           },
+          ...(options?.alternateHttpBaseUrls === undefined
+            ? {}
+            : { alternateHttpBaseUrls: options.alternateHttpBaseUrls }),
         }),
       );
     }
@@ -116,6 +122,36 @@ describe("connection onboarding", () => {
       expect(tokenParams.get("scope")).toBe(AuthStandardClientScopes.join(" "));
       expect(tokenParams.get("client_label")).toBe("T3 Code Test");
     }),
+  );
+
+  it.effect(
+    "keeps the server's other hosts from the pairing on, never the paired one (fork #663)",
+    () =>
+      Effect.gen(function* () {
+        const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
+        const registration = yield* preparePairingRegistration({
+          host: "remote.example.test",
+          pairingCode: "pairing-token",
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              CLIENT_PRESENTATION_LAYER,
+              pairingHttpLayer(calls, {
+                alternateHttpBaseUrls: [
+                  "https://code.infinitus.run",
+                  "https://remote.example.test/",
+                ],
+              }),
+            ),
+          ),
+        );
+
+        expect(registration.profile).toMatchObject({
+          httpBaseUrl: "https://remote.example.test/",
+          alternateHttpBaseUrls: ["https://code.infinitus.run"],
+        });
+        expect("lastGoodHttpBaseUrl" in registration.profile).toBe(false);
+      }),
   );
 
   it.effect("does not consume a pairing credential when descriptor discovery fails", () =>
@@ -204,6 +240,42 @@ describe("connection onboarding", () => {
         credential: { token: "bearer-token" },
       });
     }),
+  );
+
+  it.effect(
+    "an edited paired host keeps the alternates and forgets the roamed one (fork #663)",
+    () =>
+      Effect.gen(function* () {
+        const environmentId = EnvironmentId.make("environment-paired");
+        const registration = yield* prepareBearerConnectionUpdate({
+          input: { environmentId, label: "Mac", httpBaseUrl: "http://192.168.1.9:3773" },
+          entry: Option.some({
+            target: new BearerConnectionTarget({
+              environmentId,
+              label: "Mac",
+              connectionId: "bearer:environment-paired",
+            }),
+            profile: Option.some(
+              new BearerConnectionProfile({
+                connectionId: "bearer:environment-paired",
+                environmentId,
+                label: "Mac",
+                httpBaseUrl: "http://192.168.1.8:3773",
+                wsBaseUrl: "ws://192.168.1.8:3773",
+                alternateHttpBaseUrls: ["https://code.infinitus.run"],
+                lastGoodHttpBaseUrl: "https://code.infinitus.run",
+              }),
+            ),
+          }),
+          credential: Option.some(new BearerConnectionCredential({ token: "bearer-token" })),
+        });
+
+        expect(registration.profile).toMatchObject({
+          httpBaseUrl: "http://192.168.1.9:3773/",
+          alternateHttpBaseUrls: ["https://code.infinitus.run"],
+        });
+        expect("lastGoodHttpBaseUrl" in registration.profile).toBe(false);
+      }),
   );
 
   it.effect("prepares an SSH registration from the provisioned platform environment", () =>

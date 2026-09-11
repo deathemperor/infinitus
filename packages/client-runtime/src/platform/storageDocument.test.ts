@@ -79,6 +79,31 @@ describe("ConnectionCatalogDocument", () => {
     expect(restored.remoteDpopTokens[0]?.accountId).toBe(accountId);
   });
 
+  it("round-trips a roamed bearer profile and still reads one written before roaming (fork #663)", () => {
+    const schema = Schema.fromJsonString(ConnectionCatalogDocument);
+    const roamed = {
+      ...EMPTY_CONNECTION_CATALOG_DOCUMENT,
+      targets: [BEARER_TARGET],
+      profiles: [
+        new BearerConnectionProfile({
+          ...BEARER_PROFILE,
+          alternateHttpBaseUrls: ["https://code.infinitus.run"],
+          lastGoodHttpBaseUrl: "https://code.infinitus.run",
+        }),
+      ],
+    };
+    expect(Schema.decodeUnknownSync(schema)(Schema.encodeSync(schema)(roamed))).toEqual(roamed);
+
+    const before = {
+      ...EMPTY_CONNECTION_CATALOG_DOCUMENT,
+      targets: [BEARER_TARGET],
+      profiles: [BEARER_PROFILE],
+    };
+    const restored = Schema.decodeUnknownSync(schema)(Schema.encodeSync(schema)(before));
+    expect(restored.profiles[0]).toEqual(BEARER_PROFILE);
+    expect("alternateHttpBaseUrls" in (restored.profiles[0] ?? {})).toBe(false);
+  });
+
   it("registers a bearer connection as one catalog mutation", () => {
     const document = registerConnectionInCatalog(
       EMPTY_CONNECTION_CATALOG_DOCUMENT,

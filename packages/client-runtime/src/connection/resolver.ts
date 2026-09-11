@@ -1,13 +1,16 @@
 import type { AuthClientPresentationMetadata } from "@t3tools/contracts";
 import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { appendClientConnectionParams } from "../authorization/remote.ts";
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
+import type { AuthorizedRemoteEnvironment } from "../authorization/service.ts";
 import * as ClientCapabilities from "../platform/capabilities.ts";
 import {
   BearerConnectionCredential,
@@ -27,6 +30,13 @@ import type {
 } from "./model.ts";
 import { ConnectionBlockedError, type ConnectionAttemptError } from "./model.ts";
 import * as ConnectionProfileStore from "./profileStore.ts";
+import {
+  bearerHostOrder,
+  learnedBearerProfile,
+  ROAM_PROBE_TIMEOUT_MS,
+  roamedWsBaseUrl,
+  roamsPast,
+} from "./roaming.ts";
 
 export class ConnectionResolver extends Context.Service<
   ConnectionResolver,
@@ -89,6 +99,7 @@ const makePrimaryBroker = Effect.fn("clientRuntime.connection.broker.makePrimary
 
 const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")(function* () {
   const credentials = yield* ConnectionCredentialStore.ConnectionCredentialStore;
+  const profiles = yield* ConnectionProfileStore.ConnectionProfileStore;
   const remote = yield* RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization;
 
   return Effect.fn("clientRuntime.connection.broker.bearer")(function* (
@@ -122,13 +133,37 @@ const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")
     if (!isBearerCredential(credential)) {
       return yield* credentialMissingError(target.connectionId);
     }
-    const authorized = yield* remote.authorizeBearer({
-      expectedEnvironmentId: target.environmentId,
-      httpBaseUrl: profile.httpBaseUrl,
-      wsBaseUrl: profile.wsBaseUrl,
-      bearerToken: credential.token,
-      connectionMethod: "direct",
-    });
+    // Fork (#663): the paired host first (or the one that worked last), then
+    // the server's alternates — its tunnel — when a host cannot be reached at
+    // all. A host that answers and refuses ends the walk. Every host but the
+    // last gets the short descriptor wait.
+    const hosts = bearerHostOrder(profile);
+    let authorized: AuthorizedRemoteEnvironment | undefined;
+    for (const [index, httpBaseUrl] of hosts.entries()) {
+      const last = index === hosts.length - 1;
+      const attempt = yield* Effect.exit(
+        remote.authorizeBearer({
+          expectedEnvironmentId: target.environmentId,
+          httpBaseUrl,
+          wsBaseUrl:
+            httpBaseUrl === profile.httpBaseUrl ? profile.wsBaseUrl : roamedWsBaseUrl(httpBaseUrl),
+          bearerToken: credential.token,
+          connectionMethod: "direct",
+          ...(last ? {} : { descriptorTimeoutMs: ROAM_PROBE_TIMEOUT_MS }),
+        }),
+      );
+      if (Exit.isSuccess(attempt)) {
+        authorized = attempt.value;
+        break;
+      }
+      const failure = Cause.findErrorOption(attempt.cause);
+      if (last || Option.isNone(failure) || !roamsPast(failure.value)) {
+        return yield* Effect.failCause(attempt.cause);
+      }
+    }
+    if (authorized === undefined) return yield* profileMissingError(target.connectionId);
+    const learned = learnedBearerProfile(profile, authorized.httpBaseUrl, authorized);
+    if (learned !== null) yield* profiles.put(learned);
     return {
       environmentId: authorized.environmentId,
       label: authorized.label,

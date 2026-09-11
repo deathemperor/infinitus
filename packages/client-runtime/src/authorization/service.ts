@@ -50,6 +50,8 @@ export interface AuthorizedRemoteEnvironment {
   readonly httpBaseUrl: string;
   readonly socketUrl: string;
   readonly httpAuthorization: PreparedHttpAuthorization;
+  /** Fork (#663): the server's other base URLs, when it names any. */
+  readonly alternateHttpBaseUrls?: ReadonlyArray<string>;
 }
 
 export interface AuthorizedRemoteHttpEnvironment {
@@ -68,6 +70,7 @@ export class RemoteEnvironmentAuthorization extends Context.Service<
       readonly wsBaseUrl: string;
       readonly bearerToken: string;
       readonly connectionMethod: ClientConnectionMethod;
+      readonly descriptorTimeoutMs?: number;
     }) => Effect.Effect<AuthorizedRemoteEnvironment, ConnectionAttemptError>;
     readonly authorizeDpop: (input: {
       readonly expectedEnvironmentId: EnvironmentId;
@@ -92,10 +95,12 @@ function mapDpopSocketError(error: RemoteEnvironmentAuthError | ConnectionAttemp
 const fetchDescriptor = Effect.fn("clientRuntime.connection.remote.fetchDescriptor")(function* (
   httpBaseUrl: string,
   connectionMethod: ClientConnectionMethod,
+  timeoutMs?: number,
 ) {
-  return yield* fetchRemoteEnvironmentDescriptor({ httpBaseUrl }).pipe(
-    Effect.mapError((error) => mapRemoteEnvironmentError(error, connectionMethod)),
-  );
+  return yield* fetchRemoteEnvironmentDescriptor({
+    httpBaseUrl,
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
+  }).pipe(Effect.mapError((error) => mapRemoteEnvironmentError(error, connectionMethod)));
 });
 
 export const make = Effect.gen(function* () {
@@ -141,6 +146,9 @@ export const make = Effect.gen(function* () {
       readonly wsBaseUrl: string;
       readonly bearerToken: string;
       readonly connectionMethod: ClientConnectionMethod;
+      /** Fork (#663): a shorter wait for the descriptor on a host that has
+          others behind it in the roaming walk. */
+      readonly descriptorTimeoutMs?: number;
     }) {
       const now = yield* Clock.currentTimeMillis;
       const cachedDescriptor = (yield* Ref.get(bearerDescriptors)).get(input.expectedEnvironmentId);
@@ -149,9 +157,11 @@ export const make = Effect.gen(function* () {
         cachedDescriptor.validatedAtEpochMs + BEARER_DESCRIPTOR_CACHE_TTL_MS > now;
       const descriptor = canReuseDescriptor
         ? cachedDescriptor.descriptor
-        : yield* fetchDescriptor(input.httpBaseUrl, input.connectionMethod).pipe(
-            Effect.provideService(HttpClient.HttpClient, httpClient),
-          );
+        : yield* fetchDescriptor(
+            input.httpBaseUrl,
+            input.connectionMethod,
+            input.descriptorTimeoutMs,
+          ).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* environmentMismatchError({
           expected: input.expectedEnvironmentId,
@@ -188,6 +198,10 @@ export const make = Effect.gen(function* () {
           _tag: "Bearer" as const,
           token: input.bearerToken,
         },
+        // Fork (#663): the server's other doors, for the roaming walk to keep.
+        ...(descriptor.alternateHttpBaseUrls === undefined
+          ? {}
+          : { alternateHttpBaseUrls: descriptor.alternateHttpBaseUrls }),
       };
     },
   );

@@ -47,6 +47,7 @@ import {
   failEnvironmentInternal,
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
+import { withAlternateHttpBaseUrls } from "./infinitus/Layers/InfinitusDescriptor.ts";
 import { browserApiCorsAllowedHeaders, browserApiCorsAllowedMethods } from "./httpCors.ts";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
@@ -300,7 +301,8 @@ export const serverEnvironmentHttpApiLayer = HttpApiBuilder.group(
       "descriptor",
       Effect.fn("environment.metadata.descriptor")(function* (args) {
         yield* annotateEnvironmentRequest(args.endpoint.name);
-        return yield* serverEnvironment.getDescriptor;
+        // Fork (#663): the Mac app's tunnel as an alternate host.
+        return yield* withAlternateHttpBaseUrls(yield* serverEnvironment.getDescriptor);
       }, traceRelayRequest),
     );
   }),

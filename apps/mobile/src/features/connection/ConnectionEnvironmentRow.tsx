@@ -13,6 +13,8 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
 import { cn } from "../../lib/cn";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
+import { useEnvironmentPresentation } from "../../state/presentation";
+import { roamingHostsLine } from "./roamingHosts";
 import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-types";
 import { serverEnvironment } from "../../state/server";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
@@ -42,6 +44,10 @@ export function ConnectionEnvironmentRow(props: {
     serverEnvironment.configValueAtom(props.environment.environmentId),
   );
   const statusLabel = connectionStatusLabel(props.environment);
+  // Fork (#663): where this connect got through, or the host it also answers on.
+  const roamingLine = roamingHostsLine(
+    useEnvironmentPresentation(props.environment.environmentId).presentation?.entry ?? null,
+  );
   const statusTraceId = props.environment.connectionErrorTraceId;
   const hasConnectionFailure = props.environment.connectionError !== null;
   const isRetrying =
@@ -92,6 +98,11 @@ export function ConnectionEnvironmentRow(props: {
           <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {props.environment.displayUrl}
           </Text>
+          {roamingLine ? (
+            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
+              {roamingLine}
+            </Text>
+          ) : null}
           {statusLabel ? (
             <Text
               className={cn(

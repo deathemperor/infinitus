@@ -96,7 +96,14 @@ const unavailableSnapshot = (reason: string): InfinitusSnapshot => ({
 /** What the one-shot getter answers with before the first cycle has produced a
     snapshot. `changes` never emits it — a subscriber waits for a real poll
     instead of flashing an offline state. */
-const NOT_POLLED = unavailableSnapshot("the socket has not been polled yet");
+/** The placeholder's reason: what a reader sees before any poll. */
+export const NOT_POLLED_REASON = "the socket has not been polled yet";
+const NOT_POLLED = unavailableSnapshot(NOT_POLLED_REASON);
+
+/** Whether a snapshot is the pre-poll placeholder — nothing has been read from
+    the socket yet, as opposed to an app that was probed and found absent. */
+export const isNotPolled = (snapshot: InfinitusSnapshot): boolean =>
+  !snapshot.available && snapshot.unavailableReason === NOT_POLLED_REASON;
 
 /**
  * One command's outcome as the poller cares about it: a value, nothing usable
@@ -452,6 +459,7 @@ const makeInfinitus = Effect.gen(function* () {
     snapshot,
     changes,
     observed,
+    refresh: guardedCycle.pipe(Effect.asVoid),
     command,
   } satisfies InfinitusServiceShape;
 });

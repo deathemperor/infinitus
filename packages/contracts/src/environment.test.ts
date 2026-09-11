@@ -52,3 +52,23 @@ describe("ExecutionEnvironmentDescriptor", () => {
     ).toEqual({ maxUploadBytes: 50 * 1024 * 1024 });
   });
 });
+
+describe("ExecutionEnvironmentDescriptor alternate hosts (fork #663)", () => {
+  const base = {
+    environmentId: "environment-1",
+    label: "Mac",
+    platform: { os: "darwin", arch: "arm64" },
+    serverVersion: "0.0.0-test",
+    capabilities: {},
+  };
+
+  it("decodes with and without the server's other base URLs", () => {
+    const without = decodeDescriptor(base);
+    expect("alternateHttpBaseUrls" in without).toBe(false);
+    const withHosts = decodeDescriptor({
+      ...base,
+      alternateHttpBaseUrls: ["https://code.infinitus.run"],
+    });
+    expect(withHosts.alternateHttpBaseUrls).toEqual(["https://code.infinitus.run"]);
+  });
+});
