@@ -56,6 +56,26 @@ final class HeadroomTests: XCTestCase {
         XCTAssertEqual(Headroom.verdict(previous: held, usage: band, lowPct: low, abundantPct: abundant)?.state, .low)
     }
 
+    func testInterruptModeSaysCriticalWhereHoldSaysLow() throws {
+        // #743: same line, same hysteresis, a different holding state —
+        // and a verdict held under the other mode re-reads in this one.
+        let hot = try usage(#"{"fiveHour": {"pct": 81}}"#)
+        let band = try usage(#"{"fiveHour": {"pct": 65}}"#)
+        let cool = try usage(#"{"fiveHour": {"pct": 50}}"#)
+        let v1 = Headroom.verdict(previous: nil, usage: hot, lowPct: low, abundantPct: abundant, interrupt: true)
+        XCTAssertEqual(v1?.state, .critical)
+        XCTAssertEqual(v1?.reason, "5h at 81%, interrupting from 80%")
+        let v2 = Headroom.verdict(previous: v1, usage: band, lowPct: low, abundantPct: abundant, interrupt: true)
+        XCTAssertEqual(v2?.state, .critical, "inside the band: still critical")
+        let v3 = Headroom.verdict(previous: v2, usage: cool, lowPct: low, abundantPct: abundant, interrupt: true)
+        XCTAssertEqual(v3?.state, .abundant)
+        // Mode flipped mid-hold: the held verdict follows the new mode.
+        let heldLow = Headroom(state: .low, window: "5h", pct: 65, reason: "")
+        XCTAssertEqual(Headroom.verdict(previous: heldLow, usage: band, lowPct: low, abundantPct: abundant, interrupt: true)?.state, .critical)
+        XCTAssertEqual(Headroom.verdict(previous: v2, usage: band, lowPct: low, abundantPct: abundant)?.state, .low)
+        XCTAssertEqual(Headroom.verdict(previous: nil, usage: band, lowPct: low, abundantPct: abundant, interrupt: true)?.state, .abundant)
+    }
+
     func testLowWinsWhenTheThresholdsCross() throws {
         // priority_abundant_pct ≥ priority_low_pct is not validated;
         // the hold threshold is checked first.
