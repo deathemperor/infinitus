@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 const { fake } = vi.hoisted(() => ({
   fake: {
-    requests: null as ReadonlyArray<PairingApprovalRequest> | null,
+    access: { kind: "loading" } as PairingAccess,
     decide: vi.fn(),
   },
 }));
@@ -17,12 +17,11 @@ vi.mock("~/state/environments", () => ({
 }));
 vi.mock("~/state/infinitus", () => ({
   infinitusEnvironment: {
-    pairing: () => ({ label: "pairing-atom" }),
     pairingDecide: { label: "decide-atom" },
   },
 }));
-vi.mock("~/state/query", () => ({
-  useEnvironmentQuery: (atom: unknown) => ({ data: atom === null ? null : fake.requests }),
+vi.mock("./usePairingRequests", () => ({
+  usePairingRequests: () => fake.access,
 }));
 vi.mock("~/state/use-atom-command", () => ({
   useAtomCommand: () => (input: unknown) => fake.decide(input),
@@ -33,6 +32,12 @@ vi.mock("../settingsLayout", async (importOriginal) => ({
 }));
 
 import { InfinitusPairingRequestsCard } from "./InfinitusPairingRequestsCard";
+import type { PairingAccess } from "./pairingAccess.logic";
+
+const pending = (...requests: ReadonlyArray<PairingApprovalRequest>): PairingAccess => ({
+  kind: "ok",
+  requests,
+});
 
 function request(overrides: Partial<PairingApprovalRequest> = {}): PairingApprovalRequest {
   return {
@@ -81,7 +86,7 @@ describe("InfinitusPairingRequestsCard", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-11T10:00:30Z"));
-    fake.requests = null;
+    fake.access = { kind: "loading" };
     fake.decide.mockReset();
   });
 
@@ -92,14 +97,30 @@ describe("InfinitusPairingRequestsCard", () => {
   });
 
   it("explains how a phone asks while nothing is pending", () => {
-    fake.requests = [];
+    fake.access = pending();
     renderer = mount();
     expect(text(renderer)).toContain("No phone is asking to pair");
     expect(buttons(renderer)).toHaveLength(0);
   });
 
+  it("names who can approve when this client lacks the scope, instead of the empty state", () => {
+    fake.access = { kind: "forbidden" };
+    renderer = mount();
+    const shown = text(renderer);
+    expect(shown).toContain("Only the desktop app on this Mac can approve devices.");
+    expect(shown).not.toContain("No phone is asking to pair");
+    expect(buttons(renderer)).toHaveLength(0);
+  });
+
+  it("shows any other stream failure in its own words", () => {
+    fake.access = { kind: "failed", message: "socket closed" };
+    renderer = mount();
+    expect(text(renderer)).toContain("Could not read the pairing requests: socket closed");
+    expect(buttons(renderer)).toHaveLength(0);
+  });
+
   it("lists a request with its name, detail, match code, countdown and the two decisions", () => {
-    fake.requests = [request()];
+    fake.access = pending(request());
     renderer = mount();
     const shown = text(renderer);
     expect(shown).toContain("Titan");
@@ -110,7 +131,7 @@ describe("InfinitusPairingRequestsCard", () => {
   });
 
   it("approves through the decide command and says nothing when the server took it", async () => {
-    fake.requests = [request()];
+    fake.access = pending(request());
     fake.decide.mockResolvedValue({ _tag: "Success", value: { decided: true } });
     renderer = mount();
     const [approve] = buttons(renderer);
@@ -125,7 +146,7 @@ describe("InfinitusPairingRequestsCard", () => {
   });
 
   it("denies through the same command and tells the user when the request was already gone", async () => {
-    fake.requests = [request()];
+    fake.access = pending(request());
     fake.decide.mockResolvedValue({ _tag: "Success", value: { decided: false } });
     renderer = mount();
     const [, deny] = buttons(renderer);
@@ -140,7 +161,7 @@ describe("InfinitusPairingRequestsCard", () => {
   });
 
   it("shows the server's reason when a decision fails", async () => {
-    fake.requests = [request()];
+    fake.access = pending(request());
     fake.decide.mockResolvedValue({
       _tag: "Failure",
       cause: Cause.fail({

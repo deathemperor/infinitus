@@ -278,7 +278,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   (device name, os · address, the match code large, a countdown), each with
   Approve / Deny through `infinitus.pairingDecide`; `decided: false` reads
   "already expired". The stream carries no secret and no credential, so the
-  card never sees one.
+  card never sees one. The stream and the decision need the administrative
+  scopes only the desktop app's own session holds; a QR / `t3 pair` client
+  is refused, and the card then says "Only the desktop app on this Mac can
+  approve devices" instead of the empty state (`pairingAccess.logic` +
+  `usePairingRequests`, shared with the toast hook, #730).
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
   which also holds the pairing stream + decide command, #710).
@@ -287,7 +291,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `/settings/infinitus/devices`. Never an Approve in the toast (a spoofed
   device name must not be let in by reflex) and never the match code; every
   unseen id is toasted once, including those already pending at load. Mounted
-  from `InfinitusEventToasts` beside the events hook.
+  from `InfinitusEventToasts` beside the events hook. Silent when the stream
+  is refused for want of a scope; any other failure is logged once (#730).
 - `apps/web/src/hooks/useInfinitusEventToasts.ts`,
   `apps/web/src/hooks/infinitusEventToasts.logic.ts`,
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events

@@ -4,7 +4,9 @@
  * user compares against the phone's screen, its time left, and Approve /
  * Deny. Approving mints the one-time credential the phone then collects by
  * polling; nothing about it reaches this page — the stream carries the
- * request's metadata and the match code only.
+ * request's metadata and the match code only. Only the desktop app's own
+ * administrative session may read the stream and decide; any other client
+ * is told so instead of seeing the empty state (#730).
  *
  * @module InfinitusPairingRequestsCard
  */
@@ -13,23 +15,22 @@ import { useCallback, useState } from "react";
 
 import { usePrimaryEnvironment } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
-import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
 import { SettingsSection, useRelativeTimeTick } from "../settingsLayout";
 import { formatCountdown } from "./pairPhone.logic";
+import { FORBIDDEN_NOTICE } from "./pairingAccess.logic";
 import { decisionNotice, pairingRequestRows } from "./pairingRequests.logic";
+import { usePairingRequests } from "./usePairingRequests";
 
 const EMPTY_NOTICE =
   "No phone is asking to pair. In the Infinitus app, add a connection, find this Mac on the network and choose “Ask to approve”.";
 
 export function InfinitusPairingRequestsCard() {
   const environmentId = usePrimaryEnvironment()?.environmentId ?? null;
-  const query = useEnvironmentQuery(
-    environmentId === null ? null : infinitusEnvironment.pairing({ environmentId, input: {} }),
-  );
-  const requests = query.data ?? [];
+  const access = usePairingRequests(environmentId);
+  const requests = access.kind === "ok" ? access.requests : [];
   const decide = useAtomCommand(infinitusEnvironment.pairingDecide, { reportFailure: false });
   const [deciding, setDeciding] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -59,7 +60,15 @@ export function InfinitusPairingRequestsCard() {
   return (
     <SettingsSection id="infinitus-pairing-requests" title="Pairing requests">
       <div className="flex flex-col gap-3 px-3 py-3 text-[13px] sm:px-4">
-        {rows.length === 0 ? (
+        {access.kind === "forbidden" ? (
+          <p role="status" className="text-muted-foreground">
+            {FORBIDDEN_NOTICE}
+          </p>
+        ) : access.kind === "failed" ? (
+          <p role="alert" className="text-muted-foreground">
+            Could not read the pairing requests: {access.message}
+          </p>
+        ) : rows.length === 0 ? (
           <p role="status" className="text-muted-foreground">
             {EMPTY_NOTICE}
           </p>
