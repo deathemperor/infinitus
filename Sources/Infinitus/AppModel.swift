@@ -691,12 +691,12 @@ final class AppModel: ObservableObject {
     /// Publish the quick tunnel's current URL to the infinitus.run
     /// rendezvous (MirrorRendezvous) so a paired phone finds the new
     /// address after a restart instead of rescanning. On by default: it
-    /// only ever runs while the quick tunnel does, and the URL is useless
+    /// only ever runs while a tunnel does, and the URL is useless
     /// without the token.
     @Published var mirrorRendezvousEnabled: Bool {
         didSet {
             defaults.set(mirrorRendezvousEnabled, forKey: "mirror_rendezvous_enabled")
-            if mirrorRendezvousEnabled, let url = quickTunnel.url { publishRendezvous(url) }
+            if mirrorRendezvousEnabled, let url = publicURL { publishRendezvous(url) }
         }
     }
     /// "Expose through a Cloudflare quick tunnel" — off by default; a
@@ -1645,6 +1645,11 @@ final class AppModel: ObservableObject {
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
+        namedTunnel.onConnected = { [weak self] up in
+            guard let self else { return }
+            applyQuickTunnel()
+            if up, let url = namedTunnel.endpoint { publishRendezvous(url) }
+        }
         // The tunnels can only point at a bound port, which arrives later.
         mirrorServer.onReady = { [weak self] _ in
             self?.applyQuickTunnel()
@@ -2373,8 +2378,15 @@ final class AppModel: ObservableObject {
     }
 
     /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
-    /// fronts the listener, so it follows the LAN toggle too.
+    /// fronts the listener, so it follows the LAN toggle too. While the
+    /// named hostname answers it stands down (#697: one public door is
+    /// enough) and comes back as the fallback the moment that drops.
     private func applyQuickTunnel() {
+        if namedTunnel.connected {
+            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel is up") }
+            quickTunnel.stop()
+            return
+        }
         guard mirrorTunnelEnabled, mirrorLANEnabled,
               let port = mirrorServer.port else {
             quickTunnel.stop()
@@ -2393,6 +2405,7 @@ final class AppModel: ObservableObject {
               !host.isEmpty else {
             namedTunnel.stop()
             applyForkTunnel()
+            applyQuickTunnel()
             return
         }
         // A local cloudflared config for this hostname wins over a token:
@@ -2405,6 +2418,7 @@ final class AppModel: ObservableObject {
             namedTunnel.stop()
         }
         applyForkTunnel()
+        applyQuickTunnel()
     }
 
     var namedTunnelTokenPresent: Bool {
@@ -2433,10 +2447,14 @@ final class AppModel: ObservableObject {
         mirrorPairToken = MirrorPairing.generateToken()
         logEvent("pairing", icon: "🔑", "phone pairing token regenerated")
         // A new token is a new rendezvous key; the old entry just expires.
-        if let url = quickTunnel.url { publishRendezvous(url) }
+        if let url = publicURL { publishRendezvous(url) }
     }
 
-    /// PUTs the quick tunnel's URL under this token's rendezvous key
+    /// The one public address the rendezvous carries: the named hostname
+    /// while it answers, else the quick tunnel's (#697).
+    private var publicURL: String? { namedTunnel.endpoint ?? quickTunnel.url }
+
+    /// PUTs the public tunnel URL under this token's rendezvous key
     /// (MirrorRendezvous). Best effort: the QR still carries the URL, this
     /// only spares the rescan after a restart.
     func publishRendezvous(_ url: String) {
