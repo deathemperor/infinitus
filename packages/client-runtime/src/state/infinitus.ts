@@ -25,6 +25,10 @@ const INFINITUS_SNAPSHOT_IDLE_TTL_MS = 60_000;
 const INFINITUS_STATS_STALE_MS = 60_000;
 const INFINITUS_STATS_REFRESH_MS = 300_000;
 const INFINITUS_STATS_IDLE_TTL_MS = 60_000;
+/** The Activity page's read (#659): `events --limit 100` once on mount; the
+    snapshot subscription's deltas carry everything after. No re-read. */
+const INFINITUS_EVENTS_STALE_MS = 60_000;
+const INFINITUS_EVENTS_IDLE_TTL_MS = 60_000;
 
 /** What a fleet row shows for an account: its alias, else the email it signed
     in with, else the number the engine knows it by. */
@@ -79,6 +83,12 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     // A read verb as a query: the same forward as `command`, held and re-read
     // only while a page subscribes. Keyed by its whole input, so each period
     // is its own atom.
+    events: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:events",
+      tag: WS_METHODS.infinitusCommand,
+      staleTimeMs: INFINITUS_EVENTS_STALE_MS,
+      idleTtlMs: INFINITUS_EVENTS_IDLE_TTL_MS,
+    }),
     stats: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:infinitus:stats",
       tag: WS_METHODS.infinitusCommand,

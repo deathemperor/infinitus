@@ -1,4 +1,5 @@
 import {
+  ActivityIcon,
   ArrowLeftIcon,
   ChartLineIcon,
   ChartNoAxesColumnIcon,
@@ -143,7 +144,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
                 ? "accounts"
                 : location.pathname === "/stats"
                   ? "stats"
-                  : null,
+                  : location.pathname === "/activity"
+                    ? "activity"
+                    : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
@@ -181,6 +184,11 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleStatsClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/stats" });
+  }, [closeMobileSidebar, navigate]);
+
+  const handleActivityClick = useCallback(() => {
+    closeMobileSidebar();
+    void navigate({ to: "/activity" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUsageClick = useCallback(() => {
@@ -231,6 +239,13 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           ) : null}
           {accountsSupported ? (
             <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
+          ) : null}
+          {accountsSupported ? (
+            <SidebarUtilityItem
+              icon={<ActivityIcon />}
+              label="Activity"
+              onClick={handleActivityClick}
+            />
           ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}

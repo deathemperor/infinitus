@@ -222,6 +222,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
   payload), which the server ref-counts into the `client-activity` lease's
   `stats` scope only while a page holds it (#587 step 2, minimal form; #625
   had dropped the scope for good reason). Estimates, never billing truth.
+- `apps/web/src/routes/activity.tsx`, `apps/web/src/components/activity/` — the
+  `/activity` page (#659): the pop-out's Activity pane in the fork — the
+  app's event log newest first, sectioned by local day (`activity.logic.ts`),
+  a kind chip per line. Reads `events --limit 100` once through
+  `infinitusEnvironment.events` (a query atom with no refresh, dropped a
+  minute after the page leaves) and then folds in `snapshot.events` deltas
+  from the shared subscription, deduped by id
+  (`packages/client-runtime/src/state/infinitusActivity.ts`, exported as
+  `@t3tools/client-runtime/state/infinitusActivity`) — no polling of its own.
+  Sidebar "Activity" beside Stats.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
