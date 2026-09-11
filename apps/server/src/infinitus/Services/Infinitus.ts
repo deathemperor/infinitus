@@ -39,6 +39,13 @@ export interface InfinitusServiceShape {
    */
   readonly observed: Stream.Stream<InfinitusSnapshot>;
   /**
+   * One poll cycle now, whatever the subscriber count — for a reader that
+   * needs a real snapshot once (the environment descriptor's alternate hosts,
+   * #663) on a server nobody is watching. Serialized with the loop's own
+   * cycle; never fails, an unreachable app lands as `available: false`.
+   */
+  readonly refresh: Effect.Effect<void>;
+  /**
    * Forwards one command from the manifest and answers with the reply's
    * `result`. A command the manifest does not list never reaches the socket.
    */

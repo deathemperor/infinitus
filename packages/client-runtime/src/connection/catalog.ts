@@ -22,6 +22,14 @@ export class BearerConnectionProfile extends Schema.TaggedClass<BearerConnection
     ...ConnectionProfileBase,
     httpBaseUrl: Schema.String,
     wsBaseUrl: Schema.String,
+    /** Fork (#663): the server's other doors (its tunnel), from the descriptor
+        at pairing and refreshed on every connect; tried when `httpBaseUrl` is
+        unreachable. Optional keys: the catalog document has no version to
+        bump — a shape an older build cannot decode is a discarded catalog. */
+    alternateHttpBaseUrls: Schema.optionalKey(Schema.Array(Schema.String)),
+    /** The host the last connect landed on; tried first next time, and what
+        the environment row shows. Cleared when the paired host is edited. */
+    lastGoodHttpBaseUrl: Schema.optionalKey(Schema.String),
   },
 ) {}
 

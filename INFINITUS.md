@@ -52,7 +52,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
   `WsRpcGroup`.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
-  `ExecutionEnvironmentCapabilities`.
+  `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+  `ExecutionEnvironmentDescriptor` (#663).
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus` in
   `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts it.
 - `apps/server/src/ws.ts` — pulls `InfinitusService` beside the other services
@@ -75,6 +76,19 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `InfinitusDesktop.layer` in `desktopApplicationLayer`.
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service.
+- `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
+  the descriptor through `withAlternateHttpBaseUrls` (#663).
+- `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
+  and `lastGoodHttpBaseUrl` (both optional keys) on `BearerConnectionProfile`;
+  `connection/resolver.ts` — the bearer broker walks `bearerHostOrder` and
+  writes `learnedBearerProfile` back; `connection/onboarding.ts` — a pairing
+  keeps the descriptor's alternates, an edit keeps them and drops the roamed
+  host; `connection/presentation.ts` — `connectionCatalogAlternateHosts` /
+  `connectionCatalogRoamedHost`; `authorization/service.ts` —
+  `authorizeBearer` takes `descriptorTimeoutMs` and returns the descriptor's
+  alternates (#663).
+- `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
+  `roamingHostsLine` under a saved environment's host (#663).
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`.
 - `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
@@ -407,6 +421,29 @@ this file adds the fork's own rules. Plan and history: issue #555.
   with the row's id, then the Thread screen opens; the row keeps a "close
   the terminal session" line, nothing reaches the Infinitus socket. No bulk
   "Move idle" on the phone.
+- `packages/client-runtime/src/connection/roaming.ts`,
+  `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
+  `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
+  roam to the tunnel (#663). The server's descriptor names its other base
+  URLs (`alternateHttpBaseUrls`: the Cloudflare tunnel from
+  `status.forkTunnel` while it is up; a never-polled snapshot is refreshed
+  once for it). The phone keeps them on the bearer profile from the pairing
+  on and re-learns them on every connect, so a tunnel turned on after the
+  pairing is picked up by the next LAN connect; each is stored in the
+  profile's normalized shape (`normalizeHttpBaseUrl`), so a pairing made
+  over the tunnel itself has no alternate. The server's list replaces
+  the phone's on every connect — it is the authority on its own doors, and a
+  quick-tunnel hostname it no longer holds can be handed to anyone, so the
+  bearer token never follows a stale one (a host the profile no longer
+  names is not tried, last-good or not). A connect tries the host that
+  worked last, then the paired one, then the alternates (3 s descriptor
+  wait on every host but the last); a host where
+  the Mac is not — nothing answers (network, timeout), or something else
+  does (`remote-unavailable`, a 404 or another environment's id) — is
+  walked past, one that refuses the credential ends the walk. The bearer
+  session is not host-bound, so no re-pair. The environment row says
+  "Connected via <host>" while roamed, else "Also via <host> when you are
+  away".
 - `apps/mobile/src/features/infinitus/lanDiscovery.logic.ts` (+ `lanDiscovery.ts`,
   `InfinitusNearbyServers.tsx`) — "Find Macs on this network" on the
   add-connection form (#651): a sweep of the phone's private /24 for

@@ -1,7 +1,7 @@
 import type { ServerConfig } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 
-import type { ConnectionCatalogEntry } from "./catalog.ts";
+import type { BearerConnectionProfile, ConnectionCatalogEntry } from "./catalog.ts";
 import type { SupervisorConnectionState } from "./model.ts";
 
 export type EnvironmentConnectionPhase =
@@ -104,4 +104,36 @@ export function connectionCatalogDisplayUrl(entry: ConnectionCatalogEntry): stri
         ? `${entry.profile.value.target.username}@${entry.profile.value.target.hostname}`
         : null;
   }
+}
+
+/** Fork (#663): the bearer profile behind an entry, when it has one. */
+function bearerProfileOf(entry: ConnectionCatalogEntry): BearerConnectionProfile | null {
+  if (
+    entry.target._tag !== "BearerConnectionTarget" ||
+    Option.isNone(entry.profile) ||
+    entry.profile.value._tag !== "BearerConnectionProfile"
+  ) {
+    return null;
+  }
+  return entry.profile.value;
+}
+
+/** Fork (#663): the environment's other hosts — the tunnel it also answers
+    on — with the paired host left out; what a row names as reachable away. */
+export function connectionCatalogAlternateHosts(
+  entry: ConnectionCatalogEntry,
+): ReadonlyArray<string> {
+  const profile = bearerProfileOf(entry);
+  if (profile === null) return [];
+  return (profile.alternateHttpBaseUrls ?? []).filter(
+    (host, index, all) => host !== profile.httpBaseUrl && all.indexOf(host) === index,
+  );
+}
+
+/** Fork (#663): the host the last connect got through on, when it was not
+    the paired one — null while the phone connects the plain way. */
+export function connectionCatalogRoamedHost(entry: ConnectionCatalogEntry): string | null {
+  const profile = bearerProfileOf(entry);
+  if (profile === null || profile.lastGoodHttpBaseUrl === undefined) return null;
+  return profile.lastGoodHttpBaseUrl === profile.httpBaseUrl ? null : profile.lastGoodHttpBaseUrl;
 }

@@ -10,6 +10,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { bootstrapRemoteBearerSession } from "../authorization/remote.ts";
 import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "../environment/endpoint.ts";
+import { normalizedAlternates } from "./roaming.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
 import * as ClientCapabilities from "../platform/capabilities.ts";
 import {
@@ -83,6 +84,17 @@ const resolvePairingTarget = Effect.fn("clientRuntime.connection.onboarding.reso
   },
 );
 
+/** The alternates worth keeping, in the profile's normalized shape: never the
+    paired host itself, absent when there are none (an absent key, the
+    catalog's shape for "no alternates"). */
+function pairingAlternates(
+  alternates: ReadonlyArray<string> | undefined,
+  httpBaseUrl: string,
+): { readonly alternateHttpBaseUrls?: ReadonlyArray<string> } {
+  const kept = normalizedAlternates(alternates, httpBaseUrl);
+  return kept.length === 0 ? {} : { alternateHttpBaseUrls: kept };
+}
+
 export const preparePairingRegistration = Effect.fn(
   "clientRuntime.connection.onboarding.preparePairingRegistration",
 )(function* (input: PairingConnectionInput) {
@@ -111,6 +123,8 @@ export const preparePairingRegistration = Effect.fn(
       label: descriptor.label,
       httpBaseUrl: target.httpBaseUrl,
       wsBaseUrl: target.wsBaseUrl,
+      // Fork (#663): the server's other doors, kept from the pairing on.
+      ...pairingAlternates(descriptor.alternateHttpBaseUrls, target.httpBaseUrl),
     }),
     credential: new BearerConnectionCredential({
       token: access.access_token,
@@ -205,6 +219,9 @@ export const prepareBearerConnectionUpdate = Effect.fn(
       label,
       httpBaseUrl,
       wsBaseUrl: deriveWsBaseUrl(httpBaseUrl),
+      // Fork (#663): an edited paired host keeps the alternates and forgets
+      // which host worked last — the next connect starts from the edit.
+      ...pairingAlternates(entry.profile.value.alternateHttpBaseUrls, httpBaseUrl),
     }),
     credential: credential.value,
   });

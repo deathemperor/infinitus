@@ -21,6 +21,7 @@ import {
 import * as ConnectionCredentialStore from "./credentialStore.ts";
 import {
   BearerConnectionTarget,
+  ConnectionBlockedError,
   ConnectionTransientError,
   PrimaryConnectionTarget,
   RelayConnectionTarget,
@@ -69,6 +70,8 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
   readonly authorizeDpop?: RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization["Service"]["authorizeDpop"];
   readonly primaryBearerToken?: string;
   readonly prepareSsh?: ClientCapabilities.SshEnvironmentGateway["Service"]["prepare"];
+  /** Fork (#663): every profile the broker writes back, in order. */
+  readonly profilePuts?: Array<ConnectionProfile>;
 }) => {
   const profiles = new Map(
     (options?.profiles ?? []).map((profile) => [profile.connectionId, profile]),
@@ -77,7 +80,11 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
 
   const profileStore = ConnectionProfileStore.ConnectionProfileStore.of({
     get: (connectionId) => Effect.succeed(Option.fromNullishOr(profiles.get(connectionId))),
-    put: (profile) => Effect.sync(() => void profiles.set(profile.connectionId, profile)),
+    put: (profile) =>
+      Effect.sync(() => {
+        profiles.set(profile.connectionId, profile);
+        options?.profilePuts?.push(profile);
+      }),
     remove: (connectionId) => Effect.sync(() => void profiles.delete(connectionId)),
   });
   const credentialStore = ConnectionCredentialStore.ConnectionCredentialStore.of({
@@ -259,6 +266,174 @@ describe("ConnectionResolver", () => {
         (yield* broker.prepare(catalogEntry(target, Option.some(profile)))).socketUrl,
       ).toContain("wsTicket=ticket");
       expect(yield* Ref.get(bearerInputs)).toEqual([{ token: "secret-bearer", method: "direct" }]);
+    }),
+  );
+
+  // Fork (#663): one environment, two hosts — the LAN one it was paired on
+  // and the tunnel it also answers on.
+  const LAN = "http://192.168.100.61:3773/";
+  const TUNNEL = "https://code.infinitus.run/";
+  const roamingTarget = new BearerConnectionTarget({
+    environmentId: ENVIRONMENT_ID,
+    label: "Mac",
+    connectionId: "bearer:environment-1",
+  });
+  const roamingProfile = (
+    over: Partial<ConstructorParameters<typeof BearerConnectionProfile>[0]> = {},
+  ) =>
+    new BearerConnectionProfile({
+      connectionId: roamingTarget.connectionId,
+      environmentId: ENVIRONMENT_ID,
+      label: "Mac",
+      httpBaseUrl: LAN,
+      wsBaseUrl: "ws://192.168.100.61:3773",
+      ...over,
+    });
+  type BearerInput = Parameters<
+    RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization["Service"]["authorizeBearer"]
+  >[0];
+  const authorizedAt = (input: BearerInput, alternates: ReadonlyArray<string>) => ({
+    environmentId: input.expectedEnvironmentId,
+    label: "Mac",
+    httpBaseUrl: input.httpBaseUrl,
+    socketUrl: `${input.wsBaseUrl.replace(/\/$/, "")}/ws?wsTicket=ticket`,
+    httpAuthorization: { _tag: "Bearer" as const, token: input.bearerToken },
+    alternateHttpBaseUrls: alternates,
+  });
+  const roamingCredential = [
+    "bearer:environment-1",
+    new BearerConnectionCredential({ token: "secret-bearer" }),
+  ] as const;
+
+  it.effect("roams to the tunnel when the paired host is unreachable and remembers it", () =>
+    Effect.gen(function* () {
+      const inputs = yield* Ref.make<ReadonlyArray<BearerInput>>([]);
+      const profilePuts: Array<ConnectionProfile> = [];
+      const brokerLayer = yield* makeDependencies({
+        credentials: [roamingCredential],
+        profilePuts,
+        authorizeBearer: (input) =>
+          Ref.update(inputs, (values) => [...values, input]).pipe(
+            Effect.flatMap(() =>
+              input.httpBaseUrl === LAN
+                ? Effect.fail(
+                    new ConnectionTransientError({ reason: "timeout", detail: "no route" }),
+                  )
+                : Effect.succeed(authorizedAt(input, [TUNNEL])),
+            ),
+          ),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(brokerLayer));
+
+      const prepared = yield* broker.prepare(
+        catalogEntry(
+          roamingTarget,
+          Option.some(roamingProfile({ alternateHttpBaseUrls: [TUNNEL] })),
+        ),
+      );
+
+      expect(prepared.httpBaseUrl).toBe(TUNNEL);
+      expect(prepared.socketUrl).toBe("wss://code.infinitus.run/ws?wsTicket=ticket");
+      const tried = yield* Ref.get(inputs);
+      expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
+        [LAN, 3_000],
+        [TUNNEL, undefined],
+      ]);
+      expect(profilePuts).toHaveLength(1);
+      expect(profilePuts[0]).toMatchObject({
+        httpBaseUrl: LAN,
+        alternateHttpBaseUrls: [TUNNEL],
+        lastGoodHttpBaseUrl: TUNNEL,
+      });
+    }),
+  );
+
+  it.effect("stops at a host that answers and refuses instead of trying the tunnel", () =>
+    Effect.gen(function* () {
+      const tried = yield* Ref.make<ReadonlyArray<string>>([]);
+      const brokerLayer = yield* makeDependencies({
+        credentials: [roamingCredential],
+        authorizeBearer: (input) =>
+          Ref.update(tried, (values) => [...values, input.httpBaseUrl]).pipe(
+            Effect.flatMap(() =>
+              Effect.fail(
+                new ConnectionBlockedError({ reason: "authentication", detail: "revoked" }),
+              ),
+            ),
+          ),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(brokerLayer));
+
+      const failure = yield* broker
+        .prepare(
+          catalogEntry(
+            roamingTarget,
+            Option.some(roamingProfile({ alternateHttpBaseUrls: [TUNNEL] })),
+          ),
+        )
+        .pipe(Effect.flip);
+
+      expect(failure).toMatchObject({ _tag: "ConnectionBlockedError", reason: "authentication" });
+      expect(yield* Ref.get(tried)).toEqual([LAN]);
+    }),
+  );
+
+  it.effect("learns the tunnel from a plain LAN connect when the pairing had none", () =>
+    Effect.gen(function* () {
+      const inputs = yield* Ref.make<ReadonlyArray<BearerInput>>([]);
+      const profilePuts: Array<ConnectionProfile> = [];
+      const brokerLayer = yield* makeDependencies({
+        credentials: [roamingCredential],
+        profilePuts,
+        authorizeBearer: (input) =>
+          Ref.update(inputs, (values) => [...values, input]).pipe(
+            Effect.as(authorizedAt(input, [TUNNEL])),
+          ),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(brokerLayer));
+
+      yield* broker.prepare(catalogEntry(roamingTarget, Option.some(roamingProfile())));
+
+      const tried = yield* Ref.get(inputs);
+      expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
+        [LAN, undefined],
+      ]);
+      expect(profilePuts).toHaveLength(1);
+      expect(profilePuts[0]).toMatchObject({
+        alternateHttpBaseUrls: [TUNNEL],
+        lastGoodHttpBaseUrl: LAN,
+      });
+    }),
+  );
+
+  it.effect("starts from the host that worked last and writes nothing when it still does", () =>
+    Effect.gen(function* () {
+      const inputs = yield* Ref.make<ReadonlyArray<BearerInput>>([]);
+      const profilePuts: Array<ConnectionProfile> = [];
+      const brokerLayer = yield* makeDependencies({
+        credentials: [roamingCredential],
+        profilePuts,
+        authorizeBearer: (input) =>
+          Ref.update(inputs, (values) => [...values, input]).pipe(
+            Effect.as(authorizedAt(input, [TUNNEL])),
+          ),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(brokerLayer));
+
+      yield* broker.prepare(
+        catalogEntry(
+          roamingTarget,
+          Option.some(
+            roamingProfile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: TUNNEL }),
+          ),
+        ),
+      );
+
+      const tried = yield* Ref.get(inputs);
+      expect(tried.map((input) => [input.httpBaseUrl, input.wsBaseUrl])).toEqual([
+        [TUNNEL, "wss://code.infinitus.run/"],
+      ]);
+      expect(profilePuts).toEqual([]);
     }),
   );
 

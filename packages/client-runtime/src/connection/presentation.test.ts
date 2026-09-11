@@ -9,7 +9,9 @@ import {
   type SupervisorConnectionState,
 } from "./model.ts";
 import {
+  connectionCatalogAlternateHosts,
   connectionCatalogDisplayUrl,
+  connectionCatalogRoamedHost,
   connectionStatusText,
   connectionStatusTitle,
   presentEnvironmentConnection,
@@ -52,6 +54,42 @@ function supervisorState(overrides: Partial<SupervisorConnectionState>): Supervi
 describe("connection presentation", () => {
   it("preserves profile display information without exposing credentials", () => {
     expect(connectionCatalogDisplayUrl(ENTRY)).toBe("https://environment.example.test");
+  });
+
+  it("names the other hosts and where the last connect landed (fork #663)", () => {
+    expect(connectionCatalogAlternateHosts(ENTRY)).toEqual([]);
+    expect(connectionCatalogRoamedHost(ENTRY)).toBeNull();
+    const roamed: ConnectionCatalogEntry = {
+      target: TARGET,
+      profile: Option.some(
+        new BearerConnectionProfile({
+          connectionId: TARGET.connectionId,
+          environmentId: TARGET.environmentId,
+          label: TARGET.label,
+          httpBaseUrl: "https://environment.example.test",
+          wsBaseUrl: "wss://environment.example.test",
+          alternateHttpBaseUrls: ["https://code.infinitus.run", "https://environment.example.test"],
+          lastGoodHttpBaseUrl: "https://code.infinitus.run",
+        }),
+      ),
+    };
+    expect(connectionCatalogDisplayUrl(roamed)).toBe("https://environment.example.test");
+    expect(connectionCatalogAlternateHosts(roamed)).toEqual(["https://code.infinitus.run"]);
+    expect(connectionCatalogRoamedHost(roamed)).toBe("https://code.infinitus.run");
+    const home: ConnectionCatalogEntry = {
+      target: TARGET,
+      profile: Option.some(
+        new BearerConnectionProfile({
+          connectionId: TARGET.connectionId,
+          environmentId: TARGET.environmentId,
+          label: TARGET.label,
+          httpBaseUrl: "https://environment.example.test",
+          wsBaseUrl: "wss://environment.example.test",
+          lastGoodHttpBaseUrl: "https://environment.example.test",
+        }),
+      ),
+    };
+    expect(connectionCatalogRoamedHost(home)).toBeNull();
   });
 
   it("distinguishes initial connection, reconnect, and retry errors", () => {

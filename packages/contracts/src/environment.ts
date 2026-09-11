@@ -169,6 +169,11 @@ export const ExecutionEnvironmentDescriptor = Schema.Struct({
   platform: ExecutionEnvironmentPlatform,
   serverVersion: TrimmedNonEmptyString,
   capabilities: ExecutionEnvironmentCapabilities,
+  /** Fork (#663): other base URLs this same server answers on — the Mac app's
+      tunnel while it is up. A phone paired over the LAN keeps them and roams
+      to one when the paired host is unreachable; same environment id, so
+      nothing re-pairs. Absent on an upstream server or with no tunnel. */
+  alternateHttpBaseUrls: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type ExecutionEnvironmentDescriptor = typeof ExecutionEnvironmentDescriptor.Type;
 
