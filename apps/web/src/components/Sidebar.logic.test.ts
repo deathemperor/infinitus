@@ -14,6 +14,8 @@ import {
   filterSidebarProjectScopeItems,
   getSidebarThreadIdsToPrewarm,
   resolveAdjacentThreadId,
+  resolveAttentionRank,
+  resolveNextAttentionThreadId,
   reduceSidebarProjectScopeMenuState,
   getFallbackThreadIdAfterDelete,
   getProjectSortTimestamp,
@@ -663,6 +665,72 @@ describe("orderItemsByPreferredIds", () => {
       "physical-a",
       "physical-b",
     ]);
+  });
+});
+
+describe("resolveAttentionRank (#270 C)", () => {
+  it("ranks approval, input, failed, held, then an unseen completion", () => {
+    expect(resolveAttentionRank({ status: "approval", isUnread: false })).toBe(0);
+    expect(resolveAttentionRank({ status: "input", isUnread: false })).toBe(1);
+    expect(resolveAttentionRank({ status: "failed", isUnread: false })).toBe(2);
+    expect(resolveAttentionRank({ status: "held", isUnread: false })).toBe(3);
+    expect(resolveAttentionRank({ status: "ready", isUnread: true })).toBe(4);
+  });
+
+  it("asks nothing of a working, monitoring or read row", () => {
+    expect(resolveAttentionRank({ status: "working", isUnread: true })).toBeNull();
+    expect(resolveAttentionRank({ status: "monitoring", isUnread: false })).toBeNull();
+    expect(resolveAttentionRank({ status: "ready", isUnread: false })).toBeNull();
+  });
+});
+
+describe("resolveNextAttentionThreadId (#270 C)", () => {
+  const entries = [
+    { id: "t1", rank: null },
+    { id: "t2", rank: 4 },
+    { id: "t3", rank: 0 },
+    { id: "t4", rank: 1 },
+    { id: "t5", rank: 0 },
+  ];
+
+  it("lands on the lowest rank, first in sidebar order after the current thread", () => {
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: "t1" })).toBe("t3");
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: "t3" })).toBe("t5");
+  });
+
+  it("wraps past the end before dropping a rank", () => {
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: "t5" })).toBe("t3");
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: "t4" })).toBe("t5");
+  });
+
+  it("starts from the top with no current thread and skips threads that ask nothing", () => {
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: null })).toBe("t3");
+    expect(
+      resolveNextAttentionThreadId({
+        entries: [
+          { id: "t1", rank: null },
+          { id: "t2", rank: 4 },
+        ],
+        currentThreadId: null,
+      }),
+    ).toBe("t2");
+  });
+
+  it("never answers with the current thread, so a lone waiting thread is a no-op", () => {
+    expect(
+      resolveNextAttentionThreadId({
+        entries: [
+          { id: "t1", rank: 0 },
+          { id: "t2", rank: null },
+        ],
+        currentThreadId: "t1",
+      }),
+    ).toBeNull();
+    expect(resolveNextAttentionThreadId({ entries: [], currentThreadId: null })).toBeNull();
+  });
+
+  it("treats an unknown current thread as no current thread", () => {
+    expect(resolveNextAttentionThreadId({ entries, currentThreadId: "gone" })).toBe("t3");
   });
 });
 

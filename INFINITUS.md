@@ -85,7 +85,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
   — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
-  `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way.
+  `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way;
+  `thread.nextAttention` (`mod+shift+l`, `!terminalFocus`) in
+  `THREAD_KEYBINDING_COMMANDS` (#270 C).
+- `apps/web/src/components/Sidebar.tsx` — `resolveNextAttentionThreadKey`
+  (ranks the rendered list: approval, input, failed, held, unseen
+  completion; holds read from the rows' atoms via `appAtomRegistry`), the
+  `thread.nextAttention` branch of the keydown handler and the
+  `onNextAttentionThreadRequest` listener (#270 C).
+- `apps/web/src/components/CommandPalette.tsx` — the "Jump to next waiting
+  thread" action (`requestNextAttentionThread`) and its keydown match (#270 C).
 - `apps/web/src/components/chat/ChatComposer.tsx` — one block of hooks
   (`useActiveProjectRef`, the captures UI store, the list query,
   `useCapturesShortcuts`) beside the stash effects, `ComposerCapturesBadge`
@@ -399,6 +408,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   until a thread with a project is open, and toasts `empty` / `failed`
   (the Accessibility fix by name). `useAddCapture` is shared with the
   shortcuts.
+- `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
+  event the palette uses to ask the sidebar for the next waiting thread
+  (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
+  `resolveNextAttentionThreadId` + tests.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
