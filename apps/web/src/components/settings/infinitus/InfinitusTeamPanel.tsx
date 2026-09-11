@@ -6,9 +6,11 @@
  * invite link on `infinitus.secret` — and Create: team name, your name, an
  * empty private repo's URL, and the remote's write token on the secret
  * channel when it needs one (an ssh remote needs none and goes over
- * `infinitus.command`). Every secret field is `type="password"`, never
- * remembered, cleared on submit; the Mac's own error verbatim, the value
- * never in it.
+ * `infinitus.command`). A leader also gets Hostnames: the Cloudflare zone
+ * and label member hostnames are minted under, with the API token on the
+ * secret channel, and Forget token (`--clear`, plain). Every secret field is
+ * `type="password"`, never remembered, cleared on submit; the Mac's own error
+ * verbatim, the value never in it.
  *
  * @module InfinitusTeamPanel
  */
@@ -38,6 +40,12 @@ import {
   teamCreateDraft,
   teamCreateSecretArgs,
   teamCreateSupported,
+  parseTeamHostnameReply,
+  teamHostnameClearInput,
+  teamHostnameDraft,
+  teamHostnameSecretArgs,
+  teamHostnameSupported,
+  type TeamHostnameReply,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
@@ -58,7 +66,9 @@ export function InfinitusTeamPanel() {
   /** `undefined` before the first read; null once the Mac says it is in no team. */
   const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<TeamAction["type"] | "join" | "create" | null>(null);
+  const [busy, setBusy] = useState<
+    TeamAction["type"] | "join" | "create" | "hostname" | "clear-hostname" | null
+  >(null);
   const [joinName, setJoinName] = useState("");
   /** The code, a secret (#747): in memory only, cleared on submit, gone with the page. */
   // A join link the desktop received (infinitus://join/…) lands here as the
@@ -80,11 +90,19 @@ export function InfinitusTeamPanel() {
   /** The remote's write token, a secret (#747): in memory only, cleared on submit. */
   const [createToken, setCreateToken] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [zone, setZone] = useState("");
+  const [label, setLabel] = useState("");
+  /** The Cloudflare API token, a secret (#747): in memory only, cleared on submit. */
+  const [cfToken, setCfToken] = useState("");
+  const [hostnameError, setHostnameError] = useState<string | null>(null);
+  /** What the last `team-hostname` answered; the Mac has no read for it. */
+  const [hostnames, setHostnames] = useState<TeamHostnameReply | null>(null);
 
   const supported =
     snapshot !== null && snapshot.available && teamStatusSupported(snapshot.commands);
   const joinSupported = snapshot !== null && teamJoinSupported(snapshot.commands);
   const createSupported = snapshot !== null && teamCreateSupported(snapshot.commands);
+  const hostnameSupported = snapshot !== null && teamHostnameSupported(snapshot.commands);
 
   const applyStatus = useCallback((result: unknown) => {
     const parsed = parseTeamStatus(result);
@@ -196,6 +214,51 @@ export function InfinitusTeamPanel() {
     }
     applyStatus(result.value.result);
   };
+
+  const saveHostnames = async () => {
+    if (environmentId === null) return;
+    const draft = teamHostnameDraft(zone, label);
+    const token = cfToken.trim();
+    setCfToken("");
+    if (draft === null || token.length === 0) {
+      setHostnameError("Fill in the zone, the label and the Cloudflare API token.");
+      return;
+    }
+    setBusy("hostname");
+    setHostnameError(null);
+    const result = await runSecret({
+      environmentId,
+      input: { ...teamHostnameSecretArgs(draft), secret: Redacted.make(token) },
+    });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setHostnameError(infinitusSecretFailure(result.cause));
+      return;
+    }
+    applyHostnames(result.value.result);
+  };
+
+  const clearHostnames = async () => {
+    if (environmentId === null) return;
+    setBusy("clear-hostname");
+    setHostnameError(null);
+    const result = await runCommand({ environmentId, input: teamHostnameClearInput() });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setHostnameError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    applyHostnames(result.value.result);
+  };
+
+  function applyHostnames(result: unknown) {
+    const parsed = parseTeamHostnameReply(result);
+    if (parsed === null) {
+      setHostnameError("Infinitus answered team-hostname with a shape this build cannot read.");
+      return;
+    }
+    setHostnames(parsed);
+  }
 
   if (capability !== true || snapshot === null || !snapshot.available || !supported) {
     const state =
@@ -314,6 +377,93 @@ export function InfinitusTeamPanel() {
                 }
               />
             ))
+          )}
+        </SettingsSection>
+      )}
+      {team === null || team === undefined || team.role !== "leader" ? null : (
+        <SettingsSection id="infinitus-team-hostnames" title="Hostnames">
+          {!hostnameSupported ? (
+            <InfinitusPanelNotice message="This Infinitus build does not take the Cloudflare token from here; use the Mac's Settings › Team › Hostnames." />
+          ) : hostnames?.configured === true ? (
+            <SettingsRow
+              title={`Cloudflare zone ${hostnames.zone ?? "—"} · label ${hostnames.label ?? "—"}`}
+              description="Member hostnames are minted under this zone; each Mac starts its tunnel on the next fetch."
+              control={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy !== null}
+                  onClick={() => void clearHostnames()}
+                >
+                  {busy === "clear-hostname" ? "Forgetting…" : "Forget token"}
+                </Button>
+              }
+            />
+          ) : (
+            <form
+              className="flex flex-col gap-2 px-3 py-2 sm:px-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveHostnames();
+              }}
+            >
+              <Input
+                size="sm"
+                aria-label="Zone"
+                placeholder="example.com"
+                autoComplete="off"
+                spellCheck={false}
+                value={zone}
+                disabled={busy !== null}
+                onChange={(event) => setZone(event.currentTarget.value)}
+              />
+              <Input
+                size="sm"
+                aria-label="Label"
+                placeholder="team"
+                autoComplete="off"
+                spellCheck={false}
+                value={label}
+                disabled={busy !== null}
+                onChange={(event) => setLabel(event.currentTarget.value)}
+              />
+              {/* The token is a secret (#747): masked, never remembered, cleared on submit. */}
+              <Input
+                type="password"
+                size="sm"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Cloudflare API token"
+                placeholder="Cloudflare API token (Account: Cloudflare Tunnel Edit · Zone: DNS Edit)"
+                value={cfToken}
+                disabled={busy !== null}
+                onChange={(event) => setCfToken(event.currentTarget.value)}
+              />
+              <p className="text-[13px] text-muted-foreground">
+                A hostname is a Cloudflare named tunnel under your zone (name.label.zone), minted
+                per member; the token is checked against the zone before the Mac keeps it. Saving
+                replaces a token kept earlier.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy !== null}
+                  onClick={() => void clearHostnames()}
+                >
+                  {busy === "clear-hostname" ? "Forgetting…" : "Forget token"}
+                </Button>
+                <Button type="submit" size="sm" disabled={busy !== null}>
+                  {busy === "hostname" ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </form>
+          )}
+          {hostnameError === null ? null : (
+            <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+              {hostnameError}
+            </p>
           )}
         </SettingsSection>
       )}

@@ -11,6 +11,11 @@ import {
   teamCreateDraft,
   teamCreateSecretArgs,
   teamCreateSupported,
+  parseTeamHostnameReply,
+  teamHostnameClearInput,
+  teamHostnameDraft,
+  teamHostnameSecretArgs,
+  teamHostnameSupported,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
@@ -175,5 +180,45 @@ describe("team.logic create (#747)", () => {
       args: ["Alpha"],
       options: { remote: "https://host/o/r.git", as: "Me" },
     });
+  });
+});
+
+describe("team.logic hostnames (#747)", () => {
+  it("gates on team-hostname taking stdin as a secret", () => {
+    expect(teamHostnameSupported([command("team-hostname", "secret")])).toBe(true);
+    expect(teamHostnameSupported([command("team-hostname")])).toBe(false);
+  });
+
+  it("keys the save by the manifest's option names and clears over the plain verb", () => {
+    expect(teamHostnameDraft(" example.com ", "team")).toEqual({
+      zone: "example.com",
+      label: "team",
+    });
+    expect(teamHostnameDraft("", "team")).toBeNull();
+    expect(teamHostnameSecretArgs({ zone: "example.com", label: "team" })).toEqual({
+      command: "team-hostname",
+      args: { zone: "example.com", label: "team" },
+    });
+    expect(teamHostnameClearInput()).toEqual({
+      command: "team-hostname",
+      args: [],
+      options: { clear: "true" },
+    });
+  });
+
+  it("reads the reply after a save and after --clear", () => {
+    expect(
+      parseTeamHostnameReply({ zone: "example.com", label: "team", configured: true }),
+    ).toEqual({
+      zone: "example.com",
+      label: "team",
+      configured: true,
+    });
+    expect(parseTeamHostnameReply({ zone: null, label: null, configured: false })).toEqual({
+      zone: null,
+      label: null,
+      configured: false,
+    });
+    expect(parseTeamHostnameReply({ ok: true })).toBeNull();
   });
 });

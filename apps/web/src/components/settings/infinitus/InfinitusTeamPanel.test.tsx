@@ -56,6 +56,7 @@ const TEAM_COMMANDS = [
   { name: "team-status" },
   { name: "team-join", stdin: "secret" },
   { name: "team-create", stdin: "secret" },
+  { name: "team-hostname", stdin: "secret" },
   { name: "team-approve" },
 ].map((entry) => ({
   args: [],
@@ -271,6 +272,54 @@ describe("InfinitusTeamPanel", () => {
       },
     });
     expect(rendered()).toContain("Alpha");
+  });
+
+  it("saves the zone and label with the Cloudflare token on the secret channel, then forgets it plainly", async () => {
+    fake.secret = vi
+      .fn()
+      .mockResolvedValue(ok({ zone: "example.com", label: "team", configured: true }));
+    await renderPanel();
+    const type = (label: string, value: string) =>
+      act(async () => {
+        (byLabel(label).props as { onChange: (event: unknown) => void }).onChange({
+          currentTarget: { value },
+        });
+      });
+    await type("Zone", "example.com");
+    await type("Label", "team");
+    await type("Cloudflare API token", "cf_secret");
+    const form = renderer!.root.findAll((node) => node.type === "form")[0]!;
+    await act(async () => {
+      (form.props as { onSubmit: (event: unknown) => void }).onSubmit({
+        preventDefault: () => undefined,
+      });
+    });
+    const input = fake.secret.mock.calls[0]![0] as {
+      input: { command: string; args: Record<string, string>; secret: Redacted.Redacted<string> };
+    };
+    expect(input.input.command).toBe("team-hostname");
+    expect(input.input.args).toEqual({ zone: "example.com", label: "team" });
+    expect(Redacted.value(input.input.secret)).toBe("cf_secret");
+    let output = rendered();
+    expect(output).not.toContain("cf_secret");
+    expect(output).toContain("Cloudflare zone example.com · label team");
+    // The page keeps the command it took at render, so the same fn answers.
+    fake.run.mockResolvedValue(ok({ zone: null, label: null, configured: false }));
+    const forget = renderer!.root.findAll(
+      (node) =>
+        typeof node.type !== "string" &&
+        (node.props as { children?: unknown }).children === "Forget token" &&
+        typeof (node.props as { onClick?: unknown }).onClick === "function",
+    )[0]!;
+    await act(async () => {
+      (forget.props as { onClick: () => void }).onClick();
+    });
+    expect(fake.run).toHaveBeenLastCalledWith({
+      environmentId: "env-1",
+      input: { command: "team-hostname", args: [], options: { clear: "true" } },
+    });
+    output = rendered();
+    expect(output).not.toContain("Cloudflare zone example.com");
   });
 
   it("refuses on a build without team-status", async () => {

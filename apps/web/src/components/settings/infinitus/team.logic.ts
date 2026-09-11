@@ -27,6 +27,11 @@ export function teamJoinSupported(commands: ReadonlyArray<InfinitusManifestComma
   return commands.some((command) => command.name === "team-join" && command.stdin === "secret");
 }
 
+/** `team-hostname` with the Cloudflare token on stdin (native #788). */
+export function teamHostnameSupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+  return commands.some((command) => command.name === "team-hostname" && command.stdin === "secret");
+}
+
 /** `team-create` with the remote's write token on stdin (native #788). */
 export function teamCreateSupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
   return commands.some((command) => command.name === "team-create" && command.stdin === "secret");
@@ -160,6 +165,48 @@ export function teamCreateCommandInput(draft: TeamCreateDraft): InfinitusCommand
     args: [draft.name],
     options: { remote: draft.remote, as: draft.leader },
   };
+}
+
+export interface TeamHostnameDraft {
+  readonly zone: string;
+  readonly label: string;
+}
+
+/** Zone and label trimmed; null when one is blank or over the secret layer's 128-character cap. */
+export function teamHostnameDraft(zone: string, label: string): TeamHostnameDraft | null {
+  const fields = [zone.trim(), label.trim()];
+  if (fields.some((field) => field.length === 0 || field.length > 128)) return null;
+  return { zone: fields[0]!, label: fields[1]! };
+}
+
+/**
+ * `team-hostname --zone <zone> --label <label>` over `infinitus.secret`: the
+ * manifest's option names are the args keys; the Cloudflare API token goes
+ * on `secret`, never here.
+ */
+export function teamHostnameSecretArgs(
+  draft: TeamHostnameDraft,
+): Omit<InfinitusSecretInput, "secret"> {
+  return { command: "team-hostname", args: { zone: draft.zone, label: draft.label } };
+}
+
+/** `team-hostname --clear` needs no stdin, so it goes over the plain command. */
+export function teamHostnameClearInput(): InfinitusCommandInput {
+  return { command: "team-hostname", args: [], options: { clear: "true" } };
+}
+
+/** What `team-hostname` answers: the zone and label kept (null after --clear) and whether a token is configured. */
+export const TeamHostnameReply = Schema.Struct({
+  zone: Schema.NullOr(Schema.String),
+  label: Schema.NullOr(Schema.String),
+  configured: Schema.Boolean,
+});
+export type TeamHostnameReply = typeof TeamHostnameReply.Type;
+
+const decodeTeamHostnameReply = Schema.decodeUnknownOption(TeamHostnameReply);
+
+export function parseTeamHostnameReply(result: unknown): TeamHostnameReply | null {
+  return Option.getOrNull(decodeTeamHostnameReply(result));
 }
 
 /** "leader" → "Leader", anything else capitalised the same way. */
