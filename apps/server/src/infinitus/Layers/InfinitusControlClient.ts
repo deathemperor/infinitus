@@ -27,6 +27,8 @@ const makeInfinitusControlClient = Effect.gen(function* () {
   const request: InfinitusControlClientShape["request"] = Effect.fn(
     "InfinitusControlClient.request",
   )(function* (input: InfinitusControlRequestInput) {
+    // The verb only (#676): args and options stay on the service span above.
+    yield* Effect.annotateCurrentSpan({ "infinitus.command": input.command });
     const socketPath = config.socketPath;
     if (socketPath === null) {
       return yield* new InfinitusUnavailable({ path: "", cause: "unsupported platform" });

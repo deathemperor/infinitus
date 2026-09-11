@@ -417,9 +417,15 @@ const makeInfinitus = Effect.gen(function* () {
     InfinitusUnavailable | InfinitusProtocolError | InfinitusCommandFailed
   > {
     const knownCommands = yield* Ref.get(commands);
+    // What the trace can say about a command (#676): the verb, its args and
+    // the option NAMES — never an option's value, so no secret can ride along
+    // if a verb ever takes one — and the manifest's effect when it knows the
+    // verb. Annotated before the table check so a refused verb is traced too.
+    const known = knownCommands.find((entry) => entry.name === input.command);
+    yield* Effect.annotateCurrentSpan(commandSpanAttributes(input, known?.effect));
     // An empty table means no poll has ever read one, not that the app has no
     // commands — then the socket itself judges the name.
-    if (knownCommands.length > 0 && !knownCommands.some((entry) => entry.name === input.command)) {
+    if (knownCommands.length > 0 && known === undefined) {
       return yield* new InfinitusCommandFailed({
         command: input.command,
         error: "unknown command",
@@ -449,5 +455,26 @@ const makeInfinitus = Effect.gen(function* () {
     command,
   } satisfies InfinitusServiceShape;
 });
+
+/** Args joined by a space, cut to this many characters: a session id list or
+    a long path is plenty to identify the call, and a span stays small. */
+const SPAN_ARGS_MAX_CHARS = 200;
+
+/** The `infinitus.*` attributes for a command span. Option values never
+    appear: `InfinitusCommandInput` carries no secret today, and this keeps
+    it that way if a verb ever takes one. */
+function commandSpanAttributes(
+  input: InfinitusCommandInput,
+  effect: string | undefined,
+): Record<string, string> {
+  const args = input.args.join(" ");
+  return {
+    "infinitus.command": input.command,
+    "infinitus.args":
+      args.length > SPAN_ARGS_MAX_CHARS ? `${args.slice(0, SPAN_ARGS_MAX_CHARS)}…` : args,
+    "infinitus.options": Object.keys(input.options).join(" "),
+    "infinitus.effect": effect ?? "unknown",
+  };
+}
 
 export const InfinitusLive = Layer.effect(InfinitusService, makeInfinitus);

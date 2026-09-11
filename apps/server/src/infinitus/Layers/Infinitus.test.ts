@@ -14,6 +14,7 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
+import * as Tracer from "effect/Tracer";
 import { describe, expect } from "vite-plus/test";
 
 import {
@@ -22,6 +23,33 @@ import {
 } from "../Services/InfinitusControlClient.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLive } from "./Infinitus.ts";
+
+/** Every sampled span the effect ended, with its attributes, oldest first. */
+const collectSpans = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<
+  ReadonlyArray<{ readonly name: string; readonly attributes: Record<string, unknown> }>,
+  E,
+  R
+> =>
+  Effect.gen(function* () {
+    const spans: Array<{ name: string; attributes: Record<string, unknown> }> = [];
+    const tracer = Tracer.make({
+      span: (options) => {
+        const span = new Tracer.NativeSpan(options);
+        const end = span.end.bind(span);
+        span.end = (endTime, exit) => {
+          end(endTime, exit);
+          if (span.sampled) {
+            spans.push({ name: span.name, attributes: Object.fromEntries(span.attributes) });
+          }
+        };
+        return span;
+      },
+    });
+    yield* effect.pipe(Effect.withTracer(tracer));
+    return spans;
+  });
 
 const FAST = Duration.seconds(5);
 const SLOW = Duration.seconds(30);
@@ -342,6 +370,35 @@ describe("InfinitusService", () => {
       const up = yield* Queue.take(queue);
       expect(up.available).toBe(true);
       expect(yield* stub.calls).toContain("manifest");
+
+      yield* Fiber.interrupt(fiber);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  effectIt.effect("traces the verb, args and option names, never an option value (#676)", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const infinitus = yield* InfinitusService;
+      const { fiber } = yield* subscribe(infinitus);
+
+      yield* stub.setResult("switch", { fleet: "cswap/claude" });
+      const spans = yield* collectSpans(
+        infinitus.command({
+          command: "switch",
+          args: ["cswap/claude", "2"],
+          options: { yes: "true", token: "s3cret-value" },
+        }),
+      );
+
+      const span = spans.find((entry) => entry.name === "Infinitus.command");
+      expect(span?.attributes).toMatchObject({
+        "infinitus.command": "switch",
+        "infinitus.args": "cswap/claude 2",
+        "infinitus.options": "yes token",
+        "infinitus.effect": "write",
+      });
+      const values = spans.flatMap((entry) => Object.values(entry.attributes).map(String));
+      expect(values.some((value) => value.includes("s3cret-value"))).toBe(false);
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),
