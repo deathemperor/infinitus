@@ -3066,6 +3066,12 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
             "rpc.aggregate": "infinitus",
           }),
+        [WS_METHODS.subscribeInfinitusHolds]: (_input) =>
+          observeRpcStreamEffect(
+            WS_METHODS.subscribeInfinitusHolds,
+            Effect.succeed(infinitusSessionHold.held),
+            { "rpc.aggregate": "infinitus" },
+          ),
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(
             WS_METHODS.infinitusReleaseThread,

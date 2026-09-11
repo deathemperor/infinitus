@@ -378,6 +378,15 @@ export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
 /** Fork (#616): "Run now" for a thread whose start session priority mode is
     holding. `released` when a held start ran; otherwise the one-line reason
     (nothing was held for that thread). Never an error. */
+/** One thread whose turn start the server holds for headroom (#616, #741):
+    when the hold began and the held row's line, for the sidebar. */
+export const InfinitusHeldThread = Schema.Struct({
+  threadId: ThreadId,
+  since: Schema.String,
+  summary: Schema.String,
+});
+export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
+
 export const InfinitusReleaseThreadInput = Schema.Struct({ threadId: ThreadId });
 export type InfinitusReleaseThreadInput = typeof InfinitusReleaseThreadInput.Type;
 export const InfinitusReleaseThreadResult = Schema.Struct({

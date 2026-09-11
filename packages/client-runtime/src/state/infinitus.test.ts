@@ -1,8 +1,9 @@
-import { EnvironmentId, WS_METHODS } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId, WS_METHODS } from "@t3tools/contracts";
 import type {
   InfinitusAccount,
   InfinitusCommandInput,
   InfinitusFleet,
+  InfinitusHeldThread,
   InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
 import type {
@@ -197,6 +198,49 @@ describe("Infinitus environment atoms", () => {
         expect(yield* Ref.get(calls)).toEqual([
           { command: "swap", args: ["claude", "2"], options: { yes: "true" } },
         ]);
+      }),
+    ),
+  );
+});
+
+describe("Infinitus holds atom (#741)", () => {
+  it.effect("holds the latest held list the subscription delivers", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const lists = yield* Queue.unbounded<ReadonlyArray<InfinitusHeldThread>>();
+        const client = {
+          [WS_METHODS.subscribeInfinitusHolds]: () => Stream.fromQueue(lists),
+        } as unknown as WsRpcProtocolClient;
+        const { atoms, registry } = yield* makeTestRuntime(client);
+        const atom = atoms.holds({ environmentId: TARGET.environmentId, input: {} });
+        const held: InfinitusHeldThread = {
+          threadId: ThreadId.make("thread-1"),
+          since: "2026-09-11T10:00:00.000Z",
+          summary: "Held for headroom on claude",
+        };
+
+        const seeded = Latch.makeUnsafe();
+        const emptied = Latch.makeUnsafe();
+        const unmount = registry.mount(atom);
+        const stop = registry.subscribe(atom, (result) => {
+          if (!AsyncResult.isSuccess(result)) return;
+          if (result.value.length === 0) emptied.openUnsafe();
+          else seeded.openUnsafe();
+        });
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            stop();
+            unmount();
+          }),
+        );
+
+        yield* Queue.offer(lists, [held]);
+        yield* seeded.await;
+        expect(yield* AtomRegistry.getResult(registry, atom)).toEqual([held]);
+
+        yield* Queue.offer(lists, []);
+        yield* emptied.await;
+        expect(yield* AtomRegistry.getResult(registry, atom)).toEqual([]);
       }),
     ),
   );

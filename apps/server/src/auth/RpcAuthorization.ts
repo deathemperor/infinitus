@@ -166,6 +166,8 @@ export const RPC_REQUIRED_SCOPES = {
   // Launching the app spawns a process on the host.
   [WS_METHODS.infinitusLaunch]: AuthOrchestrationOperateScope,
   [WS_METHODS.infinitusReleaseThread]: AuthOrchestrationOperateScope,
+  // Held threads are thread state, read like the snapshot.
+  [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
   // Pending pairing requests are pairing metadata, like the pairing-links
   // list; deciding one mints a pairing credential, like creating a link.
   [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,

@@ -788,9 +788,13 @@ export function resolveThreadRowClassName(input: {
 // whether it finished, asked a question, or proposed a plan.
 // Unread completion is tracked separately: it describes whether a ready
 // thread needs attention, not what the thread is currently doing.
+// Held (#741): the server keeps the thread's turn start for headroom
+// (session priority mode, #616). Nothing runs in it, so it reads as a calm
+// background state, not as working.
 export type SidebarThreadStatus =
   | "approval"
   | "input"
+  | "held"
   | "working"
   | "monitoring"
   | "failed"
@@ -804,7 +808,9 @@ export function shouldRecedeSidebarThread(input: {
   isSelected: boolean;
 }): boolean {
   if (input.isActive || input.isSelected) return false;
-  if (input.status === "working" || input.status === "monitoring") return true;
+  if (input.status === "working" || input.status === "monitoring" || input.status === "held") {
+    return true;
+  }
   if (input.status === "ready" || input.status === "approval" || input.status === "input") {
     return !input.isUnread && !input.isWoke;
   }
@@ -816,12 +822,20 @@ type SidebarThreadStatusInput = Pick<
   "hasPendingApprovals" | "hasPendingUserInput" | "session" | "backgroundLiveness"
 >;
 
-export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
+export function resolveSidebarThreadStatus(
+  thread: SidebarThreadStatusInput,
+  options?: { readonly held?: boolean },
+): SidebarThreadStatus {
   if (thread.hasPendingApprovals) {
     return "approval";
   }
   if (thread.hasPendingUserInput) {
     return "input";
+  }
+  // A held start is not under way whatever the session row says: the turn
+  // was requested, never sent.
+  if (options?.held === true) {
+    return "held";
   }
   if (thread.session?.status === "running" || thread.session?.status === "starting") {
     return "working";

@@ -535,7 +535,13 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
   `infinitusHoldBanner.logic.ts`) in the composer banner stack, one mount in
   `ChatView.tsx` beside the snoozed/settled banners: "Waiting for headroom",
-  the row's line, "Run now" and "Pin". `chat/PinAtCreationToggle.tsx` is
+  the row's line, "Run now" and "Pin". The sidebar row reads "Held" (#741)
+  from the `subscribeInfinitusHolds` stream (read scope; the service's `held`:
+  the in-memory list, then again on every change — lost with a restart like
+  the holds themselves), one shared stream per environment through
+  `infinitusEnvironment.holds` and `sidebar/useInfinitusHeldSummary.ts`;
+  held outranks working in `resolveSidebarThreadStatus` since the start never
+  ran. `chat/PinAtCreationToggle.tsx` is
   "Pin on create" under a draft's composer (per-browser, off by default);
   ChatView pins the thread right after the send that creates it. Archived or deleted while held:
   forgotten. A restart forgets held starts; the message is still in the thread.
