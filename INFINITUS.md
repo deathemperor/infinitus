@@ -1222,9 +1222,12 @@ pair` (token masked, server log never uploaded), screenshots every route in
   manual macOS arm64 DMG build of `main`, published as an `infinitus`-channel
   prerelease (upstream's release.yml stays disabled and untouched). It nests
   the native menu bar app as a login item (#777): `apps/desktop/native-helper.json`
-  (`{"tag", "sha256"}`, bumped by PR; the `native_helper_tag` dispatch input
-  tries a tag before pinning it) names the native release whose
-  `Infinitus-<version>.zip` the run downloads, checks (bundle id
+  (`{"tag", "version", "asset", "sha256"}`, `v0.4.5-alpha.1` first, bumped
+  by PR; the `native_helper_tag` dispatch input tries a tag before pinning
+  it) names the native release whose `Infinitus-Menu-Bar-<version>.zip` (the
+  nested build: CFBundleName "Infinitus Menu Bar", no `infinitus://` URL
+  type; the standalone `Infinitus-<version>.zip` beside it is the cask's)
+  the run downloads, checks (bundle id
   `run.infinitus`; on signed builds Developer ID from team `Q783W6B4FA`,
   hardened runtime, `stapler validate`) and hands to the build script as
   `T3CODE_DESKTOP_NATIVE_HELPER` / `--native-helper`. The script `ditto`s it
