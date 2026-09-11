@@ -46,8 +46,18 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
             | awk -F'"' '/Developer ID Application/ {print $2; exit}')
           echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
-      - name: Build app bundle
-        run: ./make-app.sh
+      # Two bundles from one build (#777): the standalone app, and the copy
+      # Infinitus desktop nests at Contents/Library/LoginItems — named
+      # "Infinitus Menu Bar", no infinitus:// URL type (the desktop owns
+      # the scheme). make-app.sh writes a fixed Infinitus.app, so each is
+      # moved into out/ before the next.
+      - name: Build app bundles
+        run: |
+          mkdir out
+          ./make-app.sh
+          mv Infinitus.app out/
+          INFINITUS_BUNDLE_NAME="Infinitus Menu Bar" ./make-app.sh
+          mv Infinitus.app "out/Infinitus Menu Bar.app"
       - name: Notarize and staple
         if: env.HAS_DEVID == 'true'
         env:
@@ -56,16 +66,21 @@ jobs:
           NOTARY_KEY_BASE64: ${{ secrets.NOTARY_KEY_BASE64 }}
         run: |
           echo "$NOTARY_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
-          ditto -c -k --keepParent Infinitus.app notarize.zip
-          xcrun notarytool submit notarize.zip --wait \
-            --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" \
-            --issuer "$NOTARY_ISSUER_ID"
-          xcrun stapler staple Infinitus.app
-          spctl --assess --type execute -vv Infinitus.app
+          for APP in out/Infinitus.app "out/Infinitus Menu Bar.app"; do
+            ditto -c -k --keepParent "$APP" notarize.zip
+            xcrun notarytool submit notarize.zip --wait \
+              --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$NOTARY_KEY_ID" \
+              --issuer "$NOTARY_ISSUER_ID"
+            xcrun stapler staple "$APP"
+            spctl --assess --type execute -vv "$APP"
+            rm notarize.zip
+          done
       - name: Zip
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          ditto -c -k --keepParent Infinitus.app "Infinitus-${VERSION}.zip"
+          ditto -c -k --keepParent out/Infinitus.app "Infinitus-${VERSION}.zip"
+          ditto -c -k --keepParent "out/Infinitus Menu Bar.app" "Infinitus-Menu-Bar-${VERSION}.zip"
+          shasum -a 256 "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,10 +94,10 @@ jobs:
             grab            { print }
           ' CHANGELOG.md > notes.md
           if [ -s notes.md ]; then
-            gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" \
+            gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
               --title "Infinitus $GITHUB_REF_NAME" --notes-file notes.md
           else
-            gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" \
+            gh release create "$GITHUB_REF_NAME" "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
               --title "Infinitus $GITHUB_REF_NAME" --generate-notes
           fi
       # Auto-bump the tap cask (CodexBar-style release->tap dispatch, done
