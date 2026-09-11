@@ -2617,7 +2617,10 @@ final class AppModel: ObservableObject {
     private func consume(_ line: EventLine, swapd: Bool = false) {
         switch line {
         case .event(let event):
-            if event.kind == "poll" { return }
+            // Heartbeats: cswap's `poll` and swapd's `sleep` mark every tick
+            // and say nothing (#475: the real daemon logged "sleep" once a
+            // minute; the e2e stub only ever emitted `poll`).
+            if event.kind == "poll" || event.kind == "sleep" { return }
             if event.kind == "no-switch" {
                 if event.summary == lastNoSwitch[swapd] { return }
                 lastNoSwitch[swapd] = event.summary
