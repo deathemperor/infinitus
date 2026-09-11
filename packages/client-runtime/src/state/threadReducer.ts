@@ -135,6 +135,7 @@ export function applyThreadDetailEvent(
           branch: event.payload.branch,
           worktreePath: event.payload.worktreePath,
           ...(event.payload.sideOf === undefined ? {} : { sideOf: event.payload.sideOf }),
+          ...(event.payload.groupId === undefined ? {} : { groupId: event.payload.groupId }),
           branchPullRequest: null,
           latestTurn: null,
           createdAt: event.payload.createdAt,

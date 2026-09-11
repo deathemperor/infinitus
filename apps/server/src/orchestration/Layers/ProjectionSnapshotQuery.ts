@@ -133,6 +133,7 @@ const ProjectionThreadDbRowSchema = ProjectionThread.mapFields(
     branchPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     babysit: Schema.NullOr(Schema.fromJsonString(ThreadBabysit)),
     sideOf: Schema.NullOr(ThreadId),
+    groupId: Schema.NullOr(Schema.String),
   }),
 );
 const ProjectionThreadActivityDbRowSchema = ProjectionThreadActivity.mapFields(
@@ -469,6 +470,11 @@ function sideOfField(sideOf: ThreadId | null | undefined): { readonly sideOf?: T
   return sideOf == null ? {} : { sideOf };
 }
 
+/** Fork (#269 B): absent unless the thread belongs to a best-of-N group. */
+function groupIdField(groupId: string | null | undefined): { readonly groupId?: string } {
+  return groupId == null ? {} : { groupId };
+}
+
 /** Fork (#269 A): absent when the thread is not babysat, like `queuedTurns`. */
 function babysitField(babysit: ThreadBabysit | null | undefined): {
   readonly babysit?: ThreadBabysit;
@@ -620,6 +626,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
           side_of AS "sideOf",
+          group_id AS "groupId",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
@@ -662,6 +669,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
           side_of AS "sideOf",
+          group_id AS "groupId",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
@@ -706,6 +714,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
           side_of AS "sideOf",
+          group_id AS "groupId",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
@@ -1287,6 +1296,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
           side_of AS "sideOf",
+          group_id AS "groupId",
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
@@ -2353,6 +2363,7 @@ pending_approval_requests AS (
                 snoozedAt: row.snoozedAt,
                 ...babysitField(row.babysit),
                 ...sideOfField(row.sideOf),
+                ...groupIdField(row.groupId),
                 pinnedAt: row.pinnedAt,
                 pinOrderKey: row.pinOrderKey ?? null,
                 activeOrderKey: row.activeOrderKey ?? null,
@@ -2610,6 +2621,7 @@ pending_approval_requests AS (
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
                   ...sideOfField(row.sideOf),
+                  ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
@@ -2785,6 +2797,7 @@ pending_approval_requests AS (
                         snoozedAt: row.snoozedAt,
                         ...babysitField(row.babysit),
                         ...sideOfField(row.sideOf),
+                        ...groupIdField(row.groupId),
                         pinnedAt: row.pinnedAt,
                         pinOrderKey: row.pinOrderKey ?? null,
                         activeOrderKey: row.activeOrderKey ?? null,
@@ -2967,6 +2980,7 @@ pending_approval_requests AS (
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
                   ...sideOfField(row.sideOf),
+                  ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
@@ -3315,6 +3329,7 @@ pending_approval_requests AS (
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
         ...sideOfField(threadRow.value.sideOf),
+        ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,
@@ -3624,6 +3639,7 @@ pending_approval_requests AS (
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
         ...sideOfField(threadRow.value.sideOf),
+        ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,

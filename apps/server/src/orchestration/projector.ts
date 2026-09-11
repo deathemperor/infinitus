@@ -440,6 +440,7 @@ export function projectEvent(
             branch: payload.branch,
             worktreePath: payload.worktreePath,
             ...(payload.sideOf === undefined ? {} : { sideOf: payload.sideOf }),
+            ...(payload.groupId === undefined ? {} : { groupId: payload.groupId }),
             pullRequests: [],
             branchPullRequest: null,
             latestTurn: null,
