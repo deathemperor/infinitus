@@ -108,21 +108,33 @@ function forkTunnelNotice(
 /** Marks a pairing link as minted for the phone app: `#token=…&for=phone`.
     The phone reads the token as before (`URLSearchParams` on the fragment);
     the browser's `/pair` page sees the marker and refuses to spend the token
-    on itself (#724 — the iOS Camera opens the link in Safari, which would
-    otherwise pair the browser and strand the phone). */
+    on itself (#724 — a link that lands in Safari would otherwise pair the
+    browser and strand the phone). */
 const PHONE_LINK_PARAM = "for";
 const PHONE_LINK_VALUE = "phone";
+/** The origin the site's link hands the phone: the Mac's tunnel or LAN
+    address, in the fragment the site's server never sees. */
+const PHONE_LINK_ORIGIN_PARAM = "to";
 
-/** Where a phone user scans from; the Camera app is the wrong scanner. */
+/** The site's `/pair`, a universal link into the phone app (#724): the only
+    host with an AASA the app can claim — the Mac's own origin never is. */
+const UNIVERSAL_PAIR_URL = "https://infinitus.run/pair";
+
+/** Where a phone user scans from. */
 export const SCAN_IN_APP_NOTICE =
-  "Scan from inside the Infinitus app: Settings › Configuration › Environments › Add › Scan QR. The Camera app opens a web page instead and the code stays unused.";
+  "Scan with the Camera app on a phone that has Infinitus, or from inside the app: Settings › Configuration › Environments › Add › Scan QR. In a browser the link only explains; the code stays unused.";
 
-/** The phone's pairing URL for an origin: upstream's `/pair` page with the
-    token in the fragment, which the phone app reads, plus the phone marker. */
+/** The phone's pairing URL for an origin: the site's universal link with the
+    token, the phone marker and the Mac's origin all in the fragment. The app
+    rebuilds upstream's `<origin>/pair#token=…` from it (#746's prefill); an
+    app-less phone lands on the site's forwarder, then on `<origin>/pair`,
+    where the marker keeps the token unspent. */
 export function phonePairingUrl(originUrl: string, credential: string): string {
-  const url = new URL(resolveDesktopPairingUrl(originUrl, credential));
-  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const target = new URL(resolveDesktopPairingUrl(originUrl, credential));
+  const hash = new URLSearchParams(target.hash.replace(/^#/, ""));
   hash.set(PHONE_LINK_PARAM, PHONE_LINK_VALUE);
+  hash.set(PHONE_LINK_ORIGIN_PARAM, target.origin);
+  const url = new URL(UNIVERSAL_PAIR_URL);
   url.hash = hash.toString();
   return url.toString();
 }
