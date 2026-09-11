@@ -12,7 +12,7 @@ final class ControlBodyTests: XCTestCase {
         for name in ["activities-token", "client-activity", "crash-report"] {
             let command = ControlCommand.named(name)
             XCTAssertEqual(command?.effect, .write, name)
-            XCTAssertEqual(command?.options, ["--body <json>"], name)
+            XCTAssertEqual(command?.options.first, "--body <json>", name)   // activities-token also takes --forget (#572 G6)
         }
     }
 
