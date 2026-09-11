@@ -3,7 +3,7 @@ import Foundation
 /// The Linux tray has no engine supervisor of its own (#9 phase D2) — no
 /// daemon to start or stop, just this detection, matching the mac's
 /// engine badge word for the two states that translate: is an
-/// auto-switch engine (`cswap auto`) alive on this host right now?
+/// auto-switch engine (`swapd auto`) alive on this host right now?
 enum EngineProbe {
     private static var pgrepPath: String? {
         let candidates = ["/usr/bin/pgrep", "/bin/pgrep", "/usr/local/bin/pgrep"]
@@ -20,7 +20,7 @@ enum EngineProbe {
         guard let pgrep = pgrepPath else { return false }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: pgrep)
-        process.arguments = ["-f", "cswap auto"]
+        process.arguments = ["-f", "swapd auto"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         guard (try? process.run()) != nil else { return false }

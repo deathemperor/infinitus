@@ -23,13 +23,13 @@ final class ResumeReliabilityModel: ObservableObject {
             key: "autoContinueAtUsageLimit",
             title: "Auto-continue at usage limit",
             explanation: "While off, a limit stop shows a dialog that blocks "
-                + "cswap's resume nudge until you answer it at the keyboard.",
+                + "the resume nudge until you answer it at the keyboard.",
             recommended: .bool(true)
         ),
         Row(
             key: "crossSessionInbound",
             title: "Cross-session messages",
-            explanation: "While unset, cswap's nudges are held for review "
+            explanation: "While unset, the resume nudges are held for review "
                 + "(its socket message carries no permission-mode attestation). "
                 + "\"accept\" delivers them immediately — but any local process "
                 + "that reaches a session's socket can then inject an "
@@ -58,9 +58,9 @@ final class ResumeReliabilityModel: ObservableObject {
     }
 }
 
-/// The nudge-reliability rows, embedded in the cswap engine pane (user
-/// 2026-08-30: the settings gating cswap's resume nudges belong with the
-/// engine that sends them). Status-first rendering: a green check when a
+/// The nudge-reliability rows, embedded in the swapd engine pane (user
+/// 2026-08-30: the settings gating the resume nudges belong with the
+/// engine that triggers them). Status-first rendering: a green check when a
 /// row already matches the recommendation, an amber warning plus the
 /// one-click fix when it doesn't.
 struct ResumeReliabilitySection: View {
@@ -75,8 +75,8 @@ struct ResumeReliabilitySection: View {
             ForEach(Array(model.rows.enumerated()), id: \.element.key) { index, row in
                 rowView(index, row)
             }
-            Text("These are Claude Code's settings, not cswap's — they "
-                 + "decide whether cswap's resume nudges actually reach a "
+            Text("These are Claude Code's settings, not the engine's — they "
+                 + "decide whether Infinitus's resume nudges actually reach a "
                  + "stopped session. Changes apply to sessions started "
                  + "afterwards.")
                 .font(.caption).foregroundStyle(.secondary)

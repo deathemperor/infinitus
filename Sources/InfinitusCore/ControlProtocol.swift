@@ -135,7 +135,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
 
     public let name: String
     /// Positional args, in order. `<fleet>` is an `EngineFleet.key`
-    /// such as `cswap/claude`; `<n>` an account number in that fleet.
+    /// such as `swapd/claude`; `<n>` an account number in that fleet.
     public let args: [String]
     public let options: [String]
     public let effect: Effect
@@ -170,7 +170,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{schemaVersion, commands:[ControlCommand]}"),
         ControlCommand(name: "status", effect: .read,
                        summary: "App version, which engines are on, engine badge, whether a sign-in is running, the fork server's tunnel (Mac only; state off|invalidPort|blocked|unavailable|starting|up|stopped, url while up — the stable fork_tunnel_hostname on the named tunnel when set, else a quick tunnel).",
-                       replyShape: "{version, sha, engines:{cswap:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground, forkTunnel:{enabled, port, state, url?, hostname?}}"),
+                       replyShape: "{version, sha, engines:{swapd:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground, forkTunnel:{enabled, port, state, url?, hostname?}}"),
         ControlCommand(name: "fleets", effect: .read,
                        summary: "Every fleet with accounts, usage, active/next, the engine's capabilities and, while priority_mode is on, its headroom verdict (#616: absent = mode off or no usage seen yet; a transient usage gap keeps the last verdict; #743: the interrupt mode says critical where hold says low).",
                        replyShape: "[{key, engineID, provider, capabilities:[String], caveat?, activeNumber?, nextCandidate?, candidateOrder?, nextRecovery?, accounts:[Account], headroom?:{state:abundant|low|critical, window, pct, reason}}]"),
@@ -206,7 +206,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Set (empty string clears) the alias every frontend shows.",
                        replyShape: "{fleet}"),
         ControlCommand(name: "prefer", args: ["<fleet>", "<n>", "on|off"], effect: .write, requires: "prefer",
-                       summary: "Star/unstar an account: the engine lands on starred ones first when it switches (cswap autoswitch.preferred; proxy priority tier). Refused when the installed cswap lacks the setting.",
+                       summary: "Star/unstar an account: the engine lands on starred ones first when it switches (swapd prefer; proxy priority tier). Refused when the engine reports no flag for the account.",
                        replyShape: "{fleet}"),
         ControlCommand(name: "aws-logins", effect: .read,
                        summary: "Sessions whose AWS or gcloud sign-in lapsed (the expired-credentials signature in their newest tool results), each with the flow the phone would start and any login in flight; `provider` is \"gcloud\" for gcloud items and absent for AWS.",
@@ -229,7 +229,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Feed the verification code read from stdin to the waiting `gcloud auth login` for that account.",
                        replyShape: "{state}"),
         ControlCommand(name: "ignite", args: ["<fleet>", "<n>"], effect: .write, requires: "ignite",
-                       summary: "Start account n's 5h window now with one tiny request (cswap run igniter, #7); the active account is untouched. Costs ~1K weekly tokens on n.",
+                       summary: "Start account n's 5h window now with one tiny request (swapd ignite, #7); the active account is untouched. Costs ~1K weekly tokens on n.",
                        replyShape: "{fleet}"),
         ControlCommand(name: "reorder", args: ["<fleet>", "<n>..."], effect: .write, requires: "reorder",
                        summary: "Set the rotation order: every account number exactly once, top first.",
@@ -327,7 +327,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "hide", args: ["popout|settings"], effect: .write,
                        summary: "Close the pinned pop-out (the e2e no-lease window) or Settings.",
                        replyShape: "{hidden}"),
-        ControlCommand(name: "engine", args: ["cswap|swapd|cliproxy|9router", "on|off"], effect: .restart,
+        ControlCommand(name: "engine", args: ["swapd|cliproxy|9router", "on|off"], effect: .restart,
                        summary: "Turn an engine on or off. The app relaunches.",
                        replyShape: "{restarting:true}"),
         ControlCommand(name: "proxy", effect: .read,

@@ -101,7 +101,7 @@ public protocol FleetModel: ObservableObject {
     func toggleEngine()
     func relaunchApp()
     func openSettings()
-    /// #7 manual mode: start account n's 5h clock (`cswap run` igniter).
+    /// #7 manual mode: start account n's 5h clock (`swapd ignite`).
     /// Mac-only; the card confirm-gates it.
     func ignite(_ number: Int)
     /// The solo card's nudge: open this fleet's sign-in for a second

@@ -6,7 +6,7 @@ import InfinitusUI
 /// One fleet's live state (#8 multi-engine seam): the accounts one
 /// engine holds for one provider, plus every per-row animation trigger
 /// the popup keys on. `apply` carries the alive↔dead diff that used to
-/// live inline in AppModel.refreshSnapshot — verbatim, so a cswap-only
+/// live inline in AppModel.refreshSnapshot — verbatim, so a single-engine
 /// Mac behaves exactly as before. Display prefs are the host's; actions
 /// go to the engine and then ask the host for a fresh snapshot.
 @MainActor
@@ -36,10 +36,9 @@ final class FleetState: ObservableObject, Identifiable {
     @Published private(set) var headroom: Headroom?
     /// The last applied snapshot, as the launch cache stores it.
     private(set) var lastFleet: EngineFleet?
-    /// Cash column (UsageSource): the cswap fleet mirrors the shared
-    /// UsageModel; other engines fill this from their own report.
+    /// Cash column (UsageSource): engines with a cost report fill this
+    /// from their own report; the rest leave it nil.
     @Published var report: UsageReport?
-    private var reportSink: AnyCancellable?
     private var hostSink: AnyCancellable?
     private var forwarding = false
 
@@ -59,12 +58,6 @@ final class FleetState: ObservableObject, Identifiable {
             self.objectWillChange.send()
             self.forwarding = false
         }
-    }
-
-    /// Mirror another report source (the cswap fleet's shared UsageModel).
-    func follow(_ usage: UsageModel) {
-        report = usage.report
-        reportSink = usage.$report.sink { [weak self] r in self?.report = r }
     }
 
     /// What one snapshot changed — the host runs its app-level hooks
@@ -411,10 +404,11 @@ extension FleetState: FleetModel {
     var introTitle: String { host.introTitle }
     var introBarDelay: Double { host.introBarDelay }
 
-    /// cswap re-logins run the app's token flow; an OAuth engine (the
-    /// proxy) signs in through the browser instead.
+    /// A credential-swap engine's re-logins run the app's token flow
+    /// (`.addCurrent`); an OAuth engine (the proxy) signs in through the
+    /// browser instead.
     func startRelogin(_ account: Account) {
-        if engineID == CswapEngine.engineID { host.startRelogin(account) }
+        if capabilities.contains(.addCurrent) { host.startRelogin(account) }
         else if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider, relogin: account)
         }
@@ -422,24 +416,24 @@ extension FleetState: FleetModel {
     func toggleEngine() { host.toggleEngine() }
     func relaunchApp() { host.relaunchApp() }
     func openSettings() { host.openSettings() }
-    /// A second account: cswap through the in-app token flow (a fresh
-    /// login, not `cswap add` — that would re-adopt the same account),
-    /// an OAuth engine through its browser sign-in.
+    /// A second account: a credential-swap engine through the in-app
+    /// token flow (a fresh login, not a bare `swapd add` — that would
+    /// re-adopt the same account), an OAuth engine through its browser
+    /// sign-in.
     func addAccount() {
-        if engineID == CswapEngine.engineID { host.addAccount() }
+        if capabilities.contains(.addCurrent) { host.addAccount() }
         else if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider)
         }
     }
     var canAddAccount: Bool {
-        engineID == CswapEngine.engineID || capabilities.contains(.addOAuth)
+        capabilities.contains(.addCurrent) || capabilities.contains(.addOAuth)
     }
 }
 
 extension FleetState: UsageSource {
     func loadIfNeeded() {
         guard capabilities.contains(.costReport) else { return }
-        if engineID == CswapEngine.engineID { return }   // the shared UsageModel drives it
         guard report == nil else { return }
         let engine = engine
         Task {

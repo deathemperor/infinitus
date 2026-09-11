@@ -21,7 +21,7 @@ final class T3ComposerLimitsTests: XCTestCase {
 
     func testACswapSessionReportsItsOneActiveAccount() {
         let session = SessionDetail(pid: 42, cwd: "/tmp", status: "busy", kind: "interactive", startedAt: 0)
-        let fleet = EngineFleet(engineID: "cswap", provider: .claude,
+        let fleet = EngineFleet(engineID: "swapd", provider: .claude,
                                 accounts: [account(1, alias: "Home", pct: 10), account(2, alias: "Work", pct: 62, active: true)],
                                 activeNumber: 2, liveSessions: LiveSessions(busy: 1, total: 1, sessions: [session]))
         let report = T3ComposerLimits.report(SessionAccountLookup.summarize(pid: 42, fleets: [fleet]), provider: .claude, now: now)!

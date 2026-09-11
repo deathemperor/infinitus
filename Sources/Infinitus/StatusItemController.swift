@@ -45,10 +45,8 @@ struct ProviderBadge {
 @MainActor
 final class StatusItemHolder: ObservableObject {
     let controller: StatusItemController
-    init(model: AppModel, usage: UsageModel,
-         settingsTabs: @escaping () -> [SettingsTab]) {
-        controller = StatusItemController(model: model, usage: usage,
-                                          settingsTabs: settingsTabs)
+    init(model: AppModel, settingsTabs: @escaping () -> [SettingsTab]) {
+        controller = StatusItemController(model: model, settingsTabs: settingsTabs)
         model.showSettings = { [weak controller] in controller?.showSettingsWindow() }
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
@@ -84,14 +82,11 @@ final class StatusItemController {
     private lazy var desktopCapture = DesktopCaptureController(model: model)
     private lazy var effects = MenuBarEffects(button: item.button)
     private let model: AppModel
-    private let usage: UsageModel
     private let settingsTabs: () -> [SettingsTab]
     private var sink: AnyCancellable?
 
-    init(model: AppModel, usage: UsageModel,
-         settingsTabs: @escaping () -> [SettingsTab]) {
+    init(model: AppModel, settingsTabs: @escaping () -> [SettingsTab]) {
         self.model = model
-        self.usage = usage
         self.settingsTabs = settingsTabs
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.behavior = []                       // not user-removable
@@ -175,7 +170,7 @@ final class StatusItemController {
         model.lock.surfaceShown()
         if anchored == nil {
             let host = NSHostingController(rootView: AnchoredRoot(
-                model: model, usage: usage,
+                model: model,
                 onSize: { [weak self] size in self?.fitAnchored(to: size) })
                 .glassChrome(model: model))
             // Same crash-avoidance as the pop-out: never let the hosting
@@ -451,7 +446,7 @@ final class StatusItemController {
     func showPinnedWindow(activate: Bool = true) {
         if pinned == nil {
             let host = NSHostingController(rootView: PinnedRoot(
-                model: model, usage: usage,
+                model: model,
                 onSize: { [weak self] size in self?.fitPinned(to: size) })
                 .glassChrome(model: model))
             // NO hosting-driven window sizing: with .standardBounds or
@@ -737,11 +732,10 @@ final class StatusItemController {
 /// so the panel follows the content's ideal size (PinnedRoot's trick).
 private struct AnchoredRoot: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var usage: UsageModel
     let onSize: (CGSize) -> Void
 
     var body: some View {
-        LockGate(lock: model.lock) { MenuContent(model: model, usage: usage) }
+        LockGate(lock: model.lock) { MenuContent(model: model) }
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -753,7 +747,6 @@ private struct AnchoredRoot: View {
 /// title header (which doubles as the drag strip where the titlebar was).
 private struct PinnedRoot: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var usage: UsageModel
     let onSize: (CGSize) -> Void
 
     var body: some View {
@@ -761,7 +754,7 @@ private struct PinnedRoot: View {
             InfinitusHeader(model: model)
                 .frame(height: 30)
             LockGate(lock: model.lock) {
-                MenuContent(model: model, usage: usage, showHeader: false)
+                MenuContent(model: model, showHeader: false)
             }
         }
         // fixedSize = the content's ideal, independent of the window; the

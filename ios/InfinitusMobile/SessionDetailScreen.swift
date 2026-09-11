@@ -78,7 +78,7 @@ enum AccountSummaryFormat {
     static func headerLine(_ summary: SessionAccountSummary?) -> (text: String, colorName: String)? {
         guard let summary else { return nil }
         switch summary.kind {
-        case .cswap, .unknownFleet:
+        case .swap, .unknownFleet:
             guard let account = summary.account else { return ("no active account", "secondary") }
             let suffix = summary.kind == .unknownFleet ? " (fleet's active account)" : ""
             return (accountCaption(account) + suffix,
@@ -239,7 +239,7 @@ struct SessionDetailScreen: View {
     @ViewBuilder private var accountSection: some View {
         if let summary {
             switch summary.kind {
-            case .cswap, .unknownFleet:
+            case .swap, .unknownFleet:
                 Section("Account") {
                     if let account = summary.account {
                         accountRow(account)
