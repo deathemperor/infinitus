@@ -155,6 +155,7 @@ publishes the matching section as the GitHub release body.
 - The control manifest marks which verbs take a secret on stdin (`stdin: secret|payload`), so a client never sends a credential to a verb that doesn't declare it (#747).
 - Control verbs `lock on|off|now|relock`, `unlock`, `team-join`, `team-hostname` and a write token on `team-create` let the fork's Lock and Team panes drive the Mac, secrets on stdin (#747).
 - `infinitusctl` reads a secret or body from stdin only when something is piped in, so a bare verb at a terminal no longer waits for Ctrl-D.
+- Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
