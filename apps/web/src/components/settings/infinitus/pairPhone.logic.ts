@@ -1,3 +1,4 @@
+import type { DesktopServerExposureState } from "@t3tools/contracts";
 import type { InfinitusForkTunnel } from "@t3tools/contracts/infinitus";
 
 import { resolveDesktopPairingUrl } from "../pairingUrls";
@@ -36,15 +37,24 @@ export interface PhonePairingLink {
 }
 
 export interface PairPhoneOrigin {
-  /** `tunnel`: the Cloudflare hostname; `lan`: the page's own non-loopback
-      origin, which only reaches phones on the same network. */
+  /** `tunnel`: the Cloudflare hostname; `lan`: the server's address on the
+      Mac's own network, which only reaches phones on the same network. */
   readonly kind: "tunnel" | "lan";
   readonly url: string;
 }
 
+/** Which origin the card encodes when both are there. */
+export type PairPhoneReach = "tunnel" | "lan";
+
 export type PairPhoneLinkState =
   | { readonly kind: "none" }
-  | { readonly kind: "active"; readonly url: string; readonly secondsLeft: number }
+  | {
+      readonly kind: "active";
+      readonly url: string;
+      /** `host[:port]` of the origin, for typing into the phone's Host field. */
+      readonly host: string;
+      readonly secondsLeft: number;
+    }
   | { readonly kind: "expired" };
 
 export interface PairPhoneCardModel {
@@ -53,9 +63,18 @@ export interface PairPhoneCardModel {
   readonly tunnel: ForkTunnelPhase | "unsupported" | "unknown";
   /** What to say about the tunnel while it is not up; null while it is. */
   readonly tunnelNotice: string | null;
+  /** What to say about the network side; null while a tunnel link needs no
+      caveat. */
+  readonly lanNotice: string | null;
+  /** Both reaches are available, so the card offers the choice. */
+  readonly reachChoice: boolean;
   readonly origin: PairPhoneOrigin | null;
   readonly link: PairPhoneLinkState;
 }
+
+const LAN_ONLY_NOTICE = "This link only works for phones on your network.";
+const LAN_UNAVAILABLE_NOTICE =
+  "Phones on your network can pair once Network access is on under Settings › Connections.";
 
 /** The Infinitus build that first reports the tunnel (native #588). */
 const FORK_TUNNEL_MIN_BUILD = "3bdc03cca";
@@ -92,30 +111,52 @@ export function phonePairingUrl(originUrl: string, credential: string): string {
   return resolveDesktopPairingUrl(originUrl, credential);
 }
 
+/**
+ * The origin a phone on the Mac's network can dial: the desktop server's
+ * advertised LAN address while its Network access is on, else the page's own
+ * origin when that is not loopback (a browser on another machine). A phone
+ * can never dial the Mac's loopback, so a loopback-only setup yields null.
+ */
+export function lanPairingOrigin(input: {
+  readonly serverExposure: DesktopServerExposureState | null;
+  readonly pageOrigin: string | null;
+}): string | null {
+  const exposure = input.serverExposure;
+  if (exposure?.mode === "network-accessible" && exposure.endpointUrl !== null) {
+    return exposure.endpointUrl;
+  }
+  return input.pageOrigin;
+}
+
 export function pairPhoneCardModel(input: {
   readonly forkTunnel: InfinitusForkTunnel | undefined;
-  /** The page's own origin when it is not loopback, else null: a phone can
-      dial a LAN origin but never the Mac's loopback. */
-  readonly pageOrigin: string | null;
+  /** From `lanPairingOrigin`; null when nothing on the network can be dialled. */
+  readonly lanOrigin: string | null;
+  /** The user's pick while both reaches are available; ignored otherwise. */
+  readonly reach: PairPhoneReach;
   readonly link: PhonePairingLink | null;
   readonly nowMs: number;
 }): PairPhoneCardModel {
-  const { forkTunnel, pageOrigin, link, nowMs } = input;
+  const { forkTunnel, lanOrigin, reach, link, nowMs } = input;
   const tunnel: PairPhoneCardModel["tunnel"] =
     forkTunnel === undefined
       ? "unsupported"
       : KNOWN_PHASES.has(forkTunnel.state)
         ? (forkTunnel.state as ForkTunnelPhase)
         : "unknown";
-  const origin: PairPhoneOrigin | null =
+  const tunnelOrigin: PairPhoneOrigin | null =
     tunnel === "up" && forkTunnel?.url !== undefined
       ? { kind: "tunnel", url: forkTunnel.url }
-      : pageOrigin !== null
-        ? { kind: "lan", url: pageOrigin }
-        : null;
+      : null;
+  const lan: PairPhoneOrigin | null = lanOrigin === null ? null : { kind: "lan", url: lanOrigin };
+  const reachChoice = tunnelOrigin !== null && lan !== null;
+  const origin = reachChoice ? (reach === "lan" ? lan : tunnelOrigin) : (tunnelOrigin ?? lan);
   return {
     tunnel,
     tunnelNotice: forkTunnelNotice(forkTunnel, tunnel),
+    lanNotice:
+      origin === null ? LAN_UNAVAILABLE_NOTICE : origin.kind === "lan" ? LAN_ONLY_NOTICE : null,
+    reachChoice,
     origin,
     link: linkState(origin, link, nowMs),
   };
@@ -129,7 +170,12 @@ function linkState(
   if (origin === null || link === null) return { kind: "none" };
   const secondsLeft = Math.ceil((link.expiresAtMs - nowMs) / 1000);
   if (secondsLeft <= 0) return { kind: "expired" };
-  return { kind: "active", url: phonePairingUrl(origin.url, link.credential), secondsLeft };
+  return {
+    kind: "active",
+    url: phonePairingUrl(origin.url, link.credential),
+    host: new URL(origin.url).host,
+    secondsLeft,
+  };
 }
 
 /** `4:59` — the countdown next to the QR. */
