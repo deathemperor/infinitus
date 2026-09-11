@@ -54,8 +54,9 @@ struct DisplayPane: View {
                 .disabled(!model.menuBarThemed)
             Toggle("Show the icon in the menu bar", isOn: $model.menuBarIconShown)
             if !model.menuBarIconShown {
-                Text("The icon is hidden until the next launch. The engine "
-                     + "keeps running, and this window and the pinned window "
+                Text("The icon stays hidden across relaunches. The engine "
+                     + "keeps running, and this window, the pinned window, the "
+                     + "desktop app and `infinitusctl prefs set menu_bar_enabled true` "
                      + "still reach it.")
                     .font(.caption).foregroundStyle(.orange)
             }

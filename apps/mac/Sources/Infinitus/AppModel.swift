@@ -570,10 +570,11 @@ final class AppModel: ObservableObject {
             self.switchFlashTick += 1
         }
     }
-    // Deliberately NOT persisted: if a hidden icon survived a relaunch there
-    // would be no UI left to unhide it from (the Settings window is only
-    // reachable through the popup). Hiding lasts until quit.
-    @Published var menuBarIconShown = true
+    // Persisted since #828 (`menu_bar_enabled`): the desktop app and
+    // `infinitusctl prefs set menu_bar_enabled true` can restore a hidden
+    // icon, so it no longer needs the popup to be reachable. Off, the app
+    // runs headless — the socket, the mirror and the pinned window stay.
+    @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -1125,6 +1126,7 @@ final class AppModel: ObservableObject {
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
+        menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -1324,6 +1326,7 @@ final class AppModel: ObservableObject {
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
         set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
+        set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
         set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)

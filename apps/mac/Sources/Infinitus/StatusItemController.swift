@@ -102,6 +102,9 @@ final class StatusItemController {
         // item.menu permanently — that hijacks left-click too; the menu
         // is attached just-in-time inside togglePopover instead.
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // A launch with the icon off (#828) never shows it, not even
+        // until the first model change lands.
+        item.isVisible = model.menuBarIconShown
 
         // The title and visibility follow the model; receive AFTER the
         // change lands (objectWillChange fires before mutation).
