@@ -21,8 +21,8 @@ const BACKABLE_PAGES: ReadonlySet<string> = new Set([
 ]);
 
 /** Chromium's `MouseEvent.button` for a mouse's back and forward buttons. */
-export const MOUSE_BACK_BUTTON = 3;
-export const MOUSE_FORWARD_BUTTON = 4;
+const MOUSE_BACK_BUTTON = 3;
+const MOUSE_FORWARD_BUTTON = 4;
 
 export type MouseHistoryIntent = "back" | "forward" | null;
 
