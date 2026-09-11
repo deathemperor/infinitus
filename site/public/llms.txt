@@ -6,12 +6,12 @@
 - Source (MIT): https://github.com/deathemperor/infinitus
 - Releases: https://github.com/deathemperor/infinitus/releases
 - Issues / roadmap: https://github.com/deathemperor/infinitus/issues
-- Version: 0.4.4-alpha.2 (2026-09, alpha)
+- Version: 0.4.5-alpha.1 (2026-09, alpha)
 
 ## What it does
 
 - Watches every Claude Code account's usage windows (5-hour, weekly, per-model / scoped) with live gauges and reset countdowns.
-- Rotates to the best candidate account automatically when a limit binds, via the `claude-swap` CLI (`cswap`). Infinitus never modifies Claude Code and never reads the engine's internal files; every engine touchpoint is a `cswap … --json` subprocess.
+- Rotates to the best candidate account automatically when a limit binds, via the `swapd` CLI. Infinitus never modifies Claude Code and never reads the engine's internal files; every engine touchpoint is a `swapd … --json` subprocess.
 - Resume nudges: after a switch, stopped Claude Code sessions are nudged back to work (peer socket / PTY based, lives in Infinitus).
 - Session progress: what each running agent is doing right now, todo counts, retries, quiet minutes, the session's goal — parsed from Claude Code's own transcript files.
 - All-dead countdown: when every account is limited, a large countdown to the next recovery.
@@ -35,7 +35,7 @@
 
 ## Requirements
 
-- Claude Code and the `claude-swap` CLI (`cswap`) on PATH. Infinitus walks you through first-account setup.
+- Claude Code and the `swapd` CLI on PATH (`cargo install --git https://github.com/deathemperor/swapd swapd`). Infinitus walks you through first-account setup.
 
 ## Pages
 
