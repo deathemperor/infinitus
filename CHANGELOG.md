@@ -148,6 +148,7 @@ publishes the matching section as the GitHub release body.
 - The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
 - The popup and pop-out no longer keep the stats cache resident: the local client leases `stats` only while the Stats pane shows (#499).
+- Mock mode's fabricated fleet also ships in swapd's shape (`tools/demo-swapd`), ready for the cswap removal (#756).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
