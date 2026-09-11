@@ -702,16 +702,28 @@ final class ControlServer {
             // The switch log Infinitus2 had to reconstruct from
             // usage-history (2026-09-04 "auto switch hell").
             let limit = Int(r.options["limit"] ?? "") ?? 100
-            let rows = model.eventLog.suffix(max(0, limit)).map { e in
+            func row(_ e: AppModel.EventEntry) -> JSONValue {
                 // `kind` is the durable log's vocabulary (switch, limit,
                 // revival, nudge, team…) and `id` holds for this app run,
                 // so a consumer classifies and dedupes without reading
                 // icons or text (#615).
-                ["id": JSONValue.string(e.id.uuidString),
-                 "at": .string(Self.iso.string(from: e.at)),
-                 "kind": .string(e.kind), "icon": .string(e.icon), "text": .string(e.text)]
+                .object(["id": .string(e.id.uuidString),
+                         "at": .string(Self.iso.string(from: e.at)),
+                         "kind": .string(e.kind), "icon": .string(e.icon), "text": .string(e.text)])
             }
-            return ControlReply(ok: true, result: .array(rows.map(JSONValue.object)))
+            // `--after <id>`: only the rows past that event, so a poller
+            // stops re-reading 100 rows every cycle (#346). An unknown id
+            // (the app relaunched, or the row aged out of the 100 kept)
+            // answers `known: false` with the full tail so the caller
+            // re-seeds its cursor.
+            if let after = r.options["after"] {
+                let index = model.eventLog.firstIndex { $0.id.uuidString == after }
+                let fresh = index.map { Array(model.eventLog[($0 + 1)...]) } ?? model.eventLog
+                return ControlReply(ok: true, result: .object([
+                    "after": .string(after), "known": .bool(index != nil),
+                    "rows": .array(fresh.suffix(max(0, limit)).map(row))]))
+            }
+            return ControlReply(ok: true, result: .array(model.eventLog.suffix(max(0, limit)).map(row)))
 
         case "stats":
             let period = Stats.Period(rawValue: r.options["period"] ?? "week") ?? .week

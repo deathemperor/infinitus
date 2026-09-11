@@ -262,6 +262,10 @@ final class StatsModel: ObservableObject {
                 }
                 if stuck || passCount >= Self.maxPasses { break }
             }
+            // Nobody watching (#499): the corpus goes back to disk until
+            // the next team-only pass instead of staying resident.
+            let unwatched = await MainActor.run { !(self.leases?.holds(.stats) ?? true) }
+            if unwatched { cacheHandle.release(to: cacheURL) }
             await MainActor.run {
                 self.progress = nil
                 self.scanEntries = entries

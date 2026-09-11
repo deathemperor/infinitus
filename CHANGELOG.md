@@ -137,6 +137,8 @@ publishes the matching section as the GitHub release body.
 - The About pane's Homebrew upgrade relaunches the way Restart does, so it no longer wedges a Mac in a team; write-effect control commands are logged by verb for the next incident.
 - The desktop app's polls cost less on the Mac and no longer make `infinitusctl` answer "busy": read-only commands run alongside each other, timestamps share one formatter, and the engine keys' presence is read from the keychain once per run (#346).
 - The engine's minute polls and repeated "no switch" lines no longer fill the Activity log.
+- `infinitusctl events --after <id>` returns only the rows past that event, so the desktop app's poll stops re-reading the whole log (#346).
+- The stats corpus leaves memory between passes nobody is watching — about 40 MB less resident on a year of transcripts while no stats screen is open (#499).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
