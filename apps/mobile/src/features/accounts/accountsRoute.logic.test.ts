@@ -31,6 +31,7 @@ const row: AccountRowModel = {
   scoped: [],
   freshness: "updated just now",
   actions: ["switch", "hold", "prefer", "rename"],
+  reloginNeeded: false,
 };
 
 const readySnapshot: InfinitusSnapshot = {

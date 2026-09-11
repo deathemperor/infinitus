@@ -7,12 +7,18 @@ import type {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  WAIT_ADD_STILL_RUNNING,
   accountCommandArgs,
   accountsPageState,
+  addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
   buildSignInRows,
   signInCommandArgs,
+  snapshotOffersAdd,
+  snapshotSignInRunning,
+  waitAddCommandArgs,
+  waitAddOutcome,
   type AccountAction,
   type AccountRowModel,
   type AccountsPageState,
@@ -250,6 +256,81 @@ describe("command arguments", () => {
     expect(accountCommandArgs("claude", row, "prefer").args).toEqual(["claude", "2", "on"]);
     const preferred = rowAt(fleet({ accounts: [account({ number: 3, preferred: true })] }));
     expect(accountCommandArgs("claude", preferred, "prefer").args).toEqual(["claude", "3", "off"]);
+  });
+});
+
+describe("add account and re-login", () => {
+  const addCommand = {
+    name: "add",
+    args: ["<fleet>"],
+    options: [],
+    effect: "human" as const,
+    summary: "",
+    replyShape: "",
+  };
+
+  it("offers add on a fleet with the in-app sign-in, never off the engine's name", () => {
+    expect(buildFleetSection(fleet({ capabilities: ["addOAuth"] })).canAdd).toBe(true);
+    expect(buildFleetSection(fleet({ engineID: "cswap", capabilities: [] })).canAdd).toBe(false);
+    expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
+  });
+
+  it("marks a lapsed sign-in for re-login only where the fleet can run one", () => {
+    const lapsed = account({ usageStatus: "relogin_required" });
+    expect(rowAt(fleet({ capabilities: ["addOAuth"], accounts: [lapsed] })).reloginNeeded).toBe(
+      true,
+    );
+    expect(rowAt(fleet({ capabilities: ["addOAuth"] })).reloginNeeded).toBe(false);
+    expect(rowAt(fleet({ capabilities: [], accounts: [lapsed] })).reloginNeeded).toBe(false);
+  });
+
+  it("gates on the manifest listing add and reads the app's sign-in flag", () => {
+    expect(snapshotOffersAdd(snapshot())).toBe(false);
+    expect(snapshotOffersAdd(snapshot({ commands: [addCommand] }))).toBe(true);
+    expect(snapshotSignInRunning(snapshot())).toBe(false);
+    expect(
+      snapshotSignInRunning(
+        snapshot({
+          status: {
+            version: "1",
+            sha: "a",
+            socket: "/tmp/s",
+            badge: "",
+            playground: false,
+            signInRunning: true,
+            engines: {},
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("shapes add and the short wait-add poll", () => {
+    expect(addAccountCommandArgs("cswap/claude")).toEqual({
+      command: "add",
+      args: ["cswap/claude"],
+      options: {},
+    });
+    expect(waitAddCommandArgs(5)).toEqual({
+      command: "wait-add",
+      args: [],
+      options: { timeout: "5" },
+    });
+  });
+
+  it("reads a wait-add reply and recognises the still-running refusal", () => {
+    expect(waitAddOutcome({ done: true, error: null, fleets: [] })).toEqual({
+      done: true,
+      error: null,
+    });
+    expect(waitAddOutcome({ done: false, error: "timed out" })).toEqual({
+      done: false,
+      error: "timed out",
+    });
+    expect(waitAddOutcome({ done: true })).toEqual({ done: true, error: null });
+    expect(waitAddOutcome({ nope: true })).toBeNull();
+    expect(WAIT_ADD_STILL_RUNNING.test("timed out after 5s")).toBe(true);
+    expect(WAIT_ADD_STILL_RUNNING.test("a sign-in is already running")).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import * as Cause from "effect/Cause";
 import type { ReactNode } from "react";
 import { act, cloneElement, isValidElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -291,6 +292,157 @@ describe("AccountsPage", () => {
       environmentId,
       input: { command: "switch", args: ["claude", "2"], options: {} },
     });
+    renderer.unmount();
+  });
+
+  const addCommand: InfinitusSnapshot["commands"][number] = {
+    name: "add",
+    args: ["<fleet>"],
+    options: [],
+    effect: "human",
+    summary: "",
+    replyShape: "",
+  };
+  const addableSnapshot: InfinitusSnapshot = {
+    ...readySnapshot,
+    commands: [addCommand],
+    fleets: [
+      {
+        ...readySnapshot.fleets[0]!,
+        capabilities: [...readySnapshot.fleets[0]!.capabilities, "addOAuth"],
+        accounts: [
+          readySnapshot.fleets[0]!.accounts[0]!,
+          account({
+            number: 2,
+            email: "two@example.com",
+            alias: "spare",
+            usageStatus: "relogin_required",
+          }),
+        ],
+      },
+      readySnapshot.fleets[1]!,
+    ],
+  };
+
+  it("offers add account and re-login only where the build and the fleet allow it", () => {
+    testState.snapshot = addableSnapshot;
+    const markup = renderToStaticMarkup(<AccountsPage />);
+    expect(markup).toContain("Add account: Claude (cswap)");
+    expect(markup).not.toContain("Add account: OpenAI (cliproxy)");
+    expect(markup).toContain("Sign in again as spare");
+
+    // The same fleets on a build whose manifest has no `add` verb.
+    testState.snapshot = { ...addableSnapshot, commands: [] };
+    const older = renderToStaticMarkup(<AccountsPage />);
+    expect(older).not.toContain("Add account");
+    expect(older).not.toContain("Sign in again");
+  });
+
+  it("says a sign-in is already running and holds the buttons", () => {
+    testState.snapshot = {
+      ...addableSnapshot,
+      status: {
+        version: "1.0",
+        sha: "abc",
+        socket: "/tmp/infinitus.sock",
+        badge: "",
+        playground: false,
+        signInRunning: true,
+        engines: {},
+      },
+    };
+    const markup = renderToStaticMarkup(<AccountsPage />);
+    expect(markup).toContain("A sign-in is already running in Infinitus.");
+    expect(markup).toContain(
+      'aria-label="Add account: Claude (cswap)" aria-busy="true" disabled=""',
+    );
+  });
+
+  it("starts the fleet's sign-in, then polls wait-add until the app says it ended", async () => {
+    testState.snapshot = addableSnapshot;
+    testState.command = vi
+      .fn()
+      .mockResolvedValueOnce({ _tag: "Success", value: { result: { started: true } } })
+      .mockResolvedValueOnce({
+        _tag: "Failure",
+        cause: Cause.fail({ _tag: "InfinitusCommandFailed", error: "timed out after 5s" }),
+      })
+      .mockResolvedValueOnce({
+        _tag: "Success",
+        value: { result: { done: true, error: null, fleets: [] } },
+      });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+    )[0]!;
+
+    await act(async () => {
+      button.props.onClick();
+    });
+
+    expect(testState.command).toHaveBeenNthCalledWith(1, {
+      environmentId,
+      input: { command: "add", args: ["claude"], options: {} },
+    });
+    expect(testState.command).toHaveBeenNthCalledWith(2, {
+      environmentId,
+      input: { command: "wait-add", args: [], options: { timeout: "5" } },
+    });
+    expect(testState.command).toHaveBeenCalledTimes(3);
+    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
+    expect(status.children.join("")).toBe("Sign-in finished.");
+    renderer.unmount();
+  });
+
+  it("signs a lapsed account in again through the same verb, naming who to sign in as", async () => {
+    testState.snapshot = addableSnapshot;
+    testState.command = vi
+      .fn()
+      .mockResolvedValueOnce({ _tag: "Success", value: { result: { started: true } } })
+      .mockReturnValue(new Promise(() => undefined));
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Sign in again as spare",
+    )[0]!;
+
+    await act(async () => {
+      button.props.onClick();
+    });
+
+    expect(testState.command).toHaveBeenNthCalledWith(1, {
+      environmentId,
+      input: { command: "add", args: ["claude"], options: {} },
+    });
+    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
+    expect(status.children.join("")).toBe("Sign-in running on the Mac — sign in as spare.");
+    renderer.unmount();
+  });
+
+  it("surfaces the app's refusal to start a second sign-in", async () => {
+    testState.snapshot = addableSnapshot;
+    testState.command = vi.fn().mockResolvedValue({
+      _tag: "Failure",
+      cause: Cause.fail({ _tag: "InfinitusCommandFailed", error: "a sign-in is already running" }),
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (cswap)",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
+    expect(status.children.join("")).toBe("Sign-in failed: a sign-in is already running");
+    expect(testState.command).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 
