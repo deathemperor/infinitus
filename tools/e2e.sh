@@ -416,6 +416,10 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
 "$CTL" prefs set revive_lead_minutes 10 | expect "d['value']==10" || fail "prefs set back"
+"$CTL" prefs get intro_speed gamification_style | expect "d['prefs'][0]['section']=='animations' and d['prefs'][0]['min']==0.4 and d['prefs'][0]['max']==2 and any(c['id']=='rpg' for c in d['prefs'][1]['choices'])" || fail "prefs: animations range / theme choices (#747)"
+"$CTL" prefs set intro_speed 3 >/dev/null 2>&1 && fail "prefs set accepted a value outside the range"
+"$CTL" prefs set intro_style fade | expect "d['value']=='fade'" || fail "prefs set intro_style"
+"$CTL" prefs set intro_style top >/dev/null || fail "prefs set intro_style back"
 # The fork server's tunnel (#572): off by default on T3's port; a mock
 # instance named Infinitus is `blocked`, so enabling it here never runs
 # cloudflared — the gate is what this checks.

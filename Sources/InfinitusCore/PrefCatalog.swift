@@ -32,11 +32,16 @@ public enum PrefCatalog {
         /// Every accepted value when the set is closed; nil when any
         /// value of the type is (a theme id, say).
         public let choices: [JSONValue]?
+        /// A numeric pref's closed range (#747: the web renders a bounded
+        /// number field from it); nil = unbounded.
+        public let min: Double?
+        public let max: Double?
 
         init(_ key: String, _ type: Kind, _ `default`: JSONValue, _ section: Section,
-             effect: Effect = .live, choices: [JSONValue]? = nil) {
+             effect: Effect = .live, choices: [JSONValue]? = nil, min: Double? = nil, max: Double? = nil) {
             self.key = key; self.type = type; self.default = `default`
             self.section = section.slug; self.effect = effect; self.choices = choices
+            self.min = min; self.max = max
         }
     }
 
@@ -49,6 +54,8 @@ public enum PrefCatalog {
         public let section: String
         public let effect: Effect
         public let choices: [JSONValue]?
+        public let min: Double?
+        public let max: Double?
     }
 
     public struct Reply: Codable, Sendable, Equatable {
@@ -58,12 +65,13 @@ public enum PrefCatalog {
 
     public static let display = Section(slug: "display", name: "Display")
     public static let themes = Section(slug: "themes", name: "Themes")
+    public static let animations = Section(slug: "animations", name: "Animations")
     public static let push = Section(slug: "push", name: "Push")
     public static let devices = Section(slug: "devices", name: "Devices")
     public static let engines = Section(slug: "engines", name: "Engines")
     public static let about = Section(slug: "about", name: "About")
     public static let sessions = Section(slug: "sessions", name: "Sessions")
-    public static let sections: [Section] = [display, themes, push, devices, engines, about, sessions]
+    public static let sections: [Section] = [display, themes, animations, push, devices, engines, about, sessions]
 
     public static let priorityModes = ["off", "hold"]
 
@@ -101,6 +109,11 @@ public enum PrefCatalog {
         Entry("keep_awake_display", .bool, .bool(true), display),
         // Themes: any theme id, built-in or custom.
         Entry("gamification_style", .string, .string("off"), themes),
+
+        Entry("intro_style", .string, .string("top"), animations, choices: strings(introStyles)),
+        Entry("intro_title", .string, .string("zoom"), animations, choices: strings(introTitles)),
+        Entry("intro_speed", .double, .number(1.0), animations, min: 0.4, max: 2),
+        Entry("burn_style", .string, .string("ember"), animations, choices: strings(burnStyles)),
         // Push.
         Entry("push_sessions_done", .bool, .bool(true), push),
         Entry("push_all_dead", .bool, .bool(true), push),
@@ -133,6 +146,12 @@ public enum PrefCatalog {
         Entry("priority_low_pct", .int, .number(80), sessions),
         Entry("priority_abundant_pct", .int, .number(50), sessions),
     ]
+
+    /// The popup intro (`AnimationsDebugPane`): how the content enters,
+    /// what the title does, and the pace fire on the 7d/model bars.
+    public static let introStyles = ["top", "bottom", "fade", "rows"]
+    public static let introTitles = ["zoom", "slam", "spin", "off"]
+    public static let burnStyles = ["off", "ember", "flame", "limit"]
 
     public static func entry(_ key: String) -> Entry? { entries.first { $0.key == key } }
 
@@ -169,18 +188,25 @@ public enum PrefCatalog {
 
     public struct UnknownKey: Error, Equatable { public let key: String }
 
-    public static func pref(_ entry: Entry, in defaults: UserDefaults) -> Pref {
+    /// `choices` overrides the entry's own list for the reply only —
+    /// an OPEN set the app knows at run time (the theme ids, built-in
+    /// plus the user's `themes.json`); validation still uses the entry's.
+    public static func pref(_ entry: Entry, in defaults: UserDefaults, choices: [JSONValue]? = nil) -> Pref {
         Pref(key: entry.key, type: entry.type, default: entry.default, value: value(entry, in: defaults),
-             section: entry.section, effect: entry.effect, choices: entry.choices)
+             section: entry.section, effect: entry.effect, choices: choices ?? entry.choices,
+             min: entry.min, max: entry.max)
     }
 
     /// The table with values, every entry or only `keys` (in table
     /// order); a key the table does not list is an error, not a silent
-    /// omission, so a client typo shows.
-    public static func reply(from defaults: UserDefaults, keys: [String]? = nil) throws -> Reply {
+    /// omission, so a client typo shows. `choices` adds run-time choice
+    /// lists by key (see `pref`).
+    public static func reply(from defaults: UserDefaults, keys: [String]? = nil,
+                             choices: [String: [JSONValue]] = [:]) throws -> Reply {
         if let keys, let unknown = keys.first(where: { entry($0) == nil }) { throw UnknownKey(key: unknown) }
         let wanted = keys.map(Set.init)
-        return Reply(sections: sections, prefs: entries.filter { wanted?.contains($0.key) ?? true }.map { pref($0, in: defaults) })
+        return Reply(sections: sections, prefs: entries.filter { wanted?.contains($0.key) ?? true }
+            .map { pref($0, in: defaults, choices: choices[$0.key]) })
     }
 
     /// A value refused by `validate`: the wrong type, or off a closed set.
@@ -203,6 +229,9 @@ public enum PrefCatalog {
         if let choices = entry.choices, !choices.contains(value) {
             let listed = choices.map(describe).joined(separator: ", ")
             throw Violation(key: key, message: "\(key) must be one of \(listed), not \(describe(value))")
+        }
+        if case .number(let n) = value, let low = entry.min, let high = entry.max, n < low || n > high {
+            throw Violation(key: key, message: "\(key) must be between \(describe(.number(low))) and \(describe(.number(high))), not \(describe(value))")
         }
         return entry
     }
