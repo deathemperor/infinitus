@@ -246,8 +246,9 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        assert.deepEqual(calls.setName, [`${PRODUCT_NAME} (Alpha)`]);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `${PRODUCT_NAME} (Alpha)`);
+        // A packaged build of this repo is titled plainly (#823 layer 3).
+        assert.deepEqual(calls.setName, [PRODUCT_NAME]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, PRODUCT_NAME);
         assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
         // Packaged: the bundle's own icon stands, so a custom one the user
