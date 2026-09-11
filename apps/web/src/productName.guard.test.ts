@@ -13,6 +13,10 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // The GNOME extension's shipped metadata.json name, which the user has to find
   // in GNOME Extensions by that exact name.
   ["components/settings/SnapShotSetupDialog.tsx", "T3 Code SnapShots"],
+  // Copied standalone into a bare temp root by bundledDev.test, so it cannot
+  // import the constant; vite.config's productNamePlugin rewrites it at build.
+  ["lib/bootError.ts", "T3 Code failed to start."],
+  ["lib/bootError.ts", "T3 Code could not load."],
 ];
 
 const SRC = NodeURL.fileURLToPath(new URL(".", import.meta.url));

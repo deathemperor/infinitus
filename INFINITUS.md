@@ -71,7 +71,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   GNOME extension's shipped name). Comments, "T3 Connect" and the
   `t3code/<version>` UA token stay (#601 slice A).
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
-  boot-shell title and splash labels to `PRODUCT_NAME`.
+  boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
+  `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
+  and cannot import the constant).
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
