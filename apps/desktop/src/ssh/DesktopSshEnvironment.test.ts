@@ -10,6 +10,7 @@ import * as Path from "effect/Path";
 
 import * as DesktopSshEnvironment from "./DesktopSshEnvironment.ts";
 import * as DesktopSshPasswordPrompts from "./DesktopSshPasswordPrompts.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 function makeTempHomeDir() {
   return Effect.gen(function* () {
@@ -30,7 +31,7 @@ describe("sshEnvironment", () => {
     assert.equal(cause.message, "Failed to present SSH password prompt for devbox.");
     assert.equal(
       DesktopSshEnvironment.toSshPasswordPromptError(cause).message,
-      "T3 Code window is not available for SSH authentication.",
+      `${PRODUCT_NAME} window is not available for SSH authentication.`,
     );
   });
 

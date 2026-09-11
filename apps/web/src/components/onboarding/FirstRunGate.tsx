@@ -29,6 +29,7 @@ import { primaryServerConfigAtom, primaryServerWelcomeAtom } from "../../state/s
 import { environmentShell } from "../../state/shell";
 import { environmentThreadShells } from "../../state/threads";
 import { Button } from "../ui/button";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /**
  * Holds back authenticated and hosted app trees until the first-run decision
@@ -212,7 +213,7 @@ function FirstRunRecovery({
         <p className="mt-2 text-sm text-muted-foreground">
           {settingsReadFailed
             ? "Your saved settings could not be loaded."
-            : "T3 Code could not confirm this workspace."}
+            : `${PRODUCT_NAME} could not confirm this workspace.`}
         </p>
         <Button
           className="mt-5"

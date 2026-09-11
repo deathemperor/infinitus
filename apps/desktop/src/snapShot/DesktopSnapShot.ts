@@ -86,6 +86,7 @@ import {
   snapShotShortcutRegistrationFailureMessage,
   snapShotShortcutSystemConflict,
 } from "./snapShot.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const MAX_CAPTURE_WIDTH = 2_560;
 const MAX_CAPTURE_HEIGHT = 1_600;
@@ -98,12 +99,9 @@ const FLASH_FRAME_INTERVAL_MS = 16;
 const FLASH_PEAK_OPACITY = 0.08;
 const MAC_SCREEN_CAPTURE_SETTINGS_URL =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
-const MAC_SCREEN_CAPTURE_PERMISSION_MESSAGE =
-  "Allow Screen Recording in System Settings, then restart T3 Code.";
-const MAC_ACCESSIBILITY_PERMISSION_MESSAGE =
-  "Allow Accessibility in System Settings, then restart T3 Code.";
-const MAC_BOTH_PERMISSIONS_MESSAGE =
-  "Allow Accessibility and Screen Recording in System Settings, then restart T3 Code.";
+const MAC_SCREEN_CAPTURE_PERMISSION_MESSAGE = `Allow Screen Recording in System Settings, then restart ${PRODUCT_NAME}.`;
+const MAC_ACCESSIBILITY_PERMISSION_MESSAGE = `Allow Accessibility in System Settings, then restart ${PRODUCT_NAME}.`;
+const MAC_BOTH_PERMISSIONS_MESSAGE = `Allow Accessibility and Screen Recording in System Settings, then restart ${PRODUCT_NAME}.`;
 const MAC_PERMISSION_MESSAGES = new Set([
   MAC_SCREEN_CAPTURE_PERMISSION_MESSAGE,
   MAC_ACCESSIBILITY_PERMISSION_MESSAGE,
@@ -895,7 +893,7 @@ export const make = Effect.gen(function* () {
       const capturedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso));
       if (snapshot.linuxActivationFailure) {
         yield* Effect.logWarning(
-          "The compositor could not activate T3 Code after the snapshot",
+          `The compositor could not activate ${PRODUCT_NAME} after the snapshot`,
           snapshot.linuxActivationFailure.cause,
         );
       }
@@ -1015,7 +1013,7 @@ export const make = Effect.gen(function* () {
     if (mode === "portal" && niriSocketPath()) {
       return {
         available: false,
-        message: "Configure the capture shortcut in your Niri config, not in T3 Code.",
+        message: `Configure the capture shortcut in your Niri config, not in ${PRODUCT_NAME}.`,
       };
     }
     if (mode === "portal" && isHyprlandCaptureSession()) {
@@ -1165,7 +1163,7 @@ export const make = Effect.gen(function* () {
         const { startNiriCaptureShortcut } = await import("./NiriCaptureShortcut.ts");
         return startNiriCaptureShortcut(linuxAppId, onCurrentShortcut, () => {
           void runPromise(
-            setShortcutFailure("The Niri capture endpoint disconnected. Restart T3 Code."),
+            setShortcutFailure(`The Niri capture endpoint disconnected. Restart ${PRODUCT_NAME}.`),
           ).catch(() => undefined);
         });
       }).pipe(
@@ -1187,7 +1185,7 @@ export const make = Effect.gen(function* () {
         shortcutActionRegistered: registered,
         shortcutMessage: registered
           ? "Set up the shortcut to add it to your Niri config."
-          : "Could not start the Niri capture endpoint. Another T3 Code instance may be using it.",
+          : `Could not start the Niri capture endpoint. Another ${PRODUCT_NAME} instance may be using it.`,
         message: null,
       });
       return;

@@ -22,6 +22,7 @@ import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "../ui/dialog";
 import { ThemeSearchSection } from "./ThemeSearchSection";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /**
  * A full theme export is a few KB, so anything past this is not a theme file.
@@ -525,7 +526,7 @@ export function ThemeImportDialog({
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Theme file</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {fileName ?? "Drop T3 Code or VS Code .json files"}
+                      {fileName ?? `Drop ${PRODUCT_NAME} or VS Code .json files`}
                     </p>
                   </div>
                   {chooseButton()}

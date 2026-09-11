@@ -14,6 +14,7 @@ import {
   snapShotDescription,
   snapShotAccessibilityUnavailableMessage,
 } from "./SnapShotSettings.logic";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 it.each([
   ["off", { snapShotPlaySound: false }],
@@ -315,7 +316,7 @@ it("hides macOS setup only while permissions and the shortcut are all in place",
   const revoked = {
     ...ready,
     macPermissions: { screenRecording: true, accessibility: false },
-    message: "Allow Accessibility in System Settings, then restart T3 Code.",
+    message: `Allow Accessibility in System Settings, then restart ${PRODUCT_NAME}.`,
   };
   expect(snapShotSetupComplete(revoked, true)).toBe(false);
   expect(snapShotStatus(revoked, true)).toBe("Capture needs attention");

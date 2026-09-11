@@ -19,6 +19,7 @@ import {
 import { useEnvironments } from "../state/environments";
 import { APP_DISPLAY_NAME } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 function ChatIndexRouteView() {
   const { authGateState } = Route.useRouteContext();
@@ -132,11 +133,12 @@ function HostedStaticOnboardingState() {
                 <LinkIcon className="size-5" />
               </div>
               <EmptyTitle className="text-foreground text-xl">
-                Connect to a computer running T3 Code
+                Connect to a computer running {PRODUCT_NAME}
               </EmptyTitle>
               <EmptyDescription className="mt-2 text-sm leading-relaxed text-muted-foreground/78">
-                This browser connects to T3 Code running on your computer or a server. Start the T3
-                Code desktop app or command-line server on that machine and keep it running.
+                This browser connects to {PRODUCT_NAME} running on your computer or a server. Start
+                the {PRODUCT_NAME} desktop app or command-line server on that machine and keep it
+                running.
               </EmptyDescription>
               <EmptyDescription className="mt-2 text-sm leading-relaxed text-muted-foreground/78">
                 {cloudEnabled

@@ -14,6 +14,7 @@ import { satisfiesSemverRange } from "@t3tools/shared/semver";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { parseWslDistroList, type WslDistro } from "./wslPathParsing.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const PROCESS_TERMINATE_GRACE = Duration.seconds(1);
 const LIST_TIMEOUT = Duration.seconds(8);
@@ -492,7 +493,7 @@ const NODE_PTY_PREBUILD_MISSING_EXIT_CODE = 4;
 
 const formatNodePtyProbeFailureReason = (exitCode: number): string | null =>
   exitCode === NODE_PTY_PREBUILD_MISSING_EXIT_CODE
-    ? "WSL support is missing from this T3 Code build: the packaged Linux node-pty binary was not included. Rebuild the Windows artifact with `--wsl-prebuild <path-to-linux-pty.node>` or install a build that includes WSL support."
+    ? `WSL support is missing from this ${PRODUCT_NAME} build: the packaged Linux node-pty binary was not included. Rebuild the Windows artifact with \`--wsl-prebuild <path-to-linux-pty.node>\` or install a build that includes WSL support.`
     : null;
 
 const NODE_PTY_PROBE_SCRIPT = (

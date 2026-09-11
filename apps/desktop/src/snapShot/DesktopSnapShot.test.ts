@@ -19,6 +19,7 @@ import * as TestClock from "effect/testing/TestClock";
 import type * as Electron from "electron";
 import type { PortalShortcutState } from "./PortalCaptureShortcut.ts";
 import { beforeEach, vi } from "vite-plus/test";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 beforeEach(() => {
   portalShortcutInstances.length = 0;
@@ -1621,7 +1622,7 @@ it.effect(
         const warning = logs.find(
           (message) =>
             Array.isArray(message) &&
-            message[0] === "The compositor could not activate T3 Code after the snapshot",
+            message[0] === `The compositor could not activate ${PRODUCT_NAME} after the snapshot`,
         );
         assert.strictEqual(Array.isArray(warning) ? warning[1] : undefined, activationFailure);
         const pending = yield* decodePendingMetadata(saved);
@@ -2882,7 +2883,7 @@ it.effect("flags revoked macOS permissions on read and re-registers once they re
       const revoked = yield* service.state;
       assert.equal(
         revoked.message,
-        "Allow Screen Recording in System Settings, then restart T3 Code.",
+        `Allow Screen Recording in System Settings, then restart ${PRODUCT_NAME}.`,
       );
       assert.deepEqual(revoked.macPermissions, { screenRecording: false, accessibility: true });
 
@@ -2895,7 +2896,7 @@ it.effect("flags revoked macOS permissions on read and re-registers once they re
       const blocked = yield* service.state;
       assert.equal(
         blocked.message,
-        "Allow Screen Recording in System Settings, then restart T3 Code.",
+        `Allow Screen Recording in System Settings, then restart ${PRODUCT_NAME}.`,
       );
       assert.isFalse(blocked.shortcutRegistered);
 
