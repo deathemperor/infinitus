@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).
+- `history <fleet> [--limit n]` hands the engine's own switch log to the fork — swapd's `{schemaVersion, switches:[{ts, from?, to, trigger?}]}` untouched (#779).
 
 ## 0.4.5-alpha.1
 
