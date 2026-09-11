@@ -1,0 +1,12 @@
+{
+  "name": "infinitus",
+  "owner": { "name": "Loc Truong" },
+  "description": "Infinitus — the Claude Code plugin that keeps the Mac app and your phone in step with every session.",
+  "plugins": [
+    {
+      "name": "infinitus",
+      "source": "./plugins/infinitus",
+      "description": "Hooks that tell the Infinitus Mac app the moment a session needs you or ends a turn — the phone hears about it at once."
+    }
+  ]
+}

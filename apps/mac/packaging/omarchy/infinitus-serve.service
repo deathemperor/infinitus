@@ -1,0 +1,13 @@
+[Unit]
+Description=Infinitus phone companion (fleet snapshot over HTTP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/infinitus-tray serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

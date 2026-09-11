@@ -1,0 +1,2 @@
+{"type":"user","uuid":"u1","timestamp":"2026-09-05T15:57:00.000Z","message":{"content":"keep going"}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-05T15:57:47.113Z","isApiErrorMessage":true,"error":"rate_limit","message":{"model":"<synthetic>","content":[{"type":"text","text":"You've hit your session limit · resets 12:20am (Asia/Saigon)"}]}}

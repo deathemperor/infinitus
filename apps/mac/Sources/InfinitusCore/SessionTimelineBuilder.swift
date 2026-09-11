@@ -1,0 +1,483 @@
+import Foundation
+
+/// The transcript → `SessionTimeline` walk (#223 phase 1). A second pass
+/// over the entries `SessionFeedReader.read` already decodes; the legacy
+/// `parse` is untouched. Mirrors T3's ProviderRuntimeIngestion +
+/// projector rules with the transcript as the source instead of the SDK.
+public enum SessionTimelineBuilder {
+    public static func build(entries: [[String: Any]], status: String?, statusUpdatedAt: Date? = nil,
+                             agents: [String: SessionFeedItem.Agent] = [:], now: Date = Date()) -> SessionTimeline {
+        var walk = Walk(agents: agents)
+        for entry in entries {
+            // Sub-agent traffic is summarized by `task.*` rows; the
+            // transcript has no parent_tool_use_id to filter on.
+            if (entry["isSidechain"] as? Bool) == true { continue }
+            walk.visit(entry)
+        }
+        return walk.finish(status: status, statusUpdatedAt: statusUpdatedAt)
+    }
+
+    /// `TokenRateScanner.parseStamp`: the transcript's `…T15:11:48.377Z` shape
+    /// parses without a formatter (#380 — the formatter was a quarter of
+    /// a tail read); anything else still goes through the formatters.
+    static func timestamp(_ entry: [String: Any]) -> Date? {
+        (entry["timestamp"] as? String).flatMap(TokenRateScanner.parseStamp).map(Date.init(timeIntervalSince1970:))
+    }
+
+    /// The mutable state of one walk.
+    struct Walk {
+        let agents: [String: SessionFeedItem.Agent]
+        var turns: [TurnDraft] = []
+        var messages: [SessionTimeline.Message] = []
+        var activities: [SessionTimeline.Activity] = []
+        var seq = 0
+        /// Index in `messages` of the assistant message still absorbing
+        /// streamed blocks, or nil once a non-text entry closed it.
+        var openAssistant: Int?
+        var lastAt: Date?
+        /// Tool calls awaiting their `tool_result`, by tool_use id.
+        var openTools: [String: OpenTool] = [:]
+
+        struct OpenTool {
+            let name: String
+            let command: String?
+            let files: [String]
+            let input: JSONValue
+        }
+
+        /// JSONSerialization's Any → the closed `JSONValue`. A JSON `true`
+        /// bridges as NSNumber too, so the boolean check comes first.
+        static func json(_ any: Any) -> JSONValue {
+            #if !canImport(Darwin)
+            // swift-corelibs-foundation bridges JSON booleans to Bool, never NSNumber.
+            if let b = any as? Bool { return .bool(b) }
+            #endif
+            if let n = any as? NSNumber {
+                #if canImport(Darwin)
+                if CFGetTypeID(n) == CFBooleanGetTypeID() { return .bool(n.boolValue) }
+                #endif
+                return .number(n.doubleValue)
+            }
+            switch any {
+            case let s as String: return .string(s)
+            case let a as [Any]: return .array(a.map(json))
+            case let o as [String: Any]: return .object(o.mapValues(json))
+            default: return .null
+            }
+        }
+
+        struct TurnDraft {
+            let id: String
+            let requestedAt: Date
+            var startedAt: Date?
+            var lastAt: Date?
+            var assistantMessageId: String?
+            var interrupted = false
+            var errored = false
+        }
+
+        init(agents: [String: SessionFeedItem.Agent]) { self.agents = agents }
+
+        var currentTurnId: String { turns.last?.id ?? "" }
+
+        mutating func visit(_ entry: [String: Any]) {
+            let type = entry["type"] as? String
+            let at = SessionTimelineBuilder.timestamp(entry) ?? lastAt ?? Date(timeIntervalSince1970: 0)
+            lastAt = at
+            switch type {
+            case "attachment":
+                // A prompt typed while a turn was running is absorbed
+                // mid-turn and logged as a `queued_command`, never as a
+                // `user` entry (same rule as the legacy feed).
+                guard let attachment = entry["attachment"] as? [String: Any],
+                      (attachment["type"] as? String) == "queued_command",
+                      let prompt = attachment["prompt"] as? String,
+                      let user = SessionFeedReader.presentableUser(prompt) else { return }
+                let images = SessionFeedReader.attachedImageIds(user.text)
+                openTurn(id: entry["uuid"] as? String ?? "q:\(seq)", at: at, text: user.text,
+                         images: images, sender: user.sender)
+            case "user":
+                visitUser(entry, at: at)
+            case "assistant":
+                visitAssistant(entry, at: at)
+            case "system":
+                let subtype = entry["subtype"] as? String
+                if subtype == "informational", let content = entry["content"] as? String,
+                   let text = SessionFeedReader.heldText(content) {
+                    append("runtime.warning", id: entry["uuid"] as? String ?? "held:\(seq)", tone: .info,
+                           summary: text, payload: ["code": .string("held")], at: at)
+                } else if subtype == "compact_boundary" {
+                    let meta = entry["compactMetadata"] as? [String: Any] ?? [:]
+                    var payload: [String: JSONValue] = [:]
+                    if let n = meta["preTokens"] as? NSNumber { payload["beforeTokens"] = .number(n.doubleValue) }
+                    if let n = meta["postTokens"] as? NSNumber { payload["afterTokens"] = .number(n.doubleValue) }
+                    append("context-compaction", id: entry["uuid"] as? String ?? "compact:\(seq)", tone: .info,
+                           summary: "Context compacted", payload: payload, at: at)
+                }
+            default:
+                break
+            }
+            // After dispatch: a prompt that just opened a turn stamps the
+            // new one, never the turn it closed.
+            if !turns.isEmpty { turns[turns.count - 1].lastAt = at }
+        }
+
+        mutating func openTurn(id: String, at: Date, text: String, images: [String], sender: String?) {
+            turns.append(TurnDraft(id: id, requestedAt: at, lastAt: at))
+            messages.append(SessionTimeline.Message(id: id, role: .user, text: String(text.prefix(SessionFeedReader.textCap)),
+                                    images: images.isEmpty ? nil : images, sender: sender,
+                                    turnId: id, streaming: false, createdAt: at))
+            openAssistant = nil
+        }
+
+        mutating func visitUser(_ entry: [String: Any], at: Date) {
+            // The post-compaction summary is Claude Code's, not a prompt.
+            if (entry["isCompactSummary"] as? Bool) == true { return }
+            guard let message = entry["message"] as? [String: Any] else { return }
+            let raw: String?
+            if let plain = message["content"] as? String {
+                raw = plain
+            } else if let content = message["content"] as? [[String: Any]] {
+                raw = content.first(where: { ($0["type"] as? String) == "text" })?["text"] as? String
+            } else {
+                raw = nil
+            }
+            // Esc in the terminal: the turn ends `interrupted`, the marker
+            // is not something anyone typed.
+            if let raw, raw.hasPrefix("[Request interrupted by user") {
+                if !turns.isEmpty { turns[turns.count - 1].interrupted = true }
+                openTools.removeAll()
+                openAssistant = nil
+                return
+            }
+            if let raw, let user = SessionFeedReader.presentableUser(raw) {
+                let images = SessionFeedReader.imageIds(entry: entry, text: user.text)
+                openTurn(id: entry["uuid"] as? String ?? "u:\(seq)", at: at,
+                         text: SessionFeedReader.bubbleText(user.text, images: images),
+                         images: images, sender: user.sender)
+                return
+            }
+            if let content = message["content"] as? [[String: Any]] {
+                for block in content where (block["type"] as? String) == "tool_result" {
+                    visitToolResult(block, entry: entry, at: at)
+                }
+            }
+        }
+
+        mutating func visitToolUse(name: String, id: String, input: [String: Any], at: Date) {
+            if name == "AskUserQuestion" {
+                let (text, _) = SessionFeedReader.describeQuestion(["input": input])
+                let questions = (input["questions"] as? [[String: Any]] ?? []).map { q -> JSONValue in
+                    let question = q["question"] as? String ?? ""
+                    let options = (q["options"] as? [[String: Any]] ?? []).map { o -> JSONValue in
+                        .object(["label": .string(o["label"] as? String ?? ""),
+                                 "description": .string(o["description"] as? String ?? "")])
+                    }
+                    // `id` == the question text: Claude Code maps answers by it.
+                    return .object(["id": .string(question), "question": .string(question),
+                                    "header": .string(q["header"] as? String ?? ""),
+                                    "multiSelect": .bool((q["multiSelect"] as? Bool) ?? false),
+                                    "options": .array(options)])
+                }
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                openPrompts.insert("perm:" + id)
+                append("user-input.requested", id: "perm:" + id, tone: .approval,
+                       summary: text.split(separator: "\n").first.map(String.init) ?? "Question",
+                       payload: ["requestId": .string("perm:" + id), "questions": .array(questions)], at: at)
+                return
+            }
+            if name == "TodoWrite" || name == "TaskCreate" || name == "TaskUpdate" {
+                let todos = input["todos"] as? [[String: Any]] ?? []
+                let steps = todos.map { t -> JSONValue in
+                    .object(["text": .string(t["content"] as? String ?? ""), "status": .string(t["status"] as? String ?? "pending")])
+                }
+                let done = todos.filter { ($0["status"] as? String) == "completed" }.count
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                append("turn.plan.updated", id: id, tone: .info, summary: "\(done) of \(todos.count) steps",
+                       payload: ["steps": .array(steps), "completed": .number(Double(done)),
+                                 "total": .number(Double(todos.count))], at: at)
+                return
+            }
+            if name == "Agent" {
+                let description = input["description"] as? String ?? "sub-agent"
+                let type = input["subagent_type"] as? String ?? "agent"
+                openTools[id] = OpenTool(name: name, command: nil, files: [], input: .object([:]))
+                append("task.started", id: "task:" + id, tone: .info, summary: description,
+                       payload: agentPayload(id: id, type: type, description: description), at: at)
+                return
+            }
+            let title = SessionFeedReader.describeTool(name: name, input: input)
+            let command = name == "Bash" ? (input["command"] as? String) : nil
+            let files = (input["file_path"] as? String).map { [$0] } ?? []
+            openTools[id] = OpenTool(name: name, command: command, files: files, input: Walk.json(input))
+            var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name))]
+            if !title.isEmpty { payload["title"] = .string(title) }
+            payload["toolCallId"] = .string(id)
+            if let command { payload["command"] = .string(command) }
+            append("tool.started", id: id, tone: .tool, summary: title.isEmpty ? name : title, payload: payload, at: at)
+        }
+
+        /// The `attachAgents` summary for a spawn, when the sub-agent's
+        /// meta/log were read; the row exists without it.
+        func agentPayload(id toolUseId: String, type: String, description: String) -> [String: JSONValue] {
+            var p: [String: JSONValue] = ["agentType": .string(type), "description": .string(description)]
+            if let a = agents[toolUseId] {
+                p["agentId"] = .string(a.id); p["agentType"] = .string(a.type)
+                p["toolCalls"] = .number(Double(a.toolCalls)); p["running"] = .bool(a.running)
+                if let t = a.lastTool { p["lastTool"] = .string(t) }
+            }
+            return p
+        }
+
+        /// The result closes the pair as one `tool.completed` row whose
+        /// payload IS the result — no tool_result entity (T3).
+        mutating func visitToolResult(_ block: [String: Any], entry: [String: Any], at: Date) {
+            guard let toolUseId = block["tool_use_id"] as? String else { return }
+            let isError = (block["is_error"] as? Bool) == true
+            // T3 pairs a result only with an in-flight call; one whose call
+            // aged out of the tail window is dropped, not shown blank.
+            guard let open = openTools.removeValue(forKey: toolUseId) else { return }
+            let name = open.name
+            let text: String
+            if let s = block["content"] as? String {
+                text = s
+            } else if let parts = block["content"] as? [[String: Any]] {
+                text = parts.compactMap { ($0["type"] as? String) == "text" ? $0["text"] as? String : nil }.joined(separator: "\n")
+            } else {
+                text = ""
+            }
+            if name == "AskUserQuestion" {
+                openPrompts.remove("perm:" + toolUseId)
+                append("user-input.resolved", id: "perm:\(toolUseId)/resolved", tone: .approval, summary: "Answered",
+                       payload: ["requestId": .string("perm:" + toolUseId), "answers": .string(String(text.prefix(2000)))], at: at)
+                return
+            }
+            if name == "TodoWrite" || name == "TaskCreate" || name == "TaskUpdate" { return }
+            if name == "Agent" {
+                let started = activities.first { $0.id == "task:" + toolUseId }
+                let description = started?.summary ?? "sub-agent"
+                var p = agentPayload(id: toolUseId, type: started?.payload["agentType"]?.stringValue ?? "agent",
+                                     description: description)
+                p["running"] = .bool(false)
+                append("task.completed", id: "task:\(toolUseId)/completed", tone: isError ? .error : .info,
+                       summary: description, payload: p, at: at)
+                return
+            }
+            var payload: [String: JSONValue] = ["toolName": .string(name), "itemType": .string(Slim.itemType(for: name)),
+                                                "status": .string(isError ? "failed" : "completed")]
+            payload["toolCallId"] = .string(toolUseId)
+            if let c = open.command { payload["command"] = .string(c) }
+            let line = Slim.output(text)
+            if !line.isEmpty { payload["output"] = .string(line) }
+            var files = open.files
+            if let r = entry["toolUseResult"] as? [String: Any], let fp = r["filePath"] as? String, !files.contains(fp) {
+                files.append(fp)
+            }
+            if !files.isEmpty, Slim.itemType(for: name) == "file_change" {
+                payload["changedFiles"] = .array(Slim.files(files).map(JSONValue.string))
+            }
+            let summary = open.command
+                ?? SessionFeedReader.describeTool(name: name, input: ["file_path": open.files.first ?? ""])
+            append("tool.completed", id: toolUseId + "/completed", tone: isError ? .error : .tool,
+                   summary: summary.isEmpty ? name : summary,
+                   detail: Slim.outputDetail(text, command: open.command), payload: payload, at: at)
+        }
+
+        mutating func visitAssistant(_ entry: [String: Any], at: Date) {
+            guard let message = entry["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else { return }
+            if !turns.isEmpty, turns[turns.count - 1].startedAt == nil { turns[turns.count - 1].startedAt = at }
+            if Transcript.isLimitStop(entry) {
+                append("runtime.warning", id: entry["uuid"] as? String ?? "limit:\(seq)", tone: .info,
+                       summary: Transcript.limitText(entry), payload: ["code": .string("limit")], at: at)
+                return
+            }
+            if (entry["isApiErrorMessage"] as? Bool) == true {
+                let text = content.first(where: { ($0["type"] as? String) == "text" })?["text"] as? String ?? "API error"
+                var payload: [String: JSONValue] = ["message": .string(text)]
+                if let status = entry["apiErrorStatus"] as? NSNumber { payload["status"] = .number(status.doubleValue) }
+                append("runtime.error", id: entry["uuid"] as? String ?? "err:\(seq)", tone: .error,
+                       summary: String(text.prefix(180)), payload: payload, at: at)
+                if !turns.isEmpty { turns[turns.count - 1].errored = true }
+                return
+            }
+            for block in content {
+                switch block["type"] as? String {
+                case "text":
+                    guard let text = block["text"] as? String else { continue }
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { continue }
+                    appendAssistantText(trimmed, id: entry["uuid"] as? String ?? "a:\(seq)", at: at)
+                case "tool_use":
+                    let name = block["name"] as? String ?? ""
+                    let id = block["id"] as? String ?? "tool:\(seq)"
+                    visitToolUse(name: name, id: id, input: block["input"] as? [String: Any] ?? [:], at: at)
+                default:
+                    // Thinking never enters the timeline (T3 ingestion :1567).
+                    continue
+                }
+            }
+        }
+
+        /// Streamed blocks merge into one message (id = the first
+        /// entry's uuid), the way the legacy feed merges bubbles.
+        mutating func appendAssistantText(_ text: String, id: String, at: Date) {
+            if let i = openAssistant {
+                let m = messages[i]
+                let joined = String((m.text + "\n\n" + text).prefix(SessionFeedReader.textCap))
+                messages[i] = SessionTimeline.Message(id: m.id, role: .assistant, text: joined, images: nil, sender: nil,
+                                      turnId: m.turnId, streaming: false, createdAt: m.createdAt, updatedAt: max(m.updatedAt, at))
+                return
+            }
+            messages.append(SessionTimeline.Message(id: id, role: .assistant, text: String(text.prefix(SessionFeedReader.textCap)),
+                                    images: nil, sender: nil, turnId: currentTurnId, streaming: false, createdAt: at))
+            openAssistant = messages.count - 1
+            if !turns.isEmpty { turns[turns.count - 1].assistantMessageId = id }
+        }
+
+        mutating func append(_ kind: String, id: String, tone: SessionTimeline.Activity.Tone, summary: String,
+                             detail: String? = nil, payload: [String: JSONValue] = [:], at: Date) {
+            activities.append(SessionTimeline.Activity(id: id, tone: tone, kind: kind, summary: summary,
+                                       detail: detail.map(Slim.detail), payload: payload,
+                                       turnId: currentTurnId, sequence: seq, createdAt: at))
+            seq += 1
+            openAssistant = nil
+        }
+
+        /// Request ids of prompts nothing has resolved yet.
+        var openPrompts: Set<String> = []
+
+        /// Turn state follows the session status, as T3's projector does
+        /// (`projector.ts:78-93`): the last turn is running while the
+        /// record is busy; every earlier turn is closed by the next prompt.
+        func finish(status: String?, statusUpdatedAt: Date?) -> SessionTimeline {
+            var activities = self.activities
+            var openPrompts = self.openPrompts
+            // The legacy `finalize` rule: a tool still open when the record
+            // says "waiting" is a permission prompt — unless the "waiting"
+            // predates the newest entry (a peer-started turn runs under
+            // the previous turn's status, 2026-09-04).
+            var recordWaiting = status == "waiting"
+            if recordWaiting, let flipped = statusUpdatedAt, let at = lastAt, flipped < at { recordWaiting = false }
+            if recordWaiting, let last = activities.last, last.kind == "tool.started", let tool = openTools[last.id] {
+                let id = "perm:" + last.id
+                openPrompts.insert(id)
+                activities.append(SessionTimeline.Activity(id: id, tone: .approval, kind: "approval.requested", summary: last.summary,
+                                           detail: nil,
+                                           payload: ["requestId": .string(id), "toolName": .string(tool.name),
+                                                     "requestType": .string(Slim.requestType(for: tool.name)),
+                                                     "input": tool.input],
+                                           turnId: last.turnId, sequence: seq, createdAt: last.createdAt))
+            }
+            var out: [SessionTimeline.Turn] = []
+            var messages = self.messages
+            for (i, d) in turns.enumerated() {
+                let isLast = i == turns.count - 1
+                let state: SessionTimeline.Turn.State
+                if d.interrupted { state = .interrupted }
+                else if d.errored { state = .error }
+                else if isLast, status == "busy" { state = .running }
+                else if isLast, status == "waiting", !openPrompts.isEmpty { state = .running }
+                else { state = .completed }
+                out.append(SessionTimeline.Turn(id: d.id, state: state, requestedAt: d.requestedAt, startedAt: d.startedAt,
+                                completedAt: state == .running ? nil : d.lastAt,
+                                userMessageId: d.id, assistantMessageId: d.assistantMessageId))
+                if state == .running, let aid = d.assistantMessageId,
+                   let mi = messages.firstIndex(where: { $0.id == aid }) {
+                    let m = messages[mi]
+                    messages[mi] = SessionTimeline.Message(id: m.id, role: m.role, text: m.text, images: m.images, sender: m.sender,
+                                           turnId: m.turnId, streaming: true, createdAt: m.createdAt, updatedAt: m.updatedAt)
+                }
+            }
+            return SessionTimeline(turns: out, messages: messages, activities: activities)
+        }
+    }
+
+    /// T3's slimming rules, applied once at build time
+    /// (`ActivityPayloadProjection.ts`, ingestion 180-char detail cap).
+    enum Slim {
+        static func detail(_ s: String) -> String { String(s.prefix(180)) }
+
+        /// First meaningful line when it fits, else "N lines" — T3's
+        /// `summarizeToolTextOutput`.
+        /// Walks the UTF-8 bytes rather than splitting Characters: a
+        /// tool result is a bridged NSString hundreds of KB long, and
+        /// the Character split was a quarter of a tail read (#380). A
+        /// line is meaningful when trimming `.whitespaces` leaves
+        /// something — decided on bytes for ASCII, by the trim itself
+        /// when a line carries anything non-ASCII (NBSP trims too).
+        static func output(_ text: String) -> String {
+            var text = text
+            text.makeContiguousUTF8()
+            var first: String?
+            var meaningful = 0
+            text.utf8.withContiguousStorageIfAvailable { bytes in
+                var start = 0
+                let n = bytes.count
+                while start <= n {
+                    var end = start
+                    while end < n, bytes[end] != 10 { end += 1 }
+                    let next = end + 1
+                    if end > start, bytes[end - 1] == 13 { end -= 1 }   // CRLF is a line break too
+                    var blank = true, ascii = true
+                    for b in bytes[start..<end] {
+                        if b >= 0x80 { ascii = false; break }
+                        if b != 0x20, b != 0x09 { blank = false }
+                    }
+                    var line: String?
+                    if !ascii {
+                        let s = String(decoding: bytes[start..<end], as: UTF8.self).trimmingCharacters(in: .whitespaces)
+                        blank = s.isEmpty
+                        line = s
+                    }
+                    if !blank {
+                        meaningful += 1
+                        if first == nil {
+                            first = line ?? String(decoding: bytes[start..<end], as: UTF8.self).trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+                    start = next
+                }
+            }
+            guard let first else { return "" }
+            if first.count <= 84 { return first }
+            return "\(meaningful) line\(meaningful == 1 ? "" : "s")"
+        }
+
+        /// The detail line for a completed tool, or nil when it merely
+        /// echoes the command (T3 `threadActivity.ts` suppression).
+        static func outputDetail(_ text: String, command: String?) -> String? {
+            let line = output(text)
+            guard !line.isEmpty, line != command else { return nil }
+            return line
+        }
+
+        /// Paths trimmed to their last four components, at most twelve.
+        static func files(_ paths: [String]) -> [String] {
+            paths.prefix(12).map { path in
+                path.split(separator: "/").suffix(4).joined(separator: "/")
+            }
+        }
+
+        /// T3's requestType heuristic (`ClaudeAdapter.ts:954-964`).
+        static func requestType(for tool: String) -> String {
+            switch itemType(for: tool) {
+            case "file_read", "search": return "file_read_approval"
+            case "command_execution": return "command_execution_approval"
+            case "file_change": return "file_change_approval"
+            default: return "dynamic_tool_call"
+            }
+        }
+
+        /// T3's item types for the tools Claude Code ships.
+        static func itemType(for tool: String) -> String {
+            switch tool {
+            case "Bash": return "command_execution"
+            case "Edit", "Write", "NotebookEdit", "MultiEdit": return "file_change"
+            case "Read": return "file_read"
+            case "Grep", "Glob", "WebSearch": return "search"
+            default: return "dynamic_tool_call"
+            }
+        }
+    }
+}

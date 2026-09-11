@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "infinitus.fleet",
+  "name": "Infinitus",
+  "version": "1.0.0",
+  "author": "Infinitus",
+  "license": "MIT",
+  "description": "claude-swap fleet in the bar: active account usage, themed fleet tooltip, click opens the fleet panel.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Infinitus fleet",
+    "description": "Active claude-swap account with 5h/7d usage; hover for the whole themed fleet; click opens the fleet panel (switch, rotate, themes).",
+    "category": "AI",
+    "aliases": [
+      "infinitus",
+      "cswap"
+    ],
+    "allowMultiple": false,
+    "defaults": {
+      "theme": "rpg",
+      "refreshIntervalSec": 60,
+      "sortByHeadroom": true
+    },
+    "schema": [
+      {
+        "key": "theme",
+        "type": "string",
+        "label": "Theme id",
+        "defaultValue": "rpg",
+        "description": "infinitus-tray themes lists the ids (off, rpg, movie, hades, mgs, ...)"
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 15,
+        "max": 3600,
+        "step": 15,
+        "defaultValue": 60
+      },
+      {
+        "key": "sortByHeadroom",
+        "type": "boolean",
+        "label": "Sort rows by headroom (active and next first)",
+        "defaultValue": true,
+        "description": "Display only — panel rows: active, next candidate, then most headroom first. Off keeps the engine's slot order."
+      }
+    ]
+  }
+}

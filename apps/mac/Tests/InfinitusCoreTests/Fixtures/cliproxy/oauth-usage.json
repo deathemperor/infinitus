@@ -1,0 +1,15 @@
+{
+  "five_hour": {"utilization": 63.2, "resets_at": "2026-09-02T18:00:00Z"},
+  "seven_day": {"utilization": 91.0, "resets_at": "2026-09-05T00:00:00Z"},
+  "extra_usage": {
+    "is_enabled": true,
+    "used_credits": 1234,
+    "monthly_limit": 10000,
+    "utilization": 12.34,
+    "currency": "USD",
+    "resets_at": "2026-10-01T00:00:00Z"
+  },
+  "limits": [
+    {"scope": {"model": {"display_name": "Fable"}}, "percent": 45, "resets_at": "2026-09-05T00:00:00Z"}
+  ]
+}

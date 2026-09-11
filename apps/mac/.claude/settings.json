@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SubagentStop": [
+      { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/tools/sim-teardown.sh" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/tools/sim-teardown.sh" } ] }
+    ]
+  }
+}

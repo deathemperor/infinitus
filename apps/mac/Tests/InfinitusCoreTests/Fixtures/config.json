@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "path": "/Users/deathemperor/.claude-swap-backup/settings.json",
+  "settings": [
+    {
+      "key": "autoswitch.threshold",
+      "value": 98.0,
+      "isSet": true,
+      "kind": "float",
+      "help": "Switch when the binding 5h/7d window reaches this pct",
+      "default": 90.0,
+      "lo": 50.0,
+      "hi": 99.9
+    },
+    {
+      "key": "autoswitch.intervalSeconds",
+      "value": 60.0,
+      "isSet": false,
+      "kind": "float",
+      "help": "Poll interval for the cswap auto loop, in seconds",
+      "default": 60.0,
+      "lo": 15.0,
+      "hi": 3600.0
+    },
+    {
+      "key": "autoswitch.cooldownSeconds",
+      "value": 300.0,
+      "isSet": false,
+      "kind": "float",
+      "help": "Minimum seconds between proactive switches",
+      "default": 300.0,
+      "lo": 0.0,
+      "hi": 86400.0
+    },
+    {
+      "key": "autoswitch.hysteresisPct",
+      "value": 10.0,
+      "isSet": false,
+      "kind": "float",
+      "help": "A target must beat the active account by this many pct",
+      "default": 10.0,
+      "lo": 0.0,
+      "hi": 50.0
+    },
+    {
+      "key": "autoswitch.strategy",
+      "value": "best",
+      "isSet": true,
+      "kind": "choice",
+      "help": "How auto-switch picks the target account",
+      "default": "best",
+      "choices": [
+        "best",
+        "consume-first"
+      ]
+    },
+    {
+      "key": "autoswitch.includeApiKeyAccounts",
+      "value": false,
+      "isSet": false,
+      "kind": "bool",
+      "help": "Allow rotating onto managed API-key accounts (bill per token)",
+      "default": false
+    },
+    {
+      "key": "autoswitch.unhealthyTicks",
+      "value": 3,
+      "isSet": false,
+      "kind": "int",
+      "help": "Consecutive failed polls before an account is unhealthy",
+      "default": 3,
+      "lo": 1,
+      "hi": 100
+    },
+    {
+      "key": "autoswitch.model",
+      "value": "Fable",
+      "isSet": true,
+      "kind": "string",
+      "help": "Also switch on these models' weekly limits (e.g. Fable, Fable,Opus, or all)",
+      "default": null
+    },
+    {
+      "key": "autoswitch.resumeStoppedSessions",
+      "value": true,
+      "isSet": true,
+      "kind": "bool",
+      "help": "Nudge sessions stopped by a usage limit once quota returns",
+      "default": false
+    },
+    {
+      "key": "autoswitch.limitScanIntervalSeconds",
+      "value": 5.0,
+      "isSet": true,
+      "kind": "float",
+      "help": "Scan sessions for a hit limit this often, in seconds (0 disables)",
+      "default": 5.0,
+      "lo": 0.0,
+      "hi": 60.0
+    },
+    {
+      "key": "ui.theme",
+      "value": "auto",
+      "isSet": true,
+      "kind": "choice",
+      "help": "Color theme; auto follows the terminal background",
+      "default": "auto",
+      "choices": [
+        "dark",
+        "light",
+        "auto"
+      ]
+    }
+  ]
+}

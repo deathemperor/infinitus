@@ -1,0 +1,6 @@
+{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","isSidechain":false,"message":{"role":"user","content":"fix the build"}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:01.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"Looking into it."}]}}
+{"type":"assistant","uuid":"a2","timestamp":"2026-09-01T10:00:02.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"Found it."}]}}
+{"type":"system","subtype":"turn_duration","uuid":"s1","timestamp":"2026-09-01T10:00:03.000Z"}
+{"type":"user","uuid":"u2","timestamp":"2026-09-01T10:01:00.000Z","isSidechain":false,"message":{"role":"user","content":[{"type":"text","text":"thanks"}]}}
+{"type":"assistant","uuid":"a3","timestamp":"2026-09-01T10:01:01.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"Anytime."}]}}

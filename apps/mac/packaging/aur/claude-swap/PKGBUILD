@@ -1,0 +1,25 @@
+# Maintainer: deathemperor <deathemperor1st@gmail.com>
+# The claude-swap engine CLI (upstream PyPI package, MIT). The Infinitus
+# menu bar app itself is macOS-only; on Arch (Omarchy included) this CLI
+# is the piece that runs — `cswap` in a terminal, same account switching.
+pkgname=claude-swap
+pkgver=0.25.0
+pkgrel=1
+pkgdesc="Multi-account switcher for Claude Code"
+arch=(any)
+url="https://github.com/realiti4/claude-swap"
+license=(MIT)
+depends=(python python-textual python-truststore)
+makedepends=(python-build python-installer python-wheel python-hatchling)
+source=("https://files.pythonhosted.org/packages/94/bd/b993db9038aad64fd7d3abc9105580b842bb09a2f188037c57922b06ffb3/claude_swap-$pkgver.tar.gz")
+sha256sums=('e665dbd7249f1211a5bc6df384c10965d78fd950b2cde305e1af93a73c8648d0')
+
+build() {
+  cd "claude_swap-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "claude_swap-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+}

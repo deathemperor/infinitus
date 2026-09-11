@@ -1,0 +1,5 @@
+{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","message":{"content":"delete everything"}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:01.000Z","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"rm -rf build"}}]}}
+{"type":"user","uuid":"i1","timestamp":"2026-09-01T10:00:05.000Z","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]},"interruptedMessageId":"msg_1"}
+{"type":"user","uuid":"u2","timestamp":"2026-09-01T10:01:00.000Z","message":{"content":"just the cache"}}
+{"type":"assistant","uuid":"a2","timestamp":"2026-09-01T10:01:01.000Z","isApiErrorMessage":true,"apiErrorStatus":500,"error":"api_error","message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error: 500 Internal server error"}]}}

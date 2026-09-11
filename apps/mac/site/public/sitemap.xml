@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://infinitus.run/</loc>
+    <lastmod>2026-09-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://infinitus.run/img/wall.png</image:loc><image:title>Infinitus fleet wall</image:title></image:image>
+    <image:image><image:loc>https://infinitus.run/img/themes/rpg.png</image:loc><image:title>Infinitus popup, RPG theme</image:title></image:image>
+  </url>
+  <url><loc>https://infinitus.run/llms.txt</loc><lastmod>2026-09-02</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>
+</urlset>

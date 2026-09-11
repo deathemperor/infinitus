@@ -1,0 +1,10 @@
+{
+  "themes": [
+    {
+      "id": "synthwave",
+      "name": "Synthwave — neon grid",
+      "author": "deathemperor",
+      "file": "community/synthwave.json"
+    }
+  ]
+}

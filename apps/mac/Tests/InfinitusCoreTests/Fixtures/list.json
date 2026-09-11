@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "activeAccountNumber": 5,
+  "accounts": [
+    {
+      "number": 1,
+      "email": "account1@example.com",
+      "organizationName": "account1@example.com's Organization",
+      "organizationUuid": "8a1edcc0-7b39-5a6b-bf97-31990bbd78a2",
+      "isOrganization": true,
+      "active": false,
+      "usageStatus": "ok",
+      "usage": {
+        "fiveHour": {
+          "pct": 0.0
+        },
+        "sevenDay": {
+          "pct": 100.0,
+          "resetsAt": "2026-08-31T15:00:00.374139+00:00",
+          "countdown": "3d 17h",
+          "clock": "Aug 31 22:00",
+          "expectedPct": 46.5,
+          "aheadOfPace": true,
+          "projectedExhaustionAt": "2026-08-27T21:10:50Z",
+          "willLastToReset": false
+        },
+        "scoped": [
+          {
+            "pct": 95.0,
+            "resetsAt": "2026-08-31T15:00:00.374421+00:00",
+            "countdown": "3d 17h",
+            "clock": "Aug 31 22:00",
+            "expectedPct": 46.5,
+            "aheadOfPace": true,
+            "projectedExhaustionAt": "2026-08-28T01:17:43Z",
+            "willLastToReset": false,
+            "name": "Fable"
+          }
+        ]
+      },
+      "usageFetchedAt": "2026-08-27T21:10:50Z",
+      "usageAgeSeconds": 45.6
+    },
+    {
+      "number": 2,
+      "email": "account5@example.com",
+      "organizationName": "Papaya",
+      "organizationUuid": "5f18a3d3-690c-5955-8019-34f1e535eae0",
+      "isOrganization": true,
+      "active": false,
+      "usageStatus": "ok",
+      "usage": {
+        "fiveHour": {
+          "pct": 0.0
+        },
+        "sevenDay": {
+          "pct": 100.0,
+          "resetsAt": "2026-08-29T14:00:00.453220+00:00",
+          "countdown": "1d 16h",
+          "clock": "Aug 29 21:00",
+          "expectedPct": 75.7,
+          "aheadOfPace": true,
+          "projectedExhaustionAt": "2026-08-27T21:10:50Z",
+          "willLastToReset": false
+        },
+        "spend": {
+          "used": 200.29,
+          "limit": 200.0,
+          "pct": 100.0,
+          "currency": "USD"
+        },
+        "scoped": [
+          {
+            "pct": 91.0,
+            "resetsAt": "2026-08-29T14:00:00.453440+00:00",
+            "countdown": "1d 16h",
+            "clock": "Aug 29 21:00",
+            "expectedPct": 75.7,
+            "aheadOfPace": true,
+            "projectedExhaustionAt": "2026-08-28T09:45:32Z",
+            "willLastToReset": false,
+            "name": "Fable"
+          }
+        ]
+      },
+      "usageFetchedAt": "2026-08-27T21:10:50Z",
+      "usageAgeSeconds": 45.6
+    },
+    {
+      "number": 3,
+      "email": "account4@example.com",
+      "organizationName": "account4@example.com's Organization",
+      "organizationUuid": "5fb1a5bb-3aab-57da-8185-21b4f576874f",
+      "isOrganization": true,
+      "active": false,
+      "usageStatus": "ok",
+      "usage": {
+        "fiveHour": {
+          "pct": 0.0
+        },
+        "sevenDay": {
+          "pct": 70.0,
+          "resetsAt": "2026-08-28T00:59:59.643722+00:00",
+          "countdown": "3h 48m",
+          "clock": "07:59",
+          "expectedPct": 97.7,
+          "aheadOfPace": false,
+          "projectedExhaustionAt": "2026-08-30T19:32:38Z",
+          "willLastToReset": true
+        },
+        "scoped": [
+          {
+            "pct": 100.0,
+            "resetsAt": "2026-08-28T00:59:59.643931+00:00",
+            "countdown": "3h 48m",
+            "clock": "07:59",
+            "expectedPct": 97.7,
+            "aheadOfPace": false,
+            "projectedExhaustionAt": "2026-08-27T21:10:50Z",
+            "willLastToReset": false,
+            "name": "Fable"
+          }
+        ]
+      },
+      "usageFetchedAt": "2026-08-27T21:10:50Z",
+      "usageAgeSeconds": 45.6
+    },
+    {
+      "number": 4,
+      "email": "account3@example.com",
+      "organizationName": "account3@example.com's Organization",
+      "organizationUuid": "1c11e304-4b73-551d-8da6-e208f01d977f",
+      "isOrganization": true,
+      "active": false,
+      "usageStatus": "ok",
+      "usage": {
+        "fiveHour": {
+          "pct": 0.0
+        },
+        "sevenDay": {
+          "pct": 0.0
+        },
+        "scoped": [
+          {
+            "pct": 0.0,
+            "name": "Fable"
+          }
+        ]
+      },
+      "usageFetchedAt": "2026-08-27T21:10:50Z",
+      "usageAgeSeconds": 45.6
+    },
+    {
+      "number": 5,
+      "email": "account2@example.com",
+      "organizationName": "account2@example.com's Organization",
+      "organizationUuid": "e68f0e6d-e415-5689-a534-c39ae1c77a19",
+      "isOrganization": true,
+      "active": true,
+      "usageStatus": "ok",
+      "usage": {
+        "fiveHour": {
+          "pct": 12.0,
+          "resetsAt": "2026-08-27T23:20:00.289064+00:00",
+          "countdown": "2h 8m",
+          "clock": "06:20"
+        },
+        "sevenDay": {
+          "pct": 93.0,
+          "resetsAt": "2026-08-29T01:00:00.289088+00:00",
+          "countdown": "1d 3h",
+          "clock": "Aug 29 08:00",
+          "expectedPct": 83.4,
+          "aheadOfPace": false,
+          "projectedExhaustionAt": "2026-08-28T07:42:43Z",
+          "willLastToReset": false
+        },
+        "scoped": [
+          {
+            "pct": 85.0,
+            "resetsAt": "2026-08-29T01:00:00.289358+00:00",
+            "countdown": "1d 3h",
+            "clock": "Aug 29 08:00",
+            "expectedPct": 83.4,
+            "aheadOfPace": false,
+            "projectedExhaustionAt": "2026-08-28T21:53:48Z",
+            "willLastToReset": false,
+            "name": "Fable"
+          }
+        ]
+      },
+      "usageFetchedAt": "2026-08-27T21:09:44Z",
+      "usageAgeSeconds": 111.8
+    }
+  ],
+  "liveSessions": {
+    "busy": 4,
+    "idle": 7,
+    "waiting": 0,
+    "shell": 1,
+    "unknown": 2,
+    "total": 14
+  }
+}
