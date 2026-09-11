@@ -112,6 +112,10 @@ export const SET_INFINITUS_QUIT_WITH_APP_CHANNEL = "desktop:infinitus-set-quit-w
 export const SET_INFINITUS_CAPTURE_GESTURE_ENABLED_CHANNEL =
   "desktop:infinitus-set-capture-gesture-enabled";
 export const CAPTURE_GESTURE_EVENT_CHANNEL = "desktop:infinitus-capture-gesture-event";
+// Fork: OS notifications and the Dock badge for threads waiting on the user (#270 B).
+export const POST_NOTIFICATION_CHANNEL = "desktop:infinitus-post-notification";
+export const SET_BADGE_COUNT_CHANNEL = "desktop:infinitus-set-badge-count";
+export const NOTIFICATION_ACTIVATED_CHANNEL = "desktop:infinitus-notification-activated";
 // Fork: a fleet's sign-in inside the app (#677).
 export const OPEN_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-open-sign-in";
 export const CLOSE_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-close-sign-in";

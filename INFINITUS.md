@@ -347,6 +347,33 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `SnapShotCoordinator`, the row from `SnapShotSettings.tsx` after the
   capture sound, and the `completion-sound` search item in
   `settingsSearch.ts`.
+- `apps/web/src/lib/desktopNotifications.logic.ts`,
+  `apps/web/src/components/desktop/DesktopNotificationCoordinator.tsx`,
+  `apps/web/src/components/settings/DesktopNotificationSettings.tsx`,
+  `apps/desktop/src/electron/ElectronNotification.ts`,
+  `apps/desktop/src/ipc/methods/notifications.ts` — the desktop's OS
+  notifications and Dock badge (#270 B). The renderer decides: one banner
+  per thread this window already knew that moves into approval, input,
+  held or failed, or (off by default) reaches a completed turn it had not
+  seen completed — the completion sound's rule; the thread on screen while
+  the window is focused stays quiet. The badge counts the threads in
+  approval or input. The main process only shows (`Electron.Notification`,
+  a no-op where unsupported) and, on a click, reveals the window on the
+  thread over `NOTIFICATION_ACTIVATED_CHANNEL` (`DesktopWindow.
+dispatchNotificationActivated`). Fork-thread events only: the account
+  events (a limit, every account dead, revived) stay the native app's
+  Notification Center items. Six client-setting booleans
+  (`desktopNotifyOn*`, `desktopBadgeAttention`) in
+  `packages/contracts/src/settings.ts`; the `DesktopBridge` methods
+  `postNotification` / `setBadgeCount` / `onNotificationActivated` and the
+  `DesktopNotificationRequest` / `DesktopNotificationActivated` schemas in
+  `packages/contracts/src/ipc.ts`, all optional. Registration points: the
+  coordinator mounted from `__root.tsx` after the completion sound (primary
+  environment authenticated), the settings section as the notifications
+  pane's `lead`, the `desktop-notify-*` / `desktop-badge` search items, the
+  three channels in `apps/desktop/src/ipc/channels.ts`, the two handlers in
+  `DesktopIpcHandlers.ts`, `ElectronNotification.layer` in `main.ts`, and
+  the preload's `isNotificationActivated` guard.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all ten where no
   connected server reaches an Infinitus app.

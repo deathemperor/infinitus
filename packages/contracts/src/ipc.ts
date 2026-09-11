@@ -89,7 +89,7 @@ import type {
   OrchestrationThreadStreamItem,
 } from "./orchestration.ts";
 import { SnapShotSource } from "./orchestration.ts";
-import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { EnvironmentId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { BrowserProfileId } from "./browserProfile.ts";
 import type {
   BrowserImportResult,
@@ -319,6 +319,25 @@ export const DesktopSnapShotEvent = Schema.Union([
   Schema.Struct({ type: Schema.Literal("shortcut-changed") }),
 ]);
 export type DesktopSnapShotEvent = typeof DesktopSnapShotEvent.Type;
+
+/**
+ * Fork (#270 B): one OS notification for a thread, posted by the renderer
+ * when the thread moves into a state waiting on the user; a click routes
+ * the window to that thread through `onNotificationActivated`.
+ */
+export const DesktopNotificationRequest = Schema.Struct({
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+  title: TrimmedNonEmptyString,
+  body: TrimmedNonEmptyString,
+});
+export type DesktopNotificationRequest = typeof DesktopNotificationRequest.Type;
+
+export const DesktopNotificationActivated = Schema.Struct({
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+});
+export type DesktopNotificationActivated = typeof DesktopNotificationActivated.Type;
 
 /**
  * Fork (#433 slice 2): one read of the front app's selection after the
@@ -1341,6 +1360,13 @@ export interface DesktopBridge {
    * control socket by the shell itself. Optional: without them the web client
    * falls back to the sign-in on the Mac.
    */
+  /**
+   * Fork (#270 B): an OS notification for a thread, and the Dock badge with
+   * the count of threads waiting on the user. Optional: a shell without them
+   * posts nothing and hides the settings.
+   */
+  postNotification?: (input: DesktopNotificationRequest) => Promise<void>;
+  setBadgeCount?: (count: number) => Promise<void>;
   openInfinitusSignIn?: (input: InfinitusSignInWindowInput) => Promise<void>;
   closeInfinitusSignIn?: (flowId: string) => Promise<void>;
   submitInfinitusSignInCode?: (
@@ -1374,6 +1400,8 @@ export interface DesktopBridge {
   probeRemoteEditors?: () => Promise<readonly EditorId[]>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
+  /** Fork (#270 B): a notification's click. Optional: older shells never emit it. */
+  onNotificationActivated?: (listener: (event: DesktopNotificationActivated) => void) => () => void;
   /** Fork (#433 slice 2): the capture gesture's reads. Optional: older shells never emit them. */
   onCaptureGestureEvent?: (listener: (event: DesktopCaptureGestureEvent) => void) => () => void;
   /**
