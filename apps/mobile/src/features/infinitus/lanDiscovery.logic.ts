@@ -77,6 +77,76 @@ export function subnetCandidates(ownIp: string | null): ReadonlyArray<string> {
   return hosts;
 }
 
+/** The /24 a sweep covers, "192.168.2.0/24", or null when `subnetCandidates`
+    has nothing for the address. */
+export function subnetLabel(ownIp: string | null): string | null {
+  if (subnetCandidates(ownIp).length === 0) return null;
+  return `${ownIp!.split(".").slice(0, 3).join(".")}.0/24`;
+}
+
+/**
+ * What one sweep did, for the line under the button (#787): with the
+ * counts a report says which suspect it is — an address the sweep will not
+ * touch (link-local `169.254.x`, a tailnet `100.x`), a port nobody answers
+ * on, or a batch of timeouts. Addresses and counts only, never a server's
+ * label or id.
+ */
+export interface SweepReport {
+  /** The address expo-network gave, the last `en*` IPv4 on iOS. */
+  readonly ownIp: string | null;
+  /** "Wi‑Fi", "cellular", …, or null when the state lookup failed. */
+  readonly network: string | null;
+  readonly port: number;
+  readonly timeoutMs: number;
+  readonly probed: number;
+  /** Descriptor answers: servers listed. */
+  readonly servers: number;
+  /** Something answered on the port that was not a server. */
+  readonly answeredOther: number;
+  readonly timedOut: number;
+  /** Refused, unreachable, and every other transport failure. */
+  readonly failed: number;
+  /** The first failure's message, so a "Network request failed" reads as such. */
+  readonly failure: string | null;
+  readonly aborted: boolean;
+  readonly elapsedMs: number;
+}
+
+/** expo-network's `NetworkStateType` as a word for the report. */
+export function networkWord(type: string | undefined): string | null {
+  switch (type) {
+    case undefined:
+      return null;
+    case "WIFI":
+      return "Wi‑Fi";
+    case "CELLULAR":
+      return "cellular";
+    default:
+      return type.toLowerCase();
+  }
+}
+
+export function sweepSummary(report: SweepReport): string {
+  const on = report.network === null ? "" : ` on ${report.network}`;
+  const subnet = subnetLabel(report.ownIp);
+  if (subnet === null) {
+    return report.ownIp === null
+      ? `Nothing swept: the phone reported no address${on}.`
+      : `Nothing swept: ${report.ownIp}${on} is not a private Wi‑Fi address.`;
+  }
+  const seconds = `${(report.elapsedMs / 1000).toFixed(1)} s`;
+  const counts = [
+    `${report.probed} probed`,
+    `${report.servers} answered`,
+    `${report.timedOut} timed out (${report.timeoutMs} ms)`,
+    `${report.failed} failed`,
+    ...(report.answeredOther > 0 ? [`${report.answeredOther} not a server`] : []),
+  ].join(", ");
+  const failure = report.failure === null ? "" : ` First failure: ${report.failure}.`;
+  const aborted = report.aborted ? " Stopped early." : "";
+  return `Swept ${subnet} on :${report.port} from ${report.ownIp}${on}: ${counts}, ${seconds}.${failure}${aborted}`;
+}
+
 export function probeUrl(ip: string, port: number = INFINITUS_SERVER_PORT): string {
   return `http://${ip}:${port}${WELL_KNOWN_ENVIRONMENT_PATH}`;
 }

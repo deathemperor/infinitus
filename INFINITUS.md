@@ -809,6 +809,12 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   environment id (a Mac on two interfaces answers twice), and after "Use"
   the Add button waits for a pairing code with a hint under the code field
   (`pickedHostNeedsCode`); approve-on-Mac keeps its own button.
+  After a sweep a line under the button says what it did (#787,
+  `sweepSummary`): subnet, port, the phone's own address (expo-network's
+  last `en*` IPv4 — a `169.254.x` or `100.x` there means the Wi‑Fi address
+  was not the one picked, and nothing is swept), how many probes answered,
+  timed out or failed, and the first failure's words; counts and addresses
+  only.
 - `apps/mobile/src/features/infinitus/pairingApproval.logic.ts` (+ `pairingApproval.ts`,
   `InfinitusAskToApprove.tsx`) — "Ask this Mac to approve" under the code
   field (#710, PR 3): the phone POSTs a request with a random secret to the
