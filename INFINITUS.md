@@ -456,6 +456,18 @@ this file adds the fork's own rules. Plan and history: issue #555.
   live instances, then expected spawns an hour — with the top 12 shown and
   the rest behind "Show all". `machine-kill`, `machine-reclaim` and
   `machine-hook` are not exposed. Sidebar "Machine" beside Activity.
+- `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/`
+  — the `/utilization` page (#747): the native Utilization pane in the fork.
+  Today the forecast section only: every account's projection at its own
+  measured pace (windows, pct, pace, when each fills or "Resets before it
+  fills", which window binds first) plus the fleet strip Accounts shows,
+  read off the `forecast` reply the snapshot already carries — no extra
+  verb, no extra poll. `buildForecast` in
+  `packages/client-runtime/src/state/infinitusAccounts.ts` decodes the
+  lines leniently (the contract leaves them opaque; an odd line or window
+  is dropped alone). The history chart and the run-rate table follow the
+  `utilization --days` verb native is adding. Sidebar "Utilization" beside
+  Machine.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud

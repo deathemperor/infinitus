@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as UtilizationRouteImport } from './routes/utilization'
 import { Route as UsageRouteImport } from './routes/usage'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -47,6 +48,11 @@ import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$e
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UtilizationRoute = UtilizationRouteImport.update({
+  id: '/utilization',
+  path: '/utilization',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UsageRoute = UsageRouteImport.update({
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/usage': typeof UsageRoute
+  '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/connect/callback': typeof ConnectCallbackRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/usage': typeof UsageRoute
+  '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/connect/callback': typeof ConnectCallbackRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/usage': typeof UsageRoute
+  '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
   '/connect_/callback': typeof ConnectCallbackRoute
@@ -339,6 +348,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/usage'
+    | '/utilization'
     | '/welcome'
     | '/pull-requests'
     | '/connect/callback'
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/usage'
+    | '/utilization'
     | '/welcome'
     | '/pull-requests'
     | '/connect/callback'
@@ -409,6 +420,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/usage'
+    | '/utilization'
     | '/welcome'
     | '/_chat/pull-requests'
     | '/connect_/callback'
@@ -446,6 +458,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   StatsRoute: typeof StatsRoute
   UsageRoute: typeof UsageRoute
+  UtilizationRoute: typeof UtilizationRoute
   WelcomeRoute: typeof WelcomeRoute
   ConnectCallbackRoute: typeof ConnectCallbackRoute
   ProjectsProjectKeyRoute: typeof ProjectsProjectKeyRoute
@@ -458,6 +471,13 @@ declare module '@tanstack/react-router' {
       path: '/welcome'
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/utilization': {
+      id: '/utilization'
+      path: '/utilization'
+      fullPath: '/utilization'
+      preLoaderRoute: typeof UtilizationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/usage': {
@@ -766,6 +786,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   StatsRoute: StatsRoute,
   UsageRoute: UsageRoute,
+  UtilizationRoute: UtilizationRoute,
   WelcomeRoute: WelcomeRoute,
   ConnectCallbackRoute: ConnectCallbackRoute,
   ProjectsProjectKeyRoute: ProjectsProjectKeyRoute,

@@ -64,11 +64,42 @@ export interface FleetSectionModel {
   readonly canAdd: boolean;
 }
 
+/** One window of one account's projection: where it stands, the measured
+    pace, and when it fills at that pace (`null` when the reset lands first or
+    the pace is unknown). Instants are ISO strings. */
+export interface ForecastWindowModel {
+  readonly name: string;
+  readonly pct: number;
+  readonly ratePctPerHour: number | null;
+  readonly resetsAt: string | null;
+  readonly hitsAt: string | null;
+}
+
+/** One account's projection at its own measured pace (the Utilization page's
+    forecast section, #747). `bindsAt`/`bindsWindow` are the earliest `hitsAt`
+    across its windows, what native's `AccountLine.bindsAt` computes. */
+export interface ForecastLineModel {
+  readonly number: number;
+  readonly label: string;
+  readonly active: boolean;
+  readonly disabled: boolean;
+  readonly windows: ReadonlyArray<ForecastWindowModel>;
+  readonly bindsAt: string | null;
+  readonly bindsWindow: string | null;
+}
+
 /** The fleet-wide run-rate projection. Estimates, never billing truth. */
 export interface ForecastModel {
   readonly allDeadAt: string | null;
   readonly drainOrder: ReadonlyArray<string>;
   readonly computedAt: string | null;
+  /** What the numbers rest on, the app's own words; null when it sent none. */
+  readonly basis: string | null;
+  /** Whether the app projected an active account at all. */
+  readonly hasActive: boolean;
+  /** Every account's line, in the app's order; `[]` on a build that does not
+      send them or a shape this reader does not know. */
+  readonly accounts: ReadonlyArray<ForecastLineModel>;
 }
 
 /** What every Infinitus page shows before it can show its own body. */
@@ -273,6 +304,62 @@ function isoFromEpochSeconds(value: unknown): string | null {
   return instant._tag === "Some" ? DateTime.formatIso(instant.value) : null;
 }
 
+/** The forecast's account lines, which the contract leaves opaque. Every key
+    the app may omit is optional here; a line missing its identity is dropped
+    on its own, so one odd line never blanks the section. */
+const ForecastWindowPayload = Schema.Struct({
+  name: Schema.String,
+  pct: Schema.Finite,
+  ratePctPerHour: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  resetsAt: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  hitsAt: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+});
+
+const ForecastLinePayload = Schema.Struct({
+  number: Schema.Finite,
+  email: Schema.String,
+  alias: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  active: Schema.optionalKey(Schema.Boolean),
+  disabled: Schema.optionalKey(Schema.Boolean),
+  windows: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const decodeForecastLine = Schema.decodeUnknownOption(ForecastLinePayload);
+const decodeForecastWindow = Schema.decodeUnknownOption(ForecastWindowPayload);
+
+function forecastWindow(payload: unknown): ForecastWindowModel | null {
+  const window = decodeForecastWindow(payload);
+  if (window._tag === "None") return null;
+  return {
+    name: window.value.name,
+    pct: Math.min(100, Math.max(0, Math.round(window.value.pct))),
+    ratePctPerHour: window.value.ratePctPerHour ?? null,
+    resetsAt: isoFromEpochSeconds(window.value.resetsAt),
+    hitsAt: isoFromEpochSeconds(window.value.hitsAt),
+  };
+}
+
+function forecastLine(payload: unknown): ForecastLineModel | null {
+  const line = decodeForecastLine(payload);
+  if (line._tag === "None") return null;
+  const windows = (line.value.windows ?? [])
+    .map(forecastWindow)
+    .filter((window): window is ForecastWindowModel => window !== null);
+  const binding = windows
+    .filter((window) => window.hitsAt !== null)
+    .sort((left, right) => (left.hitsAt ?? "").localeCompare(right.hitsAt ?? ""))[0];
+  const alias = line.value.alias ?? "";
+  return {
+    number: line.value.number,
+    label: alias !== "" ? alias : line.value.email,
+    active: line.value.active ?? false,
+    disabled: line.value.disabled ?? false,
+    windows,
+    bindsAt: binding?.hitsAt ?? null,
+    bindsWindow: binding?.name ?? null,
+  };
+}
+
 /** The label a drain-order number stands for, looked up across every fleet.
     Numbers are per-fleet, so the first match wins; a number no fleet knows
     stays a bare `#n` rather than disappearing from the order. */
@@ -295,10 +382,16 @@ export function buildForecast(snapshot: InfinitusSnapshot): ForecastModel | null
         .filter((entry): entry is number => typeof entry === "number")
         .map((entry) => drainLabel(snapshot, entry))
     : [];
+  const accounts = Array.isArray(forecast.accounts)
+    ? forecast.accounts.map(forecastLine).filter((line): line is ForecastLineModel => line !== null)
+    : [];
   return {
     allDeadAt: isoFromEpochSeconds(forecast.allDeadAt),
     drainOrder,
     computedAt: isoFromEpochSeconds(forecast.computedAt),
+    basis: typeof forecast.basis === "string" ? forecast.basis : null,
+    hasActive: forecast.active !== undefined && forecast.active !== null,
+    accounts,
   };
 }
 
