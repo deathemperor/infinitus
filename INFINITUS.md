@@ -415,10 +415,13 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `status.forkTunnel` while it is up; a never-polled snapshot is refreshed
   once for it). The phone keeps them on the bearer profile from the pairing
   on and re-learns them on every connect, so a tunnel turned on after the
-  pairing is picked up by the next LAN connect, and a connect that finds
-  none named keeps the known ones (a tunnel blip is not a removal). A
-  connect tries the host that worked last, then the paired one, then the
-  alternates (3 s descriptor wait on every host but the last); a host where
+  pairing is picked up by the next LAN connect. The server's list replaces
+  the phone's on every connect — it is the authority on its own doors, and a
+  quick-tunnel hostname it no longer holds can be handed to anyone, so the
+  bearer token never follows a stale one (a host the profile no longer
+  names is not tried, last-good or not). A connect tries the host that
+  worked last, then the paired one, then the alternates (3 s descriptor
+  wait on every host but the last); a host where
   the Mac is not — nothing answers (network, timeout), or something else
   does (`remote-unavailable`, a 404 or another environment's id) — is
   walked past, one that refuses the credential ends the walk. The bearer

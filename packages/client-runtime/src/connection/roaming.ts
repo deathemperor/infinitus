@@ -17,20 +17,21 @@ import type { ConnectionAttemptError } from "./model.ts";
 export const ROAM_PROBE_TIMEOUT_MS = 3_000;
 
 /** The hosts to try, in order: the one that worked last (it is the paired one
-    until a roam), then the paired one, then the alternates. No repeats. */
+    until a roam), then the paired one, then the alternates. No repeats, and
+    only hosts the profile still names — a last-good host the server has since
+    dropped is not this environment's any more and is not tried. */
 export function bearerHostOrder(
   profile: Pick<
     BearerConnectionProfile,
     "httpBaseUrl" | "alternateHttpBaseUrls" | "lastGoodHttpBaseUrl"
   >,
 ): ReadonlyArray<string> {
+  const named = [profile.httpBaseUrl, ...(profile.alternateHttpBaseUrls ?? [])];
   const order: Array<string> = [];
-  for (const host of [
-    profile.lastGoodHttpBaseUrl,
-    profile.httpBaseUrl,
-    ...(profile.alternateHttpBaseUrls ?? []),
-  ]) {
-    if (host !== undefined && host !== "" && !order.includes(host)) order.push(host);
+  for (const host of [profile.lastGoodHttpBaseUrl, ...named]) {
+    if (host !== undefined && host !== "" && named.includes(host) && !order.includes(host)) {
+      order.push(host);
+    }
   }
   return order;
 }
@@ -56,10 +57,12 @@ export function roamsPast(error: ConnectionAttemptError): boolean {
 
 /**
  * The profile after a connect landed on `liveHttpBaseUrl` and read
- * `descriptor`: the live host remembered, the alternates re-learned from the
- * server (the paired host itself never listed among them). A descriptor that
- * names none leaves the known alternates alone — the tunnel is down for the
- * moment, not gone, and a stale one costs one short probe. Null when nothing
+ * `descriptor`: the live host remembered, the alternates replaced by what the
+ * server names now (the paired host itself never listed among them). The
+ * server is the authority on its own doors: a quick-tunnel hostname it no
+ * longer holds can be handed to anyone, and the bearer token must never
+ * follow a stale one — so a descriptor naming no alternates drops ours, and
+ * the next connect that names them learns them again. Null when nothing
  * changed, so the store is not written on every connect.
  */
 export function learnedBearerProfile(
@@ -67,10 +70,9 @@ export function learnedBearerProfile(
   liveHttpBaseUrl: string,
   descriptor: Pick<ExecutionEnvironmentDescriptor, "alternateHttpBaseUrls">,
 ): BearerConnectionProfile | null {
-  const named = (descriptor.alternateHttpBaseUrls ?? []).filter(
+  const alternates = (descriptor.alternateHttpBaseUrls ?? []).filter(
     (host) => host !== profile.httpBaseUrl,
   );
-  const alternates = named.length === 0 ? (profile.alternateHttpBaseUrls ?? []) : named;
   const sameAlternates =
     alternates.length === (profile.alternateHttpBaseUrls ?? []).length &&
     alternates.every((host, index) => profile.alternateHttpBaseUrls?.[index] === host);

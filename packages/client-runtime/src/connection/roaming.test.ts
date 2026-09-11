@@ -29,6 +29,18 @@ describe("bearerHostOrder", () => {
       bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL, LAN], lastGoodHttpBaseUrl: LAN })),
     ).toEqual([LAN, TUNNEL]);
   });
+
+  it("never tries a last-good host the server no longer names", () => {
+    expect(bearerHostOrder(profile({ lastGoodHttpBaseUrl: TUNNEL }))).toEqual([LAN]);
+    expect(
+      bearerHostOrder(
+        profile({
+          alternateHttpBaseUrls: ["https://new.example.test"],
+          lastGoodHttpBaseUrl: TUNNEL,
+        }),
+      ),
+    ).toEqual([LAN, "https://new.example.test"]);
+  });
 });
 
 describe("roamsPast", () => {
@@ -66,15 +78,24 @@ describe("learnedBearerProfile", () => {
     expect(back?.lastGoodHttpBaseUrl).toBe(LAN);
   });
 
-  it("writes nothing when nothing changed, never lists the paired host, keeps the tunnel through a blip", () => {
+  it("writes nothing when nothing changed and never lists the paired host", () => {
     const settled = profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: LAN });
     expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [TUNNEL] })).toBeNull();
     expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [LAN, TUNNEL] })).toBeNull();
-    expect(learnedBearerProfile(settled, LAN, {})).toBeNull();
-    expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [] })).toBeNull();
+  });
+
+  it("drops a tunnel the server no longer names and takes the one it names now", () => {
+    const settled = profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: LAN });
+    const gone = learnedBearerProfile(settled, LAN, {});
+    expect(gone?.alternateHttpBaseUrls).toBeUndefined();
+    expect(gone?.lastGoodHttpBaseUrl).toBe(LAN);
+    expect(
+      learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [] })?.alternateHttpBaseUrls,
+    ).toBeUndefined();
     const moved = learnedBearerProfile(settled, LAN, {
       alternateHttpBaseUrls: ["https://other.example.test"],
     });
     expect(moved?.alternateHttpBaseUrls).toEqual(["https://other.example.test"]);
+    expect(bearerHostOrder(moved!)).toEqual([LAN, "https://other.example.test"]);
   });
 });
