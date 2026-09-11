@@ -22,7 +22,7 @@ import {
   type InfinitusControlClientShape,
 } from "../Services/InfinitusControlClient.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
-import { InfinitusLive } from "./Infinitus.ts";
+import { InfinitusLive, manifestOffersOption } from "./Infinitus.ts";
 
 /** Every sampled span the effect ended, with its attributes, oldest first. */
 const collectSpans = <A, E, R>(
@@ -937,4 +937,14 @@ describe("events", () => {
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),
   );
+});
+
+describe("manifestOffersOption", () => {
+  it("matches the bare and the dashed-with-placeholder spellings, nothing looser", () => {
+    expect(manifestOffersOption({ options: ["limit", "after"] }, "after")).toBe(true);
+    expect(manifestOffersOption({ options: ["--body <json>"] }, "body")).toBe(true);
+    expect(manifestOffersOption({ options: ["--forget <deviceId>/<kind>"] }, "forget")).toBe(true);
+    expect(manifestOffersOption({ options: ["limit"] }, "after")).toBe(false);
+    expect(manifestOffersOption({ options: ["after-all"] }, "after")).toBe(false);
+  });
 });
