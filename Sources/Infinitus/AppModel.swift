@@ -781,7 +781,10 @@ final class AppModel: ObservableObject {
     func uiSurface(_ id: String, visible: Bool) {
         let was = localUIVisible
         if visible { visibleSurfaces.insert(id) } else { visibleSurfaces.remove(id) }
-        if localUIVisible != was || visible { reportLocalActivity(visible: localUIVisible) }
+        // Every change re-reports: the scopes follow WHICH surfaces show,
+        // not only whether any does (the stats pane closing while the
+        // popup stays must drop `.stats`, #499).
+        reportLocalActivity(visible: localUIVisible)
         // The exporter's one unthrottled pass (launch) can land before this
         // lease does — a startup race between StatusItemController's
         // delayed pop-out/workspace restore and refreshSnapshot's first,
@@ -801,15 +804,24 @@ final class AppModel: ObservableObject {
             }
         }
     }
+    /// The popup and pop-out watch sessions and fleets; only the Stats
+    /// pane watches stats. Holding `.stats` from every local surface kept
+    /// the lazy stats cache (~27 MB of Day maps, tallies and file entries)
+    /// resident whenever the popup was open (#499).
     private func reportLocalActivity(visible: Bool) {
         if visible {
+            var scopes: [ClientActivity.Scope] = []
+            if !visibleSurfaces.subtracting([Self.statsSurface]).isEmpty { scopes += [.sessions, .fleets] }
+            if visibleSurfaces.contains(Self.statsSurface) { scopes.append(.stats) }
             mirrorServer.leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
-                                             recentlyInteracted: true, scopes: [.sessions, .fleets, .stats],
+                                             recentlyInteracted: true, scopes: scopes,
                                              ttlMs: ClientActivity.ttlCapMs))
         } else {
             mirrorServer.leases.release(clientId: ClientActivity.localClientId)
         }
     }
+    /// `uiSurface` id the Stats pane reports while it shows.
+    static let statsSurface = "stats"
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
