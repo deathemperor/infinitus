@@ -164,8 +164,23 @@ export const VcsRemoveWorktreeInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   path: TrimmedNonEmptyStringSchema,
   force: Schema.optional(Schema.Boolean),
+  /** Commit uncommitted changes to the worktree's branch before removing it,
+      so the branch, not the directory, holds the work (#270 A). */
+  keepWork: Schema.optional(Schema.Boolean),
+  /** Delete the worktree's branch after a successful removal. Ignored when
+      `keepWork` had something to commit: that commit is the work's only copy. */
+  deleteBranch: Schema.optional(Schema.Boolean),
 });
 export type VcsRemoveWorktreeInput = typeof VcsRemoveWorktreeInput.Type;
+
+export const VcsRemoveWorktreeResult = Schema.Struct({
+  /** The branch the worktree had checked out; null when detached or unknown. */
+  branch: Schema.NullOr(TrimmedNonEmptyStringSchema),
+  /** The commit `keepWork` made, or null when there was nothing to save. */
+  savedWorkCommit: Schema.NullOr(TrimmedNonEmptyStringSchema),
+  branchDeleted: Schema.Boolean,
+});
+export type VcsRemoveWorktreeResult = typeof VcsRemoveWorktreeResult.Type;
 
 export const VcsCreateRefInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,

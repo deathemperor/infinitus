@@ -36,7 +36,12 @@ import {
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useUiStateStore } from "../uiStateStore";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
-import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
+import {
+  branchDeletionPrompt,
+  describeSavedWorktreeWork,
+  formatWorktreePathForDisplay,
+  getOrphanedWorktreePathForThread,
+} from "../worktreeCleanup";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { useClientSettings } from "./useSettings";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -373,6 +378,18 @@ export function useThreadActions() {
         }
         shouldDeleteWorktree = confirmationResult.value;
       }
+      let shouldDeleteBranch = false;
+      if (shouldDeleteWorktree && localApi && thread.branch !== null) {
+        const branchResult = await settlePromise(() =>
+          localApi.dialogs.confirm(branchDeletionPrompt(thread.branch as string), {
+            variant: "destructive",
+          }),
+        );
+        if (branchResult._tag === "Failure") {
+          return branchResult;
+        }
+        shouldDeleteBranch = branchResult.value;
+      }
 
       if (thread.session && thread.session.status !== "stopped") {
         await stopThreadSession({
@@ -440,8 +457,15 @@ export function useThreadActions() {
           cwd: threadProject.workspaceRoot,
           path: orphanedWorktreePath,
           force: true,
+          keepWork: true,
+          deleteBranch: shouldDeleteBranch,
         },
       });
+      const savedWork =
+        removeResult._tag === "Success" ? describeSavedWorktreeWork(removeResult.value) : null;
+      if (savedWork) {
+        toastManager.add(stackedThreadToast({ type: "info", ...savedWork }));
+      }
       const refreshResult =
         removeResult._tag === "Success"
           ? await refreshVcsStatus({

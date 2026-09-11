@@ -2,7 +2,12 @@ import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools
 import { describe, expect, it } from "vite-plus/test";
 
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type Thread } from "./types";
-import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "./worktreeCleanup";
+import {
+  branchDeletionPrompt,
+  describeSavedWorktreeWork,
+  formatWorktreePathForDisplay,
+  getOrphanedWorktreePathForThread,
+} from "./worktreeCleanup";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 
@@ -109,5 +114,37 @@ describe("formatWorktreePathForDisplay", () => {
   it("ignores trailing slashes", () => {
     const result = formatWorktreePathForDisplay("/tmp/custom-worktrees/my-worktree/");
     expect(result).toBe("my-worktree");
+  });
+});
+
+describe("branchDeletionPrompt", () => {
+  it("names the branch and says saved work keeps it", () => {
+    const prompt = branchDeletionPrompt("t3code/feature-x");
+    expect(prompt).toContain('"t3code/feature-x"');
+    expect(prompt).toContain("kept");
+  });
+});
+
+describe("describeSavedWorktreeWork", () => {
+  it("is silent when nothing had to be saved", () => {
+    expect(
+      describeSavedWorktreeWork({
+        branch: "feature/x",
+        savedWorkCommit: null,
+        branchDeleted: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("names the branch and the short commit when work was saved", () => {
+    const toast = describeSavedWorktreeWork({
+      branch: "feature/x",
+      savedWorkCommit: "0123456789abcdef0123456789abcdef01234567",
+      branchDeleted: false,
+    });
+    expect(toast?.title).toBe("Uncommitted work saved");
+    expect(toast?.description).toContain('"feature/x"');
+    expect(toast?.description).toContain("0123456");
+    expect(toast?.description).not.toContain("0123456789abcdef0123456789abcdef01234567");
   });
 });
