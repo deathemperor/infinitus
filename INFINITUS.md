@@ -168,7 +168,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch. The sync workflow
-  re-applies the runner swap after every merge.
+  re-applies the runner swap after every merge. It pushes with the
+  `UPSTREAM_SYNC_TOKEN` secret when present (a fine-grained PAT: contents,
+  workflows, pull requests — write), since the default token cannot push a
+  branch that touches `.github/workflows` (#658); without it such a sync
+  is done by hand.
 - Upstream workflows that deploy or publish (Release, Deploy T3 Connect
   relay, Forward to Cursor hygiene, Mobile EAS Preview/Production, Publish
   AUR, Issue Labels, Desktop macOS Preview, Web Preview, Mobile Showcase
