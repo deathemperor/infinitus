@@ -63,7 +63,8 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `./infinitusPairing` and `./captures` subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus` capability on
   `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
-  `ExecutionEnvironmentDescriptor` (#663).
+  `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
+  beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
   `subscribeInfinitusPairing` and `subscribeCaptures` in
   `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
@@ -144,7 +145,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   fill in for the Infinitus variant outside `__DEV__` too, auto-connect stays
   development-only.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
-  capability from `resolveInfinitusControlSocketPath`.
+  capability from `resolveInfinitusControlSocketPath`, and `lanHttpBaseUrls`
+  from `infinitus/Layers/LanBaseUrls.ts` (#651: the routable IPv4 addresses
+  on the listening port while the bind is beyond loopback).
 - `apps/web/src/branding.ts` — `APP_BASE_NAME` falls back to `PRODUCT_NAME`
   (window title, auth/pairing surfaces) instead of "T3 Code".
 - `apps/web/src/**` — every user-facing "T3 Code" (brand mark, first-run
@@ -291,16 +294,17 @@ this file adds the fork's own rules. Plan and history: issue #555.
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
   address (the desktop's `serverExposureState.endpointUrl` while Network
-  access is on, else the page's own non-loopback origin; #651). Both up →
-  an Internet / Same network choice; neither → it points at Settings ›
-  Connections › Network access. "Type it instead" reveals host + code for
-  the phone's manual form. The link carries `&for=phone` in the fragment
-  (#724): the card says to scan from inside the app (Settings › Configuration ›
-  Environments › Add › Scan QR), and a Camera-app scan that lands in Safari
-  gets `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone
-  app") from `routes/pair.tsx` instead of `PairingRouteSurface`, so the
-  browser never spends the one-time token; the phone's parser reads the token
-  off the fragment as before. It is mounted through the prefs panel's `footer`
+  access is on, else the first of the server's own `lanHttpBaseUrls`, else
+  the page's own non-loopback origin; #651). Both up → an Internet / Same
+  Wi‑Fi choice; neither → it points at Settings › Connections › Network
+  access. "Type it instead" reveals host + code for the phone's manual form.
+  The link carries `&for=phone` in the fragment (#724): the card says to scan
+  from inside the app (Settings › Configuration › Environments › Add › Scan
+  QR), and a Camera-app scan that lands in Safari gets
+  `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone app")
+  from `routes/pair.tsx` instead of `PairingRouteSurface`, so the browser
+  never spends the one-time token; the phone's parser reads the token off the
+  fragment as before. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card

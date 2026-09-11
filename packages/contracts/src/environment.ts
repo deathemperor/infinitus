@@ -174,6 +174,11 @@ export const ExecutionEnvironmentDescriptor = Schema.Struct({
       to one when the paired host is unreachable; same environment id, so
       nothing re-pairs. Absent on an upstream server or with no tunnel. */
   alternateHttpBaseUrls: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Fork (#651): the base URLs on the host's own network — its routable
+      IPv4 addresses on the listening port — while the server listens beyond
+      loopback. The Devices card encodes the first as the "same Wi‑Fi" pairing
+      link. Absent on an upstream server or a loopback bind. */
+  lanHttpBaseUrls: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type ExecutionEnvironmentDescriptor = typeof ExecutionEnvironmentDescriptor.Type;
 

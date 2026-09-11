@@ -11,6 +11,7 @@ import {
   HostProcessPlatform,
 } from "@t3tools/shared/hostProcess";
 import { resolveInfinitusControlSocketPath } from "@t3tools/shared/infinitusControl";
+import { lanHttpBaseUrls } from "../infinitus/Layers/LanBaseUrls.ts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -220,6 +221,9 @@ export const make = Effect.gen(function* () {
     homeDir: NodeOS.homedir(),
   });
 
+  // Fork (#651): where a phone on the Mac's own network can dial this server.
+  const lanBaseUrls = lanHttpBaseUrls({ host: serverConfig.host, port: serverConfig.port });
+
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
     label,
@@ -261,6 +265,7 @@ export const make = Effect.gen(function* () {
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
       infinitus: infinitusSocketPath !== null,
     },
+    ...(lanBaseUrls.length === 0 ? {} : { lanHttpBaseUrls: lanBaseUrls }),
   };
 
   return ServerEnvironment.of({

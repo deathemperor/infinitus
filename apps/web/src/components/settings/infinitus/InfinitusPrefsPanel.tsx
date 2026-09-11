@@ -58,15 +58,21 @@ export function useInfinitusEnvironment(): {
   readonly environmentId: EnvironmentId | null;
   readonly capability: boolean | undefined;
   readonly snapshot: InfinitusSnapshot | null;
+  /** The server's own LAN base URLs (`lanHttpBaseUrls`, #651); empty when
+      it reports none or predates the field. */
+  readonly serverLanOrigins: ReadonlyArray<string>;
 } {
   const environment = usePrimaryEnvironment();
   const environmentId = environment?.environmentId ?? null;
   const capability = environment?.serverConfig?.environment.capabilities.infinitus;
+  const serverLanOrigins = environment?.serverConfig?.environment.lanHttpBaseUrls ?? EMPTY_ORIGINS;
   const query = useEnvironmentQuery(
     environmentId === null ? null : infinitusEnvironment.snapshot({ environmentId, input: {} }),
   );
-  return { environmentId, capability, snapshot: query.data };
+  return { environmentId, capability, snapshot: query.data, serverLanOrigins };
 }
+
+const EMPTY_ORIGINS: ReadonlyArray<string> = [];
 
 /** Everything the panes say when there is nothing to edit yet. */
 export function InfinitusPanelNotice({ message }: { readonly message: string }) {
