@@ -86,7 +86,8 @@ public enum LiveActivityPush {
 
     /// APNs answers that mean the token will never work again, so the
     /// registration is dropped instead of retried every tick: 410
-    /// Unregistered, 400 BadDeviceToken, and 400 DeviceTokenNotForTopic —
+    /// Unregistered, 400 BadDeviceToken (after its one resend on the
+    /// other gateway — `onOtherGateway`), and 400 DeviceTokenNotForTopic —
     /// a token a phone registered under the previous bundle id (the
     /// 2026-09-05 move to `run.infinitus.mobile`).
     public static func isDeadToken(status: Int, body: String) -> Bool {

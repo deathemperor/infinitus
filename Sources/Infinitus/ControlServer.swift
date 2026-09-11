@@ -85,20 +85,28 @@ final class ControlServer {
     /// killed, it leaves an inode nobody answers, and every infinitusctl
     /// and phone control call got "connection refused" until a relaunch
     /// (2026-09-03, the bundle sat that way for 25 minutes). Called after
-    /// every snapshot, so the cost is one stat per refresh. A LIVE foreign
-    /// listener is left alone: two instances must not fight over the path.
+    /// every snapshot, so the cost is one stat and one connect per
+    /// refresh. A LIVE foreign listener is left alone: two instances must
+    /// not fight over the path.
     func heal() {
         guard listener != nil, boundInode != 0 else { return }
         let path = ControlProtocol.socketURL().path
         var st = stat()
         let why: String
         if stat(path, &st) == 0 {
-            if st.st_ino == boundInode { return }
-            if Self.answers(path) {
+            if st.st_ino == boundInode {
+                // Our inode, but does it answer? A listener whose socket
+                // died under it (#637: `Connection refused` mid-run with
+                // the path intact and nothing logged) looked healthy to
+                // the inode check forever. One connect per snapshot.
+                if Self.answers(path) { return }
+                why = "our own inode \(boundInode) refuses"
+            } else if Self.answers(path) {
                 NSLog("Infinitus control: another instance listens at %@; leaving it", path)
                 return
+            } else {
+                why = "inode \(st.st_ino) is not ours (\(boundInode)), nobody answers"
             }
-            why = "inode \(st.st_ino) is not ours (\(boundInode)), nobody answers"
         } else {
             why = String(cString: strerror(errno))
         }
