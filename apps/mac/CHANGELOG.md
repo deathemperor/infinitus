@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - One release: the desktop app, the menu bar app nested inside it, the Linux tray and the phone share one version number and ship from one `v<version>` tag (#823).
 
 ### Mac
+- The first-run card (and Settings › Engines) installs the engine for you — Rust when it is missing, then swapd — instead of printing two terminal commands (#871).
 - The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
 - `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
 - `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads over the credential it hands the app at port publish (#822).

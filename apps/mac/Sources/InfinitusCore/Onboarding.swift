@@ -103,7 +103,8 @@ public enum OnboardingBrief {
         }
         out += ["", "## Steps"]
         out.append("- [\(engineInstalled ? "x" : " ")] 1. Install the engine: "
-                   + "`\(swapdInstallCommand)` (needs a Rust toolchain: `brew install rust`). Relaunch Infinitus.")
+                   + "`\(swapdInstallCommand)` (needs a Rust toolchain: `brew install rust`). Relaunch Infinitus. "
+                   + "Infinitus can do this step itself: its first-run card has an \"Install engine\" button.")
         let signedIn = claude?.email != nil
         out.append("- [\(signedIn ? "x" : " ")] 2. Sign Claude Code into the first account: run `claude`, use "
                    + "`/login`, the human completes the browser sign-in.")
