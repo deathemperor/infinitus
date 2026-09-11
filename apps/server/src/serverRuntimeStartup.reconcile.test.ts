@@ -735,7 +735,9 @@ it.effect("does not fail startup when the live provider session inventory cannot
       subscribeDomainEvents: Effect.succeed(Stream.empty),
       latestSequence: Effect.succeed(0),
     }),
-    Effect.provide(Layer.mergeAll(NodeServices.layer, ServerSettings.layerTest())),
+    Effect.provide(
+      Layer.mergeAll(NodeServices.layer, ServerSettings.layerTest(), TurnStartGatePassthrough),
+    ),
     Effect.tap(() => Effect.sync(() => assert.equal(queried, false))),
   );
 });

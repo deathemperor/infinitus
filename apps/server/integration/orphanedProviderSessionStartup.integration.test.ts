@@ -31,6 +31,7 @@ import { OrchestrationLayerLive } from "../src/orchestration/runtimeLayer.ts";
 import * as OrchestrationEngine from "../src/orchestration/Services/OrchestrationEngine.ts";
 import * as OrchestrationReactor from "../src/orchestration/Services/OrchestrationReactor.ts";
 import * as ProjectionSnapshotQuery from "../src/orchestration/Services/ProjectionSnapshotQuery.ts";
+import { TurnStartGatePassthrough } from "../src/orchestration/Services/TurnStartGate.ts";
 import { makeSqlitePersistenceLive } from "../src/persistence/Layers/Sqlite.ts";
 import * as ProviderSessionRuntime from "../src/persistence/ProviderSessionRuntime.ts";
 import * as ExternalLauncher from "../src/process/externalLauncher.ts";
@@ -69,6 +70,7 @@ const makePersistedRuntimeLayer = (dbPath: string) => {
 };
 
 const startupDependencies = Layer.mergeAll(
+  TurnStartGatePassthrough,
   Layer.mock(Keybindings.Keybindings)({
     start: Effect.void,
   }),

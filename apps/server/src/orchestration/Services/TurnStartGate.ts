@@ -13,19 +13,20 @@ import * as Layer from "effect/Layer";
  * `InfinitusSessionHold` replaces it with the one that holds background
  * threads while their fleet's headroom is low.
  */
-export interface TurnStartInput<R> {
+export interface TurnStartInput<E, R> {
   readonly threadId: ThreadId;
-  /** The send itself, including its own failure handling; never fails. It
-      may need the caller's services (a scope to fork into, the activation
-      gate): a gate that keeps it captures the caller's context at this call
-      and runs it under that context later. */
-  readonly run: Effect.Effect<void, never, R>;
+  /** The send itself, including its own failure handling. A start that runs
+      now fails the way it always did; a gate that keeps it owns its later
+      failures. It may need the caller's services (a scope to fork into, the
+      activation gate): a gate that keeps it captures the caller's context at
+      this call and runs it under that context later. */
+  readonly run: Effect.Effect<void, E, R>;
 }
 
 export type TurnStartVerdict = "started" | "held";
 
 export interface TurnStartGateShape {
-  readonly start: <R>(input: TurnStartInput<R>) => Effect.Effect<TurnStartVerdict, never, R>;
+  readonly start: <E, R>(input: TurnStartInput<E, R>) => Effect.Effect<TurnStartVerdict, E, R>;
 }
 
 export class TurnStartGate extends Context.Service<TurnStartGate, TurnStartGateShape>()(
