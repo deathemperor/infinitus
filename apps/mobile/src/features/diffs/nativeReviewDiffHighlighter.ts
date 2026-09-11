@@ -82,6 +82,9 @@ const NATIVE_REVIEW_DIFF_VISIBLE_OVERSCAN_ROWS = 160;
 const NATIVE_REVIEW_DIFF_VISIBLE_MAX_ROWS = 360;
 const NATIVE_REVIEW_DIFF_TOKENIZE_MAX_LINE_LENGTH = 1_000;
 const NATIVE_REVIEW_DIFF_TOKENIZE_MAX_CHARACTERS = 8_000;
+// A cold JavaScript regex engine can spend shiki's default 500 ms per-line
+// budget compiling patterns and fuse the rest of the line (infinitus#610).
+const NATIVE_REVIEW_DIFF_TOKENIZE_TIME_LIMIT_MS = 5_000;
 
 const NATIVE_REVIEW_DIFF_THEME_NAME_BY_SCHEME = {
   dark: "t3-pierre-dark",
@@ -257,6 +260,7 @@ function createHighlighterHandle(
           lang,
           theme,
           grammarState,
+          tokenizeTimeLimit: NATIVE_REVIEW_DIFF_TOKENIZE_TIME_LIMIT_MS,
         });
         grammarState = highlighter.getLastGrammarState(tokens);
         highlighted.push(...normalizeTokens(tokens));

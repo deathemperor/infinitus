@@ -56,6 +56,11 @@ const REVIEW_HIGHLIGHTER_ENGINE_PREFERENCE = resolveReviewHighlighterEnginePrefe
 const REVIEW_HIGHLIGHT_CHUNK_LINE_THRESHOLD = 8;
 const REVIEW_HIGHLIGHT_CHUNK_SIZE = 200;
 const REVIEW_TOKENIZE_MAX_LINE_LENGTH = 1_000;
+// shiki's default per-line budget is 500 ms, which a cold JavaScript regex
+// engine spends compiling its patterns; running out mid-line silently fuses
+// the rest of the line into one token (infinitus#610). Lines are already
+// capped by length, so the budget only guards pathological patterns.
+const REVIEW_TOKENIZE_TIME_LIMIT_MS = 5_000;
 const REVIEW_INITIAL_LANGUAGE_MODULES = [
   bashLanguage,
   javascriptLanguage,
@@ -561,6 +566,7 @@ async function highlightLines(
     const tokenLines = highlighter.codeToTokensBase(shortLineBatch.join("\n"), {
       lang: language,
       theme,
+      tokenizeTimeLimit: REVIEW_TOKENIZE_TIME_LIMIT_MS,
     });
     highlightedLines.push(...normalizeHighlightedLines(tokenLines));
     shortLineBatch.length = 0;
