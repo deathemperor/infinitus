@@ -80,6 +80,9 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("prefs-set")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("prefs-set")?.args, ["<key>", "<value>"])
         XCTAssertNotNil(ControlCommand.named("team-code")); XCTAssertNotNil(ControlCommand.named("team-fetch")); XCTAssertNotNil(ControlCommand.named("team-decline"))
+        XCTAssertEqual(ControlCommand.named("team-sessions")?.effect, .read)
+        XCTAssertEqual(ControlCommand.named("team-drive")?.args.first, "<kid|name>")
+        XCTAssertEqual(ControlCommand.named("team-drive")?.effect, .write)
         XCTAssertNil(ControlCommand.named("nope"))
     }
 
