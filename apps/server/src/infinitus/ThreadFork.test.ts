@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import { MessageId, ThreadId, TurnId } from "@t3tools/contracts";
 
-import { claudeForkAnchor, forkMarkerText, forkSeedMessages } from "./ThreadFork.ts";
+import {
+  claudeForkAnchor,
+  forkCreateFields,
+  forkMarkerText,
+  forkSeedMessages,
+} from "./ThreadFork.ts";
 
 const threadId = ThreadId.make("thread-1");
 
@@ -88,5 +93,24 @@ describe("forkMarkerText", () => {
     expect(forkMarkerText({ title: "Fix login", id: threadId }, 2)).toBe(
       "Forked from **Fix login** at turn 2 (thread `thread-1`).",
     );
+  });
+});
+
+describe("forkCreateFields (#269 C)", () => {
+  const source = { id: ThreadId.make("t-main"), title: "Main work", interactionMode: "default" };
+
+  it("keeps a plain fork in the source's mode with the turn in the title", () => {
+    expect(forkCreateFields(source, { turnCount: 3 })).toEqual({
+      title: "Main work (fork at turn 3)",
+      interactionMode: "default",
+    });
+  });
+
+  it("makes a side question read-only and marks it sideOf the source", () => {
+    expect(forkCreateFields(source, { turnCount: 3, side: true })).toEqual({
+      title: "Side question: Main work",
+      interactionMode: "plan",
+      sideOf: "t-main",
+    });
   });
 });

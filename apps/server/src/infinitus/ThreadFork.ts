@@ -100,6 +100,23 @@ export function forkMarkerText(source: { title: string; id: ThreadId }, turnCoun
   return `Forked from **${source.title}** at turn ${turnCount} (thread \`${source.id}\`).`;
 }
 
+/**
+ * Fork (#269 C): what a side question changes about the new thread — it
+ * asks in plan mode (read-only) and carries `sideOf`, so the lists hide it
+ * and the drawer finds it. A plain fork keeps the source's mode.
+ */
+export function forkCreateFields<Mode extends string>(
+  source: { readonly id: ThreadId; readonly title: string; readonly interactionMode: Mode },
+  input: { readonly turnCount: number; readonly side?: true | undefined },
+): { readonly title: string; readonly interactionMode: Mode | "plan"; readonly sideOf?: ThreadId } {
+  return input.side === true
+    ? { title: `Side question: ${source.title}`, interactionMode: "plan", sideOf: source.id }
+    : {
+        title: `${source.title} (fork at turn ${input.turnCount})`,
+        interactionMode: source.interactionMode,
+      };
+}
+
 export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
   input: InfinitusThreadForkInput,
 ) {
@@ -174,10 +191,9 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
       commandId: CommandId.make(yield* nextId),
       threadId,
       projectId: source.value.projectId,
-      title: `${source.value.title} (fork at turn ${input.turnCount})`,
+      ...forkCreateFields(source.value, input),
       modelSelection: source.value.modelSelection,
       runtimeMode: source.value.runtimeMode,
-      interactionMode: source.value.interactionMode,
       branch: source.value.branch,
       worktreePath: source.value.worktreePath,
       createdAt: now,

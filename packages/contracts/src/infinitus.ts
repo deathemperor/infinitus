@@ -423,6 +423,9 @@ export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.T
 export const InfinitusThreadForkInput = Schema.Struct({
   threadId: ThreadId,
   turnCount: Schema.Int,
+  /** Fork (#269 C): a side question — read-only (plan mode), marked `sideOf`
+      the source, so it opens in a drawer instead of the thread list. */
+  side: Schema.optional(Schema.Literal(true)),
 });
 export type InfinitusThreadForkInput = typeof InfinitusThreadForkInput.Type;
 export const InfinitusThreadForkResult = Schema.Struct({ threadId: ThreadId });
