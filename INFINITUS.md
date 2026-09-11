@@ -149,14 +149,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Live Activity toggle, pusher Mac)
-  after General.
+  `SettingsInfinitusSection` (Accounts row, Live Activity / Mac alerts /
+  reset alarms toggles, pusher Mac) after General.
 - `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
-  Activity token registration with the Mac) and `InfinitusAlarmsBridge`
-  (local reset / swap alarms).
+  Activity token registration with the Mac), `InfinitusAlarmsBridge`
+  (local reset / swap alarms) and `InfinitusAlertPushBridge` (the `alert`
+  token, so the Mac's pushes reach the phone as banners).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
-  `infinitusAlarmsEnabled` keys (interface and sanitizer).
+  `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` keys (interface
+  and sanitizer).
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).

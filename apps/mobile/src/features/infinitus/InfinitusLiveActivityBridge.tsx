@@ -1,12 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
-import Constants from "expo-constants";
-import { resolveApnsEnvironment } from "./apnsEnvironment";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { addPushToStartTokenListener, type LiveActivityFactory } from "expo-widgets";
 import { useEffect, useMemo } from "react";
 import { AppState, Platform } from "react-native";
 
-import { loadOrCreateAgentAwarenessDeviceId } from "../../persistence/imperative";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { mobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
@@ -15,14 +12,8 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import InfinitusRevival from "../../widgets/InfinitusRevival";
 import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
-import {
-  type LiveActivityTokenKind,
-  pusherMac,
-  registrationBody,
-  registrationCommand,
-  type SentToken,
-  shouldSendToken,
-} from "./liveActivity.logic";
+import { type LiveActivityTokenKind, pusherMac } from "./liveActivity.logic";
+import { tokenSender } from "./pushRegistration";
 
 const FACTORIES: ReadonlyArray<readonly [LiveActivityFactory<object>, LiveActivityTokenKind]> = [
   [InfinitusWorking, "working"],
@@ -52,33 +43,9 @@ export function InfinitusLiveActivityBridge() {
   useEffect(() => {
     if (Platform.OS !== "ios" || !enabled || environmentId === null) return;
     let cancelled = false;
-    const sent = new Map<LiveActivityTokenKind, SentToken>();
     const watched = new Set<string>();
     const subscriptions: Array<{ remove(): void }> = [];
-
-    const send = async (kind: LiveActivityTokenKind, token: string) => {
-      const now = Date.now();
-      if (!shouldSendToken(sent, kind, token, now)) return;
-      sent.set(kind, { token, at: now });
-      try {
-        const deviceId = await loadOrCreateAgentAwarenessDeviceId();
-        const apnsEnvironment = await resolveApnsEnvironment();
-        if (cancelled) return;
-        const body = registrationBody({
-          kind,
-          token,
-          deviceId,
-          deviceName: Constants.deviceName?.trim() || "iPhone",
-          environmentId,
-          sandbox: apnsEnvironment === "sandbox",
-          now: new Date(now),
-        });
-        const result = await run({ environmentId, input: registrationCommand(body) });
-        if (result._tag !== "Success") sent.delete(kind);
-      } catch {
-        sent.delete(kind);
-      }
-    };
+    const send = tokenSender({ environmentId, run, isCancelled: () => cancelled });
 
     const attach = () => {
       for (const [factory, kind] of FACTORIES) {

@@ -7,9 +7,14 @@ import * as Schema from "effect/Schema";
 
 import type { InfinitusMac } from "../accounts/accountsRoute.logic";
 
-/** The four Live Activity token kinds this app registers. The plain
-    notification token (`alert`) is task 5's. */
-export type LiveActivityTokenKind = "working-start" | "working" | "revival-start" | "revival";
+/** The token kinds this app registers: the four Live Activity ones and the
+    plain notification token (`alert`, #702), all through the same verb. */
+export type LiveActivityTokenKind =
+  | "working-start"
+  | "working"
+  | "revival-start"
+  | "revival"
+  | "alert";
 
 /** Tokens are re-sent no more often than this unless they change. */
 export const TOKEN_RESEND_INTERVAL_MS = 60_000;
