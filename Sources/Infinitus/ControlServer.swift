@@ -831,6 +831,13 @@ final class ControlServer {
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
         case "activities-token":
+            // `--forget <deviceId>/<kind>` withdraws one registration (#572
+            // G6); idempotent, so a phone that never registered here can
+            // still switch its alerts off.
+            if let slot = r.options["forget"] {
+                let forgotten = model.liveActivityPusher.forget(slot: slot)
+                return ControlReply(ok: true, result: .object(["slot": .string(slot), "forgotten": .bool(forgotten)]))
+            }
             // The mirror's `POST /activities/token`, for a client on the
             // socket (#572 N1): the same decode, the same registration.
             let registration = try ControlBody.decode(ActivityPushRegistration.self, from: r)
