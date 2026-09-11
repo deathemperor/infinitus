@@ -125,6 +125,19 @@ final class LiveActivityPushTests: XCTestCase {
         XCTAssertEqual(LiveActivityPush.topic, "run.infinitus.mobile.push-type.liveactivity")
     }
 
+    func testOnOtherGatewayFlipsOnlyTheEnvironment() {
+        let reg = ActivityPushRegistration(kind: .working, token: "ff", deviceId: "d1", deviceName: "Titan",
+                                           environment: "production", themeID: nil, macId: "m1", layout: "expo")
+        let other = reg.onOtherGateway()
+        XCTAssertTrue(other.isSandbox)
+        XCTAssertEqual(LiveActivityPush.url(token: other.token, sandbox: other.isSandbox).host, "api.sandbox.push.apple.com")
+        XCTAssertEqual(other.onOtherGateway().environment, "production")
+        XCTAssertEqual(other.slot, reg.slot)
+        XCTAssertEqual(other.token, reg.token)
+        XCTAssertEqual(other.macId, reg.macId)
+        XCTAssertEqual(other.layout, reg.layout)
+    }
+
     func testRegistrationSlotAndRoundTrip() throws {
         let reg = ActivityPushRegistration(kind: .working, token: "ff", deviceId: "d1", deviceName: "Titan",
                                            environment: "sandbox", themeID: "rpg",

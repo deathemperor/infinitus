@@ -267,7 +267,10 @@ final class LiveActivityPusher: ObservableObject {
         return token
     }
 
-    private func send(_ payload: Data, to registration: ActivityPushRegistration, what: String) {
+    /// `retried`: this is the one resend on the other APNs gateway after
+    /// a BadDeviceToken — a second refusal writes the token off.
+    private func send(_ payload: Data, to registration: ActivityPushRegistration, what: String,
+                      retried: Bool = false) {
         let slot = registration.slot
         // Activity updates coalesce per slot; alerts are each their own
         // message (two in one refresh must both land).
@@ -295,6 +298,16 @@ final class LiveActivityPusher: ObservableObject {
                 self.inFlight.remove(key)
                 if code == 200 {
                     self.lastResult = "\(what) → \(device) ok \(Date().formatted(date: .omitted, time: .shortened))"
+                    // The token lives on the gateway the phone did not
+                    // declare: remember that, so the next push goes
+                    // straight there (and a re-registration still wins).
+                    if retried, self.registrations[slot]?.token == registration.token {
+                        self.registrations[slot] = registration
+                        self.persist()
+                        self.log?("ℹ️", "Live Activity push: \(device)'s token is a \(registration.environment) one, not the \(registration.onOtherGateway().environment) it declared — switched gateway")
+                    }
+                } else if !retried, code == 400, body.contains("BadDeviceToken") {
+                    self.send(payload, to: registration.onOtherGateway(), what: what, retried: true)
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code) \(body)"
                     self.lastResult = "\(what) → \(device) failed: \(why)"
