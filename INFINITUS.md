@@ -213,7 +213,11 @@ this file adds the fork's own rules. Plan and history: issue #555.
   hand, nothing imports it).
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
-  `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`.
+  `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
+  `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
+  to the iOS associated domains and an `autoVerify` intent filter for
+  `https://infinitus.run/pair` on Android (the site serves the AASA
+  `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`).
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
@@ -221,7 +225,14 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
   `SettingsInfinitusSection` (Accounts row, Live Activity / Mac alerts /
   reset alarms toggles, pusher Mac) after General.
-- `apps/mobile/src/App.tsx` — mounts `InfinitusLiveActivityBridge` (Live
+- `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
+  link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
+  `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
+  `subscribe`, `features/connection/universalPairLink.logic.ts`, #724): the
+  Mac's origin travels in the fragment the site never sees, `to` is taken as
+  a bare http(s) origin only, and the sheet fills Host and code like a
+  scanned QR (#746) — the same rewrite runs on the in-app scanner's payload
+  and on the route's `pairingUrl`. Mounts `InfinitusLiveActivityBridge` (Live
   Activity token registration with the Mac), `InfinitusAlarmsBridge`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
   token, so the Mac's pushes reach the phone as banners; both bridges

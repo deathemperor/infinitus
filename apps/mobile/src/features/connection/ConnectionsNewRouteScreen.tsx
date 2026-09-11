@@ -13,6 +13,7 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { InfinitusAskToApprove } from "../infinitus/InfinitusAskToApprove";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
+import { resolvePairingLink } from "./universalPairLink.logic";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
 import {
   buildPairingUrl,
@@ -140,7 +141,9 @@ export function ConnectionsNewRouteScreen({
       setScannerLocked(true);
 
       try {
-        const pairingUrl = extractPairingUrlFromQrPayload(data);
+        // The Devices card's QR is the site's universal link (#724): read
+        // the Mac's origin out of its fragment before the usual parse.
+        const pairingUrl = resolvePairingLink(extractPairingUrlFromQrPayload(data));
         const { host, code } = parsePairingUrl(pairingUrl);
         setHostInput(host);
         setCodeInput(code);
