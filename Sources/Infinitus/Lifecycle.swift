@@ -17,6 +17,15 @@ enum Lifecycle {
         NSSetUncaughtExceptionHandler { e in
             Lifecycle.log.fault("uncaught exception \(e.name.rawValue, privacy: .public): \(e.reason ?? "", privacy: .public)\n\(e.callStackSymbols.joined(separator: "\n"), privacy: .public)")
         }
+        // #637: a write to a pipe whose reader already exited (the login
+        // wrapper quits before the app's next line to its stdin) raised
+        // SIGPIPE, whose default action ends the process with no crash
+        // report and no last line. Ignored, the write returns EPIPE and
+        // the writers' do/catch copes. Children don't inherit it: NSTask
+        // resets dispositions (probed 2026-09-11), TerminalHost's fork
+        // resets them itself. CI never saw the death because its runner
+        // already ignores SIGPIPE and that survives exec.
+        signal(SIGPIPE, SIG_IGN)
         // Off the main queue, and `_exit` (no atexit handlers, no stdio
         // flush, nothing that takes a lock), so a hung main thread still
         // dies on SIGTERM the way it did before — with one line left behind.
