@@ -90,6 +90,7 @@ import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
+import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -544,6 +545,7 @@ const makeWsRpcLayer = (
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusSessionHold = yield* InfinitusSessionHold;
+      const infinitusSessionInterrupt = yield* InfinitusSessionInterrupt;
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
@@ -3084,7 +3086,24 @@ const makeWsRpcLayer = (
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(
             WS_METHODS.infinitusReleaseThread,
-            infinitusSessionHold.release(input.threadId),
+            // Fork (#743): the same word continues a turn paused for headroom.
+            infinitusSessionHold
+              .release(input.threadId)
+              .pipe(
+                Effect.flatMap((held) =>
+                  held.released
+                    ? Effect.succeed(held)
+                    : infinitusSessionInterrupt
+                        .resume(input.threadId)
+                        .pipe(
+                          Effect.map((paused) =>
+                            paused.released
+                              ? paused
+                              : { released: false, reason: "nothing is held or paused" },
+                          ),
+                        ),
+                ),
+              ),
             { "rpc.aggregate": "infinitus", "thread.id": input.threadId },
           ),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
