@@ -70,6 +70,7 @@ cleanup() {
     pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
+    [ -z "${DESK_PID:-}" ] || kill "$DESK_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
     "$INFINITUS_SWAPD_CLI" reset >/dev/null 2>&1 || true
     defaults delete "$DOMAIN" >/dev/null 2>&1 || true
@@ -662,6 +663,52 @@ echo "team: ok (leader Ann, member Bo $KID)"
 "$CTL" team-hostname --zone example.com --label infi </dev/null 2>&1 | grep -q "needs the Cloudflare API token" || fail "team-hostname must ask for the token on stdin"
 "$CTL" team-hostname --zone example.com 2>&1 | grep -q "usage: team-hostname" || fail "team-hostname must want a label"
 "$CTL" team-hostname --clear </dev/null | expect "d['configured'] is False and d['zone'] is None" || fail "team-hostname --clear"
+
+# #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
+# credential comes on stdin like every secret and stays in this run's own
+# keychain slot, the CLI reads it back over the socket and talks HTTP.
+DESK_PORT=$((50000 + $$ % 10000)); DESK_TOKEN="e2e-desktop-token-$$"
+python3 tools/demo-desktop "$DESK_PORT" "$DESK_TOKEN" &
+DESK_PID=$!
+desk_get() { python3 -c "import json,sys,urllib.request; r=urllib.request.Request('http://127.0.0.1:$DESK_PORT$1', headers={'Authorization':'Bearer $DESK_TOKEN'}); print(urllib.request.urlopen(r, timeout=3).read().decode())"; }
+i=0; until desk_get /.well-known/t3/environment >/dev/null 2>&1; do i=$((i + 1)); [ "$i" -lt 50 ] || fail "the demo desktop did not come up"; sleep 0.1; done
+"$CTL" environments </dev/null 2>&1 | grep -q "no Infinitus desktop credential" || fail "environments must want a credential first"
+"$CTL" desktop status </dev/null | expect "d['credential'] is None and d['reachable'] is False and d['port']==3773" || fail "desktop status without a credential"
+printf 'x' | "$CTL" desktop-credential --origin nope 2>&1 | grep -q "http(s) URL" || fail "desktop-credential must want an http origin"
+printf '%s' "$DESK_TOKEN" | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" --expiresAt 2099-01-01T00:00:00Z \
+    | expect "d['stored'] is True and d['origin']=='http://127.0.0.1:$DESK_PORT' and d['expiresAt']=='2099-01-01T00:00:00Z'" || fail "desktop-credential store"
+"$CTL" desktop-status | expect "d['credential']=='…'+'$DESK_TOKEN'[-4:] and d['stale'] is True" || fail "desktop-status must mask the credential and flag the moved port"
+"$CTL" desktop status | expect "d['reachable'] is True and d['version']=='0.0.0-demo'" || fail "desktop status reachable"
+"$CTL" desktop status | grep -q "$DESK_TOKEN" && fail "desktop status must never print the token"
+"$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is True and d['label'].startswith('…')" || fail "desktop credential accepted"
+"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT'" || fail "environments"
+"$CTL" projects | expect "d[0]['id']=='p-demo' and d[0]['name']=='Demo project' and d[0]['env']=='env-demo'" || fail "projects"
+"$CTL" threads | expect "[t['id'] for t in d]==['t-running','t-idle'] and d[0]['status']=='running' and d[1]['status']=='held' and d[1]['hold']['summary']=='at limit until 09:00' and d[0]['project']=='Demo project'" || fail "threads"
+"$CTL" threads --status held | expect "len(d)==1 and d[0]['id']=='t-idle'" || fail "threads --status held"
+"$CTL" threads --status bogus 2>&1 | grep -q "usage: threads --status" || fail "threads must refuse an unknown status"
+"$CTL" thread show t-idle --turns 1 | expect "d['thread']['status']=='held' and [m['text'] for m in d['messages']]==['hello','hi there']" || fail "thread show"
+"$CTL" thread show t-none 2>&1 | grep -q "no thread t-none" || fail "thread show must name a missing thread"
+"$CTL" thread send t-running "more" 2>&1 | grep -q "turn running; --steer" || fail "send on a running thread must refuse without --steer"
+"$CTL" thread send t-idle "more" 2>&1 | grep -q "turn running; --steer" || fail "send on a held thread must refuse without --steer"
+"$CTL" thread send t-running "more" --steer | expect "d['steered'] is True and len(d['messageId'])==36" || fail "thread send --steer"
+"$CTL" thread release t-idle | expect "d['released'] is True" || fail "thread release"
+"$CTL" thread release t-idle | expect "d['released'] is False and d['reason']=='not held'" || fail "a second release reports the reason"
+printf 'ping\n' | "$CTL" thread send t-idle - --wait | expect "d['text']=='echo: ping' and d['turn']['state']=='completed'" || fail "thread send --wait"
+"$CTL" thread new --project "Demo project" "Fix the build" --worktree fix/build 2>&1 | grep -q "pass --base" || fail "thread new --worktree must want a base when the project dir is not a repo"
+"$CTL" thread new --project "Demo project" "Fix the build" --worktree fix/build --base main --wait | expect "d['text']=='echo: Fix the build' and len(d['threadId'])==36" || fail "thread new --wait"
+"$CTL" threads --project p-demo | expect "any(t['title']=='Fix the build' and t['branch']=='fix/build' and t['worktree']=='/tmp/demo-project/.wt/'+t['id'] for t in d)" || fail "the new thread shows its worktree"
+"$CTL" thread new --project nope "x" 2>&1 | grep -q "no project nope" || fail "thread new must name a missing project"
+"$CTL" thread interrupt t-running | expect "d['ok'] is True and d['turnId']=='u-1'" || fail "thread interrupt"
+"$CTL" threads --status running | expect "d==[]" || fail "the interrupted thread is no longer running"
+desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.start','thread.turn.start','thread.turn.start','thread.turn.interrupt'] and d[0]['runtimeMode']=='full-access' and d[0]['message']['role']=='user' and d[0]['message']['attachments']==[] and d[1]['runtimeMode']=='approval-required' and d[2]['bootstrap']['createThread']['projectId']=='p-demo' and d[2]['bootstrap']['createThread']['modelSelection']=={'provider':'claude','model':'opus'} and d[2]['bootstrap']['prepareWorktree']['branch']=='fix/build' and d[2]['bootstrap']['prepareWorktree']['projectCwd']=='/tmp/demo-project' and d[2]['bootstrap']['prepareWorktree']['baseBranch']=='main' and d[2]['titleSeed']=='Fix the build' and d[3]['turnId']=='u-1'" || fail "the dispatched commands must carry the desktop's shapes"
+printf 'wrong' | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" >/dev/null || fail "desktop-credential replace"
+rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && grep -q "no longer accepts this credential" "$LOG.desk" || fail "a revoked credential must exit 2 with the relaunch hint (got $rc: $(head -c 200 "$LOG.desk"))"
+"$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is False" || fail "desktop credential must report the refusal"
+"$CTL" desktop-credential </dev/null | expect "d['stored'] is False and d['origin'] is None" || fail "desktop-credential with empty stdin forgets"
+"$CTL" desktop status | expect "d['credential'] is None and d['reachable'] is False" || fail "desktop status after forget"
+kill "$DESK_PID" 2>/dev/null || true
+echo "desktop verbs: ok"
 
 # --- team control (#220, grantor) ------------------------------------------
 # Bo lets leaders send to one session; the hint rides Bo's now.json and
