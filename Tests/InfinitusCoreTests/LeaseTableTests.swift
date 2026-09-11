@@ -45,6 +45,14 @@ final class LeaseTableTests: XCTestCase {
         XCTAssertEqual(t.clientCount(now: t0), 0)
     }
 
+    func testHeldNamesEachClientsScopes() {
+        let t = LeaseTable()
+        t.report(report("p1", [.session(7), .stats]), now: t0)
+        t.report(report("web", [.sessions, .fleets]), now: t0)
+        XCTAssertEqual(t.held(now: t0), ["p1": ["session:7", "stats"], "web": ["fleets", "sessions"]])
+        XCTAssertEqual(t.held(now: t0.addingTimeInterval(60)), [:])
+    }
+
     func testNoLeasesMeansNothingIsHeld() {
         let t = LeaseTable()
         XCTAssertFalse(t.holds(.sessions, now: t0))
