@@ -129,6 +129,7 @@ publishes the matching section as the GitHub release body.
 - A Live Activity push refused with BadDeviceToken is retried once on the other APNs gateway, so a phone build whose declared environment disagrees with its entitlement still gets its cards.
 - The control-socket watchdog also checks that its own socket still answers, so a listener that died under the app is re-bound within a refresh instead of refusing every call until a relaunch (#637).
 - The fork server can ride the companion's named Cloudflare tunnel on a stable hostname (`fork_tunnel_hostname`), so a relaunch no longer mints a fresh trycloudflare name under the phone (#650).
+- `infinitusctl quit` ends the menu-bar app gracefully, and the status item menu gains "Open Infinitus" when the fork desktop app is installed (#654).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.

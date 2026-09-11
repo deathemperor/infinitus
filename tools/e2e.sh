@@ -736,4 +736,20 @@ echo "idle CPU with no lease (pop-out closed, no phone): ${PCT}%  (budget ${IDLE
 python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU with no lease ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
+# #654: the fork's quit-with-window setting sends `quit`; the app answers,
+# then leaves on its own (tunnels, terminals, owned sessions first). This
+# instance leads a team with a git remote, and applicationShouldTerminate
+# holds the quit for the team's now.json delete (TeamModel.quitBound,
+# 20s) — the wait is bounded above that, and the time is printed.
+"$CTL" quit | expect "d['quitting'] is True" || fail "quit"
+# The app is this shell's child: until `wait` reaps it the pid lingers as
+# a zombie, so the exit shows as state Z, not as a missing pid.
+i=0
+while [ "$(ps -o stat= -p "$APP_PID" 2>/dev/null | cut -c1)" ] \
+      && [ "$(ps -o stat= -p "$APP_PID" 2>/dev/null | cut -c1)" != "Z" ]; do
+    i=$((i + 1)); [ "$i" -lt 300 ] || fail "the app did not exit within 30s of quit"
+    sleep 0.1
+done
+wait "$APP_PID" 2>/dev/null
+echo "quit: ok (exited after $((i / 10)).$((i % 10))s)"
 echo "E2E PASS"
