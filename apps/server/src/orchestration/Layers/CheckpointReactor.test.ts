@@ -1764,6 +1764,72 @@ describe("CheckpointReactor", () => {
     ).toBe(false);
   });
 
+  effectIt.effect("rewinds the chat without touching files or checkpoint refs (#270 E1)", () =>
+    Effect.gen(function* () {
+      const harness = yield* Effect.promise(() => createHarness());
+      const createdAt = "2026-01-01T00:00:00.000Z";
+
+      yield* harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-set"),
+        threadId: ThreadId.make("thread-1"),
+        session: {
+          threadId: ThreadId.make("thread-1"),
+          status: "ready",
+          providerName: "codex",
+          runtimeMode: "approval-required",
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: createdAt,
+        },
+        createdAt,
+      });
+      for (const turn of [1, 2]) {
+        yield* harness.engine.dispatch({
+          type: "thread.turn.diff.complete",
+          commandId: CommandId.make(`cmd-diff-${turn}`),
+          threadId: ThreadId.make("thread-1"),
+          turnId: asTurnId(`turn-${turn}`),
+          completedAt: createdAt,
+          checkpointRef: checkpointRefForThreadTurn(ThreadId.make("thread-1"), turn),
+          status: "ready",
+          files: [],
+          checkpointTurnCount: turn,
+          createdAt,
+        });
+      }
+      NodeFS.writeFileSync(NodePath.join(harness.cwd, "README.md"), "edited by hand\n", "utf8");
+
+      yield* harness.engine.dispatch({
+        type: "thread.chat.rewind",
+        commandId: CommandId.make("cmd-chat-rewind"),
+        threadId: ThreadId.make("thread-1"),
+        turnCount: 1,
+        createdAt,
+      });
+
+      yield* Effect.promise(() =>
+        waitForEvent(harness.engine, (event) => event.type === "thread.reverted"),
+      );
+      const thread = yield* Effect.promise(() =>
+        waitForThread(harness.readModel, (entry) => entry.checkpoints.length === 1),
+      );
+
+      expect(thread.latestTurn?.turnId).toBe("turn-1");
+      expect(harness.provider.rollbackConversation).toHaveBeenCalledWith({
+        threadId: ThreadId.make("thread-1"),
+        numTurns: 1,
+      });
+      // The workspace and the later checkpoint's ref are exactly as they were.
+      expect(NodeFS.readFileSync(NodePath.join(harness.cwd, "README.md"), "utf8")).toBe(
+        "edited by hand\n",
+      );
+      expect(
+        gitRefExists(harness.cwd, checkpointRefForThreadTurn(ThreadId.make("thread-1"), 2)),
+      ).toBe(true);
+    }),
+  );
+
   it("executes provider revert and emits thread.reverted for claude sessions", async () => {
     const harness = await createHarness({ providerName: ProviderDriverKind.make("claudeAgent") });
     const createdAt = "2026-01-01T00:00:00.000Z";

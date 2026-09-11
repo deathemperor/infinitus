@@ -331,7 +331,7 @@ import { createPageScrollController, type PageScrollKey } from "./chat/pageScrol
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
-import { MessagesTimeline } from "./chat/MessagesTimeline";
+import { MessagesTimeline, type TimelineRevertMode } from "./chat/MessagesTimeline";
 import type { AssistantCitationRequest } from "./chat/AssistantCitationSource";
 import { resolveTimelineIsAtEnd } from "./chat/MessagesTimeline.logic";
 import { resolveComposerTimelineInset, resolveScrollToEndClearance } from "./composerFooterLayout";
@@ -1390,7 +1390,7 @@ function chatActionErrorMessage(error: unknown): string {
 const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
 const EMPTY_HELD_TURN_DIFF_SUMMARIES: readonly never[] = [];
 const noopHeldTurnDiff = (_turnId: TurnId, _filePath?: string) => {};
-const noopHeldRevert = (_targetTurnCount: number) => {};
+const noopHeldRevert = (_targetTurnCount: number, _mode?: TimelineRevertMode) => {};
 const noopHeldAttachment = (_attachment: ChatFileAttachment) => {};
 
 /**
@@ -1470,6 +1470,7 @@ export default function ChatView(props: ChatViewProps) {
   const revertThreadCheckpoint = useAtomCommand(threadEnvironment.revertCheckpoint, {
     reportFailure: false,
   });
+  const rewindThreadChat = useAtomCommand(threadEnvironment.rewindChat, { reportFailure: false });
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
   const { environments } = useEnvironments();
@@ -6480,8 +6481,10 @@ export default function ChatView(props: ChatViewProps) {
     return () => window.removeEventListener("paste", handler, true);
   }, [activeThreadId, composerRef]);
 
+  // Fork (#270 E1): `mode` picks the full revert (files and chat) or the
+  // chat-only rewind; both share the guards and the reverting flag.
   const onRevertToTurnCount = useCallback(
-    async (turnCount: number) => {
+    async (turnCount: number, mode: TimelineRevertMode = "files") => {
       const localApi = readLocalApi();
       if (!localApi || !activeThread || isRevertingCheckpoint) return;
 
@@ -6504,11 +6507,18 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
       const confirmed = await localApi.dialogs.confirm(
-        [
-          `Revert this thread to checkpoint ${turnCount}?`,
-          "This will discard newer messages and turn diffs in this thread.",
-          "This action cannot be undone.",
-        ].join("\n"),
+        (mode === "chat"
+          ? [
+              "Rewind the chat to this message? Files stay as they are.",
+              "Newer messages leave this thread; the workspace is untouched.",
+              "This action cannot be undone.",
+            ]
+          : [
+              `Revert this thread to checkpoint ${turnCount}?`,
+              "This will discard newer messages and turn diffs in this thread.",
+              "This action cannot be undone.",
+            ]
+        ).join("\n"),
         { variant: "destructive" },
       );
       if (!confirmed) {
@@ -6517,13 +6527,11 @@ export default function ChatView(props: ChatViewProps) {
 
       setIsRevertingCheckpoint(true);
       setThreadError(activeThread.id, null);
-      const result = await revertThreadCheckpoint({
-        environmentId,
-        input: {
-          threadId: activeThread.id,
-          turnCount,
-        },
-      });
+      const input = { threadId: activeThread.id, turnCount };
+      const result =
+        mode === "chat"
+          ? await rewindThreadChat({ environmentId, input })
+          : await revertThreadCheckpoint({ environmentId, input });
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
@@ -6543,6 +6551,7 @@ export default function ChatView(props: ChatViewProps) {
       isSendBusy,
       phase,
       revertThreadCheckpoint,
+      rewindThreadChat,
       setThreadError,
       supportsConversationRollback,
     ],
@@ -8117,8 +8126,8 @@ export default function ChatView(props: ChatViewProps) {
   // reference is fully stable and never busts TimelineRowCtx identity.
   const onRevertToTurnCountRef = useRef(onRevertToTurnCount);
   onRevertToTurnCountRef.current = onRevertToTurnCount;
-  const onRevertTimelineTurn = useCallback((targetTurnCount: number) => {
-    void onRevertToTurnCountRef.current(targetTurnCount);
+  const onRevertTimelineTurn = useCallback((targetTurnCount: number, mode?: TimelineRevertMode) => {
+    void onRevertToTurnCountRef.current(targetTurnCount, mode);
   }, []);
 
   // Files dropped on a sidebar row land here once the dropped-on thread is

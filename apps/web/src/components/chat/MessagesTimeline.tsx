@@ -116,6 +116,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { useAssetUrlRefresh, useAssetUrls, useAssetUrlState } from "../../assets/assetUrls";
 import { MediaVideoPlayer } from "../media/MediaVideoPlayer";
 import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
@@ -221,7 +222,7 @@ interface TimelineRowSharedState {
   workspaceRoot: string | undefined;
   skills: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
   activeThreadEnvironmentId: EnvironmentId;
-  onRevertToTurnCount: (targetTurnCount: number) => void;
+  onRevertToTurnCount: (targetTurnCount: number, mode?: TimelineRevertMode) => void;
   onUseArtifactTemplate: (template: CodexArtifactTemplate) => void;
   onImageExpand: (preview: ExpandedImagePreview) => void;
   onFileOpen: (attachment: ChatFileAttachment) => void;
@@ -339,7 +340,7 @@ interface MessagesTimelineProps {
   displayThreadKey?: string;
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   supportsConversationRollback: boolean;
-  onRevertToTurnCount: (targetTurnCount: number) => void;
+  onRevertToTurnCount: (targetTurnCount: number, mode?: TimelineRevertMode) => void;
   onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
   isRevertingCheckpoint: boolean;
   onImageExpand: (preview: ExpandedImagePreview) => void;
@@ -1592,28 +1593,47 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 }
 
+/** Fork (#270 E1): what a revert from a user message touches. */
+export type TimelineRevertMode = "files" | "chat";
+
 function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
   const ctx = use(TimelineRowCtx);
   const activity = use(TimelineRowActivityCtx);
+  const disabled = activity.isRevertingCheckpoint || activity.isWorking;
 
+  // Fork (#270 E1): the one button opens a menu; the full revert is the first
+  // item and the chat-only rewind the second.
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={activity.isRevertingCheckpoint || activity.isWorking}
-            onClick={() => ctx.onRevertToTurnCount(turnCount)}
-            aria-label="Revert to this message"
-          />
-        }
-      >
-        <Undo2Icon className="size-3" />
-      </TooltipTrigger>
-      <TooltipPopup side="top">Revert to this message</TooltipPopup>
-    </Tooltip>
+    <Menu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <MenuTrigger
+              render={
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  disabled={disabled}
+                  aria-label="Revert to this message"
+                />
+              }
+            />
+          }
+        >
+          <Undo2Icon className="size-3" />
+        </TooltipTrigger>
+        <TooltipPopup side="top">Revert to this message</TooltipPopup>
+      </Tooltip>
+      <MenuPopup align="end">
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "files")}>
+          Revert files and chat
+        </MenuItem>
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "chat")}>
+          Rewind chat only
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }
 
