@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)
@@ -130,7 +133,6 @@ publishes the matching section as the GitHub release body.
 - Priority mode gains `interrupt`: the fleet's headroom verdict says `critical` where hold mode says `low`, so the fork can pause running background turns as well as new starts (#743).
 - The app knows when it runs nested inside Infinitus desktop (`status` says `bundlePath`/`nested`): updates and Start at login defer to the desktop, a second copy yields to the one already running, the desktop's own threads are not announced twice, and `make-app.sh INFINITUS_BUNDLE_NAME` names the nested bundle and leaves the `infinitus://` scheme to the desktop (#777, #270).
 - infinitus.run serves the phone app's universal link: the Devices QR points at `infinitus.run/pair`, which the app takes on a phone that has it and a browser forwards to the Mac's own pairing page (#724).
-- The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
