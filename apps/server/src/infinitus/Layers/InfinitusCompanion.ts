@@ -23,6 +23,11 @@ const INFINITUS_BUNDLE_ID = "run.infinitus";
 /** How long the socket may stay quiet after the server starts before the app
     is opened for the user (#654 step 1). */
 export const STARTUP_GRACE = Duration.seconds(3);
+/** A socket file that refuses is re-probed this often, this many times, before
+    it counts as stale (20 s in all): a relaunching Infinitus rebinds within
+    seconds, a crash's leftover never does (#637). */
+export const RELAUNCH_REPROBE = Duration.seconds(2);
+export const RELAUNCH_REPROBES = 10;
 
 /** `open` could not be spawned or waited for at all (as opposed to exiting
     non-zero, which is an exit code). */
@@ -124,17 +129,35 @@ export const launchInfinitus = Effect.fn("Infinitus.launch")(function* (
   return yield* openInfinitus(deps.runOpen);
 });
 
+/** Waits out a socket file that refuses: an Infinitus mid-relaunch (its own
+    reopen shell runs `open` once the old pid exits; a second `open` on top is
+    the race of #637/#756) rebinds within seconds, so the file is re-probed
+    until it answers, vanishes, or the window runs out — then it is a crash's
+    stale leftover and the app is as gone as with no file at all. */
+const awaitRelaunch = Effect.fn("Infinitus.awaitRelaunch")(function* (
+  first: Extract<Probe, { state: "refusing" }>,
+): Effect.fn.Return<Probe, never, InfinitusControlClient> {
+  let probe: Probe = first;
+  for (let attempt = 0; attempt < RELAUNCH_REPROBES && probe.state === "refusing"; attempt++) {
+    yield* Effect.sleep(RELAUNCH_REPROBE);
+    probe = yield* probeInfinitus();
+  }
+  if (probe.state === "refusing") {
+    yield* Effect.logInfo("infinitus.companion.stale-socket", {
+      path: probe.path,
+      cause: probe.cause,
+      waited: Duration.format(Duration.times(RELAUNCH_REPROBE, RELAUNCH_REPROBES)),
+    });
+  }
+  return probe;
+});
+
 /**
  * The startup companion: a socket still quiet after `STARTUP_GRACE` gets the
  * app opened once, with one log line either way. No retry, no loop — a user
  * who quits the menu-bar app afterwards keeps it quit (that is what the
- * "Launch Infinitus" button is for).
- *
- * A socket file that exists but refuses is left alone too: an Infinitus is
- * starting or mid-relaunch (its own reopen shell runs `open` once the old pid
- * exits), and a second `open` on top of it is the relaunch race of #637/#756.
- * The stale file a crash leaves behind looks the same, so that case waits for
- * the "Launch Infinitus" button as well.
+ * "Launch Infinitus" button is for). A socket file that refuses gets the
+ * relaunch window first (`awaitRelaunch`).
  */
 export const launchInfinitusAtStartup = Effect.fn("Infinitus.launchAtStartup")(function* (
   deps: InfinitusLaunchDeps,
@@ -144,15 +167,10 @@ export const launchInfinitusAtStartup = Effect.fn("Infinitus.launchAtStartup")(f
   if (client.socketPath === null) return null;
   if ((yield* probeInfinitus()).state === "answering") return null;
   yield* Effect.sleep(STARTUP_GRACE);
-  const probe = yield* probeInfinitus();
+  let probe = yield* probeInfinitus();
+  if (probe.state === "refusing") probe = yield* awaitRelaunch(probe);
   if (probe.state === "answering") return null;
-  const result =
-    probe.state === "refusing"
-      ? {
-          launched: false,
-          reason: `the control socket at ${probe.path} exists but nobody answers (${probe.cause}): an Infinitus is starting or mid-relaunch, left alone`,
-        }
-      : yield* openInfinitus(deps.runOpen);
+  const result = yield* openInfinitus(deps.runOpen);
   yield* Effect.logInfo("infinitus.companion.launch", result);
   return result;
 });

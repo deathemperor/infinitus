@@ -560,10 +560,11 @@ reason?}`, never an error) answered by `ws.ts` from the same service. The
   withheld from dev/worktree servers and from any instance running with an
   `INFINITUS_CONTROL_SOCKET` override — an isolated instance by definition,
   which must never `open` the installed app — exactly like the port
-  publish; and it stands down when the socket FILE exists but refuses —
-  the app never unlinks its socket, so that is an Infinitus quitting or
-  mid-relaunch whose own reopen shell will `open` it, #637/#756 — leaving a
-  crash's stale file to the button), and the
+  publish; a socket FILE that exists but refuses — the app never unlinks
+  its socket, so that is an Infinitus mid-relaunch whose own reopen shell
+  will `open` it, #637/#756 — is re-probed every 2 s for 20 s and only a
+  file still refusing after that counts as a crash's stale leftover and is
+  opened over, `infinitus.companion.stale-socket`), and the
   same body answers `infinitus.launch` (operate scope) for the web's "Launch
   Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
   error; the app coming up is the snapshot flipping.

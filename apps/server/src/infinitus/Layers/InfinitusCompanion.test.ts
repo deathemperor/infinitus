@@ -16,6 +16,8 @@ import {
   InfinitusOpenFailed,
   launchInfinitus,
   launchInfinitusAtStartup,
+  RELAUNCH_REPROBE,
+  RELAUNCH_REPROBES,
   STARTUP_GRACE,
 } from "./InfinitusCompanion.ts";
 
@@ -174,23 +176,41 @@ describe("launchInfinitusAtStartup", () => {
     }),
   );
 
-  effectIt.effect(
-    "leaves a socket file that refuses alone: an Infinitus is mid-relaunch (#637)",
-    () =>
-      Effect.gen(function* () {
-        const opens = yield* Ref.make(0);
-        const available = yield* Ref.make(false);
-        const fiber = yield* launchInfinitusAtStartup({
-          platform: "darwin",
-          runOpen: openStub(opens),
-        }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
-        yield* TestClock.adjust(STARTUP_GRACE);
-        const result = yield* Fiber.join(fiber);
-        expect(result?.launched).toBe(false);
-        expect(result?.launched === false ? result.reason : "").toContain(SOCKET);
-        expect(result?.launched === false ? result.reason : "").toContain("ECONNREFUSED");
-        expect(yield* Ref.get(opens)).toBe(0);
-      }),
+  effectIt.effect("waits out a socket file that refuses, then opens it as stale (#637)", () =>
+    Effect.gen(function* () {
+      const opens = yield* Ref.make(0);
+      const available = yield* Ref.make(false);
+      const fiber = yield* launchInfinitusAtStartup({
+        platform: "darwin",
+        runOpen: openStub(opens),
+      }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
+      yield* TestClock.adjust(STARTUP_GRACE);
+      expect(yield* Ref.get(opens)).toBe(0);
+      const window = Duration.times(RELAUNCH_REPROBE, RELAUNCH_REPROBES);
+      yield* TestClock.adjust(Duration.subtract(window, Duration.millis(1)));
+      expect(yield* Ref.get(opens)).toBe(0);
+      yield* TestClock.adjust(Duration.millis(1));
+      expect(yield* Fiber.join(fiber)).toEqual({ launched: true });
+      expect(yield* Ref.get(opens)).toBe(1);
+    }),
+  );
+
+  effectIt.effect("does nothing when a refusing socket answers within the window (#637)", () =>
+    Effect.gen(function* () {
+      const opens = yield* Ref.make(0);
+      const available = yield* Ref.make(false);
+      const fiber = yield* launchInfinitusAtStartup({
+        platform: "darwin",
+        runOpen: openStub(opens),
+      }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
+      // Refused at 3 s and 5 s; the relaunched app is listening by the 7 s probe.
+      yield* TestClock.adjust(Duration.sum(STARTUP_GRACE, RELAUNCH_REPROBE));
+      expect(yield* Ref.get(opens)).toBe(0);
+      yield* Ref.set(available, true);
+      yield* TestClock.adjust(RELAUNCH_REPROBE);
+      expect(yield* Fiber.join(fiber)).toBeNull();
+      expect(yield* Ref.get(opens)).toBe(0);
+    }),
   );
 
   effectIt.effect(
