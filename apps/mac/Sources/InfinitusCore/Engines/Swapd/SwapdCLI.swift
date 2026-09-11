@@ -26,6 +26,12 @@ public enum SwapdLocator {
     }
 }
 
+/// A failed engine run: the engine's own message (SwapdCLI.failure).
+public struct CLIError: Error, Sendable {
+    public let message: String
+    public init(message: String) { self.message = message }
+}
+
 /// Thin async wrapper over Process for one-shot `swapd … --json` commands
 /// (the engine's own daemon, `swapd auto --json`, is a supervisor's job).
 ///

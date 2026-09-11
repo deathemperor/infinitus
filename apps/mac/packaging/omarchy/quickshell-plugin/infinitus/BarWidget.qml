@@ -6,7 +6,7 @@ import qs.Ui
 
 // Infinitus fleet widget for the Omarchy (Quickshell) bar — the same
 // infinitus-tray binary the Waybar module uses, one JSON status line
-// per refresh. The engine stays behind `cswap … --json`; the widget
+// per refresh. The engine stays behind `swapd … --json`; the widget
 // never reads engine internals.
 //
 // Clicking opens the fleet panel (Panel.qml) — matching the macOS

@@ -36,7 +36,7 @@ enum TrayMirror {
             // No `cswap usage --json` cash cache on Linux today (#9
             // phase D1a) — TrayHistory only tracks headroom, not spend.
             usageJSON: nil,
-            // Status-page poller + `cswap auto` probe (#9 phase D2 parity,
+            // Status-page poller + `swapd auto` probe (#9 phase D2 parity,
             // TrayServiceStatus/EngineProbe) — the tray has no supervisor
             // of its own, just a snapshot of what's true right now.
             serviceStatus: serviceStatus,

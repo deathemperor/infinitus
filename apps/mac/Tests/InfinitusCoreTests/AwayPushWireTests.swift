@@ -36,6 +36,20 @@ final class AwayPushWireTests: XCTestCase {
         XCTAssertNil(AwayPushWire.telegramRequest(token: "1:a", chat: "@", text: "hi"))
     }
 
+    func testEnvTargetsBuildOneRequestPerConfiguredChannel() {
+        XCTAssertTrue(AwayPushWire.requests(text: "hi", env: [:]).isEmpty)
+        let both = AwayPushWire.requests(text: "hi", env: [
+            "INFINITUS_SLACK_WEBHOOK": "https://hooks.slack.com/services/T0/B0/x",
+            "INFINITUS_TELEGRAM_TOKEN": "123456:ABC", "INFINITUS_TELEGRAM_CHAT": "-1001"])
+        XCTAssertEqual(both.map(\.channel), ["slack", "telegram"])
+        XCTAssertEqual(both[0].request.url?.host, "hooks.slack.com")
+        XCTAssertEqual(both[1].request.url?.host, "api.telegram.org")
+        // The wrong shape is skipped, never posted; a token with no chat is nothing.
+        let wrong = AwayPushWire.requests(text: "hi", env: [
+            "INFINITUS_SLACK_WEBHOOK": "http://hooks.slack.com/x", "INFINITUS_TELEGRAM_TOKEN": "123456:ABC"])
+        XCTAssertTrue(wrong.isEmpty)
+    }
+
     func testMaskedNeverShowsAShortSecret() {
         XCTAssertEqual(AwayPushWire.masked("12345678"), "••••")
         XCTAssertEqual(AwayPushWire.masked("123456:ABCDEF"), "••••CDEF")

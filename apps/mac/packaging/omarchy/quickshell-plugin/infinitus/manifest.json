@@ -14,11 +14,11 @@
   },
   "barWidget": {
     "displayName": "Infinitus fleet",
-    "description": "Active claude-swap account with 5h/7d usage; hover for the whole themed fleet; click opens the fleet panel (switch, rotate, themes).",
+    "description": "Active swapd account with 5h/7d usage; hover for the whole themed fleet; click opens the fleet panel (switch, rotate, themes).",
     "category": "AI",
     "aliases": [
       "infinitus",
-      "cswap"
+      "swapd"
     ],
     "allowMultiple": false,
     "defaults": {

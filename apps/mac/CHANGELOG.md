@@ -14,6 +14,9 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl utilization --days N` answers with the Utilization pane's data — samples, waste generations, five-hour windows, replay, dry-run plan and token run rate — so the desktop app renders the app's figures (#747).
 - `history <fleet> [--limit n]` hands the engine's own switch log to the fork — swapd's `{schemaVersion, switches:[{ts, from?, to, trigger?}]}` untouched (#779).
 
+### Linux tray
+- `infinitus-tray` drives swapd like the Mac (`swapd list/switch/rotate/hold`), and `serve`'s pushes post to a Slack webhook and/or Telegram bot from `INFINITUS_SLACK_WEBHOOK` / `INFINITUS_TELEGRAM_TOKEN` + `INFINITUS_TELEGRAM_CHAT` — the cswap adapter is gone (#756).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)

@@ -11,7 +11,7 @@ import qs.Ui
 //
 // Data comes from `infinitus-tray panel --theme <id>` (structured JSON,
 // themed strings rendered Swift-side); the engine stays behind
-// `cswap … --json` subprocesses. BarWidget.qml owns the bar label and
+// `swapd … --json` subprocesses. BarWidget.qml owns the bar label and
 // hands this panel the widget to anchor against.
 Panel {
   id: root
