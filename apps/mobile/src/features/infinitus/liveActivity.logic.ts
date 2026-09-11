@@ -70,6 +70,25 @@ export function registrationCommand(
   };
 }
 
+/** The kinds the Live Activity switch owns; `alert` belongs to the Alerts switch. */
+export const LIVE_ACTIVITY_TOKEN_KINDS: ReadonlyArray<LiveActivityTokenKind> = [
+  "working-start",
+  "working",
+  "revival-start",
+  "revival",
+];
+
+/** The control command withdrawing one registration (#702): the Mac drops
+    `<deviceId>/<kind>`, idempotently. A bundle before the verb (#712) refuses
+    the write, and the registration stays until APNs rotates the token, as it
+    always did. */
+export function forgetCommand(
+  deviceId: string,
+  kind: LiveActivityTokenKind,
+): InfinitusCommandInput {
+  return { command: "activities-token", args: [], options: { forget: `${deviceId}/${kind}` } };
+}
+
 export interface SentToken {
   readonly token: string;
   readonly at: number;
