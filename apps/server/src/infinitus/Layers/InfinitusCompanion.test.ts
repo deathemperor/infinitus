@@ -16,19 +16,27 @@ import {
   InfinitusOpenFailed,
   launchInfinitus,
   launchInfinitusAtStartup,
+  RELAUNCH_REPROBE,
+  RELAUNCH_REPROBES,
   STARTUP_GRACE,
 } from "./InfinitusCompanion.ts";
 
 const SOCKET = "/tmp/infinitus-companion-test.sock";
 
-/** A control client whose `status` answers while `available` is true. */
-const clientLayer = (available: Ref.Ref<boolean>, socketPath: string | null = SOCKET) =>
+/** A control client whose `status` answers while `available` is true, and
+    otherwise fails with `cause` (ENOENT: no socket file; ECONNREFUSED: a file
+    nobody listens on). */
+const clientLayer = (
+  available: Ref.Ref<boolean>,
+  socketPath: string | null = SOCKET,
+  cause = "ENOENT",
+) =>
   Layer.succeed(InfinitusControlClient, {
     socketPath,
     request: (input) =>
       Effect.gen(function* () {
         if (yield* Ref.get(available)) return { version: "0.5.0" };
-        return yield* new InfinitusUnavailable({ path: SOCKET, cause: "ENOENT" });
+        return yield* new InfinitusUnavailable({ path: SOCKET, cause });
       }),
   } satisfies InfinitusControlClientShape);
 
@@ -166,6 +174,72 @@ describe("launchInfinitusAtStartup", () => {
       expect(yield* Fiber.join(fiber)).toBeNull();
       expect(yield* Ref.get(opens)).toBe(0);
     }),
+  );
+
+  effectIt.effect("waits out a socket file that refuses, then opens it as stale (#637)", () =>
+    Effect.gen(function* () {
+      const opens = yield* Ref.make(0);
+      const available = yield* Ref.make(false);
+      const fiber = yield* launchInfinitusAtStartup({
+        platform: "darwin",
+        runOpen: openStub(opens),
+      }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
+      yield* TestClock.adjust(STARTUP_GRACE);
+      expect(yield* Ref.get(opens)).toBe(0);
+      const window = Duration.times(RELAUNCH_REPROBE, RELAUNCH_REPROBES);
+      yield* TestClock.adjust(Duration.subtract(window, Duration.millis(1)));
+      expect(yield* Ref.get(opens)).toBe(0);
+      yield* TestClock.adjust(Duration.millis(1));
+      expect(yield* Fiber.join(fiber)).toEqual({ launched: true });
+      expect(yield* Ref.get(opens)).toBe(1);
+    }),
+  );
+
+  effectIt.effect("does nothing when a refusing socket answers within the window (#637)", () =>
+    Effect.gen(function* () {
+      const opens = yield* Ref.make(0);
+      const available = yield* Ref.make(false);
+      const fiber = yield* launchInfinitusAtStartup({
+        platform: "darwin",
+        runOpen: openStub(opens),
+      }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
+      // Refused at 3 s and 5 s; the relaunched app is listening by the 7 s probe.
+      yield* TestClock.adjust(Duration.sum(STARTUP_GRACE, RELAUNCH_REPROBE));
+      expect(yield* Ref.get(opens)).toBe(0);
+      yield* Ref.set(available, true);
+      yield* TestClock.adjust(RELAUNCH_REPROBE);
+      expect(yield* Fiber.join(fiber)).toBeNull();
+      expect(yield* Ref.get(opens)).toBe(0);
+    }),
+  );
+
+  effectIt.effect(
+    "still opens the app when the relaunch finishes with no socket left (ENOENT)",
+    () =>
+      Effect.gen(function* () {
+        // Refusing during the grace, gone after it: the old instance's file was
+        // replaced by nothing — the app is not coming back on its own.
+        const opens = yield* Ref.make(0);
+        const cause = yield* Ref.make("ECONNREFUSED");
+        const layer = Layer.succeed(InfinitusControlClient, {
+          socketPath: SOCKET,
+          request: () =>
+            Effect.gen(function* () {
+              return yield* new InfinitusUnavailable({
+                path: SOCKET,
+                cause: yield* Ref.get(cause),
+              });
+            }),
+        } satisfies InfinitusControlClientShape);
+        const fiber = yield* launchInfinitusAtStartup({
+          platform: "darwin",
+          runOpen: openStub(opens),
+        }).pipe(Effect.provide(layer), Effect.forkChild);
+        yield* Ref.set(cause, "ENOENT");
+        yield* TestClock.adjust(STARTUP_GRACE);
+        expect(yield* Fiber.join(fiber)).toEqual({ launched: true });
+        expect(yield* Ref.get(opens)).toBe(1);
+      }),
   );
 
   effectIt.effect("does nothing when the app is already up, and never off macOS", () =>
