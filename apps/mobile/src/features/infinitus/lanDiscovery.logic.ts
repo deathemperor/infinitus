@@ -110,6 +110,33 @@ export interface SweepReport {
   readonly failure: string | null;
   readonly aborted: boolean;
   readonly elapsedMs: number;
+  /** Set on the sweep that ran again after the session's first found nothing (#787). */
+  readonly retried?: boolean;
+}
+
+/** How long after a silent first sweep the second one starts. */
+export const SWEEP_RETRY_DELAY_MS = 2_000;
+
+/**
+ * Whether to sweep once more before saying "No Mac answered" (#787): the
+ * session's first sweep on iOS runs while the Local Network prompt is still
+ * settling, and every probe it sent before the grant is a miss for good. So
+ * a first sweep that probed something, was not stopped, and heard from no
+ * server gets one more try after `SWEEP_RETRY_DELAY_MS`; a later sweep, an
+ * empty one, or one that found a Mac does not.
+ */
+export function shouldRetrySweep(input: {
+  readonly report: SweepReport;
+  readonly firstSweepOfSession: boolean;
+}): boolean {
+  const { report } = input;
+  return (
+    input.firstSweepOfSession &&
+    !report.aborted &&
+    !(report.retried ?? false) &&
+    report.probed > 0 &&
+    report.servers === 0
+  );
 }
 
 /** expo-network's `NetworkStateType` as a word for the report. */
@@ -144,7 +171,10 @@ export function sweepSummary(report: SweepReport): string {
   ].join(", ");
   const failure = report.failure === null ? "" : ` First failure: ${report.failure}.`;
   const aborted = report.aborted ? " Stopped early." : "";
-  return `Swept ${subnet} on :${report.port} from ${report.ownIp}${on}: ${counts}, ${seconds}.${failure}${aborted}`;
+  const retried = report.retried
+    ? ` Second sweep, ${SWEEP_RETRY_DELAY_MS / 1000} s after the first found nothing.`
+    : "";
+  return `Swept ${subnet} on :${report.port} from ${report.ownIp}${on}: ${counts}, ${seconds}.${failure}${aborted}${retried}`;
 }
 
 export function probeUrl(ip: string, port: number = INFINITUS_SERVER_PORT): string {

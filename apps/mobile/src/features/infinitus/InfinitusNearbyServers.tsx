@@ -9,8 +9,27 @@ import {
   type NearbyServer,
   type SweepReport,
   networkWord,
+  shouldRetrySweep,
+  SWEEP_RETRY_DELAY_MS,
   sweepSummary,
 } from "./lanDiscovery.logic";
+
+/** Sweeps started since the app opened; the first one may run before the
+    Local Network grant lands and gets one automatic retry (#787). */
+let sweepsThisSession = 0;
+
+const wait = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
 
 type Phase = "idle" | "scanning" | "done";
 
@@ -52,19 +71,33 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
       network = null;
     }
     if (ownIp === null) setNotice("Join the Mac's Wi‑Fi first.");
-    const swept = await discoverNearbyServers({
-      ownIp,
-      network,
-      signal: controller.signal,
-      onFound: (server) =>
-        setFound((current) =>
-          // One row per server: a Mac on two interfaces answers twice.
-          current.some((item) => item.environmentId === server.environmentId)
-            ? current
-            : [...current, server],
-        ),
-    });
+    const firstSweepOfSession = sweepsThisSession === 0;
+    sweepsThisSession += 1;
+    const sweep = () =>
+      discoverNearbyServers({
+        ownIp,
+        network,
+        signal: controller.signal,
+        onFound: (server) =>
+          setFound((current) =>
+            // One row per server: a Mac on two interfaces answers twice.
+            current.some((item) => item.environmentId === server.environmentId)
+              ? current
+              : [...current, server],
+          ),
+      });
+    let swept = await sweep();
     if (controller.signal.aborted) return;
+    // #787: the session's first sweep can predate the Local Network grant;
+    // a silent one is tried once more before the page says nobody answered.
+    if (shouldRetrySweep({ report: swept, firstSweepOfSession })) {
+      setNotice("Nothing answered on the first pass; looking once more…");
+      await wait(SWEEP_RETRY_DELAY_MS, controller.signal);
+      if (controller.signal.aborted) return;
+      swept = { ...(await sweep()), retried: true };
+      if (controller.signal.aborted) return;
+      setNotice(null);
+    }
     setReport(swept);
     setPhase("done");
   }, []);
