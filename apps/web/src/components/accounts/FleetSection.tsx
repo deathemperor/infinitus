@@ -3,17 +3,22 @@ import type {
   AccountRowModel,
   FleetSectionModel,
 } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { ExhaustedBandModel } from "@t3tools/client-runtime/state/infinitusExhausted";
 
 import { AccountRow } from "./AccountRow";
+import { ExhaustedBand } from "./ExhaustedBand";
 
 /** One engine's fleet: what it is, the warning it carries, and its accounts. */
 export function FleetSection({
   section,
+  band,
   pending,
   failure,
   onAction,
 }: {
   readonly section: FleetSectionModel;
+  /** The all-exhausted band, when every unheld account is at a limit. */
+  readonly band: ExhaustedBandModel | null;
   readonly pending: { readonly number: number; readonly action: AccountAction } | null;
   readonly failure: { readonly number: number; readonly message: string } | null;
   readonly onAction: (row: AccountRowModel, action: AccountAction, alias?: string) => void;
@@ -24,6 +29,7 @@ export function FleetSection({
       {section.caveat === null ? null : (
         <p className="text-muted-foreground text-xs">{section.caveat}</p>
       )}
+      {band === null ? null : <ExhaustedBand band={band} />}
       <div className="flex flex-col">
         {section.rows.map((row) => (
           <AccountRow

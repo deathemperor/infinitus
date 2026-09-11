@@ -10,6 +10,7 @@ import {
   type AccountRowModel,
   type SignInRowModel,
 } from "@t3tools/client-runtime/state/infinitusAccounts";
+import { exhaustedBand } from "@t3tools/client-runtime/state/infinitusExhausted";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
@@ -19,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
 import { isElectron } from "../../env";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
@@ -122,6 +124,8 @@ export function AccountsPage() {
   );
   const snapshot = snapshotQuery.data;
   const state = accountsPageState({ capability, snapshot });
+  // The exhausted band's "reset has passed" reads against the shared minute clock.
+  const minute = useNowMinute();
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
 
   // The spinner lives only as long as the snapshot the command was sent
@@ -251,6 +255,7 @@ export function AccountsPage() {
             <AccountsBody
               state={state}
               snapshot={snapshot}
+              nowMs={Date.parse(minute)}
               pending={inFlight}
               failure={failure}
               pendingSignIn={signInInFlight}
@@ -271,6 +276,7 @@ export function AccountsPage() {
 function AccountsBody({
   state,
   snapshot,
+  nowMs,
   pending,
   failure,
   pendingSignIn,
@@ -281,6 +287,7 @@ function AccountsBody({
 }: {
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
+  readonly nowMs: number;
   readonly pending: (CommandTarget & { action: AccountAction }) | null;
   readonly failure: (CommandTarget & { message: string }) | null;
   readonly pendingSignIn: string | null;
@@ -344,6 +351,7 @@ function AccountsBody({
           <FleetSection
             key={section.key}
             section={section}
+            band={exhaustedBand(fleet, nowMs)}
             pending={
               pending?.fleetKey === section.key
                 ? { number: pending.number, action: pending.action }

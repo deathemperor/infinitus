@@ -191,6 +191,16 @@ this file adds the fork's own rules. Plan and history: issue #555.
   window (`show session <pid>`) when the manifest's `show` takes one, else
   the pop-out (#612). Mounted once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that one line is the fork's only edit there).
+- `packages/client-runtime/src/state/infinitusExhausted.ts` (exported as
+  `@t3tools/client-runtime/state/infinitusExhausted`) — the all-accounts-
+  exhausted band's verdict (#659): a fleet whose every unheld account has a
+  usage window at its limit that has not rolled yet, and the earliest revival
+  (each account's LAST maxed reset; the engine's `nextRecovery` when no reset
+  can be ranked; within an 8-day horizon) — a port of native
+  `AccountVitals.isDead` / `RecoveryMath.revival`. Drawn by
+  `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
+  section ("All accounts exhausted · next revival HH:MM (account)", the
+  time in the user's timestamp format), replacing the pop-out's reviver band.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
