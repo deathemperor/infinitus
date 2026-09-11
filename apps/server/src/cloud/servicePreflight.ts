@@ -25,8 +25,7 @@ export function runServicePreflight(input: {
     return {
       status: "blocked",
       version,
-      reason:
-        `This release requires a newer ${PRODUCT_NAME} service launcher. Update it on the server machine.`,
+      reason: `This release requires a newer ${PRODUCT_NAME} service launcher. Update it on the server machine.`,
     };
   }
 

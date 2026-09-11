@@ -79,8 +79,7 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
       return yield* new ProviderSetupError({
         instanceId,
         operation,
-        detail:
-          `This instance uses a custom executable. Clear its binary path to manage installation in ${PRODUCT_NAME}.`,
+        detail: `This instance uses a custom executable. Clear its binary path to manage installation in ${PRODUCT_NAME}.`,
       });
     }
   });

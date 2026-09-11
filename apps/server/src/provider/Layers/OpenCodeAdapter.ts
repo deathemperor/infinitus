@@ -1282,8 +1282,7 @@ export function makeOpenCodeAdapter(
       ) {
         return;
       }
-      const detail =
-        `OpenCode accepted the prompt, but ${PRODUCT_NAME} could not confirm its message or session status.`;
+      const detail = `OpenCode accepted the prompt, but ${PRODUCT_NAME} could not confirm its message or session status.`;
       const abortExit = yield* Effect.exit(
         runOpenCodeSdk("session.abort", (signal) =>
           context.client.session.abort({ sessionID: context.openCodeSessionId }, { signal }),

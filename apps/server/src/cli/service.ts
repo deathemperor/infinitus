@@ -164,7 +164,9 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
         const service = yield* BootService.BootService;
         const removed = yield* service.uninstall;
         yield* Console.log(
-          removed ? `Removed the ${PRODUCT_NAME} service.` : `${PRODUCT_NAME} service is not installed.`,
+          removed
+            ? `Removed the ${PRODUCT_NAME} service.`
+            : `${PRODUCT_NAME} service is not installed.`,
         );
       }),
     ),
@@ -192,7 +194,9 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
     return false;
   }
   if (installed && current) {
-    yield* Console.log(`${PRODUCT_NAME} is already set up to run in the background on this machine.`);
+    yield* Console.log(
+      `${PRODUCT_NAME} is already set up to run in the background on this machine.`,
+    );
     return true;
   }
   for (const problem of status.problems ?? []) {
