@@ -780,6 +780,41 @@ final class StatsTests: XCTestCase {
     /// A handle carries the decoded cache across a chunked backfill and
     /// still lands the finished state on disk, identical to the
     /// handle-less scan.
+    /// #499: a released handle has written what moved and forgotten the
+    /// corpus; the next pass re-reads the file and sums the same days.
+    func testCacheHandleReleaseWritesAndForgets() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stats-r-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let project = dir.appendingPathComponent("p")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        var lines: [String] = []
+        for i in 0..<4 {
+            lines.append(#"{"type":"user","cwd":"/r/a","timestamp":"2026-09-04T01:0\#(i):00.000Z","origin":{"kind":"human"},"message":{"role":"user","content":"hi"}}"#)
+            lines.append(#"{"type":"assistant","timestamp":"2026-09-04T01:0\#(i):05.000Z","message":{"id":"a\#(i)","model":"claude-opus-5","usage":{"input_tokens":5,"output_tokens":10},"content":[{"type":"text","text":"ok"}]}}"#)
+        }
+        try lines.joined(separator: "\n").appending("\n").write(to: project.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
+        let cacheURL = dir.appendingPathComponent("held.json")
+        let handle = StatsScanner.CacheHandle()
+        let first = StatsScanner.scan(projectsDir: dir, cacheURL: cacheURL, calendar: cal, handle: handle)
+        XCTAssertEqual(first.remaining, 0)
+        XCTAssertNotNil(handle.cache)
+        // The corpus moves after the write, so the handle is dirty again.
+        let fh = try FileHandle(forWritingTo: project.appendingPathComponent("s1.jsonl"))
+        try fh.seekToEnd(); try fh.write(contentsOf: Data(lines[0...1].joined(separator: "\n").appending("\n").utf8)); try fh.close()
+        let moved = StatsScanner.scan(projectsDir: dir, cacheURL: cacheURL, calendar: cal, handle: handle)
+        XCTAssertTrue(handle.dirty, "a settled corpus that moved waits for the settled cadence")
+        let before = try Data(contentsOf: cacheURL)
+        handle.release(to: cacheURL)
+        XCTAssertNil(handle.cache)
+        XCTAssertNil(handle.sums)
+        XCTAssertFalse(handle.dirty)
+        XCTAssertNotEqual(try Data(contentsOf: cacheURL), before, "release flushed the moved corpus")
+        let again = StatsScanner.scan(projectsDir: dir, cacheURL: cacheURL, calendar: cal, handle: handle)
+        XCTAssertEqual(again.days, moved.days, "the re-read corpus sums the same days")
+        XCTAssertEqual(again.files, 1)
+        XCTAssertNotNil(handle.cache)
+    }
+
     func testCacheHandleCarriesThePassesAndWritesTheFinishedCache() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("stats-h-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
