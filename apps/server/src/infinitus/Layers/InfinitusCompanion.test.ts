@@ -21,14 +21,20 @@ import {
 
 const SOCKET = "/tmp/infinitus-companion-test.sock";
 
-/** A control client whose `status` answers while `available` is true. */
-const clientLayer = (available: Ref.Ref<boolean>, socketPath: string | null = SOCKET) =>
+/** A control client whose `status` answers while `available` is true, and
+    otherwise fails with `cause` (ENOENT: no socket file; ECONNREFUSED: a file
+    nobody listens on). */
+const clientLayer = (
+  available: Ref.Ref<boolean>,
+  socketPath: string | null = SOCKET,
+  cause = "ENOENT",
+) =>
   Layer.succeed(InfinitusControlClient, {
     socketPath,
     request: (input) =>
       Effect.gen(function* () {
         if (yield* Ref.get(available)) return { version: "0.5.0" };
-        return yield* new InfinitusUnavailable({ path: SOCKET, cause: "ENOENT" });
+        return yield* new InfinitusUnavailable({ path: SOCKET, cause });
       }),
   } satisfies InfinitusControlClientShape);
 
@@ -166,6 +172,54 @@ describe("launchInfinitusAtStartup", () => {
       expect(yield* Fiber.join(fiber)).toBeNull();
       expect(yield* Ref.get(opens)).toBe(0);
     }),
+  );
+
+  effectIt.effect(
+    "leaves a socket file that refuses alone: an Infinitus is mid-relaunch (#637)",
+    () =>
+      Effect.gen(function* () {
+        const opens = yield* Ref.make(0);
+        const available = yield* Ref.make(false);
+        const fiber = yield* launchInfinitusAtStartup({
+          platform: "darwin",
+          runOpen: openStub(opens),
+        }).pipe(Effect.provide(clientLayer(available, SOCKET, "ECONNREFUSED")), Effect.forkChild);
+        yield* TestClock.adjust(STARTUP_GRACE);
+        const result = yield* Fiber.join(fiber);
+        expect(result?.launched).toBe(false);
+        expect(result?.launched === false ? result.reason : "").toContain(SOCKET);
+        expect(result?.launched === false ? result.reason : "").toContain("ECONNREFUSED");
+        expect(yield* Ref.get(opens)).toBe(0);
+      }),
+  );
+
+  effectIt.effect(
+    "still opens the app when the relaunch finishes with no socket left (ENOENT)",
+    () =>
+      Effect.gen(function* () {
+        // Refusing during the grace, gone after it: the old instance's file was
+        // replaced by nothing — the app is not coming back on its own.
+        const opens = yield* Ref.make(0);
+        const cause = yield* Ref.make("ECONNREFUSED");
+        const layer = Layer.succeed(InfinitusControlClient, {
+          socketPath: SOCKET,
+          request: () =>
+            Effect.gen(function* () {
+              return yield* new InfinitusUnavailable({
+                path: SOCKET,
+                cause: yield* Ref.get(cause),
+              });
+            }),
+        } satisfies InfinitusControlClientShape);
+        const fiber = yield* launchInfinitusAtStartup({
+          platform: "darwin",
+          runOpen: openStub(opens),
+        }).pipe(Effect.provide(layer), Effect.forkChild);
+        yield* Ref.set(cause, "ENOENT");
+        yield* TestClock.adjust(STARTUP_GRACE);
+        expect(yield* Fiber.join(fiber)).toEqual({ launched: true });
+        expect(yield* Ref.get(opens)).toBe(1);
+      }),
   );
 
   effectIt.effect("does nothing when the app is already up, and never off macOS", () =>

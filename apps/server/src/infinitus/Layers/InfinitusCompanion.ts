@@ -48,14 +48,29 @@ export interface InfinitusLaunchDeps {
   readonly runOpen: Effect.Effect<InfinitusOpenOutcome, InfinitusOpenFailed>;
 }
 
-/** Whether `status` answered. Any reply — a failed command included — means
-    the app is there; only an unreachable socket is `unavailable`. */
+/** What one `status` probe found. Any reply — a failed command included —
+    means the app is there (`answering`). An unreachable socket is `gone` when
+    the path does not exist (ENOENT) and `refusing` when it does but nobody
+    listens (ECONNREFUSED, a hang-up, EACCES): the app never unlinks its
+    socket, so a quitting or relaunching Infinitus leaves the file behind
+    until the next instance rebinds it (#637). */
+type Probe =
+  | { readonly state: "answering" }
+  | { readonly state: "gone" }
+  | { readonly state: "refusing"; readonly path: string; readonly cause: string };
+
 const probeInfinitus = Effect.fn("Infinitus.probe")(function* () {
   const client = yield* InfinitusControlClient;
   return yield* client.request({ command: "status" }).pipe(
-    Effect.as("answering" as const),
-    Effect.catchTag("InfinitusUnavailable", () => Effect.succeed("unavailable" as const)),
-    Effect.catch(() => Effect.succeed("answering" as const)),
+    Effect.as<Probe>({ state: "answering" }),
+    Effect.catchTag("InfinitusUnavailable", (error) =>
+      Effect.succeed<Probe>(
+        error.cause === "ENOENT"
+          ? { state: "gone" }
+          : { state: "refusing", path: error.path, cause: error.cause },
+      ),
+    ),
+    Effect.catch(() => Effect.succeed<Probe>({ state: "answering" })),
   );
 });
 
@@ -103,7 +118,7 @@ export const launchInfinitus = Effect.fn("Infinitus.launch")(function* (
   if (client.socketPath === null) {
     return { launched: false, reason: "this host has no Infinitus control socket" };
   }
-  if ((yield* probeInfinitus()) === "answering") {
+  if ((yield* probeInfinitus()).state === "answering") {
     return { launched: false, reason: "Infinitus is already running" };
   }
   return yield* openInfinitus(deps.runOpen);
@@ -114,6 +129,12 @@ export const launchInfinitus = Effect.fn("Infinitus.launch")(function* (
  * app opened once, with one log line either way. No retry, no loop — a user
  * who quits the menu-bar app afterwards keeps it quit (that is what the
  * "Launch Infinitus" button is for).
+ *
+ * A socket file that exists but refuses is left alone too: an Infinitus is
+ * starting or mid-relaunch (its own reopen shell runs `open` once the old pid
+ * exits), and a second `open` on top of it is the relaunch race of #637/#756.
+ * The stale file a crash leaves behind looks the same, so that case waits for
+ * the "Launch Infinitus" button as well.
  */
 export const launchInfinitusAtStartup = Effect.fn("Infinitus.launchAtStartup")(function* (
   deps: InfinitusLaunchDeps,
@@ -121,10 +142,17 @@ export const launchInfinitusAtStartup = Effect.fn("Infinitus.launchAtStartup")(f
   if (deps.platform !== "darwin") return null;
   const client = yield* InfinitusControlClient;
   if (client.socketPath === null) return null;
-  if ((yield* probeInfinitus()) === "answering") return null;
+  if ((yield* probeInfinitus()).state === "answering") return null;
   yield* Effect.sleep(STARTUP_GRACE);
-  if ((yield* probeInfinitus()) === "answering") return null;
-  const result = yield* openInfinitus(deps.runOpen);
+  const probe = yield* probeInfinitus();
+  if (probe.state === "answering") return null;
+  const result =
+    probe.state === "refusing"
+      ? {
+          launched: false,
+          reason: `the control socket at ${probe.path} exists but nobody answers (${probe.cause}): an Infinitus is starting or mid-relaunch, left alone`,
+        }
+      : yield* openInfinitus(deps.runOpen);
   yield* Effect.logInfo("infinitus.companion.launch", result);
   return result;
 });
