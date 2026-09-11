@@ -31,6 +31,7 @@ import {
   ComposerInlineControl,
   ComposerToolbarRow,
 } from "../../components/ComposerToolbar";
+import { InfinitusPinAtCreationControl } from "../infinitus/InfinitusPinAtCreationControl";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
@@ -1381,6 +1382,10 @@ export function NewTaskDraftScreen(props: {
                         showChevron={false}
                       />
                     ) : null}
+                    <InfinitusPinAtCreationControl
+                      environmentId={selectedProject?.environmentId ?? null}
+                      disabled={isComposerInteractionLocked}
+                    />
                   </View>
                 </>
               )}

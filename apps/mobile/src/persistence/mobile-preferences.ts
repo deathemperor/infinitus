@@ -52,6 +52,8 @@ export interface Preferences {
   /** Infinitus (fork): local reset / swap alarms planned from the Mac's fleet. */
   readonly infinitusAlarmsEnabled?: boolean;
   readonly infinitusPushAlertsEnabled?: boolean;
+  /** Infinitus (fork, #742): pin each new task as the server creates it. */
+  readonly infinitusPinAtCreation?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -116,6 +118,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     infinitusLiveActivityMac?: string;
     infinitusAlarmsEnabled?: boolean;
     infinitusPushAlertsEnabled?: boolean;
+    infinitusPinAtCreation?: boolean;
   } = {};
 
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
@@ -203,6 +206,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.infinitusPushAlertsEnabled === "boolean") {
     preferences.infinitusPushAlertsEnabled = parsed.infinitusPushAlertsEnabled;
+  }
+  if (typeof parsed.infinitusPinAtCreation === "boolean") {
+    preferences.infinitusPinAtCreation = parsed.infinitusPinAtCreation;
   }
   return preferences;
 }

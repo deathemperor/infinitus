@@ -20,6 +20,7 @@ import { Alert } from "react-native";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildProjectThreadStartTurnInput } from "../lib/projectThreadStartTurn";
 import { prepareTurnAttachments, type PreparedTurnAttachments } from "../lib/attachmentUpload";
+import { usePinAtCreation } from "../features/infinitus/pinAtCreation";
 import { randomHex } from "../lib/uuid";
 import { isModelSelectionUnavailable } from "../lib/modelOptions";
 import {
@@ -547,6 +548,7 @@ export function useThreadOutboxDrain(): void {
   const setThreadInteractionMode = useAtomCommand(threadEnvironment.setInteractionMode, {
     reportFailure: false,
   });
+  const pinNewThread = usePinAtCreation();
   const dispatchingQueuedMessageId = useAtomValue(dispatchingQueuedMessageIdAtom);
   const editingQueuedMessageIds = useAtomValue(editingQueuedMessageIdsAtom);
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
@@ -945,6 +947,12 @@ export function useThreadOutboxDrain(): void {
       // Recorded before the queue entry goes so the thread screen never sees a
       // gap between the queued creation and the server's shell.
       recordPendingThreadCreationOutcome({ kind: "delivered", message: persistedMessage });
+      // Infinitus (fork, #742): "Pin on create" pins the thread the server
+      // just made; the pin releases a first start the hold layer kept.
+      void pinNewThread({
+        environmentId: queuedMessage.environmentId,
+        threadId: queuedMessage.threadId,
+      });
       const outcome = await completeQueuedMessageDelivery(persistedMessage, deliveryRevision);
       if (outcome === "edited") {
         if (appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId]) {
@@ -959,7 +967,7 @@ export function useThreadOutboxDrain(): void {
       }
       return outcome === "removed";
     },
-    [makeDeliveryHelpers, restoreQueuedMessage, startTurn],
+    [makeDeliveryHelpers, pinNewThread, restoreQueuedMessage, startTurn],
   );
 
   // A creation outcome bridges setup until the server's shell has a turn.
