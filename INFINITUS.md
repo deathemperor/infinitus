@@ -462,9 +462,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
   start (the user's send, an async answer, resume-on-limit, the post-update
   continuation) while the fleet its driver spends on publishes `headroom.state`
   `low`/`critical`, and runs it when the fleet reads `abundant`, the thread is
-  pinned, or `release(threadId)` ("Run now"). Pinned threads and a thread
-  mid-turn are never held; a fleet that publishes no `headroom` (mode off, an
-  older build) never holds. Held starts live in memory, oldest first, released
+  pinned, `release(threadId)` ("Run now"), or a real poll carries no verdict
+  for the fleet any more (mode turned off; an unreachable app keeps the hold).
+  Pinned threads and a thread mid-turn are never held; a fleet that publishes
+  no `headroom` (mode off, an older build) never holds. Held starts live in memory, oldest first, released
   2 s apart; one `infinitus.thread.held` / `infinitus.thread.released` work-log
   row per hold, which the web derives the held state from. The snapshot
   subscription is held only while a start is. Archived or deleted while held:

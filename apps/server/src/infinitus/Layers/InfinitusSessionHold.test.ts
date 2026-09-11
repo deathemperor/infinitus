@@ -57,6 +57,14 @@ const snapshotWith = (fleets: ReadonlyArray<InfinitusFleet>): InfinitusSnapshot 
 
 const low = snapshotWith([fleet({ headroom: { state: "low", window: "5h", pct: 84 } })]);
 const abundant = snapshotWith([fleet({ headroom: { state: "abundant" } })]);
+const silent = snapshotWith([fleet()]);
+const offline: InfinitusSnapshot = {
+  available: false,
+  unavailableReason: "connection refused",
+  fleets: [],
+  sessions: [],
+  commands: [],
+};
 /** What `snapshot` answers before the first poll on a server nobody watches. */
 const notPolled: InfinitusSnapshot = {
   available: false,
@@ -65,7 +73,6 @@ const notPolled: InfinitusSnapshot = {
   sessions: [],
   commands: [],
 };
-const silent = snapshotWith([fleet()]);
 
 const shellFor = (
   threadId: ThreadId,
@@ -146,9 +153,7 @@ const makeHarness = Effect.gen(function* () {
             ),
           observed: Stream.empty,
           // A refresh polls for real: here it lands the low reading.
-          refresh: Ref.update(refreshes, (n) => n + 1).pipe(
-            Effect.andThen(Ref.set(current, low)),
-          ),
+          refresh: Ref.update(refreshes, (n) => n + 1).pipe(Effect.andThen(Ref.set(current, low))),
         }),
         Layer.succeed(Crypto.Crypto, testCrypto),
       ),
@@ -301,6 +306,38 @@ describe("InfinitusSessionHoldLayers", () => {
         ]);
         expect(markers[1]?.summary).toBe("Released: headroom abundant on claude");
         yield* settle(h.watchers, (n) => n === 0);
+      }),
+    ),
+  );
+
+  effectIt.effect("releases when a real poll carries no verdict for the fleet (mode off)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.start(one);
+        yield* settle(h.watchers, (n) => n === 1);
+
+        yield* h.poll(silent);
+        const ran = yield* settle(h.ran, (list) => list.length === 1);
+        expect(ran).toEqual(["thread-1"]);
+        expect((yield* h.markers)[1]?.summary).toBe("Released: no headroom verdict on claude");
+        yield* settle(h.watchers, (n) => n === 0);
+      }),
+    ),
+  );
+
+  effectIt.effect("keeps holding while the app cannot be reached", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.start(one);
+        yield* settle(h.watchers, (n) => n === 1);
+
+        yield* h.poll(offline);
+        yield* Effect.yieldNow;
+        yield* Effect.yieldNow;
+        expect(yield* h.ran).toEqual([]);
+        expect(yield* h.watchers).toBe(1);
       }),
     ),
   );

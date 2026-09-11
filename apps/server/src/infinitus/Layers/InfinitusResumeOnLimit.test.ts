@@ -31,6 +31,7 @@ import {
   TurnStartGate,
   TurnStartGatePassthrough,
   type TurnStartGateShape,
+  type TurnStartInput,
 } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
@@ -237,9 +238,14 @@ describe("InfinitusResumeOnLimitLive", () => {
         Effect.gen(function* () {
           const kept: Array<{ threadId: ThreadId; run: Effect.Effect<void> }> = [];
           const h = yield* makeHarnessWith({
-            start: ({ threadId: held, run }) =>
-              Effect.sync(() => {
-                kept.push({ threadId: held, run: run as Effect.Effect<void> });
+            start: <E, R>({ threadId: held, run }: TurnStartInput<E, R>) =>
+              Effect.gen(function* () {
+                // What the real hold does: bind the caller's context, own the failures.
+                const context = yield* Effect.context<R>();
+                kept.push({
+                  threadId: held,
+                  run: run.pipe(Effect.provideContext(context), Effect.orDie),
+                });
                 return "held" as const;
               }),
           });

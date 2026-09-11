@@ -39,7 +39,7 @@ import {
 interface Held {
   readonly threadId: ThreadId;
   readonly provider: string;
-  readonly run: Effect.Effect<void>;
+  readonly run: Effect.Effect<void, unknown>;
 }
 
 type Input =
@@ -67,9 +67,10 @@ const eventThreadId = (event: OrchestrationEvent): ThreadId | null => {
  * Session priority mode for the threads this server runs (#616): the
  * `TurnStartGate` that holds a background thread's start while the fleet its
  * driver spends on reads `low` headroom, and runs it when the fleet reads
- * `abundant`, the thread is pinned, or the user says "Run now". Pinned threads
- * are never held; a thread mid-turn is not either (that send is a steer). The
- * verdict is native's, published per fleet; the fork only reads it.
+ * `abundant`, the thread is pinned, the user says "Run now", or a real poll
+ * carries no verdict for the fleet any more. Pinned threads are never held; a
+ * thread mid-turn is not either (that send is a steer). The verdict is
+ * native's, published per fleet; the fork only reads it.
  *
  * Held starts live in memory in arrival order, one marker row per held
  * thread, and the snapshot subscription (what makes the server poll, #346)
@@ -222,11 +223,22 @@ const InfinitusSessionHoldLive = Layer.effect(
             return;
           }
           case "snapshot": {
+            // An app that cannot be reached says nothing: the hold stands. One
+            // that answers without a verdict for the fleet (mode turned off,
+            // the account swapped to one with no usage yet) releases: nobody
+            // is judging headroom any more.
             for (const provider of new Set(held.map((entry) => entry.provider))) {
-              if (headroomVerdict(input.snapshot, provider).verdict !== "release") continue;
+              const verdict = headroomVerdict(input.snapshot, provider).verdict;
+              const reason =
+                verdict === "release"
+                  ? "abundant"
+                  : verdict === "unknown" && input.snapshot.available
+                    ? "off"
+                    : null;
+              if (reason === null) continue;
               yield* release(
                 heldThreads((entry) => entry.provider === provider),
-                "abundant",
+                reason,
               );
             }
             return;
@@ -303,9 +315,9 @@ const InfinitusSessionHoldLive = Layer.effect(
       );
 
     return InfinitusSessionHold.of({
-      start: <R>(input: {
+      start: <E, R>(input: {
         readonly threadId: ThreadId;
-        readonly run: Effect.Effect<void, never, R>;
+        readonly run: Effect.Effect<void, E, R>;
       }) =>
         Effect.gen(function* () {
           const decision = yield* decide(input.threadId);

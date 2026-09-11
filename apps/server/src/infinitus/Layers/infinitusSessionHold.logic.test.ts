@@ -123,5 +123,6 @@ describe("marker summaries", () => {
     );
     expect(releaseMarkerSummary("pinned", "claude")).toBe("Released: pinned");
     expect(releaseMarkerSummary("user", "claude")).toBe("Released: run now");
+    expect(releaseMarkerSummary("off", "claude")).toBe("Released: no headroom verdict on claude");
   });
 });

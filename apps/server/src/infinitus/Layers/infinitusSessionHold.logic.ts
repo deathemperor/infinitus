@@ -18,7 +18,11 @@ export const RELEASE_MARKER_KIND = "infinitus.thread.released";
     flip itself back. */
 export const RELEASE_SPACING_MS = 2_000;
 
-export type ReleaseReason = "abundant" | "pinned" | "user";
+/** Why a held start ran: the fleet read abundant, the thread was pinned,
+    the user said "Run now", or a real poll carried no verdict for the
+    fleet any more (priority mode off, or the account swapped to one that
+    has never carried usage). */
+export type ReleaseReason = "abundant" | "pinned" | "user" | "off";
 
 /** The fleet provider a driver's threads spend on; null for a driver whose
     accounts no engine holds (never held). */
@@ -78,5 +82,7 @@ export function releaseMarkerSummary(reason: ReleaseReason, provider: string): s
       return "Released: pinned";
     case "user":
       return "Released: run now";
+    case "off":
+      return `Released: no headroom verdict on ${provider}`;
   }
 }
