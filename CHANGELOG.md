@@ -125,6 +125,7 @@ publishes the matching section as the GitHub release body.
 - The stats cache holds each transcript-day's hour histogram as the few hours it covers instead of a full week of slots, trimming ~17 MB from the app's resident memory on a year of transcripts (#499).
 - A headless session's expired AWS or gcloud sign-in is read off its stream the moment the command fails, so the phone's login alert no longer waits for the transcript scan (#402).
 - The stats cache is written one transcript entry at a time, so each checkpoint's write no longer spikes the app by ~130 MB on a year of transcripts (#499).
+- The quick tunnel (mirror and fork) ignores ~/.cloudflared/config.yml, so a named tunnel's ingress no longer turns every quick-tunnel request into cloudflared's own 404.
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
