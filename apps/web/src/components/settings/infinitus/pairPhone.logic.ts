@@ -87,11 +87,11 @@ function forkTunnelNotice(
     case "up":
       return null;
     case "unsupported":
-      return `This Infinitus build has no fork tunnel (needs ≥ ${FORK_TUNNEL_MIN_BUILD}, on a Mac).`;
+      return `This Infinitus build has no tunnel (needs ≥ ${FORK_TUNNEL_MIN_BUILD}, on a Mac).`;
     case "off":
       return "Turn on the Cloudflare quick tunnel above to pair a phone off your network.";
     case "invalidPort":
-      return `The fork server port (${tunnel?.port ?? "?"}) is out of range; set it above to the port this server listens on.`;
+      return `The server port (${tunnel?.port ?? "?"}) is out of range; set it above to the port this server listens on.`;
     case "blocked":
       return "The tunnel stays off for playground and mock instances of Infinitus.";
     case "unavailable":

@@ -1,4 +1,4 @@
-// This file mostly exists because we want dev mode to say "T3 Code (Dev)" instead of "electron"
+// This file mostly exists because we want dev mode to say "Infinitus (Dev)" instead of "electron"
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -15,7 +15,7 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
+const APP_DISPLAY_NAME = isDevelopment ? "Infinitus (Dev)" : "Infinitus";
 const APP_BUNDLE_ID = isDevelopment
   ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
   : "com.t3tools.t3code";
@@ -271,8 +271,8 @@ export function resolveMacBundleInfoPlistStrings(executableName) {
     CFBundleExecutable: executableName,
     CFBundleIconFile: "icon.icns",
     NSScreenCaptureUsageDescription:
-      "T3 Code captures the active window when you use the snapshot shortcut.",
-    NSDocumentsFolderUsageDescription: "T3 Code reads project files you open in the desktop app.",
+      "Infinitus captures the active window when you use the snapshot shortcut.",
+    NSDocumentsFolderUsageDescription: "Infinitus reads project files you open in the desktop app.",
   };
 }
 
@@ -403,7 +403,7 @@ function buildMacLauncher(electronBinaryPath) {
   if (isDevelopment) {
     // Keep Electron's native executable inside the branded bundle. Launching the
     // node_modules copy makes macOS associate the process (and Dock label) with
-    // Electron.app even though this bundle's Info.plist has the T3 Code name.
+    // Electron.app even though this bundle's Info.plist has the Infinitus name.
     // Its conventional executable name also keeps Electron's default-app runtime
     // in development mode instead of making app.isPackaged report true.
     writeDevelopmentEnvironmentScript();
