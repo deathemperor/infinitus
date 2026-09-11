@@ -16,9 +16,10 @@ import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
-/** Settings › Infinitus (fork, #572): the Live Activity toggle, the reset /
-    swap alarms toggle (which asks for the notification permission) and, with
-    several Macs, which one drives the cards. Absent until a paired Mac runs
+/** Settings › Infinitus (fork, #572): the Live Activity toggle, the Mac
+    alerts toggle (#702) and the reset / swap alarms toggle (both ask for the
+    notification permission) and, with several Macs, which one drives the
+    cards and sends the alerts. Absent until a paired Mac runs
     Infinitus, so plain T3 users never see it. */
 export function SettingsInfinitusSection() {
   const preferences = useAtomValue(mobilePreferencesAtom);
@@ -29,6 +30,7 @@ export function SettingsInfinitusSection() {
   const loaded = AsyncResult.isSuccess(preferences);
   const enabled = loaded && preferences.value.infinitusLiveActivityEnabled !== false;
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
+  const pushAlertsEnabled = loaded && preferences.value.infinitusPushAlertsEnabled === true;
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
   const macActions = useMemo<MenuAction[]>(
     () =>
@@ -57,6 +59,22 @@ export function SettingsInfinitusSection() {
         onValueChange={(value) => savePreferences({ infinitusLiveActivityEnabled: value })}
       />
       <SettingsSwitchRow
+        icon="bell.badge"
+        label="Alerts from Mac"
+        subtitle={
+          Platform.OS === "ios"
+            ? "The Mac's limit, waiting and sign-in alerts arrive as banners."
+            : "Mac alerts reach iPhones only."
+        }
+        disabled={Platform.OS !== "ios" || !loaded}
+        value={pushAlertsEnabled}
+        onValueChange={(value) => {
+          savePreferences({ infinitusPushAlertsEnabled: value });
+          if (value)
+            void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
+        }}
+      />
+      <SettingsSwitchRow
         icon="alarm"
         label="Reset alarms"
         subtitle="A banner before an exhausted account's limit lifts, and when the fleet swaps."
@@ -70,7 +88,7 @@ export function SettingsInfinitusSection() {
       />
       {macs.length > 1 && pusher ? (
         <ControlPillMenu
-          title="Mac that drives the card"
+          title="Mac that drives the card and sends alerts"
           actions={macActions}
           onPressAction={({ nativeEvent }) =>
             savePreferences({ infinitusLiveActivityMac: nativeEvent.event })
