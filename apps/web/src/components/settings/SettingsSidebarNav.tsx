@@ -26,6 +26,8 @@ import {
   SearchIcon,
   Settings2Icon,
   SmartphoneIcon,
+  SparklesIcon,
+  SwatchBookIcon,
   XIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -91,6 +93,8 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/source-control": GitBranchIcon,
   "/settings/connections": Link2Icon,
   "/settings/infinitus": InfinityIcon,
+  "/settings/infinitus/themes": SwatchBookIcon,
+  "/settings/infinitus/animations": SparklesIcon,
   "/settings/infinitus/notifications": BellIcon,
   "/settings/infinitus/devices": SmartphoneIcon,
   "/settings/infinitus/engines": CpuIcon,
@@ -101,6 +105,8 @@ const SETTINGS_SECTION_ICONS: Readonly<
 /** The pages that only exist where a connected server drives an Infinitus app. */
 const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
   "/settings/infinitus",
+  "/settings/infinitus/themes",
+  "/settings/infinitus/animations",
   "/settings/infinitus/notifications",
   "/settings/infinitus/devices",
   "/settings/infinitus/engines",

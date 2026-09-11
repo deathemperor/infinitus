@@ -167,6 +167,8 @@ describe("searchSettings", () => {
       "auto-settle-merged-threads",
       "days-before-auto-settle",
       "infinitus-preferences",
+      "infinitus-themes",
+      "infinitus-animations",
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
@@ -206,6 +208,8 @@ describe("searchSettings", () => {
 
     expect(searchSettings("infinitus", available).map((item) => item.id)).toEqual([
       "infinitus-preferences",
+      "infinitus-themes",
+      "infinitus-animations",
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",

@@ -259,6 +259,68 @@ describe("parseControlInput", () => {
     expect(parseControlInput(theme, "")).toEqual({ ok: true, value: "" });
   });
 
+  it("renders {id, name} choices by name and writes the id (#747)", () => {
+    const style = pref({
+      key: "gamification_style",
+      section: "themes",
+      type: "string",
+      default: "off",
+      value: "hades",
+      choices: [
+        { id: "off", name: "Off" },
+        { id: "rpg", name: "RPG" },
+        { id: "hades", name: "Hades" },
+        { id: "custom-1", name: "My theme" },
+        { id: "bare" },
+      ],
+    });
+    const row = rowOf(catalog([{ slug: "themes", name: "Themes" }], [style]), "gamification_style");
+
+    // The web's own copy still wins for built-ins it describes; the catalog's
+    // name labels the rest (custom themes), and a nameless id labels itself.
+    expect(row.control).toEqual({
+      kind: "select",
+      value: "hades",
+      options: [
+        { value: "off", label: "Off — plain numbers" },
+        { value: "rpg", label: "RPG — HP/MP gauges + gold" },
+        { value: "hades", label: "Hades — blades & darkness" },
+        { value: "custom-1", label: "My theme" },
+        { value: "bare", label: "bare" },
+      ],
+    });
+    expect(parseControlInput(style, "custom-1")).toEqual({ ok: true, value: "custom-1" });
+    expect(parseControlInput(style, "Hades").ok).toBe(false);
+  });
+
+  it("carries a bounded number's range and refuses a value outside it (#747)", () => {
+    const speed = pref({
+      key: "intro_speed",
+      section: "animations",
+      type: "double",
+      default: 1,
+      value: 1.5,
+      min: 0.4,
+      max: 2,
+    });
+    const row = rowOf(
+      catalog([{ slug: "animations", name: "Animations" }], [speed]),
+      "intro_speed",
+    );
+
+    expect(row.control).toEqual({ kind: "number", value: 1.5, integer: false, min: 0.4, max: 2 });
+    expect(parseControlInput(speed, "0.4")).toEqual({ ok: true, value: 0.4 });
+    expect(parseControlInput(speed, "2")).toEqual({ ok: true, value: 2 });
+    expect(parseControlInput(speed, "2.5").ok).toBe(false);
+    expect(parseControlInput(speed, "0").ok).toBe(false);
+    // An unbounded int keeps the old control shape.
+    expect(rowOf(catalog([displaySection], [lead]), "revive_lead_minutes").control).toEqual({
+      kind: "number",
+      value: 25,
+      integer: true,
+    });
+  });
+
   it("rejects a value outside the choices and names them in the reason", () => {
     const rejected = parseControlInput(layout, "grid");
 
