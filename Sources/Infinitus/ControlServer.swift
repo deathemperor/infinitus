@@ -581,6 +581,85 @@ final class ControlServer {
                 "fleets": try .of(fleetsPayload()),
             ] as [String: JSONValue]), error: stillRunning ? "timed out after \(Int(timeout))s" : error)
 
+        case "signin-begin":
+            guard let key = r.args.first,
+                  let fleet = model.fleets.first(where: { $0.id == key }) else {
+                throw Fail("usage: signin-begin <fleet> [--relogin <email>]; fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
+            }
+            let flow = TokenFlow.shared
+            guard !flow.running, !model.addingFirstAccount else {
+                throw Fail("a sign-in is already running")
+            }
+            var relogin: Account?
+            if let email = r.options["relogin"] {
+                guard let account = fleet.accounts.first(where: { $0.email == email }) else {
+                    throw Fail("\(key) has no account \(email)")
+                }
+                relogin = account
+            }
+            if fleet.capabilities.contains(.addOAuth) {
+                model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
+                                      relogin: relogin, headless: true)
+            } else if fleet.engineID == CswapEngine.engineID {
+                flow.start(model: model, relogin: relogin, headless: true)
+            } else {
+                throw Fail("\(key) has no sign-in flow")
+            }
+            guard let flowID = flow.flowID, flow.running || flow.authURL != nil else {
+                throw Fail("the sign-in did not start")
+            }
+            // The OAuth URL arrives once the CLI (or the engine) hands it
+            // over — a second or two; the caller gets it in this reply.
+            let urlDeadline = Date().addingTimeInterval(30)
+            while flow.authURL == nil, flow.running, Date() < urlDeadline {
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if case .failed(let why) = flow.phase { throw Fail(why) }
+            guard let url = flow.authURL else {
+                flow.cancel()
+                throw Fail("no sign-in URL within 30s")
+            }
+            return ControlReply(ok: true, result: .object([
+                "flowId": .string(flowID),
+                "url": .string(url.absoluteString),
+                "pasteCode": .bool(flow.pasteCode),
+                "label": .string(flow.reloginTarget.map { "Sign in again \u{2014} \($0)" } ?? "Add account"),
+            ]))
+
+        case "signin-status":
+            return ControlReply(ok: true, result: signinPayload(try signinFlow(r)))
+
+        case "signin-code":
+            let flow = try signinFlow(r)
+            guard let code = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else {
+                throw Fail("signin-code: the code is expected on stdin")
+            }
+            guard flow.pasteCode else { throw Fail("this sign-in takes no code — it finishes on its own") }
+            guard case .awaitingLogin = flow.phase else {
+                throw Fail("not waiting for a code (\(signinPhase(flow).phase))")
+            }
+            flow.code = code
+            flow.submitCode()
+            // The CLI answers a bad paste within a second ("Invalid code…",
+            // "OAuth error: …"); a good one moves on to registering.
+            let codeDeadline = Date().addingTimeInterval(15)
+            while Date() < codeDeadline {
+                if let err = flow.codeError {
+                    return ControlReply(ok: false, result: .object(["ok": .bool(false), "error": .string(err)]), error: err)
+                }
+                guard case .waitingForToken = flow.phase else { break }
+                try await Task.sleep(nanoseconds: 200_000_000)
+            }
+            if case .failed(let why) = flow.phase {
+                return ControlReply(ok: false, result: .object(["ok": .bool(false), "error": .string(why)]), error: why)
+            }
+            return ControlReply(ok: true, result: .object(["ok": .bool(true)]))
+
+        case "signin-cancel":
+            let flow = try signinFlow(r)
+            flow.cancel()
+            return ControlReply(ok: true, result: .object(["cancelled": .bool(true)]))
+
         case "windows":
             struct Win: Encodable {
                 let number: Int, title: String, `class`: String
@@ -851,6 +930,40 @@ final class ControlServer {
         let candidateOrder: [Int]?
         let nextRecovery: NextRecovery?
         let accounts: [Account]
+    }
+
+    /// The running (or last) sign-in, when the caller names it.
+    private func signinFlow(_ r: ControlRequest) throws -> TokenFlow {
+        let flow = TokenFlow.shared
+        guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: \(r.command) <flowId>") }
+        guard flow.flowID == id else { throw Fail("no sign-in \(id)") }
+        return flow
+    }
+
+    /// The #677 phase names over TokenFlow.Phase.
+    private func signinPhase(_ flow: TokenFlow) -> (phase: String, error: String?) {
+        switch flow.phase {
+        case .idle: return ("failed", "cancelled")
+        case .launching: return ("starting", nil)
+        case .awaitingLogin: return (flow.pasteCode ? "waitingForCode" : "waitingForToken", flow.codeError)
+        case .waitingForToken: return ("waitingForToken", nil)
+        case .registering: return ("registering", nil)
+        case .done: return ("done", nil)
+        case .failed(let why): return ("failed", why)
+        }
+    }
+
+    private func signinPayload(_ flow: TokenFlow) -> JSONValue {
+        let (phase, error) = signinPhase(flow)
+        var d: [String: JSONValue] = [
+            "flowId": .string(flow.flowID ?? ""),
+            "phase": .string(phase),
+            "pasteCode": .bool(flow.pasteCode),
+        ]
+        if let error { d["error"] = .string(error) }
+        if let url = flow.authURL { d["url"] = .string(url.absoluteString) }
+        if let email = flow.completedEmail { d["account"] = .string(email) }
+        return .object(d)
     }
 
     private func fleetPayload(_ f: FleetState) -> FleetPayload {

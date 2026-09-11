@@ -101,6 +101,14 @@ private let addAccountFooter =
     /// and whether the companion window needs the paste-code bar.
     private var engineTask: Task<Void, Never>?
     @Published var pasteCode = true
+    /// The control verbs' handle on a run (#677): a fresh id per start.
+    /// `headless` skips the sheet and the companion window — the desktop
+    /// app hosts the OAuth page itself and hands the code back through
+    /// `signin-code`. `completedEmail` is the address a finished run
+    /// bound (the relogin target, or the one new account).
+    private(set) var flowID: String?
+    private(set) var headless = false
+    private(set) var completedEmail: String?
 
     var running: Bool {
         switch phase {
@@ -109,8 +117,11 @@ private let addAccountFooter =
         }
     }
 
-    func start(model: AppModel, relogin: Account? = nil) {
+    func start(model: AppModel, relogin: Account? = nil, headless: Bool = false) {
         guard !running else { return }
+        flowID = UUID().uuidString
+        self.headless = headless
+        completedEmail = nil
         reloginTarget = relogin.map { ($0.alias?.isEmpty == false ? $0.alias! : $0.email) }
         reloginEmail = relogin?.email
         previousActive = model.activeNumber
@@ -149,8 +160,12 @@ private let addAccountFooter =
     /// already has a jar opens signed in, whichever engine made it.
     /// `onFinish` gets nil on success or cancel, else the error text.
     func start(model: AppModel, engine: any AccountEngine, provider: Provider,
-               relogin: Account? = nil, onFinish: @escaping (String?) -> Void) {
+               relogin: Account? = nil, headless: Bool = false,
+               onFinish: @escaping (String?) -> Void) {
         guard !running else { return }
+        flowID = UUID().uuidString
+        self.headless = headless
+        completedEmail = nil
         reloginTarget = relogin.map { ($0.alias?.isEmpty == false ? $0.alias! : $0.email) }
         reloginEmail = relogin?.email
         let fleetEmails = { (model: AppModel) -> Set<String> in
@@ -182,10 +197,12 @@ private let addAccountFooter =
                 await model.refreshSnapshot()
                 if let email = self.reloginEmail {
                     Self.bind(email: email, id: self.storeID)
+                    self.completedEmail = email
                 } else {
                     let new = fleetEmails(model).subtracting(self.preEmails)
                     if let email = new.first, new.count == 1 {
                         Self.bind(email: email, id: self.storeID)
+                        self.completedEmail = email
                     }
                 }
                 self.phase = .done("captured")
@@ -386,11 +403,13 @@ private let addAccountFooter =
                 // relogins: the relogin target, or the one new email.
                 if let email = self.reloginEmail {
                     Self.bind(email: email, id: self.storeID)
+                    self.completedEmail = email
                 } else {
                     let new = Set(model.accounts.map(\.email))
                         .subtracting(self.preEmails)
                     if let email = new.first, new.count == 1 {
                         Self.bind(email: email, id: self.storeID)
+                        self.completedEmail = email
                     }
                 }
                 self.phase = .done("captured")
@@ -419,6 +438,9 @@ private let addAccountFooter =
     /// paste-code bar. The per-account private WKWebView window stays
     /// available as the opt-in alternative for isolated sessions.
     private func openAuthWindow(_ url: URL) {
+        // A headless run (#677) shows nothing here: the desktop app
+        // opened `url` in its own window and pastes the code back.
+        guard !headless else { return }
         let host = NSHostingController(rootView: AuthWindowRoot(flow: self))
         host.sizingOptions = []
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 190),

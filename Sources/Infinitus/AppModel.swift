@@ -496,14 +496,15 @@ final class AppModel: ObservableObject {
     /// a browser (the proxy): the same in-app sign-in chooser as cswap
     /// (system sheet or per-account private window — never the user's
     /// default browser), polling the engine until the credential lands.
-    func addOAuthAccount(engineID: String, provider: Provider, relogin: Account? = nil) {
+    func addOAuthAccount(engineID: String, provider: Provider, relogin: Account? = nil,
+                         headless: Bool = false) {
         guard let engine = registry.engine(id: engineID),
               engine.capabilities.contains(.addOAuth),
               !addingFirstAccount, !TokenFlow.shared.running else { return }
         addingFirstAccount = true
         firstAccountMessage = nil
         TokenFlow.shared.start(model: self, engine: engine, provider: provider,
-                               relogin: relogin) { [weak self] message in
+                               relogin: relogin, headless: headless) { [weak self] message in
             self?.firstAccountMessage = message
             self?.addingFirstAccount = false
         }
