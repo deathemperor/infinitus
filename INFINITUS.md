@@ -33,6 +33,9 @@ this file adds the fork's own rules. Plan and history: issue #555.
   `nightly` from `main`. The fork's desktop releases are prereleases tagged
   `v<version>-infinitus.<date>.<run>` and served on the `infinitus` updater
   channel (manifest `infinitus-mac.yml`), built by "Fork desktop release".
+  On that channel an available update downloads itself
+  (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
+  behind a click, and a click that raced a relaunch started over.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
