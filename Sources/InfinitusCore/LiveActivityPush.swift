@@ -29,7 +29,7 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
     public let deviceName: String
     /// "sandbox" for development-signed builds, "production" otherwise —
     /// Apple routes them to different gateways.
-    public let environment: String
+    public private(set) var environment: String
     /// The phone's theme, so the Mac themes the content the way the
     /// phone would; nil = the Mac's own.
     public let themeID: String?
@@ -65,6 +65,17 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
     public var isExpo: Bool { layout == LiveActivityPush.expoLayout }
 
     public var isSandbox: Bool { environment == "sandbox" }
+    /// The same registration declared for the other gateway. A phone
+    /// whose declared environment disagrees with its `aps-environment`
+    /// entitlement (a Release build signed with a development profile
+    /// says "production" while its token is a sandbox one) gets 400
+    /// BadDeviceToken from the host it named; the other host is the one
+    /// retry before the token is written off (fork phone check, 2026-09-11).
+    public func onOtherGateway() -> ActivityPushRegistration {
+        var other = self
+        other.environment = isSandbox ? "production" : "sandbox"
+        return other
+    }
     /// One slot per device+kind: a new token for the same replaces it.
     public var slot: String { "\(deviceId)/\(kind.rawValue)" }
 }
