@@ -331,33 +331,14 @@ final class AppModel: ObservableObject {
     /// engine is registered from it, and the pane shows where it is.
     /// Never in the playground — that model is demo data only.
     let swapd: SwapdCLI?
-    /// True for the Animation Playground's private model: cswap is pinned
-    /// to the bundled demo script and every outward side effect —
-    /// snapshot cache, notifications, resume nudges, push, sync, power
-    /// assertions, the engine supervisor — is suppressed, so nothing it
-    /// does can touch real accounts or real sessions (user 2026-08-31).
-    let isPlayground: Bool
+    /// The Animation Playground is retired with the pop-out (#654); the
+    /// guards it gated — snapshot cache, notifications, resume nudges,
+    /// push, sync, power assertions, the engine supervisor — stay put
+    /// until they are swept.
+    let isPlayground = false
     /// Set by StatusItemHolder — opens the controller-owned Settings window
     /// (the SwiftUI Settings scene is unreachable from popover hosts).
     var showSettings: (() -> Void)?
-    /// Set by StatusItemHolder — closes and re-shows an open popover.
-    /// NSPopover keeps a stale fitting size when the content swaps shape
-    /// wholesale (wide<->stacked left it clipped or oversized until a
-    /// manual reopen, user-verified); a programmatic bounce is that same
-    /// fix without the user doing it.
-    var reopenPopover: (() -> Void)?
-    /// Set by StatusItemHolder — closes the popover and opens the same
-    /// content as a free-floating window (the pop-out action).
-    var popOut: (() -> Void)?
-    /// Set by StatusItemHolder — toggles the full-screen fleet wall
-    /// (issue #11).
-    var showWall: (() -> Void)?
-    /// Opens the workspace window (T3 clone B), optionally on a screen
-    /// ("sidebar" | "thread" | "composer" — the parity harness's names).
-    var showWorkspace: ((String?) -> Void)?
-    /// Opens a live session's chat window (#151); set by the status item
-    /// controller, called from the sessions card's rows.
-    var openSessionChat: ((SessionDetail) -> Void)?
     // The bundle on disk was rebuilt since this instance launched (the
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
@@ -398,11 +379,6 @@ final class AppModel: ObservableObject {
     @Published var refreshInterval: Int { didSet { defaults.set(refreshInterval, forKey: "refresh_interval") } }
     @Published var gamification: String { didSet { defaults.set(gamification, forKey: "gamification_style") } }
     @Published var compactRows: Bool { didSet { defaults.set(compactRows, forKey: "compact_rows") } }
-    // Hide the popup's action controls but keep the status chips (claude
-    // status, working sessions, engine badge) — todo 2026-08-30. Safe to
-    // persist: every hidden action lives in the status item's right-click
-    // menu, so Settings/Quit can never strand.
-    @Published var footerActionsHidden: Bool { didSet { defaults.set(footerActionsHidden, forKey: "footer_actions_hidden") } }
     @Published var popupLayout: String { didSet { defaults.set(popupLayout, forKey: "popup_layout") } }
     @Published var popupTextSize: String { didSet { defaults.set(popupTextSize, forKey: "popup_text_size") } }
     // Popup transparency, 0 (full frost) … 1 (clearest). ONE dial for
@@ -588,18 +564,6 @@ final class AppModel: ObservableObject {
     // would be no UI left to unhide it from (the Settings window is only
     // reachable through the popup). Hiding lasts until quit.
     @Published var menuBarIconShown = true
-    // Pin holds the popover open (click-outside stops closing it).
-    // Persisted by request — a pinned popup stays pinned across relaunches.
-    @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Floating revival countdown while every account is limited (#1's
-    /// macOS equivalent). On by default; ✕ on the panel hides one episode.
-    @Published var revivalPanelShown: Bool {
-        didSet {
-            defaults.set(revivalPanelShown, forKey: "revival_panel")
-            if !isPlayground { revivalPanel.sync(model: self) }
-        }
-    }
-    private lazy var revivalPanel = RevivalPanelController()
     /// Haiku names unnamed sessions (SessionNamer). On by default; one
     /// short Haiku turn per session on the active account.
     @Published var sessionAutoNames: Bool {
@@ -759,50 +723,6 @@ final class AppModel: ObservableObject {
     /// Numbers every timeline change for `/timeline` resumes (#223 phase 4).
     let sequenceLog = SequenceLog()
 
-    /// The Mac's own popup / pop-out / chat window is a client too (#223
-    /// phase 5): while one is open, nothing the user sees here depends on
-    /// a phone holding a lease. StatusItemController and the chat window
-    /// call it on show / hide; the cap is the TTL, so a UI that dies
-    /// never pins work for more than five minutes.
-    /// The local surfaces on screen by id — "popup", "popout",
-    /// "chat:<pid>" — the lease holds while any is up, so closing the
-    /// popup over an open chat window drops nothing.
-    private var visibleSurfaces = Set<String>()
-    private var localUIVisible: Bool { !visibleSurfaces.isEmpty }
-    /// The pass a surface's very first appearance starts (below).
-    private var localSurfaceRefresh: Task<Void, Never>?
-    func uiSurface(_ id: String, visible: Bool) {
-        let was = localUIVisible
-        if visible { visibleSurfaces.insert(id) } else { visibleSurfaces.remove(id) }
-        if localUIVisible != was || visible { reportLocalActivity(visible: localUIVisible) }
-        // The exporter's one unthrottled pass (launch) can land before this
-        // lease does — a startup race between StatusItemController's
-        // delayed pop-out/workspace restore and refreshSnapshot's first,
-        // faster turnaround. That pass then writes an empty factsByPid,
-        // and the 30 s throttle after it starves every thread's row
-        // (`guard let f = inputs.facts[...]`) for the rest of the window
-        // (#468). A surface's first appearance forces the next export
-        // through, the same bypass an AWS-login need uses below — but only
-        // while facts are actually empty: a reopen soon after a good
-        // export has real facts already and must not fight the 30 s
-        // throttle #346 relies on to keep a busy fleet cheap.
-        if !was, localUIVisible, !isPlayground, sessionProgress.facts.isEmpty, localSurfaceRefresh == nil {
-            mirrorExportDue = true
-            localSurfaceRefresh = Task { [weak self] in
-                await self?.refreshSnapshot()
-                self?.localSurfaceRefresh = nil
-            }
-        }
-    }
-    private func reportLocalActivity(visible: Bool) {
-        if visible {
-            mirrorServer.leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
-                                             recentlyInteracted: true, scopes: [.sessions, .fleets, .stats],
-                                             ttlMs: ClientActivity.ttlCapMs))
-        } else {
-            mirrorServer.leases.release(clientId: ClientActivity.localClientId)
-        }
-    }
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
@@ -988,7 +908,6 @@ final class AppModel: ObservableObject {
     static let pushMemoryKey = "push_triggers_memory"
     static let announcedAwsLoginsKey = "push_announced_aws_logins"
     private let defaults: UserDefaults
-    static let playgroundSuite = "run.infinitus.playground"
 
     /// Custom skins from themes.json, loaded at launch and on demand
     /// (the Display pane reloads when it appears).
@@ -998,17 +917,6 @@ final class AppModel: ObservableObject {
         availableThemes.first { $0.id == gamification } ?? .off
     }
     func reloadCustomThemes() { customThemes = RowTheme.loadCustom() }
-
-    /// Popup scale factor — applied as a measured scaleEffect (macOS has
-    /// no Dynamic Type; see PopupScale).
-    var popupScale: CGFloat {
-        switch popupTextSize {
-        case "large": return 1.15
-        case "xlarge": return 1.3
-        case "huge": return 1.5
-        default: return 1
-        }
-    }
 
     var title: String {
         if titleIconOnly { return "" }
@@ -1043,21 +951,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    init(playground: Bool = false) {
-        isPlayground = playground
-        // Playground prefs sandbox: reads SEED from the user's live
-        // settings (registration domain, volatile), writes land in a
-        // private suite that now PERSISTS across launches (user
-        // 2026-08-31: "persist playground state with selected
-        // changes") — still never touching real prefs. Reset wipes the
-        // suite back to the live-settings seed.
-        if playground {
-            let d = UserDefaults(suiteName: Self.playgroundSuite)!
-            d.register(defaults: UserDefaults.standard.dictionaryRepresentation())
-            defaults = d
-        } else {
-            defaults = UserDefaults.standard
-        }
+    init() {
+        // The playground is retired with the pop-out (#654); `isPlayground`
+        // is a constant now and `self` is out of reach during phase 1, so
+        // the guards below read this local until they are swept.
+        let playground = false
+        defaults = UserDefaults.standard
         Self.migrateLegacyDefaults()
         debugMenu = UserDefaults.standard.bool(forKey: "debug_menu")
         showAccountName = defaults.object(forKey: "show_account_name") as? Bool ?? true
@@ -1071,13 +970,10 @@ final class AppModel: ObservableObject {
         gamification = defaults.string(forKey: "gamification_style")
             ?? ((defaults.object(forKey: "gamified_rows") as? Bool ?? false) ? "rpg" : "off")
         compactRows = defaults.object(forKey: "compact_rows") as? Bool ?? false
-        footerActionsHidden = defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false
         titleRemaining = defaults.object(forKey: "title_remaining") as? Bool ?? false
         let reset = defaults.string(forKey: "title_reset") ?? "countdown"
         titleReset = TitlePrefs.resetChoices.contains(reset) ? reset : "countdown"
         titleIconOnly = defaults.object(forKey: "title_icon_only") as? Bool ?? false
-        popoverPinned = defaults.object(forKey: "popover_pinned") as? Bool ?? false
-        revivalPanelShown = defaults.object(forKey: "revival_panel") as? Bool ?? true
         sessionAutoNames = defaults.object(forKey: "session_auto_names") as? Bool ?? true
         popupLayout = defaults.string(forKey: "popup_layout") ?? "wide"
         popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
@@ -1208,17 +1104,6 @@ final class AppModel: ObservableObject {
         return AppSupport.root().appendingPathComponent("snapshot-cache.json")
     }()
 
-    /// The popup just opened with data already on screen (cache or an
-    /// earlier snapshot): play the launch flash on the same clock the
-    /// data-landing path uses. No-op while empty — that case is handled
-    /// by firstLoad in refreshSnapshot.
-    func introOpened() {
-        guard !accounts.isEmpty else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + introBarDelay + 0.5) {
-            self.switchFlashTick += 1
-        }
-    }
-
     /// Re-read the persisted display prefs after an iCloud sync pull — the
     /// @Published values were initialized once at launch and would
     /// otherwise never see the imported defaults.
@@ -1294,7 +1179,6 @@ final class AppModel: ObservableObject {
         set(\.refreshInterval, TitlePrefs.refreshChoices.contains(interval) ? interval : 60)
         set(\.gamification, defaults.string(forKey: "gamification_style") ?? "off")
         set(\.compactRows, defaults.object(forKey: "compact_rows") as? Bool ?? false)
-        set(\.footerActionsHidden, defaults.object(forKey: "footer_actions_hidden") as? Bool ?? false)
         set(\.titleRemaining, defaults.object(forKey: "title_remaining") as? Bool ?? false)
         let reset = defaults.string(forKey: "title_reset") ?? "countdown"
         set(\.titleReset, TitlePrefs.resetChoices.contains(reset) ? reset : "countdown")
@@ -1319,7 +1203,6 @@ final class AppModel: ObservableObject {
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
-        set(\.revivalPanelShown, defaults.object(forKey: "revival_panel") as? Bool ?? true)
         set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
@@ -1335,19 +1218,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Playground reset (user 2026-08-31): wipe the sandbox suite so
-    /// every knob falls back to the registration seed — the user's
-    /// live settings — then re-read. Playground models only.
-    func resetPlaygroundPrefs() {
-        guard isPlayground else { return }
-        defaults.removePersistentDomain(forName: Self.playgroundSuite)
-        reloadPrefs()
-        introStyle = defaults.string(forKey: "intro_style") ?? "top"
-        introSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
-        introTitle = defaults.string(forKey: "intro_title") ?? "zoom"
-        burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
-        chatHeader = defaults.string(forKey: "chat_header") ?? "compact"
-    }
 
     // MARK: battle plan (#7)
 
@@ -2620,11 +2490,6 @@ final class AppModel: ObservableObject {
     /// proxy); the popup swaps its rows for the onboarding card. A
     /// proxy-only setup is a working setup, not a missing engine.
     var engineMissing: Bool { registry.engines.isEmpty || simulateNoEngine }
-    /// A setup step (no engine / no account yet) is on screen: the popup
-    /// paints solid over the glass so the steps read against any desktop
-    /// (user 2026-09-07 from the phone: "Disable liquid glass for set up
-    /// steps", photo of the card over a Finder icon grid).
-    var setupStepShown: Bool { engineMissing || (accounts.isEmpty && snapshotLoaded) }
     /// cswap is on and its binary was found — the only case the rail's
     /// auto-switch toggle and badge mean anything.
     var cswapRegistered: Bool { registry.engines.contains { $0.id == CswapEngine.engineID } }
@@ -2935,7 +2800,6 @@ final class AppModel: ObservableObject {
         let firstLoad = change.firstLoad
         if !isPlayground {
             updateBattlePlan(list)
-            revivalPanel.sync(model: self)
         }
         // The footer's ⚡ tokens/minute needs the transcripts read even
         // with the sessions card closed (user 2026-09-03 "display
@@ -3007,8 +2871,6 @@ final class AppModel: ObservableObject {
             let sessionProfilesList = sessionProfiles.profiles
             let mirrorNow = mirrorExportDue
             mirrorExportDue = false
-            // A living UI keeps its lease; the cap only catches one that died.
-            if localUIVisible { reportLocalActivity(visible: true) }
             Task.detached(priority: .utility) { [mirrorExporter] in
                 await mirrorExporter.record(listJSON: raw, prefs: prefs,
                                             serviceStatus: serviceStatus,

@@ -20,10 +20,6 @@ struct DisplayPane: View {
         Form {
             menuBarSection
             popupSection
-            // The wall's Section is built inside WallSection, so its
-            // anchor rides the wrapper view rather than the Section.
-            WallSection(model: model)
-                .settingsAnchor("Display/Fleet wall")
             sessionsSection
             startupSection
         }
@@ -139,14 +135,11 @@ struct DisplayPane: View {
             .accessibilityLabel("Size")
             glassSlider("Transparency", value: $model.glassFocused)
             Toggle("Compact rows", isOn: $model.compactRows)
-            Toggle("Hide the action buttons", isOn: $model.footerActionsHidden)
             Picker("Sort rows by", selection: $model.popupSort) {
                 Text("Engine order").tag(PopupSort.engine)
                 Text("Headroom").tag(PopupSort.headroom)
                 Text("Candidates").tag(PopupSort.candidates)
             }
-            Toggle("Floating countdown when every account is out",
-                   isOn: $model.revivalPanelShown)
         } header: {
             Text("Popup")
         } footer: {
@@ -155,8 +148,7 @@ struct DisplayPane: View {
                  + "shifts with focus, and a bright app behind it is "
                  + "capped to a legible level at every setting. Compact "
                  + "rows put each account on one line with icon-only "
-                 + "controls. Hiding the action buttons leaves everything "
-                 + "they did in the menu bar icon's right-click menu. "
+                 + "controls. "
                  + "Sorting by headroom puts the active account first, "
                  + "then the next candidate, then the fullest; sorting by "
                  + "candidates puts the active account first and the rest "
