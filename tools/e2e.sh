@@ -436,6 +436,17 @@ echo "prefs: ok"
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
+# #835: --forget has no body, so a stdin pipe nobody closes must not hold it
+# (a fifo opened read-write never reaches EOF).
+mkfifo "$SOCKDIR/hold.fifo"; exec 7<>"$SOCKDIR/hold.fifo"
+"$CTL" activities-token --forget e2e-phone/alert <&7 >"$LOG.forget" 2>&1 &
+FORGET_PID=$!
+i=0; while /bin/kill -0 "$FORGET_PID" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 100 ] || { kill "$FORGET_PID" 2>/dev/null; fail "activities-token --forget waited on stdin (#835)"; }
+    sleep 0.1
+done
+exec 7>&-
+expect "d['forgotten'] is False" <"$LOG.forget" || fail "activities-token --forget with an open stdin"
 echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
 "$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a
