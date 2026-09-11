@@ -718,7 +718,7 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   `INFINITUS_DESKTOP_BUNDLE` for its backend, the companion resolves the
   helper at `Contents/Library/LoginItems/Infinitus Menu Bar.app` and its
   version (PlistBuddy on its Info.plist), opens it by path first (`open -g
-  -a`; a fresh DMG install is not in LaunchServices yet, and a brew-cask
+-a`; a fresh DMG install is not in LaunchServices yet, and a brew-cask
   copy may still carry the bundle id, #7) with the bundle id as the
   fallback, and reconciles at startup: an answering helper whose
   `status.bundlePath` is that nested path and whose `version` is not the
