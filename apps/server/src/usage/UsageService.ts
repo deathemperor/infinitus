@@ -462,6 +462,12 @@ export const make = Effect.gen(function* () {
     }
     const windowStartMs =
       (hourlyWindow?.sinceTimeMs ?? DateTime.toEpochMillis(windowStart.value)) - MTIME_SLACK_MS;
+    // Where the window ends for the swap count (#779): the hourly bound, or
+    // the last instant `untilDay` can still be that day in any zone (UTC-12
+    // ends it 36 h after UTC midnight). Days here are the client's zone, so
+    // this is a bound, not a boundary; the caption says "in this window".
+    const windowEndMs =
+      hourlyWindow?.untilTimeMs ?? Date.parse(`${input.untilDay}T00:00:00Z`) + 36 * 60 * 60 * 1000;
 
     // Pricing only matters once records are aggregated, so the rate table
     // loads while transcripts stream instead of gating them: a cold rates
@@ -572,7 +578,7 @@ export const make = Effect.gen(function* () {
               unattributed: aggregated.attribution.unattributed,
               notClaude: aggregated.attribution.notClaude,
               switchesInWindow: timeline.switchesAtMs.filter(
-                (atMs) => atMs >= windowStartMs + MTIME_SLACK_MS,
+                (atMs) => atMs >= windowStartMs + MTIME_SLACK_MS && atMs < windowEndMs,
               ).length,
               basis: timeline.basis,
             },

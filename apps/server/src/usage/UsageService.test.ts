@@ -133,6 +133,7 @@ describe("UsageService", () => {
                 switchesAtMs: [
                   Date.parse("2026-07-01T09:00:00Z"),
                   Date.parse("2026-08-01T09:00:00Z"),
+                  Date.parse("2026-09-15T09:00:00Z"),
                 ],
                 basis: "test history",
               }),

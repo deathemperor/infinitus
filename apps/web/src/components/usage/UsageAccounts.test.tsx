@@ -95,6 +95,20 @@ describe("UsageAccountsSection", () => {
     expect(render([environment("primary", attributed)])).toContain("$2.00");
   });
 
+  it("says so when the window holds no Claude records at all", () => {
+    const html = render([
+      environment("primary", {
+        ...attributed,
+        lines: [],
+        unattributed: { totals, costUsd: 0, records: 0 },
+        switchesInWindow: 1,
+      }),
+    ]);
+    expect(html).toContain("No Claude records in this window.");
+    expect(html).toContain("1 swap in this window");
+    expect(html).not.toContain("<table");
+  });
+
   it("renders nothing when the primary environment has no attribution", () => {
     expect(render([environment("primary", undefined)])).toBe("");
     expect(render([environment("other", attributed)])).toBe("");
