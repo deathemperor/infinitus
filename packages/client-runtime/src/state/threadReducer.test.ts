@@ -317,6 +317,35 @@ describe("applyThreadDetailEvent", () => {
       },
     );
 
+    it("patches babysit on and off (#269 A)", () => {
+      const on = applyThreadDetailEvent(baseThread, {
+        ...baseEventFields,
+        sequence: 5,
+        occurredAt: "2026-04-01T05:00:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: baseThread.id,
+        type: "thread.meta-updated",
+        payload: {
+          threadId: baseThread.id,
+          babysit: { since: "2026-04-01T05:00:00.000Z", rounds: 2 },
+          updatedAt: "2026-04-01T05:00:00.000Z",
+        },
+      });
+      expect(on.kind).toBe("updated");
+      if (on.kind !== "updated") return;
+      expect(on.thread.babysit).toEqual({ since: "2026-04-01T05:00:00.000Z", rounds: 2 });
+      const off = applyThreadDetailEvent(on.thread, {
+        ...baseEventFields,
+        sequence: 6,
+        occurredAt: "2026-04-01T05:01:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: baseThread.id,
+        type: "thread.meta-updated",
+        payload: { threadId: baseThread.id, babysit: null, updatedAt: "2026-04-01T05:01:00.000Z" },
+      });
+      expect(off.kind === "updated" && off.thread.babysit).toBeNull();
+    });
+
     it("patches title and branch", () => {
       const result = applyThreadDetailEvent(
         { ...baseThread, activeOrderKey: "m" },

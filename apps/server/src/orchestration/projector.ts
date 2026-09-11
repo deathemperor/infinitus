@@ -704,6 +704,7 @@ export function projectEvent(
               ...(payload.branchPullRequest !== undefined
                 ? { branchPullRequest: payload.branchPullRequest }
                 : {}),
+              ...(payload.babysit !== undefined ? { babysit: payload.babysit } : {}),
               ...legacyLinkPatch,
               updatedAt: payload.updatedAt,
             }),

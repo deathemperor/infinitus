@@ -137,7 +137,15 @@ export const make = Effect.gen(function* () {
     if (requested.has(key) || retryStacks.has(key)) return true;
     if (entries.some((entry) => entry.link.snapshot === null)) return true;
     if (entries.every((entry) => entry.link.snapshot?.state === "merged")) return false;
-    if (entries.some((entry) => entry.link.snapshot?.state === "open" && isUnsettled(entry.thread)))
+    // Fork (#269 A): a babysat thread reads its open pull request like an
+    // unsettled one does, whether or not the thread has settled.
+    if (
+      entries.some(
+        (entry) =>
+          entry.link.snapshot?.state === "open" &&
+          (isUnsettled(entry.thread) || entry.thread.babysit != null),
+      )
+    )
       return true;
     // Closed requests can reopen on the host, including after the thread settles.
     const last = lastSyncedAt.get(key);
@@ -178,10 +186,14 @@ export const make = Effect.gen(function* () {
       entry: LinkEntry,
       fields: SnapshotFields,
       fetchedStack: { readonly stack: ThreadPullRequestStack | null } | null,
+      requestedSync: boolean,
     ) {
       const { thread, link } = entry;
       const nextStack = fetchedStack === null ? link.stack : fetchedStack.stack;
+      // Fork (#269 A): a requested read is written even when nothing moved,
+      // so its `syncedAt` tells the babysit layer the host was asked again.
       const changed =
+        requestedSync ||
         link.snapshot === null ||
         !snapshotFieldsEqual(link.snapshot, fields) ||
         !stacksEqual(link.stack, nextStack);
@@ -280,7 +292,7 @@ export const make = Effect.gen(function* () {
       yield* Effect.forEach(
         entries,
         (entry) =>
-          syncEntry(entry, fields, fetchedStack).pipe(
+          syncEntry(entry, fields, fetchedStack, generation !== undefined).pipe(
             Effect.catchCause(
               logSkipped("pull request sync skipped", { threadId: entry.thread.id, key }),
             ),

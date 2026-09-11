@@ -30,7 +30,7 @@ import { readLocalApi } from "../localApi";
 import { useOpenPrLink } from "../lib/openPullRequestLink";
 import { shouldLoadNextBranchPageAfterScroll } from "../state/paginatedBranches";
 import { usePaginatedBranches } from "../state/queries";
-import { useProject, useThreadShell } from "../state/entities";
+import { useProject, useServerConfigs, useThreadShell } from "../state/entities";
 import { useEnvironmentQuery } from "../state/query";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -71,6 +71,7 @@ import {
 } from "./ui/combobox";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { ThreadBabysitToggle } from "./ThreadBabysitToggle";
 
 interface BranchToolbarBranchSelectorProps {
   className?: string;
@@ -650,6 +651,14 @@ export function BranchToolbarBranchSelector({
   );
   const prNumber = currentLinkedPr?.number ?? displayedPr?.number;
   const prUrl = currentLinkedPr?.url ?? displayedPr?.url;
+  // Fork (#269 A): babysit needs the fork's server and a linked open pull
+  // request; an already-babysat thread keeps the control so it can be stopped.
+  const babysit = serverThread?.babysit ?? null;
+  const serverConfigs = useServerConfigs();
+  const showBabysit =
+    hasServerThread &&
+    serverConfigs.get(environmentId)?.environment.capabilities.infinitus === true &&
+    (babysit !== null || currentLinkedPr?.snapshot?.state === "open");
   const openPrLink = useOpenPrLink(threadRef);
 
   function renderPickerItem(itemValue: string, index: number) {
@@ -764,6 +773,17 @@ export function BranchToolbarBranchSelector({
             if (prUrl) openPrLink(event, prUrl);
           }}
         />
+        {showBabysit && activeThreadId !== undefined ? (
+          <ThreadBabysitToggle
+            babysit={babysit}
+            onToggle={(on) => {
+              void updateThreadMetadata({
+                environmentId,
+                input: { threadId: activeThreadId, babysit: on },
+              });
+            }}
+          />
+        ) : null}
         {/* Context menu lives on the wrapper: the disabled Button has
             pointer-events-none, so the trigger itself never sees right-clicks
             while refs are loading or a branch action is pending. */}

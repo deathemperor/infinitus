@@ -633,6 +633,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             unsettledAt: null,
             snoozedUntil: null,
             snoozedAt: null,
+            babysit: null,
             pinnedAt: null,
             pinOrderKey: null,
             activeOrderKey: null,
@@ -870,6 +871,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             ...(event.payload.branchPullRequest !== undefined
               ? { branchPullRequest: event.payload.branchPullRequest }
               : {}),
+            ...(event.payload.babysit !== undefined ? { babysit: event.payload.babysit } : {}),
             updatedAt: event.payload.updatedAt,
           });
           // Legacy single-link events replay into the link table. The old

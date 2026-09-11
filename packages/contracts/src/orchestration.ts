@@ -712,6 +712,22 @@ export const OrchestrationQueuedTurn = Schema.Struct({
 });
 export type OrchestrationQueuedTurn = typeof OrchestrationQueuedTurn.Type;
 
+/** Fork (#269 A): automatic rounds a babysat thread runs before it stops. */
+export const BABYSIT_MAX_ROUNDS = 10;
+
+/**
+ * Fork (#269 A): the thread is babysat. While its pull request is open the
+ * server queues a fix round (through `thread.turn.queue`) whenever the
+ * checks fail, a review requests changes or the branch conflicts, up to
+ * `BABYSIT_MAX_ROUNDS`; then it turns itself off.
+ */
+export const ThreadBabysit = Schema.Struct({
+  since: IsoDateTime,
+  /** Automatic rounds queued so far. */
+  rounds: NonNegativeInt,
+});
+export type ThreadBabysit = typeof ThreadBabysit.Type;
+
 export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
@@ -763,6 +779,9 @@ export const OrchestrationThread = Schema.Struct({
   // Fork (#806): the server-side message queue, in queue order. Optional so
   // payloads from pre-queue servers still decode.
   queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
+  // Fork (#269 A): set while the thread is babysat. Optional so payloads
+  // from pre-babysit servers still decode.
+  babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -835,6 +854,9 @@ export const OrchestrationThreadShell = Schema.Struct({
   // Fork (#806): the server-side message queue, in queue order. Optional so
   // payloads from pre-queue servers still decode.
   queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
+  // Fork (#269 A): set while the thread is babysat. Optional so payloads
+  // from pre-babysit servers still decode.
+  babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   session: Schema.NullOr(OrchestrationSession),
   latestUserMessageAt: Schema.NullOr(IsoDateTime),
@@ -1160,6 +1182,10 @@ const ThreadMetaUpdateCommand = Schema.Struct({
   expectedBranch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+  /** Fork (#269 A): turn babysitting on (idempotent) or off. */
+  babysit: Schema.optional(Schema.Boolean),
+  /** Fork (#269 A): the babysit layer's round count; ignored while off. */
+  babysitRounds: Schema.optional(NonNegativeInt),
 }).check(
   Schema.makeFilter(
     (input) =>
@@ -1834,6 +1860,8 @@ export const ThreadMetaUpdatedPayload = Schema.Struct({
   // thread.pull-request-linked still decode and replay into the link table.
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+  /** Fork (#269 A): the babysit state after this update; absent when untouched. */
+  babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
   updatedAt: IsoDateTime,
 });
 
