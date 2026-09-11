@@ -40,7 +40,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
          ban acquired in the 2026-08-29 MenuBarExtra insert/evict war.
          Never change casually. -->
     <key>CFBundleIdentifier</key><string>run.infinitus</string>
-    <key>CFBundleName</key><string>Infinitus</string>
+    <!-- INFINITUS_BUNDLE_NAME (#777): the desktop nests this app as its
+         login item under "Infinitus Menu Bar" so Login Items and
+         Notification Center never show two "Infinitus"; the id stays. -->
+    <key>CFBundleName</key><string>${INFINITUS_BUNDLE_NAME:-Infinitus}</string>
+    <key>CFBundleDisplayName</key><string>${INFINITUS_BUNDLE_NAME:-Infinitus}</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION:-0.0.0}</string>
     <key>CFBundleVersion</key><string>${SHA}</string>
