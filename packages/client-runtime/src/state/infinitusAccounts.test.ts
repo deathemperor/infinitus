@@ -112,7 +112,12 @@ describe("usage windows", () => {
           account({
             usage: {
               fiveHour: { pct: 12.4 },
-              sevenDay: { pct: 63.5, countdown: "2h 14m", aheadOfPace: true },
+              sevenDay: {
+                pct: 63.5,
+                countdown: "2h 14m",
+                aheadOfPace: true,
+                resetsAt: "2026-09-15T11:00:00Z",
+              },
               scoped: [{ name: "opus", pct: 220 }, { pct: 9 }],
             },
           }),
@@ -121,15 +126,25 @@ describe("usage windows", () => {
     );
     const windows: ReadonlyArray<UsageWindowBar> = row.windows;
     expect(windows).toEqual([
-      { name: "5h", pct: 12, countdown: null, aheadOfPace: null },
-      { name: "7d", pct: 64, countdown: "2h 14m", aheadOfPace: true },
+      { name: "5h", pct: 12, countdown: null, aheadOfPace: null, resetsAt: null },
+      {
+        name: "7d",
+        pct: 64,
+        countdown: "2h 14m",
+        aheadOfPace: true,
+        resetsAt: "2026-09-15T11:00:00Z",
+      },
     ]);
-    expect(row.scoped).toEqual([{ name: "opus", pct: 100, countdown: null, aheadOfPace: null }]);
+    expect(row.scoped).toEqual([
+      { name: "opus", pct: 100, countdown: null, aheadOfPace: null, resetsAt: null },
+    ]);
   });
 
   it("clamps a negative percentage to zero", () => {
     const row = rowAt(fleet({ accounts: [account({ usage: { fiveHour: { pct: -4 } } })] }));
-    expect(row.windows).toEqual([{ name: "5h", pct: 0, countdown: null, aheadOfPace: null }]);
+    expect(row.windows).toEqual([
+      { name: "5h", pct: 0, countdown: null, aheadOfPace: null, resetsAt: null },
+    ]);
   });
 
   it("shows no windows and no freshness when usage is missing", () => {

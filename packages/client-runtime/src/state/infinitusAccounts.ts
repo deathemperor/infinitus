@@ -26,6 +26,8 @@ export interface UsageWindowBar {
   readonly pct: number;
   readonly countdown: string | null;
   readonly aheadOfPace: boolean | null;
+  /** The engine's ISO instant the window rolls at; null when it sends none. */
+  readonly resetsAt: string | null;
 }
 
 /** One account's row. `next` marks the account auto-switch would pick next,
@@ -73,6 +75,7 @@ const UsageWindowPayload = Schema.Struct({
   pct: Schema.Finite,
   countdown: Schema.optionalKey(Schema.String),
   aheadOfPace: Schema.optionalKey(Schema.Boolean),
+  resetsAt: Schema.optionalKey(Schema.String),
 });
 
 const UsagePayload = Schema.Struct({
@@ -94,6 +97,7 @@ function bar(window: typeof UsageWindowPayload.Type, fallbackName: string): Usag
     pct: Math.min(100, Math.max(0, Math.round(window.pct))),
     countdown: window.countdown ?? null,
     aheadOfPace: window.aheadOfPace ?? null,
+    resetsAt: window.resetsAt ?? null,
   };
 }
 

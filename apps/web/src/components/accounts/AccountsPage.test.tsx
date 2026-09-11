@@ -42,6 +42,8 @@ vi.mock("../../state/query", () => ({
 }));
 vi.mock("../../state/server", () => ({ environmentServerConfigsAtom: { label: "configs-atom" } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
+const NOW_ISO = "2026-09-11T10:00:00.000Z";
+vi.mock("../../hooks/useNowMinute", () => ({ useNowMinute: () => NOW_ISO }));
 vi.mock("../../hooks/useSettings", () => ({
   usePrimarySettings: (selector: (settings: { timestampFormat: string }) => unknown) =>
     selector({ timestampFormat: "24-hour" }),
@@ -202,6 +204,38 @@ describe("AccountsPage", () => {
     expect(markup).toContain("Held");
     expect(markup).toContain("All accounts exhausted by");
     expect(markup).toContain("one@example.com → spare");
+  });
+
+  it("carries the exhausted band on a fleet whose every unheld account is at a limit", () => {
+    const revivalAt = new Date(Date.parse(NOW_ISO) + 2 * 60 * 60 * 1000).toISOString();
+    testState.snapshot = {
+      ...readySnapshot,
+      fleets: [
+        {
+          ...readySnapshot.fleets[0]!,
+          accounts: [
+            account({
+              number: 1,
+              email: "one@example.com",
+              active: true,
+              usage: { fiveHour: { pct: 100, resetsAt: revivalAt } },
+            }),
+            account({ number: 2, email: "two@example.com", alias: "spare", disabled: true }),
+          ],
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup).toContain("All accounts exhausted · next revival ");
+    expect(markup).toContain("(one@example.com)");
+  });
+
+  it("shows no exhausted band while an account has room", () => {
+    testState.snapshot = readySnapshot;
+
+    expect(renderToStaticMarkup(<AccountsPage />)).not.toContain("next revival");
   });
 
   it("drops the freshness line on a held account with no reading", () => {
