@@ -2679,11 +2679,15 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
   };
 });
 
+/**
+ * One product, one version (#823): every build of this repo publishes on the
+ * `infinitus` channel — the product version carries no channel suffix — and
+ * only an upstream nightly keeps its own. `latest` is upstream's stable
+ * channel; nothing built here lands there. The same rule decides the desktop's
+ * default channel at runtime (`apps/desktop/src/updates/updateChannels.ts`).
+ */
 export function resolveDesktopUpdateChannel(version: string): DesktopUpdateChannel {
-  if (/-infinitus\.\d{8}\.\d+$/.test(version)) {
-    return "infinitus";
-  }
-  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
+  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "infinitus";
 }
 
 function isDesktopPreviewVersion(version: string): boolean {

@@ -51,6 +51,27 @@ makes wrong, in its own PR.
   On that channel an available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over.
+- **One version (#823 layer 3).** The root `VERSION` file (one line,
+  `0.5.0-alpha.N`) is the only place the product version is written:
+  `apps/mac/make-app.sh` reads it for `CFBundleShortVersionString`, the one
+  release workflow (part B) passes it as `--build-version` — until then
+  "Fork desktop release" still ships `0.0.40-infinitus.<date>.<run>` from
+  `package.json`, and one such bridge build must be installed before the
+  first `v0.5.0-alpha.N` tag: an older client maps that version to `latest`
+  and `handleUpdateAvailable` drops updates off its channel — and
+  `apps/mobile/app.config.ts` carries it as `extra.productVersion` for the
+  phone's Settings (the store's `version` stays a dotted-integer marketing
+  version, and cannot go down).
+  `apps/desktop/package.json`'s version is upstream's and never edited. The
+  `infinitus` channel id is internal and follows from the version, not a
+  flag: every version that is not an upstream nightly
+  (`-nightly.<date>.<run>`) builds on, defaults to and brands as `infinitus`
+  (`resolveDesktopUpdateChannel`, `resolveDefaultDesktopUpdateChannel`,
+  `resolveWebAssetBrandForPackageVersion`), so `0.5.0-alpha.1` and the older
+  `0.0.40-infinitus.<date>.<run>` sit on one feed and semver orders them
+  (`0.0.40-infinitus.… < 0.5.0-alpha.1 < 0.5.0`). Upstream's `latest`
+  channel is never a default here; a persisted `latest` resolves to
+  `infinitus`.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
@@ -357,9 +378,9 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.
 - `apps/desktop/src/**` — the same rule and guard test, allowlisting the
   installed app's real `T3 Code (Alpha)`/`(Dev)` directory names and the KDE
-  component name; `resolveDesktopAppBranding` titles a fork release plain
-  `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)`/`(Nightly)`/
-  `(Alpha)` otherwise.
+  component name; `resolveDesktopAppBranding` titles every packaged build
+  plain `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)` and
+  `(Nightly)` for a dev run and an upstream nightly (#823 layer 3).
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
   (it never does), so an installed `T3 Code (Alpha)` is left alone.
@@ -382,7 +403,8 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   entry `Name=` follows `PRODUCT_NAME` the same way (#601).
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
-  and `resolveWebAssetBrandForPackageVersion` mapping `-infinitus.` versions to it.
+  and `resolveWebAssetBrandForPackageVersion` mapping every non-nightly
+  version to it (#823 layer 3).
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
   TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
@@ -407,7 +429,9 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
   to the iOS associated domains and an `autoVerify` intent filter for
   `https://infinitus.run/pair` on Android (the site serves the AASA
-  `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`).
+  `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
+  `extra.productVersion` is the root `VERSION` (#823 layer 3), which
+  `SettingsRouteScreen` shows in place of the store version.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —

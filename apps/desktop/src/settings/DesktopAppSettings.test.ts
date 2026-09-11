@@ -28,7 +28,7 @@ const DesktopSettingsPatch = Schema.Struct({
   serverExposureMode: Schema.optionalKey(Schema.Literals(["local-only", "network-accessible"])),
   tailscaleServeEnabled: Schema.optionalKey(Schema.Boolean),
   tailscaleServePort: Schema.optionalKey(Schema.Number),
-  updateChannel: Schema.optionalKey(Schema.Literals(["latest", "nightly"])),
+  updateChannel: Schema.optionalKey(Schema.Literals(["latest", "nightly", "infinitus"])),
   updateChannelConfiguredByUser: Schema.optionalKey(Schema.Boolean),
   wslBackendEnabled: Schema.optionalKey(Schema.Boolean),
   wslMode: Schema.optionalKey(Schema.Literals(["local", "wsl"])),
@@ -95,8 +95,14 @@ describe("DesktopSettings", () => {
     withSettings(
       Effect.gen(function* () {
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        assert.deepEqual(yield* settings.load, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
-        assert.deepEqual(yield* settings.get, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
+        assert.deepEqual(
+          yield* settings.load,
+          DesktopAppSettings.resolveDefaultDesktopSettings("0.0.17"),
+        );
+        assert.deepEqual(
+          yield* settings.get,
+          DesktopAppSettings.resolveDefaultDesktopSettings("0.0.17"),
+        );
       }),
     ),
   );
@@ -201,7 +207,7 @@ describe("DesktopSettings", () => {
         });
         assert.isFalse(tailscale.changed);
 
-        const updateChannel = yield* settings.setUpdateChannel("latest");
+        const updateChannel = yield* settings.setUpdateChannel("infinitus");
         assert.isFalse(updateChannel.changed);
         assert.equal(updateChannel.settings.updateChannelConfiguredByUser, false);
       }),
@@ -217,7 +223,10 @@ describe("DesktopSettings", () => {
         yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
         yield* fileSystem.writeFileString(environment.desktopSettingsPath, "{not-json");
 
-        assert.deepEqual(yield* settings.load, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
+        assert.deepEqual(
+          yield* settings.load,
+          DesktopAppSettings.resolveDefaultDesktopSettings("0.0.17"),
+        );
       }),
     ),
   );
@@ -247,7 +256,7 @@ describe("DesktopSettings", () => {
           serverExposureMode: "network-accessible",
           tailscaleServeEnabled: true,
           tailscaleServePort: 8443,
-          updateChannel: "latest",
+          updateChannel: "infinitus",
           updateChannelConfiguredByUser: false,
           wslBackendEnabled: false,
           wslOnly: false,
@@ -406,7 +415,7 @@ describe("DesktopSettings", () => {
           serverExposureMode: "local-only",
           tailscaleServeEnabled: true,
           tailscaleServePort: 443,
-          updateChannel: "latest",
+          updateChannel: "infinitus",
           updateChannelConfiguredByUser: false,
           wslBackendEnabled: false,
           wslOnly: false,

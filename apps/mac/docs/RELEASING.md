@@ -1,5 +1,10 @@
 # Releasing Infinitus
 
+The version is the root `VERSION` file (one line, `0.5.0-alpha.N`; #823):
+`make-app.sh` stamps it into the bundle, the one release workflow (layer 3
+part B) passes it to the desktop build as `--build-version`, and the phone
+config carries it for Settings. Bump it in the release PR, nowhere else.
+
 A `v*` tag push runs `.github/workflows/release.yml`: build on the
 macOS 26 runner, zip, GitHub release, tap cask bump. Nightly does the same
 from `main` daily. Since 0.4.5 a release carries two Mac assets (#777):
