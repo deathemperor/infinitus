@@ -21,7 +21,7 @@ struct StartSessionSection: View {
     @State private var note: String?
 
     private static let other = "__other__"
-    private var recent: [String] { UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? [] }
+    private var recent: [String] { AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? [] }
     private var chosenFolder: String { cwd == Self.other ? custom.trimmingCharacters(in: .whitespaces) : cwd }
 
     var body: some View {

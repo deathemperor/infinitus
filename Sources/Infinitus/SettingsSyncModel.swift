@@ -23,7 +23,7 @@ final class SettingsSyncModel: ObservableObject {
     @Published var status: String?
 
     private var lastSeen: SyncSnapshot?
-    private let defaults = UserDefaults.standard
+    private let defaults = AppDefaults.standard
     private weak var model: AppModel?
 
     /// Display prefs that travel. Per-machine state (pinned popup, debug
@@ -46,7 +46,7 @@ final class SettingsSyncModel: ObservableObject {
     }
 
     init() {
-        enabled = UserDefaults.standard.bool(forKey: "icloud_sync")
+        enabled = AppDefaults.standard.bool(forKey: "icloud_sync")
     }
 
     func attach(model: AppModel) { self.model = model }
@@ -65,7 +65,7 @@ final class SettingsSyncModel: ObservableObject {
     static var isDevInstance: Bool {
         ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] != nil
             || ProcessInfo.processInfo.environment["INFINITUS_CSWAP"] != nil
-            || UserDefaults.standard.bool(forKey: "mock_mode")
+            || AppDefaults.standard.bool(forKey: "mock_mode")
             || Bundle.main.bundleIdentifier == nil
     }
 

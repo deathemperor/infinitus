@@ -888,7 +888,7 @@ final class MirrorServer: ObservableObject {
     /// that became leader after launch kept advertising `r=none`, user
     /// screenshot 2026-09-07).
     func refreshTeamStanding(force: Bool = false) {
-        let on = UserDefaults.standard.bool(forKey: TeamNearby.discoverableDefaultsKey)
+        let on = AppDefaults.standard.bool(forKey: TeamNearby.discoverableDefaultsKey)
         guard force || on != teamDiscoverable else { return }
         teamDiscoverable = on
         let name = advertisedName

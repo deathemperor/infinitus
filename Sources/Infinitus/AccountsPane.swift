@@ -55,12 +55,12 @@ private let addAccountFooter =
     private static let mapKey = "auth_web_store_map"
 
     private static func storeMap() -> [String: String] {
-        UserDefaults.standard.dictionary(forKey: mapKey) as? [String: String] ?? [:]
+        AppDefaults.standard.dictionary(forKey: mapKey) as? [String: String] ?? [:]
     }
     private static func bind(email: String, id: UUID) {
         var m = storeMap()
         m[email] = id.uuidString
-        UserDefaults.standard.set(m, forKey: mapKey)
+        AppDefaults.standard.set(m, forKey: mapKey)
     }
     /// Google's cookies (only Google's — never Anthropic's, that would
     /// be the cross-account bleed again) live in one shared jar: a
@@ -70,7 +70,7 @@ private let addAccountFooter =
     /// emails again"); every private window harvests back on close.
     private static let googleJarKey = "auth_web_store_google"
     private static var googleJar: WKWebsiteDataStore {
-        let d = UserDefaults.standard
+        let d = AppDefaults.standard
         let id = d.string(forKey: googleJarKey).flatMap(UUID.init) ?? {
             let id = UUID(); d.set(id.uuidString, forKey: googleJarKey); return id
         }()

@@ -1026,7 +1026,8 @@ final class AppModel: ObservableObject {
     /// before it the CswapBar g2 domain. Each hop runs once; existing
     /// keys are never overwritten.
     private static func migrateLegacyDefaults() {
-        let std = UserDefaults.standard
+        guard AppDefaults.suite == nil else { return }   // a dev suite starts empty
+        let std = AppDefaults.standard
         for (domain, marker) in [("com.huuloc.infinitus", "migrated_from_huuloc_id"),
                                  ("com.huuloc.limitless", "migrated_from_limitless_id"),
                                  ("io.github.claude-swap.CswapBar.g2", "migrated_from_g2")] {
@@ -1043,9 +1044,9 @@ final class AppModel: ObservableObject {
         // now and `self` is out of reach during phase 1, so the guards
         // below read this local until they are swept.
         let playground = false
-        defaults = UserDefaults.standard
+        defaults = AppDefaults.standard
         Self.migrateLegacyDefaults()
-        debugMenu = UserDefaults.standard.bool(forKey: "debug_menu")
+        debugMenu = AppDefaults.standard.bool(forKey: "debug_menu")
         showAccountName = defaults.object(forKey: "show_account_name") as? Bool ?? true
         let pct = defaults.string(forKey: "title_pct") ?? "both"
         titlePct = TitlePrefs.pctChoices.contains(pct) ? pct : "both"
@@ -3142,7 +3143,7 @@ final class AppModel: ObservableObject {
         let past = pastSessionsMemo.value(key: key, maxAge: 600) {
             PastSessions.list(claudeDir: claudeDir, limit: 200)
         }
-        let recentCwds = UserDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
+        let recentCwds = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
         // The branch is one HEAD-file read per cwd (#346) — no spawn, no
         // memo, so a checkout shows on the next pump.
         return ProjectSummary.derive(live: live, past: past, profiles: profiles,

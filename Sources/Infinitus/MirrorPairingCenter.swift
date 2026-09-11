@@ -188,14 +188,14 @@ final class QuickTunnel: ObservableObject {
         }
         self.process = process
         self.port = port
-        UserDefaults.standard.set(Int(process.processIdentifier), forKey: pidKey)
+        AppDefaults.standard.set(Int(process.processIdentifier), forKey: pidKey)
         status = "starting a quick tunnel…"
     }
 
     /// Kills a tunnel a previous launch left behind. Pids are reused, so
     /// the command line has to still look like ours before anything dies.
     private func reapOrphan() {
-        let defaults = UserDefaults.standard
+        let defaults = AppDefaults.standard
         let pid = defaults.integer(forKey: pidKey)
         defaults.removeObject(forKey: pidKey)
         guard pid > 1, let command = Self.commandLine(of: pid),
@@ -224,7 +224,7 @@ final class QuickTunnel: ObservableObject {
         process.terminationHandler = nil
         self.process = nil
         port = nil
-        UserDefaults.standard.removeObject(forKey: pidKey)
+        AppDefaults.standard.removeObject(forKey: pidKey)
         if process.isRunning { process.terminate() }
         url = nil
         status = nil
@@ -242,7 +242,7 @@ final class QuickTunnel: ObservableObject {
         guard process != nil else { return }
         process = nil
         port = nil
-        UserDefaults.standard.removeObject(forKey: pidKey)
+        AppDefaults.standard.removeObject(forKey: pidKey)
         url = nil
         status = "the quick tunnel stopped"
         log?("⚠️", "quick tunnel stopped")

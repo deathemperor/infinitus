@@ -17,7 +17,7 @@ final class MachineModel: ObservableObject {
         #if DEBUG
         return true
         #else
-        return UserDefaults.standard.bool(forKey: "show_machine_pane")
+        return AppDefaults.standard.bool(forKey: "show_machine_pane")
         #endif
     }
 
@@ -26,19 +26,19 @@ final class MachineModel: ObservableObject {
     @Published private(set) var lastSampledAt: Date?
     @Published private(set) var parkedOwners: [String] = []
     @Published var idleHours: Double {
-        didSet { UserDefaults.standard.set(idleHours, forKey: "machine_idle_hours") }
+        didSet { AppDefaults.standard.set(idleHours, forKey: "machine_idle_hours") }
     }
     @Published var enabled: Bool {
-        didSet { UserDefaults.standard.set(enabled, forKey: "machine_guardian") }
+        didSet { AppDefaults.standard.set(enabled, forKey: "machine_guardian") }
     }
     /// Per-kind mutes for the pushed warnings (user 2026-09-06: "stop the
     /// hook and tmp dir notifications"): the guardian keeps sampling and
     /// the pane keeps listing them; only the notification is skipped.
     @Published var notifyHooks: Bool {
-        didSet { UserDefaults.standard.set(notifyHooks, forKey: "machine_notify_hooks") }
+        didSet { AppDefaults.standard.set(notifyHooks, forKey: "machine_notify_hooks") }
     }
     @Published var notifyTemp: Bool {
-        didSet { UserDefaults.standard.set(notifyTemp, forKey: "machine_notify_temp") }
+        didSet { AppDefaults.standard.set(notifyTemp, forKey: "machine_notify_temp") }
     }
 
     /// AppModel owns this model; reaching back for session names,
@@ -69,17 +69,17 @@ final class MachineModel: ObservableObject {
     /// session that goes idle 12 h later at the earliest.
     private static let announcedIdleKey = "machine_idle_announced"
     private var announcedIdle: Set<Int> {
-        didSet { UserDefaults.standard.set(Array(announcedIdle), forKey: Self.announcedIdleKey) }
+        didSet { AppDefaults.standard.set(Array(announcedIdle), forKey: Self.announcedIdleKey) }
     }
 
     init() {
-        announcedIdle = Set(UserDefaults.standard.array(forKey: Self.announcedIdleKey) as? [Int] ?? [])
-        idleHours = UserDefaults.standard.object(forKey: "machine_idle_hours") as? Double ?? 12
-        enabled = UserDefaults.standard.object(forKey: "machine_guardian") as? Bool ?? true
-        notifyHooks = UserDefaults.standard.object(forKey: "machine_notify_hooks") as? Bool ?? true
-        notifyTemp = UserDefaults.standard.object(forKey: "machine_notify_temp") as? Bool ?? true
-        if let at = UserDefaults.standard.object(forKey: Self.sizesAtKey) as? Double,
-           let sizes = UserDefaults.standard.array(forKey: Self.sizesKey) as? [Int], sizes.count == 3 {
+        announcedIdle = Set(AppDefaults.standard.array(forKey: Self.announcedIdleKey) as? [Int] ?? [])
+        idleHours = AppDefaults.standard.object(forKey: "machine_idle_hours") as? Double ?? 12
+        enabled = AppDefaults.standard.object(forKey: "machine_guardian") as? Bool ?? true
+        notifyHooks = AppDefaults.standard.object(forKey: "machine_notify_hooks") as? Bool ?? true
+        notifyTemp = AppDefaults.standard.object(forKey: "machine_notify_temp") as? Bool ?? true
+        if let at = AppDefaults.standard.object(forKey: Self.sizesAtKey) as? Double,
+           let sizes = AppDefaults.standard.array(forKey: Self.sizesKey) as? [Int], sizes.count == 3 {
             lastSizesAt = Date(timeIntervalSince1970: at)
             lastSizes = (sizes[0], sizes[1], sizes[2])
         }
@@ -189,8 +189,8 @@ final class MachineModel: ObservableObject {
         }
         if doSizes {
             lastSizesAt = Date(); lastSizes = sizes
-            UserDefaults.standard.set(lastSizesAt!.timeIntervalSince1970, forKey: Self.sizesAtKey)
-            UserDefaults.standard.set([sizes.0, sizes.1, sizes.2], forKey: Self.sizesKey)
+            AppDefaults.standard.set(lastSizesAt!.timeIntervalSince1970, forKey: Self.sizesAtKey)
+            AppDefaults.standard.set([sizes.0, sizes.1, sizes.2], forKey: Self.sizesKey)
         }
         parkedOwners = parked
 
@@ -201,10 +201,10 @@ final class MachineModel: ObservableObject {
         // cwds, so a project's hooks would otherwise drop out of the
         // fingerprint the moment its last session closes and come back
         // as a spurious "new hook" the next time it's reopened.
-        let previousFingerprint = UserDefaults.standard.array(forKey: Self.fingerprintKey) as? [String]
+        let previousFingerprint = AppDefaults.standard.array(forKey: Self.fingerprintKey) as? [String]
         let newcomers = previousFingerprint.map { HookInventory.newcomers(report.hooks.map(\.registration), since: Set($0)) } ?? []
         let remembered = (previousFingerprint.map(Set.init) ?? []).union(fingerprint)
-        UserDefaults.standard.set(Array(remembered), forKey: Self.fingerprintKey)
+        AppDefaults.standard.set(Array(remembered), forKey: Self.fingerprintKey)
 
         var finalReport = report
         finalReport.warnings = MachineReport.warnings(sample: report.sample, hooks: report.hooks, newcomers: newcomers,

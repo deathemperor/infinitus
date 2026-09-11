@@ -138,6 +138,7 @@ publishes the matching section as the GitHub release body.
 - The desktop app's polls cost less on the Mac and no longer make `infinitusctl` answer "busy": read-only commands run alongside each other, timestamps share one formatter, and the engine keys' presence is read from the keychain once per run (#346).
 - `infinitusctl events --after <id>` returns only the rows past that event, so the desktop app's poll stops re-reading the whole log (#346).
 - The stats corpus leaves memory between passes nobody is watching — about 40 MB less resident on a year of transcripts while no stats screen is open (#499).
+- `INFINITUS_DEFAULTS_SUITE=<name>` gives a dev or e2e instance its own preferences domain, so unbundled runs stop sharing (and clobbering) one another's settings (#690).
 
 ### Phone
 - A thread's git sheet opens Review changes: the session's checkpoint timeline and turn diffs, from the sheet instead of the old session screen.
