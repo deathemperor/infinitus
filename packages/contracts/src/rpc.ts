@@ -41,6 +41,9 @@ import {
   InfinitusSecretRefused,
   InfinitusSecretResult,
   InfinitusSnapshot,
+  InfinitusThreadForkInput,
+  InfinitusThreadForkRefused,
+  InfinitusThreadForkResult,
   InfinitusSubscribeInput,
   InfinitusUnavailable,
 } from "./infinitus.ts";
@@ -454,6 +457,7 @@ export const WS_METHODS = {
   infinitusReleaseThread: "infinitus.releaseThread",
   subscribeInfinitusHolds: "subscribeInfinitusHolds",
   infinitusSecret: "infinitus.secret",
+  infinitusForkThread: "infinitus.forkThread",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
   // Captures (#433)
@@ -1370,6 +1374,13 @@ const WsInfinitusReleaseThreadRpc = Rpc.make(WS_METHODS.infinitusReleaseThread, 
   error: EnvironmentAuthorizationError,
 });
 
+/** Fork (#270 E2): a new thread continuing the Claude session from a turn. */
+const WsInfinitusForkThreadRpc = Rpc.make(WS_METHODS.infinitusForkThread, {
+  payload: InfinitusThreadForkInput,
+  success: InfinitusThreadForkResult,
+  error: Schema.Union([InfinitusThreadForkRefused, EnvironmentAuthorizationError]),
+});
+
 /** The requests waiting for this desktop's approval (#710): the current list,
     then the whole list again on every change. Metadata only. */
 const WsSubscribeInfinitusPairingRpc = Rpc.make(WS_METHODS.subscribeInfinitusPairing, {
@@ -1563,6 +1574,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusCommandRpc,
   WsInfinitusLaunchRpc,
   WsInfinitusReleaseThreadRpc,
+  WsInfinitusForkThreadRpc,
   WsSubscribeInfinitusHoldsRpc,
   WsInfinitusSecretRpc,
   WsSubscribeInfinitusPairingRpc,

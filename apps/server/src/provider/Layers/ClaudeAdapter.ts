@@ -134,11 +134,23 @@ type PromptQueueItem =
       readonly type: "terminate";
     };
 
+/** Fork (#270 E2): the last assistant uuid of each completed turn, the point
+    a fork of this session at that turn resumes through. */
+interface ClaudeTurnAnchor {
+  /** The orchestration turn id, stable across session restarts. */
+  readonly turnId: string;
+  readonly at: string;
+}
+const MAX_CLAUDE_TURN_ANCHORS = 200;
+
 interface ClaudeResumeState {
   readonly threadId?: ThreadId;
   readonly resume?: string;
   readonly resumeSessionAt?: string;
   readonly turnCount?: number;
+  readonly anchors?: ReadonlyArray<ClaudeTurnAnchor>;
+  /** The next start forks `resume` at `resumeSessionAt` into a new session (#270 E2). */
+  readonly fork?: boolean;
 }
 
 interface ClaudeTurnState {
@@ -330,6 +342,8 @@ interface ClaudeSessionContext {
   lastKnownTokenUsage: ThreadTokenUsageSnapshot | undefined;
   lastKnownTotalProcessedTokens: number | undefined;
   lastAssistantUuid: string | undefined;
+  /** Fork (#270 E2): one anchor per completed turn, oldest first. */
+  anchors: Array<ClaudeTurnAnchor>;
   lastThreadStartedId: string | undefined;
   /** Limits already announced for the running turn, keyed `window:resetsAt`. */
   announcedUsageLimits: { turnId: string; keys: Set<string> } | undefined;
@@ -854,7 +868,19 @@ function readClaudeResumeState(resumeCursor: unknown): ClaudeResumeState | undef
     sessionId?: unknown;
     resumeSessionAt?: unknown;
     turnCount?: unknown;
+    anchors?: unknown;
+    fork?: unknown;
   };
+  const anchors: Array<ClaudeTurnAnchor> = [];
+  if (Array.isArray(cursor.anchors)) {
+    for (const candidate of cursor.anchors as ReadonlyArray<unknown>) {
+      if (!candidate || typeof candidate !== "object") continue;
+      const { turnId, at } = candidate as { turnId?: unknown; at?: unknown };
+      if (typeof turnId === "string" && turnId.length > 0 && typeof at === "string") {
+        anchors.push({ turnId, at });
+      }
+    }
+  }
 
   const threadIdCandidate = typeof cursor.threadId === "string" ? cursor.threadId : undefined;
   const threadId =
@@ -879,6 +905,8 @@ function readClaudeResumeState(resumeCursor: unknown): ClaudeResumeState | undef
     ...(turnCountValue !== undefined && Number.isInteger(turnCountValue) && turnCountValue >= 0
       ? { turnCount: turnCountValue }
       : {}),
+    ...(anchors.length > 0 ? { anchors } : {}),
+    ...(cursor.fork === true ? { fork: true } : {}),
   };
 }
 
@@ -2044,6 +2072,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       ...(context.resumeSessionId ? { resume: context.resumeSessionId } : {}),
       ...(context.lastAssistantUuid ? { resumeSessionAt: context.lastAssistantUuid } : {}),
       turnCount: context.turns.length,
+      ...(context.anchors.length > 0 ? { anchors: context.anchors } : {}),
     };
 
     context.session = {
@@ -2597,6 +2626,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       id: turnState.turnId,
       items: [...turnState.items],
     });
+    // Fork (#270 E2): a completed turn's last assistant message is where a
+    // fork of this session at this turn resumes.
+    if (status === "completed" && context.lastAssistantUuid) {
+      context.anchors.push({ turnId: turnState.turnId, at: context.lastAssistantUuid });
+      if (context.anchors.length > MAX_CLAUDE_TURN_ANCHORS) {
+        context.anchors.splice(0, context.anchors.length - MAX_CLAUDE_TURN_ANCHORS);
+      }
+    }
 
     yield* emitThreadTokenUsage(context, usageSnapshot, {
       rawMethod: "claude/result",
@@ -4703,6 +4740,17 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(Object.keys(settings).length > 0 ? { settings } : {}),
         ...(existingResumeSessionId ? { resume: existingResumeSessionId } : {}),
         ...(newSessionId ? { sessionId: newSessionId } : {}),
+        // Fork (#270 E2): a forked thread's first start branches the source
+        // session at the anchor into a new session id; the source's transcript
+        // is never continued from here.
+        ...(resumeState?.fork && existingResumeSessionId
+          ? {
+              forkSession: true,
+              ...(resumeState.resumeSessionAt
+                ? { resumeSessionAt: resumeState.resumeSessionAt }
+                : {}),
+            }
+          : {}),
         includePartialMessages: true,
         canUseTool,
         onUserDialog,
@@ -4779,6 +4827,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           ...(sessionId ? { resume: sessionId } : {}),
           ...(resumeState?.resumeSessionAt ? { resumeSessionAt: resumeState.resumeSessionAt } : {}),
           turnCount: resumeState?.turnCount ?? 0,
+          // Until system/init reports the forked session's own id, a restart
+          // must fork again rather than continue the source.
+          ...(resumeState?.fork ? { fork: true } : {}),
+          ...(!resumeState?.fork && resumeState?.anchors ? { anchors: resumeState.anchors } : {}),
         },
         createdAt: startedAt,
         updatedAt: startedAt,
@@ -4808,6 +4860,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         lastKnownTokenUsage: undefined,
         lastKnownTotalProcessedTokens: undefined,
         lastAssistantUuid: resumeState?.resumeSessionAt,
+        // A fork starts its own turn numbering; the source's anchors stay with the source.
+        anchors: resumeState?.fork ? [] : [...(resumeState?.anchors ?? [])],
         lastThreadStartedId: undefined,
         announcedUsageLimits: undefined,
         stopped: false,
@@ -5050,7 +5104,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     function* (threadId, numTurns) {
       const context = yield* requireSession(threadId);
       const nextLength = Math.max(0, context.turns.length - numTurns);
-      context.turns.splice(nextLength);
+      const rolledBack = new Set<string>(context.turns.splice(nextLength).map((turn) => turn.id));
+      context.anchors = context.anchors.filter((anchor) => !rolledBack.has(anchor.turnId));
       yield* updateResumeCursor(context);
       return yield* snapshotThread(context);
     },

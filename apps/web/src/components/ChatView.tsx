@@ -208,6 +208,7 @@ import { AgentsPanel } from "./AgentsPanel";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
+import { infinitusEnvironment } from "~/state/infinitus";
 import { DeviceSetup } from "./device/DeviceSetup";
 import { Dialog } from "./ui/dialog";
 import { WizardPopup } from "./ui/wizard";
@@ -1471,6 +1472,9 @@ export default function ChatView(props: ChatViewProps) {
     reportFailure: false,
   });
   const rewindThreadChat = useAtomCommand(threadEnvironment.rewindChat, { reportFailure: false });
+  const forkThreadAtTurn = useAtomCommand(infinitusEnvironment.forkThread, {
+    reportFailure: false,
+  });
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
   const { environments } = useEnvironments();
@@ -2636,6 +2640,10 @@ export default function ChatView(props: ChatViewProps) {
   const supportsConversationRollback =
     conversationProviderStatus !== null &&
     conversationProviderStatus.supportsConversationRollback !== false;
+  // Fork (#270 E2): only Claude sessions record a fork point per turn.
+  const supportsThreadFork =
+    conversationProviderStatus !== null &&
+    String(conversationProviderStatus.driver) === "claudeAgent";
   const phase = derivePhase(activeThread?.session ?? null);
   const threadActivities = activeThread?.activities ?? EMPTY_ACTIVITIES;
   const latestCheckpointCompletedAt = activeThread?.checkpoints.at(-1)?.completedAt ?? null;
@@ -6506,6 +6514,28 @@ export default function ChatView(props: ChatViewProps) {
         setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
         return;
       }
+      // Fork (#270 E2): nothing to confirm, the source thread is not touched.
+      if (mode === "fork") {
+        setThreadError(activeThread.id, null);
+        const forked = await forkThreadAtTurn({
+          environmentId,
+          input: { threadId: activeThread.id, turnCount },
+        });
+        if (forked._tag === "Failure") {
+          if (isAtomCommandInterrupted(forked)) return;
+          const error = squashAtomCommandFailure(forked);
+          setThreadError(
+            activeThread.id,
+            error instanceof Error ? error.message : "Could not fork this thread.",
+          );
+          return;
+        }
+        await navigate({
+          to: "/$environmentId/$threadId",
+          params: { environmentId, threadId: forked.value.threadId },
+        });
+        return;
+      }
       const confirmed = await localApi.dialogs.confirm(
         (mode === "chat"
           ? [
@@ -6552,6 +6582,8 @@ export default function ChatView(props: ChatViewProps) {
       phase,
       revertThreadCheckpoint,
       rewindThreadChat,
+      forkThreadAtTurn,
+      navigate,
       setThreadError,
       supportsConversationRollback,
     ],
@@ -8555,6 +8587,7 @@ export default function ChatView(props: ChatViewProps) {
                 supportsConversationRollback={
                   !paintOnlyDisplayedTimeline && supportsConversationRollback
                 }
+                supportsThreadFork={!paintOnlyDisplayedTimeline && supportsThreadFork}
                 onRevertToTurnCount={
                   paintOnlyDisplayedTimeline ? noopHeldRevert : onRevertTimelineTurn
                 }

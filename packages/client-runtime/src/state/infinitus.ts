@@ -154,5 +154,11 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       label: "environment-data:infinitus:secret",
       tag: WS_METHODS.infinitusSecret,
     }),
+    // Fork a thread at a turn (#270 E2); the new thread arrives through the
+    // orchestration stream like any other, so nothing to invalidate here.
+    forkThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:fork-thread",
+      tag: WS_METHODS.infinitusForkThread,
+    }),
   };
 }

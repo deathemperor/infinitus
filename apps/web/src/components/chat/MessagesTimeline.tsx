@@ -241,6 +241,8 @@ interface TimelineRowActivityState {
   isPreparingWorktree: boolean;
   isCompacting: boolean;
   isRevertingCheckpoint: boolean;
+  /** Fork (#270 E2): the thread's provider records a fork point per turn. */
+  supportsThreadFork: boolean;
   latestTurnId: TurnId | null;
 }
 
@@ -340,6 +342,7 @@ interface MessagesTimelineProps {
   displayThreadKey?: string;
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   supportsConversationRollback: boolean;
+  supportsThreadFork?: boolean;
   onRevertToTurnCount: (targetTurnCount: number, mode?: TimelineRevertMode) => void;
   onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
   isRevertingCheckpoint: boolean;
@@ -399,6 +402,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   displayThreadKey,
   onOpenTurnDiff,
   supportsConversationRollback,
+  supportsThreadFork = false,
   onRevertToTurnCount,
   onUseArtifactTemplate = NOOP_USE_ARTIFACT_TEMPLATE,
   isRevertingCheckpoint,
@@ -824,9 +828,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isPreparingWorktree,
       isCompacting,
       isRevertingCheckpoint,
+      supportsThreadFork,
       latestTurnId: latestTurn?.turnId ?? null,
     }),
-    [isCompacting, isRevertingCheckpoint, isWorking, isPreparingWorktree, latestTurn?.turnId],
+    [
+      isCompacting,
+      isRevertingCheckpoint,
+      isWorking,
+      isPreparingWorktree,
+      supportsThreadFork,
+      latestTurn?.turnId,
+    ],
   );
 
   // Stable renderItem — no closure deps. Row components read shared state
@@ -1593,8 +1605,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   );
 }
 
-/** Fork (#270 E1): what a revert from a user message touches. */
-export type TimelineRevertMode = "files" | "chat";
+/** Fork (#270 E1/E2): what a revert from a user message touches; `fork`
+    leaves this thread alone and opens a new one from here. */
+export type TimelineRevertMode = "files" | "chat" | "fork";
 
 function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
   const ctx = use(TimelineRowCtx);
@@ -1632,6 +1645,11 @@ function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
         <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "chat")}>
           Rewind chat only
         </MenuItem>
+        {activity.supportsThreadFork ? (
+          <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "fork")}>
+            Fork a new thread from here
+          </MenuItem>
+        ) : null}
       </MenuPopup>
     </Menu>
   );
