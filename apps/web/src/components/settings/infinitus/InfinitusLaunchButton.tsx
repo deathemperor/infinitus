@@ -6,6 +6,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
 import {
+  INFINITUS_DOWNLOAD_URL,
   launchButtonLabel,
   launchNotice,
   launchPhaseAfter,
@@ -46,6 +47,19 @@ export function InfinitusLaunchButton({ className }: { readonly className?: stri
       {notice === null ? null : (
         <p role="status" className="mt-2 text-muted-foreground text-xs">
           {notice}
+          {phase.kind === "not-installed" ? (
+            <>
+              {" "}
+              <a
+                href={INFINITUS_DOWNLOAD_URL}
+                rel="noreferrer"
+                target="_blank"
+                className="text-foreground underline underline-offset-2"
+              >
+                Get Infinitus
+              </a>
+            </>
+          ) : null}
         </p>
       )}
     </div>
