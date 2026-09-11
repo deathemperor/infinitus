@@ -62,7 +62,10 @@ public enum PrefCatalog {
     public static let devices = Section(slug: "devices", name: "Devices")
     public static let engines = Section(slug: "engines", name: "Engines")
     public static let about = Section(slug: "about", name: "About")
-    public static let sections: [Section] = [display, themes, push, devices, engines, about]
+    public static let sessions = Section(slug: "sessions", name: "Sessions")
+    public static let sections: [Section] = [display, themes, push, devices, engines, about, sessions]
+
+    public static let priorityModes = ["off", "hold"]
 
     private static func strings(_ values: [String]) -> [JSONValue] { values.map(JSONValue.string) }
     private static func ints(_ values: [Int]) -> [JSONValue] { values.map { .number(Double($0)) } }
@@ -124,6 +127,11 @@ public enum PrefCatalog {
         Entry("update_auto_check", .bool, .bool(true), about),
         Entry("update_auto_install", .bool, .bool(false), about),
         Entry("update_channel", .string, .string("stable"), about, choices: strings(["stable", "nightly"])),
+        // Sessions: the headroom mode (#616) — `hold` publishes a per-fleet
+        // verdict on `fleets` that holds background sessions while low.
+        Entry("priority_mode", .string, .string("off"), sessions, choices: strings(priorityModes)),
+        Entry("priority_low_pct", .int, .number(80), sessions),
+        Entry("priority_abundant_pct", .int, .number(50), sessions),
     ]
 
     public static func entry(_ key: String) -> Entry? { entries.first { $0.key == key } }

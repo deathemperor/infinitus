@@ -144,6 +144,7 @@ publishes the matching section as the GitHub release body.
 - The app no longer dies silently when a login CLI or engine quits mid-write: SIGPIPE is ignored, so the write fails and is handled instead (#637).
 - `infinitusctl activities-token --forget <deviceId>/<kind>` withdraws one push registration, so a phone that switches its alerts off stops getting them (#572).
 - An enabled swapd engine runs its own `swapd auto` daemon under the supervisor, and the badge follows it once cswap is off (#475).
+- With `priority_mode` set to `hold`, every fleet on `fleets` carries a `headroom` verdict (abundant/low with hysteresis on the active account's fullest window), so the fork can hold background threads while headroom is low (#616).
 - The session namer no longer crashes the app when its Claude CLI quits before reading the prompt (#637).
 - `infinitusctl perf` names each client's held lease scopes, so a stats corpus that stays resident says who is watching it (#499).
 

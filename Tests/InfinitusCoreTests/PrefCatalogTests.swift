@@ -34,7 +34,7 @@ final class PrefCatalogTests: XCTestCase {
 
     func testAnUnsetSuiteReadsTheDefaults() throws {
         let reply = try PrefCatalog.reply(from: defaults)
-        XCTAssertEqual(reply.sections.map(\.slug), ["display", "themes", "push", "devices", "engines", "about"])
+        XCTAssertEqual(reply.sections.map(\.slug), ["display", "themes", "push", "devices", "engines", "about", "sessions"])
         XCTAssertEqual(reply.prefs.count, PrefCatalog.entries.count)
         for pref in reply.prefs { XCTAssertEqual(pref.value, pref.default, pref.key) }
         let layout = try XCTUnwrap(reply.prefs.first { $0.key == "popup_layout" })
