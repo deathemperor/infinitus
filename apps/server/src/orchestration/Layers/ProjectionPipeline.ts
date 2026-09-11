@@ -37,6 +37,7 @@ import {
   ProjectionThreadProposedPlanRepository,
 } from "../../persistence/Services/ProjectionThreadProposedPlans.ts";
 import * as ProjectionThreadPullRequests from "../../persistence/ProjectionThreadPullRequests.ts";
+import * as ProjectionThreadQueuedTurns from "../../persistence/ProjectionThreadQueuedTurns.ts";
 import { ProjectionThreadSessionRepository } from "../../persistence/Services/ProjectionThreadSessions.ts";
 import {
   type ProjectionTurn,
@@ -487,6 +488,8 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     const projectionThreadProposedPlanRepository = yield* ProjectionThreadProposedPlanRepository;
     const projectionThreadPullRequestRepository =
       yield* ProjectionThreadPullRequests.ProjectionThreadPullRequestRepository;
+    const projectionThreadQueuedTurnRepository =
+      yield* ProjectionThreadQueuedTurns.ProjectionThreadQueuedTurnRepository;
     const projectionThreadActivityRepository = yield* ProjectionThreadActivityRepository;
     const projectionThreadSessionRepository = yield* ProjectionThreadSessionRepository;
     const projectionTurnRepository = yield* ProjectionTurnRepository;
@@ -797,6 +800,44 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           return;
         }
 
+        // Fork (#806): the server-side message queue. Rows never touch the
+        // thread row: queuing is not thread activity.
+        case "thread.turn-queued":
+        case "thread.turn-queue-updated": {
+          const queued = event.payload.queuedTurn;
+          yield* projectionThreadQueuedTurnRepository.upsert({
+            threadId: event.payload.threadId,
+            queueId: queued.queueId,
+            messageId: queued.messageId,
+            text: queued.text,
+            attachments: queued.attachments,
+            modelSelection: queued.modelSelection ?? null,
+            orderKey: queued.orderKey,
+            createdAt: queued.createdAt,
+            updatedAt: queued.updatedAt,
+          });
+          return;
+        }
+
+        case "thread.turn-queue-removed": {
+          yield* projectionThreadQueuedTurnRepository.delete({ queueId: event.payload.queueId });
+          return;
+        }
+
+        case "thread.turn-queue-moved": {
+          const rows = yield* projectionThreadQueuedTurnRepository.listByThreadId({
+            threadId: event.payload.threadId,
+          });
+          const row = rows.find((candidate) => candidate.queueId === event.payload.queueId);
+          if (row === undefined) return;
+          yield* projectionThreadQueuedTurnRepository.upsert({
+            ...row,
+            orderKey: event.payload.orderKey,
+            updatedAt: event.payload.updatedAt,
+          });
+          return;
+        }
+
         case "thread.meta-updated": {
           const existingRow = yield* projectionThreadRepository.getById({
             threadId: event.payload.threadId,
@@ -967,6 +1008,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           }
           // A tombstoned thread must not show up as linked to a pull request.
           yield* projectionThreadPullRequestRepository.deleteByThreadId({
+            threadId: event.payload.threadId,
+          });
+          // Nor keep queued messages the drain could send into it (#806).
+          yield* projectionThreadQueuedTurnRepository.deleteByThreadId({
             threadId: event.payload.threadId,
           });
           const existingRow = yield* projectionThreadRepository.getById({
@@ -2172,6 +2217,7 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionThreadMessageRepositoryLive),
   Layer.provideMerge(ProjectionThreadProposedPlanRepositoryLive),
   Layer.provideMerge(ProjectionThreadPullRequests.layer),
+  Layer.provideMerge(ProjectionThreadQueuedTurns.layer),
   Layer.provideMerge(ProjectionThreadActivityRepositoryLive),
   Layer.provideMerge(ProjectionThreadSessionRepositoryLive),
   Layer.provideMerge(ProjectionTurnRepositoryLive),

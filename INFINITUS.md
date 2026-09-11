@@ -182,6 +182,41 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
   — the user-row revert button is a menu: "Revert files and chat" /
   "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Server-side message queue (#806, the server half of #270 F):
+  `packages/contracts/src/baseSchemas.ts` — `QueueId`;
+  `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,
+  `queuedTurns?` on `OrchestrationThread` and `OrchestrationThreadShell`
+  (optional; absent when empty so pre-queue payloads still decode), the
+  commands `thread.turn.queue` (client variant carries uploads like
+  `thread.turn.start`'s), `.queue.update`, `.queue.remove`, `.queue.move`,
+  `queuedFrom?` on both turn-start commands, and the events
+  `thread.turn-queued` / `-queue-updated` / `-queue-removed` (`reason:
+user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
+  fractional key helpers moved out of `client-runtime` `threadSort.ts` (which
+  re-exports them as `pinOrderKeyBetween` / `generateSpreadPinOrderKeys`) so
+  the decider validates and defaults a key; `apps/server/src/orchestration/decider.ts`
+  — the four cases (queue is idempotent by re-emission, update/move refuse a
+  missing row, remove re-emits) and the turn start's `queuedFrom` removal in
+  the same batch (a row already gone changes nothing); `projector.ts`,
+  `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
+  the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
+  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`),
+  dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
+  every thread read (snapshot, command read model, shells, detail);
+  `Normalizer.ts` — the queue commands' uploads stored like a sent
+  message's; `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
+  `ReactorLayerLive` above the interrupt and hold layers it consumes;
+  `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
+  hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
+  (+ `infinitusTurnQueue.logic.ts`, test) — the drain: sends a thread's
+  first row as `thread.turn.start {queuedFrom}` when the thread is idle
+  (`queueDrainVerdict`: no turn running, starting or pending, not held,
+  not paused, not archived, no send of its own in flight; `error` sessions
+  never, see #832), one send per thread at a time; wakes on session-set,
+  the queue events, unarchive, a failed start, a hold or pause letting the
+  thread go, and once at boot after the hold and interrupt layers have
+  published their first lists (5 s cap). A send the decider rejects leaves
+  the row; a provider failure after the send has already consumed it.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in

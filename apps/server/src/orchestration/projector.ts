@@ -12,6 +12,7 @@ import {
   OrchestrationCheckpointSummary,
   OrchestrationMessage,
   OrchestrationSession,
+  type OrchestrationQueuedTurn,
   OrchestrationThread,
 } from "@t3tools/contracts";
 import {
@@ -41,6 +42,10 @@ import {
   ThreadSettledPayload,
   ThreadPinnedPayload,
   ThreadPinReorderedPayload,
+  ThreadTurnQueuedPayload,
+  ThreadTurnQueueMovedPayload,
+  ThreadTurnQueueRemovedPayload,
+  ThreadTurnQueueUpdatedPayload,
   ThreadPullRequestLinkedPayload,
   ThreadPullRequestSyncedPayload,
   ThreadPullRequestUnlinkedPayload,
@@ -115,6 +120,17 @@ function updateThread(
   patch: ThreadPatch,
 ): OrchestrationThread[] {
   return threads.map((thread) => (thread.id === threadId ? { ...thread, ...patch } : thread));
+}
+
+/** The queue with `row` in place of any row sharing its id, kept in key order. */
+function upsertQueuedTurn(
+  rows: ReadonlyArray<OrchestrationQueuedTurn> | undefined,
+  row: OrchestrationQueuedTurn,
+): OrchestrationQueuedTurn[] {
+  return [...(rows ?? []).filter((entry) => entry.queueId !== row.queueId), row].sort(
+    (left, right) =>
+      left.orderKey.localeCompare(right.orderKey) || left.createdAt.localeCompare(right.createdAt),
+  );
 }
 
 /** Patch that swaps a thread's links and re-derives the legacy single-PR field from them. */
@@ -580,6 +596,73 @@ export function projectEvent(
           threads: updateThread(nextBase.threads, payload.threadId, {
             pinOrderKey: payload.orderKey,
             updatedAt: payload.updatedAt,
+          }),
+        })),
+      );
+
+    // Fork (#806): the server-side message queue lives on the thread; queuing
+    // is not thread activity, so updatedAt is left alone.
+    case "thread.turn-queued":
+    case "thread.turn-queue-updated":
+      return decodeForEvent(
+        event.type === "thread.turn-queued"
+          ? ThreadTurnQueuedPayload
+          : ThreadTurnQueueUpdatedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: nextBase.threads.map((thread) =>
+            thread.id === payload.threadId
+              ? { ...thread, queuedTurns: upsertQueuedTurn(thread.queuedTurns, payload.queuedTurn) }
+              : thread,
+          ),
+        })),
+      );
+
+    case "thread.turn-queue-removed":
+      return decodeForEvent(
+        ThreadTurnQueueRemovedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: nextBase.threads.map((thread) =>
+            thread.id === payload.threadId
+              ? {
+                  ...thread,
+                  queuedTurns: (thread.queuedTurns ?? []).filter(
+                    (row) => row.queueId !== payload.queueId,
+                  ),
+                }
+              : thread,
+          ),
+        })),
+      );
+
+    case "thread.turn-queue-moved":
+      return decodeForEvent(ThreadTurnQueueMovedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: nextBase.threads.map((thread) => {
+            if (thread.id !== payload.threadId) return thread;
+            const row = (thread.queuedTurns ?? []).find(
+              (entry) => entry.queueId === payload.queueId,
+            );
+            return row === undefined
+              ? thread
+              : {
+                  ...thread,
+                  queuedTurns: upsertQueuedTurn(thread.queuedTurns, {
+                    ...row,
+                    orderKey: payload.orderKey,
+                    updatedAt: payload.updatedAt,
+                  }),
+                };
           }),
         })),
       );
