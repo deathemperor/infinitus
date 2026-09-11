@@ -776,7 +776,7 @@ const buildAppUnderTest = (options?: {
               sessions: [],
               commands: [],
             }),
-            changes: Stream.empty,
+            changes: () => Stream.empty,
             ...options?.layers?.infinitus,
           }),
           Layer.mock(InfinitusCompanion)({
