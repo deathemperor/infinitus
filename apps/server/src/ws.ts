@@ -550,6 +550,7 @@ const makeWsRpcLayer = (
       const providerAuth = yield* ProviderAuthService;
       const providerInstances = yield* ProviderInstanceRegistry;
       const providerInstallation = yield* makeProviderInstallation();
+      const httpClient = yield* HttpClient.HttpClient;
       const serverUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
@@ -1950,6 +1951,12 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.providerInstallRemove, providerInstallation.remove(input), {
             "rpc.aggregate": "provider",
           }),
+        [WS_METHODS.providerProxyModels]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.providerProxyModels,
+            fetchProxyModels(input).pipe(Effect.provideService(HttpClient.HttpClient, httpClient)),
+            { "rpc.aggregate": "provider" },
+          ),
         [WS_METHODS.serverUpdateServer]: (input) =>
           observeRpcEffect(WS_METHODS.serverUpdateServer, serverUpdate.update(input), {
             "rpc.aggregate": "server",
