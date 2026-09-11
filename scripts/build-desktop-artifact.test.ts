@@ -289,6 +289,15 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
   });
 
+  it("packages the Infinitus artwork for fork versions", () => {
+    assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.40-infinitus.20260911.8"), {
+      macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.infinitusWindowsIconIco,
+    });
+    assert.equal(resolveDesktopWebAssetBrand("0.0.40-infinitus.20260911.8"), "infinitus");
+  });
+
   it("switches the bundled splash and favicon branding for nightly versions", () => {
     assert.equal(resolveDesktopWebAssetBrand("0.0.17"), "production");
     assert.equal(resolveDesktopWebAssetBrand("0.0.17-nightly.20260413.42"), "nightly");

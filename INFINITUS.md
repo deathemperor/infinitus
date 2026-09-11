@@ -94,7 +94,12 @@ this file adds the fork's own rules. Plan and history: issue #555.
 - `apps/server/src/http.ts` — `DESKTOP_RENDERER_ORIGINS` built from the same
   two scheme constants.
 - `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
-  (name `Infinitus`, schemes `infinitus` / `infinitus-dev`).
+  (name `Infinitus`, schemes `infinitus` / `infinitus-dev`);
+  `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the
+  `infinitus` artwork for fork versions.
+- `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
+  `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
+  and `resolveWebAssetBrandForPackageVersion` mapping `-infinitus.` versions to it.
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
   TypeScript); the dev-only bundle id stays `com.t3tools.*`.
@@ -257,6 +262,10 @@ this file adds the fork's own rules. Plan and history: issue #555.
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `assets/infinitus/` — the desktop and web artwork for fork builds: the
+  native Mac app's 1024 icon master (`make-icon.swift` on `native`), the
+  phone's full-bleed mark for Linux/apple-touch, and the `.ico`/favicon sizes
+  derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`), which also carries each

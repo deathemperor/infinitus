@@ -2633,11 +2633,20 @@ function isDesktopPreviewVersion(version: string): boolean {
 
 export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
   const channel = resolveDesktopUpdateChannel(version);
+  if (channel === "infinitus") return "infinitus";
   return resolveWebAssetBrandForChannel(channel === "nightly" ? "nightly" : "latest");
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
-  if (resolveDesktopUpdateChannel(version) === "nightly") {
+  const channel = resolveDesktopUpdateChannel(version);
+  if (channel === "infinitus") {
+    return {
+      macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.infinitusWindowsIconIco,
+    };
+  }
+  if (channel === "nightly") {
     return {
       macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,

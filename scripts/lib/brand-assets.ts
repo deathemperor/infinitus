@@ -23,6 +23,16 @@ export const BRAND_ASSET_PATHS = {
   nightlyWebFavicon32Png: "assets/nightly/nightly-web-favicon-32x32.png",
   nightlyWebAppleTouchIconPng: "assets/nightly/nightly-web-apple-touch-180.png",
 
+  // The fork's own artwork (Infinitus, INFINITUS.md): the native Mac app's
+  // icon master for macOS, the phone's full-bleed mark for Linux and the web.
+  infinitusMacIconPng: "assets/infinitus/infinitus-macos-1024.png",
+  infinitusLinuxIconPng: "assets/infinitus/infinitus-universal-1024.png",
+  infinitusWindowsIconIco: "assets/infinitus/infinitus-windows.ico",
+  infinitusWebFaviconIco: "assets/infinitus/infinitus-web-favicon.ico",
+  infinitusWebFavicon16Png: "assets/infinitus/infinitus-web-favicon-16x16.png",
+  infinitusWebFavicon32Png: "assets/infinitus/infinitus-web-favicon-32x32.png",
+  infinitusWebAppleTouchIconPng: "assets/infinitus/infinitus-web-apple-touch-180.png",
+
   developmentDesktopIconPng: "assets/dev/blueprint-macos-1024.png",
   developmentWindowsIconIco: "assets/dev/blueprint-windows.ico",
   developmentWebFaviconIco: "assets/dev/blueprint-web-favicon.ico",
@@ -31,7 +41,7 @@ export const BRAND_ASSET_PATHS = {
   developmentWebAppleTouchIconPng: "assets/dev/blueprint-web-apple-touch-180.png",
 } as const;
 
-export type WebAssetBrand = "development" | "nightly" | "production";
+export type WebAssetBrand = "development" | "nightly" | "production" | "infinitus";
 
 export const WEB_ASSET_CHANNELS = ["latest", "nightly"] as const;
 
@@ -42,6 +52,7 @@ export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAss
 }
 
 export function resolveWebAssetBrandForPackageVersion(version: string): WebAssetBrand {
+  if (version.includes("-infinitus.")) return "infinitus";
   return version.includes("-nightly.") ? "nightly" : "production";
 }
 
@@ -75,6 +86,12 @@ const WEB_ICON_SOURCE_PATHS_BY_BRAND = {
     favicon16Png: BRAND_ASSET_PATHS.productionWebFavicon16Png,
     favicon32Png: BRAND_ASSET_PATHS.productionWebFavicon32Png,
     appleTouchIconPng: BRAND_ASSET_PATHS.productionWebAppleTouchIconPng,
+  },
+  infinitus: {
+    faviconIco: BRAND_ASSET_PATHS.infinitusWebFaviconIco,
+    favicon16Png: BRAND_ASSET_PATHS.infinitusWebFavicon16Png,
+    favicon32Png: BRAND_ASSET_PATHS.infinitusWebFavicon32Png,
+    appleTouchIconPng: BRAND_ASSET_PATHS.infinitusWebAppleTouchIconPng,
   },
 } as const satisfies Record<WebAssetBrand, Record<keyof typeof WEB_ICON_TARGET_FILENAMES, string>>;
 
