@@ -1521,14 +1521,22 @@ const make = Effect.gen(function* () {
       );
       return;
     }
-    if (
-      !resumed &&
-      (compactingThreadIds.has(event.payload.threadId) ||
-        turnsAfterCompaction.has(event.payload.threadId))
-    ) {
+    const queuedBehindCompaction = (): boolean => {
+      if (
+        resumed ||
+        !(
+          compactingThreadIds.has(event.payload.threadId) ||
+          turnsAfterCompaction.has(event.payload.threadId)
+        )
+      ) {
+        return false;
+      }
       const queued = turnsAfterCompaction.get(event.payload.threadId) ?? [];
       queued.push(event);
       turnsAfterCompaction.set(event.payload.threadId, queued);
+      return true;
+    };
+    if (queuedBehindCompaction()) {
       return;
     }
     // Fork (#616): the gate may keep a background thread's start for headroom;
@@ -1536,6 +1544,11 @@ const make = Effect.gen(function* () {
     yield* turnStartGate.start({
       threadId: event.payload.threadId,
       run: Effect.gen(function* () {
+        // A start kept for headroom runs later: a compaction begun meanwhile
+        // queues it like any other, and the replay passes the gate again.
+        if (queuedBehindCompaction()) {
+          return;
+        }
         const sendTurnRequest = yield* buildSendTurnRequestForThread({
           threadId: event.payload.threadId,
           messageText: message.text,
