@@ -1064,6 +1064,46 @@ final class ControlServer {
             model.team.discoverable = arg == "on"
             return ControlReply(ok: true, result: .object(["discoverable": .bool(arg == "on")]))
 
+        case "desktop-credential":
+            // #822: the desktop's own push at port publish (or a hand-fed
+            // token); the secret rides stdin, never argv. Empty stdin forgets.
+            let token = r.secret ?? ""
+            let origin = r.options["origin"] ?? model.desktopCredential.origin ?? "http://127.0.0.1:\(model.forkServerPort)"
+            guard token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (r.options["origin"].map { $0 != "true" && !$0.isEmpty } ?? true) else {
+                throw Fail("usage: desktop-credential --origin <http://127.0.0.1:port> [--expiresAt <iso>]  (the token on stdin; empty stdin forgets it)")
+            }
+            let expiresAt = r.options["expiresAt"].flatMap { $0 == "true" ? nil : $0 }
+            if let why = model.desktopCredential.store(origin: origin, expiresAt: expiresAt, token: token) { throw Fail(why) }
+            return ControlReply(ok: true, result: .object([
+                "origin": model.desktopCredential.origin.map(JSONValue.string) ?? .null,
+                "expiresAt": model.desktopCredential.expiresAt.map(JSONValue.string) ?? .null,
+                "stored": .bool(model.desktopCredential.stored),
+            ]))
+
+        case "desktop-status":
+            let credential = model.desktopCredential
+            let origin = credential.origin
+            // Stale: the desktop moved port since it handed the credential over.
+            let stale = origin.flatMap { URL(string: $0)?.port }.map { $0 != model.forkServerPort } ?? false
+            return ControlReply(ok: true, result: .object([
+                "origin": origin.map(JSONValue.string) ?? .null,
+                "port": .number(Double(model.forkServerPort)),
+                "credential": credential.masked.map(JSONValue.string) ?? .null,
+                "expiresAt": credential.expiresAt.map(JSONValue.string) ?? .null,
+                "stale": .bool(stale),
+            ]))
+
+        case "desktop-token":
+            // The dispatcher has one entry, the Unix socket (the phone goes
+            // through the mirror), so every request here is local.
+            guard let origin = model.desktopCredential.origin, let token = model.desktopCredential.token() else {
+                throw Fail("no Infinitus desktop credential — launch Infinitus desktop")
+            }
+            return ControlReply(ok: true, result: .object([
+                "origin": .string(origin), "token": .string(token),
+                "expiresAt": model.desktopCredential.expiresAt.map(JSONValue.string) ?? .null,
+            ]))
+
         default:
             return .failure("\(r.command) is in the manifest but not implemented")
         }

@@ -418,6 +418,15 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "machine-hook", args: ["disable|restore|kill", "<owner>"], options: ["--yes"], effect: .destructive, stdin: "payload",
                        summary: "disable: move a tool's hook registrations out of ~/.claude/settings.json (a timestamped backup is written beside it); restore: put them back; kill: SIGTERM every live instance of its hooks and their helpers from the last `machine` sample (never a session's own pid), SIGKILL the survivors after 3 s. Refused without --yes.",
                        replyShape: "{result}"),
+        ControlCommand(name: "desktop-credential", options: ["--origin <http://127.0.0.1:port>", "--expiresAt <iso>"], effect: .write, stdin: "secret",
+                       summary: "Keep the bearer session Infinitus desktop mints for infinitusctl (stdin) in the keychain, with the desktop's origin; empty stdin forgets it. Infinitus desktop sends this itself when it publishes its port.",
+                       replyShape: "{origin, expiresAt, stored}"),
+        ControlCommand(name: "desktop-status", effect: .read,
+                       summary: "Where Infinitus desktop is (origin, the published port) and the CLI credential kept for it, masked.",
+                       replyShape: "{origin, port, credential: <masked>|null, expiresAt, stale}"),
+        ControlCommand(name: "desktop-token", effect: .read,
+                       summary: "The stored desktop credential, for the CLI's own requests to Infinitus desktop (this socket only; the CLI never prints it).",
+                       replyShape: "{origin, token, expiresAt}"),
     ]
 
     public static func named(_ name: String) -> ControlCommand? {
