@@ -52,6 +52,22 @@ public enum AwayPushWire {
         return Int(chat) != nil
     }
 
+    /// The Linux tray's targets (#756): it has no settings file, so the
+    /// env is its config channel — `INFINITUS_SLACK_WEBHOOK`, and
+    /// `INFINITUS_TELEGRAM_TOKEN` with `INFINITUS_TELEGRAM_CHAT`. A value
+    /// of the wrong shape yields no request rather than a bad post.
+    public static func requests(text: String, env: [String: String]) -> [(channel: String, request: URLRequest)] {
+        var out: [(channel: String, request: URLRequest)] = []
+        if let hook = env["INFINITUS_SLACK_WEBHOOK"], let url = slackWebhook(hook) {
+            out.append(("slack", slackRequest(webhook: url, text: text)))
+        }
+        if let token = env["INFINITUS_TELEGRAM_TOKEN"], let chat = env["INFINITUS_TELEGRAM_CHAT"],
+           let request = telegramRequest(token: token, chat: chat, text: text) {
+            out.append(("telegram", request))
+        }
+        return out
+    }
+
     /// What settings and logs show for a stored secret: never the value.
     public static func masked(_ secret: String) -> String {
         let tail = secret.count > 8 ? String(secret.suffix(4)) : ""

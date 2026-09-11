@@ -1,17 +1,17 @@
 # Maintainer: deathemperor <deathemperor1st@gmail.com>
 # Prebuilt infinitus-tray from the GitHub release (Arch has no official
 # Swift toolchain; the release binaries are -static-stdlib, so glibc +
-# gcc-libs is all they need). The engine is the separate claude-swap
-# package — this is the bar/panel face for Waybar and Omarchy 4+.
+# gcc-libs is all they need). The engine is swapd, installed apart
+# (cargo) — this is the bar/panel face for Waybar and Omarchy 4+.
 pkgname=infinitus-tray-bin
 pkgver=0.3.0
 pkgrel=1
-pkgdesc="claude-swap fleet in the bar — Waybar module + Omarchy Quickshell panel"
+pkgdesc="swapd account fleet in the bar — Waybar module + Omarchy Quickshell panel"
 arch=(x86_64 aarch64)
 url="https://github.com/deathemperor/limitless"
 license=(MIT)
 depends=(glibc gcc-libs)
-optdepends=('claude-swap: the engine this front-end drives'
+optdepends=('swapd: the engine this front-end drives'
             'waybar: bar module host'
             'quickshell: Omarchy 4+ bar plugin host')
 provides=(infinitus-tray)

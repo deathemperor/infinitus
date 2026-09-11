@@ -3,7 +3,7 @@ import InfinitusCore
 
 /// Footer-chip state for one tray invocation (#9 parity): the Anthropic
 /// service indicator (TrayServiceStatus, file-cached) and whether a
-/// `cswap auto` process is alive (EngineProbe) — computed once and fed
+/// `swapd auto` process is alive (EngineProbe) — computed once and fed
 /// both to the panel JSON (QML render) and the fleet mirror export (the
 /// phone's footer, once `serve` exists).
 struct FooterState {

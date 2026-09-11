@@ -65,22 +65,19 @@ The menu bar app is macOS-native (AppKit), but its Swift core ports:
 one-click rotate — as a Waybar module for
 [Omarchy](https://omarchy.org) and any Waybar desktop
 (see [`packaging/omarchy/`](packaging/omarchy/README.md)).
-The engine itself (fleet gauges, auto-switching, the `cswap` TUI)
-runs anywhere Python 3.12 does:
+The engine is the same `swapd` the Mac app drives (`swapd add`,
+`swapd auto`, `swapd list --json`); `serve`'s pushes post to the same
+Slack webhook / Telegram bot channels, from the env:
 
 ```sh
-brew install deathemperor/tap/claude-swap    # Homebrew on Linux (or macOS)
-uv tool install claude-swap                  # or straight from PyPI
+cargo install --git https://github.com/deathemperor/swapd swapd
 ```
 
-Arch users can build from [`packaging/aur/PKGBUILD`](packaging/aur/) —
-`cswap` in a terminal is the same account switching, Omarchy-style.
-(The Linux tray still drives the `cswap` CLI; its move to swapd is the
-second half of #756.)
+Arch users get the prebuilt tray from
+[`packaging/aur/infinitus-tray-bin`](packaging/aur/).
 
-> **Container-tested only.** The PyPI install (`python:3.12` image), the
-> PKGBUILD (`archlinux` image, `makepkg -s`) and the static
-> `infinitus-tray` binary (Arch Linux ARM image, themed Waybar JSON
+> **Container-tested only.** The PKGBUILD (`archlinux` image,
+> `makepkg -s`) and the static `infinitus-tray` binary (Arch Linux ARM image, themed Waybar JSON
 > against a demo fleet) all run in containers — no real accounts or
 > desktop session were involved. Reports from actual Linux desktops
 > welcome.

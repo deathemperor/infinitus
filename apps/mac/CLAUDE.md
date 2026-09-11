@@ -12,7 +12,7 @@ before that the `native` branch). Split out of
   cross-platform ships from THIS repo (InfinitusCore + InfinitusCLI on
   Swift for macOS/Linux/Windows), never as a cswap subcommand.
 - **Everything is Swift; the engine is fully isolated.** Every engine
-  touchpoint is a `cswap … --json` subprocess (InfinitusCore/Engines/Cswap/CswapCLI.swift).
+  touchpoint is a `swapd … --json` subprocess (InfinitusCore/Engines/Swapd/SwapdCLI.swift).
   Never read engine internals (`~/.claude-swap-backup/*`). Reading
   Claude Code's own files is fine: `~/.claude/settings.json`,
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.

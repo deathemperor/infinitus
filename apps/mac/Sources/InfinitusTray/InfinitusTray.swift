@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking   // URLSession lives here on Linux
+#endif
 import InfinitusCore
 
 /// The feed route's held tails (#380): one per polled pid, so a phone's
@@ -7,7 +10,7 @@ private let feedTails = FeedTails()
 
 // The Omarchy/Linux face of Infinitus: a Waybar `custom` module
 // (`return-type: json`) over the same InfinitusCore the macOS app uses.
-// Everything engine-side stays behind `cswap … --json` subprocesses —
+// Everything engine-side stays behind `swapd … --json` subprocesses —
 // the architecture rule holds on both OSes. packaging/omarchy carries
 // the module config; `status` is the interval exec, `rotate` the click.
 
@@ -201,24 +204,43 @@ struct InfinitusTray {
       on-click `infinitus-tray rotate && pkill -RTMIN+8 waybar`.
     """
 
+    static let swapdInstall = "cargo install --git https://github.com/deathemperor/swapd swapd"
+
+    /// The Claude fleet off one `swapd list --json` (#756): the provider's
+    /// view through the same SwapdMapping the Mac uses, the live Claude
+    /// Code sessions attached (swapd knows nothing about them), packed as
+    /// the AccountList this file renders — and its bytes, which are what
+    /// the mirror hands the phone. No Claude provider, or one with no
+    /// accounts, is an empty fleet, not an error: the onboarding branch.
+    static func fleet(bin: String, now: Date = Date()) async throws -> (AccountList, Data) {
+        let swapd = try await SwapdCLI(binaryPath: bin).list()
+        let view = swapd.providers.first { SwapdMapping.provider(for: $0.provider) == .claude }
+        let mapped = view.map { SwapdMapping.fleet(from: $0, provider: .claude, now: now) }
+        let list = AccountList(
+            activeAccountNumber: mapped?.activeNumber, accounts: mapped?.accounts ?? [],
+            nextCandidate: mapped?.nextCandidate, nextRecovery: mapped?.nextRecovery,
+            liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))
+        return (list, (try? JSONEncoder().encode(list)) ?? Data())
+    }
+
     // MARK: status
 
     static func status(themeID: String, remaining: Bool) async {
-        guard let bin = CswapLocator.locate() else {
+        guard let bin = SwapdLocator.locate() else {
             emit(WaybarPayload(
-                text: "\(TitleFormatter.icon) no cswap",
-                tooltip: "cswap not found — install claude-swap:\nuv tool install claude-swap",
+                text: "\(TitleFormatter.icon) no swapd",
+                tooltip: "swapd not found — install it:\n\(swapdInstall)",
                 class: "error", percentage: nil))
             return
         }
         let theme = RowTheme.builtins.first { $0.id == themeID } ?? .off
         do {
-            let (list, raw) = try await CswapCLI(binaryPath: bin).accountListRaw()
+            let (list, raw) = try await fleet(bin: bin)
             // Utilization history rides the Waybar heartbeat — one
             // append per fresh engine usage poll (todo 2026-09-01).
             TrayHistory.record(accounts: list.accounts, enginePath: bin)
             // Fleet mirror export (#9 phase 1 parity — macOS's
-            // MirrorExporter). Own throttle, own demo-cswap gate.
+            // MirrorExporter). Own throttle, own demo-swapd gate.
             let claudeDir = ClaudeSessions.configHome()
             let session = sessionRows(claudeDir: claudeDir, now: Date())
             let footer = await FooterState.current()
@@ -230,14 +252,14 @@ struct InfinitusTray {
             // tooltip reads as broken — onboard instead.
             guard !list.accounts.isEmpty else {
                 // Onboarding parity with the macOS FirstAccountCard
-                // (todo 2026-09-01): name the login `cswap add` adopts.
+                // (todo 2026-09-01): name the login `swapd add` adopts.
                 var tip = "the engine has no accounts yet — "
                 let claude = ClaudeCLIDetect.info()
                 if let email = claude.email {
                     tip += "Claude Code is signed in as \(email); "
-                        + "adopt it with:\ncswap add"
+                        + "adopt it with:\nswapd add"
                 } else {
-                    tip += "sign in with Claude Code, then:\ncswap add"
+                    tip += "sign in with Claude Code, then:\nswapd add"
                 }
                 emit(WaybarPayload(
                     text: "\(TitleFormatter.icon) no accounts",
@@ -367,13 +389,13 @@ struct InfinitusTray {
                 nextRecovery: nil, sessions: [],
                 serviceStatus: nil, sessionsChip: nil, engine: nil, devices: [], error: message))
         }
-        guard let bin = CswapLocator.locate() else {
-            emitError("cswap not found")
+        guard let bin = SwapdLocator.locate() else {
+            emitError("swapd not found")
             return
         }
         do {
-            let (list, raw) = try await CswapCLI(binaryPath: bin).accountListRaw()
             let now = Date()
+            let (list, raw) = try await fleet(bin: bin, now: now)
             let active = list.accounts.first { $0.active }
             let prefs = TitlePrefs(showAccountName: true, titlePct: "both",
                                    titleScoped: false, titleRemaining: false,
@@ -484,7 +506,7 @@ struct InfinitusTray {
             emitPanel(PanelPayload(
                 schemaVersion: 1, themeId: theme.id,
                 title: list.accounts.isEmpty
-                    ? "\(TitleFormatter.icon) no accounts — cswap add"
+                    ? "\(TitleFormatter.icon) no accounts — swapd add"
                     : TitleFormatter.format(account: active, prefs: prefs, now: now),
                 sessionsLine: list.liveSessions.map { SessionSummary.tooltip($0) },
                 activeNumber: active?.number, accounts: accounts,
@@ -506,9 +528,9 @@ struct InfinitusTray {
 
     static func switchTo(_ arg: String?) async {
         guard let arg, let n = Int(arg) else { fail("usage: infinitus-tray switch <n>") }
-        guard let bin = CswapLocator.locate() else { fail("cswap not found") }
+        guard let bin = SwapdLocator.locate() else { fail("swapd not found") }
         do {
-            _ = try await CswapCLI(binaryPath: bin).switchTo(n)
+            _ = try await SwapdCLI(binaryPath: bin).switchTo(provider: .claude, slot: n)
             print("switched to \(n)")
         } catch {
             fail("switch failed: \(error)")
@@ -518,9 +540,10 @@ struct InfinitusTray {
     static func setRotation(_ arg: String?, enabled: Bool) async {
         let verb = enabled ? "enable" : "disable"
         guard let arg, let n = Int(arg) else { fail("usage: infinitus-tray \(verb) <n>") }
-        guard let bin = CswapLocator.locate() else { fail("cswap not found") }
+        guard let bin = SwapdLocator.locate() else { fail("swapd not found") }
         do {
-            _ = try await CswapCLI(binaryPath: bin).setRotation(n, enabled: enabled)
+            // swapd's knob is the hold: held = out of the rotation.
+            _ = try await SwapdCLI(binaryPath: bin).setHold(provider: .claude, slot: n, held: !enabled)
             print("\(verb)d \(n)")
         } catch {
             fail("\(verb) failed: \(error)")
@@ -528,9 +551,9 @@ struct InfinitusTray {
     }
 
     static func rotate() async {
-        guard let bin = CswapLocator.locate() else { fail("cswap not found") }
+        guard let bin = SwapdLocator.locate() else { fail("swapd not found") }
         do {
-            _ = try await CswapCLI(binaryPath: bin).rotate()
+            _ = try await SwapdCLI(binaryPath: bin).rotate(provider: .claude)
             print("rotated")
         } catch {
             fail("rotate failed: \(error)")
@@ -540,20 +563,20 @@ struct InfinitusTray {
     // MARK: serve / pair (#9 phone companion, Linux side)
 
     /// One collection pass, independent of `panel`/`status`'s stdout
-    /// paths — always produces *some* snapshot, even with no `cswap` on
+    /// paths — always produces *some* snapshot, even with no `swapd` on
     /// the box: `serve` in a container with no engine installed answers
     /// `/snapshot` with an empty fleet rather than crashing. Returns the
-    /// decoded list (nil when `cswap` is missing or the fetch failed) so
+    /// decoded list (nil when `swapd` is missing or the fetch failed) so
     /// `serve`'s loop can tick `PushTriggers` off the same fetch instead
-    /// of paying for a second `cswap list --json`.
+    /// of paying for a second `swapd list --json`.
     @discardableResult
     static func collectAndExport(themeID: String, now: Date = Date()) async -> AccountList? {
         var raw = Data(#"{"schemaVersion":1,"accounts":[]}"#.utf8)
         var sessions: [SessionPanelRow] = []
         var progressByPid: [Int: SessionProgress] = [:]
         var list: AccountList?
-        let bin = CswapLocator.locate()
-        if let bin, let (fetched, rawData) = try? await CswapCLI(binaryPath: bin).accountListRaw() {
+        let bin = SwapdLocator.locate()
+        if let bin, let (fetched, rawData) = try? await fleet(bin: bin, now: now) {
             list = fetched
             raw = rawData
             let claudeDir = ClaudeSessions.configHome()
@@ -570,7 +593,7 @@ struct InfinitusTray {
     }
 
     /// Env-var flags for `serve`'s push triggers (#13 parity, Linux side)
-    /// — the tray has no settings file, and `INFINITUS_CSWAP` already
+    /// — the tray has no settings file, and `INFINITUS_SWAPD_CLI` already
     /// sets the precedent of env as the tray's config channel. Default
     /// on, same as the Mac app's toggles.
     static func pushFlagsFromEnv(_ env: [String: String] = ProcessInfo.processInfo.environment) -> PushTriggers.Flags {
@@ -592,7 +615,7 @@ struct InfinitusTray {
     /// multi-tick episode (e.g. the two-quiet-ticks "sessions finished"
     /// rule) across.
     static func tickPushes(list: AccountList?, pushes box: PushBox,
-                           flags: PushTriggers.Flags, bin: String?) async {
+                           flags: PushTriggers.Flags) async {
         let health = (list?.accounts ?? [])
             .filter { !($0.disabled ?? false) && $0.usage != nil }
             .map { a in PushTriggers.Account(
@@ -603,15 +626,27 @@ struct InfinitusTray {
         let pushes = box.with { $0.tick(
             busy: list?.liveSessions?.busy, total: list?.liveSessions?.total,
             accounts: health, flags: flags, sessions: list?.liveSessions?.sessions) }
-        for msg in pushes { await deliverPush(msg, bin: bin) }
+        for msg in pushes { await deliverPush(msg) }
     }
 
-    /// One push, every way this box can deliver it: the engine's phone
-    /// push and the desktop's notify-send.
-    static func deliverPush(_ msg: String, bin: String?) async {
+    /// One push, every way this box can deliver it: the away channels
+    /// the Mac posts to as well (#756 — a Slack webhook and/or a
+    /// Telegram bot, from the env, the tray's config channel) and the
+    /// desktop's notify-send. A refused post is one stderr line; the
+    /// next tick's message is not held back by it.
+    static func deliverPush(_ msg: String) async {
         logPhoneInput("🔔 \(msg)")
-        if let bin {
-            _ = try? await CswapCLI(binaryPath: bin).run(["notify", "push", "-"], stdin: msg)
+        for (channel, request) in AwayPushWire.requests(text: msg, env: ProcessInfo.processInfo.environment) {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if !(200..<300).contains(code) { logPhoneInput("push via \(channel): HTTP \(code)") }
+            } catch {
+                // The code, not the description: a transport error's text
+                // may quote the URL, and Telegram's carries the token.
+                let code = (error as? URLError).map { "URLError \($0.code.rawValue)" } ?? "no reply"
+                logPhoneInput("push via \(channel): \(code)")
+            }
         }
         if let notifySend = which("notify-send") {
             let process = Process()
@@ -816,7 +851,7 @@ struct InfinitusTray {
                 // gets its reply first, Claude Code times hooks out.
                 guard let line = event.pushLine, flags.waiting else { return }
                 if let pid { box.with { $0.announceWaiting(pid: pid) } }
-                Task { await deliverPush(line, bin: CswapLocator.locate()) }
+                Task { await deliverPush(line) }
             })
     }
 
@@ -854,8 +889,7 @@ struct InfinitusTray {
         // session already `waiting` at launch is not news (same rule
         // as the Mac — PushTriggers.seededWaiting).
         let firstList = await collectAndExport(themeID: themeID)
-        await tickPushes(list: firstList, pushes: pushes,
-                         flags: pushFlags, bin: CswapLocator.locate())
+        await tickPushes(list: firstList, pushes: pushes, flags: pushFlags)
         // `GET /.well-known/infinitus` (#486 slice 1+2): what this tray
         // serves, read before pairing, same as the Mac's descriptor
         // (`MirrorServer.descriptor`, #223 phase 4) — unauthenticated by
@@ -1061,8 +1095,7 @@ struct InfinitusTray {
             try? await Task.sleep(nanoseconds: (interval + 1) * 1_000_000_000)
             let list = await collectAndExport(themeID: themeID)
             timelineCache.evict(keeping: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
-            await tickPushes(list: list, pushes: pushes,
-                             flags: pushFlags, bin: CswapLocator.locate())
+            await tickPushes(list: list, pushes: pushes, flags: pushFlags)
         }
         #else
         fail("serve is Linux-only (no POSIX HTTP listener on this platform)")
