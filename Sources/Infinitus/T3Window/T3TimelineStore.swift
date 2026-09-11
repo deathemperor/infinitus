@@ -1,0 +1,231 @@
+import Foundation
+import AppKit
+import InfinitusCore
+
+/// The selected thread's rows, long-polled the way `SessionChatStore`
+/// polls one pid's feed (Task 9) — but reduced through `T3TimelineRows`
+/// instead of the phone's flat item list, and keyed by session id
+/// (`threadId`) so a resume (new pid, same thread) can `rebind` rather
+/// than restart from a blank store.
+@MainActor
+final class T3TimelineStore: ObservableObject {
+    @Published private(set) var rows: [T3TimelineRows.Row] = []
+    @Published private(set) var timeline: SessionTimeline?
+    /// Approvals + user inputs above the composer (Task 12).
+    @Published private(set) var pending = PendingRequests.derive([])
+    /// Owned usage limits (Task 12).
+    @Published private(set) var limits: [LimitNote] = []
+    /// The right panel's Agents tab (B-31): the thread's sub-agents and
+    /// workflow runs, read off `subagents/` on the poll's own thread. Every
+    /// row's elapsed is frozen at `agents.derivedAt` — a new value only ever
+    /// arrives with a pump, so no row needs a ticker.
+    @Published private(set) var agents = T3Agents.Panel.empty()
+    /// No record for the pid (under this thread's session id) any more.
+    /// Reset on every successful record lookup, not just a stamp
+    /// change — otherwise the banner is reachable only briefly today
+    /// because the state drops a vanished pid
+    /// (https://github.com/deathemperor/infinitus/issues/400).
+    @Published private(set) var gone = false
+
+    let threadId: String
+    /// Read off `image(id:)`, `nonisolated`, so this can't stay
+    /// actor-isolated; only `start()`/`stop()`/`rebind(pid:)`, all
+    /// main-actor methods, mutate it. (The polling loop's
+    /// `Task.detached` captures `pid` by value instead — it never reads
+    /// this property off-actor.)
+    nonisolated(unsafe) private(set) var pid: Int32
+    private weak var model: AppModel?
+    private weak var window: T3WindowModel?
+    private var loop: Task<Void, Never>?
+    private var lastOwnedPending: [PendingRequest] = []
+    private var lastFacts: SessionFacts?
+    private var lastAgentInputs: AgentInputs?
+    private var agentRefresh: Task<Void, Never>?
+
+    init(threadId: String, pid: Int32, model: AppModel, window: T3WindowModel) {
+        self.threadId = threadId
+        self.pid = pid
+        self.model = model
+        self.window = window
+    }
+
+    deinit { loop?.cancel(); agentRefresh?.cancel() }
+
+    func start() {
+        guard loop == nil, let model else { return }
+        let box = model.ownedBox
+        let timelineCache = model.timelineCache
+        let attentionStore = model.attentionStore
+        let threadId = threadId
+        loop = Task.detached(priority: .utility) { [pid, weak self] in
+            var since: String?
+            while !Task.isCancelled {
+                let claudeDir = ClaudeSessions.configHome()
+                // An owned session's prompts live in memory, not the
+                // transcript: they ride the stamp, and its actor wakes
+                // this wait the moment one parks (OwnedFeed).
+                let owned = box.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
+                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: MirrorTransport.tailWaitMax,
+                                                decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
+                                                wake: owned?.wake, isCancelled: { Task.isCancelled })
+                if Task.isCancelled { return }
+                // A pid reuse by an unrelated session must not show as
+                // this thread's transcript — only `gone`.
+                guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid && $0.sessionId == threadId }) else {
+                    await MainActor.run { [pid] in
+                        guard let self, self.pid == pid else { return }
+                        self.markGone()
+                    }
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    continue
+                }
+                await MainActor.run { [pid] in
+                    guard let self, self.pid == pid else { return }
+                    // Only publish on the flip: an unconditional write fires
+                    // objectWillChange every poll for nothing.
+                    if self.gone {
+                        self.gone = false
+                        // The rows were derived with the Working row
+                        // suppressed (#400) — put it back before the next
+                        // transcript read, which may find nothing new.
+                        self.rederive()
+                    }
+                }
+                guard let raw = timelineCache.timeline(record: record, claudeDir: claudeDir) else {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    continue
+                }
+                let ownedPending = owned?.pending(pid: pid) ?? []
+                let ownedLimits = owned?.limits(pid: pid) ?? []
+                let rawStamp = SessionFeedReader.stamp(record: record, claudeDir: claudeDir)
+                let stamp = rawStamp.map { s in OwnedFeed.decorate(s, pending: ownedPending, limits: ownedLimits) }
+                if stamp != since || since == nil {
+                    since = stamp
+                    // `pending` folds into `make`'s entries itself
+                    // (`T3TimelineEntry.entries(from:pending:)`) — limits
+                    // fold here so the published `timeline` and the facts
+                    // below both carry them, but pending stays unfolded so
+                    // it is never folded twice.
+                    let withLimits = raw.appending(limits: ownedLimits)
+                    let full = withLimits.appending(pending: ownedPending)
+                    let facts = SessionFacts.derive(timeline: full, status: record.status,
+                                                    attention: attentionStore.entry(sessionId: record.sessionId))
+                    let agentInputs = Self.agentInputs(record: record, timeline: full, claudeDir: claudeDir)
+                    let agents = agentInputs.map { Self.scanAgents($0) } ?? T3Agents.Panel.empty()
+                    await MainActor.run { [pid] in
+                        guard let self, self.pid == pid else { return }
+                        self.timeline = withLimits
+                        self.limits = ownedLimits
+                        self.pending = PendingRequests.derive(full.activities)
+                        self.lastOwnedPending = ownedPending
+                        self.lastFacts = facts
+                        self.lastAgentInputs = agentInputs
+                        self.agents = agents
+                        self.applyRows(timeline: withLimits, ownedPending: ownedPending, facts: facts)
+                    }
+                }
+                // No stamp to wait on (transcript not there yet): pace
+                // the retry instead of spinning on an instant return.
+                if since == nil { try? await Task.sleep(nanoseconds: 2_000_000_000) }
+            }
+        }
+    }
+
+    func stop() {
+        loop?.cancel()
+        loop = nil
+        agentRefresh?.cancel()
+        agentRefresh = nil
+    }
+
+    /// The session is gone (#400): the thread stays open with the banner, so
+    /// the rows are re-derived once with `ended` set — a turn that was running
+    /// when the session exited must not leave a Working row counting up.
+    /// Idempotent; the window model calls this too, since its own state knows
+    /// the pid left the fleet before the next poll wakes.
+    func markGone() {
+        guard !gone else { return }
+        gone = true
+        rederive()
+    }
+
+    /// A resume lands a new pid under the same session — keep the store
+    /// (and its rows' identity) rather than the caller tearing it down.
+    func rebind(pid: Int32) {
+        stop()
+        self.pid = pid
+        start()
+    }
+
+    /// `expandedTurnIds`/`expandedWorkGroupIds` changed: re-derive from the
+    /// cached timeline, no disk read.
+    func rederive() {
+        guard let timeline else { return }
+        applyRows(timeline: timeline, ownedPending: lastOwnedPending, facts: lastFacts)
+    }
+
+    private func applyRows(timeline built: SessionTimeline, ownedPending: [PendingRequest], facts: SessionFacts?) {
+        let expandedTurnIds = window?.state.expandedTurnIds[threadId] ?? []
+        let expandedWorkGroupIds = window?.state.expandedWorkGroupIds[threadId] ?? []
+        let input = T3TimelineInput.make(timeline: built, pending: ownedPending, facts: facts,
+                                         expandedTurnIds: expandedTurnIds, expandedWorkGroupIds: expandedWorkGroupIds,
+                                         ended: gone)
+        let next = T3TimelineRows.stable(previous: rows, next: T3TimelineRows.derive(input))
+        if next != rows { rows = next }
+    }
+
+    // MARK: Agents (B-31)
+
+    /// What the Agents panel needs off the transcript: the session's
+    /// `subagents/` dir and the spawn rows the chat derives for it. `nil` when
+    /// the thread never spawned one, so a thread without sub-agents never
+    /// touches the directory or derives the rows a second time.
+    nonisolated struct AgentInputs: Sendable {
+        let subagentsDir: URL
+        let spawns: [AgentSpawn.Member]
+    }
+
+    nonisolated private static func agentInputs(record: ClaudeSessionRecord, timeline: SessionTimeline,
+                                    claudeDir: URL) -> AgentInputs? {
+        let transcript = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+        let dir = transcript.deletingPathExtension().appendingPathComponent("subagents")
+        guard FileManager.default.fileExists(atPath: dir.path) else { return nil }
+        // Expanded, so a spawn row inside a collapsed turn fold still counts.
+        let spawns = ThreadFeedPresentation.deriveExpanded(timeline).flatMap { row -> [AgentSpawn.Member] in
+            guard case .agentSpawn(let spawn) = row.kind else { return [] }
+            return spawn.members
+        }
+        return AgentInputs(subagentsDir: dir, spawns: spawns)
+    }
+
+    nonisolated private static func scanAgents(_ inputs: AgentInputs) -> T3Agents.Panel {
+        T3Agents.panel(subagentsDir: inputs.subagentsDir, spawns: inputs.spawns)
+    }
+
+    /// Re-read the roster from the last pump's inputs. The Agents tab asks on
+    /// open: a sub-agent's own writes never move the parent transcript's stamp,
+    /// so a pump may be minutes away. Not a ticker — one scan per open, and the
+    /// parsed logs are cached per path.
+    func refreshAgents() {
+        guard let inputs = lastAgentInputs, agentRefresh == nil else { return }
+        agentRefresh = Task.detached(priority: .userInitiated) { [weak self, pid] in
+            let panel = Self.scanAgents(inputs)
+            await MainActor.run {
+                guard let self else { return }
+                self.agentRefresh = nil
+                guard self.pid == pid, panel != self.agents else { return }
+                self.agents = panel
+            }
+        }
+    }
+
+    /// A prompt image, read the way the mirror's image route reads it.
+    nonisolated func image(id: String) -> NSImage? {
+        let claudeDir = ClaudeSessions.configHome()
+        guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid && $0.sessionId == threadId }),
+              let image = SessionFeedReader.imageData(record: record, id: id, claudeDir: claudeDir,
+                                                      attachmentsDir: SessionInput.defaultAttachmentsDir)
+        else { return nil }
+        return NSImage(data: image.data)
+    }
+}

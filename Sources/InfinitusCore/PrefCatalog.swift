@@ -86,8 +86,10 @@ public enum PrefCatalog {
         Entry("popup_sort", .string, .string(PopupSort.headroom.rawValue), display,
               choices: strings(PopupSort.allCases.map(\.rawValue))),
         Entry("compact_rows", .bool, .bool(false), display),
+        Entry("footer_actions_hidden", .bool, .bool(false), display),
         Entry("glass_focused", .double, .number(0.7), display),
         Entry("chat_header", .string, .string("compact"), display, choices: strings(["compact", "strip", "hud"])),
+        Entry("revival_panel", .bool, .bool(true), display),
         // Display: sessions.
         Entry("session_auto_names", .bool, .bool(true), display),
         Entry("session_host", .string, .string("auto"), display,

@@ -5,8 +5,8 @@
 # One session named "Hi", status waiting, whose transcript holds the "Hi"
 # pair, an AskUserQuestion with two questions (→ `user-input.requested`) and
 # an open `Write` (→ `approval.requested`, SessionTimelineBuilder.finish).
-# The phone and the browser page both read it through the unchanged
-# pipeline, so a reference capture never depends on real work.
+# The Mac window, the phone and the browser page all read it through the
+# unchanged pipeline, so a reference capture never depends on real work.
 #
 # Everything the app could otherwise reach into is redirected under $state:
 # the Claude config dir, the profiles list, the team dir and the engine
@@ -41,7 +41,7 @@ stop() {
         kill "$app" 2>/dev/null || true
     fi
     [ -f "$state/pid" ] && kill "$(cat "$state/pid")" 2>/dev/null || true
-    for k in mirror_lan_enabled mock_mode workspace.sidebarWidth \
+    for k in mirror_lan_enabled popout_shown mock_mode workspace.sidebarWidth \
              workspace.filesExplorerOpen workspace.terminalDrawer \
              migrated_from_huuloc_id migrated_from_limitless_id migrated_from_g2 mirror_pair_token; do
         defaults delete "$domain" "$k" >/dev/null 2>&1 || true
@@ -138,6 +138,7 @@ identity=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Ap
 
 # The mirror is what the phone and the browser page read the fixture over.
 defaults write "$domain" mirror_lan_enabled -bool true
+defaults write "$domain" popout_shown -bool true
 defaults write "$domain" mock_mode -bool false   # the fixture IS the session data; mock mode would hide it
 
 # Identity isolation (final review of A): a fresh debug domain would copy
@@ -158,6 +159,7 @@ INFINITUS_CSWAP=$root/tools/demo-cswap \
 INFINITUS_DEMO_STATE=$state/demo-state.json \
 INFINITUS_PROFILES=$state/profiles.json \
 INFINITUS_TEAM_DIR=$state/team \
+INFINITUS_WORKSPACE_NO_START=1 \
     "$root/.build/debug/Infinitus" -mock_mode NO >"/tmp/$name.log" 2>&1 &
 echo $! > "$state/app.pid"
 echo "app on $sock (log /tmp/$name.log)"

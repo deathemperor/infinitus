@@ -789,10 +789,28 @@ final class ControlServer {
                 throw Fail("no status item yet")
             }
             switch r.args.first {
+            case "popout": controller.showPinnedWindow()
             case "settings": controller.showSettingsWindow()
-            case "popout", "wall", "workspace", "session":
-                throw Fail("retired: the pop-out, wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: show settings")
+            case "wall": controller.toggleWall()
+            case "workspace":
+                let screen = r.args.dropFirst().first
+                if let screen, !["sidebar", "thread", "composer", "draft", "switcher"].contains(screen) {
+                    throw Fail("usage: show workspace [sidebar|thread|composer|draft|switcher]")
+                }
+                controller.showWorkspace(screen: screen)
+            case "session":
+                // What a popup row click opens (MacSessionsPopover): the
+                // session's chat window (#612).
+                let who = r.args.dropFirst().first
+                guard let who, let pid = model.sessionPid(matching: who),
+                      let record = model.ownedRoster(claudeDir: ClaudeSessions.configHome()).first(where: { Int($0.pid) == pid }) else {
+                    throw Fail("no live session matches \(who ?? "?"); see `infinitusctl sessions`")
+                }
+                model.openSessionChat?(SessionDetail(pid: pid, cwd: record.cwd, status: record.status ?? "idle", kind: record.kind,
+                                                     startedAt: (record.startedAt ?? Date()).timeIntervalSince1970 * 1000,
+                                                     sessionId: record.sessionId))
+                return ControlReply(ok: true, result: .object(["shown": .string("session"), "pid": .number(Double(pid))]))
+            default: throw Fail("usage: show popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]|session <pid|name>")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
@@ -843,10 +861,10 @@ final class ControlServer {
                 throw Fail("no status item yet")
             }
             switch r.args.first {
+            case "popout": controller.hidePinnedWindow()
             case "settings": controller.hideSettingsWindow()
-            case "popout", "workspace":
-                throw Fail("retired: the pop-out, wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: hide settings")
+            case "workspace": controller.hideWorkspace()
+            default: throw Fail("usage: hide popout|settings|workspace")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 
