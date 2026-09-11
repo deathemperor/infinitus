@@ -249,6 +249,17 @@ const ProjectionProjectLookupRowSchema = ProjectionProjectDbRowSchema;
 const ProjectionThreadIdLookupRowSchema = Schema.Struct({
   threadId: ThreadId,
 });
+const WorktreeHolderLimitInput = Schema.Struct({
+  limit: Schema.Number,
+});
+const ProjectionWorktreeHolderCountRowSchema = Schema.Struct({
+  count: Schema.Number,
+});
+const ProjectionArchivedWorktreeHolderRowSchema = Schema.Struct({
+  threadId: ThreadId,
+  title: Schema.String,
+  archivedAt: Schema.String,
+});
 const ProjectionThreadCheckpointContextThreadRowSchema = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
@@ -1220,6 +1231,36 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           AND archived_at IS NULL
         ORDER BY created_at ASC, thread_id ASC
         LIMIT 1
+      `,
+  });
+
+  const readWorktreeHolderCount = SqlSchema.findOne({
+    Request: Schema.Void,
+    Result: ProjectionWorktreeHolderCountRowSchema,
+    execute: () =>
+      sql`
+        SELECT COUNT(*) AS "count"
+        FROM projection_threads
+        WHERE deleted_at IS NULL
+          AND worktree_path IS NOT NULL
+      `,
+  });
+
+  const listOldestArchivedWorktreeHolderRows = SqlSchema.findAll({
+    Request: WorktreeHolderLimitInput,
+    Result: ProjectionArchivedWorktreeHolderRowSchema,
+    execute: ({ limit }) =>
+      sql`
+        SELECT
+          thread_id AS "threadId",
+          title,
+          archived_at AS "archivedAt"
+        FROM projection_threads
+        WHERE deleted_at IS NULL
+          AND worktree_path IS NOT NULL
+          AND archived_at IS NOT NULL
+        ORDER BY archived_at ASC, thread_id ASC
+        LIMIT ${limit}
       `,
   });
 
@@ -3152,6 +3193,28 @@ pending_approval_requests AS (
         Effect.map(Option.map((row) => row.threadId)),
       );
 
+  const getWorktreeHolders: ProjectionSnapshotQueryShape["getWorktreeHolders"] = Effect.fn(
+    "ProjectionSnapshotQuery.getWorktreeHolders",
+  )(function* (limit) {
+    const counted = yield* readWorktreeHolderCount(undefined).pipe(
+      Effect.mapError(
+        toPersistenceSqlOrDecodeError(
+          "ProjectionSnapshotQuery.getWorktreeHolders:count",
+          "ProjectionSnapshotQuery.getWorktreeHolders:decodeCount",
+        ),
+      ),
+    );
+    const oldestArchived = yield* listOldestArchivedWorktreeHolderRows({ limit }).pipe(
+      Effect.mapError(
+        toPersistenceSqlOrDecodeError(
+          "ProjectionSnapshotQuery.getWorktreeHolders:query",
+          "ProjectionSnapshotQuery.getWorktreeHolders:decodeRows",
+        ),
+      ),
+    );
+    return { count: counted.count, oldestArchived };
+  });
+
   const getImportedAgentSessionSources: ProjectionSnapshotQueryShape["getImportedAgentSessionSources"] =
     Effect.fn("ProjectionSnapshotQuery.getImportedAgentSessionSources")(function* (projectId) {
       const rows = yield* listImportedAgentSessionSourceRows({ projectId }).pipe(
@@ -3853,6 +3916,7 @@ pending_approval_requests AS (
     getActiveProjectByWorkspaceRoot,
     getProjectShellById,
     getFirstActiveThreadIdByProjectId,
+    getWorktreeHolders,
     getImportedAgentSessionSources,
     getThreadCheckpointContext,
     getFullThreadDiffContext,

@@ -173,6 +173,22 @@ export interface ProjectionSnapshotQueryShape {
     projectId: ProjectId,
   ) => Effect.Effect<Option.Option<ThreadId>, ProjectionRepositoryError>;
 
+  /**
+   * Fork (#269 H): how many live threads hold a worktree, and up to `limit`
+   * archived ones by archive time — deleting one of those frees a worktree.
+   */
+  readonly getWorktreeHolders: (limit: number) => Effect.Effect<
+    {
+      readonly count: number;
+      readonly oldestArchived: ReadonlyArray<{
+        readonly threadId: ThreadId;
+        readonly title: string;
+        readonly archivedAt: string;
+      }>;
+    },
+    ProjectionRepositoryError
+  >;
+
   /** Read completed import sources without loading thread history. */
   readonly getImportedAgentSessionSources: (projectId: ProjectId) => Effect.Effect<
     ReadonlyArray<{

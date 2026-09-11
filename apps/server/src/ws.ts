@@ -109,6 +109,7 @@ import {
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor.ts";
+import { WORKTREE_CAP_SUGGESTIONS, worktreeCapRefusal } from "./orchestration/worktreeCap.logic.ts";
 import {
   observeRpcEffect as instrumentRpcEffect,
   observeRpcStream as instrumentRpcStream,
@@ -1138,6 +1139,21 @@ const makeWsRpcLayer = (
             });
 
           const bootstrapProgram = Effect.gen(function* () {
+            // Fork (#269 H): the worktree limit is checked before anything is
+            // created, so an over-limit send costs no thread.
+            if (bootstrap?.prepareWorktree) {
+              const { worktreeMaxCount } = yield* serverSettings.getSettings;
+              if (worktreeMaxCount > 0) {
+                const holders =
+                  yield* projectionSnapshotQuery.getWorktreeHolders(WORKTREE_CAP_SUGGESTIONS);
+                const refusal = worktreeCapRefusal(holders, worktreeMaxCount);
+                if (refusal !== null) {
+                  return yield* Effect.fail(
+                    new OrchestrationDispatchCommandError({ message: refusal }),
+                  );
+                }
+              }
+            }
             if (bootstrap?.createThread) {
               const created = yield* dispatchFromClient({
                 type: "thread.create",

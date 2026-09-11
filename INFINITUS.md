@@ -337,6 +337,17 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   one" (interrupts, archives, removes the worktree with the work kept on its
   branch). Tests: `bestOf.logic.test.ts`, `ProjectionPipeline.babysit.test.ts`
   (the column).
+- **Worktree limit (#269 H; Cursor's max worktrees).** A server setting
+  `worktreeMaxCount` (`packages/contracts/src/settings.ts`, default 25, 0
+  lifts it) checked in `apps/server/src/ws.ts` before a bootstrap creates
+  anything: `ProjectionSnapshotQuery.getWorktreeHolders` counts live threads
+  with a `worktree_path` and lists the oldest archived ones;
+  `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`)
+  words the one-line refusal, which names those threads (deleting one frees
+  its worktree) and the setting. Settings → General "Worktree limit"
+  (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
+  `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
+  `server.test.ts`, `settings.test.ts`.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
