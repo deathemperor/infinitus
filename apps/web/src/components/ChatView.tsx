@@ -47,6 +47,7 @@ import { type EnvironmentConnectionPresentation } from "@t3tools/client-runtime/
 import { wasBootstrapThreadDeleted } from "@t3tools/client-runtime/errors";
 import { type CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
 import { effectiveSnoozed, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
+import { useInfinitusHoldBanner } from "./chat/useInfinitusHoldBanner";
 import {
   parseCodexFeedbackCommand,
   submitCodexFeedback,
@@ -6034,7 +6035,15 @@ export default function ChatView(props: ChatViewProps) {
       }),
     [feedbackSubmissions, routeThreadKey],
   );
+  // Fork (#616): the thread's start is held for headroom; "Run now" / "Pin".
+  const infinitusHoldBannerItem = useInfinitusHoldBanner({
+    thread: isServerThread ? (activeServerThread ?? null) : null,
+    threadRef: activeThreadRef,
+    supportsPinning,
+    pinThread,
+  });
   const composerBannerItems = useMemo<ComposerBannerStackItem[]>(() => {
+    const infinitusHoldItems = infinitusHoldBannerItem === null ? [] : [infinitusHoldBannerItem];
     const backgroundLivenessItems =
       backgroundLivenessBannerItem === null ? [] : [backgroundLivenessBannerItem];
     const resumeCompactionItems =
@@ -6052,6 +6061,7 @@ export default function ChatView(props: ChatViewProps) {
         ...resumeCompactionItems,
         ...wokeThreadItems,
         ...parkedThreadItems,
+        ...infinitusHoldItems,
       ];
     }
     return [
@@ -6061,6 +6071,7 @@ export default function ChatView(props: ChatViewProps) {
       ...backgroundLivenessItems,
       ...resumeCompactionItems,
       ...wokeThreadItems,
+      ...infinitusHoldItems,
       {
         id: `branch-mismatch:${activeBranchMismatchKey}`,
         variant: "info",
@@ -6106,6 +6117,7 @@ export default function ChatView(props: ChatViewProps) {
     backgroundLivenessBannerItem,
     feedbackBannerItems,
     handleRestoreThreadBranch,
+    infinitusHoldBannerItem,
     isRestoringThreadBranch,
     localCheckoutBranchMismatch,
     parkedThreadBannerItem,
