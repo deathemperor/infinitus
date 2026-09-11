@@ -9,7 +9,9 @@ import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 
-/** The list a whole-list stream shows on subscribe. */
+/** The list a whole-list stream shows on subscribe. Contract: `held` and
+    `stopped` emit their current list to every subscriber at once (#741,
+    #270 I); a stream that only emitted on change would hang this read. */
 const current = <A>(stream: Stream.Stream<ReadonlyArray<A>>) =>
   Stream.runHead(stream).pipe(Effect.map(Option.getOrElse((): ReadonlyArray<A> => [])));
 
