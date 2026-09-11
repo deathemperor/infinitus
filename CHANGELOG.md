@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads over the credential it hands the app at port publish (#822).
+
 ## 0.4.5-alpha.1
 
 ### Team (preview)
