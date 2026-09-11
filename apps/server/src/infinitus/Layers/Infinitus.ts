@@ -90,8 +90,16 @@ const EventsReply = Schema.Union([
   }),
 ]);
 const decodeEvents = Schema.decodeUnknownEffect(EventsReply);
-/** The manifest names options bare: `options: ["limit", "after"]`. */
 const EVENTS_AFTER_OPTION = "after";
+/**
+ * The manifest spells options per verb: `events` lists them bare (`"after"`),
+ * the body verbs dashed with a placeholder (`"--body <json>"`). Match either.
+ */
+export const manifestOffersOption = (
+  command: Pick<InfinitusManifestCommand, "options">,
+  name: string,
+): boolean =>
+  command.options.some((option) => option.replace(/^-+/, "").split(/\s+/, 1)[0] === name);
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 
 /** See `eventCursor`. */
@@ -364,7 +372,7 @@ const makeInfinitus = Effect.gen(function* () {
       // 5 s poll no longer re-serialises the whole log).
       const cursor = yield* Ref.get(eventCursor);
       const after =
-        eventsCommand.options.includes(EVENTS_AFTER_OPTION) &&
+        manifestOffersOption(eventsCommand, EVENTS_AFTER_OPTION) &&
         Option.isSome(cursor) &&
         cursor.value.kind === "ids"
           ? cursor.value.lastId
