@@ -8,6 +8,7 @@ import type {
   ApprovalRequestId,
   AssistantCitation,
   ChatFileAttachment,
+  ComposerSendMode,
   EnvironmentId,
   ModelSelection,
   PreviewAnnotationPayload,
@@ -50,6 +51,7 @@ import {
   type ComposerSubmissionIntent,
   type ComposerTrigger,
   collapseExpandedComposerCursor,
+  composerSendModeForEnter,
   composerSubmissionIntentForEnter,
   detectComposerTrigger,
   expandCollapsedComposerCursor,
@@ -98,6 +100,12 @@ import {
 } from "../../promptStashStore";
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
+import { ComposerSendQueue } from "./ComposerSendQueue";
+import {
+  composerSendQueueKey,
+  queuedEntriesForThread,
+  shouldDrainSendQueue,
+} from "./composerSendQueue.logic";
 import { ComposerCapturesBadge } from "../captures/ComposerCapturesBadge";
 import { ComposerCapturesMenu } from "../captures/ComposerCapturesMenu";
 import { useCapturesUiStore } from "../captures/capturesUiStore";
@@ -1146,6 +1154,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   hasSendableContent: boolean;
   preserveComposerFocusOnPointerDown?: boolean;
   showSendWhileRunning?: boolean;
+  runningSendMode?: ComposerSendMode | undefined;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
@@ -1177,6 +1186,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         isConnecting={props.isConnecting}
         isEnvironmentUnavailable={props.isEnvironmentUnavailable}
         isPreparingWorktree={props.isPreparingWorktree}
+        runningSendMode={props.runningSendMode}
         hasSendableContent={props.hasSendableContent}
         preserveComposerFocusOnPointerDown={props.preserveComposerFocusOnPointerDown ?? false}
         showSendWhileRunning={props.showSendWhileRunning ?? false}
@@ -1277,6 +1287,8 @@ export interface ChatComposerProps {
   phase: SessionPhase;
   isConnecting: boolean;
   isSendBusy: boolean;
+  /** Fork (#270 F): the thread is held (#616 headroom, #743 pause); queued messages wait. */
+  isHeld: boolean;
   sendDisabledReason: string | null;
   isPreparingWorktree: boolean;
   bannerItems: readonly ComposerBannerStackItem[];
@@ -1425,6 +1437,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     phase,
     isConnecting,
     isSendBusy,
+    isHeld,
     sendDisabledReason: externalSendDisabledReason,
     isPreparingWorktree,
     environmentUnavailable,
@@ -3036,10 +3049,45 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     showPlanFollowUpPrompt,
   ]);
 
+  const stashEntriesAll = usePromptStashStore((state) => state.entries);
+  // Fork (#270 F): queued messages live in the stash store, tagged with the
+  // thread they wait for; the stash menu and badge only see the rest.
+  const stashQueue = useMemo(
+    () => stashEntriesAll.filter((entry) => entry.queuedFor === undefined),
+    [stashEntriesAll],
+  );
+  const moveStashEntry = usePromptStashStore((state) => state.moveEntry);
+  const sendQueueKey =
+    routeKind === "server" && activeThreadId !== null
+      ? composerSendQueueKey(environmentId, activeThreadId)
+      : null;
+  const queuedMessages = useMemo(
+    () => queuedEntriesForThread(stashEntriesAll, sendQueueKey),
+    [stashEntriesAll, sendQueueKey],
+  );
+  const queueCurrentPromptRef = useRef<(key: string) => void>(() => {});
   const submitComposer = useCallback(
-    (event?: { preventDefault: () => void }, intent: ComposerSubmissionIntent = "foreground") => {
+    (
+      event?: { preventDefault: () => void },
+      intent: ComposerSubmissionIntent = "foreground",
+      sendMode: ComposerSendMode = settings.composerSendMode,
+    ) => {
       if (noProviderAvailable || isSendDisabled) {
         event?.preventDefault();
+        return;
+      }
+      // Fork (#270 F): while a turn runs, "queue" parks the message until the
+      // thread is idle. Answers to the running turn (a question, an approval)
+      // always go now.
+      if (
+        phase === "running" &&
+        sendQueueKey !== null &&
+        sendMode === "queue" &&
+        !activePendingProgress &&
+        !isComposerApprovalState
+      ) {
+        event?.preventDefault();
+        queueCurrentPromptRef.current(sendQueueKey);
         return;
       }
       // A send while a pasted image is still compressing would strand that
@@ -3086,6 +3134,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       onSend,
       promptRef,
       shouldBlurMobileComposerOnSubmit,
+      settings.composerSendMode,
+      phase,
+      sendQueueKey,
+      activePendingProgress,
+      isComposerApprovalState,
     ],
   );
   const submitCitationAndSend = useCallback(() => {
@@ -3267,7 +3320,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           })
         : null;
     if (submissionIntent) {
-      submitComposer(undefined, submissionIntent);
+      submitComposer(
+        undefined,
+        submissionIntent,
+        composerSendModeForEnter({
+          sendMode: settings.composerSendMode,
+          modifierKey: event.metaKey || event.ctrlKey,
+          isDraftThread: routeKind === "draft",
+        }),
+      );
       return true;
     }
     return false;
@@ -3277,7 +3338,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // Prompt stash (⌘S)
   // ------------------------------------------------------------------
   // Files remain tied to the environment that owns their uploaded bytes.
-  const stashQueue = usePromptStashStore((state) => state.entries);
   const stashEntryToQueue = usePromptStashStore((state) => state.stashEntry);
   const takeStashEntry = usePromptStashStore((state) => state.takeEntry);
   const finalizeStashEntryImages = usePromptStashStore((state) => state.finalizeEntryImages);
@@ -3605,212 +3665,314 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     [stashQueue, takeStashEntry],
   );
 
-  const stashCurrentPrompt = useCallback(async () => {
-    // Terminal-context placeholders reference live sessions the stash can't
-    // round-trip, so they are stripped from the stashed prompt.
-    const prompt = promptRef.current.split(INLINE_TERMINAL_CONTEXT_PLACEHOLDER).join("").trim();
-    const images = [...composerImagesRef.current];
-    const files = [...composerFilesRef.current];
-    if (prompt.length === 0 && images.length === 0 && files.length === 0) {
-      const entries = usePromptStashStore.getState().entries;
-      const entry = entries.length === 1 ? entries[0] : undefined;
-      if (entry && !entry.pendingImageCount) {
-        await restoreStashEntry(entry);
-      } else {
-        setIsStashMenuOpen((open) => !open);
-      }
-      return;
-    }
-    const stashedFiles: PersistedComposerFileAttachment[] = [];
-    for (const file of files) {
-      if (composerFileNeedsReattach(file)) {
-        toastManager.add({
-          type: "error",
-          title: "Attach dropped files again or remove them before stashing",
-        });
+  const stashCurrentPrompt = useCallback(
+    async (target?: { queuedFor: string }) => {
+      // Terminal-context placeholders reference live sessions the stash can't
+      // round-trip, so they are stripped from the stashed prompt.
+      const prompt = promptRef.current.split(INLINE_TERMINAL_CONTEXT_PLACEHOLDER).join("").trim();
+      const images = [...composerImagesRef.current];
+      const files = [...composerFilesRef.current];
+      if (prompt.length === 0 && images.length === 0 && files.length === 0) {
+        if (target) return;
+        const entries = usePromptStashStore
+          .getState()
+          .entries.filter((candidate) => candidate.queuedFor === undefined);
+        const entry = entries.length === 1 ? entries[0] : undefined;
+        if (entry && !entry.pendingImageCount) {
+          await restoreStashEntry(entry);
+        } else {
+          setIsStashMenuOpen((open) => !open);
+        }
         return;
       }
-      const upload = readAttachmentUpload(file.id);
-      if (upload?.status !== "ready" || upload.environmentId !== environmentId) {
-        toastManager.add({
-          type: "error",
-          title: "Wait for file uploads before stashing this prompt",
-        });
-        return;
-      }
-      stashedFiles.push({
-        id: file.id,
-        name: file.name,
-        mimeType: file.mimeType,
-        sizeBytes: file.sizeBytes,
-        attachmentId: upload.attachmentId,
-        environmentId,
-      });
-    }
-    // A repeat ⌘S on the *same* still-unencoded snapshot would stash it
-    // twice. Guard on the snapshot itself rather than a bare boolean: once
-    // the composer has been cleared the user can type something genuinely
-    // new (or switch threads) while encoding continues, and that deserves its
-    // own entry.
-    const attachmentKey = images
-      .map((image) => `image:${image.id}`)
-      .concat(files.map((file) => `file:${file.id}`))
-      .join(",");
-    const snapshotKey = [String(composerDraftTarget), prompt, attachmentKey].join("\n");
-    if (stashInFlightRef.current.has(snapshotKey)) return;
-    stashInFlightRef.current.add(snapshotKey);
-
-    const stashTarget = composerDraftTarget;
-    const entryId = randomUUID();
-    try {
-      // Persist the text-only entry *first*, then clear. Ordering matters in
-      // both directions: writing before clearing means a crash or closed tab
-      // mid-encode still leaves the prompt recoverable, while clearing before
-      // the async image work means edits typed during encoding are not wiped.
-      // Images are appended to the stored entry as they finish encoding.
-      const { evicted, written, durable } = stashEntryToQueue({
-        id: entryId,
-        createdAt: new Date().toISOString(),
-        prompt,
-        attachments: [],
-        ...(stashedFiles.length > 0 ? { files: stashedFiles } : {}),
-        droppedImageNames: [],
-        unreadableImageNames: [],
-        pendingImageCount: images.length,
-      });
-
-      // Clearing the composer is only safe once the write actually landed.
-      // If it was rejected (quota) the store has already rolled itself back,
-      // so leave the composer untouched rather than making it the second
-      // casualty of a reload.
-      if (!written) {
-        toastManager.add({
-          type: "error",
-          title: "Could not stash this prompt",
-          description:
-            "Browser storage rejected the write, so the composer was left as-is. Free up site data and try again.",
-          data: { hideCopyButton: true },
-        });
-        return;
-      }
-      // Written but only into the in-memory fallback (localStorage blocked):
-      // the entry is visible and restorable this session, so proceed with the
-      // clear, but say it won't survive a reload.
-      if (!durable) {
-        toastManager.add({
-          type: "warning",
-          title: "Stashed prompt will not survive a reload",
-          description:
-            "Browser storage is unavailable, so this stash is kept in memory only for this session.",
-          data: { hideCopyButton: true },
-        });
-      }
-
-      // Terminal and preview context stays behind because the stash cannot restore it.
-      promptRef.current = "";
-      clearComposerDraftPromptAndImages(stashTarget);
-      for (const image of images) {
-        releaseAttachmentUpload(image.id);
-      }
-      setComposerCursor(0);
-      setComposerTrigger(null);
-      pulseStashBadge();
-
-      if (evicted) {
-        for (const file of evicted.files ?? []) {
-          releasePersistedAttachmentUpload({
-            id: file.id,
-            environmentId: file.environmentId,
-            attachmentId: file.attachmentId,
+      const stashedFiles: PersistedComposerFileAttachment[] = [];
+      for (const file of files) {
+        if (composerFileNeedsReattach(file)) {
+          toastManager.add({
+            type: "error",
+            title: "Attach dropped files again or remove them before stashing",
           });
+          return;
         }
-        toastManager.add({
-          type: "warning",
-          title: "Oldest stashed prompt discarded",
-          description: `The stash holds ${MAX_STASH_ENTRIES} prompts; the oldest was removed to make room.`,
-          data: { hideCopyButton: true },
+        const upload = readAttachmentUpload(file.id);
+        if (upload?.status !== "ready" || upload.environmentId !== environmentId) {
+          toastManager.add({
+            type: "error",
+            title: "Wait for file uploads before stashing this prompt",
+          });
+          return;
+        }
+        stashedFiles.push({
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          attachmentId: upload.attachmentId,
+          environmentId,
         });
       }
+      // A repeat ⌘S on the *same* still-unencoded snapshot would stash it
+      // twice. Guard on the snapshot itself rather than a bare boolean: once
+      // the composer has been cleared the user can type something genuinely
+      // new (or switch threads) while encoding continues, and that deserves its
+      // own entry.
+      const attachmentKey = images
+        .map((image) => `image:${image.id}`)
+        .concat(files.map((file) => `file:${file.id}`))
+        .join(",");
+      const snapshotKey = [String(composerDraftTarget), prompt, attachmentKey].join("\n");
+      if (stashInFlightRef.current.has(snapshotKey)) return;
+      stashInFlightRef.current.add(snapshotKey);
 
-      // Images are re-encoded for the stash rather than stored verbatim: the
-      // composer allows up to 10MB per image, but localStorage gives the whole
-      // origin ~5MB. Only the stashed copy shrinks; the live attachment (and
-      // anything sent without stashing) keeps the original file.
-      const candidateAttachments: PersistedComposerImageAttachment[] = [];
-      const oversizedImageNames: string[] = [];
-      const unreadableImageNames: string[] = [];
-      for (const image of images) {
-        const result = await compressImageForStash(image.file);
-        if (!result.ok) {
-          // "too large" and "could not be read" are distinct outcomes; the
-          // menu and restore toast report them separately.
-          (result.reason === "too-large" ? oversizedImageNames : unreadableImageNames).push(
-            image.name,
-          );
-          continue;
-        }
-        candidateAttachments.push({
-          id: image.id,
-          name: image.name,
-          mimeType: result.image.mimeType,
-          sizeBytes: result.image.sizeBytes,
-          dataUrl: result.image.dataUrl,
-          ...(image.source
-            ? { source: resizeSnapShotSource(image.source, result.image.imageSize) }
-            : {}),
+      const stashTarget = composerDraftTarget;
+      const entryId = randomUUID();
+      try {
+        // Persist the text-only entry *first*, then clear. Ordering matters in
+        // both directions: writing before clearing means a crash or closed tab
+        // mid-encode still leaves the prompt recoverable, while clearing before
+        // the async image work means edits typed during encoding are not wiped.
+        // Images are appended to the stored entry as they finish encoding.
+        const { evicted, written, durable } = stashEntryToQueue({
+          id: entryId,
+          createdAt: new Date().toISOString(),
+          prompt,
+          attachments: [],
+          ...(stashedFiles.length > 0 ? { files: stashedFiles } : {}),
+          droppedImageNames: [],
+          unreadableImageNames: [],
+          pendingImageCount: images.length,
+          ...(target ? { queuedFor: target.queuedFor } : {}),
         });
-      }
-      const { kept, droppedNames } = partitionStashAttachments(candidateAttachments);
 
-      const { attached, durable: imagesDurable } = finalizeStashEntryImages(entryId, {
-        attachments: kept,
-        droppedImageNames: [...oversizedImageNames, ...droppedNames],
-        unreadableImageNames,
-      });
-      if (attached) {
-        // The second phase can be rejected on its own: the text-only entry
-        // fit, but adding image payloads pushed past the quota. Disk would
-        // then still hold the phase-one entry with pendingImageCount set,
-        // which reads as an orphan after reload — so say so now. Gated on the
-        // entry write having been durable: on the in-memory fallback nothing
-        // is ever durable, and the session-only warning already covered it.
-        if (!imagesDurable && durable && images.length > 0) {
+        // Clearing the composer is only safe once the write actually landed.
+        // If it was rejected (quota) the store has already rolled itself back,
+        // so leave the composer untouched rather than making it the second
+        // casualty of a reload.
+        if (!written) {
+          toastManager.add({
+            type: "error",
+            title: target ? "Could not queue this message" : "Could not stash this prompt",
+            description:
+              "Browser storage rejected the write, so the composer was left as-is. Free up site data and try again.",
+            data: { hideCopyButton: true },
+          });
+          return;
+        }
+        // Written but only into the in-memory fallback (localStorage blocked):
+        // the entry is visible and restorable this session, so proceed with the
+        // clear, but say it won't survive a reload.
+        if (!durable) {
           toastManager.add({
             type: "warning",
-            title: "Stashed images were not saved",
+            title: "Stashed prompt will not survive a reload",
             description:
-              "The prompt was stashed, but browser storage rejected its images. They will be missing if you reload.",
+              "Browser storage is unavailable, so this stash is kept in memory only for this session.",
             data: { hideCopyButton: true },
           });
         }
-      } else if (kept.length > 0) {
-        // The entry was restored or deleted before its images finished
-        // encoding, so they have nowhere to land. Say so rather than letting
-        // them evaporate.
-        toastManager.add({
-          type: "warning",
-          title: "Stashed images did not attach",
-          description: `That prompt was restored or deleted before ${kept.length} image${kept.length === 1 ? "" : "s"} finished saving. Re-attach ${kept.length === 1 ? "it" : "them"} if you still need ${kept.length === 1 ? "it" : "them"}.`,
-          data: { hideCopyButton: true },
+
+        // Terminal and preview context stays behind because the stash cannot restore it.
+        promptRef.current = "";
+        clearComposerDraftPromptAndImages(stashTarget);
+        for (const image of images) {
+          releaseAttachmentUpload(image.id);
+        }
+        setComposerCursor(0);
+        setComposerTrigger(null);
+        if (!target) pulseStashBadge();
+
+        if (evicted) {
+          for (const file of evicted.files ?? []) {
+            releasePersistedAttachmentUpload({
+              id: file.id,
+              environmentId: file.environmentId,
+              attachmentId: file.attachmentId,
+            });
+          }
+          toastManager.add({
+            type: "warning",
+            title: "Oldest stashed prompt discarded",
+            description: `The stash holds ${MAX_STASH_ENTRIES} prompts; the oldest was removed to make room.`,
+            data: { hideCopyButton: true },
+          });
+        }
+
+        // Images are re-encoded for the stash rather than stored verbatim: the
+        // composer allows up to 10MB per image, but localStorage gives the whole
+        // origin ~5MB. Only the stashed copy shrinks; the live attachment (and
+        // anything sent without stashing) keeps the original file.
+        const candidateAttachments: PersistedComposerImageAttachment[] = [];
+        const oversizedImageNames: string[] = [];
+        const unreadableImageNames: string[] = [];
+        for (const image of images) {
+          const result = await compressImageForStash(image.file);
+          if (!result.ok) {
+            // "too large" and "could not be read" are distinct outcomes; the
+            // menu and restore toast report them separately.
+            (result.reason === "too-large" ? oversizedImageNames : unreadableImageNames).push(
+              image.name,
+            );
+            continue;
+          }
+          candidateAttachments.push({
+            id: image.id,
+            name: image.name,
+            mimeType: result.image.mimeType,
+            sizeBytes: result.image.sizeBytes,
+            dataUrl: result.image.dataUrl,
+            ...(image.source
+              ? { source: resizeSnapShotSource(image.source, result.image.imageSize) }
+              : {}),
+          });
+        }
+        const { kept, droppedNames } = partitionStashAttachments(candidateAttachments);
+
+        const { attached, durable: imagesDurable } = finalizeStashEntryImages(entryId, {
+          attachments: kept,
+          droppedImageNames: [...oversizedImageNames, ...droppedNames],
+          unreadableImageNames,
         });
+        if (attached) {
+          // The second phase can be rejected on its own: the text-only entry
+          // fit, but adding image payloads pushed past the quota. Disk would
+          // then still hold the phase-one entry with pendingImageCount set,
+          // which reads as an orphan after reload — so say so now. Gated on the
+          // entry write having been durable: on the in-memory fallback nothing
+          // is ever durable, and the session-only warning already covered it.
+          if (!imagesDurable && durable && images.length > 0) {
+            toastManager.add({
+              type: "warning",
+              title: "Stashed images were not saved",
+              description:
+                "The prompt was stashed, but browser storage rejected its images. They will be missing if you reload.",
+              data: { hideCopyButton: true },
+            });
+          }
+        } else if (kept.length > 0) {
+          // The entry was restored or deleted before its images finished
+          // encoding, so they have nowhere to land. Say so rather than letting
+          // them evaporate.
+          toastManager.add({
+            type: "warning",
+            title: "Stashed images did not attach",
+            description: `That prompt was restored or deleted before ${kept.length} image${kept.length === 1 ? "" : "s"} finished saving. Re-attach ${kept.length === 1 ? "it" : "them"} if you still need ${kept.length === 1 ? "it" : "them"}.`,
+            data: { hideCopyButton: true },
+          });
+        }
+      } finally {
+        // Must clear on every path: a throw that left this set would wedge this
+        // snapshot's ⌘S until the composer remounts.
+        stashInFlightRef.current.delete(snapshotKey);
       }
-    } finally {
-      // Must clear on every path: a throw that left this set would wedge this
-      // snapshot's ⌘S until the composer remounts.
-      stashInFlightRef.current.delete(snapshotKey);
+    },
+    [
+      clearComposerDraftPromptAndImages,
+      composerDraftTarget,
+      composerFilesRef,
+      composerImagesRef,
+      environmentId,
+      finalizeStashEntryImages,
+      promptRef,
+      pulseStashBadge,
+      restoreStashEntry,
+      stashEntryToQueue,
+    ],
+  );
+  useEffect(() => {
+    queueCurrentPromptRef.current = (key) => void stashCurrentPrompt({ queuedFor: key });
+  }, [stashCurrentPrompt]);
+
+  // Fork (#270 F): draining the queue. A queued entry is restored into the
+  // (empty) composer exactly as it was stashed, then submitted once the
+  // composer shows it: the draft store updates at once but the refs the send
+  // reads follow the render, so the submit waits for the landed prompt.
+  const [sendQueueDispatch, setSendQueueDispatch] = useState<{
+    entry: PromptStashEntry;
+    sendMode: ComposerSendMode;
+  } | null>(null);
+  const sendQueueDrainingRef = useRef(false);
+  const sendQueueSkippedIdRef = useRef<string | null>(null);
+  const dispatchQueuedMessage = useCallback(
+    async (entry: PromptStashEntry, sendMode: ComposerSendMode) => {
+      if (sendQueueDrainingRef.current) return;
+      sendQueueDrainingRef.current = true;
+      try {
+        await restoreStashEntry(entry);
+        const taken = !usePromptStashStore
+          .getState()
+          .entries.some((candidate) => candidate.id === entry.id);
+        if (taken) {
+          setSendQueueDispatch({ entry, sendMode });
+        } else {
+          // The restore refused it (files from another environment, a thread
+          // switch mid-verify): leave the row where it is, drain past it.
+          sendQueueSkippedIdRef.current = entry.id;
+        }
+      } finally {
+        sendQueueDrainingRef.current = false;
+      }
+    },
+    [restoreStashEntry],
+  );
+  const composerEmpty =
+    prompt.trim().length === 0 && composerImages.length === 0 && composerFiles.length === 0;
+  const queueHead = queuedMessages[0] ?? null;
+  useEffect(() => {
+    if (sendQueueDispatch !== null || queueHead === null) return;
+    if (queueHead.id === sendQueueSkippedIdRef.current) return;
+    if (
+      !shouldDrainSendQueue({
+        phase,
+        isHeld,
+        isSendBusy,
+        isSendDisabled,
+        composerEmpty,
+        isServerThread: routeKind === "server",
+        pendingImageCount: queueHead.pendingImageCount ?? 0,
+      })
+    ) {
+      return;
     }
+    void dispatchQueuedMessage(queueHead, "queue");
   }, [
-    clearComposerDraftPromptAndImages,
-    composerDraftTarget,
-    composerFilesRef,
-    composerImagesRef,
-    environmentId,
-    finalizeStashEntryImages,
-    promptRef,
-    pulseStashBadge,
-    restoreStashEntry,
-    stashEntryToQueue,
+    composerEmpty,
+    dispatchQueuedMessage,
+    isHeld,
+    isSendBusy,
+    isSendDisabled,
+    phase,
+    queueHead,
+    routeKind,
+    sendQueueDispatch,
   ]);
+  useEffect(() => {
+    if (sendQueueDispatch === null) return;
+    const { entry, sendMode } = sendQueueDispatch;
+    const landed =
+      prompt === entry.prompt &&
+      (entry.attachments.length === 0 || composerImages.length > 0) &&
+      ((entry.files?.length ?? 0) === 0 || composerFiles.length > 0);
+    // Attachments the restore had to drop never land; send what did after a beat.
+    const timeout = landed ? 0 : 1_500;
+    const handle = window.setTimeout(() => {
+      setSendQueueDispatch(null);
+      submitComposer(undefined, "foreground", sendMode);
+    }, timeout);
+    return () => window.clearTimeout(handle);
+  }, [composerFiles.length, composerImages.length, prompt, sendQueueDispatch, submitComposer]);
+  const sendQueuedMessageNow = useCallback(
+    (entry: PromptStashEntry) => void dispatchQueuedMessage(entry, "steer"),
+    [dispatchQueuedMessage],
+  );
+  const editQueuedMessage = useCallback(
+    (entry: PromptStashEntry) => void restoreStashEntry(entry),
+    [restoreStashEntry],
+  );
+  const moveQueuedMessage = useCallback(
+    (entry: PromptStashEntry, direction: "earlier" | "later") =>
+      moveStashEntry(entry.id, direction),
+    [moveStashEntry],
+  );
 
   const toggleStashMenu = useCallback(() => {
     if (isComposerCollapsedMobile) {
@@ -5927,6 +6089,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     hasSendableContent={composerSendState.hasSendableContent}
                     preserveComposerFocusOnPointerDown={isMobileViewport || isComposerResting}
                     showSendWhileRunning={isMobileViewport}
+                    runningSendMode={sendQueueKey === null ? undefined : settings.composerSendMode}
                     onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                     onInterrupt={handleInterruptPrimaryAction}
                     onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
@@ -5941,6 +6104,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             )}
           </div>
         </ComposerSurface.Main>
+        <ComposerSendQueue
+          entries={queuedMessages}
+          isRunning={phase === "running"}
+          onSendNow={sendQueuedMessageNow}
+          onEdit={editQueuedMessage}
+          onMove={moveQueuedMessage}
+          onRemove={deleteStashEntry}
+        />
       </div>
     </form>
   );

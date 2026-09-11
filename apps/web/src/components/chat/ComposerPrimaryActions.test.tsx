@@ -44,7 +44,11 @@ function renderPendingActions(isRunning: boolean) {
   );
 }
 
-function renderRunningActions(showSendWhileRunning: boolean, hasSendableContent: boolean) {
+function renderRunningActions(
+  showSendWhileRunning: boolean,
+  hasSendableContent: boolean,
+  runningSendMode?: "queue" | "steer",
+) {
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
       compact: true,
@@ -59,6 +63,7 @@ function renderRunningActions(showSendWhileRunning: boolean, hasSendableContent:
       isPreparingWorktree: false,
       hasSendableContent,
       showSendWhileRunning,
+      runningSendMode,
       onPreviousPendingQuestion: () => {},
       onInterrupt: () => {},
       onImplementPlanInNewThread: () => {},
@@ -138,6 +143,12 @@ describe("ComposerPrimaryActions", () => {
     expect(markup).toContain('aria-label="Stop generation"');
     expect(markup).toContain('aria-label="Send message"');
     expect(markup).toContain('type="submit"');
+  });
+
+  it("keeps send next to stop while running and names the send mode (#270 F)", () => {
+    expect(renderRunningActions(false, true, "queue")).toContain('aria-label="Queue message"');
+    expect(renderRunningActions(false, true, "steer")).toContain('aria-label="Send now"');
+    expect(renderRunningActions(false, false, "queue")).not.toContain('aria-label="Queue message"');
   });
 
   it("keeps stop as the only action while running with an empty composer", () => {

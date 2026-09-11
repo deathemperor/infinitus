@@ -8678,6 +8678,7 @@ export default function ChatView(props: ChatViewProps) {
                             phase={phase}
                             isConnecting={isConnecting}
                             isSendBusy={isSendBusy}
+                            isHeld={infinitusHoldBannerItem !== null}
                             sendDisabledReason={
                               feedbackUploading
                                 ? "Sending feedback"

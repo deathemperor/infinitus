@@ -147,6 +147,52 @@ describe("promptStashStore", () => {
     expect(entries[0]?.id).toBe("overflow");
   });
 
+  it("never evicts a queued message for room and refuses when nothing else can go (#270 F)", () => {
+    const store = usePromptStashStore.getState();
+    for (let index = 0; index < MAX_STASH_ENTRIES; index += 1) {
+      store.stashEntry({ ...makeEntry({ id: `queued-${index}` }), queuedFor: "env thread" });
+    }
+    expect(store.stashEntry(makeEntry({ id: "stash" }))).toEqual({
+      evicted: null,
+      written: false,
+      durable: false,
+    });
+    expect(usePromptStashStore.getState().entries).toHaveLength(MAX_STASH_ENTRIES);
+    // With one stash entry among the queued ones, that is the one to go.
+    store.takeEntry("queued-0");
+    store.stashEntry(makeEntry({ id: "stash" }));
+    const { evicted } = store.stashEntry({
+      ...makeEntry({ id: "queued-late" }),
+      queuedFor: "env thread",
+    });
+    expect(evicted?.id).toBe("stash");
+  });
+
+  it("moveEntry swaps a queued entry with its neighbour in the same queue only (#270 F)", () => {
+    const store = usePromptStashStore.getState();
+    store.stashEntry({ ...makeEntry({ id: "a" }), queuedFor: "t" });
+    store.stashEntry(makeEntry({ id: "stash" }));
+    store.stashEntry({ ...makeEntry({ id: "b" }), queuedFor: "t" });
+    store.stashEntry({ ...makeEntry({ id: "other" }), queuedFor: "u" });
+    // Stored newest first: other, b, stash, a. "b" earlier in its queue means
+    // it trades places with "a", skipping the stash entry between them.
+    store.moveEntry("b", "earlier");
+    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
+      "other",
+      "a",
+      "stash",
+      "b",
+    ]);
+    // Nothing earlier than the last of a queue: no change.
+    store.moveEntry("b", "earlier");
+    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
+      "other",
+      "a",
+      "stash",
+      "b",
+    ]);
+  });
+
   // This test environment has no `localStorage`, so the store runs on its
   // in-memory fallback — the exact "kept for this session, gone on reload"
   // case the composer must distinguish from an outright write failure.
