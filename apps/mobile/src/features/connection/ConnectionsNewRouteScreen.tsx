@@ -12,7 +12,12 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
-import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
+import {
+  buildPairingUrl,
+  extractPairingUrlFromQrPayload,
+  missingPairingInput,
+  parsePairingUrl,
+} from "./pairing";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 
 type ConnectionsNewRouteParams = {
@@ -43,6 +48,8 @@ export function ConnectionsNewRouteScreen({
   const [hostInput, setHostInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // What the form itself refuses before a connection is tried (#669).
+  const [formError, setFormError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(params.mode === "scan_qr");
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannerLocked, setScannerLocked] = useState(false);
@@ -76,10 +83,12 @@ export function ConnectionsNewRouteScreen({
 
   const handleHostChange = useCallback((value: string) => {
     setHostInput(value);
+    setFormError(null);
   }, []);
 
   const handleCodeChange = useCallback((value: string) => {
     setCodeInput(value);
+    setFormError(null);
   }, []);
 
   const openScanner = useCallback(async () => {
@@ -169,6 +178,11 @@ export function ConnectionsNewRouteScreen({
   );
 
   const handleSubmit = useCallback(async () => {
+    const missing = missingPairingInput(hostInput, codeInput);
+    setFormError(missing);
+    if (missing !== null) {
+      return;
+    }
     await connectAndClose(buildPairingUrl(hostInput, codeInput), false);
   }, [codeInput, connectAndClose, hostInput]);
 
@@ -293,7 +307,11 @@ export function ConnectionsNewRouteScreen({
                 />
               </View>
 
-              {pairingConnectionError ? <ErrorBanner message={pairingConnectionError} /> : null}
+              {formError !== null ? (
+                <ErrorBanner message={formError} />
+              ) : pairingConnectionError ? (
+                <ErrorBanner message={pairingConnectionError} />
+              ) : null}
 
               <ConnectionSheetButton
                 icon="plus"

@@ -3,9 +3,22 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildPairingUrl,
   extractPairingUrlFromQrPayload,
+  missingPairingInput,
   PairingQrPayloadEmptyError,
   parsePairingUrl,
 } from "./pairing";
+
+describe("missingPairingInput", () => {
+  it("asks for the pairing code when only the host is filled (#669)", () => {
+    expect(missingPairingInput("192.168.100.61:3773", "")).toBe("Enter a pairing code.");
+    expect(missingPairingInput("192.168.100.61:3773", "   ")).toBe("Enter a pairing code.");
+  });
+
+  it("asks for the host first, and is quiet once both are there", () => {
+    expect(missingPairingInput("", "abc-123")).toBe("Enter a host.");
+    expect(missingPairingInput("remote.example.com", "abc-123")).toBeNull();
+  });
+});
 
 describe("buildPairingUrl", () => {
   it("uses HTTP for a schemeless IP address", () => {
