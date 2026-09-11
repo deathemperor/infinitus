@@ -361,6 +361,9 @@ describe("forecast", () => {
       allDeadAt: "2025-09-05T15:33:20.000Z",
       computedAt: "2025-09-04T15:33:20.000Z",
       drainOrder: ["alpha@example.com", "beta", "#7"],
+      basis: "5h pace",
+      hasActive: false,
+      accounts: [],
     });
   });
 
@@ -369,10 +372,152 @@ describe("forecast", () => {
       buildForecast(
         snapshot({
           fleets: [twoAccounts],
-          forecast: { forecast: { basis: "5h pace", computedAt: null, drainOrder: "later" } },
+          forecast: {
+            forecast: { basis: 7, computedAt: null, drainOrder: "later", accounts: "soon" },
+          },
         }),
       ),
-    ).toEqual({ allDeadAt: null, computedAt: null, drainOrder: [] });
+    ).toEqual({
+      allDeadAt: null,
+      computedAt: null,
+      drainOrder: [],
+      basis: null,
+      hasActive: false,
+      accounts: [],
+    });
+  });
+
+  // The Utilization page's forecast section (#747): every account's line at
+  // its own pace, the way native's `UsageForecast.AccountLine` carries it.
+  it("reads each account's windows, dates their instants, and names the window that binds first", () => {
+    const model = buildForecast(
+      snapshot({
+        fleets: [twoAccounts],
+        forecast: {
+          forecast: {
+            basis: "5h pace",
+            computedAt: 1_757_000_000,
+            active: { number: 1 },
+            accounts: [
+              {
+                number: 1,
+                email: "alpha@example.com",
+                active: true,
+                disabled: false,
+                windows: [
+                  {
+                    name: "5h",
+                    pct: 61.4,
+                    ratePctPerHour: 39.2,
+                    resetsAt: 1_757_010_000,
+                    hitsAt: 1_757_003_600,
+                  },
+                  {
+                    name: "7d",
+                    pct: 12,
+                    ratePctPerHour: 4.05,
+                    resetsAt: 1_757_400_000,
+                    hitsAt: 1_757_002_000,
+                  },
+                  { name: "Fable", pct: 3, ratePctPerHour: null, resetsAt: null, hitsAt: null },
+                ],
+              },
+              {
+                number: 2,
+                email: "beta@example.com",
+                alias: "beta",
+                active: false,
+                disabled: true,
+                windows: [{ name: "5h", pct: 100.4, ratePctPerHour: 0, resetsAt: 1_757_001_000 }],
+              },
+            ],
+          },
+        },
+      }),
+    );
+    expect(model?.hasActive).toBe(true);
+    expect(model?.accounts).toEqual([
+      {
+        number: 1,
+        label: "alpha@example.com",
+        active: true,
+        disabled: false,
+        bindsAt: "2025-09-04T16:06:40.000Z",
+        bindsWindow: "7d",
+        windows: [
+          {
+            name: "5h",
+            pct: 61,
+            ratePctPerHour: 39.2,
+            resetsAt: "2025-09-04T18:20:00.000Z",
+            hitsAt: "2025-09-04T16:33:20.000Z",
+          },
+          {
+            name: "7d",
+            pct: 12,
+            ratePctPerHour: 4.05,
+            resetsAt: "2025-09-09T06:40:00.000Z",
+            hitsAt: "2025-09-04T16:06:40.000Z",
+          },
+          { name: "Fable", pct: 3, ratePctPerHour: null, resetsAt: null, hitsAt: null },
+        ],
+      },
+      {
+        number: 2,
+        label: "beta",
+        active: false,
+        disabled: true,
+        bindsAt: null,
+        bindsWindow: null,
+        windows: [
+          {
+            name: "5h",
+            pct: 100,
+            ratePctPerHour: 0,
+            resetsAt: "2025-09-04T15:50:00.000Z",
+            hitsAt: null,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("drops a line or window it cannot read rather than the whole projection", () => {
+    const model = buildForecast(
+      snapshot({
+        forecast: {
+          forecast: {
+            basis: "5h pace",
+            computedAt: 1_757_000_000,
+            accounts: [
+              { number: 3, email: "gamma@example.com" },
+              { email: "no-number@example.com", windows: [] },
+              { number: 4, email: "delta@example.com", windows: [{ name: "5h" }] },
+            ],
+          },
+        },
+      }),
+    );
+    expect(model?.accounts).toEqual([
+      {
+        number: 3,
+        label: "gamma@example.com",
+        active: false,
+        disabled: false,
+        bindsAt: null,
+        bindsWindow: null,
+        windows: [],
+      },
+      {
+        number: 4,
+        label: "delta@example.com",
+        active: false,
+        disabled: false,
+        bindsAt: null,
+        bindsWindow: null,
+        windows: [],
+      },
+    ]);
   });
 });
 

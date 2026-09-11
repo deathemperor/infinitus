@@ -4,6 +4,7 @@ import {
   ChartLineIcon,
   ChartNoAxesColumnIcon,
   CpuIcon,
+  GaugeIcon,
   GitPullRequestIcon,
   SettingsIcon,
   UsersIcon,
@@ -149,7 +150,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
                     ? "activity"
                     : location.pathname === "/machine"
                       ? "machine"
-                      : null,
+                      : location.pathname === "/utilization"
+                        ? "utilization"
+                        : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
@@ -197,6 +200,11 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleMachineClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/machine" });
+  }, [closeMobileSidebar, navigate]);
+
+  const handleUtilizationClick = useCallback(() => {
+    closeMobileSidebar();
+    void navigate({ to: "/utilization" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUsageClick = useCallback(() => {
@@ -257,6 +265,13 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           ) : null}
           {accountsSupported ? (
             <SidebarUtilityItem icon={<CpuIcon />} label="Machine" onClick={handleMachineClick} />
+          ) : null}
+          {accountsSupported ? (
+            <SidebarUtilityItem
+              icon={<GaugeIcon />}
+              label="Utilization"
+              onClick={handleUtilizationClick}
+            />
           ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
