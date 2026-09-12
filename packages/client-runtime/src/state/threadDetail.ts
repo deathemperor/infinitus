@@ -65,6 +65,9 @@ export function mergeEnvironmentThread(
     pinnedAt: shell.pinnedAt,
     pinOrderKey: shell.pinOrderKey,
     session: shell.session,
+    // The detail stream never carries the queue events; the shell is refetched on
+    // every thread-aggregate event, so it is the live source for the queue.
+    queuedTurns: shell.queuedTurns,
   };
 }
 
