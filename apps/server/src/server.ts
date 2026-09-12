@@ -77,6 +77,7 @@ import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
+import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
 import { InfinitusBabysitLive } from "./infinitus/Layers/InfinitusBabysit.ts";
 import { InfinitusTurnQueueLive } from "./infinitus/Layers/InfinitusTurnQueue.ts";
@@ -318,6 +319,8 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#616): the TurnStartGate every provider turn start passes — holds a
   // background thread's start while its fleet's headroom reads low.
   Layer.provideMerge(InfinitusSessionHoldLayers),
+  // Fork (#829): the running turns an update must not cut off.
+  Layer.provideMerge(InfinitusRunningTurnsLive),
 );
 
 const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(

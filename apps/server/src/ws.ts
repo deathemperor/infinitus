@@ -90,6 +90,7 @@ import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
+import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
@@ -2005,10 +2006,11 @@ const makeWsRpcLayer = (
             WS_METHODS.serverUpdateServerWithProgress,
             Stream.callback<ServerSelfUpdateProgressEvent, ServerSelfUpdateError>((queue) =>
               serverUpdate
-                .update(input, (stage) =>
+                .update(input, (stage, runningTurns) =>
                   Queue.offer(queue, {
                     type: "progress",
                     stage,
+                    ...(runningTurns !== undefined ? { runningTurns } : {}),
                   }).pipe(Effect.asVoid),
                 )
                 .pipe(
@@ -3196,9 +3198,12 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const baseServerSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const config = yield* ServerConfig.ServerConfig;
     const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+    const runningTurns = yield* InfinitusRunningTurns;
     const serverSelfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
       mode: config.mode,
       selfUpdate: baseServerSelfUpdate,
+      // Fork (#829): the update refuses or waits while a turn runs.
+      runningTurns: runningTurns.list,
       prepare: startup.markRunningProviderSessionsForContinuation.pipe(
         Effect.mapError(
           (cause) =>

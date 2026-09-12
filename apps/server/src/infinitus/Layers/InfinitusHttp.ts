@@ -1,4 +1,8 @@
-import { AuthOrchestrationOperateScope, EnvironmentHttpApi } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  EnvironmentHttpApi,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -6,6 +10,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { annotateEnvironmentRequest, requireEnvironmentScope } from "../../auth/http.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
+import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 
@@ -29,7 +34,16 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
     const hold = yield* InfinitusSessionHold;
     const stops = yield* InfinitusLimitStops;
     const interrupt = yield* InfinitusSessionInterrupt;
+    const runningTurns = yield* InfinitusRunningTurns;
     return handlers
+      .handle(
+        "runningTurns",
+        Effect.fn("environment.infinitus.runningTurns")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          return yield* runningTurns.list;
+        }),
+      )
       .handle(
         "holds",
         Effect.fn("environment.infinitus.holds")(function* (args) {

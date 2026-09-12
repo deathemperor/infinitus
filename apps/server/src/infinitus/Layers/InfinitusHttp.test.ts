@@ -7,6 +7,7 @@ import {
   EnvironmentHttpApi,
   type InfinitusHoldRow,
   ThreadId,
+  TurnId,
 } from "@t3tools/contracts";
 import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
@@ -19,6 +20,7 @@ import { HttpApiTest } from "effect/unstable/httpapi";
 import { describe, expect } from "vite-plus/test";
 
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
+import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import { infinitusHttpApiLayer } from "./InfinitusHttp.ts";
@@ -51,6 +53,9 @@ const services = Layer.mergeAll(
       ),
   }),
   Layer.mock(InfinitusLimitStops)({ stopped: Stream.succeed([row("t-limited", "limited")]) }),
+  Layer.mock(InfinitusRunningTurns)({
+    list: Effect.succeed([{ threadId: ThreadId.make("t-running"), turnId: TurnId.make("turn-1") }]),
+  }),
   Layer.mock(InfinitusSessionInterrupt)({
     paused: Effect.succeed([pausedRow("t-paused")]),
     resume: (threadId) =>
@@ -97,6 +102,16 @@ const OPERATE: ReadonlyArray<AuthEnvironmentScope> = [
 ];
 
 describe("infinitusHttpApiLayer (#822)", () => {
+  effectIt.effect("lists the running turns an update would cut off (#829)", () =>
+    withClient(["orchestration:read"], (client) =>
+      Effect.gen(function* () {
+        expect(yield* client.infinitus.runningTurns({ headers: {} })).toEqual([
+          { threadId: "t-running", turnId: "turn-1" },
+        ]);
+      }),
+    ),
+  );
+
   effectIt.effect("one read lists the held, limit-stopped and paused threads", () =>
     withClient(OPERATE, (client) =>
       Effect.gen(function* () {

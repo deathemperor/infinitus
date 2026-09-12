@@ -3,7 +3,9 @@ import {
   type ServerSelfUpdateCapability,
   type ServerSelfUpdateInput,
   type ServerSelfUpdateProgressStage,
+  type ServerRunningTurn,
   type ServerSelfUpdateResult,
+  type ServerUpdateRunningTurnsPolicy,
   type ThreadId,
 } from "@t3tools/contracts";
 import { HostProcessExecutablePath } from "@t3tools/shared/hostProcess";
@@ -47,6 +49,7 @@ export class ServerSelfUpdate extends Context.Service<
       input: ServerSelfUpdateInput,
       reportProgress?: (
         stage: ServerSelfUpdateProgressStage,
+        runningTurns?: number,
       ) => Effect.Effect<void, ServerSelfUpdateError>,
       onHandoffAccepted?: () => Effect.Effect<void>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
@@ -57,6 +60,13 @@ export class ServerSelfUpdate extends Context.Service<
   }
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
 
+/** How often a `wait` update re-reads the running turns (#829). */
+export const RUNNING_TURNS_POLL = Duration.seconds(2);
+
+export function runningTurnsRefusal(count: number): string {
+  return `${count} ${count === 1 ? "thread is" : "threads are"} running; updating now would interrupt ${count === 1 ? "it" : "them"}. Update when they finish, or stop them first.`;
+}
+
 export const withRunningThreadContinuation = Effect.fn(
   "cloud.server_self_update.withRunningThreadContinuation",
 )(function* (input: {
@@ -66,8 +76,45 @@ export const withRunningThreadContinuation = Effect.fn(
   readonly clear: (
     threadIds: ReadonlyArray<ThreadId>,
   ) => Effect.Effect<void, ServerSelfUpdateError>;
+  /** The server's own running turns (#829), read at the request and again
+      right before the install, since a turn may start in between. */
+  readonly runningTurns: Effect.Effect<ReadonlyArray<ServerRunningTurn>>;
 }) {
   const desktopContinuationTokens = yield* Ref.make(HashSet.empty<string>());
+  // The policy a desktop preparation was made under, keyed by its token: the
+  // quit happens at the commit, so the gate applies there too.
+  const desktopPolicies = new Map<string, ServerUpdateRunningTurnsPolicy>();
+
+  /** The gate (#829): `interrupt` passes, `refuse` fails naming the turns,
+      `wait` polls until none runs, reporting each change of count. */
+  const awaitIdle = (
+    policy: ServerUpdateRunningTurnsPolicy,
+    reportProgress: (
+      stage: ServerSelfUpdateProgressStage,
+      runningTurns?: number,
+    ) => Effect.Effect<void, ServerSelfUpdateError>,
+  ): Effect.Effect<void, ServerSelfUpdateError> =>
+    Effect.gen(function* () {
+      if (policy === "interrupt") return;
+      let announced = -1;
+      while (true) {
+        const running = yield* input.runningTurns;
+        if (running.length === 0) return;
+        if (policy === "refuse") {
+          return yield* Effect.fail(
+            new ServerSelfUpdateError({
+              reason: runningTurnsRefusal(running.length),
+              runningTurns: running,
+            }),
+          );
+        }
+        if (running.length !== announced) {
+          announced = running.length;
+          yield* reportProgress("waiting", running.length);
+        }
+        yield* Effect.sleep(RUNNING_TURNS_POLL);
+      }
+    });
   const clearOnError = <A>(
     effect: Effect.Effect<A, ServerSelfUpdateError>,
     threadIds: () => ReadonlyArray<ThreadId>,
@@ -86,46 +133,51 @@ export const withRunningThreadContinuation = Effect.fn(
     request,
     reportProgress = () => Effect.void,
   ) => {
+    const policy = request.runningTurns ?? "refuse";
     let prepared = false;
     let handoffAccepted = false;
     let continuationThreadIds: ReadonlyArray<ThreadId> = [];
     return clearOnError(
-      input.selfUpdate
-        .update(
-          request,
-          (stage) =>
-            (request.continueRunningThreads === true &&
-            input.mode !== "desktop" &&
-            stage === "installing" &&
-            !prepared
-              ? input.prepare.pipe(
-                  Effect.tap((threadIds) =>
-                    Effect.sync(() => {
-                      prepared = true;
-                      continuationThreadIds = threadIds;
-                    }),
-                  ),
-                  Effect.asVoid,
-                )
-              : Effect.void
-            ).pipe(Effect.andThen(reportProgress(stage))),
-          () =>
-            Effect.sync(() => {
-              handoffAccepted = true;
-            }),
-        )
-        .pipe(
-          Effect.tap((result) => {
-            if (
-              result.method === "desktop-app" &&
-              result.desktopUpdateToken !== undefined &&
-              request.continueRunningThreads === true
-            ) {
+      awaitIdle(policy, reportProgress).pipe(
+        Effect.andThen(
+          input.selfUpdate.update(
+            request,
+            (stage) =>
+              (stage === "installing" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
+                Effect.andThen(
+                  request.continueRunningThreads === true &&
+                    input.mode !== "desktop" &&
+                    stage === "installing" &&
+                    !prepared
+                    ? input.prepare.pipe(
+                        Effect.tap((threadIds) =>
+                          Effect.sync(() => {
+                            prepared = true;
+                            continuationThreadIds = threadIds;
+                          }),
+                        ),
+                        Effect.asVoid,
+                      )
+                    : Effect.void,
+                ),
+                Effect.andThen(reportProgress(stage)),
+              ),
+            () =>
+              Effect.sync(() => {
+                handoffAccepted = true;
+              }),
+          ),
+        ),
+        Effect.tap((result) => {
+          if (result.method === "desktop-app" && result.desktopUpdateToken !== undefined) {
+            desktopPolicies.set(result.desktopUpdateToken, policy);
+            if (request.continueRunningThreads === true) {
               return Ref.update(desktopContinuationTokens, HashSet.add(result.desktopUpdateToken));
             }
-            return Effect.void;
-          }),
-        ),
+          }
+          return Effect.void;
+        }),
+      ),
       () => continuationThreadIds,
       () => handoffAccepted,
     );
@@ -143,6 +195,10 @@ export const withRunningThreadContinuation = Effect.fn(
         let continuationThreadIds: ReadonlyArray<ThreadId> = [];
         return yield* clearOnError(
           Effect.gen(function* () {
+            // The gate again (#829): this is the quit. A token this server
+            // did not prepare is treated as `refuse`.
+            yield* awaitIdle(desktopPolicies.get(requestId) ?? "refuse", () => Effect.void);
+            desktopPolicies.delete(requestId);
             continuationThreadIds = shouldContinue ? yield* input.prepare : [];
             return yield* input.selfUpdate.commitDesktopUpdate(requestId, () =>
               Effect.sync(() => {
