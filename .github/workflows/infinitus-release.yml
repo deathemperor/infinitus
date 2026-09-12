@@ -461,17 +461,18 @@ jobs:
           VERSION: ${{ needs.desktop.outputs.version }}
         run: |
           set -euo pipefail
-          mkdir assets
-          cp artifacts/mac-bundles/*.zip assets/
-          cp artifacts/desktop-mac-arm64/* assets/
+          # Not `assets/`: the checkout has one (the app artwork) and mkdir must stay loud.
+          mkdir release-assets
+          cp artifacts/mac-bundles/*.zip release-assets/
+          cp artifacts/desktop-mac-arm64/* release-assets/
           cp artifacts/linux-x86_64/infinitus-tray-linux-x86_64 \
              artifacts/linux-aarch64/infinitus-tray-linux-aarch64 \
-             artifacts/linux-x86_64/infinitus-omarchy.tar.gz assets/
+             artifacts/linux-x86_64/infinitus-omarchy.tar.gz release-assets/
           for want in "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
                       "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" infinitus-mac.yml; do
-            [[ -f "assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 assets >&2; exit 1; }
+            [[ -f "release-assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 release-assets >&2; exit 1; }
           done
-          ls -l assets
+          ls -l release-assets
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -491,7 +492,7 @@ jobs:
           if [[ "$VERSION" == *-* ]]; then
             args+=(--prerelease)
           fi
-          gh release create "$GITHUB_REF_NAME" "${args[@]}" assets/*
+          gh release create "$GITHUB_REF_NAME" "${args[@]}" release-assets/*
           echo "Published $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
       # Auto-bump the tap cask (CodexBar-style release->tap dispatch, done
       # here with a repo-scoped deploy key instead of a PAT).
@@ -500,7 +501,7 @@ jobs:
           TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
           VERSION: ${{ needs.desktop.outputs.version }}
         run: |
-          SHA=$(shasum -a 256 "assets/Infinitus-${VERSION}.zip" | cut -d' ' -f1)
+          SHA=$(shasum -a 256 "release-assets/Infinitus-${VERSION}.zip" | cut -d' ' -f1)
           mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
           echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key && chmod 600 ~/.ssh/tap_key
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
