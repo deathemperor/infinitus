@@ -265,7 +265,12 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
   every thread read (snapshot, command read model, shells, detail);
   `Normalizer.ts` — the queue commands' uploads stored like a sent
-  message's; `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
+  message's (and pruned like a reverted message's, #847: a row removed
+  without sending, or an edit that dropped an upload, schedules the
+  thread's attachment prune, whose retained set now counts queued rows'
+  uploads too; a `sent` removal prunes nothing, and the boot-time cleanup
+  replay covers reverts and deletes only, so a crash between the queue
+  event and its prune leaves the copy until the thread is deleted); `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
   `ReactorLayerLive` above the interrupt and hold layers it consumes;
   `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
   hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
