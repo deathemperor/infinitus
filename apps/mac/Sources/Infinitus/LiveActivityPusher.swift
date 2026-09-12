@@ -147,12 +147,16 @@ final class LiveActivityPusher: ObservableObject {
                                                               tokenRate: tokenRate),
                       lastWorking[registration.slot] == nil else { continue }
                 lastWorking[registration.slot] = state
-                // Silent: the activity appearing is the news, and work
-                // starts many times a day.
+                // With an alert, like the revival start (#845): Apple's
+                // push-to-start payload carries one, and a silent start
+                // was accepted by APNs but never rendered a card, while
+                // the alerted revival start and every update rendered.
                 send(LiveActivityPush.startPayload(
                         attributesType: LiveActivityPush.workingAttributesType, machine: machine,
                         macId: registration.macId, state: state,
                         staleDate: Date().addingTimeInterval(LiveActivityBuilder.workingStale),
+                        alertTitle: "\(state.active) is working",
+                        alertBody: "\(state.busy) of \(state.total) session\(state.total == 1 ? "" : "s") busy",
                         expo: Self.expoName(.working, registration)),
                      to: registration, what: "start working")
             case .revivalStart:

@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
+- The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
 
 ## 0.5.0-alpha.1
 
