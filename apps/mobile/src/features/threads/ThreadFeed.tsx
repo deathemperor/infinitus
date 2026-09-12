@@ -18,6 +18,7 @@ import {
 import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { turnFooterLabel } from "@t3tools/client-runtime/turnFooter";
 import {
   classifyMarkdownImageSource,
   markdownImageSourceFragment,
@@ -144,6 +145,7 @@ import {
   type ThreadFeedLatestTurn,
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
+import type { TurnFooters } from "../infinitus/useTurnFooters";
 import {
   resolveThreadFeedLiveFollow,
   type ThreadFeedLiveFollowEvent,
@@ -198,6 +200,7 @@ const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",
 });
+const EMPTY_TURN_FOOTERS: TurnFooters = new Map();
 function formatMessageTime(input: string): string {
   const timestamp = Date.parse(input);
   if (Number.isNaN(timestamp)) {
@@ -240,6 +243,9 @@ export interface ThreadFeedProps {
   readonly contentPresentation: ThreadContentPresentation;
   readonly agentLabel: string;
   readonly latestTurn: ThreadFeedLatestTurn | null;
+  /** Fork (#952): the completed turns' footers, drawn in place of the
+      terminal assistant message's time. */
+  readonly turnFooters?: TurnFooters;
   readonly activeWorkStartedAt: string | null;
   readonly listRef: RefObject<LegendListRef | null>;
   readonly freeze: SharedValue<boolean>;
@@ -1336,6 +1342,7 @@ function renderFeedEntry(
     readonly workGroupScrollPositions: Map<string, ThreadWorkGroupScrollPosition>;
     readonly terminalAssistantMessageIds: ReadonlySet<string>;
     readonly unsettledTurnId: TurnId | null;
+    readonly turnFooters: TurnFooters;
     readonly onCopyWorkRow: (rowId: string, value: string) => void;
     readonly onToggleWorkGroup: (groupId: string, anchorKey: string) => void;
     readonly onToggleWorkRow: (rowId: string, anchorKey: string) => void;
@@ -1472,6 +1479,14 @@ function renderFeedEntry(
       props.terminalAssistantMessageIds.has(message.id) &&
       !assistantTurnStillInProgress &&
       !message.streaming;
+    // Fork (#952): a completed turn's terminal message carries the turn's
+    // footer ("Done in 49s · 12:59 PM · 1 shell still running") in place of
+    // its bare time; the time inside it is the phone's own format.
+    const turnFooter = message.turnId === null ? undefined : props.turnFooters.get(message.turnId);
+    const assistantMetaLabel =
+      turnFooter === undefined
+        ? timestampLabel
+        : turnFooterLabel(turnFooter, formatMessageTime(turnFooter.completedAt));
 
     if (isUser) {
       return (
@@ -1639,7 +1654,7 @@ function renderFeedEntry(
               iconSize={13}
             />
             <Text className="font-t3-medium text-xs tabular-nums text-adaptive-neutral-600-400">
-              {timestampLabel}
+              {assistantMetaLabel}
             </Text>
           </View>
         ) : null}
@@ -2261,6 +2276,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
   const markdownStyles = useMarkdownStyles(onMarkdownLinkPress, renderMarkdownImage);
   const reviewCommentColors = useReviewCommentColors();
+  const turnFooters = props.turnFooters ?? EMPTY_TURN_FOOTERS;
   const unsettledTurnId =
     props.latestTurn &&
     (props.latestTurn.completedAt === null || props.latestTurn.state === "running")
@@ -2709,6 +2725,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             workGroupScrollPositions,
             terminalAssistantMessageIds,
             unsettledTurnId,
+            turnFooters,
             onCopyWorkRow,
             onToggleWorkGroup,
             onToggleWorkRow,
@@ -2743,6 +2760,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       workGroupScrollPositions,
       terminalAssistantMessageIds,
       unsettledTurnId,
+      turnFooters,
       iconSubtleColor,
       screenColor,
       userBubbleColor,

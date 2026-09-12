@@ -840,7 +840,13 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   siblings from the shells by `groupId`, `features/infinitus/bestOf.logic.ts`
   carrying the web `bestOf.logic.ts` sibling and status helpers kept local;
   no "Keep this one", which removes worktrees) for the `infinitusBestOfCard`
-  slot first in the composer stack, and prepends `usePullRequestHeaderItem`'s menu to the
+  slot first in the composer stack, `useTurnFooters(selectedThreadDetail)`
+  (#952, `features/infinitus/useTurnFooters.ts`, the web hook kept local)
+  for `infinitusTurnFooters`, which `ThreadDetailScreen.tsx` hands
+  `ThreadFeed.tsx`'s `turnFooters` so a completed turn's terminal assistant
+  message shows `turnFooterLabel` — "Done in 49s · 12:59 PM · 1 shell still
+  running", the time in the feed's own `formatMessageTime` — in place of its
+  time, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`, and on an `infinitus`

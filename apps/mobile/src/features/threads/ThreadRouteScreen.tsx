@@ -82,6 +82,7 @@ import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
 import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
 import { InfinitusBestOfCard } from "../infinitus/InfinitusBestOfCard";
 import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
+import { useTurnFooters } from "../infinitus/useTurnFooters";
 import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -678,6 +679,8 @@ function ThreadRouteContent(
   const sideQuestionHeader = useSideQuestionHeaderItem(selectedThread, selectedThreadDetail);
   // Infinitus (#834): the thread's usage, once a turn has been recorded.
   const usageHeader = useThreadUsageHeaderItem(selectedThread);
+  // Infinitus (#952): the completed turns' footers for the feed.
+  const turnFooters = useTurnFooters(selectedThreadDetail);
   const infinitusHeaderItems = useMemo<NativeHeaderItems>(
     () =>
       [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item].filter(
@@ -911,6 +914,7 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusTurnFooters={turnFooters}
           infinitusBestOfCard={
             creationState === null && selectedThread.groupId != null ? (
               <InfinitusBestOfCard thread={selectedThread} />
