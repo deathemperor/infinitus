@@ -17,7 +17,6 @@ import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
-import { NOT_POLLED_REASON } from "./Infinitus.ts";
 import {
   manifestHasPush,
   shouldPushPhase,
@@ -39,8 +38,10 @@ import {
  * Off by default (`infinitusPushBridge`): the desktop already posts its own
  * banner for these phases (#270 B), and the Mac's `push` also posts one, so
  * a Mac running both would see two per approval. The setting is for the
- * away channels. Each event's phase is recorded per thread before the
- * socket call, first sighting silently, so a restart announces nothing and
+ * away channels. The setting is read first, so a server with the switch off
+ * pays no projection read per event; while it is on each event's phase is
+ * recorded per thread before the socket call, first sighting silently (a
+ * boot, or the switch just turned on), so a restart announces nothing and
  * the same phase is never pushed twice; an unreachable Mac drops the push.
  * Only thread ids and phases reach the log; never a title.
  */
@@ -60,10 +61,11 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
     );
 
     // The snapshot answers the last poll and nobody polls a headless server:
-    // an unpolled placeholder is refreshed once so the manifest gate can open.
+    // an unpolled placeholder, or an app last seen down (mid-relaunch when
+    // that poll ran), is polled again so the manifest gate can open.
     const manifestReady = Effect.gen(function* () {
       let snapshot = yield* infinitus.snapshot;
-      if (!snapshot.available && snapshot.unavailableReason === NOT_POLLED_REASON) {
+      if (!snapshot.available) {
         yield* infinitus.refresh;
         snapshot = yield* infinitus.snapshot;
       }
@@ -103,6 +105,7 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
       Effect.gen(function* () {
         const threadId = eventThreadId(event);
         if (threadId === null || !shouldPublishAgentAwarenessEvent(event)) return;
+        if (!(yield* enabled)) return;
         const state = yield* awarenessOf(threadId);
         if (state === null) {
           // Deleted, or a thread with no phase yet: nothing to remember.
@@ -112,7 +115,6 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
         const previous = phases.get(threadId);
         phases.set(threadId, state.phase);
         if (!shouldPushPhase(previous, state.phase)) return;
-        if (!(yield* enabled)) return;
         if (!(yield* manifestReady)) return;
         yield* push(threadId, state.threadTitle, state.phase);
       }).pipe(

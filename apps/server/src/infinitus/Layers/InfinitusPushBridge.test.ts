@@ -256,6 +256,18 @@ describe("InfinitusPushBridgeLive (#269 G)", () => {
     }),
   );
 
+  effectIt.effect("an app last seen down is polled again before the push is dropped", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({
+        snapshot: { ...notPolled, unavailableReason: "connect ECONNREFUSED" },
+      });
+      yield* h.move(one, "running");
+      yield* h.move(one, "approval");
+      expect(yield* h.refreshes).toBe(1);
+      expect(yield* h.pushes).toHaveLength(1);
+    }),
+  );
+
   effectIt.effect(
     "an app without the verb, or an unreachable one, gets no push and no failure",
     () =>

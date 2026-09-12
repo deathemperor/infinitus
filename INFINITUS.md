@@ -1660,10 +1660,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   Notification Center, the phone's alert token, Slack, Telegram). Each
   event's phase is recorded per thread before the socket call and the first
   sighting of a thread pushes nothing, so a restart announces nothing and a
-  phase is pushed once; `starting` / `running` / `stale` never. An unpolled
-  snapshot is refreshed once for the manifest gate; an app without the verb
-  or an unreachable one drops the push. Only thread ids and phases reach
-  the log. Off by the `infinitusPushBridge` server setting (the second row
+  phase is pushed once; `starting` / `running` / `stale` never. The setting
+  is read before anything else, so a server with it off pays no projection
+  read per event. A snapshot that is unpolled or last saw the app down is
+  polled again for the manifest gate; an app without the verb or an
+  unreachable one drops the push. Only thread ids and phases reach the log. Off by the `infinitusPushBridge` server setting (the second row
   of the same card): the desktop's own notifications (#270 B) and the Mac's
   `push` both post a banner on the Mac, so the switch is for the away
   channels.
