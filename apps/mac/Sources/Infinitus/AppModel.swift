@@ -868,8 +868,17 @@ final class AppModel: ObservableObject {
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
-    func push(_ msg: String) {
-        notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+    /// `local: false` skips the Mac's own Notification Center notice and
+    /// still reaches the phone and the away channels (#1020: the desktop
+    /// shows its own banner for its threads, and two banners per phase
+    /// change kept the bridge off).
+    func push(_ msg: String, local: Bool = true) {
+        if local {
+            notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+        } else {
+            liveActivityPusher.pushAlert(title: "Infinitus", body: msg,
+                                         unlessRevival: PushTriggers.isAllDeadMessage(msg))
+        }
         awayPush.send(msg)
     }
     /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
