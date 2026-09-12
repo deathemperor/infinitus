@@ -82,6 +82,12 @@ jobs:
       # "Infinitus Menu Bar", no infinitus:// URL type (the desktop owns
       # the scheme). make-app.sh writes a fixed Infinitus.app, so each is
       # moved into out/ before the next.
+      - name: Build bundled account engine
+        env:
+          INFINITUS_ENGINE_BUILD_ROOT: ${{ runner.temp }}/infinitus-engine
+        run: |
+          ./build-swapd.sh
+          echo "INFINITUS_BUNDLED_SWAPD=$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" >> "$GITHUB_ENV"
       - name: Build app bundles
         run: |
           mkdir out
@@ -527,7 +533,7 @@ jobs:
           else
             GATE=$'Builds are ad-hoc signed, not notarized. If Gatekeeper refuses the\nfirst launch:\n  xattr -dr com.apple.quarantine "/Applications/Infinitus.app"\nor install with --no-quarantine.\n\n'
           fi
-          CAVEATS="${GATE}The app drives the swapd engine:"$'\n'"  cargo install --git https://github.com/deathemperor/swapd swapd" \
+          CAVEATS="${GATE}The swapd account engine is bundled. Open Infinitus Settings > Engines to get started." \
             perl -0pi -e 's|^  caveats <<~EOS\n.*?^  EOS\n|"  caveats <<~EOS\n" . join("", map { $_ eq "" ? "\n" : "    $_\n" } split(/\n/, $ENV{CAVEATS})) . "  EOS\n"|mse' \
             Casks/infinitus.rb
           git -c user.name="infinitus-release" \
