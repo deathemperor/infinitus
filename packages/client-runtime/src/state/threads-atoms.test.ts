@@ -660,6 +660,10 @@ describe("createEnvironmentThreadStateAtoms", () => {
         }));
         for (let offset = 0; offset < events.length; offset += batchSize) {
           yield* Queue.offerAll(first.events, events.slice(offset, offset + batchSize));
+          // Let the subscription drain this batch before the next is offered;
+          // offered back to back they would reach `applyItems` as one chunk
+          // and the batch size under test would be a fiction.
+          yield* Effect.yieldNow;
         }
         yield* Queue.offerAll(first.events, [events[499]!, events[0]!]);
         yield* Queue.offer(first.events, { kind: "synchronized" });
