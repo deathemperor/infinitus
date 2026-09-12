@@ -31,6 +31,9 @@ export interface ThreadHold {
   readonly since: string;
   /** The row's own line: "Held for headroom on claude, 5h window 84 %". */
   readonly summary: string;
+  /** `limited` only (#270 I): when the window that stopped the turn resets
+      (ISO), as the SDK named it; null when the row carries none. */
+  readonly resetsAt: string | null;
 }
 
 interface Placed {
@@ -77,5 +80,11 @@ export function threadHold(thread: {
     markerId: hold.activity.id,
     since: hold.activity.createdAt,
     summary: hold.activity.summary,
+    resetsAt: payloadResetsAt(hold.activity.payload),
   };
+}
+
+function payloadResetsAt(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || !("resetsAt" in payload)) return null;
+  return typeof payload.resetsAt === "string" ? payload.resetsAt : null;
 }

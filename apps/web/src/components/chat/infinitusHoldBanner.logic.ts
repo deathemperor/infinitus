@@ -1,6 +1,9 @@
 import type { ThreadHold } from "@t3tools/client-runtime/state/infinitusThreadHold";
 import type { InfinitusReleaseThreadResult } from "@t3tools/contracts/infinitus";
+import type { TimestampFormat } from "@t3tools/contracts/settings";
 import * as Cause from "effect/Cause";
+
+import { formatUpcomingTimestamp } from "../../timestampFormat";
 
 /**
  * The held banner's pure half (#616): what "Run now" answered and what the
@@ -53,14 +56,37 @@ export function runNowLabel(phase: HoldPhase, kind: HoldKind = "held"): string {
   return busy ? "Starting..." : "Run now";
 }
 
+/** The limited line with its reset (#270 I): "Limit hit on x · resets 2:13 PM".
+    The label is the caller's, in the user's timestamp format. */
+export function limitedLine(summary: string, resetLabel: string | null): string {
+  return resetLabel === null ? summary : `${summary} · resets ${resetLabel}`;
+}
+
+/** The reset's label for {@link limitedLine}: null with no reset, an
+    unreadable one, or one already past — resume-on-limit follows a reset
+    within a poll, so a past instant is stale, not upcoming. */
+export function resetLabelFor(
+  resetsAt: string | null,
+  timestampFormat: TimestampFormat,
+  nowMs: number = Date.now(),
+): string | null {
+  if (resetsAt === null) return null;
+  const at = Date.parse(resetsAt);
+  if (!Number.isFinite(at) || at <= nowMs) return null;
+  return formatUpcomingTimestamp(resetsAt, timestampFormat, nowMs);
+}
+
 export function holdBannerText(
   summary: string,
   phase: HoldPhase,
   kind: HoldKind = "held",
+  resetLabel: string | null = null,
 ): { readonly description: string; readonly actionable: boolean } {
   // A limit stop has no button (#270 I): resume-on-limit continues the turn
-  // itself once the account swaps; the row says which account ran out.
-  if (kind === "limited") return { description: summary, actionable: false };
+  // itself once the account swaps; the row says which account ran out and,
+  // when the SDK named it, when its window resets.
+  if (kind === "limited")
+    return { description: limitedLine(summary, resetLabel), actionable: false };
   switch (phase.kind) {
     case "gone":
       return {

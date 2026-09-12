@@ -1,8 +1,11 @@
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
+import { formatUpcomingTimestamp } from "../../timestampFormat";
+
 import {
   holdBannerText,
+  resetLabelFor,
   holdBannerTitle,
   holdPhaseAfterRelease,
   runNowLabel,
@@ -80,5 +83,19 @@ describe("infinitusHoldBanner.logic", () => {
       description: "Limit hit on one@example.com",
       actionable: false,
     });
+    expect(
+      holdBannerText("Limit hit on one@example.com", { kind: "idle" }, "limited", "2:13 PM"),
+    ).toEqual({ description: "Limit hit on one@example.com · resets 2:13 PM", actionable: false });
+  });
+
+  it("labels a reset still ahead in the user's format, none once it has passed", () => {
+    const now = Date.parse("2026-09-11T10:00:00Z");
+    const ahead = new Date(now + 2 * 3_600_000).toISOString();
+    expect(resetLabelFor(ahead, "24-hour", now)).toBe(
+      formatUpcomingTimestamp(ahead, "24-hour", now),
+    );
+    expect(resetLabelFor(new Date(now - 60_000).toISOString(), "24-hour", now)).toBeNull();
+    expect(resetLabelFor(null, "24-hour", now)).toBeNull();
+    expect(resetLabelFor("soon", "24-hour", now)).toBeNull();
   });
 });

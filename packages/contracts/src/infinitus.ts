@@ -482,6 +482,9 @@ export const InfinitusHeldThread = Schema.Struct({
       (#270 I): the thread's turn stopped on its account's usage limit and
       resume-on-limit waits for a swap; the summary names the account. */
   kind: Schema.optionalKey(Schema.Literals(["held", "limited"])),
+  /** `limited` only: when the window that rejected the turn resets (ISO),
+      as the SDK reported it; absent when the stop named none. */
+  resetsAt: Schema.optionalKey(Schema.String),
 });
 export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
 
