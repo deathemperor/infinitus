@@ -225,7 +225,7 @@ export interface ProjectionSnapshotQueryShape {
   readonly getThreadRuntimeContext: (
     threadId: ThreadId,
   ) => Effect.Effect<
-    Option.Option<Pick<OrchestrationThreadShell, "id" | "title" | "session">>,
+    Option.Option<Pick<OrchestrationThreadShell, "id" | "projectId" | "title" | "session">>,
     ProjectionRepositoryError
   >;
 

@@ -222,7 +222,11 @@ interface TimelineRowSharedState {
   workspaceRoot: string | undefined;
   skills: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
   activeThreadEnvironmentId: EnvironmentId;
-  onRevertToTurnCount: (targetTurnCount: number, mode?: TimelineRevertMode) => void;
+  onRevertToTurnCount: (
+    targetTurnCount: number,
+    messageId: MessageId,
+    mode?: TimelineRevertMode,
+  ) => void;
   onUseArtifactTemplate: (template: CodexArtifactTemplate) => void;
   onImageExpand: (preview: ExpandedImagePreview) => void;
   onFileOpen: (attachment: ChatFileAttachment) => void;
@@ -343,7 +347,11 @@ interface MessagesTimelineProps {
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   supportsConversationRollback: boolean;
   supportsThreadFork?: boolean;
-  onRevertToTurnCount: (targetTurnCount: number, mode?: TimelineRevertMode) => void;
+  onRevertToTurnCount: (
+    targetTurnCount: number,
+    messageId: MessageId,
+    mode?: TimelineRevertMode,
+  ) => void;
   onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
   isRevertingCheckpoint: boolean;
   onImageExpand: (preview: ExpandedImagePreview) => void;
@@ -1593,7 +1601,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           </Tooltip>
           <div className="flex items-center gap-0.5">
             {typeof revertTurnCount === "number" && (
-              <RevertUserMessageButton turnCount={revertTurnCount} />
+              <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
             )}
             {displayedUserMessage.copyText && (
               <MessageCopyButton text={displayedUserMessage.copyText} variant="ghost" />
@@ -1610,13 +1618,20 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     a new one from here. */
 export type TimelineRevertMode = "files" | "restore-files" | "chat" | "fork";
 
-function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
+function RevertUserMessageButton({
+  turnCount,
+  messageId,
+}: {
+  turnCount: number;
+  messageId: MessageId;
+}) {
   const ctx = use(TimelineRowCtx);
   const activity = use(TimelineRowActivityCtx);
   const disabled = activity.isRevertingCheckpoint || activity.isWorking;
 
-  // Fork (#270 E1): the one button opens a menu; the full revert is the first
-  // item and the chat-only rewind the second.
+  // Fork (#270 E1): the one button opens a menu; the full revert ("Edit from
+  // here", which hands the prompt back to the composer) is the first item and
+  // the chat-only rewind the third.
   return (
     <Menu>
       <Tooltip>
@@ -1640,17 +1655,17 @@ function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
         <TooltipPopup side="top">Revert to this message</TooltipPopup>
       </Tooltip>
       <MenuPopup align="end">
-        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "files")}>
-          Revert files and chat
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, messageId, "files")}>
+          Edit from here
         </MenuItem>
-        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "restore-files")}>
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, messageId, "restore-files")}>
           Restore files only
         </MenuItem>
-        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "chat")}>
+        <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, messageId, "chat")}>
           Rewind chat only
         </MenuItem>
         {activity.supportsThreadFork ? (
-          <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, "fork")}>
+          <MenuItem onClick={() => ctx.onRevertToTurnCount(turnCount, messageId, "fork")}>
             Fork a new thread from here
           </MenuItem>
         ) : null}

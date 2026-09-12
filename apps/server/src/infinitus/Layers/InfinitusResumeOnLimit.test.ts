@@ -187,7 +187,9 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
           Layer.mock(ProjectionSnapshotQuery)({
             getThreadShellById: () => Effect.succeed(Option.some(shell)),
             getThreadRuntimeContext: () =>
-              Effect.succeed(Option.some({ id: threadId, title: "Thread", session })),
+              Effect.succeed(
+                Option.some({ id: threadId, projectId: shell.projectId, title: "Thread", session }),
+              ),
           }),
           Layer.mock(ServerSettingsService)({
             getSettings: Ref.get(enabled).pipe(
