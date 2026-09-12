@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- The update pill no longer shows an error for the quarter hour while a new release is still being built; the check quietly retries at the next poll (#924).
 
 ## 0.5.0-alpha.4
 

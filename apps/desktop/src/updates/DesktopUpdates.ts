@@ -140,6 +140,20 @@ export class DesktopUpdaterReportedError extends Schema.TaggedError<DesktopUpdat
   }
 }
 
+/**
+ * electron-updater lists a pushed tag from releases.atom before its release
+ * exists, then finds no channel file there until the release workflow lands the
+ * assets (#924). That check is a miss to retry on the next poll, not an error
+ * the pill should show.
+ */
+function isReleaseStillBuilding(cause: unknown): boolean {
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    (cause as { code?: unknown }).code === "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND"
+  );
+}
+
 export class DesktopUpdateUnexpectedActionError extends Schema.TaggedError<DesktopUpdateUnexpectedActionError>()(
   "DesktopUpdateUnexpectedActionError",
   {
@@ -429,6 +443,13 @@ export const make = Effect.gen(function* () {
             "desktop.updates.handleCheckForUpdatesFailure",
           )(function* (error) {
             const failedAt = yield* currentIsoTimestamp;
+            if (isReleaseStillBuilding(error.cause)) {
+              yield* setState({ ...state, checkedAt: failedAt });
+              yield* logUpdaterInfo("release still being built, retrying at the next check", {
+                channel: error.channel,
+              });
+              return true;
+            }
             yield* updateState((current) =>
               reduceDesktopUpdateStateOnCheckFailure(current, error.message, failedAt),
             );
@@ -781,6 +802,13 @@ export const make = Effect.gen(function* () {
     cause: unknown,
   ) {
     const activeAction = yield* activeUpdateAction;
+    if (
+      Option.isSome(activeAction) &&
+      activeAction.value === "check" &&
+      isReleaseStillBuilding(cause)
+    ) {
+      return;
+    }
     const error = new DesktopUpdaterReportedError({
       operation: Option.match(activeAction, {
         onNone: () => "background" as const,
