@@ -11666,6 +11666,127 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
+  it.effect("refuses a direct worktree creation over the worktree limit (#269 H)", () =>
+    Effect.gen(function* () {
+      const createWorktree = vi.fn(() =>
+        Effect.succeed({ worktree: { path: "/tmp/wt", refName: "feature/demo" } }),
+      );
+      yield* buildAppUnderTest({
+        layers: {
+          serverSettings: {
+            getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, worktreeMaxCount: 1 }),
+          },
+          projectionSnapshotQuery: {
+            getWorktreeHolders: () => Effect.succeed({ count: 1, oldestArchived: [] }),
+          },
+          gitVcsDriver: { createWorktree },
+        },
+      });
+
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const result = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) =>
+          client[WS_METHODS.vcsCreateWorktree]({ cwd: "/tmp/repo", refName: "main", path: null }),
+        ).pipe(Effect.result),
+      );
+
+      assertTrue(result._tag === "Failure");
+      assertTrue(result.failure._tag === "GitCommandError");
+      assert.include(result.failure.detail, "Worktree limit reached: 1 of 1 threads");
+      assert.strictEqual(createWorktree.mock.calls.length, 0);
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("counts a bootstrap still creating its worktree against the limit (#269 H)", () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>();
+      const gate = yield* Deferred.make<void>();
+      const dispatchedCommands: Array<OrchestrationCommand> = [];
+      yield* buildAppUnderTest({
+        layers: {
+          serverSettings: {
+            getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, worktreeMaxCount: 2 }),
+          },
+          projectionSnapshotQuery: {
+            getWorktreeHolders: () => Effect.succeed({ count: 1, oldestArchived: [] }),
+          },
+          gitVcsDriver: {
+            createWorktree: () =>
+              Deferred.succeed(entered, undefined).pipe(
+                Effect.andThen(Deferred.await(gate)),
+                Effect.as({ worktree: { path: "/tmp/wt", refName: "t3code/member" } }),
+              ),
+          },
+          orchestrationEngine: {
+            dispatch: (command) => {
+              dispatchedCommands.push(command);
+              return Effect.succeed({ sequence: dispatchedCommands.length });
+            },
+            readEvents: () => Stream.empty,
+          },
+        },
+      });
+
+      const createdAt = "2026-01-01T00:00:00.000Z";
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const start = (member: string) =>
+        Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
+              type: "thread.turn.start",
+              commandId: CommandId.make(`cmd-bootstrap-${member}`),
+              threadId: ThreadId.make(`thread-bootstrap-${member}`),
+              message: {
+                messageId: MessageId.make(`msg-bootstrap-${member}`),
+                role: "user",
+                text: "hello",
+                attachments: [],
+              },
+              modelSelection: defaultModelSelection,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              bootstrap: {
+                createThread: {
+                  projectId: defaultProjectId,
+                  title: `Member ${member}`,
+                  modelSelection: defaultModelSelection,
+                  runtimeMode: "full-access",
+                  interactionMode: "default",
+                  branch: "main",
+                  worktreePath: null,
+                  createdAt,
+                },
+                prepareWorktree: {
+                  projectCwd: "/tmp/project",
+                  baseBranch: "main",
+                  branch: `t3code/${member}`,
+                },
+                runSetupScript: false,
+              },
+              createdAt,
+            }),
+          ).pipe(Effect.result),
+        );
+
+      // The first member passes the check and blocks inside the worktree
+      // creation; the second, started meanwhile, must count it.
+      const first = yield* Effect.forkChild(start("first"));
+      yield* Deferred.await(entered);
+      const second = yield* start("second");
+      assertTrue(second._tag === "Failure");
+      assertTrue(second.failure._tag === "OrchestrationDispatchCommandError");
+      assert.include(second.failure.message, "Worktree limit reached: 2 of 2 threads");
+
+      yield* Deferred.succeed(gate, undefined);
+      const firstResult = yield* Fiber.join(first);
+      assertTrue(firstResult._tag === "Success");
+      assert.deepEqual(
+        dispatchedCommands.map((command) => command.type),
+        ["thread.create", "thread.meta.update", "thread.turn.start"],
+      );
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
   it.effect("routes websocket rpc terminal methods", () =>
     Effect.gen(function* () {
       const snapshot = {
