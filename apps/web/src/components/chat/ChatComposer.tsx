@@ -112,6 +112,7 @@ import {
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
 import { ComposerSendQueue } from "./ComposerSendQueue";
+import { restoredQueuedTurnText } from "./composerSendQueue.logic";
 import { useQueuedTurnActions } from "./useQueuedTurnActions";
 import { ComposerCapturesBadge } from "../captures/ComposerCapturesBadge";
 import { ComposerCapturesMenu } from "../captures/ComposerCapturesMenu";
@@ -213,6 +214,7 @@ import {
   ensureInlineContextReferences,
   formatInlineContextReference,
   insertInlineContextReference,
+  producerIdFromComposerContextId,
   toKindScopedComposerContextId,
 } from "~/lib/composerContextReferences";
 import {
@@ -4688,6 +4690,65 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
     [composerDraftTarget, promptRef, setComposerDraftPrompt],
   );
+  // Fork (#971): a queued message with records comes back the way a stash
+  // entry does — records into the draft first, then the text with its links
+  // pointing at the re-minted chips. The files were fetched by the caller
+  // (the removed row's uploads are gone) and go in under their records' own
+  // ids, which is what the text's links name; the import leaves image and
+  // file records alone when no source environment is given.
+  const restoreQueuedTurnToComposer = useCallback(
+    (input: {
+      readonly text: string;
+      readonly records: ReadonlyArray<ComposerContextRecord>;
+      readonly files: ReadonlyArray<{ readonly attachmentId: string; readonly file: File }>;
+    }) => {
+      const rewritten = importContextRecords(input.records, null);
+      const pending = new Map(input.files.map((entry) => [entry.attachmentId, entry.file]));
+      const images: ComposerImageAttachment[] = [];
+      const files: ComposerFileAttachment[] = [];
+      for (const candidate of input.records) {
+        const record = asKnownContextRecord(candidate);
+        if (record?.kind !== "image" && record?.kind !== "file") continue;
+        const file = pending.get(record.attachmentId);
+        if (file === undefined) continue;
+        pending.delete(record.attachmentId);
+        const id = producerIdFromComposerContextId(record.kind, record.contextId);
+        const base = { id, name: record.name, mimeType: file.type, sizeBytes: file.size, file };
+        if (record.kind === "image") {
+          images.push({ type: "image", ...base, previewUrl: URL.createObjectURL(file) });
+        } else {
+          files.push({ type: "file", ...base });
+        }
+      }
+      // A file no record names (there should be none) still comes back, under a fresh id.
+      for (const file of pending.values()) {
+        const base = {
+          id: randomUUID(),
+          name: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          file,
+        };
+        if (file.type.startsWith("image/")) {
+          images.push({ type: "image", ...base, previewUrl: URL.createObjectURL(file) });
+        } else {
+          files.push({ type: "file", ...base });
+        }
+      }
+      if (images.length > 0) addComposerDraftImages(attachmentDraftTarget, images);
+      if (files.length > 0) {
+        addComposerDraftFiles(attachmentDraftTarget, files, { appendReference: false });
+      }
+      appendQueuedTextToComposer(restoredQueuedTurnText(input.text, rewritten));
+    },
+    [
+      addComposerDraftFiles,
+      addComposerDraftImages,
+      appendQueuedTextToComposer,
+      attachmentDraftTarget,
+      importContextRecords,
+    ],
+  );
 
   const toggleStashMenu = useCallback(() => {
     if (isComposerCollapsedMobile) {
@@ -5496,6 +5557,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     thread: routeKind === "server" ? activeThread : undefined,
     appendPrompt: appendQueuedTextToComposer,
     addAttachments: (files) => addComposerAttachments(files).then(() => undefined),
+    restoreContext: restoreQueuedTurnToComposer,
   });
 
   // Fork (#875): the image being drawn on, if any. Saving swaps the

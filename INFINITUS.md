@@ -658,12 +658,17 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   title step; runtime/interaction mode still persist so the drain reads
   them); `components/chat/useQueuedTurnActions.ts` — the rows from
   `thread.queuedTurns` and their actions (send now = `thread.turn.start`
-  with `queuedFrom`; edit = fetch the attachments back through the asset
-  URL, `.queue.remove`, text and files into the composer; move =
-  `.queue.move` with `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
+  with `queuedFrom`; edit = `.queue.remove`, then for a row with context
+  records (#969) the composer's `importContextRecords` from this
+  environment — the stash restore's path, chips back and attachments
+  transferred by id — and the text with its links rewritten to the
+  re-minted ids (`restoredQueuedTurnText`, #971); a row without records
+  has its attachments fetched back through the asset URL first, then text
+  and files into the composer; move = `.queue.move` with
+  `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
   renders them; `composerSendQueue.logic.ts` (+ test) — `orderedQueuedTurns`,
-  `queuedTurnSnippet`, `queuedTurnEditableText`, `queuedTurnMoveKey`, and
-  the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
+  `queuedTurnSnippet`, `queuedTurnEditableText`, `restoredQueuedTurnText`,
+  `queuedTurnMoveKey`, and the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
   `routes/_chat.tsx`) — moves entries the stash still holds with `queuedFor`
   (#270 F, pre-#806) to the server once, ids derived from the entry, a
   refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);

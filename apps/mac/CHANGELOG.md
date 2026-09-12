@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
 
 ### Desktop
+- Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
 - A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
 
 ## 0.5.0-alpha.2
