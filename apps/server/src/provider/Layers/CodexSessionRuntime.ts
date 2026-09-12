@@ -81,6 +81,13 @@ function configuredMcpToolAvailability(
 
 export const CodexResumeCursorSchema = Schema.Struct({
   threadId: Schema.String,
+  // Fork from a turn (#819): a forked thread's binding names the source's
+  // Codex thread with `fork: true` and the turn to fork at (Codex's own turn
+  // id, which is the orchestration turn id on a Codex thread). The first
+  // start forks there instead of resuming, then the cursor is rewritten to
+  // the new thread.
+  fork: Schema.optionalKey(Schema.Literal(true)),
+  lastTurnId: Schema.optionalKey(Schema.String),
 });
 const CodexUserInputAnswerObject = Schema.Struct({
   answers: Schema.Array(Schema.String),
@@ -506,6 +513,17 @@ function readResumeCursorThreadId(
   return isCodexResumeCursorSchema(resumeCursor) ? resumeCursor.threadId : undefined;
 }
 
+/** The fork a cursor asks for on its first start (#819), or none. */
+function readResumeCursorFork(
+  resumeCursor: ProviderSession["resumeCursor"],
+): { readonly lastTurnId: string } | undefined {
+  return isCodexResumeCursorSchema(resumeCursor) &&
+    resumeCursor.fork === true &&
+    resumeCursor.lastTurnId !== undefined
+    ? { lastTurnId: resumeCursor.lastTurnId }
+    : undefined;
+}
+
 function runtimeModeToThreadConfig(input: RuntimeMode): {
   readonly approvalPolicy: EffectCodexSchema.V2ThreadStartParams__AskForApproval;
   readonly sandbox: EffectCodexSchema.V2ThreadStartParams__SandboxMode;
@@ -700,9 +718,9 @@ const decodeCodexThreadResumeMetadata = Schema.decodeUnknownEffect(CodexThreadRe
 
 interface CodexThreadOpenClient {
   readonly raw: {
-    readonly request: (
-      method: "thread/resume",
-      payload: CodexRpc.ClientRequestParamsByMethod["thread/resume"] & {
+    readonly request: <M extends "thread/resume" | "thread/fork">(
+      method: M,
+      payload: CodexRpc.ClientRequestParamsByMethod[M] & {
         readonly excludeTurns?: boolean;
       },
     ) => Effect.Effect<unknown, CodexErrors.CodexAppServerError>;
@@ -724,6 +742,8 @@ export const openCodexThread = (input: {
   readonly requestedModel: string | undefined;
   readonly serviceTier: CodexServiceTier | undefined;
   readonly resumeThreadId: string | undefined;
+  /** Fork from a turn (#819): fork `resumeThreadId` at this turn instead of resuming it. */
+  readonly fork?: { readonly lastTurnId: string } | undefined;
 }): Effect.Effect<typeof CodexThreadResumeMetadata.Type, CodexErrors.CodexAppServerError> => {
   const resumeThreadId = input.resumeThreadId;
   const startParams = buildThreadStartParams({
@@ -735,6 +755,37 @@ export const openCodexThread = (input: {
 
   if (resumeThreadId === undefined) {
     return input.client.request("thread/start", startParams);
+  }
+
+  if (input.fork !== undefined) {
+    // The response is resume-shaped: the new thread, copied up to the turn.
+    // No fresh-start fallback: a fork that lands on an empty thread would
+    // silently lie, so a refused fork is a failed start.
+    const config = runtimeModeToThreadConfig(input.runtimeMode);
+    return input.client.raw
+      .request("thread/fork", {
+        threadId: resumeThreadId,
+        lastTurnId: input.fork.lastTurnId,
+        cwd: input.cwd,
+        approvalPolicy: config.approvalPolicy,
+        sandbox: config.sandbox,
+        approvalsReviewer: config.approvalsReviewer,
+        ...(input.requestedModel ? { model: input.requestedModel } : {}),
+        ...(input.serviceTier ? { serviceTier: input.serviceTier } : {}),
+      })
+      .pipe(
+        Effect.flatMap((response) =>
+          decodeCodexThreadResumeMetadata(response).pipe(
+            Effect.mapError((error) =>
+              CodexErrors.CodexAppServerRequestError.invalidPayload(
+                "thread/fork",
+                "decode-payload",
+                error,
+              ),
+            ),
+          ),
+        ),
+      );
   }
 
   // Older providers may still return history despite excludeTurns. Only the
@@ -2377,6 +2428,7 @@ export const makeCodexSessionRuntime = (
         requestedModel,
         serviceTier: options.serviceTier,
         resumeThreadId: readResumeCursorThreadId(options.resumeCursor),
+        fork: readResumeCursorFork(options.resumeCursor),
       });
 
       const providerThreadId = opened.thread.id;
