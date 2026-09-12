@@ -265,7 +265,12 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
   every thread read (snapshot, command read model, shells, detail);
   `Normalizer.ts` — the queue commands' uploads stored like a sent
-  message's; `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
+  message's (and pruned like a reverted message's, #847: a row removed
+  without sending, or an edit that dropped an upload, schedules the
+  thread's attachment prune, whose retained set now counts queued rows'
+  uploads too; a `sent` removal prunes nothing, and the boot-time cleanup
+  replay covers reverts and deletes only, so a crash between the queue
+  event and its prune leaves the copy until the thread is deleted); `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
   `ReactorLayerLive` above the interrupt and hold layers it consumes;
   `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
   hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
@@ -389,12 +394,48 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   "Estimated from the transcript" for a `transcript` rollup; drawn only
   when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional
   `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`.
-  Backfill from `provider_session_id` (a `transcript` rollup) is a
-  follow-up; the phone sheet is its own PR. Tests: `threadUsage.test.ts`,
-  `claudeTurnUsage.logic.test.ts`, `threadTurnUsage.test.ts`,
-  `decider.turnUsage.test.ts`, `ProjectionPipeline.usage.test.ts`,
-  `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`,
-  `threadUsage.logic.test.ts`.
+  The phone sheet is PR #908. Transcript backfill (the `transcript`
+  rollup, for threads whose Claude turns ran before usage was recorded):
+  `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`)
+  — `ThreadUsageBackfillLive` in `server.ts` `ReactorLayerLive`: a boot
+  sweep (parked until activation, 500 threads a boot) over
+  `ProjectionTurnUsageRepository.listBackfillCandidates` — a
+  `claudeAgent` binding in `provider_session_runtime` whose cursor names
+  the session (`$.resume`), no rollup and no baseline, not deleted, no turn
+  pending or running — plus a re-check of one thread on a history import
+  (`thread.created` with the marker) and on a session going idle; a
+  candidate whose newest turn row of any state postdates boot is skipped
+  (the runtime records that turn; an interrupted or errored first turn
+  has its usage half-written; reading the transcript on top would count
+  it twice), and a thread is read at most once per process (marked after
+  a read that succeeded). It reads
+  `UsageService.readSessionUsage` (`<sessionId>.jsonl` under the Claude
+  home's projects, through the summary scan's file cache, summed, deduped
+  by `dedupeKey`, priced with the rate table and overrides — null when
+  nothing priced) and dispatches the server command `thread.usage.backfill`
+  → `thread.usage-backfilled {threadId, usage}` (decider refuses a thread
+  with a rollup; projector, `Schemas.ts`, `threadReducer.ts` assign).
+  Transcripts do not delimit turns, so the rollup is thread-level: turns
+  from the runtime's completed rows, tokens and cost from the transcript
+  total, `subagentTurns` and `reasoningTokens` 0. Migration `057` adds
+  `projection_threads.usage_baseline_json` (`ProjectionThreads`
+  `usageBaseline`, server-only): the pipeline stores the estimate there
+  and every refold (`foldTurnUsage(rows, base)`) folds the runtime rows
+  onto it, so a recorded turn or a revert never erases it, and the rollup
+  keeps `source: "transcript"`. Limits: a revert cannot prune
+  transcript-era turns (and a runtime thread reverted to zero turns has no
+  rollup, so after a restart the sweep estimates it from a transcript that
+  still holds the reverted turns); an imported session's `turns` is 0 (the
+  phone and web read "0 turns" while no turn carried a cost); only the
+  default Claude home is searched (an instance with its own `homePath`,
+  such as a proxy's, is not); Codex is not estimated. Only thread ids and
+  counts are logged. Tests:
+  `threadUsage.test.ts`, `claudeTurnUsage.logic.test.ts`,
+  `threadTurnUsage.test.ts`, `decider.turnUsage.test.ts`,
+  `ProjectionPipeline.usage.test.ts`, `ProviderRuntimeIngestion.test.ts`,
+  `threadReducer.test.ts`, `threadUsage.logic.test.ts`,
+  `threadUsageBackfill.logic.test.ts`, `ThreadUsageBackfill.test.ts`,
+  `UsageService.test.ts`.
 - Side question (#269 C, Cursor's `/btw` on #820's fork-at-turn):
   `packages/contracts/src/orchestration.ts` — `sideOf?` on `thread.create`,
   `thread.created`, `OrchestrationThread` and `OrchestrationThreadShell`
@@ -408,7 +449,16 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only what
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
   drops the imported history by the ids the fork minted; "Bring to main"
-  appends the latest answer to the main composer's draft);
+  puts the latest answer at the main composer's caret through
+  `ChatComposerHandle.insertTextAtCursor`, or appends it to the draft when
+  the composer cannot take an insert; a side thread deleted from the sidebar
+  reads "This side question was deleted" with a Close button, decided by
+  `isSideQuestionGone` once the shell index is bootstrapped and the drawer
+  has seen the thread or waited 3 s, since the fork's reply can land before
+  the thread's shell); closing the tab archives the side thread
+  (`ChatView.cleanupRightPanelSurfaces`: a running answer is interrupted
+  first, a refusal only logged), and Settings › Archived skips `sideOf`
+  threads like the sidebar does;
   `ChatView.tsx` `askSideQuestion` forks with `side: true` and no
   `turnCount`: the server takes the session's latest completed turn from
   its own anchors (`latestClaudeForkAnchor`, `forkSeedMessagesByTurns`),
@@ -468,7 +518,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   after the last attempt the turn fails with the message in
   `RECONNECT_EXHAUSTED_MESSAGE`. A clean stream end with an open turn now
   fails instead of reading as `interrupted`, which the #806 drain treats as
-  idle. The reason reaches the client as `OrchestrationSession.statusReason`
+  idle. A server that dies mid-backoff still picks the turn up: the first
+  reconnecting state event writes the post-update continuation marker
+  (`continueAfterServerUpdate`, `ProviderService.processRuntimeEvent`), which
+  the boot reads before the `continueThreadsAfterServerUpdate` setting, and
+  the turn ending clears it. The reason reaches the client as `OrchestrationSession.statusReason`
   (`packages/contracts/src/orchestration.ts`; ingestion sets it from a
   running `session.state.changed`, null on every other lifecycle event;
   `ProjectionThreadSessions` column `status_reason`,

@@ -103,6 +103,14 @@ before that the `native` branch). Split out of
 - macOS 26 ControlCenter can stop adopting new bundled apps' status items
   after rapid relaunch churn — only a logout clears it; `run-unbundled.sh`
   is the workaround. Don't run the dev loop's kill/reopen cycle for hours.
+- Never hide the status item with `NSStatusItem.isVisible` (#876): off
+  then on left the app pulling WindowServer datagrams every frame on the
+  CI runner (`remote_context_notify` → tracking-area + hosting-view
+  layout each display cycle, idle 5–11% with Settings open; a Mac with a
+  real GPU shows nothing). `menu_bar_enabled` off removes the item
+  (`removeStatusItem`) and on installs a fresh one (`installItem()`),
+  which idles at 1%. Tearing the layer effects down while hidden changed
+  nothing — it is the item, not the animations.
 - NSPopover windows refuse CABackdropLayer at every level (renders a
   black slab; probed 2026-08-30) — the anchored popup is therefore a
   borderless non-activating NSPanel. CABackdropLayer + CAFilter
@@ -129,6 +137,13 @@ before that the `native` branch). Split out of
   account = base URL). Unsigned debug binaries trip an ACL prompt on
   every rebuild — reads skip UI, and the dev loop codesigns the debug
   binary with the Apple Development identity so the grant sticks.
+- A dev instance never pushes Live Activities from the shipped app's
+  APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
+  only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
+  the pusher stays unconfigured — silently (no last-result line, no
+  event). Verify push changes on the tagged build; never paste the key
+  into the instance's Devices pane (`Keychain.write` deletes the shipped
+  app's item first).
 - Every SwiftUI-driven frame (TimelineView tick, repeatForever
   `.animation`) commits a CA transaction: display-list diff, AppKit
   drag-region + tracking-area rebuild, a WindowServer fence — ~7 ms

@@ -362,6 +362,35 @@ describe("applyThreadDetailEvent", () => {
       expect(result.thread.updatedAt).toBe(baseThread.updatedAt);
     });
 
+    it("assigns a backfilled transcript rollup the same way (#834)", () => {
+      const usage = {
+        source: "transcript" as const,
+        turns: 3,
+        inputTokens: 500,
+        outputTokens: 50,
+        cachedInputTokens: 400,
+        cacheCreationTokens: 20,
+        reasoningTokens: 0,
+        subagentTurns: 0,
+        costUsd: 0.1,
+        models: ["claude-sonnet-5"],
+        lastTurnAt: "2026-04-01T05:00:00.000Z",
+      };
+      const result = applyThreadDetailEvent(baseThread, {
+        ...baseEventFields,
+        sequence: 5,
+        occurredAt: "2026-04-01T05:00:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: baseThread.id,
+        type: "thread.usage-backfilled",
+        payload: { threadId: baseThread.id, usage },
+      });
+      expect(result.kind).toBe("updated");
+      if (result.kind !== "updated") return;
+      expect(result.thread.usage).toEqual(usage);
+      expect(result.thread.updatedAt).toBe(baseThread.updatedAt);
+    });
+
     it("patches babysit on and off (#269 A)", () => {
       const on = applyThreadDetailEvent(baseThread, {
         ...baseEventFields,

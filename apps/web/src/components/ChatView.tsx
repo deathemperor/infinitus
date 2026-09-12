@@ -327,6 +327,7 @@ import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSki
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import {
+  readThreadShell,
   useProject,
   useProjects,
   useThread,
@@ -1464,6 +1465,7 @@ export default function ChatView(props: ChatViewProps) {
   const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
   const createThread = useAtomCommand(threadEnvironment.create, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
+  const archiveSideThread = useAtomCommand(threadEnvironment.archive, { reportFailure: false });
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
@@ -4732,13 +4734,41 @@ export default function ChatView(props: ChatViewProps) {
             });
           }
         }
+        // Fork (#269 C): the side thread goes with its tab. A running
+        // answer is interrupted first; the thread is a throwaway, so a
+        // refusal (already gone, already archived) is only logged.
+        if (surface.kind === "side-question" && surface.forking === undefined) {
+          const sideRef = scopeThreadRef(activeThreadRef.environmentId, surface.threadId);
+          const side = readThreadShell(sideRef);
+          const activeTurnId = side?.session?.activeTurnId ?? null;
+          void (async () => {
+            if (activeTurnId !== null) {
+              await interruptThreadTurn({
+                environmentId: sideRef.environmentId,
+                input: { threadId: sideRef.threadId, turnId: activeTurnId },
+              });
+            }
+            const archived = await archiveSideThread({
+              environmentId: sideRef.environmentId,
+              input: { threadId: sideRef.threadId },
+            });
+            if (archived._tag === "Failure" && !isAtomCommandInterrupted(archived)) {
+              console.warn("Side question not archived with its tab.", {
+                threadId: sideRef.threadId,
+                error: squashAtomCommandFailure(archived),
+              });
+            }
+          })();
+        }
       }
     },
     [
       activeThreadRef,
       activePreviewState.sessions,
+      archiveSideThread,
       closePreview,
       closeTerminalMutation,
+      interruptThreadTurn,
       storeCloseTerminal,
     ],
   );
@@ -8691,8 +8721,10 @@ export default function ChatView(props: ChatViewProps) {
         environmentId={activeThreadRef.environmentId}
         threadId={renderedRightPanelSurface.threadId}
         composerDraftTarget={composerDraftTarget}
+        composerRef={composerRef}
         forking={renderedRightPanelSurface.forking}
         onRetry={askSideQuestion}
+        onClose={() => closeRightPanelSurface(renderedRightPanelSurface)}
       />
     ) : renderedRightPanelSurface?.kind === "agents" ? (
       <AgentsPanel

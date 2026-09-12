@@ -65,3 +65,11 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
 export function threadUsageSourceLine(usage: ThreadUsageRollup): string | null {
   return usage.source === "transcript" ? "Estimated from the transcript" : null;
 }
+
+/** The source line's tooltip: what a transcript estimate is and is not,
+    so the number explains itself (#834). */
+export function threadUsageSourceDetail(usage: ThreadUsageRollup): string | null {
+  return usage.source === "transcript"
+    ? "Turns come from this server; tokens and cost are the whole transcript's total, so turns before this thread or removed by a revert count too. Only the default Claude home is read; Codex threads are not estimated."
+    : null;
+}

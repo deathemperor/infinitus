@@ -105,6 +105,48 @@ it.layer(NodeServices.layer)("turn usage decider (#834)", (it) => {
     }),
   );
 
+  it.effect("backfills a transcript rollup once, and not over an existing one", () =>
+    Effect.gen(function* () {
+      const transcript: ThreadUsageRollup = {
+        source: "transcript",
+        turns: 3,
+        inputTokens: 500,
+        outputTokens: 50,
+        cachedInputTokens: 400,
+        cacheCreationTokens: 20,
+        reasoningTokens: 0,
+        subagentTurns: 0,
+        costUsd: null,
+        models: ["claude-opus-4-7"],
+        lastTurnAt: NOW,
+      };
+      const event = (yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.usage.backfill",
+          commandId: CommandId.make("cmd-backfill-1"),
+          threadId,
+          usage: transcript,
+          createdAt: NOW,
+        },
+        readModel: makeReadModel(),
+      })) as { type: string; payload: { usage: ThreadUsageRollup } };
+      expect(event.type).toBe("thread.usage-backfilled");
+      expect(event.payload.usage).toEqual(transcript);
+
+      const refused = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.usage.backfill",
+          commandId: CommandId.make("cmd-backfill-2"),
+          threadId,
+          usage: transcript,
+          createdAt: NOW,
+        },
+        readModel: makeReadModel(event.payload.usage),
+      }).pipe(Effect.flip);
+      expect(String(refused)).toContain("already has a usage rollup");
+    }),
+  );
+
   it.effect("refuses a thread it does not know", () =>
     Effect.gen(function* () {
       const failure = yield* decideOrchestrationCommand({

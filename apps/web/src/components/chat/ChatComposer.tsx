@@ -1252,6 +1252,8 @@ export interface ChatComposerHandle {
   addDroppedFiles: (files: File[]) => void;
   hasPendingAttachments: () => boolean;
   insertTextAtEnd: (text: string, options?: { ensureLeadingBoundary?: boolean }) => boolean;
+  /** Fork (#269 C): insert at the caret, for a side question's "Bring to main". */
+  insertTextAtCursor: (text: string, options?: { ensureLeadingBoundary?: boolean }) => boolean;
   citeAssistantText: (
     citation: AssistantCitation,
     sourceAnchor: AssistantCitationSourceAnchor,
@@ -4834,9 +4836,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ],
   );
 
-  const insertComposerTextAtEnd = useCallback<ChatComposerHandle["insertTextAtEnd"]>(
-    (text, options) => {
-      const inserted = insertComposerText(text, "end", options);
+  const insertComposerTextAt = useCallback(
+    (
+      position: "cursor" | "end",
+      text: string,
+      options?: { ensureLeadingBoundary?: boolean },
+    ): boolean => {
+      const inserted = insertComposerText(text, position, options);
       if (inserted && isComposerCollapsedMobile) {
         // The expanded editor is hidden at phone widths, so its scheduled
         // focus cannot expand the composer by itself. Reveal it before the
@@ -4846,6 +4852,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       return inserted;
     },
     [expandMobileComposer, insertComposerText, isComposerCollapsedMobile],
+  );
+  const insertComposerTextAtEnd = useCallback<ChatComposerHandle["insertTextAtEnd"]>(
+    (text, options) => insertComposerTextAt("end", text, options),
+    [insertComposerTextAt],
+  );
+  const insertComposerTextAtCursor = useCallback<ChatComposerHandle["insertTextAtCursor"]>(
+    (text, options) => insertComposerTextAt("cursor", text, options),
+    [insertComposerTextAt],
   );
 
   // File-tree drags land as mentions. Handled in the capture phase so the
@@ -4982,6 +4996,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       hasPendingAttachments: () =>
         (pendingImageCompressionsRef.current.get(attachmentTargetKey) ?? 0) > 0,
       insertTextAtEnd: insertComposerTextAtEnd,
+      insertTextAtCursor: insertComposerTextAtCursor,
       citeAssistantText: (citation, sourceAnchor) =>
         insertComposerText(
           formatAssistantCitationForComposer(citation, citation.comment),
@@ -5091,6 +5106,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerTerminalContexts,
       insertComposerDraftTerminalContext,
       insertComposerText,
+      insertComposerTextAtCursor,
       insertComposerTextAtEnd,
       promptRef,
       composerImagesRef,

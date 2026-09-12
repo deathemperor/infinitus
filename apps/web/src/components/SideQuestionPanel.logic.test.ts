@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import { ThreadId, TurnId } from "@t3tools/contracts";
 
-import { hasCompletedTurn, isSideQuestionMessage } from "./SideQuestionPanel.logic";
+import {
+  appendAnswerToDraft,
+  hasCompletedTurn,
+  isSideQuestionGone,
+  isSideQuestionMessage,
+} from "./SideQuestionPanel.logic";
 
 describe("isSideQuestionMessage (#269 C)", () => {
   const threadId = ThreadId.make("side-1");
@@ -62,5 +67,26 @@ describe("hasCompletedTurn (#269 C)", () => {
       }),
     ).toBe(true);
     expect(hasCompletedTurn({ messages: [assistant("turn-1")], session: null })).toBe(true);
+  });
+});
+
+describe("isSideQuestionGone (#269 C)", () => {
+  it("needs a bootstrapped shell index and a settled drawer before a missing thread counts", () => {
+    expect(isSideQuestionGone({ hasThread: false, bootstrapped: true, settled: true })).toBe(true);
+    expect(isSideQuestionGone({ hasThread: true, bootstrapped: true, settled: true })).toBe(false);
+    expect(isSideQuestionGone({ hasThread: false, bootstrapped: false, settled: true })).toBe(
+      false,
+    );
+    expect(isSideQuestionGone({ hasThread: false, bootstrapped: true, settled: false })).toBe(
+      false,
+    );
+  });
+});
+
+describe("appendAnswerToDraft (#269 C)", () => {
+  it("appends after a blank line, or stands alone", () => {
+    expect(appendAnswerToDraft("", "Answer")).toBe("Answer");
+    expect(appendAnswerToDraft("  \n", "Answer")).toBe("Answer");
+    expect(appendAnswerToDraft("Draft  \n", "Answer")).toBe("Draft\n\nAnswer");
   });
 });
