@@ -29,9 +29,9 @@ export function worktreeCapRefusal(holders: WorktreeHolders, max: number): strin
   const head = `Worktree limit reached: ${holders.count} of ${max} threads hold a worktree.`;
   const fix =
     holders.oldestArchived.length === 0
-      ? "Delete a thread you no longer need to free its worktree, or raise the limit in Settings → General."
+      ? "Delete a thread you no longer need to free its worktree, or raise the Worktree limit in the server's settings."
       : `Delete an archived thread to free its worktree (oldest: ${holders.oldestArchived
           .map((thread) => `“${boundedTitle(thread.title)}”`)
-          .join(", ")}), or raise the limit in Settings → General.`;
+          .join(", ")}), or raise the Worktree limit in the server's settings.`;
   return `${head} ${fix}`;
 }
