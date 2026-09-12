@@ -523,6 +523,9 @@ jobs:
           grep -q 'MacOS/ictl"' Casks/infinitus.rb || perl -0pi -e \
             's|^(  binary "#\{appdir\}/Infinitus.app/Contents/MacOS/infinitusctl"\n)|$1  binary "#{appdir}/Infinitus.app/Contents/MacOS/ictl"\n|m' \
             Casks/infinitus.rb
+          grep -q 'Resources/bin/infinitus"' Casks/infinitus.rb || perl -0pi -e \
+            's|^(  binary "#\{appdir\}/Infinitus.app/Contents/MacOS/infinitusctl"\n)|$1  binary "#{appdir}/Infinitus.app/Contents/Resources/bin/infinitus"\n|m' \
+            Casks/infinitus.rb
           # The caveats follow the build: a Developer ID + notarized
           # release needs no Gatekeeper workaround, an ad-hoc one (no
           # signing secrets) keeps it. Rewritten whole every release so

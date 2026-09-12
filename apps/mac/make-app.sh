@@ -20,6 +20,10 @@ cp "$(dirname "$BIN")/infinitusctl" "$APP/Contents/MacOS/infinitusctl"
 # `ictl`: the same binary under a name that is quick to type (usage text
 # follows whichever name ran it).
 ln -s infinitusctl "$APP/Contents/MacOS/ictl"
+# macOS volumes are usually case-insensitive: `infinitus` cannot sit beside
+# the native `Infinitus` executable. Keep the short command in Resources/bin.
+mkdir -p "$APP/Contents/Resources/bin"
+ln -s ../../MacOS/infinitusctl "$APP/Contents/Resources/bin/infinitus"
 # Releases pass the pinned engine built by build-swapd.sh. Keep source-only
 # development builds usable without requiring a Rust toolchain.
 if [ -n "${INFINITUS_BUNDLED_SWAPD:-}" ]; then

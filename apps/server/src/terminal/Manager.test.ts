@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import {
   DEFAULT_TERMINAL_ID,
+  EnvironmentId,
   type TerminalAttachStreamEvent,
   type TerminalEvent,
   type TerminalMetadataStreamEvent,
@@ -35,6 +36,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import { expect } from "vite-plus/test";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import { ServerEnvironment } from "../environment/ServerEnvironment.ts";
 import * as ServerConfig from "../config.ts";
 import { SqlitePersistenceMemory } from "../persistence/Layers/Sqlite.ts";
 import * as ProcessRunner from "../processRunner.ts";
@@ -1951,6 +1953,33 @@ it.layer(
       assert.equal(spawnInput.env.T3CODE_PROJECT_ROOT, "/repo");
       assert.equal(spawnInput.env.T3CODE_WORKTREE_PATH, "/repo/worktree-a");
       assert.equal(spawnInput.env.CUSTOM_FLAG, "1");
+    }),
+  );
+
+  it.effect("exports the owning thread on open and restart, overriding inherited context", () =>
+    Effect.gen(function* () {
+      const { manager, ptyAdapter } = yield* createManager(5, {
+        env: { T3_THREAD_ID: "parent", T3_ENVIRONMENT_ID: "parent-host" },
+      });
+      yield* manager.open(openInput({ env: { T3_THREAD_ID: "wrong" } }));
+      expect(ptyAdapter.spawnInputs[0]?.env.T3_THREAD_ID).toBe("thread-1");
+      expect(ptyAdapter.spawnInputs[0]?.env.T3_ENVIRONMENT_ID).toBeUndefined();
+      yield* manager.restart(restartInput());
+      expect(ptyAdapter.spawnInputs[1]?.env.T3_THREAD_ID).toBe("thread-1");
+    }),
+  );
+
+  it.effect("exports the environment identity of the server that owns the terminal", () =>
+    Effect.gen(function* () {
+      const environmentId = EnvironmentId.make("owning-host");
+      const { manager, ptyAdapter } = yield* createManager().pipe(
+        Effect.provideService(ServerEnvironment, {
+          getEnvironmentId: Effect.succeed(environmentId),
+          getDescriptor: Effect.die("not used by terminals"),
+        }),
+      );
+      yield* manager.open(openInput({ env: { T3_ENVIRONMENT_ID: "wrong-host" } }));
+      expect(ptyAdapter.spawnInputs[0]?.env.T3_ENVIRONMENT_ID).toBe(environmentId);
     }),
   );
 

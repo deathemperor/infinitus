@@ -17,19 +17,33 @@ export interface McpProviderSessionConfig {
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
 }
 
-/** Provider env with the device variables applied over `base`, or `base` untouched. */
-export function withAgentDeviceEnvironment(
+/** Apply session identity and optional device access without changing the server environment. */
+export function withProviderSessionEnvironment(
   base: NodeJS.ProcessEnv,
-  config: Pick<McpProviderSessionConfig, "agentDeviceEnvironment"> | undefined,
+  config:
+    | {
+        readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
+        readonly threadId?: string;
+        readonly environmentId?: string;
+      }
+    | undefined,
 ): NodeJS.ProcessEnv {
   const extra = config?.agentDeviceEnvironment;
-  if (!extra) return base;
+  const identity =
+    config?.threadId === undefined
+      ? {}
+      : {
+          T3_THREAD_ID: config.threadId,
+          T3_ENVIRONMENT_ID: config.environmentId,
+        };
+  if (!extra) return config?.threadId === undefined ? base : { ...base, ...identity };
   const separator = extra.PATH_SEPARATOR ?? ":";
   const basePath = base.PATH ?? base.Path;
   const { PATH: shimDir, PATH_SEPARATOR: _separator, ...rest } = extra;
   return {
     ...base,
     ...rest,
+    ...identity,
     ...(shimDir ? { PATH: basePath ? `${shimDir}${separator}${basePath}` : shimDir } : {}),
   };
 }
