@@ -391,7 +391,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "A Claude Code hook payload on stdin (the plugin's Notification/Stop hooks): a prompt is pushed the moment it appears, then the fleet refreshes.",
                        replyShape: "{pid?}"),
         ControlCommand(name: "push", effect: .write, stdin: "payload",
-                       summary: "A thread phase change from Infinitus desktop on stdin ({kind: \"thread.phase\", threadId, title, phase, detail?, local?}): pushed as one line through the Mac's channels — Notification Center, the phone, Slack/Telegram — with the Mac's own gating; `local: false` skips the Notification Center notice (the desktop shows its own banner) and still reaches the phone and Slack/Telegram. Title and phase only, never prompt text.",
+                       summary: "A thread phase change from Infinitus desktop on stdin ({kind: \"thread.phase\", threadId, title, phase, detail?, local?, slack?}): pushed as one line through the Mac's channels — Notification Center, the phone, Slack/Telegram — with the Mac's own gating; `local: false` skips the Notification Center notice (the desktop shows its own banner) and still reaches the phone and Slack/Telegram; `slack: false` skips the Slack webhook post alone (a Slack-started thread reports in its own thread there), Telegram and the phone unchanged. Title and phase only, never prompt text.",
                        replyShape: "{pushed}"),
         ControlCommand(name: "approve", effect: .read, stdin: "payload",
                        summary: "A PreToolUse hook payload on stdin: {decision: allow} when the phone allowed that tool for this session, else {decision: ask}.",

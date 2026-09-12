@@ -70,9 +70,11 @@ final class AwayPush {
 
     /// Fire and forget; a channel's first failure is logged once until it
     /// is set again, so a dead webhook never floods the log.
-    func send(_ text: String) {
+    /// `slack: false` leaves the Slack webhook out of this one send
+    /// (#574); Telegram is untouched.
+    func send(_ text: String, slack: Bool = true) {
         var requests: [(String, URLRequest)] = []
-        if let hook = Keychain.read(account: Self.slackAccount, service: Self.service),
+        if slack, let hook = Keychain.read(account: Self.slackAccount, service: Self.service),
            let url = AwayPushWire.slackWebhook(hook) {
             requests.append(("slack", AwayPushWire.slackRequest(webhook: url, text: text)))
         }
