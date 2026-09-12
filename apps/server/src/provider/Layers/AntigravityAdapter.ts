@@ -36,6 +36,7 @@ import * as EffectAcpErrors from "effect-acp/errors";
 import type * as EffectAcpSchema from "effect-acp/schema";
 
 import { ServerConfig } from "../../config.ts";
+import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { buildRuntimeInstructions } from "../RuntimeInstructions.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import type { AntigravityAuth } from "../AntigravityAuth.ts";
@@ -311,6 +312,10 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
   const path = yield* Path.Path;
   const serverConfig = yield* ServerConfig;
   const ownerScope = yield* Effect.scope;
+  const serverEnvironment = yield* Effect.serviceOption(ServerEnvironment);
+  const environmentId = Option.isSome(serverEnvironment)
+    ? yield* serverEnvironment.value.getEnvironmentId
+    : undefined;
   const makeNativeLoggers = yield* makeAcpNativeLoggerFactory();
   const sessions = new Map<ThreadId, SessionContext>();
   const locks = yield* SynchronizedRef.make(new Map<ThreadId, Semaphore.Semaphore>());
@@ -794,7 +799,11 @@ export const makeAntigravityAdapter = Effect.fn("makeAntigravityAdapter")(functi
                 clientInfo: { name: "t3-code", version: "0.0.0" },
                 clientFileSystem: true,
                 threadId: input.threadId,
-                ...(mcp ? { environmentId: mcp.environmentId } : {}),
+                ...(mcp
+                  ? { environmentId: mcp.environmentId }
+                  : environmentId
+                    ? { environmentId }
+                    : {}),
                 ...(mcp?.agentDeviceEnvironment
                   ? { agentDeviceEnvironment: mcp.agentDeviceEnvironment }
                   : {}),

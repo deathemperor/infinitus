@@ -35,6 +35,7 @@ import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
 import {
@@ -943,6 +944,10 @@ export function makeOpenCodeAdapter(
     const boundInstanceId = options?.instanceId ?? ProviderInstanceId.make("opencode");
     const serverConfig = yield* ServerConfig;
     const openCodeRuntime = yield* OpenCodeRuntime;
+    const serverEnvironment = yield* Effect.serviceOption(ServerEnvironment);
+    const environmentId = Option.isSome(serverEnvironment)
+      ? yield* serverEnvironment.value.getEnvironmentId
+      : undefined;
     const crypto = yield* Crypto.Crypto;
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -2835,7 +2840,10 @@ export function makeOpenCodeAdapter(
                 ...(serverPassword ? { serverPassword } : {}),
                 environment: McpProviderSession.withProviderSessionEnvironment(
                   options?.environment ?? process.env,
-                  mcpSession ?? { threadId: input.threadId },
+                  mcpSession ?? {
+                    threadId: input.threadId,
+                    ...(environmentId ? { environmentId } : {}),
+                  },
                 ),
               });
               const client = openCodeRuntime.createOpenCodeSdkClient({

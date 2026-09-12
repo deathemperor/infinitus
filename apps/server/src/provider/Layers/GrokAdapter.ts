@@ -40,6 +40,7 @@ import type * as EffectAcpSchema from "effect-acp/schema";
 
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { buildRuntimeInstructions } from "../RuntimeInstructions.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import {
@@ -345,6 +346,10 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
     const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const serverConfig = yield* Effect.service(ServerConfig);
     const crypto = yield* Crypto.Crypto;
+    const serverEnvironment = yield* Effect.serviceOption(ServerEnvironment);
+    const environmentId = Option.isSome(serverEnvironment)
+      ? yield* serverEnvironment.value.getEnvironmentId
+      : undefined;
     const nativeEventLogger =
       options?.nativeEventLogger ??
       (options?.nativeEventLogPath !== undefined
@@ -991,7 +996,10 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             grokSettings,
             environment: McpProviderSession.withProviderSessionEnvironment(
               options?.environment ?? process.env,
-              mcpSession ?? { threadId: input.threadId },
+              mcpSession ?? {
+                threadId: input.threadId,
+                ...(environmentId ? { environmentId } : {}),
+              },
             ),
             childProcessSpawner,
             cwd,
