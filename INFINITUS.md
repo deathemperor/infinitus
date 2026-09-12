@@ -563,9 +563,16 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
-  feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  feedback notices, #742) and the `infinitusQueuedTurns` slot right after it
+  (#806: the thread's server-side queue as a card — one row per queued
+  message with earlier/later, edit, send now, remove;
+  `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
+  `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
+  the web's `composerSendQueue.logic.ts`, kept local so neither app edits
+  the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation), and prepends `usePullRequestHeaderItem`'s menu to the
+  queued creation), `InfinitusQueuedTurns` from the thread shell's
+  `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`;
