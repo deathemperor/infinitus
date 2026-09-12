@@ -168,10 +168,13 @@ export const SlackClientLive = Layer.effect(SlackClient)(
         running = yield* Effect.forkScoped(connectLoop(slack.appToken));
       });
 
+    // Subscribed before the first read, so a token saved while the server boots is not missed.
     yield* Effect.forkScoped(
-      settings.getSettings.pipe(
-        Effect.flatMap(reconcile),
-        Effect.andThen(settings.streamChanges.pipe(Stream.runForEach(reconcile))),
+      Effect.gen(function* () {
+        const changes = yield* settings.subscribeChanges;
+        yield* settings.getSettings.pipe(Effect.flatMap(reconcile));
+        yield* changes.pipe(Stream.runForEach(reconcile));
+      }).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("infinitus.slack.socket.settings", { cause }),
         ),

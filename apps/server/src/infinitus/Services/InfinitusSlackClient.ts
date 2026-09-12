@@ -15,8 +15,10 @@ export type SlackInbound =
       readonly kind: "mention";
       readonly envelopeId: string;
       readonly channel: string;
-      /** The message's own ts: the thread every reply to this task lands in. */
+      /** The thread the task lives in: the message's own ts, or its thread's. */
       readonly threadTs: string;
+      /** The message's own ts; with the channel, the key a twin delivery is dropped by. */
+      readonly ts: string;
       readonly userId: string;
       readonly text: string;
     }
@@ -25,6 +27,7 @@ export type SlackInbound =
       readonly envelopeId: string;
       readonly channel: string;
       readonly threadTs: string;
+      readonly ts: string;
       readonly userId: string;
       readonly text: string;
     }

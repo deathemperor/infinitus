@@ -7,7 +7,9 @@ import type { SlackInbound } from "../Services/InfinitusSlackClient.ts";
  * JSON text frame, is acknowledged by its id at once, and becomes at most
  * one `SlackInbound`: an `app_mention` event (a new task, or a reply when
  * it sits in a bound thread), a threaded user `message`, or a
- * `block_actions` button press. Everything else is dropped.
+ * `block_actions` button press. Everything else is dropped. A threaded
+ * mention is delivered twice, as `app_mention` and as its `message` twin;
+ * both carry the message's `ts`, which the reactor drops the second by.
  */
 
 const Envelope = Schema.Struct({
@@ -90,6 +92,7 @@ export function parseSocketFrame(raw: string): SocketFrame {
           envelopeId,
           channel: event.channel,
           threadTs: event.thread_ts ?? event.ts,
+          ts: event.ts,
           userId: event.user,
           text,
         },
@@ -104,6 +107,7 @@ export function parseSocketFrame(raw: string): SocketFrame {
           envelopeId,
           channel: event.channel,
           threadTs: event.thread_ts,
+          ts: event.ts,
           userId: event.user,
           text,
         },

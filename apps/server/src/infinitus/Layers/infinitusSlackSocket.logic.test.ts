@@ -30,6 +30,7 @@ describe("Socket Mode frames (#574)", () => {
         envelopeId: "e1",
         channel: "C1",
         threadTs: "1.1",
+        ts: "1.1",
         userId: "U1",
         text: "<@UB> site do <it>",
       },
@@ -50,7 +51,9 @@ describe("Socket Mode frames (#574)", () => {
         "e2",
       ),
     );
-    expect(reply).toMatchObject({ inbound: { kind: "reply", threadTs: "1.1", text: "more" } });
+    expect(reply).toMatchObject({
+      inbound: { kind: "reply", threadTs: "1.1", ts: "1.2", text: "more" },
+    });
     const action = parseSocketFrame(
       envelope(
         "interactive",

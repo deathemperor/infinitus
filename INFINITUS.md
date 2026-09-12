@@ -1029,7 +1029,9 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   turn id) as "Done." / "Failed." plus the last assistant message cut at
   1500 chars and the PR link; the fork's activity rows (limited, held,
   paused, resumed, babysit) as fixed lines — a row's summary can name an
-  account and never travels. Inbound envelopes are deduped; message text
+  account and never travels. Inbound envelopes are deduped by id and, for
+  a mention or reply, by the message's own `ts` too (a threaded mention
+  arrives as `app_mention` and as its `message` twin); message text
   reaches no log, only its length; a failed post is logged and the thread
   runs on. A clean shutdown posts "Infinitus went offline." once to every
   thread this process started or steered (the layer's finalizer); a crash

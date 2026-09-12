@@ -12,6 +12,7 @@ import {
 import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -357,9 +358,17 @@ export const InfinitusSlackLive = Layer.effectDiscard(
 
     const handleInbound = (event: SlackInbound) =>
       Effect.gen(function* () {
-        if (seenEnvelopes.has(event.envelopeId)) return;
-        seenEnvelopes.add(event.envelopeId);
-        if (seenEnvelopes.size > 2000) seenEnvelopes.delete(seenEnvelopes.values().next().value!);
+        // Socket Mode redelivers an envelope it saw no ack for, and a threaded
+        // mention arrives twice (`app_mention` and its `message` twin): both drop.
+        const keys =
+          event.kind === "action"
+            ? [event.envelopeId]
+            : [event.envelopeId, `${event.channel}:${event.ts}`];
+        if (keys.some((key) => seenEnvelopes.has(key))) return;
+        for (const key of keys) {
+          seenEnvelopes.add(key);
+          if (seenEnvelopes.size > 2000) seenEnvelopes.delete(seenEnvelopes.values().next().value!);
+        }
         const { armed, allowed, defaultModelSelection } = yield* gate;
         if (!armed) return;
         if (!allowed.has(event.userId)) {
@@ -469,6 +478,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
 
     // A clean shutdown tells the threads this process was driving; a crash
     // or a closed lid cannot (Socket Mode queues nothing), see the issue.
+    // Bounded: a slow Slack must not hold the server's exit.
     yield* Effect.addFinalizer(() =>
       Effect.forEach(
         [...liveThreads],
@@ -477,7 +487,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
           return binding === undefined ? Effect.void : postTo(binding, OFFLINE_TEXT);
         },
         { discard: true },
-      ),
+      ).pipe(Effect.timeout(Duration.seconds(5)), Effect.ignore),
     );
 
     // Subscribe first so nothing published while the file loads is missed;
