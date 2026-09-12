@@ -20,6 +20,7 @@ import {
   holdPhaseAfterPin,
   holdPhaseAfterRelease,
   pinLabel,
+  resetLabelFor,
   runNowLabel,
   type HoldPhase,
 } from "./holdBanner.logic";
@@ -53,7 +54,12 @@ export function InfinitusHoldBanner(props: {
   const phase: HoldPhase =
     answered !== null && answered.markerId === hold.markerId ? answered.phase : { kind: "idle" };
   const settle = (next: HoldPhase) => setAnswered({ markerId: hold.markerId, phase: next });
-  const { description, actionable } = holdBannerText(hold.summary, phase, hold.kind);
+  const { description, actionable } = holdBannerText(
+    hold.summary,
+    phase,
+    hold.kind,
+    resetLabelFor(hold.resetsAt),
+  );
   const runNow = runNowLabel(phase, hold.kind);
   const busy = holdBannerBusy(phase);
 
