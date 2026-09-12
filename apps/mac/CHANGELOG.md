@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 - The thread-info popover counts the tool calls and the duration of the turns this server ran, per thread (#834).
 
 ### Phone
+- A best-of-N member thread carries the group card: every live sibling with its model and a status word, a tap opens it; keeping one stays on the desktop (#269).
 - A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
 - Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).

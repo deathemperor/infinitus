@@ -130,6 +130,8 @@ export interface ThreadDetailScreenProps {
     | null;
   /** Infinitus (fork, #742): the "Waiting for headroom" card for a held
       thread, built by the route from the thread's detail; null otherwise. */
+  /** Fork (#269 B): the best-of-N group card, first in the stack. */
+  readonly infinitusBestOfCard?: ReactNode;
   /** Fork (#832): the reconnecting line, above the hold banner. */
   readonly infinitusReconnectingNotice?: ReactNode;
   readonly infinitusHoldBanner?: ReactNode;
@@ -952,6 +954,15 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                     onDismiss={() => props.onDismissFeedback(submission.id)}
                   />
                 ))}
+                {props.infinitusBestOfCard ? (
+                  <Animated.View
+                    className="shrink-0 px-4 pb-3"
+                    entering={FadeInDown.duration(220)}
+                    exiting={FadeOut.duration(140)}
+                  >
+                    {props.infinitusBestOfCard}
+                  </Animated.View>
+                ) : null}
                 {props.infinitusReconnectingNotice ? (
                   <Animated.View
                     className="shrink-0 px-4 pb-3"

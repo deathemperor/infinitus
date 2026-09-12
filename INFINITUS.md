@@ -773,7 +773,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
   queued creation), `InfinitusQueuedTurns` from the thread shell's
-  `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
+  `queuedTurns`, `InfinitusBestOfCard` (#269 B, read-only: the group's live
+  siblings from the shells by `groupId`, `features/infinitus/bestOf.logic.ts`
+  carrying the web `bestOf.logic.ts` sibling and status helpers kept local;
+  no "Keep this one", which removes worktrees) for the `infinitusBestOfCard`
+  slot first in the composer stack, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`; on Android the hook's
