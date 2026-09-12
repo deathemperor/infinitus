@@ -40,6 +40,17 @@ thread, pass `--thread <id>`. Run the command on the thread's owning Mac; it use
 that Mac's desktop connection. An explicit rename takes precedence over pending
 automatic title generation and appears on all connected clients.
 
+## Desktop notifications
+
+In **Settings → Infinitus → Notifications**, choose alerts for approvals, questions,
+held turns, and failures. Completion alerts are separate and off by default.
+Notifications identify the project and thread; click one to open that thread.
+The visible thread stays quiet while the desktop window has focus. Enable the
+Dock badge to count threads waiting for approval or input.
+
+Desktop alerts need no T3 Connect account. Allow Infinitus notifications in macOS
+System Settings. For alerts on a phone, see [Mobile notifications](./mobile-notifications.md).
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.

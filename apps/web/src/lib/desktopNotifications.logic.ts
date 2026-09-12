@@ -23,6 +23,7 @@ export interface WatchedThread {
   readonly environmentId: string;
   readonly id: string;
   readonly title: string;
+  readonly projectTitle?: string | undefined;
   readonly status: SidebarThreadStatus;
   readonly latestTurn: {
     readonly turnId: string;
@@ -70,7 +71,7 @@ export function threadNotifications(
     requests.push({
       environmentId: thread.environmentId as DesktopNotificationRequest["environmentId"],
       threadId: thread.id as DesktopNotificationRequest["threadId"],
-      title: thread.title,
+      title: thread.projectTitle ? `${thread.projectTitle} · ${thread.title}` : thread.title,
       body,
     });
   }

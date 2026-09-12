@@ -57,6 +57,45 @@ describe("threadNotifications", () => {
     ]);
   });
 
+  it("identifies the project and scopes identical thread IDs to their environment", () => {
+    const previous = seen([
+      ["env:a", { status: "working", turn: null }],
+      ["remote:a", { status: "working", turn: null }],
+    ]);
+    const threads = [
+      { ...thread("a", "input"), projectTitle: "Banyan" },
+      { ...thread("a", "approval"), environmentId: "remote", projectTitle: "Other project" },
+    ];
+    const { requests, next } = threadNotifications(previous, threads, ALL_ON, {
+      viewedKey: "env:a",
+    });
+    expect(requests).toEqual([
+      {
+        environmentId: "remote",
+        threadId: "a",
+        title: "Other project · Thread a",
+        body: "Waiting for your approval",
+      },
+    ]);
+    expect(threadNotifications(next, threads, ALL_ON, { viewedKey: null }).requests).toEqual([]);
+  });
+
+  it("notifies again only after a thread leaves and re-enters the attention state", () => {
+    const initial = seen([["env:a", { status: "working", turn: null }]]);
+    const waiting = threadNotifications(initial, [thread("a", "input")], ALL_ON, {
+      viewedKey: null,
+    });
+    expect(waiting.requests).toHaveLength(1);
+    const working = threadNotifications(waiting.next, [thread("a", "working")], ALL_ON, {
+      viewedKey: null,
+    });
+    expect(working.requests).toEqual([]);
+    expect(
+      threadNotifications(working.next, [thread("a", "input")], ALL_ON, { viewedKey: null })
+        .requests,
+    ).toHaveLength(1);
+  });
+
   it("posts a completion only for a turn the window had not seen completed", () => {
     const previous = seen([
       ["env:a", { status: "working", turn: "t1:running" }],
