@@ -1068,6 +1068,41 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       });
     });
 
+  // Fork (#832): a turn whose transport went away is marked for the boot
+  // continuation the moment the adapter starts waiting to reconnect
+  // (`session.state.changed {running, reason: "reconnecting:<n>/<max>"}`),
+  // so a server that dies mid-backoff picks the turn up on restart whatever
+  // `continueThreadsAfterServerUpdate` says: the boot reads the marker
+  // before the setting. `sendTurn` and `stopSession` null the key on their
+  // own; clearing it when the turn ends is hygiene (a finished turn is not
+  // orphaned at boot, so a stale marker would be ignored) kept cheap by
+  // remembering which threads this process marked.
+  const reconnectMarked = new Set<ThreadId>();
+  const writeReconnectContinuationMarker = (
+    source: {
+      readonly instanceId: ProviderInstanceId;
+      readonly provider: ProviderDriverKind;
+    },
+    threadId: ThreadId,
+    turnId: TurnId | null,
+  ) =>
+    directory
+      .upsert({
+        threadId,
+        provider: source.provider,
+        providerInstanceId: source.instanceId,
+        runtimePayload: { continueAfterServerUpdate: turnId },
+      })
+      .pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("provider.reconnect.continuation-marker-failed", {
+            threadId,
+            turnId,
+            cause,
+          }),
+        ),
+      );
+
   const processRuntimeEvent = (
     source: {
       readonly instanceId: ProviderInstanceId;
@@ -1092,6 +1127,22 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         canonicalEvent.type === "turn.aborted"
       ) {
         yield* recordTurnCompletedAnalytics(source, canonicalEvent);
+        if (reconnectMarked.delete(canonicalEvent.threadId)) {
+          yield* writeReconnectContinuationMarker(source, canonicalEvent.threadId, null);
+        }
+      } else if (
+        canonicalEvent.type === "session.state.changed" &&
+        canonicalEvent.payload.state === "running" &&
+        canonicalEvent.payload.reason?.startsWith("reconnecting:") === true &&
+        canonicalEvent.turnId !== undefined &&
+        !reconnectMarked.has(canonicalEvent.threadId)
+      ) {
+        reconnectMarked.add(canonicalEvent.threadId);
+        yield* writeReconnectContinuationMarker(
+          source,
+          canonicalEvent.threadId,
+          canonicalEvent.turnId,
+        );
       } else if (canonicalEvent.type === "session.exited") {
         yield* clearTurnAnalyticsSession(source.instanceId, canonicalEvent.threadId);
       }

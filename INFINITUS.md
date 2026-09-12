@@ -509,7 +509,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   after the last attempt the turn fails with the message in
   `RECONNECT_EXHAUSTED_MESSAGE`. A clean stream end with an open turn now
   fails instead of reading as `interrupted`, which the #806 drain treats as
-  idle. The reason reaches the client as `OrchestrationSession.statusReason`
+  idle. A server that dies mid-backoff still picks the turn up: the first
+  reconnecting state event writes the post-update continuation marker
+  (`continueAfterServerUpdate`, `ProviderService.processRuntimeEvent`), which
+  the boot reads before the `continueThreadsAfterServerUpdate` setting, and
+  the turn ending clears it. The reason reaches the client as `OrchestrationSession.statusReason`
   (`packages/contracts/src/orchestration.ts`; ingestion sets it from a
   running `session.state.changed`, null on every other lifecycle event;
   `ProjectionThreadSessions` column `status_reason`,
