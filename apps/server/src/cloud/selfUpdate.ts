@@ -61,9 +61,9 @@ export class ServerSelfUpdate extends Context.Service<
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
 
 /** How often a `wait` update re-reads the running turns (#829). */
-export const RUNNING_TURNS_POLL = Duration.seconds(2);
+export const RUNNING_TURNS_POLL = Duration.seconds(5);
 
-export function runningTurnsRefusal(count: number): string {
+function runningTurnsRefusal(count: number): string {
   return `${count} ${count === 1 ? "thread is" : "threads are"} running; updating now would interrupt ${count === 1 ? "it" : "them"}. Update when they finish, or stop them first.`;
 }
 
@@ -86,7 +86,12 @@ export const withRunningThreadContinuation = Effect.fn(
   const desktopPolicies = new Map<string, ServerUpdateRunningTurnsPolicy>();
 
   /** The gate (#829): `interrupt` passes, `refuse` fails naming the turns,
-      `wait` polls until none runs, reporting each change of count. */
+      `wait` polls until none runs, reporting each change of count. An
+      update refuses at its entry (nothing downloaded for nothing) and waits
+      at the install hook, after the download; in desktop mode the install
+      is the commit, which `commitDesktopUpdate` gates under the same policy
+      (the desktop app's own update run is bounded by a timeout, so no wait
+      happens inside it). */
   const awaitIdle = (
     policy: ServerUpdateRunningTurnsPolicy,
     reportProgress: (
@@ -138,12 +143,15 @@ export const withRunningThreadContinuation = Effect.fn(
     let handoffAccepted = false;
     let continuationThreadIds: ReadonlyArray<ThreadId> = [];
     return clearOnError(
-      awaitIdle(policy, reportProgress).pipe(
+      (policy === "refuse" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
         Effect.andThen(
           input.selfUpdate.update(
             request,
             (stage) =>
-              (stage === "installing" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
+              (stage === "installing" && input.mode !== "desktop"
+                ? awaitIdle(policy, reportProgress)
+                : Effect.void
+              ).pipe(
                 Effect.andThen(
                   request.continueRunningThreads === true &&
                     input.mode !== "desktop" &&

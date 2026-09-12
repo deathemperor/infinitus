@@ -4,7 +4,9 @@ import * as Layer from "effect/Layer";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 
-/** #829: a live provider session in `running` with an active turn. */
+/** #829: every provider session with an active turn. The status is not
+    consulted: a turn waiting on an approval or an input request is as
+    live as one streaming, and both die with the process. */
 export const InfinitusRunningTurnsLive = Layer.effect(
   InfinitusRunningTurns,
   Effect.gen(function* () {
@@ -15,7 +17,7 @@ export const InfinitusRunningTurnsLive = Layer.effect(
         .pipe(
           Effect.map((sessions) =>
             sessions.flatMap((session) =>
-              session.status === "running" && session.activeTurnId !== undefined
+              session.activeTurnId !== undefined
                 ? [{ threadId: session.threadId, turnId: session.activeTurnId }]
                 : [],
             ),

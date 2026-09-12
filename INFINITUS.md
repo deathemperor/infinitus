@@ -277,6 +277,43 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   thread go, and once at boot after the hold and interrupt layers have
   published their first lists (5 s cap). A send the decider rejects leaves
   the row; a provider failure after the send has already consumed it.
+- Update idle gate (#829): a server update is gated on the server's own
+  turn state, never on process heuristics. `packages/contracts/src/server.ts`
+  — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`
+  (`refuse` | `wait` | `interrupt`; `runningTurns?` on `ServerSelfUpdateInput`,
+  missing = `refuse`), the `waiting` progress stage with `runningTurns?`
+  (count), and `runningTurns?` on `ServerSelfUpdateError` naming the turns a
+  refusal was over; `packages/contracts/src/environmentHttp.ts` — `GET
+/api/infinitus/running-turns` (read scope) for infinitusctl and the desktop;
+  `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` +
+  `Layers/InfinitusRunningTurns.ts` — every provider session with an
+  `activeTurnId` (a turn waiting on an approval counts: it dies with the
+  process too), served by `Layers/InfinitusHttp.ts`; `apps/server/src/cloud/selfUpdate.ts`
+  — `awaitIdle`: `refuse` fails at the entry (nothing downloaded for
+  nothing), `wait` downloads first and polls (5 s) at the install hook
+  reporting each change of count, `interrupt` passes; in desktop mode the
+  run itself never waits (the desktop app's update run has a timeout) and
+  `commitDesktopUpdate` gates under the policy the preparation used (an
+  unknown token = `refuse`); `ws.ts` streams the count, `server.ts` provides
+  the layer. Client: `packages/client-runtime/src/state/server.ts` —
+  `waiting` stage + `runningTurns?` on the running state;
+  `apps/web/src/components/ServerUpdateAction.tsx` — a refusal (error with
+  `runningTurns`) becomes a toast, "Update when they finish" resends with
+  `wait`, "Update now" with `interrupt`, dismiss = later; the progress row
+  reads "Waiting for N running threads to finish…". Desktop:
+  `apps/web/src/components/desktopUpdate.logic.ts` — `countRunningLocalTurns`
+  over the thread shells of local backends (primary or desktop-local,
+  `isLocalConnectionTarget` from `ProviderUpdateLaunchNotification.environments.ts`)
+  and the copy; `sidebar/SidebarUpdatePill.tsx` — the install click shows
+  the same two-way toast while turns run ("Install when they finish" arms
+  `desktopInstallWhenIdleAtom` in `state/desktopUpdate.ts`; the pill fires
+  the install once the count hits zero and reads "Installs when N running
+  threads finish. Click to cancel."); shells not yet bootstrapped = an
+  unknown count, which offers only "Install now". No `apps/desktop` change:
+  the main process has no orchestration access, so the two quit paths are
+  gated at the renderer (the IPC install) and at the server (the commit of
+  a remote desktop update). A plain app quit with a downloaded update still
+  installs it — the remaining hole.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts`
   — `ThreadBabysit` (`since`, `rounds`), `BABYSIT_MAX_ROUNDS` (10), `babysit?`
   on `OrchestrationThread` and `OrchestrationThreadShell` (optional, so

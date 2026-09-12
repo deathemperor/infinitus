@@ -230,16 +230,14 @@ it.layer(NodeServices.layer)("server self update", (it) => {
         const events: string[] = [];
         let reads = 0;
         const turn = { threadId: ThreadId.make("thread-running"), turnId: TurnId.make("turn-1") };
-        // Two turns, then one, then idle; a turn starts again during the download.
+        // After the download: two turns, still two, then one, then idle.
         const runningTurns = Effect.sync(() => {
           reads += 1;
           return reads <= 2
             ? [turn, { ...turn, turnId: TurnId.make("turn-2") }]
             : reads === 3
               ? [turn]
-              : reads === 5
-                ? [turn]
-                : [];
+              : [];
         });
         const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
           runningTurns,
@@ -264,16 +262,9 @@ it.layer(NodeServices.layer)("server self update", (it) => {
         yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
         yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
         yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
-        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
         yield* Fiber.join(fiber);
 
-        expect(events).toEqual([
-          "waiting:2",
-          "waiting:1",
-          "downloading",
-          "waiting:1",
-          "installing",
-        ]);
+        expect(events).toEqual(["downloading", "waiting:2", "waiting:1", "installing"]);
       }),
   );
 
@@ -298,6 +289,8 @@ it.layer(NodeServices.layer)("server self update", (it) => {
         clear: () => Effect.void,
       });
 
+      // The desktop run itself never waits (its own timeout bounds it): a
+      // turn that starts after the download is met at the commit.
       yield* selfUpdate.update({ targetVersion: "1.1.0" });
       running = [{ threadId: ThreadId.make("thread-running"), turnId: TurnId.make("turn-1") }];
       const refused = yield* selfUpdate.commitDesktopUpdate("token-1").pipe(Effect.flip);

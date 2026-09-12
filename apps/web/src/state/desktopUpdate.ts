@@ -81,6 +81,14 @@ export function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridg
 
 const desktopUpdateStateAtom = createDesktopUpdateStateAtom(getDesktopUpdateBridge);
 
+/** #829: the update button was told to install once every running turn on
+    a local backend has finished. Cleared by the button itself when the
+    install fires, when it is clicked again, or when no install is pending. */
+export const desktopInstallWhenIdleAtom = Atom.make(false).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("desktop:install-when-idle"),
+);
+
 export function useDesktopUpdateState(): DesktopUpdateState | null {
   return AsyncResult.getOrElse(useAtomValue(desktopUpdateStateAtom), () => null);
 }
