@@ -94,6 +94,27 @@ final class WeeklyRollTests: XCTestCase {
     }
 }
 
+final class StaleAgeTests: XCTestCase {
+    func testStaleAgeLabel() {
+        XCTAssertEqual(StaleAge.label(seconds: 30), "just now")
+        XCTAssertEqual(StaleAge.label(seconds: 380), "6 min ago")
+        XCTAssertEqual(StaleAge.label(seconds: 7400), "2 hr ago")
+        XCTAssertEqual(StaleAge.label(seconds: 90000), "1 day ago")
+        XCTAssertEqual(StaleAge.label(seconds: 200000), "2 days ago")
+    }
+
+    func testStaleAgeLabelOnlyForStaleRows() {
+        let fresh = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380)
+        XCTAssertNil(fresh.staleAgeLabel)
+
+        let stale = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380, stale: true)
+        XCTAssertEqual(stale.staleAgeLabel, "6 min ago")
+
+        let staleNoAge = Account(number: 1, email: "a@b.c", stale: true)
+        XCTAssertNil(staleNoAge.staleAgeLabel)
+    }
+}
+
 final class SentinelNotesTests: XCTestCase {
     func testOkIsNil() { XCTAssertNil(SentinelNotes.note(for: "ok")) }
 

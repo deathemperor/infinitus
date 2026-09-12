@@ -30,6 +30,12 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                     Text(plan).font(PopupFont.caption).foregroundStyle(.secondary)
                         .instantTip("Subscription: \(account.plan ?? "?")")
                 }
+                if let age = cells.staleAge {
+                    Text("· \(age)").font(PopupFont.caption).foregroundStyle(.orange)
+                        .fixedSize()
+                        .instantTip("Usage from \(age) — swapd could not "
+                                    + "refresh this account; it retries on its own")
+                }
                 Spacer(minLength: 12)
                 cells.cashCell
             }

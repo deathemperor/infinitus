@@ -47,6 +47,14 @@ public struct AccountHeaderLine<M: FleetModel, U: UsageSource>: View {
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Color.primary.opacity(0.08), in: Capsule())
             }
+            if let age = cells.staleAge {
+                Text("· \(age)")
+                    .font(PopupFont.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize()
+                    .instantTip("Usage from \(age) — swapd could not "
+                                + "refresh this account; it retries on its own")
+            }
             Spacer(minLength: 4)
             cells.cashCell
         }

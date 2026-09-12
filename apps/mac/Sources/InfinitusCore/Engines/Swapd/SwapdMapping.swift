@@ -231,7 +231,8 @@ public enum SwapdMapping {
                        usageAgeSeconds: view.ageSeconds ?? view.lastGood?.ageSeconds,
                        lastGoodUsage: view.lastGood.map { usage($0.windows, now: now) } ?? nil,
                        lastGoodFetchedAt: view.lastGood?.fetchedAt,
-                       lastGoodAgeSeconds: view.lastGood?.ageSeconds)
+                       lastGoodAgeSeconds: view.lastGood?.ageSeconds,
+                       stale: view.usageStatus == "stale" ? true : nil)
     }
 
     /// The contract's window list as today's UI (and the phone's decoder)

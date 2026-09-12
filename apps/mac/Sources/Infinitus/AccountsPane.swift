@@ -1104,6 +1104,13 @@ private struct FleetAccountsSection: View {
         if a.active {
             chip("Active", .green)
         }
+        // A stale row is `usageStatus == "ok"`, so the orange health
+        // chip below never shows for it — this chip is its health.
+        if let age = a.staleAgeLabel {
+            chip("Stale · \(age)", .orange)
+                .accessibilityLabel("Stale. The usage shown is from \(age); "
+                                    + "swapd could not refresh it and retries on its own.")
+        }
         if a.disabled ?? false {
             // Primary type on the gray fill: secondary-on-secondary at
             // .caption2 sits under the contrast floor.

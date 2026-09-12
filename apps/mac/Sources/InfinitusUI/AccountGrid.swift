@@ -88,13 +88,25 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                     .frame(minWidth: 110, maxWidth: 230, alignment: .leading)
                     .alignedColumn("name")
                     .activeBand(account.active)
-                    Text(cells.planText ?? "")
-                        .font(PopupFont.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize()
-                        .instantTip("Subscription: \(account.plan ?? "?")")
-                        .alignedColumn("plan")
-                        .activeBand(account.active)
+                    HStack(spacing: 4) {
+                        Text(cells.planText ?? "")
+                            .font(PopupFont.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize()
+                        if let age = cells.staleAge {
+                            Text("· \(age)")
+                                .font(PopupFont.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize()
+                                .instantTip("Usage from \(age) — swapd could not "
+                                            + "refresh this account; it retries on its own")
+                        }
+                    }
+                    .instantTip(cells.staleAge.map {
+                        "Usage from \($0) — swapd could not refresh this account; it retries on its own"
+                    } ?? "Subscription: \(account.plan ?? "?")")
+                    .alignedColumn("plan")
+                    .activeBand(account.active)
                     if let note = SentinelNotes.note(for: account.usageStatus) {
                         // Short one-liner like deadCell — the full note
                         // wraps to three rows inside one grid column;
