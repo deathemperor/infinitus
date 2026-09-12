@@ -26,6 +26,38 @@ public struct TeamGrants: Codable, Equatable, Sendable {
     public static let lifecycleCapabilities = [stop, resumePast, delete]
     public static let accountCapabilities = [swap, hold]
     public static let capabilities = [view] + driveCapabilities + lifecycleCapabilities + accountCapabilities
+
+    /// The grant sheet's three groups (#220 Phase 2 §7.1), in display order.
+    public struct Tier: Equatable, Sendable {
+        public var name: String
+        public var capabilities: [String]
+        /// nil: this tier never asks (the drive set); else the note the sheet shows.
+        public var asks: String?
+    }
+    public static let tiers: [Tier] = [
+        Tier(name: "Drive", capabilities: [view] + driveCapabilities, asks: nil),
+        Tier(name: "Lifecycle", capabilities: lifecycleCapabilities, asks: "asks you first unless pre-authorised; delete always asks"),
+        Tier(name: "Accounts", capabilities: accountCapabilities, asks: "about this Mac's accounts, not a session; asks you first unless pre-authorised"),
+    ]
+    /// One line per capability for the sheet: what it does.
+    public static let meanings: [String: String] = [
+        view: "read the session's live feed", send: "type a prompt into the session",
+        approve: "answer a tool prompt with Yes or Esc", mode: "switch the session's mode",
+        resume: "nudge a stalled session", key: "press a single key (y, n, 1–9, enter, esc)",
+        stop: "stop the session (Esc, then SIGTERM after 5 s)", resumePast: "resume a past session in a new terminal",
+        delete: "hide a past session from every list on this Mac (the transcript stays)",
+        swap: "switch this Mac's active account", hold: "hold or release one of this Mac's accounts",
+    ]
+    /// The sheet's expiry choices (nil seconds = until revoked).
+    public struct ExpiryChoice: Equatable, Sendable, Identifiable {
+        public var label: String
+        public var seconds: Int?
+        public var id: String { label }
+    }
+    public static let expiryChoices: [ExpiryChoice] = [
+        .init(label: "Until revoked", seconds: nil), .init(label: "1 hour", seconds: 3600), .init(label: "8 hours", seconds: 8 * 3600),
+        .init(label: "1 day", seconds: 86_400), .init(label: "1 week", seconds: 7 * 86_400),
+    ]
     /// Address the Mac, not a session: `Command.session` is
     /// `TeamControl.machineSession` and the grant's `sessions` is not consulted.
     public static let machineScoped: Set<String> = [swap, hold]
@@ -110,6 +142,27 @@ public struct TeamGrants: Codable, Equatable, Sendable {
         }
 
         func alive(at now: Int) -> Bool { expires.map { $0 > now } ?? true }
+
+        /// "until revoked", "expires in 2 h 05 m" / "expires in 3 d", or "expired" — for the pane's row.
+        public func expiryLabel(now: Int) -> String {
+            guard let expires else { return "until revoked" }
+            guard expires > now else { return "expired" }
+            let remaining = expires - now
+            if remaining < 3600 { return "expires in \(remaining / 60) m" }
+            if remaining < 48 * 3600 {
+                return "expires in \(remaining / 3600) h \(String(format: "%02d", (remaining % 3600) / 60)) m"
+            }
+            return "expires in \(remaining / 86_400) d"
+        }
+
+        /// The row's capability list: sorted; a capability that `requiresApproval` reads "stop (asks)",
+        /// a pre-authorised one "hold (no ask)", view and the drive set bare.
+        public func capabilitiesLabel() -> String {
+            capabilities.sorted().map { cap in
+                if cap == TeamGrants.view || TeamGrants.driveCapabilities.contains(cap) { return cap }
+                return preauthorized.contains(cap) ? "\(cap) (no ask)" : "\(cap) (asks)"
+            }.joined(separator: ", ")
+        }
     }
 
     public var schema = 1

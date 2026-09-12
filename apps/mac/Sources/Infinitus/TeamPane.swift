@@ -10,6 +10,10 @@ import InfinitusCore
 struct TeamPane: View {
     @ObservedObject var team: TeamModel
     @ObservedObject var feed: TeamControlFeed
+    /// Bumped every 5 s while a wait is unexpired, so the "Waiting for
+    /// your OK" countdown updates without a continuous repaint (#220
+    /// Phase 2 §7.1).
+    @State private var now = Date()
 
     var body: some View {
         // NavigationStack so a member row's "Detail" link pushes TeamMemberPane.
@@ -35,6 +39,15 @@ struct TeamPane: View {
                 }
             }
             .onAppear { team.load() }
+            // 5 s tick only while an unexpired wait exists; a wait no
+            // audit has swept yet must not keep the loop alive forever.
+            .task(id: feed.pending) {
+                now = Date()
+                while feed.pending.contains(where: { $0.expires > now }) {
+                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                    now = Date()
+                }
+            }
             // On the Form, not on inTeam's Group: a Group hands its modifier
             // to every child, which would arm one alert per Section.
             .alert("Remove \(removeTarget?.name ?? "")?", isPresented: Binding(get: { removeTarget != nil }, set: { if !$0 { removeTarget = nil } })) {
@@ -251,6 +264,7 @@ struct TeamPane: View {
             if snap.role == "leader" { inviteSection }
             if snap.role == "leader", let policy = team.policy { policySection(policy) }
             sharingSection(snap)
+            pendingSection
             controlSection(snap)
             if snap.role == "leader" { hostnamesSection(snap) }
             exclusionsSection
@@ -392,6 +406,32 @@ struct TeamPane: View {
         }
     }
 
+    /// The teammate asks waiting for Allow/Deny (#220 Phase 2 §7.1); the
+    /// pane never sees `command.text` — the feed's `Pending` row is the
+    /// type boundary.
+    @ViewBuilder
+    private var pendingSection: some View {
+        let waiting = feed.pending.filter { $0.expires > now }
+        if !waiting.isEmpty {
+            Section("Waiting for your OK") {
+                ForEach(waiting) { row in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(row.driver) asks to \(row.action) \(row.project)")
+                            Text("expires in \(Int(row.expires.timeIntervalSince(now)))s")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Allow") { feed.decide?(row.id, true) }
+                            .buttonStyle(.borderedProminent).controlSize(.small)
+                        Button("Deny") { feed.decide?(row.id, false) }
+                            .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
     /// Team session control (#220 §7.1): grants, the add sheet, the feed.
     private func controlSection(_ snap: TeamSnapshot) -> some View {
         Section("Session control") {
@@ -400,13 +440,16 @@ struct TeamPane: View {
             }
             ForEach(team.grants.grants) { g in
                 HStack {
-                    Text("\(audienceLabel(g.audience, snap)) · \(sessionsLabel(g.sessions)) · \(g.capabilities.sorted().joined(separator: ", "))")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(audienceLabel(g.audience, snap)) · \(sessionsLabel(g.sessions)) · \(g.capabilitiesLabel())")
+                        Text(g.expiryLabel(now: Int(Date().timeIntervalSince1970))).font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Button("Remove") { Task { await team.revokeGrant(id: g.id) } }.controlSize(.small)
                 }
             }
             Button("Add grant…") { showGrant = true }
-            Text("A grant lets the people named send prompts, answer tool prompts or switch modes on the sessions named — from their Mac or `infinitusctl`. Every command is logged below.")
+            Text("A grant lets the people named drive the sessions named — from their Mac, the desktop app or `infinitusctl`. Stop, resume-past, delete, swap and hold ask you here first unless the grant says otherwise; delete always asks. Every command is logged below.")
                 .font(.caption).foregroundStyle(.secondary)
             if !feed.lines.isEmpty {
                 DisclosureGroup("Recent commands") {

@@ -144,6 +144,31 @@ final class AppModel: ObservableObject {
         if audit.outcome == TeamControl.Outcome.pending {
             notify("\(driver) asks to \(audit.action) \(project) — allow or deny in Settings › Team, or `infinitusctl team-pending`")
         }
+        refreshTeamPending()
+    }
+
+    /// Mirrors the box's in-memory waits into the feed's screen-safe rows
+    /// (#220 Phase 2 §7.1). Called on every audit: `pending`, `done`,
+    /// `refused`, `denied`, `expired` and `revoked` all change the list.
+    func refreshTeamPending() {
+        let entries = mirrorServer.teamControl.pending()
+        guard !entries.isEmpty else { teamControlFeed.setPending([]); return }
+        let sessions = entries.contains { $0.command.session != TeamControl.machineSession }
+            ? ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()) : []
+        let rows = entries.map { entry -> TeamControlFeed.Pending in
+            let driver = team.snapshot?.members.first { $0.kid == entry.driver }?.name ?? String(entry.driver.prefix(8))
+            let project: String
+            if entry.command.session == TeamControl.machineSession {
+                project = "this Mac"
+            } else if let session = sessions.first(where: { $0.sessionId == entry.command.session }) {
+                project = URL(fileURLWithPath: session.cwd).lastPathComponent
+            } else {
+                project = entry.command.session
+            }
+            return TeamControlFeed.Pending(id: entry.command.id, driver: driver, project: project,
+                                           action: entry.command.action, expires: Date(timeIntervalSince1970: TimeInterval(entry.expires)))
+        }
+        teamControlFeed.setPending(rows)
     }
 
     /// Where a teammate reaches this Mac right now (#220 §5.1), for now.json.
@@ -1576,6 +1601,9 @@ final class AppModel: ObservableObject {
         }
         mirrorServer.teamControl.onAudit = { [weak self] audit, name in
             Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
+        }
+        teamControlFeed.decide = { [weak self] id, allow in
+            self?.mirrorServer.teamControl.decide(id, allow: allow) { _ in }
         }
         // Both re-apply the listener first: joining, leaving or flipping
         // Discoverable decides whether the team keeps it up (#356).

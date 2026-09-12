@@ -1010,12 +1010,14 @@ final class TeamModel: ObservableObject {
     /// Local setting (never sent): where one kind goes. Applies to the
     /// next publish; `reshare(days:)` re-wraps history on request.
     /// Team session control (#220): who may drive which of my sessions.
-    func addGrant(audience: TeamRoster.ShareTarget, sessions: TeamGrants.Sessions, capabilities: Set<String>) async {
+    func addGrant(audience: TeamRoster.ShareTarget, sessions: TeamGrants.Sessions, capabilities: Set<String>,
+                  preauthorized: Set<String> = [], expires: Int? = nil) async {
         await action("Saving…") { paths, _ in
             guard let id = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
             let dir = paths.teamDir(id)
             var grants = TeamGrants.load(teamDir: dir)
-            grants.add(audience: audience, sessions: sessions, capabilities: capabilities, now: Int(Date().timeIntervalSince1970))
+            grants.add(audience: audience, sessions: sessions, capabilities: capabilities,
+                       preauthorized: preauthorized, expires: expires, now: Int(Date().timeIntervalSince1970))
             try grants.save(teamDir: dir)
         }
     }
