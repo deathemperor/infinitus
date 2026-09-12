@@ -80,7 +80,7 @@ const command = (name: string, stdin?: string): InfinitusManifestCommand => ({
   args: [],
   options: [],
   effect: "write",
-  summary: "",
+  summary: "…{kind, threadId, title, phase, detail?, local?}…",
   replyShape: "",
   ...(stdin === undefined ? {} : { stdin }),
 });
@@ -203,6 +203,7 @@ describe("InfinitusPushBridgeLive (#269 G)", () => {
             threadId: one,
             title: "Fix the build",
             phase: "waiting_for_approval",
+            local: false,
           },
         },
       ]);

@@ -33,12 +33,13 @@ import {
  * and Telegram. Nothing new on the wire: one verb the manifest lists with
  * `stdin: "payload"`, the JSON on the request line's `secret` field where
  * stdin material always travels, through the control client directly (the
- * `command` path is secret-free and polls after every write).
- *
- * Off by default (`infinitusPushBridge`): the desktop already posts its own
- * banner for these phases (#270 B), and the Mac's `push` also posts one, so
- * a Mac running both would see two per approval. The setting is for the
- * away channels. The setting is read first, so a server with the switch off
+ * `command` path is secret-free and polls after every write). The payload
+ * says `local: false`: the desktop already posts its own banner for these
+ * phases (#270 B), so the Mac skips its Notification Center notice and the
+ * push is for the away channels — which is why it is on by default
+ * (`infinitusPushBridge`) and why an app whose `push` predates the flag
+ * (its summary does not name `local`) gets no push rather than a doubled
+ * banner. The setting is read first, so a server with the switch off
  * pays no projection read per event; while it is on each event's phase is
  * recorded per thread before the socket call, first sighting silently (a
  * boot, or the switch just turned on), so a restart announces nothing and

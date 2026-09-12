@@ -13,8 +13,8 @@ const PUSH_LABEL = "Push thread alerts through Infinitus";
  * marker row in the thread. Server-scoped: the server that runs the thread is
  * the one that resumes it. Below it the push bridge switch (#269 G): a
  * thread waiting on a person, finished or failed goes out through the Mac's
- * channels — the phone, Slack, Telegram — off by default since the desktop's
- * own notifications already cover this screen.
+ * channels — the phone, Slack, Telegram; the Mac skips its own notice since
+ * the desktop's notifications already cover this screen.
  */
 export function InfinitusResumeCard() {
   const enabled = usePrimarySettings((settings) => settings.infinitusResumeOnLimit);
@@ -51,7 +51,7 @@ export function InfinitusResumeCard() {
       <SettingsRow
         serverScoped
         title={PUSH_LABEL}
-        description="When a thread waits for an approval or an answer, finishes or fails, Infinitus sends the alert the way it sends its own: the phone, Slack, Telegram. The desktop's own notifications stay as they are."
+        description="When a thread waits for an approval or an answer, finishes or fails, Infinitus sends the alert the way it sends its own: the phone, Slack, Telegram. On this Mac the desktop's own notification is the only one."
         resetAction={
           pushEnabled !== DEFAULT_UNIFIED_SETTINGS.infinitusPushBridge ? (
             <SettingResetButton

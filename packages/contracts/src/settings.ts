@@ -1069,9 +1069,9 @@ export const ServerSettings = Schema.Struct({
   // account Infinitus swapped to. Default on; the switch is Settings › Infinitus.
   infinitusResumeOnLimit: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Fork (#269 G): a thread waiting on a person, finished or failed is pushed
-  // through the Mac's own channels (phone, Slack, Telegram). Default off: the
-  // desktop's own notifications (#270 B) already cover the Mac's screen.
-  infinitusPushBridge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  // through the Mac's own channels (phone, Slack, Telegram); the Mac's own
+  // notice is skipped, the desktop's notifications (#270 B) cover its screen.
+  infinitusPushBridge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Fork (#574): the Slack bridge; its tokens are redacted for clients.
   infinitusSlack: InfinitusSlackSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   /**
