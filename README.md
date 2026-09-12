@@ -10,7 +10,7 @@ What the desktop, web and phone apps add to the agent client:
 - **Command palette** — "Open accounts".
 - **Event toasts** — the engine's events (a swap, a reset, a session that needs you) surface as toasts in the app shell.
 - **Phone** — Accounts and Sessions per paired Mac, and a Live Activity the Mac drives while an agent works.
-- **Desktop** — the `run.infinitus.desktop` app, state under `~/.infinitus`, the menu bar app nested as a login item, and an `infinitus` update channel fed by the one GitHub release per `v<version>` tag.
+- **Desktop** — the `run.infinitus.desktop` app, state under `~/.infinitus`, the menu bar app nested as a login item, and in-app updates from the GitHub releases.
 
 Install: `Infinitus-<version>-arm64.dmg` from the [latest release](https://github.com/deathemperor/infinitus/releases/latest) is the desktop app with the menu bar app nested inside as a login item — one download. The menu bar app alone: `brew install --cask deathemperor/tap/infinitus` (or `Infinitus-<version>.zip` from the same release); Linux gets `infinitus-tray-linux-x86_64` / `-aarch64` and `infinitus-omarchy.tar.gz` beside them. The engine is [swapd](https://github.com/deathemperor/swapd).
 
