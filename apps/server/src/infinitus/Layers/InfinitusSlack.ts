@@ -12,6 +12,7 @@ import {
 import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -34,6 +35,7 @@ import {
   type SlackInbound,
   type SlackPost,
 } from "../Services/InfinitusSlackClient.ts";
+import { OFFLINE_TEXT } from "./infinitusSlackSocket.logic.ts";
 import {
   activityLine,
   approvalMessage,
@@ -85,6 +87,8 @@ export const InfinitusSlackLive = Layer.effectDiscard(
     /** Per thread: what has been posted once (turn ids, PR states, request ids). */
     const posted = new Map<ThreadId, Set<string>>();
     const seenEnvelopes = new Set<string>();
+    /** Threads this process started or steered: told when it goes away. */
+    const liveThreads = new Set<ThreadId>();
 
     const oncePer = (threadId: ThreadId, key: string): boolean => {
       const set = posted.get(threadId) ?? new Set<string>();
@@ -245,6 +249,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
           interactionMode: "default",
           createdAt,
         });
+        liveThreads.add(threadId);
         yield* Effect.logInfo("infinitus.slack.started", {
           threadId,
           projectId: project.id,
@@ -270,6 +275,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
       Effect.gen(function* () {
         const command = replyCommand(event.text);
         if (command === null) return;
+        liveThreads.add(binding.threadId);
         const shell = Option.getOrUndefined(yield* shellOf(binding.threadId));
         if (shell === undefined || shell.archivedAt !== null) {
           return yield* postTo(binding, "That thread is gone.");
@@ -352,9 +358,17 @@ export const InfinitusSlackLive = Layer.effectDiscard(
 
     const handleInbound = (event: SlackInbound) =>
       Effect.gen(function* () {
-        if (seenEnvelopes.has(event.envelopeId)) return;
-        seenEnvelopes.add(event.envelopeId);
-        if (seenEnvelopes.size > 2000) seenEnvelopes.delete(seenEnvelopes.values().next().value!);
+        // Socket Mode redelivers an envelope it saw no ack for, and a threaded
+        // mention arrives twice (`app_mention` and its `message` twin): both drop.
+        const keys =
+          event.kind === "action"
+            ? [event.envelopeId]
+            : [event.envelopeId, `${event.channel}:${event.ts}`];
+        if (keys.some((key) => seenEnvelopes.has(key))) return;
+        for (const key of keys) {
+          seenEnvelopes.add(key);
+          if (seenEnvelopes.size > 2000) seenEnvelopes.delete(seenEnvelopes.values().next().value!);
+        }
         const { armed, allowed, defaultModelSelection } = yield* gate;
         if (!armed) return;
         if (!allowed.has(event.userId)) {
@@ -461,6 +475,20 @@ export const InfinitusSlackLive = Layer.effectDiscard(
       }).pipe(
         Effect.catchCause((cause) => Effect.logWarning("infinitus.slack.event-failed", { cause })),
       );
+
+    // A clean shutdown tells the threads this process was driving; a crash
+    // or a closed lid cannot (Socket Mode queues nothing), see the issue.
+    // Bounded: a slow Slack must not hold the server's exit.
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach(
+        [...liveThreads],
+        (threadId) => {
+          const binding = byThread.get(threadId);
+          return binding === undefined ? Effect.void : postTo(binding, OFFLINE_TEXT);
+        },
+        { discard: true },
+      ).pipe(Effect.timeout(Duration.seconds(5)), Effect.ignore),
+    );
 
     // Subscribe first so nothing published while the file loads is missed;
     // each handler waits for the load before it reads the maps.

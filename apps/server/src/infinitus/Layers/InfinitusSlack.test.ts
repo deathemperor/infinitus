@@ -58,19 +58,21 @@ const testCrypto = Crypto.make({
   digest: (_algorithm, data) => Effect.succeed(data),
 });
 
-const reply = (text: string): SlackInbound => ({
+const reply = (text: string, ts = `r.${++uuidCounter}`): SlackInbound => ({
   kind: "reply",
   envelopeId: `env-${++uuidCounter}`,
   channel: "C1",
   threadTs: "1.1",
+  ts,
   userId: "U1",
   text,
 });
-const mention = (text: string, userId = "U1"): SlackInbound => ({
+const mention = (text: string, userId = "U1", ts = `m.${++uuidCounter}`): SlackInbound => ({
   kind: "mention",
   envelopeId: `env-${++uuidCounter}`,
   channel: "C1",
   threadTs: "1.1",
+  ts,
   userId,
   text,
 });
@@ -209,11 +211,15 @@ describe("InfinitusSlack (#574)", () => {
       yield* harness.send(reply("also add tests"));
       yield* harness.send(reply("stop"));
       yield* harness.send(reply("babysit"));
+      // A threaded mention arrives twice (app_mention, then its message twin): one command.
+      yield* harness.send(mention("<@U0BOT> and docs", "U1", "9.9"));
+      yield* harness.send(reply("<@U0BOT> and docs", "9.9"));
       const later = (yield* harness.dispatched).slice(2);
       expect(later.map((command) => command.type)).toEqual([
         "thread.turn.queue",
         "thread.turn.interrupt",
         "thread.meta.update",
+        "thread.turn.queue",
       ]);
       expect(later[2]).toMatchObject({ babysit: true });
 

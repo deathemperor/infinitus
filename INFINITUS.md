@@ -220,8 +220,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648). `InfinitusSlackLive` (provided `SlackClientInert`) beside it
-  (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
+  (#648). `InfinitusSlackLive` (provided `SlackClientLive` over
+  `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
@@ -1001,8 +1001,7 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts`, tests) —
   the Slack bridge's reactor (#574, PR 2 of 4). `SlackClient` is the
   transport seam (inbound `mention` / `reply` / `action` events with an
-  envelope id, `post`); `SlackClientInert` (nothing arrives, a post fails)
-  fills it in `server.ts` until the Socket Mode client lands (PR 4). A
+  envelope id, `post`), filled by `InfinitusSlackSocket.ts` below. A
   mention `@Infinitus <project> [build] <task>` from an allowed user
   (`infinitusSlack.allowedUserIds`; `enabled` and both tokens are the
   gate, anyone else gets no reply and an id-only log line) resolves the
@@ -1030,9 +1029,13 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   turn id) as "Done." / "Failed." plus the last assistant message cut at
   1500 chars and the PR link; the fork's activity rows (limited, held,
   paused, resumed, babysit) as fixed lines — a row's summary can name an
-  account and never travels. Inbound envelopes are deduped; message text
+  account and never travels. Inbound envelopes are deduped by id and, for
+  a mention or reply, by the message's own `ts` too (a threaded mention
+  arrives as `app_mention` and as its `message` twin); message text
   reaches no log, only its length; a failed post is logged and the thread
-  runs on. Tests: `infinitusSlack.logic.test.ts`, `InfinitusSlack.test.ts`
+  runs on. A clean shutdown posts "Infinitus went offline." once to every
+  thread this process started or steered (the layer's finalizer); a crash
+  or a closed lid cannot, and Socket Mode queues nothing meanwhile. Tests: `infinitusSlack.logic.test.ts`, `InfinitusSlack.test.ts`
   (mocked engine, projection, provider stream, settings, Slack client, an
   in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
@@ -1504,6 +1507,24 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (#346): `known: true` replies are all new, `known: false` (the app
   restarted) re-seeds the cursor and publishes only rows newer than the last
   one seen; builds without the option get the full-list read as before.
+- `apps/server/src/infinitus/Layers/InfinitusSlackSocket.ts` (+
+  `infinitusSlackSocket.logic.ts`, test) — the Socket Mode client (#574,
+  PR 4), `SlackClientLive`. While `infinitusSlack.enabled` and both tokens
+  hold (re-read on every settings change: a change interrupts the loop and
+  starts it over) it asks `apps.connections.open` for a socket URL with the
+  app-level token, opens it with Node's global `WebSocket`, acks every
+  envelope by id at once and turns it into at most one inbound event
+  (`parseSocketFrame`: `app_mention` → mention, a threaded user `message`
+  with no subtype and no `bot_id` → reply, `block_actions` → action; Slack's
+  escapes and `<url|label>` links unwrapped); `hello` resets the backoff,
+  `disconnect`, a close or an error reconnects after 1, 2, 4 … 60 s
+  (`reconnectDelaySeconds`). `post` is `chat.postMessage` with the bot
+  token. Tokens travel in the Authorization header only — never argv, a
+  log line or a span; the log carries attempt counts, `greeted` and
+  Slack's `error` word. Socket Mode disables HTTP event delivery for the
+  whole Slack app, so the bridge needs its own "Infinitus" app, and at most
+  one server holds its socket. The transport itself has no test (a real
+  socket); the frame translation and backoff do.
 - `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+
   `slack.logic.ts`, test) — Settings › Infinitus › Slack (#574, PR 3), the
   "Slack" section under Threads on the Menu bar page (`settings.infinitus.index.tsx`
