@@ -303,6 +303,82 @@ it.layer(NodeServices.layer)("server settings", (it) => {
     ).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
+  it.effect(
+    "keeps the Slack tokens in the secret store, off the file and off the wire (#574)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const serverConfig = yield* ServerConfig.ServerConfig;
+          const fileSystem = yield* FileSystem.FileSystem;
+          const secretStore = yield* ServerSecretStore.ServerSecretStore;
+          const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+          const readPersisted = fileSystem
+            .readFileString(serverConfig.settingsPath)
+            .pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(ServerSettings))),
+            );
+          const redacted = "\u2022\u2022\u2022\u2022\u2022\u2022";
+          const readStored = (name: string) =>
+            secretStore
+              .get(name)
+              .pipe(
+                Effect.map((stored) =>
+                  Option.isSome(stored) ? new TextDecoder().decode(stored.value) : null,
+                ),
+              );
+
+          const updated = yield* serverSettings.updateSettings({
+            infinitusSlack: {
+              enabled: true,
+              allowedUserIds: ["U1"],
+              appToken: "xapp-1",
+              botToken: "xoxb-1",
+            },
+          });
+          assert.deepStrictEqual(updated.infinitusSlack, {
+            enabled: true,
+            allowedUserIds: ["U1"],
+            appToken: "xapp-1",
+            botToken: "xoxb-1",
+          });
+          const persisted = yield* readPersisted;
+          assert.deepStrictEqual(persisted.infinitusSlack, {
+            enabled: true,
+            allowedUserIds: ["U1"],
+            appToken: redacted,
+            botToken: redacted,
+          });
+          assert.strictEqual(yield* readStored("infinitus-slack-app-token"), "xapp-1");
+          assert.deepStrictEqual(
+            ServerSettingsModule.redactServerSettingsForClient(updated).infinitusSlack,
+            { enabled: true, allowedUserIds: ["U1"], appToken: redacted, botToken: redacted },
+          );
+
+          // The marker sent back keeps the token; an empty string clears it.
+          const kept = yield* serverSettings.updateSettings({
+            infinitusSlack: { appToken: redacted, botToken: "" },
+          });
+          assert.strictEqual(kept.infinitusSlack.appToken, "xapp-1");
+          assert.strictEqual(kept.infinitusSlack.botToken, "");
+          assert.strictEqual(yield* readStored("infinitus-slack-bot-token"), null);
+          assert.strictEqual((yield* readPersisted).infinitusSlack.botToken, "");
+        }),
+      ).pipe(
+        // The store is merged in, not just provided: the test reads it too.
+        Effect.provide(
+          ServerSettingsModule.layer.pipe(
+            Layer.provideMerge(ServerSecretStore.layer),
+            Layer.provideMerge(Layer.fresh(SqlitePersistenceMemory)),
+            Layer.provideMerge(
+              Layer.fresh(
+                ServerConfig.layerTest(process.cwd(), { prefix: "t3code-server-settings-test-" }),
+              ),
+            ),
+          ),
+        ),
+      ),
+  );
+
   it.effect("persists and broadcasts thread settlement settings", () =>
     Effect.scoped(
       Effect.gen(function* () {

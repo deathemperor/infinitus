@@ -150,6 +150,23 @@ function usageLimitSourceSecretName(sourceId: string): string {
   return `usage-limit-source-${Buffer.from(sourceId, "utf8").toString("base64url")}`;
 }
 
+/** Fork (#574): the Slack bridge's two tokens, kept like a hub key. */
+const INFINITUS_SLACK_SECRET_NAMES = {
+  appToken: "infinitus-slack-app-token",
+  botToken: "infinitus-slack-bot-token",
+} as const;
+type InfinitusSlackTokenField = keyof typeof INFINITUS_SLACK_SECRET_NAMES;
+
+function redactInfinitusSlack(
+  slack: ServerSettings["infinitusSlack"],
+): ServerSettings["infinitusSlack"] {
+  return {
+    ...slack,
+    appToken: slack.appToken.length > 0 ? USAGE_LIMIT_SOURCE_KEY_REDACTED : "",
+    botToken: slack.botToken.length > 0 ? USAGE_LIMIT_SOURCE_KEY_REDACTED : "",
+  };
+}
+
 function redactProviderEnvironmentVariable(
   variable: ProviderInstanceEnvironmentVariable,
 ): ProviderInstanceEnvironmentVariable {
@@ -186,7 +203,12 @@ export function redactServerSettingsForClient(settings: ServerSettings): ServerS
       },
     ]),
   );
-  return { ...settings, providerInstances, usageLimitSources };
+  return {
+    ...settings,
+    providerInstances,
+    usageLimitSources,
+    infinitusSlack: redactInfinitusSlack(settings.infinitusSlack),
+  };
 }
 
 export class ServerSettingsService extends Context.Service<
@@ -652,6 +674,43 @@ const make = Effect.gen(function* () {
 
   const getSettingsFromCache = Cache.get(settingsCache, cacheKey);
 
+  // Fork (#574): a Slack token on disk is the marker; the value is in the store.
+  const readInfinitusSlackToken = (
+    field: InfinitusSlackTokenField,
+    value: string,
+  ): Effect.Effect<string, ServerSettingsError> =>
+    value !== USAGE_LIMIT_SOURCE_KEY_REDACTED
+      ? Effect.succeed(value)
+      : secretStore.get(INFINITUS_SLACK_SECRET_NAMES[field]).pipe(
+          Effect.map((secret) => (Option.isSome(secret) ? textDecoder.decode(secret.value) : "")),
+          Effect.mapError(
+            (cause) => new ServerSettingsError({ settingsPath, operation: "read-secret", cause }),
+          ),
+        );
+
+  // The marker sent back means "keep what you have"; an empty string clears.
+  const persistInfinitusSlackToken = (
+    field: InfinitusSlackTokenField,
+    value: string,
+  ): Effect.Effect<string, ServerSettingsError> =>
+    value === USAGE_LIMIT_SOURCE_KEY_REDACTED
+      ? Effect.succeed(value)
+      : value.length === 0
+        ? secretStore.remove(INFINITUS_SLACK_SECRET_NAMES[field]).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({ settingsPath, operation: "remove-secret", cause }),
+            ),
+            Effect.as(""),
+          )
+        : secretStore.set(INFINITUS_SLACK_SECRET_NAMES[field], textEncoder.encode(value)).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({ settingsPath, operation: "write-secret", cause }),
+            ),
+            Effect.as(USAGE_LIMIT_SOURCE_KEY_REDACTED),
+          );
+
   const materializeProviderEnvironmentSecrets = (
     settings: ServerSettings,
   ): Effect.Effect<ServerSettings, ServerSettingsError> =>
@@ -709,10 +768,16 @@ const make = Effect.gen(function* () {
           managementKey: Option.isSome(secret) ? textDecoder.decode(secret.value) : "",
         };
       }
+      const infinitusSlack = {
+        ...settings.infinitusSlack,
+        appToken: yield* readInfinitusSlackToken("appToken", settings.infinitusSlack.appToken),
+        botToken: yield* readInfinitusSlackToken("botToken", settings.infinitusSlack.botToken),
+      };
       return {
         ...settings,
         providerInstances: providerInstances as ServerSettings["providerInstances"],
         usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
+        infinitusSlack,
       };
     });
 
@@ -881,10 +946,16 @@ const make = Effect.gen(function* () {
           );
       }
 
+      const infinitusSlack = {
+        ...next.infinitusSlack,
+        appToken: yield* persistInfinitusSlackToken("appToken", next.infinitusSlack.appToken),
+        botToken: yield* persistInfinitusSlackToken("botToken", next.infinitusSlack.botToken),
+      };
       return {
         ...next,
         providerInstances: providerInstances as ServerSettings["providerInstances"],
         usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
+        infinitusSlack,
       };
     });
 
