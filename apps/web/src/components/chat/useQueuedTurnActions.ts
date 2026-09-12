@@ -1,4 +1,8 @@
-import type { EnvironmentId, OrchestrationQueuedTurn } from "@t3tools/contracts";
+import {
+  type EnvironmentId,
+  type OrchestrationQueuedTurn,
+  QUEUED_TURN_GONE,
+} from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -98,7 +102,18 @@ export function useQueuedTurnActions(input: {
           interactionMode: thread.interactionMode,
           queuedFrom: row.queueId,
         },
-      }).then((result) => reportFailure("Could not send the queued message", result));
+      }).then((result) => {
+        if (
+          result._tag === "Failure" &&
+          !isAtomCommandInterrupted(result) &&
+          failureDescription(result)?.includes(QUEUED_TURN_GONE)
+        ) {
+          // The drain (or another client) sent the row first: not an error.
+          toastManager.add({ type: "info", title: "Already sent" });
+          return;
+        }
+        reportFailure("Could not send the queued message", result);
+      });
     },
     [environmentId, startTurn, thread],
   );

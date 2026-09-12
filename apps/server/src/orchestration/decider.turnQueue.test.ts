@@ -226,35 +226,39 @@ it.layer(NodeServices.layer)("turn queue decider (#806)", (it) => {
     }),
   );
 
-  it.effect("a turn start from a queued row removes the row in the same batch", () =>
-    Effect.gen(function* () {
-      const start = {
-        type: "thread.turn.start" as const,
-        commandId: CommandId.make("cmd-start"),
-        threadId,
-        message: message("m1", "queued q1"),
-        runtimeMode: "full-access" as const,
-        interactionMode: "default" as const,
-        queuedFrom: QueueId.make("q1"),
-        createdAt: LATER,
-      };
-      const withRow = events(
-        yield* decideOrchestrationCommand({
-          command: start,
-          readModel: makeReadModel({ queuedTurns: [row("q1", "m")] }),
-        }),
-      ).map((event) => event.type);
-      expect(withRow).toEqual([
-        "thread.message-sent",
-        "thread.turn-start-requested",
-        "thread.turn-queue-removed",
-      ]);
+  it.effect(
+    "a turn start from a queued row removes the row in the same batch, and a gone row refuses the start",
+    () =>
+      Effect.gen(function* () {
+        const start = {
+          type: "thread.turn.start" as const,
+          commandId: CommandId.make("cmd-start"),
+          threadId,
+          message: message("m1", "queued q1"),
+          runtimeMode: "full-access" as const,
+          interactionMode: "default" as const,
+          queuedFrom: QueueId.make("q1"),
+          createdAt: LATER,
+        };
+        const withRow = events(
+          yield* decideOrchestrationCommand({
+            command: start,
+            readModel: makeReadModel({ queuedTurns: [row("q1", "m")] }),
+          }),
+        ).map((event) => event.type);
+        expect(withRow).toEqual([
+          "thread.message-sent",
+          "thread.turn-start-requested",
+          "thread.turn-queue-removed",
+        ]);
 
-      // The row was removed meanwhile: the send still goes, nothing else.
-      const withoutRow = events(
-        yield* decideOrchestrationCommand({ command: start, readModel: makeReadModel({}) }),
-      ).map((event) => event.type);
-      expect(withoutRow).toEqual(["thread.message-sent", "thread.turn-start-requested"]);
-    }),
+        // The row went meanwhile (the drain or "Send now" got there first, or
+        // the user removed it): the start is refused, the message is not sent twice.
+        const withoutRow = yield* decideOrchestrationCommand({
+          command: start,
+          readModel: makeReadModel({}),
+        }).pipe(Effect.flip);
+        expect(String(withoutRow)).toContain("already sent or removed");
+      }),
   );
 });

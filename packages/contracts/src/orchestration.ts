@@ -719,6 +719,11 @@ export const OrchestrationQueuedTurn = Schema.Struct({
 export type OrchestrationQueuedTurn = typeof OrchestrationQueuedTurn.Type;
 
 /** Fork (#269 A): automatic rounds a babysat thread runs before it stops. */
+/** The refusal a `thread.turn.start` gets when its `queuedFrom` row is gone
+    (#806): the drain or "Send now" already sent it, or the user removed it.
+    Clients match this to keep the refusal quiet. */
+export const QUEUED_TURN_GONE = "already sent or removed";
+
 export const BABYSIT_MAX_ROUNDS = 10;
 
 /**
