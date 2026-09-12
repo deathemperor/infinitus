@@ -15,6 +15,7 @@ publishes the matching section as the GitHub release body.
 - A session that stops on an API error — a usage limit, an outage — reads idle at once and the error kind shows in Activity, from Claude Code's StopFailure hook (#79).
 - Resume after a limit no longer waits for a usage read of the account swapd just switched to — the switch is that read, so stopped sessions get their nudge about two minutes sooner (#964).
 - An account whose usage swapd could not refresh shows how old its numbers are — "· 6 min ago" beside the plan, "Stale · 6 min ago" on the Accounts page — instead of reading like a fresh one (#965).
+- A session no longer disappears from the list for a minute while Claude Code is rewriting its record.
 
 ### Desktop
 - Installing an update while threads run asks in a dialog again, not a toast: Later, Install now, or Install when they finish — and that wait no longer lapses at the next update check, which read as "checking" for a moment and silently cancelled it; clicking the armed update button opens the dialog to keep, cancel or skip the wait (#829).
