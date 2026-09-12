@@ -2,9 +2,10 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ComponentProps } from "react";
 import { Alert, Platform } from "react-native";
 
+import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
@@ -23,6 +24,53 @@ import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
+
+/**
+ * A settings row that opens a menu of choices. iOS: `ControlPillMenu`'s
+ * native `MenuView` opens on the tap whatever the row does, so the row's
+ * press is a no-op. Android: `AndroidAnchoredMenu` wraps a plain child in
+ * its own Pressable, which the row's inner Pressable would swallow, so the
+ * row is handed `open` to call from its own press instead.
+ */
+function PickerRow(props: {
+  readonly title: string;
+  readonly actions: MenuAction[];
+  readonly onPressAction: NonNullable<ComponentProps<typeof ControlPillMenu>["onPressAction"]>;
+  readonly icon: ComponentProps<typeof SettingsRow>["icon"];
+  readonly label: string;
+  readonly value: string;
+  readonly disabled?: boolean;
+}) {
+  const row = (open: () => void) => (
+    <SettingsRow
+      icon={props.icon}
+      label={props.label}
+      value={props.value}
+      disabled={props.disabled}
+      onPress={open}
+    />
+  );
+  if (Platform.OS === "android") {
+    return (
+      <AndroidAnchoredMenu
+        title={props.title}
+        actions={props.actions}
+        onPressAction={props.onPressAction}
+      >
+        {row}
+      </AndroidAnchoredMenu>
+    );
+  }
+  return (
+    <ControlPillMenu
+      title={props.title}
+      actions={props.actions}
+      onPressAction={props.onPressAction}
+    >
+      {row(() => {})}
+    </ControlPillMenu>
+  );
+}
 
 /** The working cards live on this phone right now, none off iOS or when
     the widgets module is not there. */
@@ -137,7 +185,7 @@ export function SettingsInfinitusSection() {
             void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
         }}
       />
-      <ControlPillMenu
+      <PickerRow
         title="Sending while a turn runs"
         actions={sendModeActions}
         onPressAction={({ nativeEvent }) => {
@@ -145,25 +193,22 @@ export function SettingsInfinitusSection() {
           if (mode === "queue" || mode === "steer")
             savePreferences({ infinitusComposerSendMode: mode });
         }}
-      >
-        <SettingsRow
-          icon="tray.and.arrow.up"
-          label="Sending while a turn runs"
-          value={COMPOSER_SEND_MODE_LABELS[sendMode]}
-          disabled={!loaded}
-          onPress={() => {}}
-        />
-      </ControlPillMenu>
+        icon="tray.and.arrow.up"
+        label="Sending while a turn runs"
+        value={COMPOSER_SEND_MODE_LABELS[sendMode]}
+        disabled={!loaded}
+      />
       {macs.length > 1 && pusher ? (
-        <ControlPillMenu
+        <PickerRow
           title="Mac that drives the card and sends alerts"
           actions={macActions}
           onPressAction={({ nativeEvent }) =>
             savePreferences({ infinitusLiveActivityMac: nativeEvent.event })
           }
-        >
-          <SettingsRow icon="desktopcomputer" label="Mac" value={pusher.label} onPress={() => {}} />
-        </ControlPillMenu>
+          icon="desktopcomputer"
+          label="Mac"
+          value={pusher.label}
+        />
       ) : null}
     </SettingsSection>
   );
