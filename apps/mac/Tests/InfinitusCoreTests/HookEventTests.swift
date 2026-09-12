@@ -57,4 +57,21 @@ final class HookEventTests: XCTestCase {
         XCTAssertNil(HookEvent.parse("not json"))
         XCTAssertNil(HookEvent.parse(#"{"session_id":"x"}"#))
     }
+
+    /// The hint a `Stop`/`SessionEnd` hook lets the app assume ahead of
+    /// the record (#79).
+    func testStopHintsIdleUnlessAStopHookFiredIt() {
+        let stop = HookEvent.parse(#"{"session_id":"abc","cwd":"/r","hook_event_name":"Stop","stop_hook_active":false}"#)
+        XCTAssertEqual(stop?.statusHint()?.status, "idle")
+
+        let fromStopHook = HookEvent.parse(#"{"session_id":"abc","cwd":"/r","hook_event_name":"Stop","stop_hook_active":true}"#)
+        XCTAssertNil(fromStopHook?.statusHint())
+
+        let ended = HookEvent.parse(#"{"session_id":"abc","cwd":"/r","hook_event_name":"SessionEnd","reason":"exit"}"#)
+        XCTAssertEqual(ended?.statusHint()?.status, nil)
+        XCTAssertNotNil(ended?.statusHint())
+
+        let notification = HookEvent(name: "Notification", cwd: "/r/app", notificationType: "auth_success")
+        XCTAssertNil(notification.statusHint())
+    }
 }

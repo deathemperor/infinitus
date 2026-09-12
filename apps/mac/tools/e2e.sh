@@ -521,6 +521,28 @@ echo "aws: need surfaced after ${i}s"
 # #612: the row carries the id, the start and the need the fork's list shows;
 # the by-hand nudge is a no-op with its reason on a session that never stopped.
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
+# #79: the Stop hook hints idle at once; the record's next statusUpdatedAt
+# still wins.
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
+ "statusUpdatedAt":1700000000000}
+EOF
+"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='busy'" || fail "session busy before the Stop hook (#79)"
+printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"Stop","stop_hook_active":false}' "$SESSION_CWD" \
+    | "$CTL" event >/dev/null || fail "event Stop"
+"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "Stop hint did not read idle ahead of the record (#79)"
+sleep 1
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
+ "statusUpdatedAt":$(date +%s)000}
+EOF
+"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='busy'" || fail "a fresh record status did not override the Stop hint (#79)"
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
+EOF
 "$CTL" nudge "$SESSION_PID" | expect "d['pid']==$SESSION_PID and d['nudged']==False and d['reason'].startswith('not resumable')" || fail "nudge no-op"
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the

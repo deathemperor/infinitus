@@ -812,6 +812,10 @@ final class AppModel: ObservableObject {
     /// main actor so `PastSessions.list/find` can read it from the mirror
     /// box or a popover's detached task without hopping here first.
     let hiddenSessions = OSAllocatedUnfairLock(initialState: PastSessions.Hidden.load(root: AppSupport.root()).ids)
+    /// `Stop`/`SessionEnd` hints ahead of Claude Code's own record (#79);
+    /// off the main actor like `hiddenSessions` — `ownedRoster` reads it
+    /// from wherever the control socket calls in.
+    let sessionStatusHints = OSAllocatedUnfairLock(initialState: SessionStatusHints())
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
@@ -930,6 +934,9 @@ final class AppModel: ObservableObject {
         if event.name == "UserPromptSubmit", checkpointsEnabled, !isPlayground,
            let sessionId = event.sessionId, let cwd = event.cwd {
             recordCheckpoint(sessionId: sessionId, cwd: cwd, subject: event.prompt ?? "")
+        }
+        if let sessionId = event.sessionId, let hint = event.statusHint() {
+            sessionStatusHints.withLock { $0.note(sessionId: sessionId, hint) }
         }
         if let line = event.pushLine, !isPlayground, !forkDriven {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
@@ -3283,10 +3290,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The roster with an owned child's status filled in from its actor
-    /// (the CLI leaves an sdk-cli record's status empty).
+    /// The roster with the hook hints applied (#79) and an owned child's
+    /// status filled in from its actor (the CLI leaves an sdk-cli record's
+    /// status empty) — the overlay stays last: an owned child's actor is
+    /// the truth for its own pid.
     nonisolated func ownedRoster(claudeDir: URL) -> [ClaudeSessionRecord] {
-        overlayingOwnedStatus(ClaudeSessions.list(claudeDir: claudeDir))
+        let hinted = sessionStatusHints.withLock { $0.apply(ClaudeSessions.list(claudeDir: claudeDir)) }
+        return overlayingOwnedStatus(hinted)
     }
 
     nonisolated func overlayingOwnedStatus(_ records: [ClaudeSessionRecord]) -> [ClaudeSessionRecord] {

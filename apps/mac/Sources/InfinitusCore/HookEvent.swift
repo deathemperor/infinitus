@@ -13,10 +13,16 @@ public struct HookEvent: Equatable, Sendable {
     public let toolCommand: String?
     /// UserPromptSubmit: the prompt's text — a checkpoint's subject (#167).
     public let prompt: String?
+    /// Stop: whether a stop hook (not this one) is what ended the turn —
+    /// then the turn isn't really over, so no idle hint (#79).
+    public let stopHookActive: Bool?
+    /// SessionEnd's own field; unused beyond `statusHint` today.
+    public let reason: String?
 
     public init(name: String, sessionId: String? = nil, cwd: String? = nil,
                 message: String? = nil, notificationType: String? = nil,
-                toolName: String? = nil, toolCommand: String? = nil, prompt: String? = nil) {
+                toolName: String? = nil, toolCommand: String? = nil, prompt: String? = nil,
+                stopHookActive: Bool? = nil, reason: String? = nil) {
         self.name = name
         self.sessionId = sessionId
         self.cwd = cwd
@@ -25,6 +31,8 @@ public struct HookEvent: Equatable, Sendable {
         self.toolName = toolName
         self.toolCommand = toolCommand
         self.prompt = prompt
+        self.stopHookActive = stopHookActive
+        self.reason = reason
     }
 
     public static func parse(_ json: String) -> HookEvent? {
@@ -37,7 +45,9 @@ public struct HookEvent: Equatable, Sendable {
                          notificationType: object["notification_type"] as? String,
                          toolName: object["tool_name"] as? String,
                          toolCommand: (object["tool_input"] as? [String: Any])?["command"] as? String,
-                         prompt: object["prompt"] as? String)
+                         prompt: object["prompt"] as? String,
+                         stopHookActive: object["stop_hook_active"] as? Bool,
+                         reason: object["reason"] as? String)
     }
 
     public var repo: String {
@@ -62,6 +72,17 @@ public struct HookEvent: Equatable, Sendable {
         let detail = (message ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return detail.isEmpty ? "waiting on you — \(repo) needs an answer"
                               : "waiting on you — \(repo): \(detail)"
+    }
+
+    /// The status the hook lets the app assume ahead of the record (#79).
+    /// nil: nothing to assume (a `Stop` fired by a stop hook, or any
+    /// other event).
+    public func statusHint(now: Date = Date()) -> SessionStatusHints.Hint? {
+        switch name {
+        case "Stop": return stopHookActive == true ? nil : .init(status: "idle", at: now)
+        case "SessionEnd": return .init(status: nil, at: now)
+        default: return nil
+        }
     }
 
     public var logLine: String {
