@@ -10,7 +10,7 @@ import {
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
-import type { OrchestrationThread } from "@t3tools/contracts";
+import type { OrchestrationEvent, OrchestrationThread } from "@t3tools/contracts";
 
 import { applyThreadDetailEvent } from "./threadReducer.ts";
 
@@ -1173,6 +1173,55 @@ describe("applyThreadDetailEvent", () => {
       if (result.kind === "updated") {
         expect(result.thread.activities).toHaveLength(1);
         expect(result.thread.activities[0]?.kind).toBe("file-edit");
+      }
+    });
+
+    it("cuts a live history back to the snapshot window past the high-water mark (#900)", () => {
+      const appended = (index: number): OrchestrationEvent => ({
+        ...baseEventFields,
+        sequence: 100 + index,
+        occurredAt: "2026-04-01T11:00:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: ThreadId.make("thread-1"),
+        type: "thread.activity-appended",
+        payload: {
+          threadId: ThreadId.make("thread-1"),
+          activity: {
+            id: EventId.make(`activity-${index}`),
+            tone: "tool",
+            kind: "file-edit",
+            summary: `Edit ${index}`,
+            payload: {},
+            turnId: TurnId.make("turn-1"),
+            sequence: 100 + index,
+            createdAt: "2026-04-01T11:00:00.000Z",
+          },
+        },
+      });
+      let thread = baseThread;
+      for (let index = 0; index < 1000; index += 1) {
+        const result = applyThreadDetailEvent(thread, appended(index));
+        if (result.kind === "updated") thread = result.thread;
+      }
+      expect(thread.activities).toHaveLength(1000);
+
+      const trimmed = applyThreadDetailEvent(thread, appended(1000));
+      expect(trimmed.kind).toBe("updated");
+      if (trimmed.kind !== "updated") return;
+      expect(trimmed.thread.activities).toHaveLength(500);
+      expect(trimmed.thread.activities[0]?.id).toBe("activity-501");
+      expect(trimmed.thread.activities.at(-1)?.id).toBe("activity-1000");
+
+      // The cut array stays indexed: a re-delivered id is still rejected and
+      // the next append lands at the tail.
+      const redelivered = applyThreadDetailEvent(trimmed.thread, appended(1000));
+      if (redelivered.kind === "updated") {
+        expect(redelivered.thread.activities).toHaveLength(500);
+      }
+      const next = applyThreadDetailEvent(trimmed.thread, appended(1001));
+      if (next.kind === "updated") {
+        expect(next.thread.activities).toHaveLength(501);
+        expect(next.thread.activities.at(-1)?.id).toBe("activity-1001");
       }
     });
 

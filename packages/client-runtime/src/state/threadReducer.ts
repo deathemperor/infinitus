@@ -63,6 +63,15 @@ const activityOrder = O.combineAll<OrchestrationThreadActivity>([
   O.mapInput(O.String, (a) => a.id),
 ]);
 
+// A thread detail snapshot carries the most recent 500 activities (the
+// server's THREAD_DETAIL_ACTIVITY_LIMIT). Live appends have no such cap, so a
+// client that stays on a thread through a long turn keeps every activity the
+// turn streams (thousands of rows, a 1 MB cache record on the phone, #900).
+// Past the high-water mark the history is cut back to the snapshot's window,
+// so a live thread never holds more than a fresh load would give.
+const THREAD_ACTIVITY_WINDOW = 500;
+const THREAD_ACTIVITY_HIGH_WATER = THREAD_ACTIVITY_WINDOW * 2;
+
 // Per-array id index so the streaming append path can reject a re-delivered
 // id without rescanning the history. Only arrays this reducer produced are
 // indexed: presence also proves the array is activityOrder-sorted, which
@@ -110,6 +119,21 @@ function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity
  * (e.g. resolving attachment preview URLs, normalising model slugs, adding
  * scoped fields like `environmentId`) is the caller's responsibility.
  */
+/**
+ * Cuts a sorted, indexed activity history back to the most recent
+ * THREAD_ACTIVITY_WINDOW rows once it passes the high-water mark; the returned
+ * array is indexed so the next append keeps the fast path.
+ */
+function trimActivityWindow(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyArray<OrchestrationThreadActivity> {
+  if (activities.length <= THREAD_ACTIVITY_HIGH_WATER) return activities;
+  const kept = activities.slice(-THREAD_ACTIVITY_WINDOW);
+  activityIdIndex.delete(activities);
+  activityIdIndex.set(kept, new Set(kept.map((entry) => entry.id)));
+  return kept;
+}
+
 export function applyThreadDetailEvent(
   thread: OrchestrationThread,
   event: OrchestrationEvent,
@@ -752,7 +776,7 @@ export function applyThreadDetailEvent(
           kind: "updated",
           thread: {
             ...thread,
-            activities,
+            activities: trimActivityWindow(activities),
             updatedAt: event.occurredAt,
           },
         };
@@ -789,7 +813,11 @@ export function applyThreadDetailEvent(
         activityIdIndex.set(activities, ids);
         return {
           kind: "updated",
-          thread: { ...thread, activities, updatedAt: event.occurredAt },
+          thread: {
+            ...thread,
+            activities: trimActivityWindow(activities),
+            updatedAt: event.occurredAt,
+          },
         };
       }
       const activities = pipe(
