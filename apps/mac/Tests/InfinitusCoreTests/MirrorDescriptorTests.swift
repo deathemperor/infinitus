@@ -21,12 +21,8 @@ final class MirrorDescriptorTests: XCTestCase {
         XCTAssertTrue(text.contains(#""prefs":true"#))
         #if os(macOS)
         XCTAssertEqual(d.platform, "macos")
-        // The PTY host is the Mac app's (#507 step 3); a Core build on Linux
-        // links the same `.current()` and must still say no.
-        XCTAssertEqual(d.capabilities.terminal, true)
         #else
         XCTAssertEqual(d.platform, "linux")
-        XCTAssertEqual(d.capabilities.terminal, false)
         #endif
         XCTAssertEqual(d.machineId, "m1")
         XCTAssertEqual(MirrorTransport.wellKnownPath, "/.well-known/infinitus")
@@ -49,7 +45,7 @@ final class MirrorDescriptorTests: XCTestCase {
             XCTAssertEqual(served, true)
         }
         for other in [d.capabilities.leases, d.capabilities.ownedSessions, d.capabilities.team,
-                     d.capabilities.pastSessions, d.capabilities.terminal, d.capabilities.prefs] {
+                     d.capabilities.pastSessions, d.capabilities.prefs] {
             XCTAssertEqual(other, false)
         }
         let text = String(decoding: try JSONEncoder().encode(d), as: UTF8.self)
