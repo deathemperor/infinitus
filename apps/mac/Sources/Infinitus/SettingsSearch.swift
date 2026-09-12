@@ -24,8 +24,6 @@ enum SettingsSearchCatalog {
     private static func rows(of pane: String) -> [SettingsSearchEntry] {
         switch pane {
         case "Display": return DisplayPane.searchEntries
-        case "Themes": return ThemesPane.searchEntries
-        case "Utilization": return UtilizationPane.searchEntries
         case "Stats": return StatsPane.searchEntries
         case "Machine": return MachinePane.searchEntries
         case "Activity": return ActivityPane.searchEntries
