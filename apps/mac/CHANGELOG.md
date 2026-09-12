@@ -26,6 +26,7 @@ publishes the matching section as the GitHub release body.
 - The turn footer also counts the background agents a turn left running, and a session that ends with agents still running (Stop, or the app quitting) leaves an error row saying how many, instead of the thread reading as finished work (#974).
 - A server that was killed with background agents running (the desktop quitting) writes that same error row at its next start, so the thread no longer reads as ready for hours (#977).
 - A side question the server refused now says why, on the desktop and the phone: the refusal reached both with a title and an empty reason (#941).
+- The queue card under the composer now follows the server's queue live — a message queued from the phone (or on a busy thread) shows on the desktop at once, and a drained queue leaves the card (#941).
 - A side question works on threads from before forking existed: with no recorded fork point the session forks at its latest turn (#941).
 
 ## 0.5.0-alpha.2
