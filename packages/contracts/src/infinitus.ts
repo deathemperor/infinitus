@@ -438,7 +438,13 @@ export type InfinitusThreadForkResult = typeof InfinitusThreadForkResult.Type;
 export class InfinitusThreadForkRefused extends Schema.TaggedError<InfinitusThreadForkRefused>()(
   "InfinitusThreadForkRefused",
   { reason: Schema.String },
-) {}
+) {
+  // The clients show `error.message`; without this the alert has a title and
+  // an empty body (#941 walk: "Could not open a side question", nothing under it).
+  override get message(): string {
+    return this.reason;
+  }
+}
 
 /** The desktop shell's own Infinitus knobs (one-app feel, #654), kept by the
     shell rather than the server because they describe this window.
