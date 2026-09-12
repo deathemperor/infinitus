@@ -28,7 +28,6 @@ import {
   getDesktopUpdateArmedTooltip,
   getDesktopUpdateButtonTooltip,
   getDesktopUpdateInstallConfirmationMessage,
-  getDesktopUpdateRunningTurnsToast,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
   shouldShowArm64IntelBuildWarning,
@@ -44,6 +43,10 @@ import {
   shouldContinueDesktopUpdateCheckAnimation,
   shouldShowDesktopUpdateCheckIcon,
 } from "./DesktopUpdateStatusIcon";
+import {
+  DesktopUpdateRunningTurnsDialog,
+  type DesktopUpdateRunningTurnsDialogRequest,
+} from "./DesktopUpdateRunningTurnsDialog";
 import { SidebarUpdateReleaseNotes } from "./SidebarUpdateReleaseNotes";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
@@ -145,6 +148,8 @@ function SidebarUpdateControl() {
     });
   }, [presentationById, shells, shellsBootstrapped]);
   const [isActionPending, setIsActionPending] = useState(false);
+  const [runningTurnsDialog, setRunningTurnsDialog] =
+    useState<DesktopUpdateRunningTurnsDialogRequest | null>(null);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
   const [isCheckAnimationLatched, setIsCheckAnimationLatched] = useState(false);
   const [releaseNotesPopoverHandle] = useState(() => PopoverCreateHandle());
@@ -235,19 +240,28 @@ function SidebarUpdateControl() {
       .finally(() => setIsActionPending(false));
   }, []);
 
-  // #829: "Install when they finish" — fire once the count reaches zero;
-  // drop the arming when no install is pending any more.
+  // #829: "Install when they finish" — fire once the count reaches zero and
+  // the install action is back (the 4-minute poll reads as "checking" for a
+  // moment, with the downloaded build kept: that is no reason to disarm);
+  // drop the arming only when nothing is left to install.
   useEffect(() => {
     if (!installWhenIdle) return;
-    if (action !== "install") {
+    if (!state?.downloadedVersion) {
       setInstallWhenIdle(false);
       return;
     }
-    if (runningLocalTurns === 0) {
+    if (action === "install" && runningLocalTurns === 0) {
       setInstallWhenIdle(false);
       installNow();
     }
-  }, [action, installNow, installWhenIdle, runningLocalTurns, setInstallWhenIdle]);
+  }, [
+    action,
+    installNow,
+    installWhenIdle,
+    runningLocalTurns,
+    setInstallWhenIdle,
+    state?.downloadedVersion,
+  ]);
 
   const handleAction = useCallback(async () => {
     const bridge = window.desktopBridge;
@@ -289,47 +303,16 @@ function SidebarUpdateControl() {
 
     if (action === "install") {
       if (installWhenIdle) {
-        // The armed button: a click cancels the pending install.
-        setInstallWhenIdle(false);
+        // The armed button: a click opens the dialog to keep, cancel or skip the wait.
         setIsActionPending(false);
+        setRunningTurnsDialog({ count: runningLocalTurns ?? 0, armed: true });
         return;
       }
       if (runningLocalTurns !== 0) {
-        // Turns would die with the app (#829): no dialog, a toast with the
-        // two ways forward; dismissing it leaves the update for later.
+        // Turns would die with the app (#829): the confirm becomes a dialog
+        // with the ways forward; Later leaves the update for another click.
         setIsActionPending(false);
-        const copy = getDesktopUpdateRunningTurnsToast(runningLocalTurns);
-        const toastId = toastManager.add(
-          stackedThreadToast({
-            type: "warning",
-            title: copy.title,
-            description: copy.description,
-            timeout: 0,
-            actionProps:
-              runningLocalTurns === null
-                ? { children: "Install now", onClick: installNow }
-                : {
-                    children: "Install when they finish",
-                    onClick: () => setInstallWhenIdle(true),
-                  },
-            actionVariant: "outline",
-            data: {
-              hideCopyButton: true,
-              ...(runningLocalTurns === null
-                ? {}
-                : {
-                    secondaryActionProps: {
-                      children: "Install now",
-                      onClick: () => {
-                        toastManager.close(toastId);
-                        installNow();
-                      },
-                    },
-                    secondaryActionVariant: "outline" as const,
-                  }),
-            },
-          }),
-        );
+        setRunningTurnsDialog({ count: runningLocalTurns, armed: false });
         return;
       }
       let confirmed = false;
@@ -390,7 +373,6 @@ function SidebarUpdateControl() {
     isInteractionDisabled,
     prefersReducedMotion,
     runningLocalTurns,
-    setInstallWhenIdle,
     state,
   ]);
 
@@ -455,6 +437,16 @@ function SidebarUpdateControl() {
 
   return (
     <SidebarMenuItem className="ml-auto shrink-0">
+      {state ? (
+        <DesktopUpdateRunningTurnsDialog
+          onCancelArm={() => setInstallWhenIdle(false)}
+          onClose={() => setRunningTurnsDialog(null)}
+          onInstallNow={installNow}
+          onInstallWhenIdle={() => setInstallWhenIdle(true)}
+          request={runningTurnsDialog}
+          state={state}
+        />
+      ) : null}
       <Popover
         handle={releaseNotesPopoverHandle}
         onOpenChange={(open, details) => {

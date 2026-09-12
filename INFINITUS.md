@@ -391,11 +391,17 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   `apps/web/src/components/desktopUpdate.logic.ts` — `countRunningLocalTurns`
   over the thread shells of local backends (primary or desktop-local,
   `isLocalConnectionTarget` from `ProviderUpdateLaunchNotification.environments.ts`)
-  and the copy; `sidebar/SidebarUpdatePill.tsx` — the install click shows
-  the same two-way toast while turns run ("Install when they finish" arms
+  and the copy; `sidebar/SidebarUpdatePill.tsx` — the install click while
+  turns run opens `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, a modal in
+  the plain install confirm's shape (user ruling 2026-09-12: a dialog, not a
+  toast): Later / Install now / "Install when they finish", which arms
   `desktopInstallWhenIdleAtom` in `state/desktopUpdate.ts`; the pill fires
-  the install once the count hits zero and reads "Installs when N running
-  threads finish. Click to cancel."); shells not yet bootstrapped = an
+  the install once the count hits zero and the install action is back,
+  reads "Installs when N running threads finish. Click to cancel.", and a
+  click on it opens the same dialog to keep, cancel or skip the wait. The
+  arming is dropped only when no downloaded build is left — the 4-minute
+  poll reads as `checking` for a moment with the build kept, and disarming
+  on that made the wait silently lapse; shells not yet bootstrapped = an
   unknown count, which offers only "Install now". No `apps/desktop` change:
   the main process has no orchestration access, so the two quit paths are
   gated at the renderer (the IPC install) and at the server (the commit of
