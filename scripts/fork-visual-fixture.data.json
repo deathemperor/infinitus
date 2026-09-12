@@ -495,6 +495,30 @@
         "summary": "PUT the proxy's routing strategy."
       },
       {
+        "args": [],
+        "effect": "read",
+        "name": "team-grants",
+        "options": [],
+        "replyShape": "{schema, grants: [{id, audience, sessions, capabilities, preauthorized?, since, expires?}]}",
+        "summary": "This Mac's session-control grants (#220): who may do what to which sessions."
+      },
+      {
+        "args": ["<leaders|team|kid,…>"],
+        "effect": "write",
+        "name": "team-grant",
+        "options": ["--cap <a,b>", "--sessions <id,id>", "--pre <a,b>", "--expires <seconds>"],
+        "replyShape": "{id, audience, sessions, capabilities, preauthorized?, since, expires?}",
+        "summary": "Add a grant: the capabilities in --cap for the people named on the sessions named (all when --sessions is absent); --pre names the ones that run without asking (delete never does); --expires counts from now."
+      },
+      {
+        "args": ["<id>"],
+        "effect": "write",
+        "name": "team-revoke",
+        "options": [],
+        "replyShape": "{removed}",
+        "summary": "Remove one grant; the next command under it is refused noGrant."
+      },
+      {
         "args": ["on|off"],
         "effect": "write",
         "name": "team-discoverable",

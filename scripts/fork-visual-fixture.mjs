@@ -353,6 +353,22 @@ function answer(request, socketPath) {
       return { enabled: true, locked: false, relock: "5 min" };
     case "team-status":
       return teamStatus();
+    case "team-grants":
+      // One grant (#220) so the Team page's Session control section renders
+      // populated; team-grant / team-revoke are writes the fixture refuses.
+      return {
+        schema: 1,
+        grants: [
+          {
+            id: "g-fixture1",
+            audience: "leaders",
+            sessions: "all",
+            capabilities: ["send", "stop", "view"],
+            preauthorized: ["stop"],
+            since: Math.floor(Date.now() / 1000) - 3600,
+          },
+        ],
+      };
     default:
       return undefined;
   }
