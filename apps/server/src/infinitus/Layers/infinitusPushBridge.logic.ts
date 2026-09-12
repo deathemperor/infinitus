@@ -9,8 +9,10 @@ import * as Schema from "effect/Schema";
  * false}`, which native words ("<title>: waiting for approval") and fans
  * out to the phone's alert token and the Slack / Telegram away channels;
  * `local: false` skips the Mac's own Notification Center notice, since the
- * desktop already shows a banner for these phases (#270 B). Only the phases
- * a person acts on are worth a push: the two waits and the two ends.
+ * desktop already shows a banner for these phases (#270 B); `slack: false`
+ * (#1028) skips the Mac's Slack webhook post alone, for a thread the Slack
+ * bridge (#574) already reports in a Slack thread of its own. Only the
+ * phases a person acts on are worth a push: the two waits and the two ends.
  * `starting` / `running` / `stale` are noise.
  */
 
@@ -30,6 +32,7 @@ const ThreadPhasePush = Schema.Struct({
   title: Schema.String,
   phase: Schema.String,
   local: Schema.Literal(false),
+  slack: Schema.optional(Schema.Literal(false)),
 });
 const encodePush = Schema.encodeSync(Schema.fromJsonString(ThreadPhasePush));
 
@@ -47,11 +50,12 @@ export function shouldPushPhase(
   return previous !== undefined && previous !== phase && PUSHED_PHASES.has(phase);
 }
 
-/** The JSON line the verb takes on `secret`. */
+/** The JSON line the verb takes on `secret`; `skipSlack` adds `slack: false`. */
 export function threadPhasePayload(input: {
   readonly threadId: string;
   readonly title: string;
   readonly phase: AgentAwarenessPhase;
+  readonly skipSlack?: boolean;
 }): string {
   const trimmed = input.title.trim();
   return encodePush({
@@ -63,6 +67,7 @@ export function threadPhasePayload(input: {
         : trimmed,
     phase: input.phase,
     local: false,
+    ...(input.skipSlack === true ? { slack: false as const } : {}),
   });
 }
 
@@ -76,4 +81,13 @@ export function manifestHasPush(commands: ReadonlyArray<InfinitusManifestCommand
     (command) =>
       command.name === "push" && command.stdin === "payload" && command.summary.includes("local"),
   );
+}
+
+/**
+ * The push summary names the `slack` flag (#1028; before it the summary
+ * said only "Slack/Telegram", capitalized). An older app ignores an unknown
+ * key, so the flag is simply not sent to it.
+ */
+export function manifestPushSkipsSlack(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+  return commands.some((command) => command.name === "push" && command.summary.includes("slack"));
 }

@@ -1688,7 +1688,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   polled again for the manifest gate; an app without the verb or an
   unreachable one drops the push, and so does an app whose `push` summary
   does not name `local` (it would post a second banner beside the
-  desktop's). Only thread ids and phases reach the log. On by default,
+  desktop's). A thread the Slack bridge (#574) is armed for and reports in
+  a Slack thread of its own (`InfinitusSlackBindings.isBound`, the service
+  `InfinitusSlackLive` returns) gets `slack: false` too, only on an app
+  whose `push` summary names `slack` in lowercase (#1028; the older summary
+  said "Slack/Telegram"), so the Mac's own Slack webhook does not post a
+  second copy — Telegram and the phone still get it. Only thread ids and
+  phases reach the log. On by default,
   off by the `infinitusPushBridge` server setting (the second row of the
   same card).
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a

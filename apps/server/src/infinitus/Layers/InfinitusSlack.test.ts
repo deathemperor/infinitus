@@ -10,6 +10,7 @@ import {
   type ServerSettings,
 } from "@t3tools/contracts";
 import { it as effectIt } from "@effect/vitest";
+import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -34,6 +35,7 @@ import {
   type SlackInbound,
   type SlackPost,
 } from "../Services/InfinitusSlackClient.ts";
+import { InfinitusSlackBindings } from "../Services/InfinitusSlackBindings.ts";
 import { InfinitusSlackLive } from "./InfinitusSlack.ts";
 
 const model = {
@@ -197,7 +199,7 @@ const makeHarness = (settings: ServerSettings, files: Map<string, string>, git: 
         ),
       ),
     );
-    yield* Layer.build(layer);
+    const context = yield* Layer.build(layer);
     const settle = Effect.gen(function* () {
       for (let i = 0; i < 40; i += 1) yield* Effect.yieldNow;
     });
@@ -212,6 +214,8 @@ const makeHarness = (settings: ServerSettings, files: Map<string, string>, git: 
         Ref.update(shells, (map) => new Map(map).set(shell.id, shell)),
       dispatched: Ref.get(dispatched),
       posts: Ref.get(posts),
+      isBound: (threadId: ThreadId) =>
+        Context.get(context, InfinitusSlackBindings).isBound(threadId),
     };
   });
 
@@ -424,6 +428,28 @@ describe("InfinitusSlack (#574)", () => {
       expect(yield* off.dispatched).toEqual([]);
       expect(yield* off.posts).toEqual([]);
     }),
+  );
+
+  effectIt.effect(
+    "a bound thread of an armed bridge reads bound, for the push bridge (#1020)",
+    () =>
+      Effect.gen(function* () {
+        const files = new Map<string, string>();
+        const on = yield* makeHarness(armed, files);
+        yield* on.send(mention("<@U0BOT> limitless keep me"));
+        const create = (yield* on.dispatched)[0] as Extract<
+          OrchestrationCommand,
+          { type: "thread.create" }
+        >;
+        expect(yield* on.isBound(create.threadId)).toBe(true);
+        expect(yield* on.isBound(ThreadId.make("someone-else"))).toBe(false);
+        // The same bindings file with the bridge off: nothing is reported in Slack any more.
+        const off = yield* makeHarness(
+          { ...armed, infinitusSlack: { ...armed.infinitusSlack, enabled: false } },
+          files,
+        );
+        expect(yield* off.isBound(create.threadId)).toBe(false);
+      }),
   );
 
   effectIt.effect("bindings survive a restart", () =>

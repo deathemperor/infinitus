@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   MAX_PUSH_TITLE_LENGTH,
   manifestHasPush,
+  manifestPushSkipsSlack,
   shouldPushPhase,
   threadPhasePayload,
 } from "./infinitusPushBridge.logic.ts";
@@ -55,6 +56,21 @@ describe("push bridge logic (#269 G)", () => {
     expect(title.endsWith("…")).toBe(true);
   });
 
+  it("adds `slack: false` only when asked, so an older app sees no unknown key", () => {
+    const payload = (skipSlack?: boolean) =>
+      JSON.parse(
+        threadPhasePayload({
+          threadId: "thread-1",
+          title: "t",
+          phase: "completed",
+          ...(skipSlack === undefined ? {} : { skipSlack }),
+        }),
+      ) as Record<string, unknown>;
+    expect(payload(true)).toMatchObject({ local: false, slack: false });
+    expect("slack" in payload(false)).toBe(false);
+    expect("slack" in payload()).toBe(false);
+  });
+
   it("gates on a push verb that takes a payload and knows the local flag", () => {
     expect(manifestHasPush([command("push", "payload")])).toBe(true);
     // An app from before the flag would post its own notice beside the desktop's.
@@ -62,5 +78,17 @@ describe("push bridge logic (#269 G)", () => {
     expect(manifestHasPush([command("push", "secret")])).toBe(false);
     expect(manifestHasPush([command("push")])).toBe(false);
     expect(manifestHasPush([command("status")])).toBe(false);
+  });
+
+  it("knows the slack flag only from a summary that names it in lowercase (#1028)", () => {
+    const named = "…{kind, threadId, title, phase, detail?, local?, slack?}; `slack: false` skips…";
+    expect(manifestPushSkipsSlack([command("push", "payload", named)])).toBe(true);
+    // The summary before the flag: "Slack/Telegram", capitalized only.
+    expect(
+      manifestPushSkipsSlack([
+        command("push", "payload", "…the phone and Slack/Telegram; `local: false` skips…"),
+      ]),
+    ).toBe(false);
+    expect(manifestPushSkipsSlack([command("status", "payload", named)])).toBe(false);
   });
 });
