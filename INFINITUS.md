@@ -257,7 +257,8 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   the decider validates and defaults a key; `apps/server/src/orchestration/decider.ts`
   — the four cases (queue is idempotent by re-emission, update/move refuse a
   missing row, remove re-emits) and the turn start's `queuedFrom` removal in
-  the same batch (a row already gone changes nothing); `projector.ts`,
+  the same batch (a row already gone refuses the start, so "Send now" and
+  the idle drain racing on one row send it once); `projector.ts`,
   `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
   the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
   `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`),

@@ -3,6 +3,7 @@ import {
   MAX_SCRIPT_ID_LENGTH,
   SCRIPT_RUN_COMMAND_PATTERN,
   MessageId,
+  QUEUED_TURN_GONE,
   ThreadLinkedPullRequest,
   type ThreadBabysit,
   UserInputRequestedPayload,
@@ -1413,13 +1414,18 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         });
       }
       // Fork (#806): the queued row this send came from leaves the queue in
-      // the same batch as the send. A row already gone (removed by the user
-      // meanwhile) changes nothing: the send still goes.
+      // the same batch as the send. A row already gone is refused: "Send
+      // now" and the idle drain both start the row, and the loser of that
+      // race must not send the message a second time (a row the user
+      // removed meanwhile is the same case — the send was withdrawn).
       const queueRemovedEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
-      if (
-        command.queuedFrom !== undefined &&
-        (targetThread.queuedTurns ?? []).some((row) => row.queueId === command.queuedFrom)
-      ) {
+      if (command.queuedFrom !== undefined) {
+        if (!(targetThread.queuedTurns ?? []).some((row) => row.queueId === command.queuedFrom)) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `Queued message '${command.queuedFrom}' on thread '${command.threadId}' was ${QUEUED_TURN_GONE}.`,
+          });
+        }
         queueRemovedEvents.push({
           ...(yield* withEventBase({
             aggregateKind: "thread",
