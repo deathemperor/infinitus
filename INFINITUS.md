@@ -1032,9 +1032,14 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   `thread.create` (`approval-required` + `default` interaction — a plan
   interaction would end in a proposed plan Slack cannot approve; `build`
   → `auto-accept-edits`, never `full-access`; model = the project's
-  default, else the server's, else a reply asking for one; on the project
-  checkout — the worktree bootstrap is ws.ts-only, a follow-up) and
-  `thread.turn.start`, and binds the Slack thread to the Infinitus thread
+  default, else the server's, else a reply asking for one), ws.ts's
+  worktree bootstrap when the project's `defaultThreadEnvMode` is
+  `worktree` (#957: the checkout's current branch is the base, from
+  origin's copy with `newWorktreesStartFromOrigin`; the worktree limit
+  (#269 H) is checked before the create and its refusal is the reply; a
+  git failure deletes the thread and posts the error; a plain folder or a
+  detached HEAD stays on the checkout; the setup script runs best-effort,
+  logged) and `thread.turn.start`, and binds the Slack thread to the Infinitus thread
   in memory and in `<stateDir>/infinitus-slack/threads.json` (atomic
   writes, ≤ 500 rows; dropped on `thread.deleted` / `thread.archived`).
   Replies in the Slack thread: `stop` → `thread.turn.interrupt`,

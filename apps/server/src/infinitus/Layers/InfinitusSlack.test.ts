@@ -1,5 +1,6 @@
 import {
   DEFAULT_SERVER_SETTINGS,
+  GitCommandError,
   ThreadId,
   type OrchestrationCommand,
   type OrchestrationEvent,
@@ -21,10 +22,13 @@ import * as Stream from "effect/Stream";
 import { describe, expect } from "vite-plus/test";
 
 import { ServerConfig } from "../../config.ts";
+import { GitWorkflowService } from "../../git/GitWorkflowService.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { ProjectSetupScriptRunner } from "../../project/ProjectSetupScriptRunner.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import {
   SlackClient,
   type SlackInbound,
@@ -94,7 +98,14 @@ const memoryFs = (files: Map<string, string>) =>
     remove: () => Effect.void,
   });
 
-const makeHarness = (settings: ServerSettings, files: Map<string, string>) =>
+interface GitFixture {
+  /** The checkout's branch; null is a detached HEAD, undefined no repo. */
+  readonly refName?: string | null;
+  readonly worktreeHolders?: number;
+  readonly createWorktreeFails?: boolean;
+}
+
+const makeHarness = (settings: ServerSettings, files: Map<string, string>, git: GitFixture = {}) =>
   Effect.gen(function* () {
     const inbound = yield* PubSub.unbounded<SlackInbound>();
     const runtime = yield* PubSub.unbounded<ProviderRuntimeEvent>();
@@ -124,6 +135,8 @@ const makeHarness = (settings: ServerSettings, files: Map<string, string>) =>
               } as never),
             getThreadShellById: (threadId) =>
               Ref.get(shells).pipe(Effect.map((map) => Option.fromNullishOr(map.get(threadId)))),
+            getWorktreeHolders: () =>
+              Effect.succeed({ count: git.worktreeHolders ?? 0, oldestArchived: [] }),
             getThreadDetailById: (threadId) =>
               Ref.get(shells).pipe(
                 Effect.map((map) => {
@@ -143,6 +156,33 @@ const makeHarness = (settings: ServerSettings, files: Map<string, string>) =>
             },
           }),
           Layer.mock(ServerSettingsService)({ getSettings: Effect.succeed(settings) }),
+          Layer.mock(GitWorkflowService)({
+            remoteExists: () => Effect.succeed(false),
+            createWorktree: (input) =>
+              git.createWorktreeFails === true
+                ? Effect.fail(
+                    new GitCommandError({
+                      operation: "worktree",
+                      command: "git worktree add",
+                      cwd: input.cwd,
+                      detail: "fatal: not a git repository",
+                    }),
+                  )
+                : Effect.succeed({
+                    worktree: { path: `${input.cwd}-wt`, refName: input.newRefName },
+                  } as never),
+          }),
+          Layer.mock(VcsStatusBroadcaster)({
+            getStatus: () =>
+              Effect.succeed({
+                isRepo: git.refName !== undefined,
+                refName: git.refName ?? null,
+              } as never),
+            refreshStatus: () => Effect.succeed({} as never),
+          }),
+          Layer.mock(ProjectSetupScriptRunner)({
+            runForThread: () => Effect.succeed({ status: "no-script" } as never),
+          }),
           Layer.succeed(SlackClient)({
             inbound: Stream.fromPubSub(inbound),
             post: (post) =>
@@ -176,6 +216,86 @@ const makeHarness = (settings: ServerSettings, files: Map<string, string>) =>
   });
 
 describe("InfinitusSlack (#574)", () => {
+  const worktreeArmed: ServerSettings = {
+    ...armed,
+    worktreeMaxCount: 1,
+    projectSettingsOverrides: { p1: { defaultThreadEnvMode: "worktree" } } as never,
+  };
+
+  effectIt.effect(
+    "a worktree project gets ws.ts's bootstrap: create, worktree, meta, start (#957)",
+    () =>
+      Effect.gen(function* () {
+        const harness = yield* makeHarness(worktreeArmed, new Map(), { refName: "main" });
+        yield* harness.send(mention("<@U0BOT> limitless build fix the flaky test"));
+        const commands = yield* harness.dispatched;
+        expect(commands.map((command) => command.type)).toEqual([
+          "thread.create",
+          "thread.meta.update",
+          "thread.turn.start",
+        ]);
+        expect(commands[1]).toMatchObject({
+          branch: expect.stringMatching(/^t3code\/[0-9a-f]{8}$/),
+          worktreePath: "/w/limitless-wt",
+        });
+        const posts = yield* harness.posts;
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.text).toMatch(/^Started in Limitless on t3code\/[0-9a-f]{8} \(build\)\.$/);
+      }),
+  );
+
+  effectIt.effect("the worktree limit refuses before anything is created (#957, #269 H)", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness(worktreeArmed, new Map(), {
+        refName: "main",
+        worktreeHolders: 1,
+      });
+      yield* harness.send(mention("<@U0BOT> limitless build fix the flaky test"));
+      expect(yield* harness.dispatched).toEqual([]);
+      const posts = yield* harness.posts;
+      expect(posts).toHaveLength(1);
+      expect(posts[0]!.text).toContain("Worktree limit reached: 1 of 1");
+    }),
+  );
+
+  effectIt.effect("a git failure deletes the created thread and posts the error (#957)", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness(worktreeArmed, new Map(), {
+        refName: "main",
+        createWorktreeFails: true,
+      });
+      yield* harness.send(mention("<@U0BOT> limitless build fix the flaky test"));
+      const commands = yield* harness.dispatched;
+      expect(commands.map((command) => command.type)).toEqual(["thread.create", "thread.delete"]);
+      const posts = yield* harness.posts;
+      expect(posts).toHaveLength(1);
+      expect(posts[0]!.text).toContain("Could not create a worktree for Limitless");
+      // The thread was never bound: a reply in the Slack thread is not a follow-up.
+      yield* harness.send(reply("more"));
+      expect((yield* harness.dispatched).map((command) => command.type)).toEqual([
+        "thread.create",
+        "thread.delete",
+      ]);
+    }),
+  );
+
+  effectIt.effect("a detached HEAD or a plain folder keeps the thread on the checkout (#957)", () =>
+    Effect.gen(function* () {
+      const detached = yield* makeHarness(worktreeArmed, new Map(), { refName: null });
+      yield* detached.send(mention("<@U0BOT> limitless build fix the flaky test"));
+      expect((yield* detached.dispatched).map((command) => command.type)).toEqual([
+        "thread.create",
+        "thread.turn.start",
+      ]);
+      const folder = yield* makeHarness(worktreeArmed, new Map(), {});
+      yield* folder.send(mention("<@U0BOT> limitless build fix the flaky test"));
+      expect((yield* folder.dispatched).map((command) => command.type)).toEqual([
+        "thread.create",
+        "thread.turn.start",
+      ]);
+    }),
+  );
+
   effectIt.effect("an allowed mention creates a thread, starts the turn, binds and posts", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness(armed, new Map());
