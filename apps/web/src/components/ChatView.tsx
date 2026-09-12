@@ -341,6 +341,7 @@ import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline, type TimelineRevertMode } from "./chat/MessagesTimeline";
+import { useTurnFooters } from "./chat/useTurnFooters";
 import type { AssistantCitationRequest } from "./chat/AssistantCitationSource";
 import { resolveTimelineIsAtEnd } from "./chat/MessagesTimeline.logic";
 import { resolveComposerTimelineInset, resolveScrollToEndClearance } from "./composerFooterLayout";
@@ -2028,6 +2029,7 @@ export default function ChatView(props: ChatViewProps) {
     return openTerminalThreadKeys.filter((nextThreadKey) => existingThreadKeys.has(nextThreadKey));
   }, [draftThreadKeys, openTerminalThreadKeys, serverThreadKeys]);
   const activeLatestTurn = activeThread?.latestTurn ?? null;
+  const turnFooters = useTurnFooters(activeThread ?? null);
   const activeRunningTurnId =
     (activeThread?.session?.status === "running" ? activeThread.session.activeTurnId : null) ??
     (activeLatestTurn?.state === "running" ? activeLatestTurn.turnId : null);
@@ -8949,6 +8951,7 @@ export default function ChatView(props: ChatViewProps) {
                 listRef={legendListRef}
                 timelineEntries={displayedTimeline.entries}
                 latestTurn={paintOnlyDisplayedTimeline ? null : activeLatestTurn}
+                {...(paintOnlyDisplayedTimeline ? {} : { turnFooters })}
                 runningTurnId={paintOnlyDisplayedTimeline ? null : activeRunningTurnId}
                 turnDiffSummaries={
                   paintOnlyDisplayedTimeline
