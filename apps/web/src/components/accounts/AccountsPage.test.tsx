@@ -531,12 +531,26 @@ describe("AccountsPage", () => {
     expect(field.props.type).toBe("password");
     expect(field.props.autoComplete).toBe("off");
 
-    const section = renderer.root.findAll(
-      (node) => node.props.signIn?.onSubmitCode !== undefined,
-    )[0]!;
-    await act(async () => {
-      section.props.signIn.onSubmitCode("the-code");
-    });
+    // The submit reads the code field without a DOM class: this suite runs in
+    // node, where HTMLInputElement is undefined, and a form with no field is
+    // a no-op rather than a throw.
+    const form = renderer.root.findAll((node) => node.type === "form")[0]!;
+    const submit = (input: { value: string } | null) =>
+      act(async () => {
+        form.props.onSubmit({
+          preventDefault: () => {},
+          currentTarget: { elements: { namedItem: () => input } },
+        });
+      });
+    await submit(null);
+    expect(
+      testState.command.mock.calls.some(
+        (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
+      ),
+    ).toBe(false);
+    const codeInput = { value: "the-code" };
+    await submit(codeInput);
+    expect(codeInput.value).toBe("");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
