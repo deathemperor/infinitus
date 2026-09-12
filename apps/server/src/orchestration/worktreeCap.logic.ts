@@ -23,10 +23,19 @@ function boundedTitle(title: string): string {
   return shown.length > 40 ? `${shown.slice(0, 39)}…` : shown;
 }
 
-/** The refusal for a new worktree, or null when one may be created. */
-export function worktreeCapRefusal(holders: WorktreeHolders, max: number): string | null {
-  if (max <= 0 || holders.count < max) return null;
-  const head = `Worktree limit reached: ${holders.count} of ${max} threads hold a worktree.`;
+/**
+ * The refusal for a new worktree, or null when one may be created. `inFlight`
+ * counts the worktrees other bootstraps are creating right now (Best-of
+ * starts its members together): they hold one before the projection says so.
+ */
+export function worktreeCapRefusal(
+  holders: WorktreeHolders,
+  max: number,
+  inFlight = 0,
+): string | null {
+  const count = holders.count + inFlight;
+  if (max <= 0 || count < max) return null;
+  const head = `Worktree limit reached: ${count} of ${max} threads hold a worktree.`;
   const fix =
     holders.oldestArchived.length === 0
       ? "Delete a thread you no longer need to free its worktree, or raise the Worktree limit in the server's settings."

@@ -8,6 +8,13 @@ describe("worktreeCapRefusal (#269 H)", () => {
     expect(worktreeCapRefusal({ count: 400, oldestArchived: [] }, 0)).toBeNull();
   });
 
+  it("counts the worktrees other bootstraps are creating right now", () => {
+    expect(worktreeCapRefusal({ count: 23, oldestArchived: [] }, 25, 1)).toBeNull();
+    expect(worktreeCapRefusal({ count: 23, oldestArchived: [] }, 25, 2)).toContain(
+      "25 of 25 threads",
+    );
+  });
+
   it("refuses at the limit and names the oldest archived holders, bounded to one line", () => {
     const refusal = worktreeCapRefusal(
       {
