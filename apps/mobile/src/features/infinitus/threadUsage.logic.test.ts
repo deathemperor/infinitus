@@ -33,6 +33,16 @@ describe("thread usage sheet (#834)", () => {
     ]);
   });
 
+  it("shows tool calls and the time working only when the server counted them (#927)", () => {
+    const rows = threadUsageRows({ ...ROLLUP, toolCalls: 12, durationMs: 754_000 });
+    expect(rows.slice(0, 3).map((row) => [row.label, row.value])).toEqual([
+      ["Turns", "3"],
+      ["Tool calls", "12"],
+      ["Duration", "12m 34s"],
+    ]);
+    expect(threadUsageRows(ROLLUP).map((row) => row.label)).not.toContain("Tool calls");
+  });
+
   it("hides zero shares and an unnamed model, and says when no cost was recorded", () => {
     const rows = threadUsageRows({
       ...ROLLUP,
