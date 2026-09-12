@@ -9,7 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Desktop
 - Side questions and forks from a turn answer again: the fork point now names a transcript line Claude Code can resume at, and a fork whose recorded point is missing falls back to the session's end instead of dying silently.
-
+- The update pill no longer shows an error for the quarter hour while a new release is still being built; the check quietly retries at the next poll (#924).
 
 ## 0.5.0-alpha.4
 
