@@ -1442,8 +1442,18 @@ final class AppModel: ObservableObject {
     /// may still carry the pre-ignite window.
     @discardableResult
     func igniteAndPublish(_ state: FleetState, number: Int) async throws -> Date? {
+        try await state.engine.ignite(fleet: state.provider, number: number)
+        let resets = try await igniteReset(state, number: number)
+        // The endpoint reports the window minutes after the run (#338):
+        // keep asking for this account until its clock shows.
+        if resets == nil { followUpIgnite(state, number: number) }
+        return resets
+    }
+
+    /// Fetch account n again and read when its 5h window ends, or nil
+    /// while the endpoint has not reported one.
+    private func igniteReset(_ state: FleetState, number: Int) async throws -> Date? {
         let engine = state.engine, provider = state.provider
-        try await engine.ignite(fleet: provider, number: number)
         guard engine.capabilities.contains(.refreshAccount) else {
             await refreshSnapshot()
             return state.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
@@ -1455,6 +1465,37 @@ final class AppModel: ObservableObject {
             .flatMap(UsageHistory.parseISO)
     }
 
+    private var igniteFollowUp: Task<Void, Never>?
+
+    /// `IgniteFollowUp.delays` more fetches of account n; the plan line
+    /// keeps its "waiting" result (and so does not offer the account
+    /// again) until the clock shows or the schedule runs out.
+    private func followUpIgnite(_ state: FleetState, number: Int) {
+        igniteFollowUp?.cancel()
+        let name = accountName(number)
+        igniteFollowUp = Task { [weak self] in
+            for delay in IgniteFollowUp.delays {
+                try? await Task.sleep(for: .seconds(delay))
+                if Task.isCancelled { return }
+                guard let resets = try? await self?.igniteReset(state, number: number) else { continue }
+                let result = IgniteResult(text: IgniteFollowUp.started(name, resets: resets), ok: true)
+                self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(IgniteFollowUp.clock(resets))")
+                self?.igniteResult = result
+                try? await Task.sleep(for: .seconds(10))
+                if self?.igniteResult == result { self?.igniteResult = nil }
+                return
+            }
+            let result = IgniteResult(text: IgniteFollowUp.unseen(name), ok: false)
+            self?.logEvent("other", icon: "exclamationmark.triangle", result.text)
+            self?.igniteResult = result
+        }
+    }
+
+    private func accountName(_ number: Int) -> String {
+        accounts.first { $0.number == number }
+            .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(number)"
+    }
+
     /// Manual ignition (#7 MVP step 3) through the primary fleet's engine
     /// (`AccountEngine.ignite`, capability-gated): one tiny request as
     /// account n so its 5h clock starts now; the fleet stays put. Outcome
@@ -1463,26 +1504,31 @@ final class AppModel: ObservableObject {
         guard let primary, canIgnite, !isPlayground, igniting == nil else { return }
         igniting = number
         let fleet = primary
-        let name = accounts.first { $0.number == number }
-            .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(number)"
+        let name = accountName(number)
         logEvent("ignite", icon: "flag.checkered", "igniting \(name)'s 5h window")
         Task { [weak self] in
             var result: IgniteResult?
+            var waiting = false
             do {
-                // now + 5 h only when nothing knows better: an engine that
-                // refreshes one account answers with the window the run
-                // just opened (#338: "nothing happens" after an ignite).
-                let resets = try await self?.igniteAndPublish(fleet, number: number)
-                    ?? Date().addingTimeInterval(5 * 3_600)
-                let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short
-                result = IgniteResult(text: "\(name)'s window started — resets \(f.string(from: resets))", ok: true)
-                self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(f.string(from: resets))")
+                // No guessed "now + 5 h": the run's window is only known
+                // once the endpoint reports it, which takes minutes (#338).
+                // Meanwhile the follow-up asks again and the result stays
+                // "waiting", so the plan line does not offer n again.
+                if let resets = try await self?.igniteAndPublish(fleet, number: number) {
+                    result = IgniteResult(text: IgniteFollowUp.started(name, resets: resets), ok: true)
+                    self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — window started, resets \(IgniteFollowUp.clock(resets))")
+                } else {
+                    result = IgniteResult(text: IgniteFollowUp.waiting(name), ok: true)
+                    self?.logEvent("ignite", icon: "flag.checkered", "ignited \(name) — waiting for its clock to show")
+                    waiting = true
+                }
             } catch {
                 result = IgniteResult(text: "ignite \(name) failed: \((error as? CLIError)?.message ?? error.localizedDescription)", ok: false)
                 self?.logEvent("other", icon: "exclamationmark.triangle", result!.text)
             }
             self?.igniting = nil
             self?.igniteResult = result
+            if waiting { return }
             try? await Task.sleep(for: .seconds(10))
             if self?.igniteResult == result { self?.igniteResult = nil }
         }
@@ -3354,13 +3400,10 @@ extension AppModel: FleetModel {
     /// status item injects.
     func openSettings() { showSettings?() }
 
-    /// The "at this pace" line's click: Settings on the Utilization pane
-    /// (the forecast dashboard), selected through the same notification
-    /// the playground's `playctl settings` uses.
+    /// The "at this pace" line's click. The Utilization pane is the
+    /// desktop app's now (#654, #774); Settings is what the Mac still opens.
     func openForecast() {
         showSettings?()
-        NotificationCenter.default.post(name: Notification.Name("infinitus.selectPane"),
-                                        object: "Utilization")
     }
 
     /// The primary fleet's engine decides what the mac-only panes may do.

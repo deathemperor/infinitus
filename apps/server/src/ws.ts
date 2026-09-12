@@ -3130,7 +3130,7 @@ const makeWsRpcLayer = (
                 providerSessionDirectory,
               ),
             ),
-            { "rpc.aggregate": "infinitus", "thread.turnCount": input.turnCount },
+            { "rpc.aggregate": "infinitus", "thread.turnCount": input.turnCount ?? "latest" },
           ),
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(

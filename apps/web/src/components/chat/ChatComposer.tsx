@@ -1,4 +1,6 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
+import { ImageMarkupDialog } from "./ImageMarkupDialog";
+import { markedFileName } from "./imageMarkup.logic";
 import {
   questionAttachmentDraftId,
   useQuestionAttachmentPreparation,
@@ -1054,6 +1056,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   /** Fork (#269 C): opens a read-only side question in the right panel. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 C): set, the Aside button is off and says why. */
+  sideQuestionUnavailable?: string | undefined;
 }) {
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -1128,6 +1132,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
               <ComposerSelectControl
                 size={size}
                 className={size === "xs" ? undefined : "font-medium"}
+                chevronOnHover={runtimeModeLabelCollapsed}
                 aria-label="Runtime mode"
               />
             }
@@ -1177,6 +1182,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                   )}
                   type="button"
                   onClick={props.onAskSideQuestion}
+                  disabled={props.sideQuestionUnavailable !== undefined}
                   aria-label="Ask a side question"
                   data-testid="composer-side-question"
                 />
@@ -1186,8 +1192,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
               <span className="sr-only sm:not-sr-only">Aside</span>
             </TooltipTrigger>
             <TooltipPopup side="top">
-              Ask a side question: a read-only tangent in the right panel that leaves this turn
-              alone
+              {props.sideQuestionUnavailable ??
+                "Ask a side question: a read-only tangent in the right panel that leaves this turn alone"}
             </TooltipPopup>
           </Tooltip>
         </>
@@ -1444,6 +1450,8 @@ export interface ChatComposerProps {
   onCompactContext: () => void;
   /** Fork (#269 C): absent when the thread cannot host a side question. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 C): set while no turn has completed; the button is off and says why. */
+  sideQuestionUnavailable?: string | undefined;
   /** Fork (#269 B): absent unless this draft can start once per model (a worktree draft). */
   onBestOf?: ((chips: ReadonlyArray<BestOfChip>) => void) | undefined;
   onSend: (e?: { preventDefault: () => void }, intent?: ComposerSubmissionIntent) => void;
@@ -1554,6 +1562,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onPageScrollRelease,
     onCompactContext,
     onAskSideQuestion,
+    sideQuestionUnavailable,
     onBestOf,
     onSend,
     onInterrupt,
@@ -4265,6 +4274,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
           onAskSideQuestion={onAskSideQuestion}
+          sideQuestionUnavailable={sideQuestionUnavailable}
         />
       ),
     },
@@ -4362,6 +4372,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
           onAskSideQuestion={onAskSideQuestion}
+          sideQuestionUnavailable={sideQuestionUnavailable}
         />
       ) : (
         <>
@@ -4411,6 +4422,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 onAskSideQuestion={
                   hiddenRestingBlockIds.includes("mode") ? onAskSideQuestion : undefined
                 }
+                sideQuestionUnavailable={sideQuestionUnavailable}
               />
             </div>
           ) : null}
@@ -4746,6 +4758,24 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     addAttachments: addComposerAttachments,
   });
 
+  // Fork (#875): the image being drawn on, if any. Saving swaps the
+  // attachment for the edited PNG under a new id, so the upload queue (keyed
+  // by id) uploads the copy and the original is released.
+  const [markupImageId, setMarkupImageId] = useState<string | null>(null);
+  const replaceComposerImageWithMarkup = (image: ComposerImageAttachment, blob: Blob) => {
+    const file = new File([blob], markedFileName(image.name), { type: "image/png" });
+    addComposerImage({
+      type: "image",
+      id: randomUUID(),
+      name: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      previewUrl: URL.createObjectURL(file),
+      file,
+    });
+    removeComposerImageFromDraft(image.id);
+    setMarkupImageId(null);
+  };
   const removeComposerImage = (imageId: string) => {
     removeComposerImageFromDraft(imageId);
   };
@@ -5738,6 +5768,24 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             >
                               <XIcon />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="absolute right-7 top-1 bg-background/80 opacity-0 transition-opacity hover:bg-background/90 pointer-coarse:opacity-100 focus-visible:opacity-100 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100"
+                              onClick={() => setMarkupImageId(image.id)}
+                              aria-label={`Draw on ${image.name}`}
+                            >
+                              <PenLineIcon />
+                            </Button>
+                            {markupImageId === image.id ? (
+                              <ImageMarkupDialog
+                                open
+                                imageName={image.name}
+                                previewUrl={image.previewUrl}
+                                onCancel={() => setMarkupImageId(null)}
+                                onSave={(blob) => replaceComposerImageWithMarkup(image, blob)}
+                              />
+                            ) : null}
                           </SnapShotAttachmentFrame>
                         );
                       })

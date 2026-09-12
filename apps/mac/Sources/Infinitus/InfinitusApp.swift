@@ -88,7 +88,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
     @StateObject private var reliabilityModel: ResumeReliabilityModel
-    @StateObject private var utilizationModel = UtilizationModel()
     @StateObject private var appRelease: AppReleaseModel
     @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -110,8 +109,6 @@ struct InfinitusApp: App {
         RenameMigration.run()   // before anything reads App Support
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
-        let utilization = UtilizationModel()
-        _utilizationModel = StateObject(wrappedValue: utilization)
         let release = AppReleaseModel()
         _appRelease = StateObject(wrappedValue: release)
         release.onUpdate = { [weak model] in model?.appUpdateVersion = $0 }
@@ -133,8 +130,6 @@ struct InfinitusApp: App {
                 settingsTabs: {
                     settingsTabs(
                         model: model, reliabilityModel: reliabilityModel,
-                        utilizationModel: utilization,
-                        statsModel: model.statsModel,
                         appRelease: release, brew: brew)
                 })
         }
@@ -163,8 +158,6 @@ struct InfinitusApp: App {
         Settings {
             SettingsRoot(tabs: settingsTabs(
                 model: model, reliabilityModel: reliabilityModel,
-                utilizationModel: utilizationModel,
-                statsModel: model.statsModel,
                 appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
@@ -187,8 +180,6 @@ struct InfinitusApp: App {
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
     model: AppModel, reliabilityModel: ResumeReliabilityModel,
-    utilizationModel: UtilizationModel,
-    statsModel: StatsModel,
     appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
@@ -204,38 +195,10 @@ struct InfinitusApp: App {
                                "add", "remove", "delete", "oauth",
                                "order", "reorder", "alias", "rename"],
                     view: AnyView(AccountsPane(model: model))),
-        SettingsTab(title: "Themes", symbol: "paintpalette", tint: .orange,
-                    keywords: ["theme", "skin", "gallery", "community",
-                               "rpg", "row", "gamification"],
-                    view: AnyView(ThemesPane(model: model))),
         SettingsTab(title: "Push", symbol: "antenna.radiowaves.left.and.right",
                     tint: .red,
                     keywords: ["push", "phone", "notification", "sessions", "accounts"],
                     view: AnyView(NotifyPane(app: model))),
-        SettingsTab(title: "Utilization", symbol: "chart.xyaxis.line",
-                    tint: .mint,
-                    keywords: ["history", "utilization", "waste", "window",
-                               "5h", "7d", "weekly", "chart", "over time"],
-                    view: AnyView(UtilizationPane(model: utilizationModel))),
-        SettingsTab(title: "Stats", symbol: "chart.bar.xaxis", tint: .indigo,
-                    keywords: ["stats", "metrics", "commits", "prs", "lines",
-                               "messages", "sessions", "week", "month", "year"],
-                    view: AnyView(StatsPane(model: statsModel, app: model))),
-    ]
-    + (MachineModel.paneShown
-       ? [SettingsTab(title: "Machine", symbol: "cpu", tint: .brown,
-                      keywords: ["machine", "health", "hooks", "runaway", "temp",
-                                 "swap", "memory", "residue", "guardian"],
-                      view: AnyView(MachinePane(model: model.machineModel)))]
-       : [])
-    + [
-        SettingsTab(title: "Profiles", symbol: "person.text.rectangle", tint: .pink,
-                    keywords: ["profile", "preset", "start", "session", "model",
-                               "permission", "system prompt", "launch"],
-                    view: AnyView(ProfilesPane(profiles: model.sessionProfiles))),
-        SettingsTab(title: "Activity", symbol: "clock.arrow.circlepath", tint: .teal,
-                    keywords: ["history", "switches", "log", "events"],
-                    view: AnyView(ActivityPane(model: model))),
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
@@ -251,11 +214,6 @@ struct InfinitusApp: App {
                     keywords: ["team", "invite", "code", "join", "members", "leader", "share", "publish", "exclude", "control", "grant", "drive"],
                     view: AnyView(TeamPane(team: model.team, feed: model.teamControlFeed))),
     ]
-    + (model.debugMenu
-       ? [SettingsTab(title: "Animations", symbol: "sparkles", tint: .pink,
-                      keywords: ["debug", "test"],
-                      view: AnyView(AnimationsDebugPane(model: model)))]
-       : [])
     + [
         SettingsTab(title: "About", symbol: "info.circle", tint: .indigo,
                     keywords: ["update", "version", "license", "links"],

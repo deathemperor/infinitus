@@ -27,6 +27,7 @@ import { relativeTime } from "../../lib/time";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
+import { reconnectingRowLabel } from "../infinitus/reconnecting.logic";
 import { useThreadReadyForReview } from "../infinitus/useThreadReadyForReview";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
@@ -465,10 +466,14 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   // Infinitus (#269 F): an idle active row whose PR waits on a reviewer says so
   // instead of its time. Settled rows keep the stamp they sort by.
   const readyForReview = useThreadReadyForReview(thread);
+  // Infinitus (#832): a working row whose turn waits for the network says so.
+  const reconnecting = status === "working" ? reconnectingRowLabel(thread.session) : null;
   const statusLabel =
-    status === "ready" && variant === "card" && readyForReview
-      ? READY_FOR_REVIEW_LABEL
-      : STATUS_LABEL_BY_STATUS[status];
+    reconnecting !== null
+      ? { label: reconnecting, className: "text-warning-foreground" }
+      : status === "ready" && variant === "card" && readyForReview
+        ? READY_FOR_REVIEW_LABEL
+        : STATUS_LABEL_BY_STATUS[status];
   // Settled rows label by the same stamp they sort by, so order and label
   // can't disagree. updatedAt is always present, so the resolver never
   // returns null here.

@@ -456,6 +456,19 @@ describe("thread outbox drain delivery cleanup", () => {
     expect(appAtomRegistry.get(acknowledgedThreadMessagesAtom)).toEqual([message]);
   });
 
+  it("does not hold a feed row for a message parked on the server's queue (#812)", async () => {
+    const message = queuedMessage({ messageId: "message-queued", text: "later" });
+    await harness.manager.enqueue(message);
+    const deliveryRevision = harness.manager.revisionOf(message.messageId);
+
+    await expect(
+      completeQueuedMessageDelivery(message, deliveryRevision, { retainInFeed: false }),
+    ).resolves.toBe("removed");
+
+    expect(remainingMessages()).toEqual([]);
+    expect(appAtomRegistry.get(acknowledgedThreadMessagesAtom)).toEqual([]);
+  });
+
   it("keeps a delivered message when its editor opens during storage removal", async () => {
     const message = queuedMessage({
       messageId: "message-editor-removal-race",

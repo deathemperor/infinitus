@@ -132,8 +132,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   routes (#710), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing` and `./captures` subpath exports.
-- `packages/contracts/src/environment.ts` — the `infinitus` capability on
-  `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+- `packages/contracts/src/environment.ts` — the `infinitus` and `turnQueue`
+  (#812) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
   beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
@@ -323,8 +323,15 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
   drops the imported history by the ids the fork minted; "Bring to main"
   appends the latest answer to the main composer's draft);
-  `ChatView.tsx` `askSideQuestion` forks the latest completed turn with
-  `side: true` and opens the drawer, gated on a Claude session and
+  `ChatView.tsx` `askSideQuestion` forks with `side: true` and no
+  `turnCount`: the server takes the session's latest completed turn from
+  its own anchors (`latestClaudeForkAnchor`, `forkSeedMessagesByTurns`),
+  so a thread in a plain directory, which never gets a checkpoint, forks
+  too. The drawer opens on the click in a forking state
+  (`openSideQuestionPending`, `failSideQuestionPending`; the pending
+  surface is never persisted) and shows a failure inside with "Try again";
+  until a turn has completed (`hasCompletedTurn`) the button is off and
+  its tooltip says so. Gated on a Claude session and
   `capabilities.infinitus`; the button sits after the mode toggle in
   `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in
   `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and
@@ -358,6 +365,34 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.
+- **Reconnect a turn whose transport went away (#832).** The Claude adapter
+  (`apps/server/src/provider/Layers/ClaudeAdapter.ts`) keeps the turn open
+  when its stream fails with a socket-level error (or a process exit after
+  the CLI reported `api_retry`), when a result reports `api_error` with no
+  cause the turn already knows (login, usage limit), or when the stream ends
+  cleanly with the turn open; `scheduleReconnect` emits
+  `session.state.changed {running, reason: "reconnecting:<n>/5"}` and after
+  the attempt's backoff (`claudeReconnect.logic.ts`: 5 s, 15 s, 1 min, 3 min,
+  10 min) `reopenForReconnect` closes the old query, carries any queued
+  prompt over, and reopens the CLI on the reported session id
+  (`reconnectQueryOptions`, `context.reopenStream`) with the shared
+  continuation prompt (`apps/server/src/provider/turnContinuation.ts`, the
+  one the post-update boot continuation sends) or, when nothing answered
+  yet, the turn's own message again. An assistant message resets the count;
+  after the last attempt the turn fails with the message in
+  `RECONNECT_EXHAUSTED_MESSAGE`. A clean stream end with an open turn now
+  fails instead of reading as `interrupted`, which the #806 drain treats as
+  idle. The reason reaches the client as `OrchestrationSession.statusReason`
+  (`packages/contracts/src/orchestration.ts`; ingestion sets it from a
+  running `session.state.changed`, null on every other lifecycle event;
+  `ProjectionThreadSessions` column `status_reason`,
+  `Migrations/055_ProjectionThreadSessionsStatusReason.ts`, `ProjectionPipeline.ts`,
+  `ProjectionSnapshotQuery.ts`), and the web shows "Waiting for the network.
+  Reconnect attempt n of 5." under the thread's banners
+  (`apps/web/src/components/chat/ThreadReconnectingNotice.tsx`, mounted in
+  `ChatView.tsx`). Codex is out of scope. Tests:
+  `claudeReconnect.logic.test.ts`, `ClaudeAdapter.test.ts` "reconnect (#832)",
+  `ProviderRuntimeIngestion.test.ts`, `ThreadReconnectingNotice.test.ts`.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
@@ -562,13 +597,30 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
   `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
+  `infinitusReconnectingNotice` slot above the hold banner (#832: "Waiting
+  for the network. Reconnect attempt n of 5." while the session's
+  `statusReason` reads `reconnecting:<n>/<max>` on a running session;
+  `apps/mobile/src/features/infinitus/InfinitusReconnectingNotice.tsx` +
+  `reconnecting.logic.ts`, the web helper's copy; `ThreadRouteScreen.tsx`
+  builds it from the thread shell's session, and
+  `thread-list-v2-items.tsx` labels such a working row "Reconnecting n/max"
+  in amber instead of "Working"), the optional
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
-  feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  feedback notices, #742) and the `infinitusQueuedTurns` slot right after it
+  (#806: the thread's server-side queue as a card — one row per queued
+  message with earlier/later, edit, send now, remove;
+  `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
+  `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
+  the web's `composerSendQueue.logic.ts`, kept local so neither app edits
+  the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation), and prepends `usePullRequestHeaderItem`'s menu to the
+  queued creation), `InfinitusQueuedTurns` from the thread shell's
+  `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
-  ready for review over `pullRequests.runAction`;
+  ready for review over `pullRequests.runAction`; on Android the hook's
+  `androidAction` is a header button before the git controls whose tap
+  opens the same choices as an alert;
   `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
@@ -580,6 +632,17 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `apps/mobile/src/features/archive/ArchivedThreadsRouteScreen.tsx` filters
   the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
   #863).
+- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — a side question
+  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s button follows
+  the PR menu in the iOS header (its `version` in `optionsVersion`) and joins
+  the Android header actions on a Claude Agent thread of an `infinitus`
+  server; a tap forks the session's latest completed turn (`infinitus.forkThread`
+  with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet`
+  (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
+  no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx`
+  subscribes to the side fork, asks in plan mode, and "Bring to main" appends
+  the latest answer to the main composer's draft (`sideQuestions.ts` carries
+  the web `SideQuestionPanel.logic.ts` helpers, kept local).
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
@@ -590,7 +653,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   pass and the live re-check before a send) are wrapped in
   `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
   its turn runs or the server holds it, the phone's copy of the desktop
-  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too.
+  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too. Since
+  #812 that wait becomes a `thread.turn.queue` when the server advertises
+  `turnQueue` (`resolveThreadOutboxDelivery`, `queueTurnCommandInput`):
+  `sendQueuedMessage` takes `via: "start" | "queue"` and, for a queue, sends
+  `threadEnvironment.queueTurn` with the outbox's command id and a fresh
+  queue id after the same settings sync and uploads, and
+  `completeQueuedMessageDelivery` takes `{ retainInFeed: false }` so no
+  "Pending" feed row waits for an echo the timeline only gives at drain.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -1349,6 +1419,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   of steering; creations and every other action pass through. `mode` is
   `"queue"` at both call sites — the phone has no copy of the desktop's
   `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when
+  the server's capabilities carry `turnQueue` (fork capability in
+  `packages/contracts/src/environment.ts`, set true in
+  `apps/server/src/environment/ServerEnvironment.ts`); `queueTurnCommandInput`
+  is the `thread.turn.queue` an outbox message becomes.
   `readHeldThreads` reads the environment's `infinitusEnvironment.holds` atom
   from the registry (the web sidebar's idiom), null without the `infinitus`
   capability and before the list's first delivery, so the first pass after
@@ -1422,6 +1497,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (ActivityKit's message in an alert) blames the phone's settings; with
   working cards live the same row reads "End the working card(s)" and ends
   them all — the Mac cannot end a card it never got an update token for.
+  A started test card bumps `liveActivityStarts.ts`'s atom, which
+  `InfinitusLiveActivityBridge` watches to re-scan the live cards and file
+  the new card's `working` update token with the Mac (the bridge otherwise
+  scans only at mount and on foreground); `pushRegistration.ts` logs a
+  refused `activities-token` (`[infinitus-push]`) since the bridges send
+  with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.

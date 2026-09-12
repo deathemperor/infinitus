@@ -80,6 +80,9 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("prefs-set")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("prefs-set")?.args, ["<key>", "<value>"])
         XCTAssertNotNil(ControlCommand.named("team-code")); XCTAssertNotNil(ControlCommand.named("team-fetch")); XCTAssertNotNil(ControlCommand.named("team-decline"))
+        XCTAssertEqual(ControlCommand.named("team-sessions")?.effect, .read)
+        XCTAssertEqual(ControlCommand.named("team-drive")?.args.first, "<kid|name>")
+        XCTAssertEqual(ControlCommand.named("team-drive")?.effect, .write)
         XCTAssertNil(ControlCommand.named("nope"))
     }
 
@@ -138,7 +141,7 @@ final class ControlProtocolTests: XCTestCase {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
         XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "team-create", "team-join", "team-hostname", "proxy-key", "9router-password", "push-slack", "push-telegram", "desktop-credential"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
-        XCTAssertEqual(Set(payload), ["send", "approve", "event", "machine-hook"])
+        XCTAssertEqual(Set(payload), ["send", "approve", "event", "machine-hook", "push"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
     }
 

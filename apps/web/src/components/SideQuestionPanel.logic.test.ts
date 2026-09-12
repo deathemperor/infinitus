@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ThreadId } from "@t3tools/contracts";
+import { ThreadId, TurnId } from "@t3tools/contracts";
 
-import { isSideQuestionMessage } from "./SideQuestionPanel.logic";
+import { hasCompletedTurn, isSideQuestionMessage } from "./SideQuestionPanel.logic";
 
 describe("isSideQuestionMessage (#269 C)", () => {
   const threadId = ThreadId.make("side-1");
@@ -24,5 +24,43 @@ describe("isSideQuestionMessage (#269 C)", () => {
     expect(isSideQuestionMessage(threadId, { id: "m-4", role: "system", text: "note" })).toBe(
       false,
     );
+  });
+});
+
+describe("hasCompletedTurn (#269 C)", () => {
+  const turn = (id: string) => TurnId.make(id);
+  const assistant = (turnId: string | null, streaming = false) => ({
+    role: "assistant",
+    turnId: turnId === null ? null : turn(turnId),
+    streaming,
+  });
+
+  it("needs an assistant message finished under a turn that is not the running one", () => {
+    expect(hasCompletedTurn({ messages: [], session: null })).toBe(false);
+    expect(
+      hasCompletedTurn({
+        messages: [{ role: "user", turnId: null, streaming: false }, assistant(null)],
+        session: null,
+      }),
+    ).toBe(false);
+    expect(
+      hasCompletedTurn({
+        messages: [assistant("turn-1", true)],
+        session: { activeTurnId: turn("turn-1") },
+      }),
+    ).toBe(false);
+    expect(
+      hasCompletedTurn({
+        messages: [assistant("turn-1")],
+        session: { activeTurnId: turn("turn-1") },
+      }),
+    ).toBe(false);
+    expect(
+      hasCompletedTurn({
+        messages: [assistant("turn-1"), assistant("turn-2", true)],
+        session: { activeTurnId: turn("turn-2") },
+      }),
+    ).toBe(true);
+    expect(hasCompletedTurn({ messages: [assistant("turn-1")], session: null })).toBe(true);
   });
 });

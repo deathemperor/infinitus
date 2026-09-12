@@ -33,6 +33,7 @@ import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
+import { TURN_CONTINUATION_PROMPT } from "./provider/turnContinuation.ts";
 import * as OrchestrationReactor from "./orchestration/Services/OrchestrationReactor.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerSettings from "./serverSettings.ts";
@@ -340,7 +341,6 @@ const runStartupPhase = <A, E, R>(phase: string, effect: Effect.Effect<A, E, R>)
 const ORPHANED_PROVIDER_SESSION_ERROR =
   "Provider session did not survive a server restart. Send a new message to continue.";
 const SERVER_UPDATE_CONTINUATION_KEY = "continueAfterServerUpdate";
-const SERVER_UPDATE_CONTINUATION_PROMPT = "Continue where you left off.";
 
 class ProviderSessionContinuationError extends Schema.TaggedError<ProviderSessionContinuationError>()(
   "ProviderSessionContinuationError",
@@ -700,7 +700,7 @@ export const reconcileProviderSessions = Effect.gen(function* () {
                 threadId: thread.id,
                 ...(capabilities.promptlessTurnContinuation === true
                   ? { continuation: true }
-                  : { input: SERVER_UPDATE_CONTINUATION_PROMPT }),
+                  : { input: TURN_CONTINUATION_PROMPT }),
                 interactionMode: thread.interactionMode,
               });
             });

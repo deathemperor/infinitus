@@ -6,6 +6,7 @@ import * as Cause from "effect/Cause";
 import { useMemo } from "react";
 import { Alert } from "react-native";
 
+import type { AndroidHeaderAction } from "../../components/AndroidScreenHeader";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { resolveThreadPrSource } from "../../state/thread-pr-presentation";
@@ -25,6 +26,9 @@ type HeaderItem = Record<string, unknown>;
 export interface PullRequestHeaderItem {
   /** The menu, or null while the thread has no pull request to show. */
   readonly item: HeaderItem | null;
+  /** The Android in-flow header's button for the same choices (it takes no
+      menus): a tap opens an alert with the phase and the actions. */
+  readonly androidAction: AndroidHeaderAction | null;
   /** Changes whenever the menu's content does; the native header's option
       factories are stabilised, so ThreadRouteScreen feeds this to
       `optionsVersion` (a menu built from a later snapshot would otherwise
@@ -32,7 +36,7 @@ export interface PullRequestHeaderItem {
   readonly version: string;
 }
 
-const NO_ITEM: PullRequestHeaderItem = { item: null, version: "" };
+const NO_ITEM: PullRequestHeaderItem = { item: null, androidAction: null, version: "" };
 const PR_ICON = { name: "arrow.triangle.pull", type: "sfSymbol" } as const;
 
 /**
@@ -44,7 +48,8 @@ const PR_ICON = { name: "arrow.triangle.pull", type: "sfSymbol" } as const;
  * the link afterwards, so the phase follows on its own. The phase reads the
  * linked snapshot the server pushes with the thread; a thread with only the
  * legacy branch reference (no link) gets the number and "Open pull request".
- * iOS only: Android's in-flow header takes plain buttons, not menus.
+ * Android's in-flow header takes plain buttons, not menus, so there the
+ * same choices open as an alert (#849 follow-up).
  */
 export function usePullRequestHeaderItem(
   thread: EnvironmentThreadShell | null,
@@ -144,6 +149,17 @@ export function usePullRequestHeaderItem(
         sharesBackground: true,
         type: "menu",
         variant: "plain",
+      },
+      androidAction: {
+        accessibilityLabel: `Pull request ${status}`,
+        icon: "arrow.triangle.pull",
+        onPress: (): void =>
+          Alert.alert(
+            `Pull request #${number}`,
+            phaseLabel,
+            items.map((item) => ({ text: item.label, onPress: (): void => run(item.action) })),
+            { cancelable: true },
+          ),
       },
       version: [number, url, phaseLabel, ...items.map((item) => item.action)].join(":"),
     };

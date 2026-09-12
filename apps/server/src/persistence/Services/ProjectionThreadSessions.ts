@@ -29,6 +29,8 @@ export const ProjectionThreadSession = Schema.Struct({
   runtimeMode: RuntimeMode,
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(Schema.String),
+  /** Fork (#832): the reason behind a `running` status (`reconnecting:n/max`). */
+  statusReason: Schema.NullOr(Schema.String),
   updatedAt: IsoDateTime,
 });
 export type ProjectionThreadSession = typeof ProjectionThreadSession.Type;

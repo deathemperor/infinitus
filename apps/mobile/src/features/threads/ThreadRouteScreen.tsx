@@ -69,6 +69,7 @@ import {
 } from "./ThreadGitControls";
 import { GitOverviewSheet } from "./git/GitOverviewSheet";
 import { usePullRequestHeaderItem } from "../infinitus/usePullRequestHeaderItem";
+import { useSideQuestionHeaderItem } from "../infinitus/useSideQuestionHeaderItem";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git-actions";
 import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-state";
@@ -77,6 +78,9 @@ import { useSelectedThreadWorktree } from "../../state/use-selected-thread-workt
 import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { threadEnvironment } from "../../state/threads";
 import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
+import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
+import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
+import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import {
@@ -666,19 +670,21 @@ function ThreadRouteContent(
   const gitRightHeaderItems = useThreadGitRightHeaderItems(threadGitControlProps);
   // Infinitus (#269): the thread's pull request leads the header when it has one.
   const pullRequestHeader = usePullRequestHeaderItem(selectedThread);
+  // Infinitus (#832): the turn is still running while the server reconnects.
+  const reconnectingNoticeText = reconnectingNotice(selectedThread?.session);
+  // Infinitus (#269 C, #881): the side-question button follows it.
+  const sideQuestionHeader = useSideQuestionHeaderItem(selectedThread, selectedThreadDetail);
+  const infinitusHeaderItems = useMemo<NativeHeaderItems>(
+    () => [pullRequestHeader.item, sideQuestionHeader.item].filter((item) => item !== null),
+    [pullRequestHeader.item, sideQuestionHeader.item],
+  );
   const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
-    () =>
-      pullRequestHeader.item
-        ? [pullRequestHeader.item, ...gitCenterHeaderItems]
-        : gitCenterHeaderItems,
-    [gitCenterHeaderItems, pullRequestHeader.item],
+    () => [...infinitusHeaderItems, ...gitCenterHeaderItems],
+    [gitCenterHeaderItems, infinitusHeaderItems],
   );
   const compactRightHeaderItems = useMemo<NativeHeaderItems>(
-    () =>
-      pullRequestHeader.item
-        ? [pullRequestHeader.item, ...gitRightHeaderItems]
-        : gitRightHeaderItems,
-    [gitRightHeaderItems, pullRequestHeader.item],
+    () => [...infinitusHeaderItems, ...gitRightHeaderItems],
+    [gitRightHeaderItems, infinitusHeaderItems],
   );
   const splitLeftHeaderItems = useMemo<NativeHeaderItems>(
     () => [
@@ -746,11 +752,18 @@ function ThreadRouteContent(
         onPress: () => handleOpenTerminal(null),
       });
     }
+    // Infinitus (#269 F): the pull request leads the git controls, as on iOS.
+    if (pullRequestHeader.androidAction !== null) {
+      actions.push(pullRequestHeader.androidAction);
+    }
     actions.push({
       accessibilityLabel: "Open git controls",
       icon: "point.topleft.down.curvedto.point.bottomright.up",
       onPress: handleOpenGitInspector,
     });
+    if (sideQuestionHeader.androidAction !== null) {
+      actions.push(sideQuestionHeader.androidAction);
+    }
     if (fileInspector.supported && selectedThreadCwd !== null) {
       actions.push({
         accessibilityLabel: "Toggle inspector",
@@ -767,7 +780,9 @@ function ThreadRouteContent(
     handleToggleInspector,
     props.onReturnToThread,
     selectedThreadCwd,
+    pullRequestHeader.androidAction,
     selectedThreadProject?.workspaceRoot,
+    sideQuestionHeader.androidAction,
   ]);
 
   const handleEditFailedCreation = useCallback(async () => {
@@ -885,6 +900,11 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusReconnectingNotice={
+            creationState === null && reconnectingNoticeText !== null ? (
+              <InfinitusReconnectingNotice notice={reconnectingNoticeText} />
+            ) : null
+          }
           infinitusHoldBanner={
             creationState === null && selectedThreadDetail !== null ? (
               <InfinitusHoldBanner
@@ -893,6 +913,11 @@ function ThreadRouteContent(
                 activities={selectedThreadDetail.activities}
                 latestTurn={selectedThreadDetail.latestTurn}
               />
+            ) : null
+          }
+          infinitusQueuedTurns={
+            creationState === null && selectedThread.queuedTurns !== undefined ? (
+              <InfinitusQueuedTurns environmentId={environmentId} thread={selectedThread} />
             ) : null
           }
           activePendingApproval={requests.activePendingApproval}
@@ -941,7 +966,11 @@ function ThreadRouteContent(
     <>
       {activeInspectorRenderer ? <InspectorPaneRoleActivation /> : null}
       <NativeStackScreenOptions
-        optionsVersion={[threadGitControlProps.projectScripts, pullRequestHeader.version]}
+        optionsVersion={[
+          threadGitControlProps.projectScripts,
+          pullRequestHeader.version,
+          sideQuestionHeader.version,
+        ]}
         options={{
           // Android draws its own in-flow header (AndroidScreenHeader below);
           // the native stack header stays iOS-only.

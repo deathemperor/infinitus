@@ -146,7 +146,7 @@ public enum PrefCatalog {
         Entry("priority_abundant_pct", .int, .number(50), sessions),
     ]
 
-    /// The popup intro (`AnimationsDebugPane`): how the content enters,
+    /// The popup intro (the desktop app's Animations settings): how the content enters,
     /// what the title does, and the pace fire on the 7d/model bars.
     public static let introStyles = ["top", "bottom", "fade", "rows"]
     public static let introTitles = ["zoom", "slam", "spin", "off"]
