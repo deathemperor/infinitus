@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - The pop-out no longer re-asks for a window size the screen refused: the loop guard compared the refusal with the content's ideal instead of the settled size it had asked for, so a clamped settle was retried on every re-measure for a second (#229).
 - The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
 - Team control runs the whole grant menu: a teammate you grant stop, resume-past, delete, swap, hold, kill or reclaim runs that Mac verb here; anything not pre-authorised waits for your Allow (`infinitusctl team-pending / team-allow / team-deny`, two minutes) and delete, kill, reclaim always wait (#220).
+- A session reads idle the moment its Stop hook fires and leaves the list on SessionEnd, ahead of Claude Code's own record; the record's next status change still wins (#79).
 
 ### Phone
 - The thread header's Infinitus choices — the pull request, Ask a side question, Thread usage — are one menu button, so the git, files and terminal buttons stay visible instead of everything collapsing into "…" (#941).
