@@ -20,6 +20,7 @@ publishes the matching section as the GitHub release body.
 - A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
 - Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).
+- The thread header's pull request menu can babysit the PR — a fix round is queued whenever it conflicts, fails its checks or gets changes requested, up to ten — and stop it; a babysat thread's list row reads "Babysitting r/10" (#269).
 
 ### Mac
 - The five-minute team publish no longer stats every transcript in the scan (two `lstat`s per transcript, about 23k a pass over the 11k transcripts of the last 30 days here, seconds of it while peers write): the session, agent and project identity is read off the path string (#346).

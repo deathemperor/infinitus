@@ -1,9 +1,11 @@
-import type {
-  PullRequestChecksState,
-  PullRequestMergeability,
-  PullRequestReviewDecision,
-  PullRequestState,
-  ThreadPullRequestLink,
+import {
+  BABYSIT_MAX_ROUNDS,
+  type PullRequestChecksState,
+  type PullRequestMergeability,
+  type PullRequestReviewDecision,
+  type PullRequestState,
+  type ThreadBabysit,
+  type ThreadPullRequestLink,
 } from "@t3tools/contracts";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
 
@@ -84,7 +86,7 @@ export function prChecksUrl(url: string): string | null {
   return parsed.toString();
 }
 
-export type PrHeaderAction = "open" | "checks" | "ready";
+export type PrHeaderAction = "open" | "checks" | "ready" | "babysit-on" | "babysit-off";
 
 export interface PrHeaderMenuItem {
   readonly action: PrHeaderAction;
@@ -94,12 +96,16 @@ export interface PrHeaderMenuItem {
 }
 
 /** The menu under the header's PR item: open the PR, its checks when the
-    host has a checks page, and "Mark ready for review" while it is a draft
-    the server can act on. Read-only otherwise: no merge from the phone. */
+    host has a checks page, "Mark ready for review" while it is a draft the
+    server can act on, and — on an Infinitus server, while the PR is open
+    or the thread is already babysat (#269 A, the web's gate) — the babysit
+    toggle. Read-only otherwise: no merge from the phone. */
 export function prHeaderMenuItems(input: {
   readonly pr: PrPhaseInput;
   readonly checksUrl: string | null;
   readonly canRunActions: boolean;
+  /** Null when the server cannot babysit; else the thread's state, null while off. */
+  readonly babysit?: { readonly state: ThreadBabysit | null } | null;
 }): ReadonlyArray<PrHeaderMenuItem> {
   const items: PrHeaderMenuItem[] = [
     {
@@ -125,7 +131,32 @@ export function prHeaderMenuItems(input: {
       icon: "checkmark.circle",
     });
   }
+  const babysit = input.babysit ?? null;
+  if (babysit !== null && (babysit.state !== null || input.pr.state === "open")) {
+    items.push(
+      babysit.state === null
+        ? {
+            action: "babysit-on",
+            label: "Babysit",
+            description:
+              "Queue a fix round when it conflicts, fails checks or gets changes requested",
+            icon: "arrow.triangle.2.circlepath",
+          }
+        : {
+            action: "babysit-off",
+            label: `Stop babysitting (${babysit.state.rounds}/${BABYSIT_MAX_ROUNDS})`,
+            description: "Fix rounds stop; the pull request is left as it is",
+            icon: "stop.circle",
+          },
+    );
+  }
   return items;
+}
+
+/** "Babysitting r/10" while the thread is babysat (#269 A), for the thread
+    list row and the header menu's status line; null while off. */
+export function babysitLabel(babysit: ThreadBabysit | null | undefined): string | null {
+  return babysit == null ? null : `Babysitting ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}`;
 }
 
 function prChecksDescription(checksState: PullRequestChecksState | null): string {

@@ -810,14 +810,19 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   slot first in the composer stack, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
-  ready for review over `pullRequests.runAction`; on Android the hook's
-  `androidAction` is a header button before the git controls whose tap
-  opens the same choices as an alert;
+  ready for review over `pullRequests.runAction`, and on an `infinitus`
+  server "Babysit" / "Stop babysitting (r/10)" over `thread.meta.update
+{babysit}` while the PR is open or the thread is already babysat — the
+  web toggle's gate, #269 A, the menu's status line reading "Babysitting
+  r/10" while on; on Android the hook's `androidAction` is a header button
+  before the git controls whose tap opens the same choices as an alert;
   `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
-  (`useThreadReadyForReview`, #269 F); settled rows keep their stamp.
+  (`useThreadReadyForReview`, #269 F); settled rows keep their stamp. A
+  babysat idle row reads "Babysitting r/10" ahead of that (`babysitLabel`,
+  #269 A).
 - `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
   questions (`sideOf != null`, #269 C) and `useThreadShell` answers null for
   one, so a side question is in no phone list and never opens as a page;
