@@ -119,7 +119,7 @@ func runTeamControl(_ args: [String]) -> Int32? {
         case "drive":
             // #220 Phase 2: any granted capability, not just the drive
             // set — the grantor's own verbs (stop, resume-past, delete,
-            // swap, hold, kill, reclaim) ride the same envelope.
+            // swap, hold) ride the same envelope.
             guard positional.count >= 3 else { return controlFail(teamUsage(), code: 2) }
             let (kid, session, action) = (positional[0], positional[1], positional[2])
             guard action != TeamGrants.view, TeamGrants.capabilities.contains(action) else { return controlFail(teamUsage(), code: 2) }

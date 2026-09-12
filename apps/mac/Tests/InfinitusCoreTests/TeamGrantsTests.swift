@@ -100,22 +100,22 @@ final class TeamGrantsTests: XCTestCase {
         XCTAssertFalse(g.requiresApproval(TeamGrants.view))
     }
 
-    func testDeleteKillReclaimNeverRunUnasked() {
+    func testDeleteNeverRunsUnasked() {
         var grants = TeamGrants()
         let g = grants.add(audience: .team, sessions: .all,
-                           capabilities: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.kill, TeamGrants.swap],
-                           preauthorized: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.kill, TeamGrants.reclaim, "reboot"],
+                           capabilities: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.swap],
+                           preauthorized: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.hold, "reboot"],
                            expires: 1_000, now: 300)
-        XCTAssertEqual(g.preauthorized, [TeamGrants.stop], "drive is implicit, delete/kill never, reclaim/reboot were not granted")
+        XCTAssertEqual(g.preauthorized, [TeamGrants.stop], "drive is implicit, delete never, hold/reboot were not granted")
         XCTAssertFalse(g.requiresApproval(TeamGrants.stop))
         XCTAssertTrue(g.requiresApproval(TeamGrants.delete))
         XCTAssertTrue(g.requiresApproval(TeamGrants.swap))
-        // A hand-edited file cannot pre-authorize them either.
-        let hand = TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all, capabilities: [TeamGrants.delete, TeamGrants.reclaim],
-                                    since: 1, preauthorized: [TeamGrants.delete, TeamGrants.reclaim])
+        // A hand-edited file cannot pre-authorize it either.
+        let hand = TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all, capabilities: [TeamGrants.delete, TeamGrants.swap],
+                                    since: 1, preauthorized: [TeamGrants.delete, TeamGrants.swap])
         XCTAssertTrue(hand.requiresApproval(TeamGrants.delete))
-        XCTAssertTrue(hand.requiresApproval(TeamGrants.reclaim))
-        let json = #"{"grants":[{"audience":"team","capabilities":["kill"],"id":"g-00000001","preauthorized":["kill"],"sessions":"all","since":5}],"schema":1}"#
+        XCTAssertFalse(hand.requiresApproval(TeamGrants.swap))
+        let json = #"{"grants":[{"audience":"team","capabilities":["delete"],"id":"g-00000001","preauthorized":["delete"],"sessions":"all","since":5}],"schema":1}"#
         let edited = try? CanonicalJSON.decode(TeamGrants.self, from: Data(json.utf8))
         XCTAssertEqual(edited?.grants.first?.preauthorized, [])
         // The file carries them sorted, and the round trip holds.

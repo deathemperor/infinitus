@@ -331,9 +331,6 @@ final class TeamControlTests: XCTestCase {
         XCTAssertEqual(verb("hold", "claude 3", session: "-", pid: nil), V(command: "hold", args: ["claude", "3"]))
         XCTAssertEqual(verb("hold", "claude 3 off", session: "-", pid: nil), V(command: "unhold", args: ["claude", "3"]))
         XCTAssertNil(verb("hold", "claude 3 maybe", session: "-", pid: nil))
-        XCTAssertEqual(verb("kill", "555", session: "-", pid: nil), V(command: "machine-kill", args: ["555"], options: ["yes": ""]))
-        XCTAssertNil(verb("kill", "1", session: "-", pid: nil)); XCTAssertNil(verb("kill", "-9 555", session: "-", pid: nil))
-        XCTAssertEqual(verb("reclaim", nil, session: "-", pid: nil), V(command: "machine-reclaim", options: ["yes": ""]))
         XCTAssertNil(verb("send", "hi"), "drive actions are SessionInput, never a verb")
         XCTAssertNil(TeamControl.request(action: "stop", text: nil), "and the reverse")
     }

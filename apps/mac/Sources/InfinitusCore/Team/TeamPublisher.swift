@@ -410,7 +410,7 @@ public struct TeamPublisher {
     /// built a full attribute dictionary for each of a 5,000-copy store's
     /// files on every publish, ~0.8 s of the pass's CPU (#346). The keys
     /// used are the ones corelibs-foundation implements too (the Linux
-    /// tests walk the same way in `Residue.size` and `Transcript.agentFiles`).
+    /// tests walk the same way in `Transcript.agentFiles`).
     static func pruneCopies(in copiesDir: URL, cap: Int) -> Int {
         let fm = FileManager.default
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
