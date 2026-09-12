@@ -8,12 +8,16 @@ import {
   threadPhasePayload,
 } from "./infinitusPushBridge.logic.ts";
 
-const command = (name: string, stdin?: string | null): InfinitusManifestCommand => ({
+const command = (
+  name: string,
+  stdin?: string | null,
+  summary = "…({kind, threadId, title, phase, detail?, local?}); `local: false` skips…",
+): InfinitusManifestCommand => ({
   name,
   args: [],
   options: [],
   effect: "write",
-  summary: "",
+  summary,
   replyShape: "",
   ...(stdin === undefined ? {} : { stdin }),
 });
@@ -41,6 +45,7 @@ describe("push bridge logic (#269 G)", () => {
       threadId: "thread-1",
       title: "Fix the build",
       phase: "failed",
+      local: false,
     });
     const long = "x".repeat(MAX_PUSH_TITLE_LENGTH + 20);
     const title = JSON.parse(
@@ -50,8 +55,10 @@ describe("push bridge logic (#269 G)", () => {
     expect(title.endsWith("…")).toBe(true);
   });
 
-  it("gates on a push verb that takes a payload", () => {
+  it("gates on a push verb that takes a payload and knows the local flag", () => {
     expect(manifestHasPush([command("push", "payload")])).toBe(true);
+    // An app from before the flag would post its own notice beside the desktop's.
+    expect(manifestHasPush([command("push", "payload", "A thread phase on stdin.")])).toBe(false);
     expect(manifestHasPush([command("push", "secret")])).toBe(false);
     expect(manifestHasPush([command("push")])).toBe(false);
     expect(manifestHasPush([command("status")])).toBe(false);

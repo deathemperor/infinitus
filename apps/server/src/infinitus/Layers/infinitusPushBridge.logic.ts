@@ -5,11 +5,13 @@ import * as Schema from "effect/Schema";
 /**
  * Push bridge (#269 G), the pure half. A thread phase the Mac's `push` verb
  * takes on the request line's `secret` field (the manifest says `stdin:
- * "payload"`): `{kind: "thread.phase", threadId, title, phase}`, which
- * native words ("<title>: waiting for approval") and fans out to the
- * Notification Center, the phone's alert token and the Slack / Telegram
- * away channels. Only the phases a person acts on are worth a push: the
- * two waits and the two ends. `starting` / `running` / `stale` are noise.
+ * "payload"`): `{kind: "thread.phase", threadId, title, phase, local:
+ * false}`, which native words ("<title>: waiting for approval") and fans
+ * out to the phone's alert token and the Slack / Telegram away channels;
+ * `local: false` skips the Mac's own Notification Center notice, since the
+ * desktop already shows a banner for these phases (#270 B). Only the phases
+ * a person acts on are worth a push: the two waits and the two ends.
+ * `starting` / `running` / `stale` are noise.
  */
 
 const PUSHED_PHASES: ReadonlySet<AgentAwarenessPhase> = new Set<AgentAwarenessPhase>([
@@ -27,6 +29,7 @@ const ThreadPhasePush = Schema.Struct({
   threadId: Schema.String,
   title: Schema.String,
   phase: Schema.String,
+  local: Schema.Literal(false),
 });
 const encodePush = Schema.encodeSync(Schema.fromJsonString(ThreadPhasePush));
 
@@ -59,10 +62,18 @@ export function threadPhasePayload(input: {
         ? `${trimmed.slice(0, MAX_PUSH_TITLE_LENGTH - 1)}…`
         : trimmed,
     phase: input.phase,
+    local: false,
   });
 }
 
-/** The verb, taking a payload on stdin, is in the manifest (native since the `push` verb landed). */
+/**
+ * The verb, taking a payload on stdin whose summary names the `local` flag,
+ * is in the manifest. An app older than the flag would post its own notice
+ * beside the desktop's banner, so it gets no push at all rather than two.
+ */
 export function manifestHasPush(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
-  return commands.some((command) => command.name === "push" && command.stdin === "payload");
+  return commands.some(
+    (command) =>
+      command.name === "push" && command.stdin === "payload" && command.summary.includes("local"),
+  );
 }
