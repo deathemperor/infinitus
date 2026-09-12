@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - A thread phase alert sent from the desktop can skip the Mac's own notification banner and still reach the phone, Slack and Telegram.
 
 ### Desktop
+- A Cursor or Grok thread's usage popover now keeps its tool calls and time working even though the provider reports no tokens; it says "Usage not reported by this provider" instead of a cost.
 - A thread waiting for an approval or an answer, finished or failed can now be pushed through Infinitus to the phone, Slack and Telegram, from a switch on Settings › Infinitus; the Mac skips its own notice for these, the desktop's banner stays the one.
 - The worktree limit also covers a worktree created straight from the branch picker, and a Best-of run cannot land over it: members starting together count each other.
 - A thread stopped on a usage limit now says when the limit resets, in the sidebar's tooltip and the thread's banner.

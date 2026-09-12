@@ -462,9 +462,17 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   that went down means the session started over). Tokens come from the
   per-turn `tokenUsage` every adapter normalizes, so Codex turns record too,
   with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
-  dispatch, a `turn.completed` naming its turn with usage that is not
-  `unavailable` dispatches the command (`orchestration/threadTurnUsage.ts`;
-  a refusal is logged, never blocks); `decider.ts` — folds the read model's
+  dispatch, a `turn.completed` naming its turn dispatches the command
+  (`orchestration/threadTurnUsage.ts`; a refusal is logged, never blocks)
+  when it reported usage, or when it completed and the ingestion counted
+  its tool calls and wall time: a turn whose provider reported none (Cursor
+  and Grok send no `tokenUsage`; the others answer `unavailable` for a turn
+  interrupted before any usage, which stays unrecorded) is a
+  `usageUnavailable: true` row with zero tokens, the
+  rollup counts it in `unreportedTurns`, and the popover shows tokens and
+  cost only while `threadUsageReported` (a turn reported, or a transcript
+  estimate), else "Usage not reported by this provider"; a turn with
+  neither usage nor a counted start is not recorded; `decider.ts` — folds the read model's
   rollup into the event; `projector.ts`, `Schemas.ts`, `threadReducer.ts` —
   assign it. `persistence/ProjectionTurnUsage.ts` + migration `056` — one
   row per turn (`projection_turn_usage`, PK thread + turn) and

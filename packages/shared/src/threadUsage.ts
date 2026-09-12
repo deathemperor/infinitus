@@ -42,7 +42,22 @@ export function addTurnUsage(
     lastTurnAt: turn.completedAt > base.lastTurnAt ? turn.completedAt : base.lastTurnAt,
     ...optionalSum("toolCalls", base.toolCalls, turn.toolCalls),
     ...optionalSum("durationMs", base.durationMs, turn.durationMs),
+    ...optionalSum(
+      "unreportedTurns",
+      base.unreportedTurns,
+      turn.usageUnavailable === true ? 1 : undefined,
+    ),
   };
+}
+
+/**
+ * Whether the rollup's tokens and cost mean anything: at least one recorded
+ * turn reported usage, or the figures came from a transcript. A thread of
+ * turns whose provider reports no usage (Cursor, Grok) keeps its turn, tool
+ * call and duration counts and says "not reported" for the rest.
+ */
+export function threadUsageReported(rollup: ThreadUsageRollup): boolean {
+  return rollup.source === "transcript" || rollup.turns > (rollup.unreportedTurns ?? 0);
 }
 
 /** A sum that stays absent until a turn carries the figure (no key, not

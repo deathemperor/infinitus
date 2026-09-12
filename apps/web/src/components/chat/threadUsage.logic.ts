@@ -1,5 +1,6 @@
 import type { ThreadUsageRollup } from "@t3tools/contracts";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+import { threadUsageReported } from "@t3tools/shared/threadUsage";
 
 import { formatContextWindowTokens } from "~/lib/contextWindow";
 
@@ -65,6 +66,13 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
     });
   }
   return rows;
+}
+
+/** In place of the cost row when no recorded turn reported usage (a
+    Cursor or Grok thread): the turns, tool calls and duration above are
+    real, the zero tokens are not figures. */
+export function threadUsageUnreportedLine(usage: ThreadUsageRollup): string | null {
+  return threadUsageReported(usage) ? null : "Usage not reported by this provider";
 }
 
 /** One line under the rows when the figures came from a transcript rather

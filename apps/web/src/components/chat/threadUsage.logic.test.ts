@@ -8,6 +8,7 @@ import {
   threadUsageRows,
   threadUsageSourceDetail,
   threadUsageSourceLine,
+  threadUsageUnreportedLine,
 } from "./threadUsage.logic";
 
 function rollup(overrides: Partial<ThreadUsageRollup> = {}): ThreadUsageRollup {
@@ -78,6 +79,34 @@ describe("threadUsageRows", () => {
     expect(threadUsageRows(rollup({ models: [] })).some((row) => row.label === "Model")).toBe(
       false,
     );
+  });
+});
+
+describe("threadUsageUnreportedLine", () => {
+  it("replaces the cost when no recorded turn reported usage", () => {
+    const grok = rollup({
+      turns: 2,
+      unreportedTurns: 2,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationTokens: 0,
+      costUsd: null,
+      models: [],
+      toolCalls: 7,
+      durationMs: 65_000,
+    });
+    expect(threadUsageUnreportedLine(grok)).toBe("Usage not reported by this provider");
+    expect(threadUsageRows(grok).map((row) => row.label)).toEqual([
+      "Turns",
+      "Tool calls",
+      "Duration",
+    ]);
+    expect(threadUsageBadgeLabel(grok)).toBe("2 turns");
+    expect(threadUsageUnreportedLine(rollup())).toBeNull();
+    expect(threadUsageUnreportedLine(rollup({ turns: 3, unreportedTurns: 2 }))).toBeNull();
+    expect(
+      threadUsageUnreportedLine(rollup({ source: "transcript", turns: 1, unreportedTurns: 1 })),
+    ).toBeNull();
   });
 });
 

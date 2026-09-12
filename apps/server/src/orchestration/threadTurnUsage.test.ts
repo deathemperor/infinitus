@@ -86,8 +86,86 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
     expect(untracked).not.toHaveProperty("durationMs");
   });
 
-  it("records nothing without usage", () => {
+  it("records a turn without usage as a marker row when the ingestion counted something", () => {
+    // Cursor and Grok send no tokenUsage at all.
+    expect(
+      turnUsageFromCompletedTurn({ state: "completed", turnModels: ["grok-4"] }, turnId, at, {
+        toolCalls: 5,
+        durationMs: 42_000,
+      }),
+    ).toEqual({
+      turnId,
+      model: "grok-4",
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheCreationTokens: 0,
+      reasoningTokens: null,
+      complete: false,
+      hasSubagents: false,
+      costUsd: null,
+      completedAt: at,
+      toolCalls: 5,
+      durationMs: 42_000,
+      usageUnavailable: true,
+    });
+    // An adapter answering `unavailable` is the same row.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "completed",
+          tokenUsage: { usageScope: "main_agent", usageStatus: "unavailable", hasSubagents: true },
+        },
+        turnId,
+        at,
+        { toolCalls: 0, durationMs: 1_000 },
+      ),
+    ).toMatchObject({ usageUnavailable: true, hasSubagents: true, toolCalls: 0 });
+    // A turn that reported carries no marker.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "completed",
+          tokenUsage: { usageScope: "main_agent", usageStatus: "partial", hasSubagents: false },
+        },
+        turnId,
+        at,
+        { toolCalls: 1, durationMs: 1_000 },
+      ),
+    ).not.toHaveProperty("usageUnavailable");
+  });
+
+  it("records nothing without usage or a counted start, nor an interrupted turn without usage", () => {
     expect(turnUsageFromCompletedTurn({ state: "failed" }, turnId, at)).toBeUndefined();
+    // Claude answers `unavailable` for a turn interrupted before any usage: not a turn.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "interrupted",
+          tokenUsage: { usageScope: "main_agent", usageStatus: "unavailable", hasSubagents: false },
+        },
+        turnId,
+        at,
+        { toolCalls: 2, durationMs: 3_000 },
+      ),
+    ).toBeUndefined();
+    // An interrupted turn that did report usage records as before.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "interrupted",
+          tokenUsage: {
+            usageScope: "main_agent",
+            usageStatus: "partial",
+            outputTokens: 12,
+            hasSubagents: false,
+          },
+        },
+        turnId,
+        at,
+        { toolCalls: 2, durationMs: 3_000 },
+      ),
+    ).toMatchObject({ outputTokens: 12, toolCalls: 2 });
     expect(
       turnUsageFromCompletedTurn(
         {
