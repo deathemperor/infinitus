@@ -809,10 +809,10 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
   reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
-  worded like the web popover (#907): turns (with the subagent count), each
-  non-zero token share, model(s), cost ("Cost not recorded" for null, never
-  $0.00), last turn — every estimate prefixed "≈", and the caveat lines
-  under them.
+  worded like the web popover (#907): turns (with the subagent count), tool
+  calls and duration when the server counted them (#927), each non-zero
+  token share, model(s), cost ("Cost not recorded" for null, never $0.00),
+  last turn — every estimate prefixed "≈", and the caveat lines under them.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
