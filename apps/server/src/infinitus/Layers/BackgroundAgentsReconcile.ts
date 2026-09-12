@@ -60,6 +60,7 @@ export const reconcileBackgroundAgents = Effect.gen(function* () {
     JOIN projection_thread_activities a
       ON a.thread_id = s.thread_id AND a.kind = 'task.started'
     WHERE s.status IN ('ready', 'running', 'starting')
+      AND json_type(a.payload_json, '$.taskId') = 'text'
       AND (
         json_extract(a.payload_json, '$.agentKind') = 'agent'
         OR (
