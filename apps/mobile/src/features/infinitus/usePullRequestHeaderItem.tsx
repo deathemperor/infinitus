@@ -6,7 +6,6 @@ import * as Cause from "effect/Cause";
 import { useMemo } from "react";
 import { Alert } from "react-native";
 
-import type { AndroidHeaderAction } from "../../components/AndroidScreenHeader";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { resolveThreadPrSource } from "../../state/thread-pr-presentation";
@@ -15,22 +14,17 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import {
   babysitLabel,
   prChecksUrl,
-  prHeaderLabel,
   prHeaderMenuItems,
   prPhaseLabel,
   type PrPhaseInput,
 } from "./prHeader.logic";
 import { runPullRequestAction } from "./pullRequestActions";
-
-/** A native header item descriptor, the shape ThreadGitControls builds. */
-type HeaderItem = Record<string, unknown>;
+import { PR_ICON, type ThreadMenuPullRequest } from "./threadHeaderMenu.logic";
 
 export interface PullRequestHeaderItem {
-  /** The menu, or null while the thread has no pull request to show. */
-  readonly item: HeaderItem | null;
-  /** The Android in-flow header's button for the same choices (it takes no
-      menus): a tap opens an alert with the phase and the actions. */
-  readonly androidAction: AndroidHeaderAction | null;
+  /** The thread header menu's pull request part, or null while the thread
+      has no pull request to show. */
+  readonly menu: ThreadMenuPullRequest | null;
   /** Changes whenever the menu's content does; the native header's option
       factories are stabilised, so ThreadRouteScreen feeds this to
       `optionsVersion` (a menu built from a later snapshot would otherwise
@@ -38,20 +32,18 @@ export interface PullRequestHeaderItem {
   readonly version: string;
 }
 
-const NO_ITEM: PullRequestHeaderItem = { item: null, androidAction: null, version: "" };
-const PR_ICON = { name: "arrow.triangle.pull", type: "sfSymbol" } as const;
+const NO_ITEM: PullRequestHeaderItem = { menu: null, version: "" };
 
 /**
- * The thread header's pull request menu (#269 F): the PR's number as the
- * label, its phase ("Ready for review", "Checks failing", …) as the first,
+ * The thread header menu's pull request part (#269 F, folded into one
+ * button with the side question and usage by #941): the PR's number as the
+ * button's label, its phase ("Ready for review", "Checks failing", …) as the first,
  * inert line, then "Open pull request", "View checks" (GitHub) and, for a
  * draft on a server that runs PR actions, "Mark ready for review" through
  * `pullRequests.runAction` — the web PR panel's route; the server re-syncs
  * the link afterwards, so the phase follows on its own. The phase reads the
  * linked snapshot the server pushes with the thread; a thread with only the
  * legacy branch reference (no link) gets the number and "Open pull request".
- * Android's in-flow header takes plain buttons, not menus, so there the
- * same choices open as an alert (#849 follow-up).
  */
 export function usePullRequestHeaderItem(
   thread: EnvironmentThreadShell | null,
@@ -151,62 +143,26 @@ export function usePullRequestHeaderItem(
       }
     };
     return {
-      item: {
-        accessibilityLabel: `Pull request ${status}`,
-        icon: PR_ICON,
-        identifier: "thread-right-pull-request",
-        label: prHeaderLabel(number),
-        menu: {
-          items: [
-            {
-              description: babysitting ?? status,
-              disabled: true,
-              icon: PR_ICON,
-              label: phaseLabel,
-              onPress: (): void => {},
-              type: "action",
-            },
-            ...items.map((item) => ({
-              description: item.description,
-              icon: { name: item.icon, type: "sfSymbol" },
-              label: item.label,
-              onPress: (): void => run(item.action),
-              type: "action",
-            })),
-          ],
-          title: `Pull request #${number}`,
-        },
-        sharesBackground: true,
-        type: "menu",
-        variant: "plain",
-      },
-      // Android's in-flow header opens the same choices as an anchored menu
-      // (not an Alert: that shows three buttons at most, and a draft with a
-      // checks page plus babysit is four).
-      androidAction: {
-        accessibilityLabel: `Pull request ${status}`,
-        icon: "arrow.triangle.pull",
-        onPress: (): void => {},
-        menu: {
-          title: `Pull request #${number}`,
-          actions: [
-            {
-              id: "phase",
-              title: phaseLabel,
-              subtitle: babysitting ?? status,
-              attributes: { disabled: true },
-            },
-            ...items.map((item) => ({
-              id: item.action,
-              title: item.label,
-              subtitle: item.description,
-            })),
-          ],
-          onPressAction: ({ nativeEvent }): void => {
-            const item = items.find((candidate) => candidate.action === nativeEvent.event);
-            if (item !== undefined) run(item.action);
+      menu: {
+        number,
+        status,
+        actions: [
+          {
+            id: "phase",
+            label: phaseLabel,
+            description: babysitting ?? status,
+            icon: PR_ICON,
+            disabled: true,
+            onPress: (): void => {},
           },
-        },
+          ...items.map((item) => ({
+            id: item.action,
+            label: item.label,
+            description: item.description,
+            icon: item.icon,
+            onPress: (): void => run(item.action),
+          })),
+        ],
       },
       version: [number, url, phaseLabel, babysitting, ...items.map((item) => item.label)].join(":"),
     };
