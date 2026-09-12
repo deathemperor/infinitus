@@ -32,8 +32,9 @@ makes wrong, in its own PR.
   Expected on every sync (#823 layer 3): upstream's tests assume a plain
   `x.y.z` is a `latest` build titled "(Alpha)"; here every non-nightly
   version is an `infinitus` build, so their fixture expectations in
-  `scripts/build-desktop-artifact.test.ts` (0.0.17 icons and brand, 0.0.33
-  publish config, DMG background), `apps/desktop/src/settings/DesktopAppSettings.test.ts`
+  `scripts/build-desktop-artifact.test.ts` (0.0.17 icons and brand, DMG
+  background; the publish config follows the version's prerelease id and
+  matches upstream's expectation), `apps/desktop/src/settings/DesktopAppSettings.test.ts`
   (default channel), `apps/desktop/src/app/DesktopEnvironment.test.ts`,
   `DesktopAppIdentity.test.ts` and `DesktopPreReadyPlatform.test.ts` (plain
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
@@ -56,7 +57,7 @@ makes wrong, in its own PR.
   notarizes and staples both Swift bundles on `macos-26`; `desktop` nests
   that run's `Infinitus-Menu-Bar-<v>.zip` and builds the DMG with
   `--build-version "$VERSION"`; `linux` builds the tray; `publish` creates
-  the one GitHub release — DMG, zip, blockmaps, `infinitus-mac.yml`, both
+  the one GitHub release — DMG, zip, blockmaps, the updater manifest, both
   menu bar zips, the Linux binaries — titled `Infinitus <version>`, notes
   from the `## <version>` section of `apps/mac/CHANGELOG.md` (no section, no
   release), `--prerelease` iff the version carries a prerelease tag, then
@@ -65,12 +66,27 @@ makes wrong, in its own PR.
   published). Installed menu bar apps poll `releases/latest` and the
   `nightly` tag: `latest` becomes the one-app release with the first plain
   version; `nightly` stays `mac-nightly.yml`'s rolling Mac build. Desktop
-  updates ride the `infinitus` channel (manifest `infinitus-mac.yml`); on it
-  an available update downloads itself
+  updates follow electron-updater's own GitHub rule (#924): the client's
+  channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
+  `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
+  offers a release only when the tag's prerelease id equals it, and it
+  downloads `<id>-mac.yml` from that release (`latest-mac.yml` for a plain
+  version), which is why the build publishes on that id
+  (`resolveDesktopPublishChannel`) and the workflow checks for that file.
+  An `alpha` client follows a newer `beta` tag and, through the library's
+  `latest-mac.yml` fallback, the first plain version; a plain version reads
+  `releases/latest` and never sees a prerelease. A release whose tag is not
+  a semver version has no channel: a prerelease client would take it and
+  fail its polls (no manifest) were it the feed's first entry, which is why
+  the `nightly` release must keep its place below the newest versioned tag
+  (its rule is with `nightly` above). The `infinitus` track name lives only
+  in the desktop's settings and UI. On the track an available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over. History:
   before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
-  prereleases from "Fork desktop release" and the Mac app from
+  prereleases from "Fork desktop release" (channel `infinitus`, manifest
+  `infinitus-mac.yml`: those clients, and `0.5.0-alpha.1`, which still told
+  the updater `infinitus`, can only be updated by hand) and the Mac app from
   `mac-v<version>` tags with a `native-helper.json` pin.
 - **One version (#823 layer 3).** The root `VERSION` file (one line,
   `0.5.0-alpha.N`) is the only place the product version is written:
@@ -78,20 +94,15 @@ makes wrong, in its own PR.
   `infinitus-release.yml` passes it as `--build-version`, and
   `apps/mobile/app.config.ts` carries it as `extra.productVersion` for the
   phone's Settings (the store's `version` stays a dotted-integer marketing
-  version, and cannot go down). A client older than the rule below maps
-  `0.5.0-alpha.1` to `latest` and `handleUpdateAvailable` drops updates off
-  its channel, which is why one `0.0.40-infinitus.<date>.<run>` bridge build
-  carrying the rule shipped before the first `v0.5.0-alpha.N` tag.
+  version, and cannot go down).
   `apps/desktop/package.json`'s version is upstream's and never edited. The
-  `infinitus` channel id is internal and follows from the version, not a
-  flag: every version that is not an upstream nightly
-  (`-nightly.<date>.<run>`) builds on, defaults to and brands as `infinitus`
-  (`resolveDesktopUpdateChannel`, `resolveDefaultDesktopUpdateChannel`,
-  `resolveWebAssetBrandForPackageVersion`), so `0.5.0-alpha.1` and the older
-  `0.0.40-infinitus.<date>.<run>` sit on one feed and semver orders them
-  (`0.0.40-infinitus.… < 0.5.0-alpha.1 < 0.5.0`). Upstream's `latest`
-  channel is never a default here; a persisted `latest` resolves to
-  `infinitus`.
+  `infinitus` track is internal and follows from the version, not a flag:
+  every version that is not an upstream nightly (`-nightly.<date>.<run>`)
+  defaults to and brands as `infinitus` (`resolveDesktopUpdateChannel`,
+  `resolveDefaultDesktopUpdateChannel`,
+  `resolveWebAssetBrandForPackageVersion`). Upstream's `latest` track is
+  never a default here; a persisted `latest` resolves to `infinitus`. The
+  feed a build follows is a separate thing, above.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
