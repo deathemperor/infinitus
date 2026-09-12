@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- A thread waiting for an approval or an answer, finished or failed can now be pushed through Infinitus to the phone, Slack and Telegram, from a switch on Settings › Infinitus (off by default).
 
 ## 0.5.0-alpha.5
 

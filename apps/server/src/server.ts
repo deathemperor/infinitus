@@ -75,6 +75,7 @@ import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
+import { InfinitusPushBridgeLive } from "./infinitus/Layers/InfinitusPushBridge.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
 import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
@@ -317,6 +318,8 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#269 G): thread phases a person acts on, pushed through the Mac.
+  Layer.provideMerge(InfinitusPushBridgeLive),
   // Fork (#574): the Slack bridge over Socket Mode.
   Layer.provideMerge(
     InfinitusSlackLive.pipe(Layer.provide(SlackClientLive), Layer.provide(FetchHttpClient.layer)),
