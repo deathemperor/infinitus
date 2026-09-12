@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { TurnId } from "@t3tools/contracts";
+import { ThreadId, TurnId } from "@t3tools/contracts";
 
-import { turnUsageFromCompletedTurn } from "./threadTurnUsage.ts";
+import { TurnTelemetryTracker, turnUsageFromCompletedTurn } from "./threadTurnUsage.ts";
 
+const threadId = ThreadId.make("thread-1");
 const turnId = TurnId.make("turn-1");
 const at = "2026-09-12T00:00:00.000Z";
 
@@ -67,6 +68,24 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
     });
   });
 
+  it("carries the tool calls and wall time the tracker counted, else neither", () => {
+    const payload = {
+      state: "completed" as const,
+      tokenUsage: {
+        usageScope: "main_agent" as const,
+        usageStatus: "partial" as const,
+        outputTokens: 1,
+        hasSubagents: false,
+      },
+    };
+    expect(
+      turnUsageFromCompletedTurn(payload, turnId, at, { toolCalls: 3, durationMs: 90_000 }),
+    ).toMatchObject({ toolCalls: 3, durationMs: 90_000 });
+    const untracked = turnUsageFromCompletedTurn(payload, turnId, at);
+    expect(untracked).not.toHaveProperty("toolCalls");
+    expect(untracked).not.toHaveProperty("durationMs");
+  });
+
   it("records nothing without usage", () => {
     expect(turnUsageFromCompletedTurn({ state: "failed" }, turnId, at)).toBeUndefined();
     expect(
@@ -79,5 +98,51 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
         at,
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("TurnTelemetryTracker (#834)", () => {
+  const later = "2026-09-12T00:01:30.000Z";
+
+  it("counts distinct tool items from the first start to the completion", () => {
+    const tracker = new TurnTelemetryTracker();
+    tracker.started(threadId, turnId, at);
+    tracker.toolSeen(threadId, turnId, "item-1");
+    tracker.toolSeen(threadId, turnId, "item-1");
+    tracker.toolSeen(threadId, turnId, "item-2");
+    // A reconnect announces the turn again; the first clock stays.
+    tracker.started(threadId, turnId, "2026-09-12T00:01:00.000Z");
+    expect(tracker.completed(threadId, turnId, later)).toEqual({
+      toolCalls: 2,
+      durationMs: 90_000,
+    });
+    // Read once: the turn is forgotten.
+    expect(tracker.completed(threadId, turnId, later)).toBeUndefined();
+  });
+
+  it("answers nothing for a turn whose start it did not see, an aborted one, or an exited session's", () => {
+    const tracker = new TurnTelemetryTracker();
+    tracker.toolSeen(threadId, turnId, "item-1");
+    expect(tracker.completed(threadId, turnId, later)).toBeUndefined();
+
+    tracker.started(threadId, turnId, at);
+    tracker.aborted(threadId, turnId);
+    expect(tracker.completed(threadId, turnId, later)).toBeUndefined();
+
+    const other = TurnId.make("turn-2");
+    tracker.started(threadId, other, at);
+    tracker.started(ThreadId.make("thread-2"), other, at);
+    tracker.threadEnded(threadId);
+    expect(tracker.completed(threadId, other, later)).toBeUndefined();
+    expect(tracker.completed(ThreadId.make("thread-2"), other, later)).toEqual({
+      toolCalls: 0,
+      durationMs: 90_000,
+    });
+  });
+
+  it("never records a negative duration", () => {
+    const tracker = new TurnTelemetryTracker();
+    tracker.started(threadId, turnId, later);
+    expect(tracker.completed(threadId, turnId, at)?.durationMs).toBe(0);
   });
 });

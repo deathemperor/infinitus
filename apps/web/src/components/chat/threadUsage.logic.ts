@@ -1,4 +1,5 @@
 import type { ThreadUsageRollup } from "@t3tools/contracts";
+import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 
 import { formatContextWindowTokens } from "~/lib/contextWindow";
 
@@ -33,14 +34,20 @@ export interface ThreadUsageRow {
   readonly value: string;
 }
 
-/** The popover's label/value rows: turns first, then the token counts
-    that moved (a zero row is left out), then the models. */
+/** The popover's label/value rows: turns first, the tool calls and the
+    wall time when the server counted them, then the token counts that
+    moved (a zero row is left out), then the models. */
 export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
   const turns =
     usage.subagentTurns > 0
       ? `${usage.turns} (${usage.subagentTurns} with subagents)`
       : `${usage.turns}`;
   const rows: ThreadUsageRow[] = [{ label: "Turns", value: turns }];
+  if (usage.toolCalls !== undefined)
+    rows.push({ label: "Tool calls", value: `${usage.toolCalls}` });
+  if (usage.durationMs !== undefined) {
+    rows.push({ label: "Duration", value: formatDuration(usage.durationMs) });
+  }
   const tokens: ReadonlyArray<readonly [string, number]> = [
     ["Input tokens", usage.inputTokens],
     ["Output tokens", usage.outputTokens],

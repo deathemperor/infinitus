@@ -69,6 +69,18 @@ describe("thread usage rollup (#834)", () => {
     expect(next.lastTurnAt).toBe("2026-09-12T00:00:00.000Z");
   });
 
+  it("sums tool calls and time only from the turns that carried them", () => {
+    const plain = addTurnUsage(undefined, turn("t1"));
+    expect(plain).not.toHaveProperty("toolCalls");
+    expect(plain).not.toHaveProperty("durationMs");
+    const counted = addTurnUsage(plain, turn("t2", { toolCalls: 4, durationMs: 60_000 }));
+    expect(counted).toMatchObject({ toolCalls: 4, durationMs: 60_000 });
+    const more = addTurnUsage(counted, turn("t3", { toolCalls: 1, durationMs: 5_000 }));
+    expect(more).toMatchObject({ toolCalls: 5, durationMs: 65_000 });
+    // A turn the server did not time leaves the sums as they were.
+    expect(addTurnUsage(more, turn("t4"))).toMatchObject({ toolCalls: 5, durationMs: 65_000 });
+  });
+
   it("folds a list, and none is absence", () => {
     expect(foldTurnUsage([])).toBeUndefined();
     expect(foldTurnUsage([turn("t1"), turn("t2")])?.turns).toBe(2);

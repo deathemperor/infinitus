@@ -40,7 +40,20 @@ export function addTurnUsage(
         ? [...base.models, turn.model]
         : base.models,
     lastTurnAt: turn.completedAt > base.lastTurnAt ? turn.completedAt : base.lastTurnAt,
+    ...optionalSum("toolCalls", base.toolCalls, turn.toolCalls),
+    ...optionalSum("durationMs", base.durationMs, turn.durationMs),
   };
+}
+
+/** A sum that stays absent until a turn carries the figure (no key, not
+    `undefined`, so a rollup compares equal to its literal). */
+function optionalSum<K extends string>(
+  key: K,
+  base: number | undefined,
+  turn: number | undefined,
+): { [key in K]?: number } {
+  const sum = turn === undefined ? base : (base ?? 0) + turn;
+  return sum === undefined ? {} : ({ [key]: sum } as { [key in K]: number });
 }
 
 /**
