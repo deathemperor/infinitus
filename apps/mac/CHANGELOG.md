@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Phone
+- The worktree-limit refusal no longer sends a phone to "Settings → General", a desktop path: it names the Worktree limit in the server's settings, which the desktop's Settings › General edits (#988).
 
 ## 0.5.0-alpha.3
 
