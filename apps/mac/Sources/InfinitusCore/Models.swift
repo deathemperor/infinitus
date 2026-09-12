@@ -198,6 +198,11 @@ public struct Account: Codable, Sendable {
     public let lastGoodUsage: Usage?
     public let lastGoodFetchedAt: String?
     public let lastGoodAgeSeconds: Double?
+    /// swapd's verdict that this reading is an older good fetch its
+    /// collector could not refresh (#965); `usageStatus` stays `ok` so
+    /// every reader still renders the numbers. nil on engines that have
+    /// no such state.
+    public let stale: Bool?
 
     /// Memberwise, for engines that build accounts directly instead of
     /// decoding `cswap list --json` (multi-engine seam, #8).
@@ -209,7 +214,7 @@ public struct Account: Codable, Sendable {
                 plan: String? = nil, disabled: Bool? = nil, preferred: Bool? = nil,
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
-                lastGoodAgeSeconds: Double? = nil) {
+                lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil) {
         self.number = number
         self.email = email
         self.organizationName = organizationName
@@ -229,6 +234,7 @@ public struct Account: Codable, Sendable {
         self.lastGoodUsage = lastGoodUsage
         self.lastGoodFetchedAt = lastGoodFetchedAt
         self.lastGoodAgeSeconds = lastGoodAgeSeconds
+        self.stale = stale
     }
 
     /// The same account with `preferred` stamped — cswap learns it from
@@ -240,7 +246,7 @@ public struct Account: Codable, Sendable {
                 alias: alias, icon: icon, plan: plan, disabled: disabled, preferred: preferred,
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
-                lastGoodAgeSeconds: lastGoodAgeSeconds)
+                lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale)
     }
 }
 

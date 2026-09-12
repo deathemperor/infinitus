@@ -160,6 +160,28 @@ public enum SessionSummary {
 }
 
 
+/// How old a stale reading is, for the row (#965): "just now" under a
+/// minute, then minutes, hours, days — the desktop's wording.
+public enum StaleAge {
+    public static func label(seconds: Double) -> String {
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(Int(seconds / 60)) min ago" }
+        if seconds < 86400 { return "\(Int(seconds / 3600)) hr ago" }
+        let days = Int(seconds / 86400)
+        return days == 1 ? "1 day ago" : "\(days) days ago"
+    }
+}
+
+public extension Account {
+    /// The row's age caption when swapd could not refresh this account
+    /// (#965); nil for every non-stale row, and nil when stale but the
+    /// engine gave no age to show.
+    var staleAgeLabel: String? {
+        guard stale == true else { return nil }
+        return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
+    }
+}
+
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
 /// `SENTINEL_NOTES` from claude_swap/switcher.py — the codebase's stated
 /// invariant is that every surface renders these identically.

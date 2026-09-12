@@ -869,6 +869,15 @@ SOCK_GRANT="$("$CTL" team-grants | json "d['grants'][0]['id']")"
 "$CTL" team-revoke "$("$CTL" team-grants | json "d['grants'][0]['id']")" | expect "d['removed']" || fail "revoke the second"
 echo "team grants over the socket: ok"
 
+# The CLI's own grant goes through the app when it answers (#220): it is in
+# team-grants at once. Like #354's `team status` above: without
+# INFINITUS_TEAM_DIR — set, the CLI is its own identity and keeps the file.
+CLI_ROUTED="$(env -u INFINITUS_TEAM_DIR "$CTL" team grant leaders --view | json "d['id']")" || fail "team grant via the app"
+"$CTL" team-grants | expect "[g['id'] for g in d['grants']]==['$CLI_ROUTED'] and d['grants'][0]['capabilities']==['view']" || fail "the CLI grant did not reach the app at once"
+env -u INFINITUS_TEAM_DIR "$CTL" team revoke "$CLI_ROUTED" | expect "d['removed']" || fail "team revoke via the app"
+"$CTL" team-grants | expect "d['grants']==[]" || fail "the CLI revoke did not reach the app"
+echo "team grant via the app: ok"
+
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window
 # or a scenario swap shows up as idle cost.
