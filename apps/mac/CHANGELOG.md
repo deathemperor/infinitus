@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- Utilization now charts every account's usage history over 24 hours, 7 or 30 days and tables the token run rate, read off the Mac.
 - A side question that fails now says why in the drawer instead of sitting on the question, with a Retry that asks it again on a fresh fork.
 - The update pill no longer shows an error for the quarter hour while a new release is still being built; the check quietly retries at the next poll (#924).
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
+  utilization: null as { result: unknown } | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -15,11 +16,22 @@ vi.mock("@effect/atom-react", () => ({
 }));
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => "test-environment" }));
 vi.mock("../../state/infinitus", () => ({
-  infinitusEnvironment: { snapshot: () => ({ label: "snapshot-atom" }) },
+  infinitusEnvironment: {
+    snapshot: () => ({ label: "snapshot-atom" }),
+    utilization: () => ({ label: "utilization-atom" }),
+  },
+}));
+vi.mock("../../hooks/useLocalStorage", () => ({
+  useLocalStorage: (_key: string, initial: unknown) => [initial, () => {}],
 }));
 vi.mock("../../state/query", () => ({
   useEnvironmentQuery: (atom: { label: string } | null) => {
-    const data = atom === null ? null : testState.snapshot;
+    const data =
+      atom === null
+        ? null
+        : atom.label === "utilization-atom"
+          ? testState.utilization
+          : testState.snapshot;
     return {
       data,
       error: null,
@@ -67,7 +79,59 @@ const forecastVerb = {
   replyShape: "",
 } as const;
 
+const utilizationVerb = { ...forecastVerb, name: "utilization" } as const;
+
 const inAnHour = Math.floor(Date.now() / 1000) + 3600;
+const now = inAnHour - 3600;
+const utilizationReply = {
+  result: {
+    days: 7,
+    bucketSeconds: 1800,
+    samples: [
+      {
+        t: now - 7200,
+        email: "alpha@example.com",
+        number: 1,
+        fiveHour: { pct: 20 },
+        sevenDay: { pct: 10 },
+      },
+      {
+        t: now - 3600,
+        email: "alpha@example.com",
+        number: 1,
+        active: true,
+        fiveHour: { pct: 61 },
+        sevenDay: { pct: 12 },
+      },
+      { t: now - 3600, email: "beta@example.com", number: 2, fiveHour: { pct: 100 } },
+    ],
+    windows: ["5h", "7d"],
+    emails: ["alpha@example.com", "beta@example.com"],
+    rates: {
+      computedAt: now,
+      lastHour: {
+        input: 1000,
+        output: 200,
+        cacheRead: 5000,
+        cacheWrite: 100,
+        usd: 0.42,
+        messages: 12,
+      },
+      lastDay: {
+        input: 20_000,
+        output: 4000,
+        cacheRead: 90_000,
+        cacheWrite: 1000,
+        usd: 7.5,
+        messages: 240,
+      },
+      lastWeek: { input: 100_000, output: 20_000, cacheRead: 400_000, usd: 31, messages: 1200 },
+      files: 9,
+      unpricedModels: ["mystery-1"],
+    },
+    liveRate: { perMinute: 1500, peakPerMinute: 4200 },
+  },
+};
 const inADay = inAnHour + 86_400;
 
 const readySnapshot: InfinitusSnapshot = {
@@ -99,7 +163,7 @@ const readySnapshot: InfinitusSnapshot = {
     },
   ],
   sessions: [],
-  commands: [forecastVerb],
+  commands: [forecastVerb, utilizationVerb],
   forecast: {
     forecast: {
       basis: "5h pace measured over the last hour",
@@ -141,8 +205,40 @@ const readySnapshot: InfinitusSnapshot = {
 describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
+    testState.utilization = utilizationReply;
     testState.capability = true;
     testState.refresh.mockReset();
+  });
+
+  it("charts every account's window over the range and tables the run rate (#747)", () => {
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    expect(markup).toContain("History");
+    expect(markup).toContain("<polyline");
+    expect(markup).toContain(">beta<");
+    expect(markup).toContain("61%");
+    expect(markup).toContain("100%");
+    expect(markup).toContain("The 5h window of every account");
+    expect(markup).toContain("Run rate");
+    expect(markup).toContain("Last hour");
+    expect(markup).toContain("6.3k");
+    expect(markup).toContain("520.0k");
+    expect(markup).toContain("31.00");
+    expect(markup).toContain("Tokens counted but not priced: mystery-1");
+    expect(markup).toContain("Live: 1.5k output tokens/min");
+    expect(markup).toContain("24 hours");
+  });
+
+  it("waits for the scan, and says what a build without the verb is missing", () => {
+    testState.utilization = { result: { days: 7, samples: [] } };
+    let markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain("No history yet");
+    expect(markup).toContain("Scanning transcripts");
+
+    testState.snapshot = { ...readySnapshot, commands: [forecastVerb] };
+    markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain("need a newer Infinitus app");
+    expect(markup).not.toContain("Run rate");
   });
 
   it("renders every account's line with its windows, paces and the window that binds first", () => {

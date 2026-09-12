@@ -1352,16 +1352,25 @@ configured}` and drawn as the configured row with Forget token, which is
   Sidebar "Activity" beside Stats.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/`
   — the `/utilization` page (#747): the native Utilization pane in the fork.
-  Today the forecast section only: every account's projection at its own
-  measured pace (windows, pct, pace, when each fills or "Resets before it
-  fills", which window binds first) plus the fleet strip Accounts shows,
-  read off the `forecast` reply the snapshot already carries — no extra
-  verb, no extra poll. `buildForecast` in
-  `packages/client-runtime/src/state/infinitusAccounts.ts` decodes the
-  lines leniently (the contract leaves them opaque; an odd line or window
-  is dropped alone). The history chart and the run-rate table follow the
-  `utilization --days` verb native is adding. Sidebar "Utilization" beside
-  Activity.
+  Forecast: every account's projection at its own measured pace (windows,
+  pct, pace, when each fills or "Resets before it fills", which window
+  binds first) plus the fleet strip Accounts shows, read off the `forecast`
+  reply the snapshot already carries — no extra verb, no extra poll.
+  `buildForecast` in `packages/client-runtime/src/state/infinitusAccounts.ts`
+  decodes the lines leniently (the contract leaves them opaque; an odd line
+  or window is dropped alone). History (every account's percentage of one
+  window — 5h, 7d, a model — over 24 hours / 7 / 30 days, one SVG line per
+  account) and Run rate (tokens, API-equivalent $ and turns over the last
+  hour / day / week, unpriced models, the live output rate) read the Mac's
+  `utilization --days n` through `infinitusEnvironment.utilization`, a
+  query atom re-read every 5 min while the page is mounted and dropped a
+  minute after it leaves; `InfinitusUtilization` in
+  `packages/contracts/src/infinitus.ts` pins the samples and the rates and
+  leaves the waste generations, five-hour windows, replay and dry-run plan
+  opaque (not drawn yet); the fold is
+  `packages/client-runtime/src/state/infinitusUtilization.ts`. A build
+  without the verb keeps the forecast and says what is missing. Sidebar
+  "Utilization" beside Activity.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:

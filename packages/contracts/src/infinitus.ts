@@ -192,6 +192,80 @@ export const InfinitusForecast = Schema.Struct({
 });
 export type InfinitusForecast = typeof InfinitusForecast.Type;
 
+/** One recorded usage window of a sample: percent used, and the reset instant
+    (epoch seconds) when the API sent one. */
+export const InfinitusUtilizationWindow = Schema.Struct({
+  pct: Schema.Finite,
+  resetsAt: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+});
+export type InfinitusUtilizationWindow = typeof InfinitusUtilizationWindow.Type;
+
+/** One point of the recorded usage history (native's `UsageSample`): the
+    engine's fetch instant, the account, and its windows at that moment —
+    `scoped` is the per-model weekly windows by display name. */
+export const InfinitusUtilizationSample = Schema.Struct({
+  t: Schema.Finite,
+  email: Schema.String,
+  number: Schema.Finite,
+  active: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  fiveHour: Schema.optionalKey(Schema.NullOr(InfinitusUtilizationWindow)),
+  sevenDay: Schema.optionalKey(Schema.NullOr(InfinitusUtilizationWindow)),
+  scoped: Schema.optionalKey(
+    Schema.NullOr(Schema.Record(Schema.String, InfinitusUtilizationWindow)),
+  ),
+});
+export type InfinitusUtilizationSample = typeof InfinitusUtilizationSample.Type;
+
+/** Token totals of one run-rate period (native's `TokenRates.Totals`). */
+export const InfinitusUtilizationTotals = Schema.Struct({
+  input: Schema.optionalKey(Schema.Finite),
+  output: Schema.optionalKey(Schema.Finite),
+  cacheRead: Schema.optionalKey(Schema.Finite),
+  cacheWrite: Schema.optionalKey(Schema.Finite),
+  usd: Schema.optionalKey(Schema.Finite),
+  messages: Schema.optionalKey(Schema.Finite),
+});
+export type InfinitusUtilizationTotals = typeof InfinitusUtilizationTotals.Type;
+
+/** The `utilization --days n` reply (#747): the recorded usage samples of the
+    range, downsampled to `bucketSeconds`, the window names and accounts they
+    carry, the transcript run rate (`rates`, absent until the Mac has scanned)
+    and the popup's live output rate. The waste generations, five-hour windows,
+    replay and dry-run plan travel opaque: the page does not draw them yet.
+    Estimates read off the Mac, never billing truth. */
+export const InfinitusUtilization = Schema.Struct({
+  days: Schema.Finite,
+  bucketSeconds: Schema.optionalKey(Schema.Finite),
+  samples: Schema.Array(InfinitusUtilizationSample),
+  windows: Schema.optionalKey(Schema.Array(Schema.String)),
+  emails: Schema.optionalKey(Schema.Array(Schema.String)),
+  generations: Schema.optionalKey(Schema.Unknown),
+  fiveHourWindows: Schema.optionalKey(Schema.Unknown),
+  replay: Schema.optionalKey(Schema.Unknown),
+  dryRunPlan: Schema.optionalKey(Schema.Unknown),
+  rates: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        computedAt: Schema.Finite,
+        lastHour: InfinitusUtilizationTotals,
+        lastDay: InfinitusUtilizationTotals,
+        lastWeek: InfinitusUtilizationTotals,
+        files: Schema.optionalKey(Schema.Finite),
+        unpricedModels: Schema.optionalKey(Schema.Array(Schema.String)),
+      }),
+    ),
+  ),
+  liveRate: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        perMinute: Schema.Finite,
+        peakPerMinute: Schema.optionalKey(Schema.Finite),
+      }),
+    ),
+  ),
+});
+export type InfinitusUtilization = typeof InfinitusUtilization.Type;
+
 /** One live Claude Code session from the `sessions` reply. That reply is built
     by hand rather than encoded from a struct, so a session with no name,
     status, permission mode or profile carries an explicit null there. */
