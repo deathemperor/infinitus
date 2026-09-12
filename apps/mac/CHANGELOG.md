@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - The pop-out no longer re-asks for a window size the screen refused: the loop guard compared the refusal with the content's ideal instead of the settled size it had asked for, so a clamped settle was retried on every re-measure for a second (#229).
+- The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
 
 ### Desktop
 - A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
