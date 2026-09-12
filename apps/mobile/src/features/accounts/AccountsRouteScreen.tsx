@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import { useMemo } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { Linking, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
@@ -96,7 +96,16 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         />
       ) : null}
       {model.state === "empty" ? (
-        <EmptyState title="No accounts yet" detail="Add accounts in Infinitus on the Mac." />
+        <EmptyState
+          title="Set up your first account fleet"
+          detail="An engine manages your provider logins as a fleet of accounts. On this Mac, open Infinitus Settings → Engines, enable an engine, then add an account."
+          actionLabel="Read the accounts setup guide"
+          onAction={() =>
+            void Linking.openURL(
+              "https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md",
+            )
+          }
+        />
       ) : null}
       {model.sections.map((section) => (
         <SettingsSection key={section.key} title={section.title} card>

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import {
   accountCommandArgs,
@@ -485,6 +486,7 @@ export function AccountsPage() {
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide">
             <AccountsBody
+              environmentId={environmentId}
               state={state}
               snapshot={snapshot}
               nowMs={Date.parse(minute)}
@@ -516,6 +518,7 @@ export function AccountsPage() {
 }
 
 function AccountsBody({
+  environmentId,
   state,
   snapshot,
   nowMs,
@@ -531,6 +534,7 @@ function AccountsBody({
   onSignIn,
   onAdd,
 }: {
+  readonly environmentId: EnvironmentId | null;
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
@@ -586,7 +590,37 @@ function AccountsBody({
   if (state === "empty") {
     return (
       <div className="flex flex-col gap-6">
-        <p className="text-muted-foreground text-sm">No engines report accounts on this host.</p>
+        <section className="max-w-xl space-y-3 rounded-lg border p-4">
+          <h2 className="text-sm font-medium">Set up your first account fleet</h2>
+          <p className="text-sm text-muted-foreground">
+            An engine manages your provider logins as a fleet of accounts. This host is connected,
+            but no engine is reporting a fleet yet.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Enable an engine in Settings › Infinitus › Engines, then add an account on that host.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              render={
+                <Link
+                  to="/settings/infinitus/engines"
+                  search={environmentId ? { environmentId } : {}}
+                />
+              }
+              size="sm"
+            >
+              Set up engines
+            </Button>
+            <a
+              href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm underline underline-offset-4"
+            >
+              Read the accounts setup guide
+            </a>
+          </div>
+        </section>
         {signInsSection}
       </div>
     );

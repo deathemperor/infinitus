@@ -202,7 +202,7 @@ describe("AccountsPage", () => {
 
     const markup = renderToStaticMarkup(<AccountsPage />);
 
-    expect(markup).toContain("No engines report accounts on this host.");
+    expect(markup).toContain("Set up your first account fleet");
   });
 
   it("draws every fleet with its accounts, badges, windows and forecast", () => {
@@ -749,7 +749,7 @@ describe("AccountsPage", () => {
 
     testState.snapshot = { available: true, fleets: [], sessions: [], commands: [], awsLogins };
     const empty = renderToStaticMarkup(<AccountsPage />);
-    expect(empty).toContain("No engines report accounts on this host.");
+    expect(empty).toContain("Set up your first account fleet");
     expect(empty).toContain("Sign in: AWS dev");
   });
 
