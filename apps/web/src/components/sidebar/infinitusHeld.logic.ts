@@ -10,8 +10,13 @@ import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
 export function heldEntryFor(
   holds: ReadonlyArray<InfinitusHeldThread> | null | undefined,
   threadId: ThreadId,
-): { readonly kind: "held" | "limited"; readonly summary: string } | null {
+): {
+  readonly kind: "held" | "limited";
+  readonly summary: string;
+  /** `limited` only: when the window resets (ISO), when the server named it. */
+  readonly resetsAt: string | null;
+} | null {
   const entry = holds?.find((held) => held.threadId === threadId);
   if (entry === undefined) return null;
-  return { kind: entry.kind ?? "held", summary: entry.summary };
+  return { kind: entry.kind ?? "held", summary: entry.summary, resetsAt: entry.resetsAt ?? null };
 }

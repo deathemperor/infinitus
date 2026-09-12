@@ -44,6 +44,9 @@ export interface LimitStop {
   /** Who each Claude fleet ran on when the stop landed, by fleet key; the
       marker names the change. */
   readonly activeAtStop: ReadonlyMap<string, string>;
+  /** When the window that rejected the turn resets (epoch ms), from the SDK's
+      `rate_limit_info`; null for a failed turn, whose error names no reset. */
+  readonly resetsAt: number | null;
 }
 
 /** The adapter's own two wordings for a limit-ended turn — fixed strings in
@@ -76,7 +79,14 @@ export function limitStopFromEvent(
       "status" in detail &&
       detail.status === "rejected"
     ) {
-      return { ...base, kind: "parked" };
+      const resetsAt = "resetsAt" in detail ? detail.resetsAt : undefined;
+      return {
+        ...base,
+        kind: "parked",
+        // Epoch seconds on the wire, as the adapter reads it.
+        resetsAt:
+          typeof resetsAt === "number" && Number.isFinite(resetsAt) ? resetsAt * 1000 : null,
+      };
     }
     return null;
   }
@@ -86,7 +96,7 @@ export function limitStopFromEvent(
     event.payload.errorMessage !== undefined &&
     LIMIT_FAILURE.test(event.payload.errorMessage)
   ) {
-    return { ...base, kind: "failed" };
+    return { ...base, kind: "failed", resetsAt: null };
   }
   return null;
 }

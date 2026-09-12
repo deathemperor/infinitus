@@ -202,12 +202,12 @@ public enum SessionFeedReader {
         guard !record.sessionId.isEmpty else { return nil }
         let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
         var held = tail.flatMap { $0.url == url && $0.maxBytes <= maxBytes ? $0 : nil }
-            ?? SessionTail(url: url, maxBytes: tailBytes, scansAgents: false)
+            ?? SessionTail(url: url, maxBytes: tailBytes, scansAgents: false, slims: false)
         _ = held.advance()
         var parsed = parse(entries: held.entries, limit: limit)
         let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
         while parsed.count < limit, held.maxBytes < size, held.maxBytes < maxBytes {
-            held = SessionTail(url: url, maxBytes: held.maxBytes * 4, scansAgents: false)
+            held = SessionTail(url: url, maxBytes: held.maxBytes * 4, scansAgents: false, slims: false)
             _ = held.advance()
             parsed = parse(entries: held.entries, limit: limit)
         }
