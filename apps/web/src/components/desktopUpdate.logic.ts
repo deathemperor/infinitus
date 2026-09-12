@@ -156,10 +156,14 @@ function runningThreadsPhrase(count: number): string {
   return count === 1 ? "1 running thread" : `${count} running threads`;
 }
 
-/** The toast an install click gets instead of the confirm dialog while
-    turns run; `null` is an unknown count (some backend's shells have not
-    loaded), which offers only "Install now". */
-export function getDesktopUpdateRunningTurnsToast(count: number | null): {
+/** The dialog an install click gets instead of the plain confirm while
+    turns run (#829): the old confirm's title, then what would be cut off;
+    `null` is an unknown count (some backend's shells have not loaded),
+    which offers only "Install now". */
+export function getDesktopUpdateRunningTurnsDialog(
+  count: number | null,
+  state: Pick<DesktopUpdateState, "availableVersion" | "downloadedVersion">,
+): {
   readonly title: string;
   readonly description: string;
 } {
@@ -169,9 +173,22 @@ export function getDesktopUpdateRunningTurnsToast(count: number | null): {
       description: `Some backends have not loaded yet. Installing now may interrupt a running thread.`,
     };
   }
+  const version = state.downloadedVersion ?? state.availableVersion;
+  const them = count === 1 ? "it" : "them";
   return {
-    title: runningThreadsPhrase(count),
-    description: `Installing the update now would interrupt ${count === 1 ? "it" : "them"}.`,
+    title: `Install update${version ? ` ${version}` : ""} and restart ${PRODUCT_NAME}?`,
+    description: `${runningThreadsPhrase(count)} would be interrupted. Install when ${count === 1 ? "it finishes" : "they finish"}, or install now and cut ${them} off.`,
+  };
+}
+
+/** The dialog a click on the armed button gets: the wait can be kept, cancelled or skipped. */
+export function getDesktopUpdateArmedDialog(count: number): {
+  readonly title: string;
+  readonly description: string;
+} {
+  return {
+    title: `Installing when ${runningThreadsPhrase(count)} finish${count === 1 ? "es" : ""}`,
+    description: `The update installs on its own once every running thread on this Mac has finished.`,
   };
 }
 

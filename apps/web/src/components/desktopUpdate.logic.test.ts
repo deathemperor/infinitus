@@ -10,7 +10,8 @@ import {
   canCheckForUpdate,
   countRunningLocalTurns,
   getDesktopUpdateArmedTooltip,
-  getDesktopUpdateRunningTurnsToast,
+  getDesktopUpdateArmedDialog,
+  getDesktopUpdateRunningTurnsDialog,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
@@ -373,15 +374,21 @@ describe("running local turns before a desktop install (#829)", () => {
     expect(countRunningLocalTurns([], () => true)).toBe(0);
   });
 
-  it("words the toast by count and offers only an immediate install for an unknown count", () => {
-    expect(getDesktopUpdateRunningTurnsToast(1)).toEqual({
-      title: "1 running thread",
-      description: "Installing the update now would interrupt it.",
+  it("words the dialog by count and offers only an immediate install for an unknown count", () => {
+    const state = { availableVersion: "0.5.0-alpha.4", downloadedVersion: "0.5.0-alpha.4" };
+    expect(getDesktopUpdateRunningTurnsDialog(1, state)).toEqual({
+      title: "Install update 0.5.0-alpha.4 and restart Infinitus?",
+      description:
+        "1 running thread would be interrupted. Install when it finishes, or install now and cut it off.",
     });
-    expect(getDesktopUpdateRunningTurnsToast(3).title).toBe("3 running threads");
-    expect(getDesktopUpdateRunningTurnsToast(null).title).toBe(
+    expect(getDesktopUpdateRunningTurnsDialog(3, state).description).toBe(
+      "3 running threads would be interrupted. Install when they finish, or install now and cut them off.",
+    );
+    expect(getDesktopUpdateRunningTurnsDialog(null, state).title).toBe(
       "Could not confirm no threads are running",
     );
+    expect(getDesktopUpdateArmedDialog(1).title).toBe("Installing when 1 running thread finishes");
+    expect(getDesktopUpdateArmedDialog(2).title).toBe("Installing when 2 running threads finish");
     expect(getDesktopUpdateArmedTooltip(1)).toBe(
       "Installs when 1 running thread finishes. Click to cancel.",
     );

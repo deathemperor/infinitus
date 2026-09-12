@@ -10,6 +10,9 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 
+### Desktop
+- Installing an update while threads run asks in a dialog again, not a toast: Later, Install now, or Install when they finish — and that wait no longer lapses at the next update check, which read as "checking" for a moment and silently cancelled it; clicking the armed update button opens the dialog to keep, cancel or skip the wait (#829).
+
 ### Phone
 - Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer with its files, as the desktop does (#971).
 - The worktree-limit refusal no longer sends a phone to "Settings → General", a desktop path: it names the Worktree limit in the server's settings, which the desktop's Settings › General edits (#988).
