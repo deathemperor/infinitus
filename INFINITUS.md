@@ -76,10 +76,11 @@ makes wrong, in its own PR.
   An `alpha` client follows a newer `beta` tag and, through the library's
   `latest-mac.yml` fallback, the first plain version; a plain version reads
   `releases/latest` and never sees a prerelease. A release whose tag is not
-  a semver version is taken by every prerelease client and breaks its
-  polls (no manifest), so a nightly's tag must carry a prerelease id no
-  desktop follows. The `infinitus` track name lives only in the desktop's
-  settings and UI. On the track an available update downloads itself
+  a semver version has no channel: a prerelease client would take it and
+  fail its polls (no manifest) were it the feed's first entry, which is why
+  the `nightly` release must keep its place below the newest versioned tag
+  (its rule is with `nightly` above). The `infinitus` track name lives only
+  in the desktop's settings and UI. On the track an available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over. History:
   before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
