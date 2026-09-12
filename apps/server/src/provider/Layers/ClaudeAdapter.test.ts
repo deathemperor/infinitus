@@ -50,6 +50,7 @@ import {
 import { ProviderAdapterProcessError, ProviderAdapterValidationError } from "../Errors.ts";
 import type { ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import type { ClaudeScopedLimitNames } from "./claudeUsageLimits.ts";
+import { RECONNECT_EXHAUSTED_MESSAGE } from "./claudeReconnect.logic.ts";
 import { makeClaudeAdapter, type ClaudeAdapterLiveOptions } from "./ClaudeAdapter.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 const encodeUnknownJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
@@ -7528,6 +7529,83 @@ describe("reconnect (#832)", () => {
         session_id: "sess-1",
         uuid: "result-tool",
       } as unknown as SDKMessage);
+      yield* settle;
+      runtimeEventsFiber.interruptUnsafe();
+
+      assert.deepEqual(reconnectReasons(runtimeEvents), []);
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type, "turn.completed");
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "failed");
+      }
+      assert.equal(harness.queries.length, 1);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect(
+    "a reopened session's own failure is reported as itself, not as the lost connection",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness);
+        harness.query.fail(new Error("read ECONNRESET"));
+        yield* settle;
+        yield* TestClock.adjust("5 seconds");
+        yield* settle;
+        assert.equal(harness.queries.length, 2);
+        const second = harness.queries[1]!;
+        init(second, "sess-1");
+        second.emit({
+          type: "result",
+          subtype: "error_during_execution",
+          is_error: true,
+          terminal_reason: "malformed_tool_use_exhausted",
+          errors: [],
+          session_id: "sess-1",
+          uuid: "result-tool",
+        } as unknown as SDKMessage);
+        yield* settle;
+        runtimeEventsFiber.interruptUnsafe();
+
+        assert.deepEqual(reconnectReasons(runtimeEvents), ["reconnecting:1/5"]);
+        const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+        assert.equal(completed?.type, "turn.completed");
+        if (completed?.type === "turn.completed") {
+          assert.equal(completed.payload.state, "failed");
+          assert.notEqual(completed.payload.errorMessage, RECONNECT_EXHAUSTED_MESSAGE);
+        }
+        assert.equal(harness.queries.length, 2);
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
+  it.effect("does not reconnect before the CLI reported a session to resume", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: THREAD_ID, input: "hello", attachments: [] });
+      yield* settle;
+      // The CLI dies before its init message: there is no session to resume.
+      harness.query.finish();
+      yield* settle;
+      yield* TestClock.adjust("5 seconds");
       yield* settle;
       runtimeEventsFiber.interruptUnsafe();
 
