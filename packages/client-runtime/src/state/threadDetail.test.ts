@@ -8,7 +8,11 @@ import {
   QueueId,
   ThreadId,
 } from "@t3tools/contracts";
-import type { OrchestrationQueuedTurn, OrchestrationThread, OrchestrationThreadShell } from "@t3tools/contracts";
+import type {
+  OrchestrationQueuedTurn,
+  OrchestrationThread,
+  OrchestrationThreadShell,
+} from "@t3tools/contracts";
 
 import type { EnvironmentThread, EnvironmentThreadShell } from "./models.ts";
 import { mergeEnvironmentThread } from "./threadDetail.ts";
