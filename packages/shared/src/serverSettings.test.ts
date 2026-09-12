@@ -750,3 +750,24 @@ describe("serverSettings helpers", () => {
     expect(resolved.pauseWhenOnBattery).toBe(false);
   });
 });
+
+describe("infinitusSlack patch (#574)", () => {
+  it("replaces the allowlist whole and keeps the other fields", () => {
+    const current = {
+      ...DEFAULT_SERVER_SETTINGS,
+      infinitusSlack: {
+        enabled: true,
+        allowedUserIds: ["U1", "U2"],
+        appToken: "xapp",
+        botToken: "",
+      },
+    };
+    const next = applyServerSettingsPatch(current, { infinitusSlack: { allowedUserIds: ["U3"] } });
+    expect(next.infinitusSlack).toEqual({
+      enabled: true,
+      allowedUserIds: ["U3"],
+      appToken: "xapp",
+      botToken: "",
+    });
+  });
+});

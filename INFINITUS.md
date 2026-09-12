@@ -608,6 +608,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (#270 G). `packages/shared/src/serverSettings.ts` —
   `applyServerSettingsPatch` merges `projectPromptSnippets` per project key
   like `projectScriptOverrides`, so one project's save leaves the others.
+- `packages/contracts/src/settings.ts` — `InfinitusSlackSettings`
+  (`enabled` off, `allowedUserIds` empty = nobody, `appToken`, `botToken`)
+  as `infinitusSlack` on `ServerSettings`, one-field-at-a-time on the patch
+  (#574, PR 1 of the Slack bridge). `packages/shared/src/serverSettings.ts`
+  merges it flat (the allowlist is replaced whole). `apps/server/src/serverSettings.ts`
+  keeps the two tokens the way a usage-limit source's key is kept: the
+  settings file and every client see the `••••••` marker, the value lives in
+  `ServerSecretStore` (`infinitus-slack-app-token` / `-bot-token`), the marker
+  sent back means keep, an empty string clears. The reactor (PR 2), the
+  Settings row (PR 3) and the Socket Mode client (PR 4) follow.
 - `packages/contracts/src/settings.ts` — `ComposerSendMode` and
   `composerSendMode` (`queue` default, `steer`) on `ClientSettings` and its
   patch (#270 F); `settings.test.ts` covers the default.

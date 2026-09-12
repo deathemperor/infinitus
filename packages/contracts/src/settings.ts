@@ -909,6 +909,33 @@ export const UsageLimitSourceConfig = Schema.Struct({
 });
 export type UsageLimitSourceConfig = typeof UsageLimitSourceConfig.Type;
 
+/**
+ * Fork (#574): the Slack bridge. A separate "Infinitus" Slack app: its
+ * app-level token opens the Socket Mode connection, its bot token posts.
+ * Both travel like a usage-limit source's key — redacted before a client
+ * sees them, the real value in the server's secret store. Off by default;
+ * with either token missing the bridge is inert.
+ */
+export const InfinitusSlackSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** Slack user ids that may start a thread; empty means nobody. */
+  allowedUserIds: Schema.Array(TrimmedNonEmptyString).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
+  appToken: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  botToken: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+});
+export type InfinitusSlackSettings = typeof InfinitusSlackSettings.Type;
+
+/** One field at a time: the pane saves a token without resending the list. */
+export const InfinitusSlackSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  allowedUserIds: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString)),
+  appToken: Schema.optionalKey(TrimmedString),
+  botToken: Schema.optionalKey(TrimmedString),
+});
+export type InfinitusSlackSettingsPatch = typeof InfinitusSlackSettingsPatch.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -1041,6 +1068,8 @@ export const ServerSettings = Schema.Struct({
   // Fork (#648): a thread's turn stopped by a Claude usage limit resumes on the
   // account Infinitus swapped to. Default on; the switch is Settings › Infinitus.
   infinitusResumeOnLimit: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  // Fork (#574): the Slack bridge; its tokens are redacted for clients.
+  infinitusSlack: InfinitusSlackSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   /**
    * Whether agents may drive the in-app preview browser. Turning this off
    * withholds the MCP credential, so the `t3-code` server (and with it every
@@ -1383,6 +1412,7 @@ export const ServerSettingsPatch = Schema.Struct({
   enableLegacyTokenStreaming: Schema.optionalKey(Schema.Boolean),
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   infinitusResumeOnLimit: Schema.optionalKey(Schema.Boolean),
+  infinitusSlack: Schema.optionalKey(InfinitusSlackSettingsPatch),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
   projectAgentBrowserAccessOverrides: Schema.optionalKey(

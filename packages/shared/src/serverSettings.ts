@@ -273,6 +273,8 @@ export function applyServerSettingsPatch(
     // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
+    // Fork (#574): merged flat below; deepMerge would merge `allowedUserIds` by index.
+    infinitusSlack: infinitusSlackPatch,
     // Entry replacement: deepMerge would keep keys the client meant to clear.
     projectSettingsOverrides: projectSettingsOverridesPatch,
     // Already translated into `projectSettingsOverrides` above; the legacy
@@ -374,6 +376,9 @@ export function applyServerSettingsPatch(
             usagePriceOverridesPatch,
           ),
         }
+      : {}),
+    ...(infinitusSlackPatch !== undefined
+      ? { infinitusSlack: { ...current.infinitusSlack, ...infinitusSlackPatch } }
       : {}),
     ...(patch.sourceControlWriterModelSelection !== undefined
       ? { sourceControlWriterModelSelection: patch.sourceControlWriterModelSelection }

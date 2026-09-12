@@ -846,3 +846,18 @@ it("validates remote device hosts and rejects ambiguous host ids", () => {
   ).toThrow();
   expect(() => decodeDeviceHostSettings({ deviceHosts: [{ ...host, port: 0 }] })).toThrow();
 });
+
+describe("infinitusSlack (#574)", () => {
+  it("is off, with no tokens and nobody allowed, by default; a patch edits one field", () => {
+    expect(decodeServerSettings({}).infinitusSlack).toEqual({
+      enabled: false,
+      allowedUserIds: [],
+      appToken: "",
+      botToken: "",
+    });
+    expect(
+      decodeServerSettingsPatch({ infinitusSlack: { allowedUserIds: ["U1"] } }).infinitusSlack,
+    ).toEqual({ allowedUserIds: ["U1"] });
+    expect(() => decodeServerSettingsPatch({ infinitusSlack: { allowedUserIds: [""] } })).toThrow();
+  });
+});
