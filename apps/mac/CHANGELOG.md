@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - The thread-info popover counts the tool calls and the duration of the turns this server ran, per thread (#834).
 
 ### Phone
+- A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
 
 ### Mac
