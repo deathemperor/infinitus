@@ -34,17 +34,17 @@ export function isTransportErrorMessage(text: string): boolean {
 
 /**
  * A result the CLI gave up on because the API was unreachable: repeated API
- * errors with no cause of its own reported earlier in the turn, or the 529
- * overload result. A failure hint (expired login, usage limit) means the
- * turn already knows why it failed, and that is never a transport problem.
+ * errors with no cause of its own reported earlier in the turn. A failure
+ * hint (expired login, usage limit) means the turn already knows why it
+ * failed, and that is never a transport problem; a 529 overload is the API
+ * answering, and the CLI's own retries already covered it.
  */
 export function isTransportResult(
   result: SDKResultMessage,
   failureHint: string | undefined,
 ): boolean {
   if (failureHint !== undefined) return false;
-  if (result.subtype === "success") return result.api_error_status === 529;
-  return result.terminal_reason === "api_error";
+  return result.subtype !== "success" && result.terminal_reason === "api_error";
 }
 
 /**

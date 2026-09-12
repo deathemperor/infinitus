@@ -27,6 +27,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -172,6 +173,10 @@ function makeHarness(config?: {
   readonly environment?: ClaudeAdapterLiveOptions["environment"];
 }) {
   const query = new FakeClaudeQuery();
+  // Reconnect (#832): every createQuery after the first gets its own fake,
+  // so a reopened session can be driven apart from the one that died.
+  const queries: Array<FakeClaudeQuery> = [query];
+  let createCalls = 0;
   let createInput:
     | {
         readonly prompt: AsyncIterable<SDKUserMessage>;
@@ -186,7 +191,11 @@ function makeHarness(config?: {
     modelCatalog: Effect.succeed(SYNTHETIC_CLAUDE_MODEL_CATALOG),
     createQuery: (input) => {
       createInput = input;
-      return query;
+      createCalls += 1;
+      if (createCalls === 1) return query;
+      const next = new FakeClaudeQuery();
+      queries.push(next);
+      return next;
     },
     ...(config?.nativeEventLogger
       ? {
@@ -218,6 +227,7 @@ function makeHarness(config?: {
       Layer.provideMerge(NodeServices.layer),
     ),
     query,
+    queries,
     getLastCreateQueryInput: () => createInput,
   };
 }
@@ -7296,6 +7306,264 @@ describe("ClaudeAdapterLive", () => {
         nativeThreadIds.every((threadId) => threadId === String(THREAD_ID)),
         true,
       );
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+});
+
+describe("reconnect (#832)", () => {
+  const init = (query: FakeClaudeQuery, sessionId: string) =>
+    query.emit({
+      type: "system",
+      subtype: "init",
+      apiKeySource: "none",
+      claude_code_version: "test",
+      cwd: "/tmp/claude-adapter-test",
+      tools: [],
+      mcp_servers: [],
+      model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+      permissionMode: "bypassPermissions",
+      slash_commands: [],
+      output_style: "default",
+      skills: [],
+      plugins: [],
+      session_id: sessionId,
+      uuid: `init-${sessionId}`,
+    } as unknown as SDKMessage);
+  const assistant = (query: FakeClaudeQuery, sessionId: string, text: string) =>
+    query.emit({
+      type: "assistant",
+      session_id: sessionId,
+      uuid: `assistant-${text}`,
+      parent_tool_use_id: null,
+      message: { id: `message-${text}`, content: [{ type: "text", text }] },
+    } as unknown as SDKMessage);
+  const apiErrorResult = (query: FakeClaudeQuery, sessionId: string) =>
+    query.emit({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      terminal_reason: "api_error",
+      errors: [],
+      session_id: sessionId,
+      uuid: `result-${sessionId}`,
+    } as unknown as SDKMessage);
+  const settle = Effect.gen(function* () {
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+  });
+  const reconnectReasons = (events: ReadonlyArray<ProviderRuntimeEvent>) =>
+    events.flatMap((event) =>
+      event.type === "session.state.changed" &&
+      typeof event.payload.reason === "string" &&
+      event.payload.reason.startsWith("reconnecting:")
+        ? [event.payload.reason]
+        : [],
+    );
+
+  const setup = (harness: ReturnType<typeof makeHarness>) =>
+    Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      const started = yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "hello",
+        attachments: [],
+      });
+      init(harness.query, "sess-1");
+      // The CLI reads its prompt; an unread one would be carried over as is.
+      yield* Effect.promise(() => readFirstPromptText(harness.getLastCreateQueryInput()));
+      yield* settle;
+      return { adapter, runtimeEvents, runtimeEventsFiber, turnId: started.turnId };
+    });
+
+  it.effect(
+    "keeps the turn open on a socket error and reopens the session after the backoff",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const { runtimeEvents, runtimeEventsFiber, turnId } = yield* setup(harness);
+
+        harness.query.fail(new Error("read ECONNRESET"));
+        yield* settle;
+
+        assert.deepEqual(reconnectReasons(runtimeEvents), ["reconnecting:1/5"]);
+        assert.isUndefined(runtimeEvents.find((event) => event.type === "turn.completed"));
+        assert.isUndefined(runtimeEvents.find((event) => event.type === "runtime.error"));
+        assert.equal(harness.queries.length, 1);
+
+        yield* TestClock.adjust("5 seconds");
+        yield* settle;
+
+        assert.equal(harness.queries.length, 2);
+        const reopened = harness.getLastCreateQueryInput();
+        assert.equal(reopened?.options.resume, "sess-1");
+        assert.isUndefined(reopened?.options.sessionId);
+        // Nothing answered the message, so it is sent again rather than a nudge.
+        assert.equal(yield* Effect.promise(() => readFirstPromptText(reopened)), "hello");
+
+        const second = harness.queries[1]!;
+        init(second, "sess-1");
+        assistant(second, "sess-1", "answer");
+        second.emit({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          errors: [],
+          session_id: "sess-1",
+          uuid: "result-ok",
+        } as unknown as SDKMessage);
+        yield* settle;
+        runtimeEventsFiber.interruptUnsafe();
+
+        const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+        assert.equal(completed?.type, "turn.completed");
+        if (completed?.type === "turn.completed") {
+          assert.equal(completed.payload.state, "completed");
+          assert.equal(completed.turnId, turnId);
+        }
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
+  it.effect(
+    "counts an api_error result and the stream end after it as one attempt, then nudges",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness);
+        assistant(harness.query, "sess-1", "partial");
+        apiErrorResult(harness.query, "sess-1");
+        yield* settle;
+        harness.query.finish();
+        yield* settle;
+
+        assert.deepEqual(reconnectReasons(runtimeEvents), ["reconnecting:1/5"]);
+        assert.isUndefined(runtimeEvents.find((event) => event.type === "turn.completed"));
+        assert.isUndefined(runtimeEvents.find((event) => event.type === "session.exited"));
+
+        yield* TestClock.adjust("5 seconds");
+        yield* settle;
+        runtimeEventsFiber.interruptUnsafe();
+
+        assert.equal(harness.queries.length, 2);
+        assert.equal(harness.query.closeCalls, 1);
+        assert.equal(
+          yield* Effect.promise(() => readFirstPromptText(harness.getLastCreateQueryInput())),
+          "Continue where you left off.",
+        );
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
+  it.effect(
+    "fails the turn after the last attempt; a clean stream end never reads as interrupted",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness);
+        const backoffs = [5_000, 15_000, 60_000, 180_000, 600_000];
+        harness.query.finish();
+        yield* settle;
+        for (const [index, backoff] of backoffs.entries()) {
+          assert.equal(reconnectReasons(runtimeEvents).at(-1), `reconnecting:${index + 1}/5`);
+          yield* TestClock.adjust(Duration.millis(backoff));
+          yield* settle;
+          assert.equal(harness.queries.length, index + 2);
+          const reopened = harness.queries[index + 1]!;
+          init(reopened, "sess-1");
+          reopened.finish();
+          yield* settle;
+        }
+        runtimeEventsFiber.interruptUnsafe();
+
+        assert.equal(reconnectReasons(runtimeEvents).length, 5);
+        const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+        assert.equal(completed?.type, "turn.completed");
+        if (completed?.type === "turn.completed") {
+          assert.equal(completed.payload.state, "failed");
+          assert.equal(
+            completed.payload.errorMessage,
+            "Lost the connection to Claude after 5 reconnect attempts. Send a message to continue.",
+          );
+        }
+        assert.isDefined(runtimeEvents.find((event) => event.type === "session.exited"));
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
+  it.effect("never reconnects on a model or tool failure", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness);
+      harness.query.emit({
+        type: "result",
+        subtype: "error_during_execution",
+        is_error: true,
+        terminal_reason: "malformed_tool_use_exhausted",
+        errors: [],
+        session_id: "sess-1",
+        uuid: "result-tool",
+      } as unknown as SDKMessage);
+      yield* settle;
+      runtimeEventsFiber.interruptUnsafe();
+
+      assert.deepEqual(reconnectReasons(runtimeEvents), []);
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type, "turn.completed");
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "failed");
+      }
+      assert.equal(harness.queries.length, 1);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("a stop during the backoff cancels the reopen and interrupts the turn", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { adapter, runtimeEvents, runtimeEventsFiber } = yield* setup(harness);
+      harness.query.fail(new Error("connect ETIMEDOUT 1.2.3.4:443"));
+      yield* settle;
+      assert.deepEqual(reconnectReasons(runtimeEvents), ["reconnecting:1/5"]);
+
+      yield* adapter.stopSession(THREAD_ID);
+      yield* settle;
+      yield* TestClock.adjust("5 seconds");
+      yield* settle;
+      runtimeEventsFiber.interruptUnsafe();
+
+      assert.equal(harness.queries.length, 1);
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type, "turn.completed");
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "interrupted");
+      }
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),

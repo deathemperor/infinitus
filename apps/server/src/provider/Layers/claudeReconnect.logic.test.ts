@@ -1,4 +1,7 @@
-import type { Options as ClaudeQueryOptions, SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  Options as ClaudeQueryOptions,
+  SDKResultMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -50,14 +53,14 @@ describe("claudeReconnect.logic (#832)", () => {
     }
   });
 
-  it("treats repeated API errors and the 529 overload result as transport unless the turn knows better", () => {
+  it("treats repeated API errors as transport unless the turn knows better; a 529 answered", () => {
     assert.isTrue(
       isTransportResult(
         result({ subtype: "error_during_execution", terminal_reason: "api_error", errors: [] }),
         undefined,
       ),
     );
-    assert.isTrue(isTransportResult(result({ api_error_status: 529 }), undefined));
+    assert.isFalse(isTransportResult(result({ api_error_status: 529 }), undefined));
     assert.isFalse(
       isTransportResult(
         result({ subtype: "error_during_execution", terminal_reason: "api_error", errors: [] }),
