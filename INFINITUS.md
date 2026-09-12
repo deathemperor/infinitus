@@ -232,7 +232,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
-  before it (#743), a consumer of that gate. `CaptureStore.layer` (#433) in the
+  before it (#743), a consumer of that gate. `InfinitusForkAnchorGate` just above
+  the hold layers (#1013): wraps the gate with the fork-anchor re-check. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
 - `apps/server/src/vcs/GitVcsDriver.ts` (+ its test) — upstream's open PR
   pingdotgg/t3code#10792 carried ahead of upstream (2026-09-12, upstream
@@ -651,9 +652,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   every anchor recorded before this rule on a turn whose last message had
   more than one block) is retried once without the anchor when the binding
   says `resumeSessionAtLatest` (`ThreadFork.ts` sets it for a side question
-  and for a fork at the latest anchored turn: the session's end was that
-  turn when the fork was bound, #941 — a source that completed more turns
-  before the fork's first start moves the fallback past the intended turn), with a `runtime.warning` row naming the repair; an earlier
+  and for a fork at the latest anchored turn: the session's end is that
+  turn, #941; `InfinitusForkAnchorGate` re-checks at every turn start and
+  drops the flag once the source's latest anchor moved past the fork point), with a `runtime.warning` row naming the repair; an earlier
   turn's anchor fails the turn plainly instead
   (`claudeForkFallback.logic.ts`); `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
   `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude and Codex),
