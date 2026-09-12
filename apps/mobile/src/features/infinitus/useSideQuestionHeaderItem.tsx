@@ -9,32 +9,29 @@ import { useNavigation } from "@react-navigation/native";
 import { useCallback, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 
-import type { AndroidHeaderAction } from "../../components/AndroidScreenHeader";
-import { withNativeGlassHeaderItem } from "../layout/native-glass-header-items";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { resolveThreadProviderInstance } from "../threads/thread-provider-instance";
 import { hasCompletedTurn, SIDE_QUESTION_NEEDS_TURN } from "./sideQuestions";
+import type { ThreadMenuAction } from "./threadHeaderMenu.logic";
 
 export interface SideQuestionHeaderItem {
-  /** The iOS header button, or null when this thread cannot take a side question. */
-  readonly item: Record<string, unknown> | null;
-  /** The Android in-flow header's button, or null likewise. */
-  readonly androidAction: AndroidHeaderAction | null;
+  /** The thread header menu's choice, or null when this thread cannot take a side question. */
+  readonly action: ThreadMenuAction | null;
   /** Feeds `optionsVersion`: the stabilised header factories re-read the
       item only when this changes. */
   readonly version: string;
 }
 
-const NO_ITEM: SideQuestionHeaderItem = { item: null, androidAction: null, version: "" };
+const NO_ITEM: SideQuestionHeaderItem = { action: null, version: "" };
 const LABEL = "Ask a side question";
 
 /**
- * Fork (#269 C, #881): the thread header's side-question button — the web's
- * Aside. It forks the session's latest completed turn into a hidden
+ * Fork (#269 C, #881): the thread header menu's "Ask a side question" — the
+ * web's Aside. It forks the session's latest completed turn into a hidden
  * read-only sibling (`infinitus.forkThread` with `side: true`, no
- * `turnCount`, #887) and opens it as a sheet over this thread. Shown on a
+ * `turnCount`, #887) and opens it as a sheet over this thread. Offered on a
  * Claude Agent thread of a server with the `infinitus` capability; a tap
  * before any turn has completed says so instead of forking.
  */
@@ -82,14 +79,12 @@ export function useSideQuestionHeaderItem(
   return useMemo<SideQuestionHeaderItem>(() => {
     if (!supported) return NO_ITEM;
     return {
-      item: withNativeGlassHeaderItem({
-        accessibilityLabel: LABEL,
-        icon: { name: "questionmark.bubble", type: "sfSymbol" as const },
-        identifier: "thread-right-side-question",
+      action: {
+        id: "side-question",
+        label: LABEL,
+        icon: "questionmark.bubble",
         onPress: () => void ask(),
-        type: "button" as const,
-      }),
-      androidAction: { accessibilityLabel: LABEL, icon: "text.bubble", onPress: () => void ask() },
+      },
       // The header keeps the item it was handed until this changes; the ids
       // it closes over are the route's, so only the gate needs to bump it.
       version: canAsk ? "side-question:ready" : "side-question:waiting",
