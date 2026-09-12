@@ -131,6 +131,9 @@ export interface ThreadDetailScreenProps {
   /** Infinitus (fork, #742): the "Waiting for headroom" card for a held
       thread, built by the route from the thread's detail; null otherwise. */
   readonly infinitusHoldBanner?: ReactNode;
+  /** Infinitus (fork, #806): the thread's queued messages under the
+      composer, built by the route from the thread shell; null otherwise. */
+  readonly infinitusQueuedTurns?: ReactNode;
   readonly activePendingApproval: PendingApproval | null;
   readonly respondingApprovalId: ApprovalRequestId | null;
   readonly activePendingUserInput: PendingUserInput | null;
@@ -954,6 +957,15 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                     exiting={FadeOut.duration(140)}
                   >
                     {props.infinitusHoldBanner}
+                  </Animated.View>
+                ) : null}
+                {props.infinitusQueuedTurns ? (
+                  <Animated.View
+                    className="shrink-0 px-4 pb-3"
+                    entering={FadeInDown.duration(220)}
+                    exiting={FadeOut.duration(140)}
+                  >
+                    {props.infinitusQueuedTurns}
                   </Animated.View>
                 ) : null}
                 {usageLimitsReport && activeUserInputRequestId === null ? (
