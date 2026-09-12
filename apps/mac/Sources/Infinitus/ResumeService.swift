@@ -228,7 +228,8 @@ final class ResumeService: ObservableObject {
         if let outcome {
             for session in outcome.accepted {
                 let via = outcome.channel[session.sessionId] ?? "?"
-                log?("play.circle", "resumed \(session.sessionId.prefix(8)) via \(via)")
+                log?("play.circle", "resumed \(session.sessionId.prefix(8)) via \(via)"
+                     + (accountName.map { " on \($0)" } ?? ""))
             }
             if !outcome.accepted.isEmpty {
                 let text = "resumed \(outcome.accepted.count) stopped session(s)"
