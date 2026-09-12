@@ -147,10 +147,23 @@ while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; [ "$1" = "--remot
 # A session's own login (#275): without --remote the real CLI waits on
 # a callback listener; any callback ends the wait and it fails on the state.
 if [ -z "$remote" ]; then
-    port=$((40000 + $$ % 10000))
+    # A port nothing holds (#1007): `40000 + $$ % 10000` alone could land
+    # on a listener already there, and `nc -l` on a busy port exits in
+    # 10 ms — the stub then dies before the app can release it, and the
+    # nudge never says it was stopped. Kept out of the ephemeral range: on
+    # a port from `bind(0)` the released stub lingered 10 s+ (2 of 2 runs,
+    # unexplained). A listen that still fails leaves a marker the fail()
+    # socket-dir listing shows.
+    port=$(python3 -c 'import socket, sys
+for p in [int(sys.argv[1])] + list(range(40000, 50000)):
+    s = socket.socket()
+    try: s.bind(("127.0.0.1", p)); print(p); break
+    except OSError: pass
+    finally: s.close()' "$((40000 + $$ % 10000))")
     echo "Attempting to open your default browser. If the browser does not open, open the following URL."
     echo "https://e2e.invalid/authorize?profile=$profile&redirect_uri=http://127.0.0.1:$port/oauth/callback"
-    printf 'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' | nc -l 127.0.0.1 "$port" >/dev/null
+    printf 'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' | nc -l 127.0.0.1 "$port" >/dev/null \
+        || touch "$(dirname "$0")/aws-own-login-nc-failed"
     echo "aws: [ERROR]: Error loading or redeeming a login authorization code: State parameter infinitus does not match expected value e2e."; exit 255
 fi
 echo "Please visit the following URL:"
@@ -529,6 +542,9 @@ until aws_login_item; do
     sleep 1
 done
 echo "aws: need surfaced after ${i}s"
+# The session's own stuck login (#275) must still be waiting on its
+# callback here, or the release round below passes for the wrong reason.
+pgrep -f "aws login --profile e2e-login" >/dev/null || fail "the session's own aws login is not running before the sign-in (#1007)"
 # #612: the row carries the id, the start and the need the fork's list shows;
 # the by-hand nudge is a no-op with its reason on a session that never stopped.
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
@@ -603,7 +619,7 @@ echo "aws: code flow signed in, need cleared, session nudged"
 # and the nudge says so.
 i=0
 while pgrep -f "aws login --profile e2e-login" >/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released"
+    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|nc -l' | grep -v grep | head -4 | tr '\n' ';'))"
     sleep 1
 done
 grep -q "Your own .aws login. was stopped" "$INBOX" || fail "nudge does not say the session's own login was stopped"
