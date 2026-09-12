@@ -10,6 +10,7 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 - The control socket manages session-control grants — `team-grants`, `team-grant`, `team-revoke` — so the desktop app's Team page can add and remove them on the running app (#220).
+- Settings › Team shows a teammate's request to stop or delete a session, resume a past one, or swap or hold an account, with Allow and Deny; the grant sheet has the tiers, "without asking" and an expiry (#220).
 
 ### Desktop
 - Installing an update while threads run asks in a dialog again, not a toast: Later, Install now, or Install when they finish — and that wait no longer lapses at the next update check, which read as "checking" for a moment and silently cancelled it; clicking the armed update button opens the dialog to keep, cancel or skip the wait (#829).

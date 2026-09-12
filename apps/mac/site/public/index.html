@@ -257,11 +257,10 @@
       "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges and 15 themes.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
-      "softwareVersion": "0.5.0-alpha.1",
       "license": "https://github.com/deathemperor/infinitus/blob/main/LICENSE",
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "downloadUrl": "https://github.com/deathemperor/infinitus/releases/latest",
+      "downloadUrl": "https://infinitus.run/download/mac",
       "installUrl": "https://infinitus.run/#install",
       "screenshot": [
         "https://infinitus.run/img/og.png",
@@ -343,9 +342,9 @@
     so an agent run survives the five-hour wall without you.
   </p>
   <div class="cta">
-    <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/Infinitus-0.5.0-alpha.1.zip">Download for macOS</a>
+    <a class="btn primary" href="/download/mac">Download for macOS</a>
     <a class="btn" href="https://github.com/deathemperor/infinitus">Source on GitHub</a>
-    <span class="note">v0.5.0-alpha.1 · alpha · macOS menu bar + Linux panel · free &amp; open source</span>
+    <span class="note" id="version-note">alpha · macOS menu bar + Linux panel · free &amp; open source</span>
   </div>
   <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
           title="Copy to clipboard" aria-label="Copy the Homebrew install command">
@@ -356,12 +355,12 @@
     Needs the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI
     on your PATH — Infinitus walks you through the first account.</p>
   <p class="also">Also for
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/infinitus-tray-linux-x86_64">Linux x86_64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/infinitus-tray-linux-aarch64">Linux aarch64</a> ·
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/infinitus-omarchy.tar.gz">Omarchy</a>
+    <a href="/download/linux-x86_64">Linux x86_64</a> ·
+    <a href="/download/linux-aarch64">Linux aarch64</a> ·
+    <a href="/download/omarchy">Omarchy</a>
     — or <a href="#install">brew / AUR / source</a>.
     The full desktop app, menu bar included:
-    <a href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/Infinitus-0.5.0-alpha.1-arm64.dmg">Infinitus desktop (DMG, Apple silicon)</a>.</p>
+    <a href="/download/dmg">Infinitus desktop (DMG, Apple silicon)</a>.</p>
 </header>
 
 <div class="fleet wrap" aria-hidden="true">
@@ -708,7 +707,7 @@
   <div class="wrap">
     <h2>Keep the agents running.</h2>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.1/Infinitus-0.5.0-alpha.1.zip">Download for macOS</a>
+      <a class="btn primary" href="/download/mac">Download for macOS</a>
       <a class="btn" href="#install">Linux &amp; source</a>
     </div>
     <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
@@ -733,6 +732,13 @@
 
 <script>
 (function () {
+  // The version note: the buttons point at /download/<kind>, which the
+  // Worker resolves to the newest release, so the page names no version
+  // of its own — it asks the same Worker and stays "alpha" if that fails.
+  fetch("/download/version").then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+    var note = document.getElementById("version-note");
+    if (v && v.version && note) note.textContent = "v" + v.version + " · " + note.textContent;
+  }).catch(function () {});
   // Hero brew line: click copies, the badge says so for a moment.
   document.querySelectorAll(".brew").forEach(function (button) {
     button.addEventListener("click", function () {
