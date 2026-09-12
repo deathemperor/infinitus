@@ -5,11 +5,13 @@ import { usePrimarySettings } from "../../hooks/useSettings";
 import { formatDayAwareTimestamp } from "../../timestampFormat";
 import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   threadUsageBadgeAriaLabel,
   threadUsageBadgeLabel,
   threadUsageCostLabel,
   threadUsageRows,
+  threadUsageSourceDetail,
   threadUsageSourceLine,
 } from "./threadUsage.logic";
 
@@ -24,6 +26,7 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const rows = threadUsageRows(usage);
   const sourceLine = threadUsageSourceLine(usage);
+  const sourceDetail = threadUsageSourceDetail(usage);
   return (
     <Popover>
       <PopoverTrigger
@@ -73,7 +76,18 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
             </div>
           </dl>
           {sourceLine ? (
-            <div className="text-pretty text-secondary-label text-[11px]">{sourceLine}</div>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="cursor-help text-pretty text-secondary-label text-[11px] underline decoration-dotted underline-offset-2" />
+                }
+              >
+                {sourceLine}
+              </TooltipTrigger>
+              <TooltipPopup side="bottom" className="max-w-64 text-pretty">
+                {sourceDetail}
+              </TooltipPopup>
+            </Tooltip>
           ) : null}
         </div>
       </PopoverPopup>
