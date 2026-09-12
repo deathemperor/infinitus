@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 - The control socket manages session-control grants — `team-grants`, `team-grant`, `team-revoke` — so the desktop app's Team page can add and remove them on the running app (#220).
 - Settings › Team shows a teammate's request to stop or delete a session, resume a past one, or swap or hold an account, with Allow and Deny; the grant sheet has the tiers, "without asking" and an expiry (#220).
+- `infinitusctl team grant`, `grants` and `revoke` go through the running app, so a grant made from the terminal shows in Settings › Team and in teammates' hints at once; with no app they edit the file as before (#220).
 - A session that stops on an API error — a usage limit, an outage — reads idle at once and the error kind shows in Activity, from Claude Code's StopFailure hook (#79).
 
 ### Desktop
