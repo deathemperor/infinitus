@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- Side questions and forks from a turn answer again: the fork point now names a transcript line Claude Code can resume at, and a fork whose recorded point is missing falls back to the session's end instead of dying silently.
+
 
 ## 0.5.0-alpha.4
 
