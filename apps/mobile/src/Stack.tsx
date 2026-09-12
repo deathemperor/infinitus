@@ -32,6 +32,7 @@ import { GitCommitSheet } from "./features/threads/git/GitCommitSheet";
 import { GitConfirmSheet } from "./features/threads/git/GitConfirmSheet";
 import { GitOverviewSheet } from "./features/threads/git/GitOverviewSheet";
 import { InfinitusSideQuestionSheet } from "./features/infinitus/InfinitusSideQuestionSheet";
+import { InfinitusThreadUsageSheet } from "./features/infinitus/InfinitusThreadUsageSheet";
 import { ThreadRouteScreen } from "./features/threads/ThreadRouteScreen";
 import { ConnectionsRouteScreen } from "./features/connection/ConnectionsRouteScreen";
 import { ConnectionsNewRouteScreen } from "./features/connection/ConnectionsNewRouteScreen";
@@ -348,6 +349,7 @@ const WORKSPACE_OVERLAY_ROUTES = new Set([
   "SettingsSheet",
   "SideQuestionSheet",
   "ThreadReviewComment",
+  "ThreadUsageSheet",
   "ThreadSettingsSheet",
 ]);
 
@@ -545,6 +547,15 @@ export const RootStack = createNativeStackNavigator({
     // side fork's id is minted on the tap.
     SideQuestionSheet: createNativeStackScreen({
       screen: InfinitusSideQuestionSheet,
+      options: {
+        ...FORM_SHEET_PRESENTATION_OPTIONS,
+        sheetAllowedDetents: [0.55, 0.92],
+        sheetGrabberVisible: true,
+      },
+    }),
+    // Fork (#834): a thread's usage rollup over its thread; no link.
+    ThreadUsageSheet: createNativeStackScreen({
+      screen: InfinitusThreadUsageSheet,
       options: {
         ...FORM_SHEET_PRESENTATION_OPTIONS,
         sheetAllowedDetents: [0.55, 0.92],

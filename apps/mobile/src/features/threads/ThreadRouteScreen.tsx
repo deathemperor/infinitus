@@ -70,6 +70,7 @@ import {
 import { GitOverviewSheet } from "./git/GitOverviewSheet";
 import { usePullRequestHeaderItem } from "../infinitus/usePullRequestHeaderItem";
 import { useSideQuestionHeaderItem } from "../infinitus/useSideQuestionHeaderItem";
+import { useThreadUsageHeaderItem } from "../infinitus/useThreadUsageHeaderItem";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git-actions";
 import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-state";
@@ -674,9 +675,14 @@ function ThreadRouteContent(
   const reconnectingNoticeText = reconnectingNotice(selectedThread?.session);
   // Infinitus (#269 C, #881): the side-question button follows it.
   const sideQuestionHeader = useSideQuestionHeaderItem(selectedThread, selectedThreadDetail);
+  // Infinitus (#834): the thread's usage, once a turn has been recorded.
+  const usageHeader = useThreadUsageHeaderItem(selectedThread);
   const infinitusHeaderItems = useMemo<NativeHeaderItems>(
-    () => [pullRequestHeader.item, sideQuestionHeader.item].filter((item) => item !== null),
-    [pullRequestHeader.item, sideQuestionHeader.item],
+    () =>
+      [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item].filter(
+        (item) => item !== null,
+      ),
+    [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item],
   );
   const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
     () => [...infinitusHeaderItems, ...gitCenterHeaderItems],
@@ -764,6 +770,9 @@ function ThreadRouteContent(
     if (sideQuestionHeader.androidAction !== null) {
       actions.push(sideQuestionHeader.androidAction);
     }
+    if (usageHeader.androidAction !== null) {
+      actions.push(usageHeader.androidAction);
+    }
     if (fileInspector.supported && selectedThreadCwd !== null) {
       actions.push({
         accessibilityLabel: "Toggle inspector",
@@ -783,6 +792,7 @@ function ThreadRouteContent(
     pullRequestHeader.androidAction,
     selectedThreadProject?.workspaceRoot,
     sideQuestionHeader.androidAction,
+    usageHeader.androidAction,
   ]);
 
   const handleEditFailedCreation = useCallback(async () => {
@@ -970,6 +980,7 @@ function ThreadRouteContent(
           threadGitControlProps.projectScripts,
           pullRequestHeader.version,
           sideQuestionHeader.version,
+          usageHeader.version,
         ]}
         options={{
           // Android draws its own in-flow header (AndroidScreenHeader below);

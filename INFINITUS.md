@@ -719,6 +719,19 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   subscribes to the side fork, asks in plan mode, and "Bring to main" appends
   the latest answer to the main composer's draft (`sideQuestions.ts` carries
   the web `SideQuestionPanel.logic.ts` helpers, kept local).
+- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — the thread's
+  usage from the phone (#834): `useThreadUsageHeaderItem`'s button follows
+  the side-question one in the iOS header (its `version` in
+  `optionsVersion`) and joins the Android header actions once the shell
+  carries `usage` (a turn was recorded; no button before, and none on a
+  server without the rollup); a tap opens `ThreadUsageSheet`
+  (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
+  no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
+  reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
+  worded like the web popover (#907): turns (with the subagent count), each
+  non-zero token share, model(s), cost ("Cost not recorded" for null, never
+  $0.00), last turn — every estimate prefixed "≈", and the caveat lines
+  under them.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
