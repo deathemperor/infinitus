@@ -6,7 +6,7 @@
 - Source (MIT): https://github.com/deathemperor/infinitus
 - Releases: https://github.com/deathemperor/infinitus/releases
 - Issues / roadmap: https://github.com/deathemperor/infinitus/issues
-- Version: 0.5.0-alpha.1 (2026-09, alpha)
+- Version: alpha; the current one answers at https://infinitus.run/download/version, downloads at https://infinitus.run/download/mac (standalone menu bar app), /download/dmg (desktop app, Apple silicon), /download/linux-x86_64, /download/linux-aarch64, /download/omarchy
 
 ## What it does
 
