@@ -87,8 +87,18 @@ export type RightPanelSurface =
   /** The thread's linked pull requests, one singleton tab beside any number of `pull-request` tabs. */
   | { id: "pull-requests"; kind: "pull-requests" }
   | { id: "agents"; kind: "agents" }
-  /** Fork (#269 C): a side question of this thread, keyed by its own thread id. */
-  | { id: `side-question:${string}`; kind: "side-question"; threadId: ThreadId };
+  /**
+   * Fork (#269 C): a side question of this thread, keyed by its own thread id.
+   * While the fork is being made (`forking` set) the surface is the pending
+   * one, keyed `pending`, and `threadId` is the source thread's; it is never
+   * persisted.
+   */
+  | {
+      id: `side-question:${string}`;
+      kind: "side-question";
+      threadId: ThreadId;
+      forking?: { readonly error: string | null };
+    };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v9 removed the "plan" surface kind (plans render inline in the transcript).
@@ -154,6 +164,10 @@ interface RightPanelStoreState {
   openTerminal: (ref: ScopedThreadRef, terminalId: string) => void;
   /** Fork (#269 C): open (or return to) the drawer of a side question. */
   openSideQuestion: (ref: ScopedThreadRef, threadId: ThreadId) => void;
+  /** Fork (#269 C): open the drawer at once, in its forking state, so the click shows. */
+  openSideQuestionPending: (ref: ScopedThreadRef) => void;
+  /** Fork (#269 C): the fork failed; the pending drawer shows why. */
+  failSideQuestionPending: (ref: ScopedThreadRef, error: string) => void;
   splitTerminal: (
     ref: ScopedThreadRef,
     surfaceId: string,
@@ -272,6 +286,22 @@ export function pullRequestSurface(target: {
     ...(typeof target.url === "string" ? { url: target.url } : {}),
   };
 }
+
+const PENDING_SIDE_QUESTION_ID = "side-question:pending";
+
+/** Fork (#269 C): the pending drawer is a moment of one click, never kept. */
+const withoutPendingSideQuestion = (current: ThreadRightPanelState): ThreadRightPanelState => {
+  if (!current.surfaces.some((surface) => surface.id === PENDING_SIDE_QUESTION_ID)) return current;
+  const surfaces = current.surfaces.filter((surface) => surface.id !== PENDING_SIDE_QUESTION_ID);
+  return {
+    ...current,
+    surfaces,
+    activeSurfaceId:
+      current.activeSurfaceId === PENDING_SIDE_QUESTION_ID
+        ? (surfaces.at(-1)?.id ?? null)
+        : current.activeSurfaceId,
+  };
+};
 
 const upsertSurface = (
   current: ThreadRightPanelState,
@@ -583,12 +613,34 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
       openSideQuestion: (ref, threadId) =>
         set((state) =>
           userAction(state, scopedThreadKey(ref), (current) =>
-            upsertSurface(current, {
+            upsertSurface(withoutPendingSideQuestion(current), {
               id: `side-question:${threadId}`,
               kind: "side-question",
               threadId,
             }),
           ),
+        ),
+      openSideQuestionPending: (ref) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) =>
+            upsertSurface(withoutPendingSideQuestion(current), {
+              id: PENDING_SIDE_QUESTION_ID,
+              kind: "side-question",
+              threadId: ref.threadId,
+              forking: { error: null },
+            }),
+          ),
+        ),
+      failSideQuestionPending: (ref, error) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => ({
+            ...current,
+            surfaces: current.surfaces.map((surface) =>
+              surface.id === PENDING_SIDE_QUESTION_ID && surface.kind === "side-question"
+                ? { ...surface, forking: { error } }
+                : surface,
+            ),
+          })),
         ),
       openFile: (ref, relativePath, line) =>
         set((state) =>
@@ -881,9 +933,9 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
       ),
       partialize: (state) => ({
         byThreadKey: Object.fromEntries(
-          Object.entries(state.byThreadKey).filter(
-            ([threadKey]) => !isPullRequestsPanelKey(threadKey),
-          ),
+          Object.entries(state.byThreadKey)
+            .filter(([threadKey]) => !isPullRequestsPanelKey(threadKey))
+            .map(([threadKey, current]) => [threadKey, withoutPendingSideQuestion(current)]),
         ),
       }),
       migrate: migratePersistedRightPanelState,

@@ -323,8 +323,15 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
   drops the imported history by the ids the fork minted; "Bring to main"
   appends the latest answer to the main composer's draft);
-  `ChatView.tsx` `askSideQuestion` forks the latest completed turn with
-  `side: true` and opens the drawer, gated on a Claude session and
+  `ChatView.tsx` `askSideQuestion` forks with `side: true` and no
+  `turnCount`: the server takes the session's latest completed turn from
+  its own anchors (`latestClaudeForkAnchor`, `forkSeedMessagesByTurns`),
+  so a thread in a plain directory, which never gets a checkpoint, forks
+  too. The drawer opens on the click in a forking state
+  (`openSideQuestionPending`, `failSideQuestionPending`; the pending
+  surface is never persisted) and shows a failure inside with "Try again";
+  until a turn has completed (`hasCompletedTurn`) the button is off and
+  its tooltip says so. Gated on a Claude session and
   `capabilities.infinitus`; the button sits after the mode toggle in
   `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in
   `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and

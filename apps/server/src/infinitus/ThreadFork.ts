@@ -1,4 +1,4 @@
-import { CommandId, MessageId, ThreadId, type TurnId } from "@t3tools/contracts";
+import { CommandId, MessageId, ThreadId, TurnId } from "@t3tools/contracts";
 import {
   InfinitusThreadForkInput,
   InfinitusThreadForkRefused,
@@ -51,6 +51,43 @@ export function claudeForkAnchor(
   return null;
 }
 
+/**
+ * The session's latest completed turn as a fork point (#269 C): the last
+ * anchor, with every anchored turn id so the seed can keep exactly the
+ * completed turns. Null when no turn has completed in this session.
+ */
+export function latestClaudeForkAnchor(resumeCursor: unknown): {
+  readonly sessionId: string;
+  readonly at: string;
+  readonly turnCount: number;
+  readonly turnIds: ReadonlySet<TurnId>;
+} | null {
+  if (!resumeCursor || typeof resumeCursor !== "object") return null;
+  const cursor = resumeCursor as { resume?: unknown; anchors?: unknown };
+  if (typeof cursor.resume !== "string" || !Array.isArray(cursor.anchors)) return null;
+  const anchors: Array<{ turnId: TurnId; at: string }> = [];
+  for (const anchor of cursor.anchors as ReadonlyArray<unknown>) {
+    if (!anchor || typeof anchor !== "object") continue;
+    const candidate = anchor as { turnId?: unknown; at?: unknown };
+    if (
+      typeof candidate.turnId === "string" &&
+      candidate.turnId.length > 0 &&
+      typeof candidate.at === "string" &&
+      candidate.at.length > 0
+    ) {
+      anchors.push({ turnId: TurnId.make(candidate.turnId), at: candidate.at });
+    }
+  }
+  const last = anchors.at(-1);
+  if (last === undefined) return null;
+  return {
+    sessionId: cursor.resume,
+    at: last.at,
+    turnCount: anchors.length,
+    turnIds: new Set(anchors.map((anchor) => anchor.turnId)),
+  };
+}
+
 /** The source's user and assistant messages up to the turn, in order. */
 export interface ForkSeedSource {
   readonly messages: ReadonlyArray<{
@@ -96,6 +133,29 @@ export function forkSeedMessages(
     }));
 }
 
+/**
+ * The seed of a fork at the latest completed turn (#269 C): the messages of
+ * the completed turns, plus unattributed ones (imported history); a running
+ * turn's messages carry its own id and stay out.
+ */
+export function forkSeedMessagesByTurns(
+  thread: Pick<ForkSeedSource, "messages">,
+  turnIds: ReadonlySet<TurnId>,
+): ReadonlyArray<{ role: "user" | "assistant"; text: string; createdAt: string }> {
+  return thread.messages
+    .filter(
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        message.text.trim().length > 0 &&
+        (message.turnId === null || turnIds.has(message.turnId)),
+    )
+    .map((message) => ({
+      role: message.role === "user" ? "user" : "assistant",
+      text: message.text,
+      createdAt: message.createdAt,
+    }));
+}
+
 export function forkMarkerText(source: { title: string; id: ThreadId }, turnCount: number) {
   return `Forked from **${source.title}** at turn ${turnCount} (thread \`${source.id}\`).`;
 }
@@ -133,7 +193,9 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
     .getThreadDetailById(input.threadId)
     .pipe(Effect.mapError(() => refuse("The thread could not be read.")));
   if (Option.isNone(source)) return yield* refuse("The thread was not found.");
-  if (input.turnCount < 1) return yield* refuse("Pick a turn to fork from.");
+  if (input.turnCount !== undefined && input.turnCount < 1) {
+    return yield* refuse("Pick a turn to fork from.");
+  }
 
   const binding = yield* directory
     .getBinding(input.threadId)
@@ -141,17 +203,38 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
   if (Option.isNone(binding) || binding.value.provider !== CLAUDE_DRIVER) {
     return yield* refuse("Forking a thread needs a Claude session.");
   }
-  const checkpoint = source.value.checkpoints.find(
-    (candidate) => candidate.checkpointTurnCount === input.turnCount,
-  );
-  if (!checkpoint) return yield* refuse("Nothing to fork at this turn.");
-  const anchor = claudeForkAnchor(binding.value.resumeCursor, checkpoint.turnId);
-  if (anchor === null) {
-    return yield* refuse(
-      "No fork point was recorded for this turn; turns completed before forking existed cannot be forked.",
+  const point = yield* Effect.gen(function* () {
+    if (input.turnCount === undefined) {
+      // Fork (#269 C): a side question takes the session's latest completed
+      // turn from its own anchors. A checkpoint needs a git repository; a
+      // thread in a plain directory never has one, an anchor it always has.
+      const latest = latestClaudeForkAnchor(binding.value.resumeCursor);
+      if (latest === null) {
+        return yield* refuse("Ask a side question once a turn has completed.");
+      }
+      return {
+        anchor: { sessionId: latest.sessionId, at: latest.at },
+        turnCount: latest.turnCount,
+        seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
+      };
+    }
+    const checkpoint = source.value.checkpoints.find(
+      (candidate) => candidate.checkpointTurnCount === input.turnCount,
     );
-  }
-  const seed = forkSeedMessages(source.value, input.turnCount);
+    if (!checkpoint) return yield* refuse("Nothing to fork at this turn.");
+    const anchor = claudeForkAnchor(binding.value.resumeCursor, checkpoint.turnId);
+    if (anchor === null) {
+      return yield* refuse(
+        "No fork point was recorded for this turn; turns completed before forking existed cannot be forked.",
+      );
+    }
+    return {
+      anchor,
+      turnCount: input.turnCount,
+      seed: forkSeedMessages(source.value, input.turnCount),
+    };
+  });
+  const { anchor, turnCount, seed } = point;
   if (seed.length === 0) return yield* refuse("Nothing to fork at this turn.");
 
   const now = DateTime.formatIso(yield* DateTime.now);
@@ -191,7 +274,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
       commandId: CommandId.make(yield* nextId),
       threadId,
       projectId: source.value.projectId,
-      ...forkCreateFields(source.value, input),
+      ...forkCreateFields(source.value, { turnCount, ...(input.side ? { side: true } : {}) }),
       modelSelection: source.value.modelSelection,
       runtimeMode: source.value.runtimeMode,
       branch: source.value.branch,
@@ -203,7 +286,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
 
   const marker = {
     role: "assistant" as const,
-    text: forkMarkerText({ title: source.value.title, id: source.value.id }, input.turnCount),
+    text: forkMarkerText({ title: source.value.title, id: source.value.id }, turnCount),
     createdAt: now,
   };
   yield* engine

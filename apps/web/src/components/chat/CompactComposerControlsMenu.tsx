@@ -30,6 +30,8 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   /** Fork (#269 C): opens a read-only side question in the right panel. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 C): set, the item is off. */
+  sideQuestionUnavailable?: string | undefined;
 }) {
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -87,7 +89,12 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
         {props.onAskSideQuestion ? (
           <>
             <MenuDivider />
-            <MenuItem onClick={props.onAskSideQuestion}>Ask a side question</MenuItem>
+            <MenuItem
+              onClick={props.onAskSideQuestion}
+              disabled={props.sideQuestionUnavailable !== undefined}
+            >
+              Ask a side question
+            </MenuItem>
           </>
         ) : null}
       </MenuPopup>
