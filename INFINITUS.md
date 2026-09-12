@@ -227,7 +227,10 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648). `InfinitusSlackLive` (provided `SlackClientLive` over
+  (#648), `InfinitusPushBridgeLive` after it (#269 G; provided its own
+  `InfinitusControlClientLive`, the one in `InfinitusLayerLive` being
+  private to that block — the visual pass, which runs the server from
+  source, is what catches a layer the tests only ever mock). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
@@ -680,7 +683,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the new thread as on any open. A side question takes the detail's
   `latestTurn` once completed. The other drivers have no fork point.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
-  `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
+  `ServerSettings` (default on) and `ServerSettingsPatch` (#648);
+  `infinitusPushBridge` (default off) the same way (#269 G); the
   `PromptSnippet` schema with its caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on both
   (#270 G). `packages/shared/src/serverSettings.ts` —
@@ -1657,6 +1661,25 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).
+  `Layers/InfinitusPushBridge.ts` (+ `infinitusPushBridge.logic.ts`) is the
+  push bridge (#269 G): the thread phases the relay's awareness ladder
+  already derives (`projectThreadAwareness`, what the phone's Live Activity
+  draws) go to the Mac's `push` verb when a thread moves into one a person
+  acts on — waiting for approval, waiting for input, finished, failed — as
+  `{kind: "thread.phase", threadId, title, phase}` on the request line's
+  `secret` field (the manifest says `stdin: "payload"`), through the control
+  client directly; the Mac fans it out like its own account events (the
+  Notification Center, the phone's alert token, Slack, Telegram). Each
+  event's phase is recorded per thread before the socket call and the first
+  sighting of a thread pushes nothing, so a restart announces nothing and a
+  phase is pushed once; `starting` / `running` / `stale` never. The setting
+  is read before anything else, so a server with it off pays no projection
+  read per event. A snapshot that is unpolled or last saw the app down is
+  polled again for the manifest gate; an app without the verb or an
+  unreachable one drops the push. Only thread ids and phases reach the log. Off by the `infinitusPushBridge` server setting (the second row
+  of the same card): the desktop's own notifications (#270 B) and the Mac's
+  `push` both post a banner on the Mac, so the switch is for the away
+  channels.
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
   Mac whose socket is still quiet 3 s after the server starts it runs `open
 -g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
