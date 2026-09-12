@@ -10,6 +10,10 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 
+### Phone
+- Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer with its files, as the desktop does (#971).
+- The worktree-limit refusal no longer sends a phone to "Settings → General", a desktop path: it names the Worktree limit in the server's settings, which the desktop's Settings › General edits (#988).
+
 ## 0.5.0-alpha.3
 
 ### Mac

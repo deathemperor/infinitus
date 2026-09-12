@@ -21,14 +21,14 @@ describe("worktreeCapRefusal (#269 H)", () => {
       25,
     );
     expect(refusal).toBe(
-      `Worktree limit reached: 25 of 25 threads hold a worktree. Delete an archived thread to free its worktree (oldest: “spike retry”, “${"x".repeat(39)}…”, “Untitled”), or raise the limit in Settings → General.`,
+      `Worktree limit reached: 25 of 25 threads hold a worktree. Delete an archived thread to free its worktree (oldest: “spike retry”, “${"x".repeat(39)}…”, “Untitled”), or raise the Worktree limit in the server's settings.`,
     );
     expect(refusal).not.toContain("\n");
   });
 
   it("points at deleting a thread when no archived thread holds one", () => {
     expect(worktreeCapRefusal({ count: 26, oldestArchived: [] }, 25)).toBe(
-      "Worktree limit reached: 26 of 25 threads hold a worktree. Delete a thread you no longer need to free its worktree, or raise the limit in Settings → General.",
+      "Worktree limit reached: 26 of 25 threads hold a worktree. Delete a thread you no longer need to free its worktree, or raise the Worktree limit in the server's settings.",
     );
   });
 });

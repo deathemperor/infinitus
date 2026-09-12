@@ -824,6 +824,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them).
+- `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
+  upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
+  resolves afresh, and once npm carried 57.0.5 the range resolved past the
+  exact key of upstream's `patches/expo-audio@57.0.4.patch`, failing the
+  Release Smoke job with `ERR_PNPM_UNUSED_PATCH`. Drop the pin when upstream
+  bumps the package and its patch together.
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
@@ -878,7 +884,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
   `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
   the web's `composerSendQueue.logic.ts`, kept local so neither app edits
-  the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  the other's file; edit puts the row's context records back with fresh ids
+  through `restoredQueuedTurn` + `insertComposerDraftContext`, #971, the
+  text alone when the draft's record cap refuses); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
   queued creation), `InfinitusQueuedTurns` from the thread shell's
   `queuedTurns`, `InfinitusBestOfCard` (#269 B, read-only: the group's live
