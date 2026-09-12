@@ -1163,7 +1163,7 @@ final class AppModel: ObservableObject {
             }
         } else {
             swapd = nil
-            if swapdEnabled { lastError = "swapd not found — install it: \(OnboardingBrief.swapdInstallCommand)" }
+            if swapdEnabled { lastError = "Account engine missing — install a current Infinitus release to restore bundled swapd, then relaunch." }
         }
         // A freshly minted token has to survive the launch that made it:
         // property initialisation doesn't run `didSet`.

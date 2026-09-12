@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import { useMemo } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { Linking, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
@@ -98,6 +98,12 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         <EmptyState
           title="Infinitus is running, but no engine reports accounts"
           detail="Install and configure an engine (swapd) for Infinitus to manage them. Engines are set up on the Mac, under Settings › Infinitus › Engines in the desktop app."
+          actionLabel="Read the accounts setup guide"
+          onAction={() =>
+            void Linking.openURL(
+              "https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md",
+            )
+          }
         />
       ) : null}
       {model.sections.map((section) => (

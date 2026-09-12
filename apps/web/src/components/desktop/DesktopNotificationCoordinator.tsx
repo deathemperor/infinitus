@@ -9,7 +9,7 @@ import {
   threadNotifications,
 } from "../../lib/desktopNotifications.logic";
 import { windowInBackground } from "../../lib/infinitusCompletionSound.logic";
-import { useThreadShells } from "../../state/entities";
+import { useProjects, useThreadShells } from "../../state/entities";
 import { usePrimaryEnvironment } from "../../state/environments";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
@@ -32,6 +32,7 @@ export function DesktopNotificationCoordinator() {
   const setBadgeCount = bridge?.setBadgeCount;
   const onNotificationActivated = bridge?.onNotificationActivated;
   const shells = useThreadShells();
+  const projects = useProjects();
   const settings = useClientSettings();
   const navigate = useNavigate();
   const primary = usePrimaryEnvironment();
@@ -49,6 +50,9 @@ export function DesktopNotificationCoordinator() {
 
   useEffect(() => {
     if (postNotification === undefined || setBadgeCount === undefined) return;
+    const projectTitles = new Map(
+      projects.map((project) => [`${project.environmentId}:${project.id}`, project.title]),
+    );
     const watched = shells.map((thread) => {
       const held = heldEntryFor(
         thread.environmentId === primaryEnvironmentId ? primaryHolds : null,
@@ -58,6 +62,7 @@ export function DesktopNotificationCoordinator() {
         environmentId: thread.environmentId,
         id: thread.id,
         title: thread.title,
+        projectTitle: projectTitles.get(`${thread.environmentId}:${thread.projectId}`),
         status: resolveSidebarThreadStatus(thread, {
           held: held?.kind === "held",
           limited: held?.kind === "limited",
@@ -88,6 +93,7 @@ export function DesktopNotificationCoordinator() {
     postNotification,
     setBadgeCount,
     shells,
+    projects,
     primaryEnvironmentId,
     primaryHolds,
     settings,

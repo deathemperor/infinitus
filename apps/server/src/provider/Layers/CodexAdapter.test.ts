@@ -6,6 +6,7 @@ import * as NodePath from "node:path";
 import {
   ApprovalRequestId,
   CodexSettings,
+  EnvironmentId,
   EventId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -36,6 +37,7 @@ import * as TestClock from "effect/testing/TestClock";
 import * as CodexErrors from "effect-codex-app-server/errors";
 
 import { ServerConfig } from "../../config.ts";
+import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderAdapterValidationError } from "../Errors.ts";
 import type { CodexAdapterShape } from "../Services/CodexAdapter.ts";
@@ -286,7 +288,9 @@ validationLayer("CodexAdapterLive validation", (it) => {
         runtimeMode: "full-access",
       });
 
-      NodeAssert.deepStrictEqual(validationRuntimeFactory.factory.mock.calls[0]?.[0], {
+      const { environment, ...runtime } = validationRuntimeFactory.factory.mock.calls[0]![0];
+      NodeAssert.equal(environment?.T3_THREAD_ID, "thread-1");
+      NodeAssert.deepStrictEqual(runtime, {
         binaryPath: "codex",
         cwd: process.cwd(),
         launchArgs: "",
@@ -476,6 +480,45 @@ sessionErrorLayer("CodexAdapterLive session errors", (it) => {
       const runtime = runtimeFactory.lastRuntime;
       NodeAssert.ok(runtime);
       NodeAssert.equal(runtime.options.launchArgs, "--strict-config --enable foo");
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("exports the environment identity of the server that owns the session", () => {
+    const runtimeFactory = makeRuntimeFactory();
+    const environmentId = EnvironmentId.make("owning-host");
+    const layer = Layer.effect(
+      CodexAdapter,
+      Effect.gen(function* () {
+        const codexConfig = decodeCodexSettings({});
+        return yield* makeCodexAdapter(codexConfig, {
+          environment: { T3_ENVIRONMENT_ID: "wrong-host" },
+          makeRuntime: runtimeFactory.factory,
+        });
+      }),
+    ).pipe(
+      Layer.provide(
+        Layer.succeed(ServerEnvironment, {
+          getEnvironmentId: Effect.succeed(environmentId),
+          getDescriptor: Effect.die("not used by provider adapters"),
+        }),
+      ),
+      Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+      Layer.provideMerge(ServerSettingsService.layerTest()),
+      Layer.provideMerge(providerSessionDirectoryTestLayer),
+      Layer.provideMerge(NodeServices.layer),
+    );
+
+    return Effect.gen(function* () {
+      const adapter = yield* CodexAdapter;
+      yield* adapter.startSession({
+        provider: ProviderDriverKind.make("codex"),
+        threadId: asThreadId("sess-environment-id"),
+        runtimeMode: "full-access",
+      });
+
+      const { environment } = runtimeFactory.factory.mock.calls[0]![0];
+      NodeAssert.equal(environment?.T3_THREAD_ID, "sess-environment-id");
+      NodeAssert.equal(environment?.T3_ENVIRONMENT_ID, environmentId);
     }).pipe(Effect.provide(layer));
   });
 

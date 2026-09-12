@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { usePrimaryEnvironment } from "~/state/environments";
+import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -19,8 +19,15 @@ import {
  * only place the app runs — and the page it sits on already knows the socket
  * is quiet, so the button never has to say so itself.
  */
-export function InfinitusLaunchButton({ className }: { readonly className?: string }) {
-  const environment = usePrimaryEnvironment();
+export function InfinitusLaunchButton({
+  className,
+  environment: targetEnvironment,
+}: {
+  readonly className?: string;
+  readonly environment?: EnvironmentPresentation | null;
+}) {
+  const primary = usePrimaryEnvironment();
+  const environment = targetEnvironment === undefined ? primary : targetEnvironment;
   const environmentId = environment?.environmentId ?? null;
   const os = environment?.serverConfig?.environment.platform.os;
   const launch = useAtomCommand(infinitusEnvironment.launch, { reportFailure: false });

@@ -26,7 +26,16 @@ vi.mock("@effect/atom-react", () => ({
     new Map([["test-environment", { environment: { capabilities: { infinitus: true } } }]]),
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
+  Link: ({
+    to,
+    children,
+    search: _search,
+    ...rest
+  }: {
+    to: string;
+    children: ReactNode;
+    search?: unknown;
+  }) => (
     <a href={to} {...rest}>
       {children}
     </a>

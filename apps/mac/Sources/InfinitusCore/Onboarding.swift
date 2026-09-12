@@ -102,14 +102,17 @@ public enum OnboardingBrief {
                           + (proxyLive ? "running" : "not running") : "not set up"))
         }
         out += ["", "## Steps"]
-        out.append("- [\(engineInstalled ? "x" : " ")] 1. Install the engine: "
-                   + "`\(swapdInstallCommand)` (needs a Rust toolchain: `brew install rust`). Relaunch Infinitus.")
+        out.append(engineInstalled
+                   ? "- [x] 1. Install the engine: already available (official Mac releases bundle swapd)."
+                   : "- [ ] 1. Install the engine: install a current Infinitus release and relaunch. "
+                     + "For source builds: `\(swapdInstallCommand)` (requires Rust).")
         let signedIn = claude?.email != nil
         out.append("- [\(signedIn ? "x" : " ")] 2. Sign Claude Code into the first account: run `claude`, use "
                    + "`/login`, the human completes the browser sign-in.")
-        out.append("- [ ] 3. Register it: `swapd add` (adopts Claude Code's current login). "
-                   + "Repeat 2–3 for every extra account: `/logout` in Claude Code, `/login` as the "
-                   + "next account, `swapd add` again. `swapd list` shows the fleet.")
+        out.append("- [ ] 3. Register it: relaunch Infinitus and choose Add beside the detected login. "
+                   + "For command-line setup, run `swapd add` using the full Binary path shown in "
+                   + "Settings → Engines. The bundled engine is not installed on PATH. "
+                   + "Use Accounts to add more logins once the fleet appears.")
         out.append("- [ ] 4. Start auto-rotation: Infinitus runs `swapd auto` itself once the "
                    + "fleet has accounts (Settings → Engines shows it; `infinitusctl status` from "
                    + "Infinitus.app/Contents/MacOS confirms).")
@@ -119,7 +122,7 @@ public enum OnboardingBrief {
                    + "accounts from the same tab.")
         out.append("- [ ] 6. Optional, the phone: Infinitus Settings → Devices has its own "
                    + "\"Copy for an AI agent\" brief for pairing the iPhone app.")
-        out += ["", "## Verify", "`swapd list --json` lists every account with usage; the Infinitus popup "
+        out += ["", "## Verify", "The Infinitus popup "
                 + "shows one row per account with 5h/7d bars; `infinitusctl status` reports "
                 + "`badge: running`."]
         return out.joined(separator: "\n")
@@ -127,8 +130,6 @@ public enum OnboardingBrief {
 
     private static func org(_ o: String?) -> String { o.map { " (\($0))" } ?? "" }
 
-    /// The engine's own install line (swapd README); quoted verbatim by
-    /// the first-run card and this brief. No formula or release archive
-    /// exists yet, so cargo is the one way in.
+    /// Source-build fallback; official Mac releases carry the engine in the bundle.
     public static let swapdInstallCommand = "cargo install --git https://github.com/deathemperor/swapd swapd"
 }

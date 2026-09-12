@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import { withAgentDeviceEnvironment } from "./McpProviderSession.ts";
+import { withProviderSessionEnvironment } from "./McpProviderSession.ts";
 
 describe("device CLI environment", () => {
   it("preserves provider credentials and commands while routing devices to the owned daemon", () => {
-    const environment = withAgentDeviceEnvironment(
+    const environment = withProviderSessionEnvironment(
       { PATH: "/provider/bin:/usr/bin", PROVIDER_KEY: "fixture" },
       {
         agentDeviceEnvironment: {
@@ -22,9 +22,24 @@ describe("device CLI environment", () => {
     });
   });
 
+  it("exports the owning thread and environment without granting device access", () => {
+    const base = { T3_THREAD_ID: "parent", T3_ENVIRONMENT_ID: "old-host", PROVIDER_KEY: "fixture" };
+    expect(
+      withProviderSessionEnvironment(base, { threadId: "child", environmentId: "host" }),
+    ).toEqual({
+      T3_THREAD_ID: "child",
+      T3_ENVIRONMENT_ID: "host",
+      PROVIDER_KEY: "fixture",
+    });
+    expect(base.T3_THREAD_ID).toBe("parent");
+    expect(
+      withProviderSessionEnvironment(base, { threadId: "child" }).T3_ENVIRONMENT_ID,
+    ).toBeUndefined();
+  });
+
   it("does not grant CLI access when device access was not supplied", () => {
     const environment = { PATH: "/usr/bin", PROVIDER_KEY: "fixture" };
-    expect(withAgentDeviceEnvironment(environment, undefined)).toBe(environment);
-    expect(withAgentDeviceEnvironment(environment, {})).toBe(environment);
+    expect(withProviderSessionEnvironment(environment, undefined)).toBe(environment);
+    expect(withProviderSessionEnvironment(environment, {})).toBe(environment);
   });
 });

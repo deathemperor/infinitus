@@ -14,6 +14,8 @@ func desktopUsage() -> String {
     usage: \(programName) environments
            \(programName) projects
            \(programName) threads [--project <id|name>] [--status running|held|paused|waiting|idle] [--limit <n>]
+           \(programName) thread rename [--thread <id>] <title>
+           \(programName) thread title [--thread <id>]
            \(programName) thread show <id> [--turns <n>]
            \(programName) thread send <id> <message|-> [--steer] [--wait] [--wait-idle]
            \(programName) thread new --project <id|name> <prompt|-> [--worktree <branch>] [--base <branch>] [--wait]
@@ -22,6 +24,7 @@ func desktopUsage() -> String {
            \(programName) desktop status | credential
 
     Infinitus desktop's projects and threads, over the credential it hands the Mac app.
+    rename/title use T3_THREAD_ID when --thread is omitted. T3_ENVIRONMENT_ID guards the host.
     `-` reads the message from stdin. `send` queues nothing: a running thread refuses
     unless --steer folds the message into the turn or --wait-idle sends it when the turn ends.
     --wait prints the assistant's answer when the turn ends (exit 1 when it errors or is interrupted).
@@ -180,7 +183,9 @@ private struct DesktopVerbs {
     }
 
     private func thread() throws -> Int32 {
-        guard let sub = positional.first, let id = positional.dropFirst().first ?? (sub == "new" ? "" : nil) else {
+        guard let sub = positional.first else { throw Refused(message: desktopUsage(), code: 2) }
+        if sub == "rename" || sub == "title" { return try threadTitle(rename: sub == "rename") }
+        guard let id = positional.dropFirst().first ?? (sub == "new" ? "" : nil) else {
             throw Refused(message: desktopUsage(), code: 2)
         }
         let api = try api()
@@ -265,6 +270,32 @@ private struct DesktopVerbs {
         default:
             throw Refused(message: desktopUsage(), code: 2)
         }
+    }
+
+    private func threadTitle(rename: Bool) throws -> Int32 {
+        let environment = ProcessInfo.processInfo.environment
+        guard let id = DesktopRows.resolveThreadID(explicit: options["thread"], environment: environment) else {
+            throw Refused(message: "no current thread: pass --thread <id> or run inside an Infinitus thread (T3_THREAD_ID)", code: 2)
+        }
+        guard positional.count == (rename ? 2 : 1), options.keys.allSatisfy({ $0 == "thread" || $0 == "env" }), flags.isEmpty else {
+            throw Refused(message: desktopUsage(), code: 2)
+        }
+        let title = rename ? try message(positional[1], what: "title") : nil
+        let api = try api()
+        if let expected = options["env"] ?? environment["T3_ENVIRONMENT_ID"],
+           try api.descriptor().environmentId != expected {
+            throw Refused(message: "this thread belongs to another environment; run the command on its owning host", code: 2)
+        }
+        guard let thread = try api.shell().threads.first(where: { $0.id == id }) else {
+            throw Refused(message: "no thread \(id) in Infinitus desktop")
+        }
+        if let title {
+            let sequence = try api.dispatch(DesktopRows.renameThread(threadId: id, title: title))
+            desktopEmit(.object(["threadId": .string(id), "title": .string(title), "sequence": .number(Double(sequence))]))
+        } else {
+            print(thread.title)
+        }
+        return 0
     }
 
     private func desktop() throws -> Int32 {

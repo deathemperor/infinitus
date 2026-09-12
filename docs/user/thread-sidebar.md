@@ -20,6 +20,37 @@ on Windows and Linux to start a new thread and immediately open another draft. T
 next draft keeps the workspace mode and base branch you selected. With **New
 worktree**, each background submission creates its own worktree.
 
+## Rename from an agent or terminal
+
+On a Mac running Infinitus desktop, an agent can rename its thread with:
+
+```sh
+infinitus thread rename "Arbiter transcription / mobile UI"
+infinitus thread title
+```
+
+`infinitusctl` and `ictl` accept the same commands. Homebrew installs the commands
+on PATH. ZIP/DMG installs include `infinitusctl` and `ictl` inside the menu bar
+app's `Contents/MacOS` directory, and `infinitus` in `Contents/Resources/bin`.
+The desktop app nests the menu bar app inside `Contents/Library/LoginItems`.
+
+New provider sessions and thread terminals receive `T3_THREAD_ID` and
+`T3_ENVIRONMENT_ID`. Existing sessions need to restart to inherit them. Outside a
+thread, pass `--thread <id>`. Run the command on the thread's owning Mac; it uses
+that Mac's desktop connection. An explicit rename takes precedence over pending
+automatic title generation and appears on all connected clients.
+
+## Desktop notifications
+
+In **Settings → Infinitus → Notifications**, choose alerts for approvals, questions,
+held turns, and failures. Completion alerts are separate and off by default.
+Notifications identify the project and thread; click one to open that thread.
+The visible thread stays quiet while the desktop window has focus. Enable the
+Dock badge to count threads waiting for approval or input.
+
+Desktop alerts need no T3 Connect account. Allow Infinitus notifications in macOS
+System Settings. For alerts on a phone, see [Mobile notifications](./mobile-notifications.md).
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.
