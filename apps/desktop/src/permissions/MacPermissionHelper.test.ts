@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import * as Electron from "electron";
 import { MacPermissionHelper, macAppBundlePath } from "./MacPermissionHelper.ts";
 import type { SettingsWindow } from "./MacSettingsWindow.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { MAC_PERMISSION_HELPER_CHANNEL } from "../ipc/channels.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -168,7 +169,7 @@ it("does not open for a permission already granted", async () => {
 });
 it("does not show a helper with a missing packaged icon", async () => {
   mocks.createFromPath.mockReturnValueOnce({ isEmpty: () => true });
-  await expect(open()).rejects.toThrow("packaged T3 Code icon is missing");
+  await expect(open()).rejects.toThrow(`packaged ${PRODUCT_NAME} icon is missing`);
   expect(windows).toHaveLength(0);
 });
 it("cleans up when the helper page fails to load", async () => {
