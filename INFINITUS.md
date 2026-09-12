@@ -312,8 +312,8 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   unknown count, which offers only "Install now". No `apps/desktop` change:
   the main process has no orchestration access, so the two quit paths are
   gated at the renderer (the IPC install) and at the server (the commit of
-  a remote desktop update). A plain app quit with a downloaded update still
-  installs it — the remaining hole.
+  a remote desktop update); a plain quit never installs (`DesktopUpdates.ts`
+  sets `autoInstallOnAppQuit` false), so those two are the only paths.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts`
   — `ThreadBabysit` (`since`, `rounds`), `BABYSIT_MAX_ROUNDS` (10), `babysit?`
   on `OrchestrationThread` and `OrchestrationThreadShell` (optional, so
