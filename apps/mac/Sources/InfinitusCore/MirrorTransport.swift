@@ -149,13 +149,6 @@ public enum MirrorTransport {
     /// 20 MiB video and three 5 MiB images at most (#381) — base64-inflated,
     /// plus the JSON envelope (2026-09-03 "add features to allow attachments").
     public static let sessionInputBodyCap = 48 * 1024 * 1024
-    /// `POST /sessions/<pid>/terminal/<id>/write` (#507): a legal 64 KB
-    /// `data` string JSON-escapes past 64 KB, so the cap is twice
-    /// `T3Terminal.maxWriteBytes` plus the envelope — truncating the body
-    /// would turn a refusal `WriteRequest.validate()` owns (413) into a
-    /// decode failure (400). Not the input route's 48 MiB: this listener
-    /// may be tunnel-exposed and a keystroke is a keystroke.
-    public static let terminalWriteBodyCap = 2 * T3Terminal.maxWriteBytes + 4096
 
     // MARK: - Server side
 
@@ -245,10 +238,6 @@ public enum MirrorTransport {
         guard method == "POST" else { return defaultBodyCap }
         // A sealed team command carries a prompt (#220) — the input cap.
         if sessionInputPid(path) != nil || path == TeamControlRoute.commandPath { return sessionInputBodyCap }
-        // A terminal write carries up to 64 KB of keystrokes or paste (#507).
-        if case .write? = T3Terminal.parse(method: method, request: Request(method: method, target: path, headers: [:])) {
-            return terminalWriteBodyCap
-        }
         return defaultBodyCap
     }
 

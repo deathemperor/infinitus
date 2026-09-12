@@ -1910,30 +1910,6 @@ final class AppModel: ObservableObject {
                 T3ProjectFiles.answer(pid: pid, path: path,
                                       sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             }))
-        // The phone's terminal (#507 step 3): the session's cwd is where the
-        // shell opens, and `TerminalHost` owns everything after that — the
-        // routes only map its result to a status. An unknown pid is a 404.
-        let terminalHost = terminalHost
-        mirrorServer.terminal.set(.init(
-            open: { [weak self] pid, request in
-                guard let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .first(where: { $0.pid == pid }) else { return nil }
-                let outcome = terminalHost.open(pid: pid, cwd: record.cwd, request: request)
-                if case .success(let opened) = outcome, opened.created {
-                    Task { @MainActor in
-                        self?.logEvent("other", icon: "apple.terminal",
-                                       "phone opened a terminal in \((record.cwd as NSString).lastPathComponent)")
-                    }
-                }
-                return outcome
-            },
-            attach: { pid, id, since, sink in
-                terminalHost.attach(pid: pid, id: id, since: since, sink: sink)
-            },
-            detach: { terminalHost.detach($0) },
-            write: { pid, id, request in terminalHost.write(pid: pid, id: id, request) },
-            resize: { pid, id, request in terminalHost.resize(pid: pid, id: id, request) },
-            close: { pid, id in terminalHost.close(pid: pid, id: id) }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in
@@ -3235,9 +3211,6 @@ final class AppModel: ObservableObject {
         quickTunnel.stop()
         namedTunnel.stop()
         forkTunnel.stop()
-        // So are the phone's terminals (#507): a login shell holding a pty
-        // must not outlive the app either.
-        terminalHost.closeAll()
         let swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
         let team = team
@@ -3258,11 +3231,6 @@ final class AppModel: ObservableObject {
             }
         }
     }
-
-    /// The phone's terminals (#507 step 3): one PTY per session pid, opened
-    /// on demand by the mirror's terminal routes. Costs nothing until one is
-    /// open — the host has no sources of its own.
-    let terminalHost = TerminalHost()
 
     // MARK: - Owned sessions (#151)
 

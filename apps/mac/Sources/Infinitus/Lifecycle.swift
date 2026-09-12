@@ -22,9 +22,8 @@ enum Lifecycle {
         // SIGPIPE, whose default action ends the process with no crash
         // report and no last line. Ignored, the write returns EPIPE and
         // the writers' do/catch copes. Children don't inherit it: NSTask
-        // resets dispositions (probed 2026-09-11), TerminalHost's fork
-        // resets them itself. CI never saw the death because its runner
-        // already ignores SIGPIPE and that survives exec.
+        // resets dispositions (probed 2026-09-11). CI never saw the death
+        // because its runner already ignores SIGPIPE and that survives exec.
         signal(SIGPIPE, SIG_IGN)
         // Off the main queue, and `_exit` (no atexit handlers, no stdio
         // flush, nothing that takes a lock), so a hung main thread still
