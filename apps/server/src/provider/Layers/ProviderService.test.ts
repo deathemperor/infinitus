@@ -1545,6 +1545,102 @@ it.effect(
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
+const reconnectMarker = makeProviderServiceLayer();
+
+reconnectMarker.layer("ProviderServiceLive reconnect continuation marker (#832)", (it) => {
+  it.effect(
+    "marks the turn when the adapter starts reconnecting and clears it when the turn ends",
+    () =>
+      Effect.gen(function* () {
+        const provider = yield* ProviderService.ProviderService;
+        const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
+        const threadId = asThreadId("reconnect-marker");
+        yield* provider.startSession(threadId, {
+          provider: CLAUDE_AGENT_DRIVER,
+          providerInstanceId: ProviderInstanceId.make(CLAUDE_AGENT_DRIVER),
+          threadId,
+          runtimeMode: "full-access",
+        });
+        const accepted = yield* provider.sendTurn({ threadId, input: "hello", attachments: [] });
+        const emitAndAwait = (event: Parameters<typeof reconnectMarker.claude.emit>[0]) =>
+          Effect.gen(function* () {
+            const published = yield* Stream.take(provider.streamEvents, 1).pipe(
+              Stream.runDrain,
+              Effect.forkChild,
+            );
+            yield* Effect.yieldNow;
+            reconnectMarker.claude.emit(event);
+            yield* Fiber.join(published);
+          });
+
+        yield* emitAndAwait({
+          type: "session.state.changed",
+          eventId: asEventId("evt-reconnect-1"),
+          provider: CLAUDE_AGENT_DRIVER,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          threadId,
+          turnId: accepted.turnId,
+          payload: { state: "running", reason: "reconnecting:1/5" },
+        });
+        const marked = yield* directory.getBinding(threadId);
+        assert(Option.isSome(marked));
+        assert.propertyVal(
+          marked.value.runtimePayload,
+          "continueAfterServerUpdate",
+          accepted.turnId,
+        );
+        assert.propertyVal(marked.value.runtimePayload, "activeTurnId", accepted.turnId);
+        assert.equal(marked.value.status, "running");
+
+        yield* emitAndAwait({
+          type: "turn.completed",
+          eventId: asEventId("evt-reconnect-2"),
+          provider: CLAUDE_AGENT_DRIVER,
+          createdAt: "2026-01-01T00:00:01.000Z",
+          threadId,
+          turnId: accepted.turnId,
+          payload: { state: "completed" },
+        });
+        const cleared = yield* directory.getBinding(threadId);
+        assert(Option.isSome(cleared));
+        assert.propertyVal(cleared.value.runtimePayload, "continueAfterServerUpdate", null);
+      }),
+  );
+
+  it.effect("leaves a plain running state alone", () =>
+    Effect.gen(function* () {
+      const provider = yield* ProviderService.ProviderService;
+      const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
+      const threadId = asThreadId("reconnect-marker-plain");
+      yield* provider.startSession(threadId, {
+        provider: CLAUDE_AGENT_DRIVER,
+        providerInstanceId: ProviderInstanceId.make(CLAUDE_AGENT_DRIVER),
+        threadId,
+        runtimeMode: "full-access",
+      });
+      const accepted = yield* provider.sendTurn({ threadId, input: "hello", attachments: [] });
+      const published = yield* Stream.take(provider.streamEvents, 1).pipe(
+        Stream.runDrain,
+        Effect.forkChild,
+      );
+      yield* Effect.yieldNow;
+      reconnectMarker.claude.emit({
+        type: "session.state.changed",
+        eventId: asEventId("evt-reconnect-plain"),
+        provider: CLAUDE_AGENT_DRIVER,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        threadId,
+        turnId: accepted.turnId,
+        payload: { state: "running" },
+      });
+      yield* Fiber.join(published);
+      const binding = yield* directory.getBinding(threadId);
+      assert(Option.isSome(binding));
+      assert.propertyVal(binding.value.runtimePayload, "continueAfterServerUpdate", null);
+    }),
+  );
+});
+
 routing.layer("ProviderServiceLive routing", (it) => {
   it.effect.each([CODEX_DRIVER, CLAUDE_AGENT_DRIVER, CURSOR_DRIVER])(
     "rejects missing, file, and saved workspace paths before starting %s",
