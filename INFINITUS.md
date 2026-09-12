@@ -296,8 +296,21 @@ completedAt`, an older turn's user message → last assistant `updatedAt`
   background agents running — their work is not finished",
   `liveBackgroundAgentsMessage`) before the stopped rows: ingestion turns
   that into the error activity and marks the session `error`, so the
-  thread stops reading as finished work. A killed server writes nothing;
-  a boot-time reconcile is a follow-up.
+  thread stops reading as finished work. A killed server writes nothing,
+  so `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+
+  test; `infinitus/backgroundAgents.logic.ts` holds the wording and the
+  rows, shared with the adapter) runs as the `background-agents.reconcile`
+  startup phase right after `provider-sessions.reconcile` in
+  `serverRuntimeStartup.ts` (#977): one SQL statement over the sessions
+  table with correlated lookups on each thread's activity index finds the
+  ready/running/starting threads whose agent-kind `task.started` rows went
+  to the background and never ended, then — for the ones not live — writes
+  the stopped rows a graceful stop would have, the error row, and the
+  session's error state — except a thread the provider-sessions reconcile
+  just flipped to `starting` for the post-update continuation, which gets
+  the stopped rows only: the continuation prompt is its wake. The stopped
+  rows make it idempotent; a #974 error row after the start row excludes
+  the thread as well.
   Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
   while entries are equal, so a running turn's ticks repaint nothing),
   `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity
@@ -521,7 +534,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ProjectionSnapshotQuery.ts` carry it); `packages/contracts/src/infinitus.ts`
   — `InfinitusThreadForkInput.side?: true`; `apps/server/src/infinitus/ThreadFork.ts`
   `forkCreateFields` — a side fork is titled "Side question: <title>", asks in
-  plan mode and is `sideOf` the source. Web: `apps/web/src/rightPanelStore.ts`
+  plan mode and is `sideOf` the source; a Claude thread whose session carries
+  no fork anchors (its turns completed before #270 E2 recorded them) forks
+  the session at its end instead (`latestClaudeSessionEnd`: `resume` +
+  `fork`, no `resumeSessionAt`), seeded with every completed turn, its
+  marker reading "at its latest turn" (#941). Web: `apps/web/src/rightPanelStore.ts`
   — the `side-question` surface (`openSideQuestion`, storage v14);
   `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only what
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
@@ -874,17 +891,23 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `ThreadFeed.tsx`'s `turnFooters` so a completed turn's terminal assistant
   message shows `turnFooterLabel` — "Done in 49s · 12:59 PM · 1 shell still
   running", the time in the feed's own `formatMessageTime` — in place of its
-  time, and prepends `usePullRequestHeaderItem`'s menu to the
-  iOS header's git items with its `version` in `optionsVersion` (#269 F: the
-  PR's phase from the linked snapshot, Open pull request / View checks / Mark
-  ready for review over `pullRequests.runAction`, and on an `infinitus`
-  server "Babysit" / "Stop babysitting (r/10)" over `thread.meta.update
-{babysit}` while the PR is open or the thread is already babysat — the
-  web toggle's gate, #269 A, the menu's status line reading "Babysitting
-  r/10" while on; on Android the hook's `androidAction` is a header button
-  before the git controls carrying the same choices as its `menu` (an
-  anchored menu, the phase line inert at the top);
-  `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
+  time, and prepends the thread menu — `useThreadHeaderMenu`
+  (`features/infinitus/useThreadHeaderMenu.ts` + `threadHeaderMenu.logic.ts`,
+  #941: ONE menu button folding the PR's choices, "Ask a side question" and
+  "Thread usage", so the compact iOS header keeps upstream's three git
+  buttons instead of collapsing everything into "…"; the PR's icon and "#N"
+  on the button while the thread has one, else the plain more circle) — to
+  the iOS header's git items with its `version` in `optionsVersion`. The
+  PR part is `usePullRequestHeaderItem`'s `menu` (#269 F: the PR's phase
+  from the linked snapshot as an inert first line, Open pull request / View
+  checks / Mark ready for review over `pullRequests.runAction`, and on an
+  `infinitus` server "Babysit" / "Stop babysitting (r/10)" over
+  `thread.meta.update {babysit}` while the PR is open or the thread is
+  already babysat — the web toggle's gate, #269 A, the status line reading
+  "Babysitting r/10" while on); on Android the hook's `androidAction` is a
+  header button before the git controls opening the same choices as an
+  anchored menu; `apps/mobile/src/features/infinitus/prHeader.logic.ts`,
+  `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
@@ -898,10 +921,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
   #863).
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — a side question
-  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s button follows
-  the PR menu in the iOS header (its `version` in `optionsVersion`) and joins
-  the Android header actions on a Claude Agent thread of an `infinitus`
-  server; a tap forks the session's latest completed turn (`infinitus.forkThread`
+  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s `action` is
+  the thread menu's "Ask a side question" (above, #941) on a Claude Agent
+  thread of an `infinitus` server; a tap forks the session's latest completed turn (`infinitus.forkThread`
   with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet`
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx`
@@ -909,11 +931,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the latest answer to the main composer's draft (`sideQuestions.ts` carries
   the web `SideQuestionPanel.logic.ts` helpers, kept local).
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — the thread's
-  usage from the phone (#834): `useThreadUsageHeaderItem`'s button follows
-  the side-question one in the iOS header (its `version` in
-  `optionsVersion`) and joins the Android header actions once the shell
-  carries `usage` (a turn was recorded; no button before, and none on a
-  server without the rollup); a tap opens `ThreadUsageSheet`
+  usage from the phone (#834): `useThreadUsageHeaderItem`'s `action` is the
+  thread menu's "Thread usage" (above, #941) once the shell carries `usage`
+  (a turn was recorded; no choice before, and none on a server without the
+  rollup); a tap opens `ThreadUsageSheet`
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
   reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
@@ -1702,17 +1723,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@t3tools/client-runtime/state/infinitusAccounts`), which also carries each
-  Mac's Sessions card (`features/infinitus/InfinitusSessions.tsx` +
-  `sessions.logic.ts`, rows from
-  `@t3tools/client-runtime/state/infinitusSessions`; `session-mode` per row).
-  Its row menu's "Move to a thread" (#648, rows with a session id) is the
-  web flow on the phone: the cwd becomes a project when it is not one
-  (`projectEnvironment.create` + a `waitForProject` in `state/entities.ts`),
-  `agentSessions.import` (`apps/mobile/src/state/agentSessions.ts`) runs
-  with the row's id, then the Thread screen opens; the row keeps a "close
-  the terminal session" line, nothing reaches the Infinitus socket. No bulk
-  "Move idle" on the phone.
+  `@t3tools/client-runtime/state/infinitusAccounts`). The per-Mac Sessions
+  card it carried (rows from `@t3tools/client-runtime/state/infinitusSessions`,
+  "Move to a thread" over `agentSessions.import`) was dropped on the #941
+  walk — the phone's surface is threads; only `sessions.logic.ts`'s
+  `attentionSessionCount` (the home chip's badge) remains.
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -1915,7 +1930,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   terminal session is never killed or typed into. The pure parts
   (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
   shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
-  the row-model module; mobile's Sessions card uses them (above).
+  the row-model module.
 
 - `packages/contracts/src/agentSessions.ts`,
   `apps/server/src/project/AgentSessionScanner.ts`,
