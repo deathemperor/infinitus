@@ -7,11 +7,12 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- The worktree limit also covers a worktree created straight from the branch picker, and a Best-of run cannot land over it: members starting together count each other.
 
 ## 0.5.0-alpha.5
 
 ### Desktop
-- The worktree limit also covers a worktree created straight from the branch picker, and a Best-of run cannot land over it: members starting together count each other.
 - Utilization now charts every account's usage history over 24 hours, 7 or 30 days and tables the token run rate, read off the Mac.
 - Side questions and forks from a turn answer again: the fork point now names a transcript line Claude Code can resume at, and a fork whose recorded point is missing falls back to the session's end instead of dying silently.
 - A side question that fails now says why in the drawer instead of sitting on the question, with a Retry that asks it again on a fresh fork.
