@@ -14,6 +14,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - The thread header's Infinitus choices — the pull request, Ask a side question, Thread usage — are one menu button, so the git, files and terminal buttons stay visible instead of everything collapsing into "…" (#941).
+- Settings › Accounts no longer lists each Mac's terminal sessions: the phone is for threads; the desktop sidebar keeps the sessions (#941).
 
 ### Desktop
 - Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
