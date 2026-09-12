@@ -521,7 +521,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ProjectionSnapshotQuery.ts` carry it); `packages/contracts/src/infinitus.ts`
   — `InfinitusThreadForkInput.side?: true`; `apps/server/src/infinitus/ThreadFork.ts`
   `forkCreateFields` — a side fork is titled "Side question: <title>", asks in
-  plan mode and is `sideOf` the source. Web: `apps/web/src/rightPanelStore.ts`
+  plan mode and is `sideOf` the source; a Claude thread whose session carries
+  no fork anchors (its turns completed before #270 E2 recorded them) forks
+  the session at its end instead (`latestClaudeSessionEnd`: `resume` +
+  `fork`, no `resumeSessionAt`), seeded with every completed turn, its
+  marker reading "at its latest turn" (#941). Web: `apps/web/src/rightPanelStore.ts`
   — the `side-question` surface (`openSideQuestion`, storage v14);
   `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only what
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
