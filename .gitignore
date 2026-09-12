@@ -11,6 +11,12 @@ packages/*/dist
 .env
 .env.local
 build/
+# Native build output must stay out of automatic Git checkpoints.
+/.build/
+/.build-linux/
+/build-ios/
+/build-titan/
+/Infinitus.app/
 .logs/
 release/
 release-mock/
