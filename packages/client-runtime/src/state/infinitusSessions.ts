@@ -55,6 +55,8 @@ export interface SessionRowModel {
   /** The mode the row's radio shows: a null mode reads as supervised, which
       is what `session-mode supervised` sets. */
   readonly permissionMode: SessionPermissionMode;
+  /** Permission prompts answered from here (#79 item 3): `session-remote on`. */
+  readonly remote: boolean;
 }
 
 const STATE_LABELS: Record<SessionState, string> = {
@@ -144,6 +146,7 @@ export function sessionRow(session: InfinitusSession, now: number): SessionRowMo
     needs,
     kind: session.kind,
     permissionMode: permissionMode(session.permissionMode),
+    remote: session.remote ?? false,
   };
 }
 
@@ -168,6 +171,8 @@ export interface SessionActions {
   readonly setMode: boolean;
   readonly show: boolean;
   readonly nudge: boolean;
+  /** `session-remote` (#79 item 3): the row can route its prompts here. */
+  readonly remote: boolean;
 }
 
 export function sessionActions(commands: ReadonlyArray<InfinitusManifestCommand>): SessionActions {
@@ -176,6 +181,7 @@ export function sessionActions(commands: ReadonlyArray<InfinitusManifestCommand>
     setMode: commands.some((command) => command.name === "session-mode"),
     show: show !== undefined && show.args.some((arg) => arg.includes("session")),
     nudge: commands.some((command) => command.name === "nudge"),
+    remote: commands.some((command) => command.name === "session-remote"),
   };
 }
 
@@ -196,6 +202,11 @@ export function sessionModeCommandArgs(
 /** `show session <pid>`: opens the session's chat window on the Mac. */
 export function showSessionCommandArgs(row: SessionRowModel): SessionCommandArgs {
   return { command: "show", args: ["session", String(row.pid)] };
+}
+
+/** `session-remote <pid> on|off`: route the session's permission prompts here. */
+export function sessionRemoteCommandArgs(row: SessionRowModel, on: boolean): SessionCommandArgs {
+  return { command: "session-remote", args: [String(row.pid), on ? "on" : "off"] };
 }
 
 /** `nudge <pid>`: the resume nudge by hand; the reply says whether it landed. */
