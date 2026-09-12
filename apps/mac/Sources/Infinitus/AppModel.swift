@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import AppKit
+import os
 import InfinitusCore
 import InfinitusUI
 
@@ -139,6 +140,9 @@ final class AppModel: ObservableObject {
            controlRefusalNotified[audit.driver].map({ Date().timeIntervalSince($0) > 3600 }) ?? true {
             controlRefusalNotified[audit.driver] = Date()
             notify("\(driver)'s commands are failing: \(audit.outcome)")
+        }
+        if audit.outcome == TeamControl.Outcome.pending {
+            notify("\(driver) asks to \(audit.action) \(project) — allow or deny in Settings › Team, or `infinitusctl team-pending`")
         }
     }
 
@@ -802,6 +806,10 @@ final class AppModel: ObservableObject {
     static let statsSurface = "stats"
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
+    /// `session-delete`d past sessions (#220 Phase 2): a set kept off the
+    /// main actor so `PastSessions.list/find` can read it from the mirror
+    /// box or a popover's detached task without hopping here first.
+    let hiddenSessions = OSAllocatedUnfairLock(initialState: PastSessions.Hidden.load(root: AppSupport.root()).ids)
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
@@ -1590,6 +1598,24 @@ final class AppModel: ObservableObject {
             self?.deliverSessionInput(pid: pid, request, from: origin)
                 ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
         }
+        // #220 Phase 2: a granted non-drive action is the Mac's own control
+        // verb, run through ControlServer.run on the main actor. The team-control
+        // queue waits here (never main): main is free while the verb runs, so
+        // team-allow — a verb itself, suspended at its await — cannot deadlock it.
+        mirrorServer.teamControl.setRunVerb { [weak self] verb in
+            guard let self else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
+            let done = DispatchSemaphore(value: 0)
+            let slot = OSAllocatedUnfairLock<ControlReply?>(initialState: nil)
+            Task { @MainActor in
+                let reply = await self.controlServer.run(ControlRequest(command: verb.command, args: verb.args, options: verb.options, secret: nil))
+                slot.withLock { $0 = reply }
+                done.signal()
+            }
+            guard done.wait(timeout: .now() + 30) == .success, let reply = slot.withLock({ $0 }) else {
+                return SessionInput.Reply(outcome: TeamControl.Outcome.refused, detail: "still running after 30 s")
+            }
+            return TeamControl.verbReply(verb, ok: reply.ok, error: reply.error)
+        }
         team.onFetched = { [mirrorServer] client in mirrorServer.teamControl.storePass(client) }
         quickTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
@@ -1661,9 +1687,10 @@ final class AppModel: ObservableObject {
             done.wait()
             return try outcome.get()
         }
-        mirrorServer.pastSessions.set { limit, search in
+        mirrorServer.pastSessions.set { [hiddenSessions] limit, search in
             PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
-                                                           limit: limit, search: search))
+                                                           limit: limit, search: search,
+                                                           hidden: hiddenSessions.withLock { $0 }))
         }
         // The phone's checkpoint routes (#167 phase 2) act on the live
         // session's record — the same lookup `infinitusctl checkpoints`
@@ -3159,9 +3186,12 @@ final class AppModel: ObservableObject {
         // mtime, and nothing else changes what the walk would find. The
         // ten-minute backstop covers a clock or filesystem oddity.
         let liveKey = live.map(\.sessionId).sorted().joined(separator: ",")
-        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir)
+        // A `session-delete` (#220 Phase 2) changes the list without moving
+        // any mtime: the hidden count is part of the key.
+        let hidden = hiddenSessions.withLock { $0 }
+        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir) + "|" + String(hidden.count)
         let past = pastSessionsMemo.value(key: key, maxAge: 600) {
-            PastSessions.list(claudeDir: claudeDir, limit: 200)
+            PastSessions.list(claudeDir: claudeDir, limit: 200, hidden: hidden)
         }
         let recentCwds = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
         // The branch is one HEAD-file read per cwd (#346) — no spawn, no

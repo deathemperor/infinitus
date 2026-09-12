@@ -136,6 +136,22 @@ final class PastSessionsTests: XCTestCase {
         XCTAssertEqual(PastSessions.heads.count, held - 1)
     }
 
+    func testHiddenIdsLeaveEveryListButTheFileStays() throws {
+        let a = try write(cwd: "/p", id: "a", lines: [user("Alpha", cwd: "/p/alpha")], age: 10)
+        try write(cwd: "/p", id: "b", lines: [user("Beta", cwd: "/p/beta")], age: 20)
+        XCTAssertEqual(PastSessions.scan(claudeDir: dir, hidden: ["a"]).map(\.sessionId), ["b"])
+        XCTAssertNil(PastSessions.find(sessionId: "a", claudeDir: dir, hidden: ["a"]))
+        XCTAssertNotNil(PastSessions.find(sessionId: "b", claudeDir: dir, hidden: ["a"]))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: a.path))
+
+        let hiddenDir = dir.appendingPathComponent("hidden-root")
+        XCTAssertEqual(PastSessions.Hidden.load(root: hiddenDir), PastSessions.Hidden())
+        var hidden = PastSessions.Hidden()
+        hidden.ids = ["a"]
+        try hidden.save(root: hiddenDir)
+        XCTAssertEqual(PastSessions.Hidden.load(root: hiddenDir), hidden)
+    }
+
     func testMissingProjectsDirIsEmpty() {
         XCTAssertEqual(PastSessions.scan(claudeDir: dir.appendingPathComponent("none")), [])
     }

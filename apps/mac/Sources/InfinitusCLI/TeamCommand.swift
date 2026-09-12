@@ -42,12 +42,14 @@ func teamUsage() -> String {
       list                                         envelopes addressed to me
       read <path> [--out <file>]                   decrypt one envelope
       grant <leaders|team|kid,…> [--sessions a,b] [--view] [--send] [--approve] [--mode] [--resume] [--key]
+            [--stop] [--resume-past] [--delete] [--swap] [--hold] [--kill] [--reclaim] [--pre a,b] [--expires <s>]
                                                    let those people drive the sessions named (default: all)
       revoke <grant id>                            take a grant back
       grants                                       the grants on this machine
       send <kid> <sessionId>                       drive: the message on stdin (LAN, tunnel, or the store on their next fetch)
       approve <kid> <sessionId> allow|deny         answer the prompt their session is showing
       mode <kid> <sessionId> <supervised|acceptEdits|bypassPermissions>
+      drive <kid> <session|-> <action> [text…]   one command under their grant (stop, resume-past, delete, swap, hold, kill, reclaim, …)
       tail <kid> <sessionId> [--follow]            their session's feed (needs the view grant; --follow polls every 3 s)
       acks                                         answers to my store-lane commands (and forgets the answered ones)
       hostname token <zone> [--label team]         leader: the Cloudflare API token on stdin (Tunnel Edit + DNS Edit on that zone)

@@ -159,6 +159,9 @@ final class ControlServer {
     /// ISO8601DateFormatter is an ICU `udat_open` each time, and `events`
     /// built one per row on every desktop-app poll (#346's sample).
     nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
+    /// `session-stop` (#220 Phase 2): how long after the Esc a session
+    /// that still owns its pid gets SIGTERM.
+    static let stopGrace: Double = 5
 
     private func handle(line: Data) async -> ControlReply {
         let request: ControlRequest
@@ -185,6 +188,20 @@ final class ControlServer {
         }
         defer { if command.effect != .read { busy = false } }
         do { return try await dispatch(request) }
+        catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
+    }
+
+    /// A granted verb, run by a teammate through their own tap or a
+    /// preauthorized command (#220 Phase 2): the same table, the same
+    /// logging, but no busy gate — it runs from inside `MirrorTeamControlBox`,
+    /// which already serializes team commands on its own queue, and a gate
+    /// here would deadlock a verb that races a store pass or an HTTP lane.
+    func run(_ r: ControlRequest) async -> ControlReply {
+        if let command = ControlCommand.named(r.command), command.effect != .read {
+            let shown = r.args.prefix(1).joined(separator: " ")
+            Self.log.notice("\(r.command, privacy: .public) \(shown, privacy: .public) (team)")
+        }
+        do { return try await dispatch(r) }
         catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
     }
 
@@ -361,7 +378,8 @@ final class ControlServer {
         case "past-sessions":
             let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                              limit: r.options["limit"].flatMap(Int.init) ?? 50,
-                                             search: r.options["search"])
+                                             search: r.options["search"],
+                                             hidden: model.hiddenSessions.withLock { $0 })
             return ControlReply(ok: true, result: try .of(PastSessions.Reply(sessions: sessions)))
 
         case "resume-session":
@@ -374,7 +392,7 @@ final class ControlServer {
             if !fork, let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
                 throw Fail("session \(id) is live (pid \(live.pid)); use `infinitusctl send \(live.pid)`, or --fork to branch it")
             }
-            guard let past = PastSessions.find(sessionId: id, claudeDir: claudeDir) else {
+            guard let past = PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: model.hiddenSessions.withLock { $0 }) else {
                 throw Fail("no past session \(id); see `infinitusctl past-sessions`")
             }
             let request = SessionStart.Request(cwd: past.cwd, resume: past.sessionId, fork: fork ? true : nil)
@@ -384,6 +402,25 @@ final class ControlServer {
             }
             return ControlReply(ok: reply.outcome == "started", result: try .of(reply),
                                 error: reply.outcome == "started" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
+
+        case "session-delete":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: session-delete <sessionId> --yes") }
+            guard r.options["yes"] != nil else { throw Fail("session-delete hides a session; pass --yes") }
+            let claudeDir = ClaudeSessions.configHome()
+            if let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
+                throw Fail("session \(id) is live (pid \(live.pid)); stop it first")
+            }
+            let hidden = model.hiddenSessions.withLock { $0 }
+            guard PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: hidden) != nil || hidden.contains(id) else {
+                throw Fail("no past session \(id)")
+            }
+            try model.hiddenSessions.withLock { ids -> Void in
+                ids.insert(id)
+                var file = PastSessions.Hidden()
+                file.ids = ids
+                try file.save(root: AppSupport.root())
+            }
+            return ControlReply(ok: true, result: .object(["hidden": .string(id)]))
 
         case "send":
             guard let text = r.secret, !text.isEmpty else { throw Fail("send: the message is expected on stdin") }
@@ -447,6 +484,33 @@ final class ControlServer {
             guard reply.outcome == "delivered" else { throw Fail(reply.detail ?? reply.outcome) }
             return ControlReply(ok: true, result: .object(["mode": model.sessionBirths[pid]?.effectiveMode.map { .string($0) } ?? .null,
                                                           "label": .string(reply.detail ?? "Supervised")]))
+
+        case "session-stop":
+            guard let pidText = r.args.first, let pid = Int32(pidText), pid > 1 else {
+                throw Fail("usage: session-stop <pid> --yes")
+            }
+            guard r.options["yes"] != nil else { throw Fail("session-stop signals a process; pass --yes") }
+            guard let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { $0.pid == pid }) else {
+                throw Fail("no live session with pid \(pid)")
+            }
+            // The escape reaches the session's own surface first — a clean
+            // stop, if it is mid-turn to see it; the grace's SIGTERM is
+            // the one that always lands.
+            let esc = await model.send(SessionInput.Request(kind: .key, text: "esc"), toPid: Int(pid), icon: "stop.circle", what: "team stop")
+            let sessionId = record.sessionId
+            Task.detached(priority: .utility) {
+                try? await Task.sleep(nanoseconds: UInt64(Self.stopGrace * 1_000_000_000))
+                // Pid reuse is why this re-resolves by session id: only a
+                // record that still names both the pid and the session is
+                // signalled.
+                guard ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
+                    .contains(where: { $0.sessionId == sessionId && $0.pid == pid }) else { return }
+                kill(pid_t(pid), SIGTERM)
+            }
+            return ControlReply(ok: true, result: .object([
+                "pid": .number(Double(pid)), "sessionId": .string(sessionId),
+                "esc": .string(esc.outcome), "grace": .number(Self.stopGrace),
+            ]))
 
         case "event":
             guard let payload = r.secret, let event = HookEvent.parse(payload) else {
@@ -946,15 +1010,42 @@ final class ControlServer {
             return ControlReply(ok: true, result: try JSONValue.of(model.team.drivableSessions(of: kid)))
 
         case "team-drive":
-            guard r.args.count >= 3 else { throw Fail("usage: team-drive <kid|name> <session> <send|approve|mode|resume|key> [text…]") }
+            guard r.args.count >= 3 else {
+                throw Fail("usage: team-drive <kid|name> <session|-> <send|approve|mode|resume|key|stop|resume-past|delete|swap|hold|kill|reclaim> [text…]")
+            }
             let kid = try teammate(r.args[0])
             let action = r.args[2]
-            guard TeamGrants.driveCapabilities.contains(action) else { throw Fail("team-drive: action must be one of \(TeamGrants.driveCapabilities.joined(separator: ", "))") }
+            guard action != TeamGrants.view, TeamGrants.capabilities.contains(action) else {
+                throw Fail("team-drive: action must be one of \(TeamGrants.capabilities.filter { $0 != TeamGrants.view }.joined(separator: ", "))")
+            }
             let text = r.args.dropFirst(3).joined(separator: " ")
             guard let delivery = await model.team.drive(kid: kid, session: r.args[1], action: action, text: text.isEmpty ? nil : text) else {
                 throw Fail(model.team.lastError ?? "team-drive: not delivered")
             }
             return ControlReply(ok: true, result: try JSONValue.of(delivery))
+
+        case "team-pending":
+            let names = model.team.snapshot?.members ?? []
+            let rows = model.mirrorServer.teamControl.pending().sorted { $0.expires < $1.expires }.map { entry -> JSONValue in
+                let driver = names.first { $0.kid == entry.driver }?.name ?? String(entry.driver.prefix(8))
+                return .object([
+                    "id": .string(entry.command.id), "driver": .string(driver), "session": .string(entry.command.session),
+                    "action": .string(entry.command.action), "expires": .number(Double(entry.expires)),
+                ])
+            }
+            return ControlReply(ok: true, result: .array(rows))
+
+        case "team-allow", "team-deny":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: \(r.command) <id>") }
+            let allow = r.command == "team-allow"
+            let decided = await withCheckedContinuation { (k: CheckedContinuation<(ack: TeamControl.Ack, audit: TeamControl.Audit)?, Never>) in
+                model.mirrorServer.teamControl.decide(id, allow: allow) { k.resume(returning: $0) }
+            }
+            guard let decided else { throw Fail("no waiting command \(id); see team-pending") }
+            return ControlReply(ok: true, result: .object([
+                "id": .string(decided.ack.id), "outcome": .string(decided.ack.outcome),
+                "detail": decided.ack.detail.map { .string($0) } ?? .null,
+            ]))
 
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {

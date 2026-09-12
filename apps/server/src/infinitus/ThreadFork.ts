@@ -127,13 +127,53 @@ export function latestCodexForkPoint(
   readonly turnIds: ReadonlySet<TurnId>;
 } | null {
   const threadId = codexThreadIdOf(resumeCursor);
-  if (threadId === null || thread.latestTurn === null) return null;
-  if (thread.latestTurn.state !== "completed") return null;
+  const turns = completedTurns(thread);
+  if (threadId === null || turns === null) return null;
+  return {
+    threadId,
+    lastTurnId: turns.lastTurnId,
+    turnCount: turns.turnIds.size,
+    turnIds: turns.turnIds,
+  };
+}
+
+/** Every turn the messages name plus the latest, once the latest has
+    completed — nothing runs, so they are all done. Null while a turn runs
+    or before any. */
+function completedTurns(thread: {
+  readonly latestTurn: { readonly turnId: TurnId; readonly state: string } | null;
+  readonly messages: ReadonlyArray<{ readonly turnId: TurnId | null }>;
+}): { readonly lastTurnId: TurnId; readonly turnIds: ReadonlySet<TurnId> } | null {
+  if (thread.latestTurn === null || thread.latestTurn.state !== "completed") return null;
   const turnIds = new Set(
     thread.messages.flatMap((message) => (message.turnId === null ? [] : [message.turnId])),
   );
   turnIds.add(thread.latestTurn.turnId);
-  return { threadId, lastTurnId: thread.latestTurn.turnId, turnCount: turnIds.size, turnIds };
+  return { lastTurnId: thread.latestTurn.turnId, turnIds };
+}
+
+/**
+ * The fork point of a Claude thread with no anchors (#941): turns completed
+ * before the adapter recorded anchors (#270 E2) left none, so a side question
+ * forks the session at its end instead — `resume` + `fork` with no
+ * `resumeSessionAt`, which the adapter passes as a fork of the whole session
+ * — seeded with every completed turn. Null before a turn completed, while
+ * one runs, or without a session.
+ */
+export function latestClaudeSessionEnd(
+  resumeCursor: unknown,
+  thread: Parameters<typeof completedTurns>[0],
+): {
+  readonly sessionId: string;
+  readonly turnCount: number;
+  readonly turnIds: ReadonlySet<TurnId>;
+} | null {
+  if (!resumeCursor || typeof resumeCursor !== "object") return null;
+  const cursor = resumeCursor as { resume?: unknown };
+  if (typeof cursor.resume !== "string" || cursor.resume.length === 0) return null;
+  const turns = completedTurns(thread);
+  if (turns === null) return null;
+  return { sessionId: cursor.resume, turnCount: turns.turnIds.size, turnIds: turns.turnIds };
 }
 
 /** The source's user and assistant messages up to the turn, in order. */
@@ -204,8 +244,9 @@ export function forkSeedMessagesByTurns(
     }));
 }
 
-export function forkMarkerText(source: { title: string; id: ThreadId }, turnCount: number) {
-  return `Forked from **${source.title}** at turn ${turnCount} (thread \`${source.id}\`).`;
+export function forkMarkerText(source: { title: string; id: ThreadId }, turn: number | "latest") {
+  const at = turn === "latest" ? "its latest turn" : `turn ${turn}`;
+  return `Forked from **${source.title}** at ${at} (thread \`${source.id}\`).`;
 }
 
 /**
@@ -284,13 +325,24 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
       // turn from its own anchors. A checkpoint needs a git repository; a
       // thread in a plain directory never has one, an anchor it always has.
       const latest = latestClaudeForkAnchor(binding.value.resumeCursor);
-      if (latest === null) {
+      if (latest !== null) {
+        return {
+          cursor: { resume: latest.sessionId, resumeSessionAt: latest.at, fork: true },
+          turnCount: latest.turnCount,
+          seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
+        };
+      }
+      // No anchor (turns completed before #270 E2 recorded them): the
+      // session's end is the latest turn (#941).
+      const end = latestClaudeSessionEnd(binding.value.resumeCursor, source.value);
+      if (end === null) {
         return yield* refuse("Ask a side question once a turn has completed.");
       }
       return {
-        cursor: { resume: latest.sessionId, resumeSessionAt: latest.at, fork: true },
-        turnCount: latest.turnCount,
-        seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
+        cursor: { resume: end.sessionId, fork: true },
+        turnCount: end.turnCount,
+        seed: forkSeedMessagesByTurns(source.value, end.turnIds),
+        marker: "latest" as const,
       };
     }
     const checkpoint = source.value.checkpoints.find(
@@ -310,6 +362,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
     };
   });
   const { cursor, turnCount, seed } = point;
+  const markerTurn = "marker" in point ? point.marker : turnCount;
   if (seed.length === 0) return yield* refuse("Nothing to fork at this turn.");
 
   const now = DateTime.formatIso(yield* DateTime.now);
@@ -358,7 +411,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
 
   const marker = {
     role: "assistant" as const,
-    text: forkMarkerText({ title: source.value.title, id: source.value.id }, turnCount),
+    text: forkMarkerText({ title: source.value.title, id: source.value.id }, markerTurn),
     createdAt: now,
   };
   yield* engine

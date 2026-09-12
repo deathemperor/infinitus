@@ -70,6 +70,7 @@ import {
 import { GitOverviewSheet } from "./git/GitOverviewSheet";
 import { usePullRequestHeaderItem } from "../infinitus/usePullRequestHeaderItem";
 import { useSideQuestionHeaderItem } from "../infinitus/useSideQuestionHeaderItem";
+import { useThreadHeaderMenu } from "../infinitus/useThreadHeaderMenu";
 import { useThreadUsageHeaderItem } from "../infinitus/useThreadUsageHeaderItem";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git-actions";
@@ -681,12 +682,16 @@ function ThreadRouteContent(
   const usageHeader = useThreadUsageHeaderItem(selectedThread);
   // Infinitus (#952): the completed turns' footers for the feed.
   const turnFooters = useTurnFooters(selectedThreadDetail);
+  // Infinitus (#941): the three as one menu button, so the compact iOS
+  // header keeps the git buttons visible instead of collapsing into "…".
+  const threadHeaderMenu = useThreadHeaderMenu({
+    pullRequest: pullRequestHeader,
+    sideQuestion: sideQuestionHeader,
+    usage: usageHeader,
+  });
   const infinitusHeaderItems = useMemo<NativeHeaderItems>(
-    () =>
-      [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item].filter(
-        (item) => item !== null,
-      ),
-    [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item],
+    () => (threadHeaderMenu.item === null ? [] : [threadHeaderMenu.item]),
+    [threadHeaderMenu.item],
   );
   const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
     () => [...infinitusHeaderItems, ...gitCenterHeaderItems],
@@ -762,21 +767,15 @@ function ThreadRouteContent(
         onPress: () => handleOpenTerminal(null),
       });
     }
-    // Infinitus (#269 F): the pull request leads the git controls, as on iOS.
-    if (pullRequestHeader.androidAction !== null) {
-      actions.push(pullRequestHeader.androidAction);
+    // Infinitus (#269 F, #941): the thread menu leads the git controls, as on iOS.
+    if (threadHeaderMenu.androidAction !== null) {
+      actions.push(threadHeaderMenu.androidAction);
     }
     actions.push({
       accessibilityLabel: "Open git controls",
       icon: "point.topleft.down.curvedto.point.bottomright.up",
       onPress: handleOpenGitInspector,
     });
-    if (sideQuestionHeader.androidAction !== null) {
-      actions.push(sideQuestionHeader.androidAction);
-    }
-    if (usageHeader.androidAction !== null) {
-      actions.push(usageHeader.androidAction);
-    }
     if (fileInspector.supported && selectedThreadCwd !== null) {
       actions.push({
         accessibilityLabel: "Toggle inspector",
@@ -793,10 +792,8 @@ function ThreadRouteContent(
     handleToggleInspector,
     props.onReturnToThread,
     selectedThreadCwd,
-    pullRequestHeader.androidAction,
     selectedThreadProject?.workspaceRoot,
-    sideQuestionHeader.androidAction,
-    usageHeader.androidAction,
+    threadHeaderMenu.androidAction,
   ]);
 
   const handleEditFailedCreation = useCallback(async () => {
@@ -986,12 +983,7 @@ function ThreadRouteContent(
     <>
       {activeInspectorRenderer ? <InspectorPaneRoleActivation /> : null}
       <NativeStackScreenOptions
-        optionsVersion={[
-          threadGitControlProps.projectScripts,
-          pullRequestHeader.version,
-          sideQuestionHeader.version,
-          usageHeader.version,
-        ]}
+        optionsVersion={[threadGitControlProps.projectScripts, threadHeaderMenu.version]}
         options={{
           // Android draws its own in-flow header (AndroidScreenHeader below);
           // the native stack header stays iOS-only.

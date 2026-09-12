@@ -9,6 +9,7 @@ import {
   forkSeedMessages,
   forkSeedMessagesByTurns,
   latestClaudeForkAnchor,
+  latestClaudeSessionEnd,
   latestCodexForkPoint,
 } from "./ThreadFork.ts";
 
@@ -57,6 +58,40 @@ describe("latestClaudeForkAnchor (#269 C)", () => {
     expect(latestClaudeForkAnchor({ resume: "sess-1" })).toBeNull();
     expect(latestClaudeForkAnchor({ anchors: [{ turnId: "turn-1", at: "uuid-1" }] })).toBeNull();
     expect(latestClaudeForkAnchor(undefined)).toBeNull();
+  });
+});
+
+describe("latestClaudeSessionEnd (#941)", () => {
+  const message = (turnId: string | null) => ({
+    turnId: turnId === null ? null : TurnId.make(turnId),
+  });
+  const latestTurn = (state: string, turnId = "turn-2") => ({ turnId: TurnId.make(turnId), state });
+
+  it("forks an anchorless session at its end, keeping every completed turn", () => {
+    const end = latestClaudeSessionEnd(
+      { threadId, resume: "sess-1" },
+      {
+        latestTurn: latestTurn("completed"),
+        messages: [message(null), message("turn-1"), message("turn-2")],
+      },
+    );
+    expect(end?.sessionId).toBe("sess-1");
+    expect(end?.turnCount).toBe(2);
+    expect([...(end?.turnIds ?? [])]).toEqual(["turn-1", "turn-2"]);
+  });
+
+  it("is null while a turn runs, before any turn, or without a session", () => {
+    const messages = [message("turn-1")];
+    expect(
+      latestClaudeSessionEnd({ resume: "sess-1" }, { latestTurn: latestTurn("running"), messages }),
+    ).toBeNull();
+    expect(latestClaudeSessionEnd({ resume: "sess-1" }, { latestTurn: null, messages })).toBeNull();
+    expect(
+      latestClaudeSessionEnd({ resume: "" }, { latestTurn: latestTurn("completed"), messages }),
+    ).toBeNull();
+    expect(
+      latestClaudeSessionEnd(undefined, { latestTurn: latestTurn("completed"), messages }),
+    ).toBeNull();
   });
 });
 
@@ -208,6 +243,12 @@ describe("forkMarkerText", () => {
   it("names the source and the turn", () => {
     expect(forkMarkerText({ title: "Fix login", id: threadId }, 2)).toBe(
       "Forked from **Fix login** at turn 2 (thread `thread-1`).",
+    );
+  });
+
+  it("says the latest turn when no anchor fixed a number (#941)", () => {
+    expect(forkMarkerText({ title: "Fix login", id: threadId }, "latest")).toBe(
+      "Forked from **Fix login** at its latest turn (thread `thread-1`).",
     );
   });
 });
