@@ -389,12 +389,48 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   "Estimated from the transcript" for a `transcript` rollup; drawn only
   when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional
   `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`.
-  Backfill from `provider_session_id` (a `transcript` rollup) is a
-  follow-up; the phone sheet is its own PR. Tests: `threadUsage.test.ts`,
-  `claudeTurnUsage.logic.test.ts`, `threadTurnUsage.test.ts`,
-  `decider.turnUsage.test.ts`, `ProjectionPipeline.usage.test.ts`,
-  `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`,
-  `threadUsage.logic.test.ts`.
+  The phone sheet is PR #908. Transcript backfill (the `transcript`
+  rollup, for threads whose Claude turns ran before usage was recorded):
+  `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`)
+  — `ThreadUsageBackfillLive` in `server.ts` `ReactorLayerLive`: a boot
+  sweep (parked until activation, 500 threads a boot) over
+  `ProjectionTurnUsageRepository.listBackfillCandidates` — a
+  `claudeAgent` binding in `provider_session_runtime` whose cursor names
+  the session (`$.resume`), no rollup and no baseline, not deleted, no turn
+  pending or running — plus a re-check of one thread on a history import
+  (`thread.created` with the marker) and on a session going idle; a
+  candidate whose newest turn row of any state postdates boot is skipped
+  (the runtime records that turn; an interrupted or errored first turn
+  has its usage half-written; reading the transcript on top would count
+  it twice), and a thread is read at most once per process (marked after
+  a read that succeeded). It reads
+  `UsageService.readSessionUsage` (`<sessionId>.jsonl` under the Claude
+  home's projects, through the summary scan's file cache, summed, deduped
+  by `dedupeKey`, priced with the rate table and overrides — null when
+  nothing priced) and dispatches the server command `thread.usage.backfill`
+  → `thread.usage-backfilled {threadId, usage}` (decider refuses a thread
+  with a rollup; projector, `Schemas.ts`, `threadReducer.ts` assign).
+  Transcripts do not delimit turns, so the rollup is thread-level: turns
+  from the runtime's completed rows, tokens and cost from the transcript
+  total, `subagentTurns` and `reasoningTokens` 0. Migration `057` adds
+  `projection_threads.usage_baseline_json` (`ProjectionThreads`
+  `usageBaseline`, server-only): the pipeline stores the estimate there
+  and every refold (`foldTurnUsage(rows, base)`) folds the runtime rows
+  onto it, so a recorded turn or a revert never erases it, and the rollup
+  keeps `source: "transcript"`. Limits: a revert cannot prune
+  transcript-era turns (and a runtime thread reverted to zero turns has no
+  rollup, so after a restart the sweep estimates it from a transcript that
+  still holds the reverted turns); an imported session's `turns` is 0 (the
+  phone and web read "0 turns" while no turn carried a cost); only the
+  default Claude home is searched (an instance with its own `homePath`,
+  such as a proxy's, is not); Codex is not estimated. Only thread ids and
+  counts are logged. Tests:
+  `threadUsage.test.ts`, `claudeTurnUsage.logic.test.ts`,
+  `threadTurnUsage.test.ts`, `decider.turnUsage.test.ts`,
+  `ProjectionPipeline.usage.test.ts`, `ProviderRuntimeIngestion.test.ts`,
+  `threadReducer.test.ts`, `threadUsage.logic.test.ts`,
+  `threadUsageBackfill.logic.test.ts`, `ThreadUsageBackfill.test.ts`,
+  `UsageService.test.ts`.
 - Side question (#269 C, Cursor's `/btw` on #820's fork-at-turn):
   `packages/contracts/src/orchestration.ts` — `sideOf?` on `thread.create`,
   `thread.created`, `OrchestrationThread` and `OrchestrationThreadShell`

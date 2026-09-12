@@ -1957,6 +1957,33 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
+    // Fork (#834): the transcript backfill. One rollup per thread, set once:
+    // a thread that already has one (a turn ran meanwhile) keeps it.
+    case "thread.usage.backfill": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      if (thread.usage !== undefined && thread.usage !== null) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Thread '${command.threadId}' already has a usage rollup.`,
+        });
+      }
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+          metadata: {},
+        })),
+        type: "thread.usage-backfilled",
+        payload: { threadId: command.threadId, usage: command.usage },
+      };
+    }
+
     case "thread.session.set": {
       const thread = yield* requireThread({
         readModel,

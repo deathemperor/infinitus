@@ -43,9 +43,15 @@ export function addTurnUsage(
   };
 }
 
-/** The rollup of a set of turns, or undefined for none: absence, never zero. */
-export function foldTurnUsage(turns: Iterable<ThreadTurnUsage>): ThreadUsageRollup | undefined {
-  let rollup: ThreadUsageRollup | undefined;
+/**
+ * The rollup of a set of turns folded onto `base` (a transcript estimate the
+ * backfill left on the thread), or undefined for none: absence, never zero.
+ */
+export function foldTurnUsage(
+  turns: Iterable<ThreadTurnUsage>,
+  base?: ThreadUsageRollup,
+): ThreadUsageRollup | undefined {
+  let rollup: ThreadUsageRollup | undefined = base;
   for (const turn of turns) {
     rollup = addTurnUsage(rollup, turn);
   }
