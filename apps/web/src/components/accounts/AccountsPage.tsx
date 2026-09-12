@@ -19,6 +19,7 @@ import {
 import { exhaustedBand } from "@t3tools/client-runtime/state/infinitusExhausted";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import { Link } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
 import { ChevronDownIcon } from "lucide-react";
@@ -586,7 +587,16 @@ function AccountsBody({
   if (state === "empty") {
     return (
       <div className="flex flex-col gap-6">
-        <p className="text-muted-foreground text-sm">No engines report accounts on this host.</p>
+        <p className="text-muted-foreground text-sm">
+          Infinitus is running, but no engine reports accounts — install and configure an engine
+          (swapd) for Infinitus to manage them.
+        </p>
+        <Link
+          to="/settings/infinitus/engines"
+          className="w-fit text-sm text-foreground underline underline-offset-2"
+        >
+          Open Settings › Infinitus › Engines
+        </Link>
         {signInsSection}
       </div>
     );
