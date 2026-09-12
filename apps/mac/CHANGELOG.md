@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.6
+
 ### Mac
 - A thread phase alert sent from the desktop can skip the Mac's own notification banner and still reach the phone, Slack and Telegram.
 - A thread phase alert can skip the Mac's Slack post alone, so a thread started from Slack is not told twice; Telegram and the phone still get it.
