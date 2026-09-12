@@ -1,6 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import { ServerSelfUpdateError, ThreadId } from "@t3tools/contracts";
+import { ServerSelfUpdateError, ThreadId, TurnId } from "@t3tools/contracts";
 import { HostProcessExecutablePath } from "@t3tools/shared/hostProcess";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Path from "effect/Path";
+import * as TestClock from "effect/testing/TestClock";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import * as ServerConfig from "../config.ts";
@@ -110,6 +111,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     Effect.gen(function* () {
       const events: string[] = [];
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "web",
         selfUpdate: {
           update: (_input, reportProgress = () => Effect.void) =>
@@ -144,6 +146,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       const events: string[] = [];
       const commitError = new ServerSelfUpdateError({ reason: "install failed" });
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "desktop",
         selfUpdate: {
           update: (_input, reportProgress = () => Effect.void) =>
@@ -187,11 +190,131 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     }),
   );
 
+  it.effect("refuses an update while a turn runs, naming the turns (#829)", () =>
+    Effect.gen(function* () {
+      const events: string[] = [];
+      const running = [
+        { threadId: ThreadId.make("thread-running"), turnId: TurnId.make("turn-1") },
+      ];
+      const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed(running),
+        mode: "web",
+        selfUpdate: {
+          update: () =>
+            Effect.sync(() => void events.push("update")).pipe(
+              Effect.andThen(Effect.die("unreachable")),
+            ),
+          commitDesktopUpdate: () => Effect.never,
+        },
+        prepare: Effect.succeed([]),
+        clear: () => Effect.void,
+      });
+
+      const error = yield* selfUpdate
+        .update({ targetVersion: "1.1.0", continueRunningThreads: true })
+        .pipe(Effect.flip);
+
+      expect(error).toBeInstanceOf(ServerSelfUpdateError);
+      expect(error.runningTurns).toEqual(running);
+      expect(error.reason).toBe(
+        "1 thread is running; updating now would interrupt it. Update when they finish, or stop them first.",
+      );
+      expect(events).toEqual([]);
+    }),
+  );
+
+  it.effect(
+    "waits for the running turns, reporting the count, and gates the install again (#829)",
+    () =>
+      Effect.gen(function* () {
+        const events: string[] = [];
+        let reads = 0;
+        const turn = { threadId: ThreadId.make("thread-running"), turnId: TurnId.make("turn-1") };
+        // After the download: two turns, still two, then one, then idle.
+        const runningTurns = Effect.sync(() => {
+          reads += 1;
+          return reads <= 2
+            ? [turn, { ...turn, turnId: TurnId.make("turn-2") }]
+            : reads === 3
+              ? [turn]
+              : [];
+        });
+        const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+          runningTurns,
+          mode: "web",
+          selfUpdate: {
+            update: (_input, reportProgress = () => Effect.void) =>
+              reportProgress("downloading").pipe(
+                Effect.andThen(reportProgress("installing")),
+                Effect.as({ targetVersion: "1.1.0", method: "boot-service" as const }),
+              ),
+            commitDesktopUpdate: () => Effect.never,
+          },
+          prepare: Effect.succeed([]),
+          clear: () => Effect.void,
+        });
+
+        const fiber = yield* selfUpdate
+          .update({ targetVersion: "1.1.0", runningTurns: "wait" }, (stage, count) =>
+            Effect.sync(() => void events.push(count === undefined ? stage : `${stage}:${count}`)),
+          )
+          .pipe(Effect.forkChild);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* Fiber.join(fiber);
+
+        expect(events).toEqual(["downloading", "waiting:2", "waiting:1", "installing"]);
+      }),
+  );
+
+  it.effect("gates the desktop commit under the policy its preparation used (#829)", () =>
+    Effect.gen(function* () {
+      let running: ReadonlyArray<{ threadId: ThreadId; turnId: TurnId }> = [];
+      const committed: string[] = [];
+      const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.sync(() => running),
+        mode: "desktop",
+        selfUpdate: {
+          update: () =>
+            Effect.succeed({
+              targetVersion: "1.1.0",
+              method: "desktop-app" as const,
+              desktopUpdateToken: "token-1",
+            }),
+          commitDesktopUpdate: (requestId) =>
+            Effect.sync(() => void committed.push(requestId)).pipe(Effect.andThen(Effect.never)),
+        },
+        prepare: Effect.succeed([]),
+        clear: () => Effect.void,
+      });
+
+      // The desktop run itself never waits (its own timeout bounds it): a
+      // turn that starts after the download is met at the commit.
+      yield* selfUpdate.update({ targetVersion: "1.1.0" });
+      running = [{ threadId: ThreadId.make("thread-running"), turnId: TurnId.make("turn-1") }];
+      const refused = yield* selfUpdate.commitDesktopUpdate("token-1").pipe(Effect.flip);
+      expect(refused.runningTurns).toEqual(running);
+      expect(committed).toEqual([]);
+
+      const unknown = yield* selfUpdate.commitDesktopUpdate("token-unknown").pipe(Effect.flip);
+      expect(unknown.runningTurns).toEqual(running);
+
+      running = [];
+      const fiber = yield* selfUpdate.commitDesktopUpdate("token-1").pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      yield* Effect.yieldNow;
+      expect(committed).toEqual(["token-1"]);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
   it.effect("reports a failed continuation-marker cleanup", () =>
     Effect.gen(function* () {
       const updateError = new ServerSelfUpdateError({ reason: "update failed" });
       const clearError = new ServerSelfUpdateError({ reason: "marker cleanup failed" });
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "web",
         selfUpdate: {
           update: (_input, reportProgress = () => Effect.void) =>
@@ -214,6 +337,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     Effect.gen(function* () {
       const events: string[] = [];
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "web",
         selfUpdate: {
           update: (
@@ -247,6 +371,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     Effect.gen(function* () {
       const events: string[] = [];
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "desktop",
         selfUpdate: {
           update: () =>
@@ -283,6 +408,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       const events: string[] = [];
       const commitError = new ServerSelfUpdateError({ reason: "install failed" });
       const selfUpdate = yield* ServerSelfUpdate.withRunningThreadContinuation({
+        runningTurns: Effect.succeed([]),
         mode: "desktop",
         selfUpdate: {
           update: () =>

@@ -14,6 +14,7 @@ import {
   ProjectId,
   ThreadId,
   TrimmedNonEmptyString,
+  TurnId,
 } from "./baseSchemas.ts";
 import {
   KeybindingCommand,
@@ -805,6 +806,18 @@ export class ServerProviderUpdateError extends Schema.TaggedError<ServerProvider
   }
 }
 
+/** A provider turn the server is running right now (#829): the only gate an
+    update may read — never a process heuristic. */
+export const ServerRunningTurn = Schema.Struct({ threadId: ThreadId, turnId: TurnId });
+export type ServerRunningTurn = typeof ServerRunningTurn.Type;
+
+/** What an update does while turns run (#829). `refuse` (the default) fails
+    the request naming them; `wait` holds the install until none runs, then
+    proceeds; `interrupt` is the old behaviour — the turns are cut off (and
+    continued after the restart when `continueRunningThreads` is set). */
+export const ServerUpdateRunningTurnsPolicy = Schema.Literals(["refuse", "wait", "interrupt"]);
+export type ServerUpdateRunningTurnsPolicy = typeof ServerUpdateRunningTurnsPolicy.Type;
+
 export const ServerSelfUpdateInput = Schema.Struct({
   /** Exact npm version of the `t3` package to install (never a dist-tag, so
       the server and the acknowledging client agree on what was requested). */
@@ -813,6 +826,8 @@ export const ServerSelfUpdateInput = Schema.Struct({
       hands off to its replacement. Missing and false keep restart behavior
       conservative under version skew. */
   continueRunningThreads: Schema.optionalKey(Schema.Boolean),
+  /** Fork (#829). Missing reads as `refuse`. */
+  runningTurns: Schema.optionalKey(ServerUpdateRunningTurnsPolicy),
 });
 export type ServerSelfUpdateInput = typeof ServerSelfUpdateInput.Type;
 
@@ -833,13 +848,20 @@ export const DesktopUpdateCommitInput = Schema.Struct({
 });
 export type DesktopUpdateCommitInput = typeof DesktopUpdateCommitInput.Type;
 
-export const ServerSelfUpdateProgressStage = Schema.Literals(["downloading", "installing"]);
+/** `waiting` (#829): the install is held until the running turns finish. */
+export const ServerSelfUpdateProgressStage = Schema.Literals([
+  "waiting",
+  "downloading",
+  "installing",
+]);
 export type ServerSelfUpdateProgressStage = typeof ServerSelfUpdateProgressStage.Type;
 
 export const ServerSelfUpdateProgressEvent = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("progress"),
     stage: ServerSelfUpdateProgressStage,
+    /** How many turns a `waiting` stage waits for (#829). */
+    runningTurns: Schema.optionalKey(NonNegativeInt),
   }),
   Schema.Struct({
     type: Schema.Literal("complete"),
@@ -853,6 +875,8 @@ export class ServerSelfUpdateError extends Schema.TaggedError<ServerSelfUpdateEr
   {
     reason: TrimmedNonEmptyString,
     cause: Schema.optional(Schema.Defect()),
+    /** Set when the update was refused because these turns run (#829). */
+    runningTurns: Schema.optional(Schema.Array(ServerRunningTurn)),
   },
 ) {
   override get message(): string {

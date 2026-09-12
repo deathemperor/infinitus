@@ -1,4 +1,9 @@
-import type { EnvironmentId, ServerSelfUpdateCapability } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  ServerRunningTurn,
+  ServerSelfUpdateCapability,
+  ServerUpdateRunningTurnsPolicy,
+} from "@t3tools/contracts";
 import type { ServerUpdateStage, ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import {
   isAtomCommandInterrupted,
@@ -21,18 +26,40 @@ import { PRODUCT_NAME } from "@t3tools/shared/productName";
 // folds it into the download phase; everything after the handoff is the
 // restart the user is actually waiting through.
 const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
+  waiting: "Waiting for running threads…",
   downloading: "Downloading…",
   installing: "Downloading…",
   resuming: "Restarting…",
 };
 const pendingUpdateEnvironmentIds = new Set<EnvironmentId>();
 
-export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
+export function serverUpdateStageLabel(stage: ServerUpdateStage, runningTurns?: number): string {
+  if (stage === "waiting" && runningTurns !== undefined) {
+    return `Waiting for ${runningThreadsPhrase(runningTurns)} to finish…`;
+  }
   return UPDATE_STAGE_LABELS[stage];
 }
 
 function updateFailureMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Server update failed.";
+}
+
+function runningThreadsPhrase(count: number): string {
+  return count === 1 ? "1 running thread" : `${count} running threads`;
+}
+
+/**
+ * The turns an update was refused over (#829): the server names them when
+ * the request carried no policy for running turns. Anything else is an
+ * ordinary failure.
+ */
+function refusedRunningTurns(error: unknown): ReadonlyArray<ServerRunningTurn> | null {
+  if (typeof error !== "object" || error === null) return null;
+  const candidate = error as { readonly _tag?: unknown; readonly runningTurns?: unknown };
+  if (candidate._tag !== "ServerSelfUpdateError" || !Array.isArray(candidate.runningTurns)) {
+    return null;
+  }
+  return candidate.runningTurns.length > 0 ? candidate.runningTurns : null;
 }
 
 export interface ServerUpdateTarget {
@@ -51,7 +78,11 @@ type UpdateButtonProps = Pick<ComponentProps<typeof Button>, "variant" | "size">
 
 function useServerUpdate() {
   const updateServer = useAtomCommand(serverEnvironment.updateServer, { reportFailure: false });
-  return async (target: ServerUpdateTarget, failureTitle = "Server update failed") => {
+  const update = async (
+    target: ServerUpdateTarget,
+    failureTitle = "Server update failed",
+    runningTurns?: ServerUpdateRunningTurnsPolicy,
+  ): Promise<void> => {
     const { environmentId, serverLabel, selfUpdate, targetVersion } = target;
     if (pendingUpdateEnvironmentIds.has(environmentId)) return;
     pendingUpdateEnvironmentIds.add(environmentId);
@@ -63,11 +94,39 @@ function useServerUpdate() {
           ...(target.threadContinuation && target.continueThreadsAfterServerUpdate
             ? { continueRunningThreads: true }
             : {}),
+          ...(runningTurns !== undefined ? { runningTurns } : {}),
         },
       });
       if (result._tag === "Failure") {
         if (isAtomCommandInterrupted(result)) return;
-        throw squashAtomCommandFailure(result);
+        const error = squashAtomCommandFailure(result);
+        const refused = runningTurns === undefined ? refusedRunningTurns(error) : null;
+        if (refused === null) throw error;
+        // #829: the server refused rather than cut the turns off. Offer the
+        // two policies; dismissing the toast leaves the update for later.
+        const toastId = toastManager.add({
+          type: "warning",
+          title: `${runningThreadsPhrase(refused.length)} on ${serverLabel}`,
+          description: "Updating now would interrupt them.",
+          timeout: 0,
+          actionProps: {
+            children: "Update when they finish",
+            onClick: () => void update(target, failureTitle, "wait"),
+          },
+          data: {
+            actionVariant: "outline",
+            hideCopyButton: true,
+            secondaryActionProps: {
+              children: "Update now",
+              onClick: () => {
+                toastManager.close(toastId);
+                void update(target, failureTitle, "interrupt");
+              },
+            },
+            secondaryActionVariant: "outline",
+          },
+        });
+        return;
       }
       toastManager.add({
         type: "success",
@@ -87,6 +146,7 @@ function useServerUpdate() {
       pendingUpdateEnvironmentIds.delete(environmentId);
     }
   };
+  return update;
 }
 
 /** Updates eligible machines independently; manual paths remain in the machine list. */
@@ -144,7 +204,8 @@ export function ServerUpdatesAction({
 
 /**
  * One-row status for an in-flight server update: "Downloading…" then
- * "Restarting…". The update is a wait, not a warning: a single pulsing dot
+ * "Restarting…" (with "Waiting for N running threads…" between them when
+ * the server holds the install, #829). The update is a wait, not a warning: a single pulsing dot
  * and label, no step rail, no versions. Failure turns the row red with the
  * rollback reason.
  */
@@ -172,7 +233,7 @@ export function ServerUpdateProgress({
         className="size-1.5 shrink-0 animate-status-pulse rounded-full bg-foreground"
         aria-hidden="true"
       />
-      <span>{serverUpdateStageLabel(state.stage)}</span>
+      <span>{serverUpdateStageLabel(state.stage, state.runningTurns)}</span>
     </div>
   );
 }

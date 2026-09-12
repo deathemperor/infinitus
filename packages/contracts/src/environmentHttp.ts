@@ -37,6 +37,7 @@ import {
   InfinitusReleaseThreadResult,
 } from "./infinitus.ts";
 import { InfinitusPairingHttpApi } from "./infinitusPairing.ts";
+import { ServerRunningTurn } from "./server.ts";
 import {
   ClientOrchestrationCommand,
   DispatchResult,
@@ -639,6 +640,15 @@ class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
     HttpApiEndpoint.get("holds", "/api/infinitus/holds", {
       headers: OptionalBearerHeaders,
       success: Schema.Array(InfinitusHoldRow),
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // #829: the turns an update would cut off, for `infinitusctl` and the
+    // desktop's own install gate.
+    HttpApiEndpoint.get("runningTurns", "/api/infinitus/running-turns", {
+      headers: OptionalBearerHeaders,
+      success: Schema.Array(ServerRunningTurn),
       error: EnvironmentScopedOperationErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )

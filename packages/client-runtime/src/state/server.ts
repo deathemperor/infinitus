@@ -55,7 +55,8 @@ import {
 // Exported server state includes this type in its inferred public return type.
 export type { ServerConfigProjection } from "./serverConfigProjection.ts";
 
-export type ServerUpdateStage = "downloading" | "installing" | "resuming";
+/** `waiting` (#829): the server holds the install while turns run. */
+export type ServerUpdateStage = "waiting" | "downloading" | "installing" | "resuming";
 
 export type ServerUpdateState =
   | { readonly status: "idle" }
@@ -64,6 +65,8 @@ export type ServerUpdateState =
       readonly stage: ServerUpdateStage;
       readonly fromVersion: string;
       readonly targetVersion: string;
+      /** The turns a `waiting` stage is waiting for (#829). */
+      readonly runningTurns?: number;
     }
   | {
       readonly status: "failed";
@@ -290,6 +293,9 @@ export function serverUpdateStateForProgressEvent(
     stage: event.type === "complete" ? "resuming" : event.stage,
     fromVersion,
     targetVersion,
+    ...(event.type === "progress" && event.runningTurns !== undefined
+      ? { runningTurns: event.runningTurns }
+      : {}),
   };
 }
 

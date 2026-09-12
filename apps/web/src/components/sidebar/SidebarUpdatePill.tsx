@@ -1,19 +1,34 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { DesktopUpdateState } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
-import { type ComponentProps, useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import { isElectron } from "../../env";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
-import { useDesktopUpdateState } from "../../state/desktopUpdate";
+import { desktopInstallWhenIdleAtom, useDesktopUpdateState } from "../../state/desktopUpdate";
+import { useAllEnvironmentShellsBootstrapped, useThreadShells } from "../../state/entities";
+import { useEnvironments } from "../../state/environments";
+import { isLocalConnectionTarget } from "../ProviderUpdateLaunchNotification.environments";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   canCheckForUpdate,
+  countRunningLocalTurns,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
+  getDesktopUpdateArmedTooltip,
   getDesktopUpdateButtonTooltip,
   getDesktopUpdateInstallConfirmationMessage,
+  getDesktopUpdateRunningTurnsToast,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
   shouldShowArm64IntelBuildWarning,
@@ -114,6 +129,21 @@ export function SidebarUpdatePill() {
 
 function SidebarUpdateControl() {
   const state = useDesktopUpdateState();
+  const installWhenIdle = useAtomValue(desktopInstallWhenIdleAtom);
+  const setInstallWhenIdle = useAtomSet(desktopInstallWhenIdleAtom);
+  const shells = useThreadShells();
+  const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
+  const { presentationById } = useEnvironments();
+  // #829: the turns an install would cut off, read from the thread shells
+  // of the local backends. Null while a backend's shells are still
+  // loading — a count of zero proves nothing then.
+  const runningLocalTurns = useMemo(() => {
+    if (!shellsBootstrapped) return null;
+    return countRunningLocalTurns(shells, (environmentId) => {
+      const presentation = presentationById.get(environmentId);
+      return presentation !== undefined && isLocalConnectionTarget(presentation.entry.target);
+    });
+  }, [presentationById, shells, shellsBootstrapped]);
   const [isActionPending, setIsActionPending] = useState(false);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
   const [isCheckAnimationLatched, setIsCheckAnimationLatched] = useState(false);
@@ -144,9 +174,11 @@ function SidebarUpdateControl() {
     showCheckIcon,
   });
   const tooltip = showUpdateDetails
-    ? state
-      ? getDesktopUpdateButtonTooltip(state)
-      : "Update available"
+    ? installWhenIdle && runningLocalTurns !== null
+      ? getDesktopUpdateArmedTooltip(runningLocalTurns)
+      : state
+        ? getDesktopUpdateButtonTooltip(state)
+        : "Update available"
     : showCheckIcon
       ? "Checking for updates…"
       : "Check for updates";
@@ -172,6 +204,50 @@ function SidebarUpdateControl() {
       releaseNotesPopoverHandle.open(releaseNotesTriggerId);
     }
   }, [releaseNotesPopoverHandle, releaseNotesTriggerId, showReleaseNotesPopover]);
+
+  const installNow = useCallback(() => {
+    const bridge = window.desktopBridge;
+    if (!bridge) return;
+    setIsActionPending(true);
+    void bridge
+      .installUpdate()
+      .then((result) => {
+        if (!shouldToastDesktopUpdateActionResult(result)) return;
+        const actionError = getDesktopUpdateActionError(result);
+        if (!actionError) return;
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not install update",
+            description: actionError,
+          }),
+        );
+      })
+      .catch((error) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not install update",
+            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          }),
+        );
+      })
+      .finally(() => setIsActionPending(false));
+  }, []);
+
+  // #829: "Install when they finish" — fire once the count reaches zero;
+  // drop the arming when no install is pending any more.
+  useEffect(() => {
+    if (!installWhenIdle) return;
+    if (action !== "install") {
+      setInstallWhenIdle(false);
+      return;
+    }
+    if (runningLocalTurns === 0) {
+      setInstallWhenIdle(false);
+      installNow();
+    }
+  }, [action, installNow, installWhenIdle, runningLocalTurns, setInstallWhenIdle]);
 
   const handleAction = useCallback(async () => {
     const bridge = window.desktopBridge;
@@ -212,6 +288,50 @@ function SidebarUpdateControl() {
     }
 
     if (action === "install") {
+      if (installWhenIdle) {
+        // The armed button: a click cancels the pending install.
+        setInstallWhenIdle(false);
+        setIsActionPending(false);
+        return;
+      }
+      if (runningLocalTurns !== 0) {
+        // Turns would die with the app (#829): no dialog, a toast with the
+        // two ways forward; dismissing it leaves the update for later.
+        setIsActionPending(false);
+        const copy = getDesktopUpdateRunningTurnsToast(runningLocalTurns);
+        const toastId = toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: copy.title,
+            description: copy.description,
+            timeout: 0,
+            actionProps:
+              runningLocalTurns === null
+                ? { children: "Install now", onClick: installNow }
+                : {
+                    children: "Install when they finish",
+                    onClick: () => setInstallWhenIdle(true),
+                  },
+            actionVariant: "outline",
+            data: {
+              hideCopyButton: true,
+              ...(runningLocalTurns === null
+                ? {}
+                : {
+                    secondaryActionProps: {
+                      children: "Install now",
+                      onClick: () => {
+                        toastManager.close(toastId);
+                        installNow();
+                      },
+                    },
+                    secondaryActionVariant: "outline" as const,
+                  }),
+            },
+          }),
+        );
+        return;
+      }
       let confirmed = false;
       try {
         confirmed = await ensureLocalApi().dialogs.confirm(
@@ -232,30 +352,7 @@ function SidebarUpdateControl() {
         setIsActionPending(false);
         return;
       }
-      void bridge
-        .installUpdate()
-        .then((result) => {
-          if (!shouldToastDesktopUpdateActionResult(result)) return;
-          const actionError = getDesktopUpdateActionError(result);
-          if (!actionError) return;
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "Could not install update",
-              description: actionError,
-            }),
-          );
-        })
-        .catch((error) => {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "Could not install update",
-              description: error instanceof Error ? error.message : "An unexpected error occurred.",
-            }),
-          );
-        })
-        .finally(() => setIsActionPending(false));
+      installNow();
       return;
     }
 
@@ -286,7 +383,16 @@ function SidebarUpdateControl() {
         );
       })
       .finally(() => setIsActionPending(false));
-  }, [action, isInteractionDisabled, prefersReducedMotion, state]);
+  }, [
+    action,
+    installNow,
+    installWhenIdle,
+    isInteractionDisabled,
+    prefersReducedMotion,
+    runningLocalTurns,
+    setInstallWhenIdle,
+    state,
+  ]);
 
   const handleCheckAnimationIteration = useCallback(() => {
     setIsCheckAnimationLatched(

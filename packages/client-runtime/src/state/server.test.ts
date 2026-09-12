@@ -310,6 +310,19 @@ describe("server state projection", () => {
     });
     expect(
       serverUpdateStateForProgressEvent("0.0.30", "0.0.31", {
+        type: "progress",
+        stage: "waiting",
+        runningTurns: 2,
+      }),
+    ).toEqual({
+      status: "running",
+      stage: "waiting",
+      fromVersion: "0.0.30",
+      targetVersion: "0.0.31",
+      runningTurns: 2,
+    });
+    expect(
+      serverUpdateStateForProgressEvent("0.0.30", "0.0.31", {
         type: "complete",
         result: { targetVersion: "0.0.31", method: "respawn" },
       }),

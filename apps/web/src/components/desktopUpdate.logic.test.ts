@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { DesktopUpdateActionResult, DesktopUpdateState } from "@t3tools/contracts";
+import {
+  type DesktopUpdateActionResult,
+  type DesktopUpdateState,
+  EnvironmentId,
+  TurnId,
+} from "@t3tools/contracts";
 
 import {
   canCheckForUpdate,
+  countRunningLocalTurns,
+  getDesktopUpdateArmedTooltip,
+  getDesktopUpdateRunningTurnsToast,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
@@ -345,6 +353,40 @@ describe("getDesktopUpdateButtonTooltip", () => {
     expect(getDesktopUpdateButtonTooltip({ ...baseState, status: "idle" })).toBe("Up to date");
     expect(getDesktopUpdateButtonTooltip({ ...baseState, status: "up-to-date" })).toBe(
       "Up to date",
+    );
+  });
+});
+
+describe("running local turns before a desktop install (#829)", () => {
+  const local = EnvironmentId.make("env-local");
+  const remote = EnvironmentId.make("env-remote");
+  const shells = [
+    { environmentId: local, session: { activeTurnId: TurnId.make("turn-1") } },
+    { environmentId: local, session: { activeTurnId: null } },
+    { environmentId: local, session: null },
+    { environmentId: remote, session: { activeTurnId: TurnId.make("turn-2") } },
+  ];
+
+  it("counts active turns on local backends only, whatever the session status", () => {
+    expect(countRunningLocalTurns(shells, (id) => id === local)).toBe(1);
+    expect(countRunningLocalTurns(shells, () => true)).toBe(2);
+    expect(countRunningLocalTurns([], () => true)).toBe(0);
+  });
+
+  it("words the toast by count and offers only an immediate install for an unknown count", () => {
+    expect(getDesktopUpdateRunningTurnsToast(1)).toEqual({
+      title: "1 running thread",
+      description: "Installing the update now would interrupt it.",
+    });
+    expect(getDesktopUpdateRunningTurnsToast(3).title).toBe("3 running threads");
+    expect(getDesktopUpdateRunningTurnsToast(null).title).toBe(
+      "Could not confirm no threads are running",
+    );
+    expect(getDesktopUpdateArmedTooltip(1)).toBe(
+      "Installs when 1 running thread finishes. Click to cancel.",
+    );
+    expect(getDesktopUpdateArmedTooltip(2)).toBe(
+      "Installs when 2 running threads finish. Click to cancel.",
     );
   });
 });

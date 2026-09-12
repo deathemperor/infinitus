@@ -1,4 +1,9 @@
-import type { DesktopUpdateActionResult, DesktopUpdateState } from "@t3tools/contracts";
+import type {
+  DesktopUpdateActionResult,
+  DesktopUpdateState,
+  EnvironmentId,
+  TurnId,
+} from "@t3tools/contracts";
 import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
@@ -121,4 +126,56 @@ export function canCheckForUpdate(state: DesktopUpdateState | null): boolean {
   return (
     state.status !== "checking" && state.status !== "downloading" && state.status !== "disabled"
   );
+}
+
+// ---------------------------------------------------------------------------
+// #829: installing the desktop update quits the app, and with it every local
+// backend's running turns. The count below is read from the same thread
+// shells the sidebar shows — never from process heuristics.
+
+/** The shell fields the count reads (`EnvironmentThreadShell` fits). */
+export interface DesktopUpdateThreadShell {
+  readonly environmentId: EnvironmentId;
+  readonly session: { readonly activeTurnId: TurnId | null } | null;
+}
+
+/** Turns with an active id on local backends (primary or desktop-local);
+    a turn waiting on an approval counts, it dies with the process too. */
+export function countRunningLocalTurns(
+  shells: ReadonlyArray<DesktopUpdateThreadShell>,
+  isLocalEnvironment: (environmentId: EnvironmentId) => boolean,
+): number {
+  let count = 0;
+  for (const shell of shells) {
+    if (shell.session?.activeTurnId != null && isLocalEnvironment(shell.environmentId)) count += 1;
+  }
+  return count;
+}
+
+function runningThreadsPhrase(count: number): string {
+  return count === 1 ? "1 running thread" : `${count} running threads`;
+}
+
+/** The toast an install click gets instead of the confirm dialog while
+    turns run; `null` is an unknown count (some backend's shells have not
+    loaded), which offers only "Install now". */
+export function getDesktopUpdateRunningTurnsToast(count: number | null): {
+  readonly title: string;
+  readonly description: string;
+} {
+  if (count === null) {
+    return {
+      title: "Could not confirm no threads are running",
+      description: `Some backends have not loaded yet. Installing now may interrupt a running thread.`,
+    };
+  }
+  return {
+    title: runningThreadsPhrase(count),
+    description: `Installing the update now would interrupt ${count === 1 ? "it" : "them"}.`,
+  };
+}
+
+/** The update button while "Install when they finish" is armed. */
+export function getDesktopUpdateArmedTooltip(count: number): string {
+  return `Installs when ${runningThreadsPhrase(count)} finish${count === 1 ? "es" : ""}. Click to cancel.`;
 }
