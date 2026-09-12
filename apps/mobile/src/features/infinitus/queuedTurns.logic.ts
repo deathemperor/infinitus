@@ -1,5 +1,11 @@
-import type { OrchestrationQueuedTurn, QueueId } from "@t3tools/contracts";
+import type {
+  OrchestrationMessageContext,
+  OrchestrationQueuedTurn,
+  QueueId,
+} from "@t3tools/contracts";
 import { orderKeyBetween } from "@t3tools/shared/orderKeys";
+
+import { reidentifyComposerContext, uploadedComposerContext } from "../../lib/composerContext";
 
 /**
  * The phone's copy of the web's `composerSendQueue.logic.ts` (#806, #851):
@@ -25,6 +31,29 @@ const EFFORT_PREFIX = "Ultrathink:\n";
 /** The row's text as the user typed it: the effort prefix the send added comes off. */
 export function queuedTurnEditableText(text: string): string {
   return text.startsWith(EFFORT_PREFIX) ? text.slice(EFFORT_PREFIX.length) : text;
+}
+
+/**
+ * The row's text and context records for the composer, when the row carries
+ * any (#971): the records get fresh ids (a queued copy must never overwrite a
+ * record the draft already holds) with the text's references rewritten to
+ * match, and a file or image record follows its attachment to the new id the
+ * download gave it — `attachments` is one entry per `row.attachments`, in
+ * order. Null for a row without context, which stays a plain text append.
+ */
+export function restoredQueuedTurn(
+  row: OrchestrationQueuedTurn,
+  attachments: ReadonlyArray<{ readonly id: string }>,
+  createId: () => string,
+): { text: string; context: OrchestrationMessageContext } | null {
+  if (!row.context) return null;
+  const fresh = reidentifyComposerContext(
+    queuedTurnEditableText(row.text),
+    row.context.records,
+    createId,
+  );
+  const context = uploadedComposerContext(fresh.context, row.attachments, attachments);
+  return context ? { text: fresh.text, context } : null;
 }
 
 /** One line of the row for the list; attachments alone read as "N attachments". */
