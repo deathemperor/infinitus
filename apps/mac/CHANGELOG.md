@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.5
+
 ### Desktop
 - Utilization now charts every account's usage history over 24 hours, 7 or 30 days and tables the token run rate, read off the Mac.
 - Side questions and forks from a turn answer again: the fork point now names a transcript line Claude Code can resume at, and a fork whose recorded point is missing falls back to the session's end instead of dying silently.
