@@ -41,7 +41,8 @@ final class NineRouterEngineTests: XCTestCase {
         var loggedIn = false
     }
 
-    private func route(_ gate: Gate, expiredID: String = "none") -> @Sendable (URLRequest, String) -> (Int, String) {
+    private func route(_ gate: Gate, expiredID: String = "none",
+                       providers: String = NineRouterEngineTests.connections) -> @Sendable (URLRequest, String) -> (Int, String) {
         { req, body in
             let path = req.url!.path
             if path == "/api/auth/login" {
@@ -52,7 +53,7 @@ final class NineRouterEngineTests: XCTestCase {
             gate.lock.lock(); let authed = gate.loggedIn; gate.lock.unlock()
             guard authed else { return (401, #"{"error":"Unauthorized"}"#) }
             switch path {
-            case "/api/providers": return (200, Self.connections)
+            case "/api/providers": return (200, providers)
             case "/api/usage/\(expiredID)":
                 return (200, #"{"message":"Claude connected. Unable to fetch usage: OAuth token expired (401)"}"#)
             case "/api/usage/k1": return (200, Self.kiroUsage)
@@ -166,6 +167,35 @@ final class NineRouterEngineTests: XCTestCase {
         ProxyStubProtocol.reset(handler: route(gate))
         _ = try await engine.snapshot()
         XCTAssertTrue(ProxyStubProtocol.seen.allSatisfy { !$0.path.hasPrefix("/api/usage/") })
+    }
+
+    /// One email on a Claude and a Codex connection (#899).
+    static let twins = """
+    {"connections":[
+      {"id":"c1","provider":"claude","authType":"oauth","name":"Claude Code","email":"one@example.com",
+       "priority":1,"isActive":true,"updatedAt":"2026-09-03T01:00:00Z"},
+      {"id":"x1","provider":"codex","authType":"oauth","name":"Codex","email":"one@example.com",
+       "priority":1,"isActive":true,"updatedAt":"2026-09-03T01:00:00Z"}
+    ]}
+    """
+
+    func testSharedUsageStaysWithinTheProvider() async throws {
+        // Another engine polled one@'s Claude account and found it at its
+        // limit. The Claude connection wears that; the Codex connection
+        // with the same email is a different account and fetches its own.
+        let gate = Gate()
+        ProxyStubProtocol.reset(handler: route(gate, providers: Self.twins))
+        let engine = makeEngine(usageTTL: 300)
+        let deadBody = #"{"five_hour":{"utilization":100,"resets_at":"2099-01-01T00:00:00Z"}}"#
+        let dead = try XCTUnwrap(OAuthUsage.parse(Data(deadBody.utf8), now: Date()))
+        await engine.offerSharedUsage(["one@example.com": SharedUsage(usage: dead, at: Date())])
+        let fleets = try await engine.snapshot()
+        XCTAssertEqual(fleets.map(\.provider), [.claude, .codex])
+        XCTAssertEqual(fleets[0].accounts[0].usage?.fiveHour?.pct, 100, "the Claude row wears the shared window")
+        XCTAssertEqual(fleets[1].accounts[0].usage?.fiveHour?.pct, 63.2, "the Codex row fetched its own")
+        XCTAssertFalse(AccountVitals.isDead(fleets[1].accounts[0].usage), "a Codex account is not dead because the Claude one is")
+        XCTAssertEqual(ProxyStubProtocol.seen.filter { $0.path == "/api/usage/x1" }.count, 1, "the Codex connection is polled, not a follower of the Claude one")
+        XCTAssertTrue(ProxyStubProtocol.seen.allSatisfy { $0.path != "/api/usage/c1" }, "the Claude connection is not polled: it has the shared window")
     }
 
     func testUsageParseShapes() {
