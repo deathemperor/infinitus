@@ -17,6 +17,10 @@ publishes the matching section as the GitHub release body.
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
 - `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
 
+### Linux tray
+- The `infinitus-tray` release binaries are stripped: 66–69 MB instead of 107 MB per architecture.
+
+
 ## 0.5.0-alpha.1
 
 ### Release

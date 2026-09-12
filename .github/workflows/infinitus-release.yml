@@ -431,7 +431,11 @@ jobs:
         run: |
           mkdir -p dist
           cp .build/release/infinitus-tray "dist/infinitus-tray-linux-${{ matrix.arch }}"
+          # The static-stdlib binary carries its symbols and debug info
+          # otherwise: alpha.1 shipped 107 MB per arch.
+          strip "dist/infinitus-tray-linux-${{ matrix.arch }}"
           tar -C packaging -czf dist/infinitus-omarchy.tar.gz omarchy
+          ls -l dist
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
