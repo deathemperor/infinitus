@@ -317,6 +317,51 @@ describe("applyThreadDetailEvent", () => {
       },
     );
 
+    it("assigns the usage rollup the server folded (#834)", () => {
+      const usage = {
+        source: "runtime" as const,
+        turns: 1,
+        inputTokens: 10,
+        outputTokens: 2,
+        cachedInputTokens: 0,
+        cacheCreationTokens: 0,
+        reasoningTokens: 0,
+        subagentTurns: 0,
+        costUsd: null,
+        models: [],
+        lastTurnAt: "2026-04-01T05:00:00.000Z",
+      };
+      const result = applyThreadDetailEvent(baseThread, {
+        ...baseEventFields,
+        sequence: 5,
+        occurredAt: "2026-04-01T05:00:00.000Z",
+        aggregateKind: "thread",
+        aggregateId: baseThread.id,
+        type: "thread.turn-usage-recorded",
+        payload: {
+          threadId: baseThread.id,
+          turnUsage: {
+            turnId: TurnId.make("turn-usage"),
+            model: null,
+            inputTokens: 10,
+            outputTokens: 2,
+            cachedInputTokens: 0,
+            cacheCreationTokens: 0,
+            reasoningTokens: null,
+            complete: true,
+            hasSubagents: false,
+            costUsd: null,
+            completedAt: "2026-04-01T05:00:00.000Z",
+          },
+          usage,
+        },
+      });
+      expect(result.kind).toBe("updated");
+      if (result.kind !== "updated") return;
+      expect(result.thread.usage).toEqual(usage);
+      expect(result.thread.updatedAt).toBe(baseThread.updatedAt);
+    });
+
     it("patches babysit on and off (#269 A)", () => {
       const on = applyThreadDetailEvent(baseThread, {
         ...baseEventFields,

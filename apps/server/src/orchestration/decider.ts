@@ -24,6 +24,7 @@ import {
 } from "@t3tools/shared/threadPullRequests";
 import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
 import { isValidOrderKey, orderKeyBetween } from "@t3tools/shared/orderKeys";
+import { addTurnUsage } from "@t3tools/shared/threadUsage";
 import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -1927,6 +1928,31 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         payload: {
           threadId: command.threadId,
           createdAt: command.createdAt,
+        },
+      };
+    }
+
+    // Fork (#834): a completed turn's usage. The event carries the thread's
+    // rollup folded with it, so projections assign instead of summing.
+    case "thread.turn.usage.record": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+          metadata: {},
+        })),
+        type: "thread.turn-usage-recorded",
+        payload: {
+          threadId: command.threadId,
+          turnUsage: command.turnUsage,
+          usage: addTurnUsage(thread.usage, command.turnUsage),
         },
       };
     }

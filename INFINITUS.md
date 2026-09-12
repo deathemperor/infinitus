@@ -347,6 +347,44 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   next to the PR badge on fork servers with an open linked PR (or while
   on). Tests: `infinitusBabysit.logic.test.ts`, `InfinitusBabysit.test.ts`,
   `ProjectionPipeline.babysit.test.ts`, `threadReducer.test.ts`.
+- Turn usage (#834, server half): `packages/contracts/src/orchestration.ts`
+  — `ThreadTurnUsage` (one completed turn: main-agent tokens, `complete`,
+  `hasSubagents`, the provider's `costUsd` estimate or null, `model`),
+  `ThreadUsageRollup` (`source: runtime | transcript`, sums, `subagentTurns`,
+  `costUsd` null until a turn carried one, distinct `models`, `lastTurnAt`),
+  `usage?` on `OrchestrationThread` and `OrchestrationThreadShell` (absent
+  until a turn is recorded — never zero for "not recorded"), the server
+  command `thread.turn.usage.record` and the event
+  `thread.turn-usage-recorded {threadId, turnUsage, usage}`;
+  `packages/shared/src/threadUsage.ts` — `addTurnUsage` / `foldTurnUsage`,
+  the one fold. `packages/contracts/src/providerRuntime.ts` — `turnCostUsd?`
+  and `turnModels?` on `turn.completed`, which
+  `apps/server/src/provider/Layers/ClaudeAdapter.ts` fills from
+  `claudeTurnUsage.logic.ts`: the SDK's `total_cost_usd` / `modelUsage` are
+  cumulative per query() session, so each result is differenced from the
+  previous one (`lastResultTotals`, reset when the query reopens; a total
+  that went down means the session started over). Tokens come from the
+  per-turn `tokenUsage` every adapter normalizes, so Codex turns record too,
+  with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
+  dispatch, a `turn.completed` naming its turn with usage that is not
+  `unavailable` dispatches the command (`orchestration/threadTurnUsage.ts`;
+  a refusal is logged, never blocks); `decider.ts` — folds the read model's
+  rollup into the event; `projector.ts`, `Schemas.ts`, `threadReducer.ts` —
+  assign it. `persistence/ProjectionTurnUsage.ts` + migration `056` — one
+  row per turn (`projection_turn_usage`, PK thread + turn) and
+  `projection_threads.usage_json`; `Layers/ProjectionPipeline.ts` —
+  upserts the row and refolds the stored rollup from the rows (a re-recorded
+  turn replaces, never adds), a revert / chat rewind drops the pruned
+  turns' rows and refolds, a delete or draft retry drops them all;
+  `ProjectionThreads.ts` and `ProjectionSnapshotQuery.ts` carry the column
+  on every thread read. Known drift: the in-memory read model and a
+  client's reducer keep the pre-revert sum until the next bootstrap; the
+  stored rollup is the truth. All figures are estimates, never billing
+  truth — UIs show "≈". Backfill from `provider_session_id` (a
+  `transcript` rollup) is a follow-up. Tests: `threadUsage.test.ts`,
+  `claudeTurnUsage.logic.test.ts`, `threadTurnUsage.test.ts`,
+  `decider.turnUsage.test.ts`, `ProjectionPipeline.usage.test.ts`,
+  `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`.
 - Side question (#269 C, Cursor's `/btw` on #820's fork-at-turn):
   `packages/contracts/src/orchestration.ts` — `sideOf?` on `thread.create`,
   `thread.created`, `OrchestrationThread` and `OrchestrationThreadShell`

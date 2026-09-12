@@ -23,6 +23,7 @@ import {
 import { parseCliArgs } from "@t3tools/shared/cliArgs";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import { type ClaudeScopedLimitNames, claudeRateLimitEventToUpdate } from "./claudeUsageLimits.ts";
+import { claudeTurnUsageDelta, type ClaudeResultTotals } from "./claudeTurnUsage.logic.ts";
 import {
   isTransportErrorMessage,
   isTransportResult,
@@ -384,6 +385,8 @@ interface ClaudeSessionContext {
   lastAssistantUuid: string | undefined;
   /** Fork (#270 E2): one anchor per completed turn, oldest first. */
   anchors: Array<ClaudeTurnAnchor>;
+  /** Fork (#834): the last result's cumulative totals, differenced per turn. */
+  lastResultTotals: ClaudeResultTotals | undefined;
   lastThreadStartedId: string | undefined;
   /** Limits already announced for the running turn, keyed `window:resetsAt`. */
   announcedUsageLimits: { turnId: string; keys: Set<string> } | undefined;
@@ -2692,6 +2695,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       rawPayload: result ?? { status },
     });
 
+    // Fork (#834): this turn's share of the session's cumulative cost.
+    const turnUsageDelta = claudeTurnUsageDelta(context.lastResultTotals, result);
+    context.lastResultTotals = turnUsageDelta.totals;
+
     const stamp = yield* makeEventStamp();
     yield* offerRuntimeEvent({
       type: "turn.completed",
@@ -2707,6 +2714,12 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(result?.modelUsage ? { modelUsage: result.modelUsage } : {}),
         ...(typeof result?.total_cost_usd === "number"
           ? { totalCostUsd: result.total_cost_usd }
+          : {}),
+        ...(turnUsageDelta.turnCostUsd !== undefined
+          ? { turnCostUsd: turnUsageDelta.turnCostUsd }
+          : {}),
+        ...(turnUsageDelta.turnModels !== undefined
+          ? { turnModels: turnUsageDelta.turnModels }
           : {}),
         ...(errorMessage ? { errorMessage } : {}),
         tokenUsage: normalizeClaudeTurnTokenUsage(result, turnState.hasSubagents, status),
@@ -5110,6 +5123,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
               ).pipe(
                 Effect.map((query) => {
                   context.query = query;
+                  // Fork (#834): a reopened query() starts its totals over.
+                  context.lastResultTotals = undefined;
                   forkStream(context);
                 }),
               ),
@@ -5135,6 +5150,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         lastAssistantUuid: resumeState?.resumeSessionAt,
         // A fork starts its own turn numbering; the source's anchors stay with the source.
         anchors: resumeState?.fork ? [] : [...(resumeState?.anchors ?? [])],
+        lastResultTotals: undefined,
         lastThreadStartedId: undefined,
         announcedUsageLimits: undefined,
         stopped: false,

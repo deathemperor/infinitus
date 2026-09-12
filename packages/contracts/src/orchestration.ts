@@ -739,6 +739,59 @@ export const ThreadBabysit = Schema.Struct({
 });
 export type ThreadBabysit = typeof ThreadBabysit.Type;
 
+/**
+ * Fork (#834): what one completed turn cost, as the provider reported it.
+ * Tokens are the main agent's (subagents excluded, so they understate on a
+ * turn with `hasSubagents`); `costUsd` is the provider's own estimate for
+ * every model call of the turn. Estimates, never billing truth.
+ */
+export const ThreadTurnUsage = Schema.Struct({
+  turnId: TurnId,
+  /** The model the turn mostly ran on, when the provider named one. */
+  model: Schema.NullOr(TrimmedNonEmptyString),
+  /** Cache reads and writes included. */
+  inputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  cachedInputTokens: NonNegativeInt,
+  cacheCreationTokens: NonNegativeInt,
+  /** Part of `outputTokens`; null when the provider does not break it out. */
+  reasoningTokens: Schema.NullOr(NonNegativeInt),
+  /** False when the provider gave partial totals. */
+  complete: Schema.Boolean,
+  hasSubagents: Schema.Boolean,
+  /** The provider's estimate in USD, null when it gave none. */
+  costUsd: Schema.NullOr(Schema.Number),
+  completedAt: IsoDateTime,
+});
+export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
+
+/**
+ * Fork (#834): a thread's completed turns summed (`@t3tools/shared/threadUsage`
+ * folds them). `runtime` rollups come from the turns this server ran;
+ * `transcript` ones are estimated from the provider's transcript after the
+ * fact. Estimates, never billing truth — show them as such.
+ */
+export const ThreadUsageSource = Schema.Literals(["runtime", "transcript"]);
+export type ThreadUsageSource = typeof ThreadUsageSource.Type;
+
+export const ThreadUsageRollup = Schema.Struct({
+  source: ThreadUsageSource,
+  turns: NonNegativeInt,
+  inputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  cachedInputTokens: NonNegativeInt,
+  cacheCreationTokens: NonNegativeInt,
+  reasoningTokens: NonNegativeInt,
+  /** Turns whose tokens understate because subagents ran. */
+  subagentTurns: NonNegativeInt,
+  /** The sum of the turns that carried an estimate; null when none did. */
+  costUsd: Schema.NullOr(Schema.Number),
+  /** Distinct, first seen first. */
+  models: Schema.Array(TrimmedNonEmptyString),
+  lastTurnAt: IsoDateTime,
+});
+export type ThreadUsageRollup = typeof ThreadUsageRollup.Type;
+
 export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
@@ -793,6 +846,9 @@ export const OrchestrationThread = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#834): the completed turns' usage summed; absent until a turn
+  // has been recorded (never zero for "not recorded").
+  usage: Schema.optional(ThreadUsageRollup),
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
@@ -873,6 +929,9 @@ export const OrchestrationThreadShell = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#834): the completed turns' usage summed; absent until a turn
+  // has been recorded (never zero for "not recorded").
+  usage: Schema.optional(ThreadUsageRollup),
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
@@ -1556,6 +1615,15 @@ const ThreadSessionSetCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+/** Fork (#834): the runtime ingestion records a completed turn's usage. */
+const ThreadTurnUsageRecordCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.usage.record"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  turnUsage: ThreadTurnUsage,
+  createdAt: IsoDateTime,
+});
+
 const ThreadMessageAssistantDeltaCommand = Schema.Struct({
   type: Schema.Literal("thread.message.assistant.delta"),
   commandId: CommandId,
@@ -1666,6 +1734,7 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadPullRequestSyncCommand,
   ThreadPullRequestLinkSyncCommand,
   ThreadSessionSetCommand,
+  ThreadTurnUsageRecordCommand,
   ThreadMessageAssistantDeltaCommand,
   ThreadMessageAssistantCompleteCommand,
   ThreadHistoryImportCommand,
@@ -1720,6 +1789,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.reverted",
   "thread.session-stop-requested",
   "thread.session-set",
+  "thread.turn-usage-recorded",
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
@@ -2002,6 +2072,13 @@ export const ThreadSessionSetPayload = Schema.Struct({
   session: OrchestrationSession,
 });
 
+/** Fork (#834): the turn's record and the thread's rollup folded with it. */
+export const ThreadTurnUsageRecordedPayload = Schema.Struct({
+  threadId: ThreadId,
+  turnUsage: ThreadTurnUsage,
+  usage: ThreadUsageRollup,
+});
+
 export const ThreadProposedPlanUpsertedPayload = Schema.Struct({
   threadId: ThreadId,
   proposedPlan: OrchestrationProposedPlan,
@@ -2228,6 +2305,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.session-set"),
     payload: ThreadSessionSetPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-usage-recorded"),
+    payload: ThreadTurnUsageRecordedPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

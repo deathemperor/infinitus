@@ -529,6 +529,10 @@ export function applyThreadDetailEvent(
     }
 
     // ── Session ─────────────────────────────────────────────────────
+    // Fork (#834): the rollup as the server folded it; no activity.
+    case "thread.turn-usage-recorded":
+      return { kind: "updated", thread: { ...thread, usage: event.payload.usage } };
+
     case "thread.session-set": {
       // Leaving the "running" session status is the turn-end signal: settle a
       // still-running latest turn so its duration reflects the whole turn.

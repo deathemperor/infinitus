@@ -8,6 +8,7 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
+import { foldTurnUsage } from "@t3tools/shared/threadUsage";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -38,6 +39,7 @@ import {
 } from "../../persistence/Services/ProjectionThreadProposedPlans.ts";
 import * as ProjectionThreadPullRequests from "../../persistence/ProjectionThreadPullRequests.ts";
 import * as ProjectionThreadQueuedTurns from "../../persistence/ProjectionThreadQueuedTurns.ts";
+import * as ProjectionTurnUsage from "../../persistence/ProjectionTurnUsage.ts";
 import { ProjectionThreadSessionRepository } from "../../persistence/Services/ProjectionThreadSessions.ts";
 import {
   type ProjectionTurn,
@@ -490,6 +492,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       yield* ProjectionThreadPullRequests.ProjectionThreadPullRequestRepository;
     const projectionThreadQueuedTurnRepository =
       yield* ProjectionThreadQueuedTurns.ProjectionThreadQueuedTurnRepository;
+    const projectionTurnUsageRepository = yield* ProjectionTurnUsage.ProjectionTurnUsageRepository;
     const projectionThreadActivityRepository = yield* ProjectionThreadActivityRepository;
     const projectionThreadSessionRepository = yield* ProjectionThreadSessionRepository;
     const projectionTurnRepository = yield* ProjectionTurnRepository;
@@ -613,6 +616,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           yield* projectionThreadPullRequestRepository.deleteByThreadId({
             threadId: event.payload.threadId,
           });
+          // So does what its turns cost (#834).
+          yield* projectionTurnUsageRepository.deleteByThreadId({
+            threadId: event.payload.threadId,
+          });
           yield* projectionThreadRepository.upsert({
             threadId: event.payload.threadId,
             projectId: event.payload.projectId,
@@ -634,6 +641,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             snoozedUntil: null,
             snoozedAt: null,
             babysit: null,
+            usage: null,
             sideOf: event.payload.sideOf ?? null,
             groupId: event.payload.groupId ?? null,
             pinnedAt: null,
@@ -1018,6 +1026,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           yield* projectionThreadQueuedTurnRepository.deleteByThreadId({
             threadId: event.payload.threadId,
           });
+          // Nor what its turns cost (#834).
+          yield* projectionTurnUsageRepository.deleteByThreadId({
+            threadId: event.payload.threadId,
+          });
           const existingRow = yield* projectionThreadRepository.getById({
             threadId: event.payload.threadId,
           });
@@ -1138,12 +1150,55 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             }
           }
 
+          // Fork (#834): the pruned turns' usage rows go, and the rollup is
+          // refolded from what stays (a chat-only rewind prunes the same way).
+          yield* projectionTurnUsageRepository.deleteByThreadIdExcept({
+            threadId: event.payload.threadId,
+            turnIds: retainedTurns.flatMap((turn) =>
+              turn.turnId !== null &&
+              turn.checkpointTurnCount !== null &&
+              turn.checkpointTurnCount <= event.payload.turnCount
+                ? [turn.turnId]
+                : [],
+            ),
+          });
+          const keptUsage = yield* projectionTurnUsageRepository.listByThreadId({
+            threadId: event.payload.threadId,
+          });
+
           yield* projectionThreadRepository.upsert({
             ...existingRow.value,
             latestTurnId,
+            usage: foldTurnUsage(keptUsage.map((row) => row.turnUsage)) ?? null,
             updatedAt: event.occurredAt,
           });
           yield* refreshThreadShellSummary(event.payload.threadId);
+          return;
+        }
+
+        // Fork (#834): the turn's row, and the thread's rollup refolded from
+        // its rows — not the payload's: the decider folds the in-memory read
+        // model, which a revert leaves over-counting until the next start,
+        // and a re-recorded turn must replace its row, not add to the sum.
+        // Usage is not thread activity: `updatedAt` stays.
+        case "thread.turn-usage-recorded": {
+          yield* projectionTurnUsageRepository.upsert({
+            threadId: event.payload.threadId,
+            turnUsage: event.payload.turnUsage,
+          });
+          const existingRow = yield* projectionThreadRepository.getById({
+            threadId: event.payload.threadId,
+          });
+          if (Option.isNone(existingRow)) {
+            return;
+          }
+          const rows = yield* projectionTurnUsageRepository.listByThreadId({
+            threadId: event.payload.threadId,
+          });
+          yield* projectionThreadRepository.upsert({
+            ...existingRow.value,
+            usage: foldTurnUsage(rows.map((row) => row.turnUsage)) ?? null,
+          });
           return;
         }
 
@@ -2223,6 +2278,7 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionThreadProposedPlanRepositoryLive),
   Layer.provideMerge(ProjectionThreadPullRequests.layer),
   Layer.provideMerge(ProjectionThreadQueuedTurns.layer),
+  Layer.provideMerge(ProjectionTurnUsage.layer),
   Layer.provideMerge(ProjectionThreadActivityRepositoryLive),
   Layer.provideMerge(ProjectionThreadSessionRepositoryLive),
   Layer.provideMerge(ProjectionTurnRepositoryLive),

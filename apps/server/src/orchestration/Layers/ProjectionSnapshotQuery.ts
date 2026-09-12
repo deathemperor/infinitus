@@ -29,6 +29,7 @@ import {
   ModelSelection,
   ProjectId,
   ThreadBabysit,
+  ThreadUsageRollup,
   ThreadLinkedPullRequest,
   ThreadId,
   ThreadPullRequestSnapshot,
@@ -132,6 +133,7 @@ const ProjectionThreadDbRowSchema = ProjectionThread.mapFields(
     linkedPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     branchPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     babysit: Schema.NullOr(Schema.fromJsonString(ThreadBabysit)),
+    usage: Schema.NullOr(Schema.fromJsonString(ThreadUsageRollup)),
     sideOf: Schema.NullOr(ThreadId),
     groupId: Schema.NullOr(Schema.String),
   }),
@@ -495,6 +497,13 @@ function babysitField(babysit: ThreadBabysit | null | undefined): {
   return babysit == null ? {} : { babysit };
 }
 
+/** Fork (#834): absent until a turn has been recorded. */
+function usageField(usage: ThreadUsageRollup | null | undefined): {
+  readonly usage?: ThreadUsageRollup;
+} {
+  return usage == null ? {} : { usage };
+}
+
 function queuedTurnsField(rows: ReadonlyArray<OrchestrationQueuedTurn> | undefined): {
   readonly queuedTurns?: ReadonlyArray<OrchestrationQueuedTurn>;
 } {
@@ -638,6 +647,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -681,6 +691,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -726,6 +737,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -1341,6 +1353,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -2399,6 +2412,7 @@ pending_approval_requests AS (
                 snoozedUntil: row.snoozedUntil,
                 snoozedAt: row.snoozedAt,
                 ...babysitField(row.babysit),
+                ...usageField(row.usage),
                 ...sideOfField(row.sideOf),
                 ...groupIdField(row.groupId),
                 pinnedAt: row.pinnedAt,
@@ -2657,6 +2671,7 @@ pending_approval_requests AS (
                   snoozedUntil: row.snoozedUntil,
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
+                  ...usageField(row.usage),
                   ...sideOfField(row.sideOf),
                   ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
@@ -2833,6 +2848,7 @@ pending_approval_requests AS (
                         snoozedUntil: row.snoozedUntil,
                         snoozedAt: row.snoozedAt,
                         ...babysitField(row.babysit),
+                        ...usageField(row.usage),
                         ...sideOfField(row.sideOf),
                         ...groupIdField(row.groupId),
                         pinnedAt: row.pinnedAt,
@@ -3016,6 +3032,7 @@ pending_approval_requests AS (
                   snoozedUntil: row.snoozedUntil,
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
+                  ...usageField(row.usage),
                   ...sideOfField(row.sideOf),
                   ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
@@ -3387,6 +3404,7 @@ pending_approval_requests AS (
         snoozedUntil: threadRow.value.snoozedUntil,
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
+        ...usageField(threadRow.value.usage),
         ...sideOfField(threadRow.value.sideOf),
         ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,
@@ -3697,6 +3715,7 @@ pending_approval_requests AS (
         snoozedUntil: threadRow.value.snoozedUntil,
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
+        ...usageField(threadRow.value.usage),
         ...sideOfField(threadRow.value.sideOf),
         ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,

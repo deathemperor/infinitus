@@ -56,6 +56,7 @@ import {
   ThreadUnsnoozedPayload,
   ThreadRevertedPayload,
   ThreadSessionSetPayload,
+  ThreadTurnUsageRecordedPayload,
   ThreadTurnDiffCompletedPayload,
 } from "./Schemas.ts";
 
@@ -884,6 +885,20 @@ export function projectEvent(
           }),
         };
       });
+
+    // Fork (#834): the decider folded the rollup; assign it.
+    case "thread.turn-usage-recorded":
+      return decodeForEvent(
+        ThreadTurnUsageRecordedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, { usage: payload.usage }),
+        })),
+      );
 
     case "thread.session-set":
       return Effect.gen(function* () {

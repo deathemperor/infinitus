@@ -31,6 +31,7 @@ import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
+import { turnUsageFromCompletedTurn } from "../threadTurnUsage.ts";
 import { ProjectionTurnRepository } from "../../persistence/Services/ProjectionTurns.ts";
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
@@ -1653,6 +1654,32 @@ const make = Effect.gen(function* () {
             },
             createdAt: now,
           });
+        }
+      }
+
+      // Fork (#834): what the completed turn cost, once per turn the runtime
+      // named. Independent of the lifecycle gate: a completion that lost the
+      // race for the session status still happened. A refusal is logged, so
+      // usage never blocks the events after it.
+      if (event.type === "turn.completed" && eventTurnId !== undefined) {
+        const turnUsage = turnUsageFromCompletedTurn(event.payload, eventTurnId, now);
+        if (turnUsage !== undefined) {
+          yield* orchestrationEngine
+            .dispatch({
+              type: "thread.turn.usage.record",
+              commandId: yield* providerCommandId(event, "thread-turn-usage-record"),
+              threadId: thread.id,
+              turnUsage,
+              createdAt: now,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("provider runtime ingestion failed to record turn usage", {
+                  eventId: event.eventId,
+                  cause: Cause.pretty(cause),
+                }),
+              ),
+            );
         }
       }
 

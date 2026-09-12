@@ -67,6 +67,7 @@ import Migration0052 from "./Migrations/052_ProjectionThreadsBabysit.ts";
 import Migration0053 from "./Migrations/053_ProjectionThreadsSideOf.ts";
 import Migration0054 from "./Migrations/054_ProjectionThreadsGroupId.ts";
 import Migration0055 from "./Migrations/055_ProjectionThreadSessionsStatusReason.ts";
+import Migration0056 from "./Migrations/056_ProjectionTurnUsage.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -134,6 +135,7 @@ const migrationEntries = [
   [53, "ProjectionThreadsSideOf", Migration0053],
   [54, "ProjectionThreadsGroupId", Migration0054],
   [55, "ProjectionThreadSessionsStatusReason", Migration0055],
+  [56, "ProjectionTurnUsage", Migration0056],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

@@ -441,6 +441,56 @@ describe("ProviderRuntimeIngestion", () => {
     expect(thread.session?.lastError).toBe("turn failed");
   });
 
+  // Fork (#834): a completed turn's usage lands on the thread; an
+  // unavailable one records nothing.
+  it("records a completed turn's usage on the thread", async () => {
+    const harness = await createHarness();
+    const now = "2026-01-01T00:00:00.000Z";
+    const completed = (turnId: string, usageStatus: "complete" | "unavailable") =>
+      harness.emit({
+        type: "turn.completed",
+        eventId: asEventId(`evt-usage-${turnId}`),
+        provider: ProviderDriverKind.make("claude"),
+        threadId: asThreadId("thread-1"),
+        createdAt: now,
+        turnId: asTurnId(turnId),
+        payload: {
+          state: "completed",
+          tokenUsage:
+            usageStatus === "complete"
+              ? {
+                  usageScope: "main_agent",
+                  usageStatus,
+                  inputTokens: 300,
+                  outputTokens: 30,
+                  cachedInputTokens: 200,
+                  cacheCreationTokens: 0,
+                  hasSubagents: false,
+                }
+              : { usageScope: "main_agent", usageStatus, hasSubagents: false },
+          turnCostUsd: 0.05,
+          turnModels: ["claude-opus-4-7"],
+        },
+      });
+
+    completed("turn-usage-1", "complete");
+    const thread = await waitForThread(harness.readModel, (entry) => entry.usage?.turns === 1);
+    expect(thread.usage).toMatchObject({
+      source: "runtime",
+      inputTokens: 300,
+      outputTokens: 30,
+      costUsd: 0.05,
+      models: ["claude-opus-4-7"],
+    });
+
+    completed("turn-usage-2", "unavailable");
+    await waitForThread(
+      harness.readModel,
+      (entry) => entry.session?.status === "ready" && entry.session.activeTurnId === null,
+    );
+    expect((await harness.readModel()).threads[0]?.usage?.turns).toBe(1);
+  });
+
   it.each([
     { delivery: "buffered", enableLegacyTokenStreaming: false },
     { delivery: "streamed", enableLegacyTokenStreaming: true },
