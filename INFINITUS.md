@@ -594,6 +594,17 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `apps/mobile/src/features/archive/ArchivedThreadsRouteScreen.tsx` filters
   the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
   #863).
+- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — a side question
+  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s button follows
+  the PR menu in the iOS header (its `version` in `optionsVersion`) and joins
+  the Android header actions on a Claude Agent thread of an `infinitus`
+  server; a tap forks the session's latest completed turn (`infinitus.forkThread`
+  with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet`
+  (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
+  no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx`
+  subscribes to the side fork, asks in plan mode, and "Bring to main" appends
+  the latest answer to the main composer's draft (`sideQuestions.ts` carries
+  the web `SideQuestionPanel.logic.ts` helpers, kept local).
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
