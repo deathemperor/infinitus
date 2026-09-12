@@ -874,17 +874,23 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `ThreadFeed.tsx`'s `turnFooters` so a completed turn's terminal assistant
   message shows `turnFooterLabel` — "Done in 49s · 12:59 PM · 1 shell still
   running", the time in the feed's own `formatMessageTime` — in place of its
-  time, and prepends `usePullRequestHeaderItem`'s menu to the
-  iOS header's git items with its `version` in `optionsVersion` (#269 F: the
-  PR's phase from the linked snapshot, Open pull request / View checks / Mark
-  ready for review over `pullRequests.runAction`, and on an `infinitus`
-  server "Babysit" / "Stop babysitting (r/10)" over `thread.meta.update
-{babysit}` while the PR is open or the thread is already babysat — the
-  web toggle's gate, #269 A, the menu's status line reading "Babysitting
-  r/10" while on; on Android the hook's `androidAction` is a header button
-  before the git controls carrying the same choices as its `menu` (an
-  anchored menu, the phase line inert at the top);
-  `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
+  time, and prepends the thread menu — `useThreadHeaderMenu`
+  (`features/infinitus/useThreadHeaderMenu.ts` + `threadHeaderMenu.logic.ts`,
+  #941: ONE menu button folding the PR's choices, "Ask a side question" and
+  "Thread usage", so the compact iOS header keeps upstream's three git
+  buttons instead of collapsing everything into "…"; the PR's icon and "#N"
+  on the button while the thread has one, else the plain more circle) — to
+  the iOS header's git items with its `version` in `optionsVersion`. The
+  PR part is `usePullRequestHeaderItem`'s `menu` (#269 F: the PR's phase
+  from the linked snapshot as an inert first line, Open pull request / View
+  checks / Mark ready for review over `pullRequests.runAction`, and on an
+  `infinitus` server "Babysit" / "Stop babysitting (r/10)" over
+  `thread.meta.update {babysit}` while the PR is open or the thread is
+  already babysat — the web toggle's gate, #269 A, the status line reading
+  "Babysitting r/10" while on); on Android the hook's `androidAction` is a
+  header button before the git controls opening the same choices as an
+  anchored menu; `apps/mobile/src/features/infinitus/prHeader.logic.ts`,
+  `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
@@ -898,10 +904,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
   #863).
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — a side question
-  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s button follows
-  the PR menu in the iOS header (its `version` in `optionsVersion`) and joins
-  the Android header actions on a Claude Agent thread of an `infinitus`
-  server; a tap forks the session's latest completed turn (`infinitus.forkThread`
+  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s `action` is
+  the thread menu's "Ask a side question" (above, #941) on a Claude Agent
+  thread of an `infinitus` server; a tap forks the session's latest completed turn (`infinitus.forkThread`
   with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet`
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx`
@@ -909,11 +914,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the latest answer to the main composer's draft (`sideQuestions.ts` carries
   the web `SideQuestionPanel.logic.ts` helpers, kept local).
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — the thread's
-  usage from the phone (#834): `useThreadUsageHeaderItem`'s button follows
-  the side-question one in the iOS header (its `version` in
-  `optionsVersion`) and joins the Android header actions once the shell
-  carries `usage` (a turn was recorded; no button before, and none on a
-  server without the rollup); a tap opens `ThreadUsageSheet`
+  usage from the phone (#834): `useThreadUsageHeaderItem`'s `action` is the
+  thread menu's "Thread usage" (above, #941) once the shell carries `usage`
+  (a turn was recorded; no choice before, and none on a server without the
+  rollup); a tap opens `ThreadUsageSheet`
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
   reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
