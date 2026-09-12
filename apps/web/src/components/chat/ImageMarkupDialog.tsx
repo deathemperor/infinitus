@@ -49,22 +49,27 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
   const [drawing, setDrawing] = useState<MarkupShape | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // The composer mounts this dialog per image and only while it is open, so
+  // every state above starts fresh; the effect only loads the pixels.
   useEffect(() => {
     if (!props.open) return;
-    setReady(false);
-    setFailed(false);
-    setShapes([]);
-    setDrawing(null);
     const image = new Image();
-    image.onload = () => {
-      imageRef.current = image;
-      setReady(true);
-    };
-    image.onerror = () => setFailed(true);
+    const controller = new AbortController();
+    image.addEventListener(
+      "load",
+      () => {
+        imageRef.current = image;
+        setReady(true);
+      },
+      { once: true, signal: controller.signal },
+    );
+    image.addEventListener("error", () => setFailed(true), {
+      once: true,
+      signal: controller.signal,
+    });
     image.src = props.previewUrl;
     return () => {
-      image.onload = null;
-      image.onerror = null;
+      controller.abort();
       imageRef.current = null;
     };
   }, [props.open, props.previewUrl]);
