@@ -1930,7 +1930,16 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   terminal session is never killed or typed into. The pure parts
   (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
   shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
-  the row-model module.
+  the row-model module. "Answer prompts here" in the row menu (#79 item 3;
+  `session-remote <pid> on|off`, the row's `remote`) routes the session's
+  permission prompts to the sidebar: `usePermissionAsks.ts` reads
+  `permission-pending` every 5 s on its own timer while any row is remote
+  (the Mac's 60 s window outpaces the snapshot's 30 s idle cadence) and
+  `permissionAsks.logic.ts` matches each ask to its row (pid, else session
+  id) and words the card — the tool and the Mac's bounded rendering of the
+  input, never a log — with Allow / Deny over `permission-decide`; no answer
+  in 60 s leaves the terminal's own prompt to run. Behind the manifest
+  listing the three verbs.
 
 - `packages/contracts/src/agentSessions.ts`,
   `apps/server/src/project/AgentSessionScanner.ts`,

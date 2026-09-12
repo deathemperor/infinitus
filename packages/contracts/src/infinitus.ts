@@ -212,6 +212,8 @@ export const InfinitusSession = Schema.Struct({
   startedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   /** Pending sign-in needs: `aws-login:<profile>`, `gcloud-login:<account>`. */
   needs: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Permission prompts routed here (`session-remote`, #79); absent before it. */
+  remote: Schema.optionalKey(Schema.Boolean),
 });
 export type InfinitusSession = typeof InfinitusSession.Type;
 

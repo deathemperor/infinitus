@@ -13,6 +13,7 @@ import {
   type SessionMoveBatch,
   sessionMoveBatches,
   type SessionPermissionMode,
+  sessionRemoteCommandArgs,
   type SessionRowModel,
   showSessionCommandArgs,
 } from "@t3tools/client-runtime/state/infinitusSessions";
@@ -39,6 +40,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import {
   Menu,
+  MenuCheckboxItem,
   MenuGroup,
   MenuGroupLabel,
   MenuItem,
@@ -50,10 +52,19 @@ import {
 } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
+  asksForSession,
+  type PermissionAsk,
+  permissionAskActions,
+  permissionAskLabel,
+  type PermissionDecision,
+  permissionDecideCommandArgs,
+} from "./permissionAsks.logic";
+import {
   sessionCommandErrorMessage,
   sessionRowDetail,
   sidebarSessionsView,
 } from "./sidebarInfinitusSessions.logic";
+import { usePermissionAsks } from "./usePermissionAsks";
 
 const OPEN_KEY = "infinitus.sidebarSessionsOpen";
 
@@ -84,6 +95,11 @@ const MOVED_COPY = "Close the terminal session; the thread carries on here.";
  * the transcript is imported as a thread and the thread opens. "Move idle" in
  * the header does that for every idle row. The terminal session is never
  * killed or typed into — the moved row asks the person to close it.
+ * "Answer prompts here" in the menu (`session-remote`, #79 item 3) routes the
+ * session's permission prompts to this sidebar: each open ask draws under
+ * its row with Allow / Deny (`permission-decide`), read from
+ * `permission-pending` every 5 s on the card's own timer while any row is
+ * remote — the Mac's 60 s window outpaces the snapshot's idle cadence.
  */
 export const SidebarInfinitusSessions = memo(function SidebarInfinitusSessions() {
   const environmentId = usePrimaryEnvironmentId();
@@ -110,6 +126,15 @@ export const SidebarInfinitusSessions = memo(function SidebarInfinitusSessions()
       forgets it; moving again is safe (the import finds the thread it made). */
   const [moved, setMoved] = useState<ReadonlyMap<string, ThreadId>>(() => new Map());
   const [moving, setMoving] = useState(false);
+  const askActions = useMemo(
+    () => permissionAskActions(snapshot?.commands ?? []),
+    [snapshot?.commands],
+  );
+  const anyRemote = view?.rows.some((row) => row.remote) ?? false;
+  const { asks, refresh: refreshAsks } = usePermissionAsks(
+    environmentId,
+    askActions.pending && anyRemote,
+  );
 
   if (view === null || environmentId === null) return null;
 
@@ -137,6 +162,14 @@ export const SidebarInfinitusSessions = memo(function SidebarInfinitusSessions()
     if (!outcome.nudged) {
       setNote({ pid: row.pid, message: outcome.reason ?? "The session was not nudged." });
     }
+  };
+
+  const setRemote = (row: SessionRowModel, on: boolean) => {
+    if (on !== row.remote) void run(row, sessionRemoteCommandArgs(row, on));
+  };
+  const decide = async (row: SessionRowModel, ask: PermissionAsk, decision: PermissionDecision) => {
+    const reply = await run(row, permissionDecideCommandArgs(ask, decision));
+    if (reply !== null) await refreshAsks();
   };
 
   /** The project rooted at `cwd` on this environment, created when missing
@@ -291,8 +324,18 @@ export const SidebarInfinitusSessions = memo(function SidebarInfinitusSessions()
                   onShow={show}
                   onNudge={nudge}
                   onSetMode={setMode}
+                  onSetRemote={setRemote}
                   onMove={move}
                 />
+                {askActions.decide
+                  ? asksForSession(asks, row).map((ask) => (
+                      <PermissionAskCard
+                        key={ask.id}
+                        ask={ask}
+                        onDecide={(decision) => void decide(row, ask, decision)}
+                      />
+                    ))
+                  : null}
                 {row.needs.map((need) => (
                   <span key={need} className="px-2 pb-0.5 text-[11px] text-warning-foreground">
                     {need}
@@ -330,6 +373,7 @@ function SessionRow({
   onShow,
   onNudge,
   onSetMode,
+  onSetRemote,
   onMove,
 }: {
   row: SessionRowModel;
@@ -338,6 +382,7 @@ function SessionRow({
   onShow: (row: SessionRowModel) => void;
   onNudge: (row: SessionRowModel) => Promise<void>;
   onSetMode: (row: SessionRowModel, mode: SessionPermissionMode) => void;
+  onSetRemote: (row: SessionRowModel, on: boolean) => void;
   onMove: (row: SessionRowModel) => Promise<void>;
 }) {
   const detail = [row.title, row.stateLabel, row.account, row.age, row.cwd]
@@ -365,7 +410,7 @@ function SessionRow({
   const className =
     "flex h-6 w-full min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-sidebar-row-hover";
   const canMove = canMoveSession(row);
-  const hasMenu = actions.nudge || actions.setMode || canMove;
+  const hasMenu = actions.nudge || actions.setMode || actions.remote || canMove;
 
   const main = actions.show ? (
     <button
@@ -396,7 +441,12 @@ function SessionRow({
           Move to a thread
         </MenuItem>
       ) : null}
-      {(actions.nudge || canMove) && actions.setMode ? <MenuSeparator /> : null}
+      {actions.remote ? (
+        <MenuCheckboxItem checked={row.remote} onCheckedChange={(on) => onSetRemote(row, on)}>
+          Answer prompts here
+        </MenuCheckboxItem>
+      ) : null}
+      {(actions.nudge || canMove || actions.remote) && actions.setMode ? <MenuSeparator /> : null}
       {actions.setMode ? (
         <MenuGroup>
           <MenuGroupLabel>Permission mode</MenuGroupLabel>
@@ -448,6 +498,52 @@ function SessionRow({
         />
         {menu}
       </Menu>
+    </div>
+  );
+}
+
+/** One open permission ask under its session row: the tool and the Mac's
+    bounded rendering of its input, Allow / Deny. The Mac answers the terminal's
+    hook the moment a button lands; an ask nobody answers within 60 s leaves
+    the list on its own (the terminal shows its own prompt then). */
+function PermissionAskCard({
+  ask,
+  onDecide,
+}: {
+  ask: PermissionAsk;
+  onDecide: (decision: PermissionDecision) => void;
+}) {
+  return (
+    <div className="mx-2 mb-1 flex flex-col gap-1 rounded-md border border-warning/40 bg-warning/8 px-2 py-1.5 text-[11px]">
+      <span className="text-muted-foreground">Permission asked</span>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="truncate font-mono text-sidebar-foreground">
+              {permissionAskLabel(ask)}
+            </span>
+          }
+        />
+        <TooltipPopup side="top" className="max-w-96 break-all font-mono">
+          {permissionAskLabel(ask)}
+        </TooltipPopup>
+      </Tooltip>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => onDecide("allow")}
+          className="rounded-md bg-primary px-2 py-0.5 text-primary-foreground hover:bg-primary/90"
+        >
+          Allow
+        </button>
+        <button
+          type="button"
+          onClick={() => onDecide("deny")}
+          className="rounded-md border border-border px-2 py-0.5 text-sidebar-foreground hover:bg-sidebar-row-hover"
+        >
+          Deny
+        </button>
+      </div>
     </div>
   );
 }
