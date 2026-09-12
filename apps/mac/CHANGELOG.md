@@ -18,7 +18,7 @@ publishes the matching section as the GitHub release body.
 - Settings › Accounts no longer lists each Mac's terminal sessions: the phone is for threads; the desktop sidebar keeps the sessions (#941).
 
 ### Desktop
-- The Machine page is gone from the sidebar and the command palette: the Mac's own health view keeps that job.
+- The Machine page is gone from the sidebar and the command palette.
 - Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
 - A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
 - The turn footer also counts the background agents a turn left running, and a session that ends with agents still running (Stop, or the app quitting) leaves an error row saying how many, instead of the thread reading as finished work (#974).
