@@ -752,7 +752,8 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
-  `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
+  `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
+  `"queue" | "steer"`) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
   `infinitusReconnectingNotice` slot above the hold banner (#832: "Waiting
   for the network. Reconnect attempt n of 5." while the session's
@@ -1586,9 +1587,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   turns an existing thread's `send` into `wait` while the thread's session is
   `starting` / `running` or the server's hold list names it (any kind: held,
   paused, limited), so a follow-up typed during a turn lands after it instead
-  of steering; creations and every other action pass through. `mode` is
-  `"queue"` at both call sites — the phone has no copy of the desktop's
-  `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  of steering; creations and every other action pass through. `mode` at
+  both call sites is `outboxQueueMode` of this phone's preferences
+  (`infinitusComposerSendMode`, the desktop's "Sending while a turn runs",
+  a picker row in `SettingsInfinitusSection.tsx`): `"queue"` by default and
+  while the store loads, `"steer"` sends into the running turn as upstream
+  does — but a thread the server's hold list names waits in either mode.
   `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when
   the server's capabilities carry `turnQueue` (fork capability in
   `packages/contracts/src/environment.ts`, set true in

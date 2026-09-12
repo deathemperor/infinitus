@@ -1,8 +1,10 @@
 import { CommandId, MessageId, ProviderInstanceId, QueueId, ThreadId } from "@t3tools/contracts";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   isThreadHeld,
+  outboxQueueMode,
   queueBehindRunningTurn,
   queueTurnCommandInput,
   resolveThreadOutboxDelivery,
@@ -21,6 +23,24 @@ describe("threadOutboxQueue.logic (#807)", () => {
     expect(queueBehindRunningTurn({ ...base, threadBusy: true })).toBe("wait");
     expect(queueBehindRunningTurn({ ...base, threadBusy: false, threadHeld: true })).toBe("wait");
     expect(queueBehindRunningTurn({ ...base, threadBusy: false })).toBe("send");
+  });
+
+  it("steers into a running turn but never past a hold", () => {
+    const base = { action: "send" as const, isCreation: false, mode: "steer" as const };
+    expect(queueBehindRunningTurn({ ...base, threadBusy: true, threadHeld: false })).toBe("send");
+    expect(queueBehindRunningTurn({ ...base, threadBusy: false, threadHeld: true })).toBe("wait");
+    expect(queueBehindRunningTurn({ ...base, threadBusy: true, threadHeld: true })).toBe("wait");
+  });
+
+  it("reads steer only from a loaded preference, and queues while the store loads", () => {
+    expect(outboxQueueMode(AsyncResult.initial())).toBe("queue");
+    expect(outboxQueueMode(AsyncResult.success({}))).toBe("queue");
+    expect(outboxQueueMode(AsyncResult.success({ infinitusComposerSendMode: "queue" }))).toBe(
+      "queue",
+    );
+    expect(outboxQueueMode(AsyncResult.success({ infinitusComposerSendMode: "steer" }))).toBe(
+      "steer",
+    );
   });
 
   it("leaves creations, non-send actions and steer mode alone", () => {
