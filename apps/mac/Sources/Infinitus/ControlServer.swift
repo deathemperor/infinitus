@@ -433,40 +433,6 @@ final class ControlServer {
             return ControlReply(ok: reply.outcome == "delivered", result: try .of(reply),
                                 error: reply.outcome == "delivered" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
 
-        case "machine":
-            if let report = model.machineModel.report {
-                return ControlReply(ok: true, result: try .of(report))
-            }
-            Task { await model.machineModel.sample() }
-            return ControlReply(ok: true, result: .object(["sampling": .bool(true)]))
-
-        case "machine-kill":
-            guard let pidText = r.args.first, let pid = Int(pidText), pid > 1 else {
-                throw Fail("usage: machine-kill <pid> --yes")
-            }
-            guard r.options["yes"] != nil else { throw Fail("machine-kill signals a process; pass --yes") }
-            let result = await model.machineModel.killRunaway(pid: pid)
-            return ControlReply(ok: true, result: .object(["result": .string(result)]))
-
-        case "machine-reclaim":
-            guard r.options["yes"] != nil else { throw Fail("machine-reclaim removes files; pass --yes") }
-            let result = await model.machineModel.reclaim()
-            return ControlReply(ok: true, result: .object(["result": .string(result)]))
-
-        case "machine-hook":
-            guard r.args.count >= 2, ["disable", "restore", "kill"].contains(r.args[0]) else {
-                throw Fail("usage: machine-hook disable|restore|kill <owner> --yes")
-            }
-            guard r.options["yes"] != nil else { throw Fail("machine-hook edits settings.json or signals processes; pass --yes") }
-            let owner = r.args[1]
-            let result: String
-            switch r.args[0] {
-            case "disable": result = await model.machineModel.disableHook(owner: owner)
-            case "kill": result = await model.machineModel.killHookInstances(owner: owner)
-            default: result = await model.machineModel.restoreHook(owner: owner)
-            }
-            return ControlReply(ok: true, result: .object(["result": .string(result)]))
-
         case "approve":
             guard let payload = r.secret, let event = HookEvent.parse(payload), event.name == "PreToolUse",
                   let sessionId = event.sessionId, let tool = event.toolName else {
@@ -1064,7 +1030,7 @@ final class ControlServer {
 
         case "team-drive":
             guard r.args.count >= 3 else {
-                throw Fail("usage: team-drive <kid|name> <session|-> <send|approve|mode|resume|key|stop|resume-past|delete|swap|hold|kill|reclaim> [text…]")
+                throw Fail("usage: team-drive <kid|name> <session|-> <send|approve|mode|resume|key|stop|resume-past|delete|swap|hold> [text…]")
             }
             let kid = try teammate(r.args[0])
             let action = r.args[2]

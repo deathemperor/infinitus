@@ -23,20 +23,17 @@ public struct TeamGrants: Codable, Equatable, Sendable {
     public static let delete = "delete"
     public static let swap = "swap"
     public static let hold = "hold"
-    public static let kill = "kill"
-    public static let reclaim = "reclaim"
     public static let lifecycleCapabilities = [stop, resumePast, delete]
     public static let accountCapabilities = [swap, hold]
-    public static let machineCapabilities = [kill, reclaim]
-    public static let capabilities = [view] + driveCapabilities + lifecycleCapabilities + accountCapabilities + machineCapabilities
+    public static let capabilities = [view] + driveCapabilities + lifecycleCapabilities + accountCapabilities
     /// Address the Mac, not a session: `Command.session` is
     /// `TeamControl.machineSession` and the grant's `sessions` is not consulted.
-    public static let machineScoped: Set<String> = [swap, hold, kill, reclaim]
+    public static let machineScoped: Set<String> = [swap, hold]
     /// Name a session that need not be live (a past transcript).
     public static let pastScoped: Set<String> = [resumePast, delete]
     /// Always ask the grantor, whatever the grant says: `add` drops them
     /// from `preauthorized`, and a hand-edited file is read the same way.
-    public static let neverPreauthorized: Set<String> = [delete, kill, reclaim]
+    public static let neverPreauthorized: Set<String> = [delete]
 
     /// `"all"` or a list of Claude Code session ids (never pids: the id
     /// is stable for a transcript, the pid is resolved at execution).
