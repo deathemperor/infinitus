@@ -20,6 +20,7 @@ import { Alert } from "react-native";
 
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildProjectThreadStartTurnInput } from "../lib/projectThreadStartTurn";
+import { serializeComposerMessageForServer, uploadedComposerContext } from "../lib/composerContext";
 import { prepareTurnAttachments, type PreparedTurnAttachments } from "../lib/attachmentUpload";
 import { usePinAtCreation } from "../features/infinitus/pinAtCreation";
 import { randomHex, uuidv4 } from "../lib/uuid";
@@ -307,7 +308,11 @@ export async function recoverEditedCreationAfterDelivery(
     // from deleting the attachment files. allowOverflow mirrors the
     // send-failure restore; the send path refuses over-cap drafts, so the
     // state stays recoverable.
-    await mergeComposerDraftContent(draftKey, { text: kept.text, attachments: [] });
+    await mergeComposerDraftContent(draftKey, {
+      text: kept.text,
+      context: kept.context,
+      attachments: [],
+    });
     if (appAtomRegistry.get(editingQueuedMessageIdsAtom)[kept.messageId]) {
       return true;
     }
@@ -399,6 +404,7 @@ export async function restoreRejectedQueuedMessage(
       stampRecoveryDraftProject(queuedMessage, draftKey);
       await mergeComposerDraftContent(draftKey, {
         text: queuedMessage.text,
+        context: queuedMessage.context,
         attachments: queuedMessage.attachments,
       });
     } finally {
@@ -817,12 +823,21 @@ export function useThreadOutboxDrain(): void {
         settings,
         currentConfig.providers,
       );
+      const serialized = serializeComposerMessageForServer(
+        queuedMessage.text,
+        uploadedComposerContext(
+          queuedMessage.context,
+          queuedMessage.attachments,
+          prepared.attachments,
+        ),
+        currentConfig.environment.capabilities.inlineMessageContext === true,
+      );
       const deliveryResult =
         via === "queue"
           ? await queueTurn({
               environmentId: queuedMessage.environmentId,
               input: queueTurnCommandInput({
-                message: queuedMessage,
+                message: { ...queuedMessage, ...serialized },
                 attachments: prepared.attachments,
                 modelSelection: sendSettings.modelSelection,
                 queueId: QueueId.make(uuidv4()),
@@ -836,7 +851,7 @@ export function useThreadOutboxDrain(): void {
                 message: {
                   messageId: queuedMessage.messageId,
                   role: "user",
-                  text: queuedMessage.text,
+                  ...serialized,
                   attachments: prepared.attachments,
                 },
                 modelSelection: sendSettings.modelSelection,
@@ -960,7 +975,15 @@ export function useThreadOutboxDrain(): void {
           commandId: queuedMessage.commandId,
           messageId: queuedMessage.messageId,
           createdAt: queuedMessage.createdAt,
-          text: queuedMessage.text.trim(),
+          ...serializeComposerMessageForServer(
+            queuedMessage.text.trim(),
+            uploadedComposerContext(
+              queuedMessage.context,
+              queuedMessage.attachments,
+              prepared.attachments,
+            ),
+            currentConfig.environment.capabilities.inlineMessageContext === true,
+          ),
           uploadedAttachments: prepared.attachments,
           modelSelection: sendSettings.modelSelection,
           runtimeMode: sendSettings.runtimeMode,

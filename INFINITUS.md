@@ -40,6 +40,13 @@ makes wrong, in its own PR.
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
   (upstream-channel tests start on a nightly feed via the harness `settings`
   option) are re-flipped to `infinitus` after each merge, never the rule.
+  An upstream migration whose number collides with the fork's own
+  (`051`–`057`, #806 onward) is renumbered after them in the merge
+  (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
+  is the fork's `058`), so an existing fork database never skips it. Upstream commits
+  `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
+  fork ignores the file and drops it from the merge (`git rm --cached`), so
+  each sync meets it as a modify/delete conflict resolved the same way.
 - **`apps/mac` is the Swift app** (#823 layer 2, 2026-09-12). Today's
   native Infinitus (menu bar, engines, team, tunnels, mirror API, control
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
