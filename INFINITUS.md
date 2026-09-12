@@ -770,7 +770,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`, and on an `infinitus`
   server "Babysit" / "Stop babysitting (r/10)" over `thread.meta.update
-  {babysit}` while the PR is open or the thread is already babysat — the
+{babysit}` while the PR is open or the thread is already babysat — the
   web toggle's gate, #269 A, the menu's status line reading "Babysitting
   r/10" while on; on Android the hook's `androidAction` is a header button
   before the git controls whose tap opens the same choices as an alert;
