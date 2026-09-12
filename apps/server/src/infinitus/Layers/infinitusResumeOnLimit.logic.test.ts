@@ -68,6 +68,7 @@ const stopAt = (snapshot: InfinitusSnapshot, kind: LimitStop["kind"] = "parked")
   kind,
   stoppedAt: NOW,
   activeAtStop: activeClaudeAccounts(snapshot),
+  resetsAt: null,
 });
 
 describe("limitStopFromEvent", () => {
@@ -80,7 +81,27 @@ describe("limitStopFromEvent", () => {
       kind: "parked",
       stoppedAt: NOW,
       activeAtStop: new Map([["swapd/claude", "one@example.com"]]),
+      // The SDK's epoch seconds, kept as milliseconds.
+      resetsAt: 1_757_600_000_000,
     });
+    // A reset the SDK left out, or one that is not a number, is none.
+    expect(
+      limitStopFromEvent(
+        { ...parkedWarning, payload: { ...parkedWarning.payload, detail: { status: "rejected" } } },
+        NOW,
+        snapshot,
+      )?.resetsAt,
+    ).toBeNull();
+    expect(
+      limitStopFromEvent(
+        {
+          ...parkedWarning,
+          payload: { ...parkedWarning.payload, detail: { status: "rejected", resetsAt: "soon" } },
+        },
+        NOW,
+        snapshot,
+      )?.resetsAt,
+    ).toBeNull();
     expect(
       limitStopFromEvent(
         { ...parkedWarning, payload: { message: "Reconnecting... 2/5", detail: { attempt: 2 } } },
@@ -109,7 +130,10 @@ describe("limitStopFromEvent", () => {
         errorMessage: "Claude stopped: a usage limit blocked the request.",
       },
     };
-    expect(limitStopFromEvent(failed, NOW, snapshot)?.kind).toBe("failed");
+    expect(limitStopFromEvent(failed, NOW, snapshot)).toMatchObject({
+      kind: "failed",
+      resetsAt: null,
+    });
     expect(
       limitStopFromEvent(
         {

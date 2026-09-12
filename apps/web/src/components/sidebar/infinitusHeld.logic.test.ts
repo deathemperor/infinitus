@@ -16,13 +16,19 @@ describe("heldEntryFor", () => {
         since: "2026-09-11T10:01:00.000Z",
         summary: "Limit hit on one@example.com",
         kind: "limited" as const,
+        resetsAt: "2026-09-11T14:00:00.000Z",
       },
     ];
     // No kind: a server before limits joined the stream, so held.
-    expect(heldEntryFor(holds, one)).toEqual({ kind: "held", summary: "Held on claude" });
+    expect(heldEntryFor(holds, one)).toEqual({
+      kind: "held",
+      summary: "Held on claude",
+      resetsAt: null,
+    });
     expect(heldEntryFor(holds, three)).toEqual({
       kind: "limited",
       summary: "Limit hit on one@example.com",
+      resetsAt: "2026-09-11T14:00:00.000Z",
     });
     expect(heldEntryFor(holds, two)).toBeNull();
   });

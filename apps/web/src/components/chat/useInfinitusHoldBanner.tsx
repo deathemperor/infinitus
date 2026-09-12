@@ -3,6 +3,7 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { CirclePauseIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { usePrimarySettings } from "~/hooks/useSettings";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type { Thread } from "~/types";
@@ -13,6 +14,7 @@ import {
   holdBannerText,
   holdBannerTitle,
   holdPhaseAfterRelease,
+  resetLabelFor,
   runNowLabel,
   type HoldPhase,
 } from "./infinitusHoldBanner.logic";
@@ -40,6 +42,7 @@ export function useInfinitusHoldBanner(input: {
     [activities, latestTurn],
   );
   const release = useAtomCommand(infinitusEnvironment.releaseThread, { reportFailure: false });
+  const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   // Keyed by the held row, so a later hold on the same thread starts idle.
   const [answered, setAnswered] = useState<{ markerId: string; phase: HoldPhase } | null>(null);
   const phase: HoldPhase =
@@ -49,7 +52,12 @@ export function useInfinitusHoldBanner(input: {
 
   return useMemo<ComposerBannerStackItem | null>(() => {
     if (hold === null || threadRef === null) return null;
-    const { description, actionable } = holdBannerText(hold.summary, phase, hold.kind);
+    const { description, actionable } = holdBannerText(
+      hold.summary,
+      phase,
+      hold.kind,
+      resetLabelFor(hold.resetsAt, timestampFormat),
+    );
     const busy =
       phase.kind === "releasing" || phase.kind === "released" || phase.kind === "pinning";
     const settle = (next: HoldPhase) => setAnswered({ markerId: hold.markerId, phase: next });
@@ -97,5 +105,5 @@ export function useInfinitusHoldBanner(input: {
         </>
       ) : undefined,
     };
-  }, [hold, phase, pinThread, release, supportsPinning, threadRef]);
+  }, [hold, phase, pinThread, release, supportsPinning, threadRef, timestampFormat]);
 }

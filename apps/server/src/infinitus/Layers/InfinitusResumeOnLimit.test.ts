@@ -103,12 +103,12 @@ const runtimeEvent = (
     payload,
   }) as ProviderRuntimeEvent;
 
-const parkedWarning = (turn: TurnId = turnId) =>
+const parkedWarning = (turn: TurnId = turnId, resetsAt = 1_757_600_000) =>
   runtimeEvent(
     "runtime.warning",
     {
       message: "Claude usage limit reached. This turn is paused until the 5-hour limit resets.",
-      detail: { status: "rejected", rateLimitType: "five_hour" },
+      detail: { status: "rejected", rateLimitType: "five_hour", resetsAt },
     },
     turn,
   );
@@ -331,6 +331,8 @@ describe("InfinitusResumeOnLimitLive", () => {
         expect(limited.activity.kind).toBe(LIMIT_MARKER_KIND);
         expect(limited.activity.summary).toBe("Limit hit on one@example.com");
         expect(limited.activity.turnId).toBe(turnId);
+        // The reset the SDK named, on the row (#270 I).
+        expect(limited.activity.payload).toMatchObject({ resetsAt: "2025-09-11T14:13:20.000Z" });
         const marker = dispatched[1]!;
         if (marker.type !== "thread.activity.append") throw new Error("marker expected");
         expect(marker.activity.kind).toBe(RESUME_MARKER_KIND);
@@ -455,12 +457,28 @@ describe("InfinitusResumeOnLimitLive", () => {
             since: expect.any(String),
             summary: "Limit hit on one@example.com",
             kind: "limited",
+            resetsAt: "2025-09-11T14:13:20.000Z",
           },
         ]);
 
+        // The SDK re-announces the parked turn with the reset moved: the
+        // entry follows, no second row is written.
+        yield* h.emit(parkedWarning(turnId, 1_757_603_600));
+        const afterMove = yield* settle(Ref.get(seen), (lists) => lists.length === 3);
+        expect(afterMove[2]).toEqual([
+          {
+            threadId,
+            since: afterStop[1]![0]!.since,
+            summary: "Limit hit on one@example.com",
+            kind: "limited",
+            resetsAt: "2025-09-11T15:13:20.000Z",
+          },
+        ]);
+        expect((yield* h.dispatched).length).toBe(1);
+
         yield* h.poll(swapped(at(150)));
-        const afterResume = yield* settle(Ref.get(seen), (lists) => lists.length === 3);
-        expect(afterResume[2]).toEqual([]);
+        const afterResume = yield* settle(Ref.get(seen), (lists) => lists.length === 4);
+        expect(afterResume[3]).toEqual([]);
       }),
     ),
   );

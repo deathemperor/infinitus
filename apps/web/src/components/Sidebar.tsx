@@ -139,6 +139,7 @@ import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
 import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
+import { HeldTooltipText } from "./sidebar/HeldTooltipText";
 import { onNextAttentionThreadRequest } from "./sidebar/nextAttentionBus";
 import { SidebarNeedsAttention } from "./sidebar/SidebarNeedsAttention";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -1109,7 +1110,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     thread.id,
     props.infinitusSupported,
   );
-  const heldSummary = heldEntry?.summary ?? null;
   const status = resolveSidebarThreadStatus(thread, {
     held: heldEntry?.kind === "held",
     limited: heldEntry?.kind === "limited",
@@ -1861,7 +1861,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           >
                             <span role="status">{topStatus.label}</span>
                           </TooltipTrigger>
-                          <TooltipPopup side="top">{heldSummary}</TooltipPopup>
+                          <TooltipPopup side="top">
+                            <HeldTooltipText entry={heldEntry} />
+                          </TooltipPopup>
                         </Tooltip>
                       ) : (
                         <span

@@ -1644,8 +1644,14 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   layer's `InfinitusLimitStops.stopped` list (#270 I), which `ws.ts` merges
   into `subscribeInfinitusHolds` beside the held starts so the sidebar reads
   "Limit" with the account in the tooltip; the banner reads "Stopped on a
-  usage limit" with no button; the resumed row or a new turn closes it. Once
-  per stop, 2-min cooldown per thread,
+  usage limit" with no button; the resumed row or a new turn closes it. A
+  parked stop's row and stream entry carry `resetsAt` (ISO) from the SDK's
+  `rate_limit_info`; the SDK re-announces a parked turn as its reset moves,
+  and the stream entry follows while the row stays as written; the tooltip
+  and the banner add "resets <time>" in the user's timestamp format while
+  the instant is still ahead (`infinitusHoldBanner.logic.ts` `limitedLine`
+  / `resetLabelFor`, `sidebar/HeldTooltipText.tsx`). A failed stop names no
+  reset. Once per stop, 2-min cooldown per thread,
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).
