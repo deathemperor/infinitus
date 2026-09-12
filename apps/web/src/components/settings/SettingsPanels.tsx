@@ -3003,11 +3003,15 @@ export function ArchivedThreadsPanel() {
         ),
       ),
     );
+    // Fork (#269 C): a side question closed with its tab is archived, and
+    // belongs to its drawer, not here.
     const threads = archivedSnapshots.flatMap(({ environmentId, snapshot }) =>
-      snapshot.threads.map((thread) => ({
-        ...thread,
-        environmentId,
-      })),
+      snapshot.threads
+        .filter((thread) => thread.sideOf == null)
+        .map((thread) => ({
+          ...thread,
+          environmentId,
+        })),
     );
 
     const archivedProjects = Array.from(projectsByEnvironmentAndId.values());
