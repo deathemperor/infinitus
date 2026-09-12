@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
+- Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).
 
 ### Mac
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.

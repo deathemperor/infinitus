@@ -9,6 +9,11 @@ import { ControlPillMenu } from "../../components/ControlPill";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
+import {
+  COMPOSER_SEND_MODE_LABELS,
+  outboxQueueMode,
+  type OutboxQueueMode,
+} from "../../state/threadOutboxQueue.logic";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
@@ -46,6 +51,17 @@ export function SettingsInfinitusSection() {
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
   const pushAlertsEnabled = loaded && preferences.value.infinitusPushAlertsEnabled === true;
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
+  // Sending while a turn runs (#807, the desktop's `composerSendMode`).
+  const sendMode = outboxQueueMode(preferences);
+  const sendModeActions = useMemo<MenuAction[]>(
+    () =>
+      (["queue", "steer"] as const).map((mode) => ({
+        id: mode,
+        title: COMPOSER_SEND_MODE_LABELS[mode],
+        state: mode === sendMode ? "on" : "off",
+      })),
+    [sendMode],
+  );
   // The test-card row (#845): how many working cards are live, re-read
   // after every press; the count is what the row offers to end.
   const [liveCards, setLiveCards] = useState(countLiveCards);
@@ -121,6 +137,23 @@ export function SettingsInfinitusSection() {
             void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
         }}
       />
+      <ControlPillMenu
+        title="Sending while a turn runs"
+        actions={sendModeActions}
+        onPressAction={({ nativeEvent }) => {
+          const mode = nativeEvent.event as OutboxQueueMode;
+          if (mode === "queue" || mode === "steer")
+            savePreferences({ infinitusComposerSendMode: mode });
+        }}
+      >
+        <SettingsRow
+          icon="tray.and.arrow.up"
+          label="Sending while a turn runs"
+          value={COMPOSER_SEND_MODE_LABELS[sendMode]}
+          disabled={!loaded}
+          onPress={() => {}}
+        />
+      </ControlPillMenu>
       {macs.length > 1 && pusher ? (
         <ControlPillMenu
           title="Mac that drives the card and sends alerts"
