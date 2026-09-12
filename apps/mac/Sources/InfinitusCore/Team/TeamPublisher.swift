@@ -57,15 +57,30 @@ public struct TeamPublisher {
     /// is a session, `<project>/<sid>/subagents/<agent>.jsonl` one of its
     /// sub-agents. For Codex files the "project dir" is a date; callers
     /// ignore it there.
+    /// String work only: `URL(fileURLWithPath:)` lstats the path to learn
+    /// whether it is a directory, and `collect` runs this over every
+    /// scan entry (~12k on a year-old corpus) every 300 s publish — one
+    /// lstat per entry was ~4 s of the pass on a Mac whose peers were
+    /// writing transcripts (#346).
     public static func transcriptIdentity(_ path: String) -> (session: String, agent: String?, projectDir: String) {
-        let url = URL(fileURLWithPath: path)
-        let parent = url.deletingLastPathComponent()
-        if parent.lastPathComponent == "subagents" {
-            let sessionDir = parent.deletingLastPathComponent()
-            return (sessionDir.lastPathComponent, url.deletingPathExtension().lastPathComponent,
-                    sessionDir.deletingLastPathComponent().lastPathComponent)
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        let n = parts.count
+        guard n >= 2 else { return (stem(parts.last ?? ""), nil, "") }
+        if parts[n - 2] == "subagents", n >= 4 {
+            return (String(parts[n - 3]), stem(parts[n - 1]), String(parts[n - 4]))
         }
-        return (url.deletingPathExtension().lastPathComponent, nil, parent.lastPathComponent)
+        return (stem(parts[n - 1]), nil, String(parts[n - 2]))
+    }
+
+    /// `URL.deletingPathExtension().lastPathComponent` without the URL.
+    private static func stem(_ name: Substring) -> String {
+        if let dot = name.lastIndex(of: "."), dot > name.startIndex { return String(name[..<dot]) }
+        return String(name)
+    }
+
+    /// `URL(fileURLWithPath:).lastPathComponent` without the lstat.
+    static func lastPathComponent(_ path: String) -> String {
+        String(path.split(separator: "/", omittingEmptySubsequences: true).last ?? "")
     }
 
     /// Folds the scan's per-file entries minus excluded projects: days
@@ -87,7 +102,7 @@ public struct TeamPublisher {
             let days = entry.daysWithOpenStretch()
             for (key, day) in days { out.days[key] = (out.days[key] ?? Stats.Day()) + day }
 
-            let project = entry.cwd.map { URL(fileURLWithPath: $0).lastPathComponent }
+            let project = entry.cwd.map(lastPathComponent)
             var row = rows[identity.session]
                 ?? TeamDocs.SessionRow(id: identity.session, project: project ?? String(identity.projectDir.split(separator: "-").last ?? ""), engine: entry.engine)
             // A sub-agent file seen first carries no cwd; the session's own file names the project.
@@ -142,7 +157,7 @@ public struct TeamPublisher {
             // session times (same rule as `collect`), and ISO day keys
             // compare as strings.
             guard let lastDay = entry.days.keys.max(), lastDay >= floor else { continue }
-            let project = entry.cwd.map { URL(fileURLWithPath: $0).lastPathComponent }
+            let project = entry.cwd.map(lastPathComponent)
             var row = out[identity.session]
                 ?? TranscriptSession(id: identity.session, project: project ?? String(identity.projectDir.split(separator: "-").last ?? ""),
                                      lastDay: lastDay, bytes: 0)
