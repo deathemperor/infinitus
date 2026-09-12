@@ -31,14 +31,14 @@ final class SettingsCatalogTests: XCTestCase {
         let tailscaleMatches = SettingsCatalog.filter("tailscale")
         XCTAssertEqual(tailscaleMatches.map(\.id), ["devices"])
 
-        let pypiMatches = SettingsCatalog.filter("pypi")
-        XCTAssertEqual(pypiMatches.map(\.id), ["cswap"])
+        let nudgeMatches = SettingsCatalog.filter("nudge")
+        XCTAssertEqual(nudgeMatches.map(\.id), ["swapd"])
     }
 
     func testEngineSectionIsExactlyThree() {
         let engines = SettingsCatalog.entries.filter(\.engine)
         XCTAssertEqual(engines.count, 3)
-        XCTAssertEqual(engines.map(\.id), ["cswap", "cliproxy", "9router"])
+        XCTAssertEqual(engines.map(\.id), ["swapd", "cliproxy", "9router"])
     }
 
     func testOrderMatchesTheMacSidebar() {
@@ -53,7 +53,7 @@ final class SettingsCatalogTests: XCTestCase {
             "activity",
             "devices",
             "about",
-            "cswap",
+            "swapd",
             "cliproxy",
             "9router"
         ]

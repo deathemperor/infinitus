@@ -1,9 +1,10 @@
 import Foundation
 
-// MARK: - cswap list --json (the display feed)
+// MARK: - The fleet display feed
 //
-// Field names mirror the schema-v1 camelCase payloads from
-// claude_swap/json_output.py verbatim, so JSONDecoder needs no key strategy.
+// Field names keep the schema-v1 camelCase of the original engine feed
+// (`SwapdMapping` builds them from `swapd list --json` today), so
+// JSONDecoder needs no key strategy.
 // Optionality mirrors the emitter: sub-keys appear only when the API sent
 // them, and `usage` is null for sentinel rows (no credentials, expired…).
 
@@ -310,55 +311,7 @@ public struct Spend: Codable, Sendable {
     }
 }
 
-// MARK: - cswap config list --json (the spec-driven settings feed)
-
-public struct ConfigList: Decodable, Sendable {
-    public let schemaVersion: Int
-    public let path: String
-    public let settings: [SettingEntry]
-}
-
-/// One SETTING_SPECS row. The GUI renders a widget from `kind` +
-/// `lo`/`hi`/`choices` and never hand-wires per-key controls — the whole
-/// point of the metadata export (spec §3.1).
-public struct SettingEntry: Decodable, Sendable {
-    public let key: String
-    public let value: JSONValue
-    public let isSet: Bool
-    public let kind: String
-    public let help: String
-    public let defaultValue: JSONValue
-    public let lo: Double?
-    public let hi: Double?
-    public let choices: [String]?
-
-    public init(
-        key: String,
-        value: JSONValue,
-        isSet: Bool = true,
-        kind: String = "string",
-        help: String = "",
-        defaultValue: JSONValue = .null,
-        lo: Double? = nil,
-        hi: Double? = nil,
-        choices: [String]? = nil
-    ) {
-        self.key = key
-        self.value = value
-        self.isSet = isSet
-        self.kind = kind
-        self.help = help
-        self.defaultValue = defaultValue
-        self.lo = lo
-        self.hi = hi
-        self.choices = choices
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case key, value, isSet, kind, help, lo, hi, choices
-        case defaultValue = "default"
-    }
-}
+// MARK: - JSON values
 
 /// Settings values are heterogeneous (bool / number / string), so they land
 /// in a closed enum instead of Any.
@@ -413,7 +366,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
     }
 }
 
-/// `cswap usage --json` — estimated per-account token spend. The dollar
+/// Estimated per-account token spend (the proxy engine's cost report). The dollar
 /// figures are API-list-price estimates (the report's caveats say so);
 /// render them as estimates, never as a bill.
 public struct UsageReport: Codable, Sendable {
@@ -558,17 +511,4 @@ public enum GaugeMath {
         guard ahead == false, let expected = expectedPct else { return 0 }
         return max(0, min(1, (expected - usedPct) / 30))
     }
-}
-
-/// `cswap history --json` — recent account switches, newest first. The
-/// engine parses its own log; frontends never scrape the file.
-public struct SwitchHistoryList: Decodable, Sendable {
-    public struct Switch: Decodable, Sendable {
-        public let from: Int
-        public let to: Int
-        public let at: String
-    }
-    public let schemaVersion: Int
-    public let switches: [Switch]
-    public let logPath: String
 }

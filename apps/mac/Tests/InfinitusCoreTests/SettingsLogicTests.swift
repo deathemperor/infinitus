@@ -1,52 +1,6 @@
 import XCTest
 @testable import InfinitusCore
 
-final class SettingDraftTests: XCTestCase {
-    private func entry(
-        kind: String, lo: Double? = nil, hi: Double? = nil, choices: [String]? = nil
-    ) -> SettingEntry {
-        SettingEntry(
-            key: "autoswitch.x", value: .null, isSet: false, kind: kind,
-            help: "", defaultValue: .null, lo: lo, hi: hi, choices: choices)
-    }
-
-    func testFloatWithinBoundsPasses() {
-        XCTAssertEqual(
-            SettingDraft.validate("97.5", for: entry(kind: "float", lo: 50, hi: 99.9)),
-            .valid("97.5"))
-    }
-
-    func testFloatOutsideBoundsNamesTheRange() {
-        guard case .invalid(let why) = SettingDraft.validate(
-            "120", for: entry(kind: "float", lo: 50, hi: 99.9)) else { return XCTFail() }
-        XCTAssertTrue(why.contains("50"))
-        XCTAssertTrue(why.contains("99.9"))
-    }
-
-    func testIntRejectsFractions() {
-        guard case .invalid = SettingDraft.validate(
-            "2.5", for: entry(kind: "int", lo: 1, hi: 100)) else { return XCTFail() }
-    }
-
-    func testBoolAcceptsTrueFalseOnly() {
-        XCTAssertEqual(SettingDraft.validate("true", for: entry(kind: "bool")), .valid("true"))
-        guard case .invalid = SettingDraft.validate("yes", for: entry(kind: "bool")) else {
-            return XCTFail()
-        }
-    }
-
-    func testChoiceMustBeListed() {
-        let e = entry(kind: "choice", choices: ["best", "consume-first"])
-        XCTAssertEqual(SettingDraft.validate("best", for: e), .valid("best"))
-        guard case .invalid = SettingDraft.validate("worst", for: e) else { return XCTFail() }
-    }
-
-    func testEmptyStringMeansUnset() {
-        XCTAssertEqual(SettingDraft.validate("", for: entry(kind: "string")), .unset)
-        XCTAssertEqual(SettingDraft.validate("  ", for: entry(kind: "float", lo: 0, hi: 9)), .unset)
-    }
-}
-
 final class ClaudeCodeConfigTests: XCTestCase {
     private var dir: URL!
     private var userFile: URL!
