@@ -866,8 +866,11 @@ final class MirrorServer: ObservableObject {
                 },
                 grants: { TeamGrants.load(teamDir: dir) },
                 liveSessions: live,
-                execute: { action, text, pid in
-                    guard let request = TeamControl.request(action: action, text: text) else {
+                execute: { action, text, _, pid in
+                    // Phase 2's non-drive actions (`TeamControl.localVerb`)
+                    // land with their verbs; until then nobody can grant
+                    // them and an unexpected one is refused here.
+                    guard let pid, let request = TeamControl.request(action: action, text: text) else {
                         return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
                     }
                     return mirrorInputQueue.sync { box.deliver(pid, request, from: "team") }

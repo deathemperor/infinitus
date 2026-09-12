@@ -81,4 +81,71 @@ final class TeamGrantsTests: XCTestCase {
         XCTAssertEqual(hints[1].sessions, ["s1"])
         XCTAssertNil(hints[0].sessions, "all is nil in the hint")
     }
+
+    // MARK: Phase 2 (#220): tiers, pre-authorization, expiry
+
+    func testAPhaseOneFileAsksForEverythingBeyondDriveAndResavesByteIdentical() throws {
+        var grants = TeamGrants()
+        grants.add(audience: .team, sessions: .all, capabilities: [TeamGrants.send, TeamGrants.stop], now: 5)
+        let phaseOne = String(decoding: try CanonicalJSON.encode(grants), as: UTF8.self)
+        XCTAssertFalse(phaseOne.contains("preauthorized"), phaseOne)
+        XCTAssertFalse(phaseOne.contains("expires"), phaseOne)
+        let read = try CanonicalJSON.decode(TeamGrants.self, from: Data(phaseOne.utf8))
+        XCTAssertEqual(read, grants)
+        let g = try XCTUnwrap(read.grants.first)
+        XCTAssertEqual(g.preauthorized, [])
+        XCTAssertNil(g.expires)
+        XCTAssertTrue(g.requiresApproval(TeamGrants.stop))
+        XCTAssertFalse(g.requiresApproval(TeamGrants.send))
+        XCTAssertFalse(g.requiresApproval(TeamGrants.view))
+    }
+
+    func testDeleteKillReclaimNeverRunUnasked() {
+        var grants = TeamGrants()
+        let g = grants.add(audience: .team, sessions: .all,
+                           capabilities: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.kill, TeamGrants.swap],
+                           preauthorized: [TeamGrants.send, TeamGrants.stop, TeamGrants.delete, TeamGrants.kill, TeamGrants.reclaim, "reboot"],
+                           expires: 1_000, now: 300)
+        XCTAssertEqual(g.preauthorized, [TeamGrants.stop], "drive is implicit, delete/kill never, reclaim/reboot were not granted")
+        XCTAssertFalse(g.requiresApproval(TeamGrants.stop))
+        XCTAssertTrue(g.requiresApproval(TeamGrants.delete))
+        XCTAssertTrue(g.requiresApproval(TeamGrants.swap))
+        // A hand-edited file cannot pre-authorize them either.
+        let hand = TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all, capabilities: [TeamGrants.delete, TeamGrants.reclaim],
+                                    since: 1, preauthorized: [TeamGrants.delete, TeamGrants.reclaim])
+        XCTAssertTrue(hand.requiresApproval(TeamGrants.delete))
+        XCTAssertTrue(hand.requiresApproval(TeamGrants.reclaim))
+        let json = #"{"grants":[{"audience":"team","capabilities":["kill"],"id":"g-00000001","preauthorized":["kill"],"sessions":"all","since":5}],"schema":1}"#
+        let edited = try? CanonicalJSON.decode(TeamGrants.self, from: Data(json.utf8))
+        XCTAssertEqual(edited?.grants.first?.preauthorized, [])
+        // The file carries them sorted, and the round trip holds.
+        let bytes = String(decoding: (try? CanonicalJSON.encode(grants)) ?? Data(), as: UTF8.self)
+        XCTAssertTrue(bytes.contains("\"preauthorized\":[\"stop\"]"), bytes)
+        XCTAssertTrue(bytes.contains("\"expires\":1000"), bytes)
+        XCTAssertEqual(try? CanonicalJSON.decode(TeamGrants.self, from: Data(bytes.utf8)), grants)
+    }
+
+    func testExpiryMachineScopeAndHints() {
+        let r = roster(leaders: [leader], members: [member])
+        var grants = TeamGrants()
+        grants.add(audience: .team, sessions: .all, capabilities: [TeamGrants.stop, TeamGrants.delete, TeamGrants.swap],
+                   preauthorized: [TeamGrants.stop], expires: 1_000, now: 300)
+        XCTAssertNotNil(grants.permits(kid: member.kid, session: "s1", capability: TeamGrants.stop, roster: r, now: 999))
+        XCTAssertNil(grants.permits(kid: member.kid, session: "s1", capability: TeamGrants.stop, roster: r, now: 1_000), "expired at its instant")
+        // Machine-scoped: the grant's sessions are not consulted; a session action still is.
+        var some = TeamGrants()
+        some.add(audience: .team, sessions: .some(["s1"]), capabilities: [TeamGrants.swap, TeamGrants.stop], now: 1)
+        XCTAssertNotNil(some.permits(kid: member.kid, session: TeamControl.machineSession, capability: TeamGrants.swap, roster: r))
+        XCTAssertNil(some.permits(kid: member.kid, session: TeamControl.machineSession, capability: TeamGrants.stop, roster: r))
+        // Hints: what asks, sorted, and when it ends; absent when nothing asks.
+        XCTAssertEqual(grants.hints[0].approval, ["delete", "swap"])
+        XCTAssertEqual(grants.hints[0].expires, 1_000)
+        XCTAssertEqual(some.hints[0].approval, ["stop", "swap"])
+        XCTAssertNil(some.hints[0].expires)
+        var drive = TeamGrants()
+        drive.add(audience: .team, sessions: .all, capabilities: [TeamGrants.send, TeamGrants.view], now: 1)
+        XCTAssertNil(drive.hints[0].approval)
+        let bytes = String(decoding: (try? CanonicalJSON.encode(drive.hints)) ?? Data(), as: UTF8.self)
+        XCTAssertFalse(bytes.contains("approval"), "a drive-only hint is byte-identical to Phase 1's")
+    }
 }

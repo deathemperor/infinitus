@@ -17,7 +17,7 @@ final class TeamControlRouteTests: XCTestCase {
         if !capabilities.isEmpty { grants.add(audience: .members([driver.kid]), sessions: .some(["s1"]), capabilities: capabilities, now: 1) }
         let r = roster
         return TeamControl.Endpoint(identity: grantor, roster: { r }, grants: { grants }, liveSessions: { ["s1": 7] },
-                                    execute: { _, _, _ in .init(outcome: "delivered", channel: "pty") },
+                                    execute: { _, _, _, _ in .init(outcome: "delivered", channel: "pty") },
                                     seen: .init(), limit: .init(), now: { Date(timeIntervalSince1970: 1_000) })
     }
 
