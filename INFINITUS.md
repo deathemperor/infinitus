@@ -597,6 +597,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
   `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
+  `infinitusReconnectingNotice` slot above the hold banner (#832: "Waiting
+  for the network. Reconnect attempt n of 5." while the session's
+  `statusReason` reads `reconnecting:<n>/<max>` on a running session;
+  `apps/mobile/src/features/infinitus/InfinitusReconnectingNotice.tsx` +
+  `reconnecting.logic.ts`, the web helper's copy; `ThreadRouteScreen.tsx`
+  builds it from the thread shell's session, and
+  `thread-list-v2-items.tsx` labels such a working row "Reconnecting n/max"
+  in amber instead of "Working"), the optional
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
   feedback notices, #742) and the `infinitusQueuedTurns` slot right after it
   (#806: the thread's server-side queue as a card — one row per queued

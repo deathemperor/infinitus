@@ -79,6 +79,8 @@ import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { threadEnvironment } from "../../state/threads";
 import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
 import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
+import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
+import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import {
@@ -668,6 +670,8 @@ function ThreadRouteContent(
   const gitRightHeaderItems = useThreadGitRightHeaderItems(threadGitControlProps);
   // Infinitus (#269): the thread's pull request leads the header when it has one.
   const pullRequestHeader = usePullRequestHeaderItem(selectedThread);
+  // Infinitus (#832): the turn is still running while the server reconnects.
+  const reconnectingNoticeText = reconnectingNotice(selectedThread?.session);
   // Infinitus (#269 C, #881): the side-question button follows it.
   const sideQuestionHeader = useSideQuestionHeaderItem(selectedThread, selectedThreadDetail);
   const infinitusHeaderItems = useMemo<NativeHeaderItems>(
@@ -896,6 +900,11 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusReconnectingNotice={
+            creationState === null && reconnectingNoticeText !== null ? (
+              <InfinitusReconnectingNotice notice={reconnectingNoticeText} />
+            ) : null
+          }
           infinitusHoldBanner={
             creationState === null && selectedThreadDetail !== null ? (
               <InfinitusHoldBanner
