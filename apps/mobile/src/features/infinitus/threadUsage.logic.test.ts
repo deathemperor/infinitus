@@ -68,6 +68,34 @@ describe("thread usage sheet (#834)", () => {
     );
   });
 
+  it("keeps the counts and says usage is not reported for a Cursor or Grok thread (#1026)", () => {
+    const grok: ThreadUsageRollup = {
+      ...ROLLUP,
+      turns: 2,
+      unreportedTurns: 2,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheCreationTokens: 0,
+      reasoningTokens: 0,
+      costUsd: null,
+      models: [],
+      toolCalls: 7,
+      durationMs: 65_000,
+    };
+    expect(threadUsageRows(grok).map((row) => row.label)).toEqual([
+      "Turns",
+      "Tool calls",
+      "Duration",
+      "Last turn",
+    ]);
+    expect(threadUsageNotes(grok)[0]).toBe("Usage not reported by this provider.");
+    // One reported turn among unreported ones keeps the figures.
+    const mixed = { ...grok, turns: 3, unreportedTurns: 2, inputTokens: 10, costUsd: 0.01 };
+    expect(threadUsageRows(mixed).map((row) => row.label)).toContain("Cost");
+    expect(threadUsageNotes(mixed)[0]).toBe("Estimates from the provider, not billing.");
+  });
+
   it("always says the numbers are estimates, and names the transcript and subagent caveats", () => {
     expect(threadUsageNotes(ROLLUP)).toEqual(["Estimates from the provider, not billing."]);
     expect(threadUsageNotes({ ...ROLLUP, source: "transcript", subagentTurns: 1 })).toEqual([
