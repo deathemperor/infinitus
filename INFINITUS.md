@@ -493,8 +493,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (`openSideQuestionPending`, `failSideQuestionPending`; the pending
   surface is never persisted) and shows a failure inside with "Try again";
   until a turn has completed (`hasCompletedTurn`) the button is off and
-  its tooltip says so. Gated on a Claude session and
-  `capabilities.infinitus`; the button sits after the mode toggle in
+  its tooltip says so. Gated on a Claude or Codex session
+  (`supportsThreadFork`, #819) and `capabilities.infinitus`; the button
+  sits after the mode toggle in
   `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in
   `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and
   `getLatestThreadForProject` skip `sideOf` threads. Tests:
