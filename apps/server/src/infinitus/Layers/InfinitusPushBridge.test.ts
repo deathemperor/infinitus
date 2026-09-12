@@ -31,12 +31,14 @@ import {
   InfinitusControlClient,
   type InfinitusControlRequestInput,
 } from "../Services/InfinitusControlClient.ts";
+import { InfinitusSlackBindings } from "../Services/InfinitusSlackBindings.ts";
 import { NOT_POLLED_REASON } from "./Infinitus.ts";
 import { InfinitusPushBridgeLive } from "./InfinitusPushBridge.ts";
 
 const environmentId = EnvironmentId.make("env-1");
 const projectId = ProjectId.make("project-1");
 const one = ThreadId.make("thread-1");
+const two = ThreadId.make("thread-2");
 const now = "2026-09-13T10:00:00.000Z";
 
 const project = { id: projectId, title: "Acme" } as unknown as OrchestrationProjectShell;
@@ -75,12 +77,12 @@ const sessionSet = (threadId: ThreadId): OrchestrationEvent =>
     payload: { threadId },
   }) as never;
 
-const command = (name: string, stdin?: string): InfinitusManifestCommand => ({
+const command = (name: string, stdin?: string, summary?: string): InfinitusManifestCommand => ({
   name,
   args: [],
   options: [],
   effect: "write",
-  summary: "…{kind, threadId, title, phase, detail?, local?}…",
+  summary: summary ?? "…{kind, threadId, title, phase, detail?, local?}…",
   replyShape: "",
   ...(stdin === undefined ? {} : { stdin }),
 });
@@ -98,6 +100,9 @@ const notPolled: InfinitusSnapshot = {
   commands: [],
 };
 const pushManifest = snapshotWith([command("push", "payload")]);
+const slackAwareManifest = snapshotWith([
+  command("push", "payload", "…{kind, threadId, title, phase, detail?, local?, slack?}…"),
+]);
 
 const makeHarness = (input: {
   readonly enabled?: boolean;
@@ -105,6 +110,7 @@ const makeHarness = (input: {
   readonly polled?: InfinitusSnapshot;
   readonly reply?: Effect.Effect<unknown, InfinitusUnavailable>;
   readonly initial?: ReadonlyArray<OrchestrationThreadShell>;
+  readonly slackBound?: ReadonlyArray<ThreadId>;
 }) =>
   Effect.gen(function* () {
     const domainEvents = yield* PubSub.unbounded<OrchestrationEvent>();
@@ -141,6 +147,9 @@ const makeHarness = (input: {
             ),
             changes: () => Stream.empty,
             observed: Stream.empty,
+          }),
+          Layer.mock(InfinitusSlackBindings)({
+            isBound: (threadId) => Effect.succeed((input.slackBound ?? []).includes(threadId)),
           }),
           Layer.mock(InfinitusControlClient)({
             socketPath: "/tmp/test.sock",
@@ -235,6 +244,26 @@ describe("InfinitusPushBridgeLive (#269 G)", () => {
       yield* h.move(one, "idle");
       expect(yield* h.pushes).toEqual([]);
     }),
+  );
+
+  effectIt.effect(
+    "a Slack-bound thread's push says `slack: false`, only on an app that knows the flag (#1028)",
+    () =>
+      Effect.gen(function* () {
+        const flag = (pushes: ReadonlyArray<{ payload: unknown }>) =>
+          pushes.map((push) => (push.payload as { slack?: false }).slack);
+        const aware = yield* makeHarness({ snapshot: slackAwareManifest, slackBound: [one] });
+        yield* aware.move(one, "running");
+        yield* aware.move(one, "approval");
+        yield* aware.move(two, "running");
+        yield* aware.move(two, "approval");
+        expect(flag(yield* aware.pushes)).toEqual([false, undefined]);
+
+        const older = yield* makeHarness({ slackBound: [one] });
+        yield* older.move(one, "running");
+        yield* older.move(one, "approval");
+        expect(flag(yield* older.pushes)).toEqual([undefined]);
+      }),
   );
 
   effectIt.effect("stays quiet with the setting off, and touches no socket", () =>

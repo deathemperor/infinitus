@@ -17,8 +17,10 @@ import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
+import { InfinitusSlackBindings } from "../Services/InfinitusSlackBindings.ts";
 import {
   manifestHasPush,
+  manifestPushSkipsSlack,
   shouldPushPhase,
   threadPhasePayload,
 } from "./infinitusPushBridge.logic.ts";
@@ -44,13 +46,17 @@ import {
  * recorded per thread before the socket call, first sighting silently (a
  * boot, or the switch just turned on), so a restart announces nothing and
  * the same phase is never pushed twice; an unreachable Mac drops the push.
- * Only thread ids and phases reach the log; never a title.
+ * A thread the Slack bridge (#574) reports in a Slack thread of its own gets
+ * `slack: false` too, on an app whose summary names it (#1028), so the
+ * Mac's webhook does not post a second copy; Telegram and the phone still
+ * get it. Only thread ids and phases reach the log; never a title.
  */
 export const InfinitusPushBridgeLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const settings = yield* ServerSettingsService;
     const infinitus = yield* InfinitusService;
     const control = yield* InfinitusControlClient;
+    const slackBindings = yield* InfinitusSlackBindings;
     const orchestrationEngine = yield* OrchestrationEngineService;
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const environmentId = yield* (yield* ServerEnvironment.ServerEnvironment).getEnvironmentId;
@@ -70,7 +76,8 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
         yield* infinitus.refresh;
         snapshot = yield* infinitus.snapshot;
       }
-      return snapshot.available && manifestHasPush(snapshot.commands);
+      if (!snapshot.available || !manifestHasPush(snapshot.commands)) return null;
+      return { skipsSlack: manifestPushSkipsSlack(snapshot.commands) };
     });
 
     const awarenessOf = (threadId: ThreadId) =>
@@ -86,9 +93,17 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
         });
       });
 
-    const push = (threadId: ThreadId, title: string, phase: AgentAwarenessPhase) =>
+    const push = (
+      threadId: ThreadId,
+      title: string,
+      phase: AgentAwarenessPhase,
+      skipSlack: boolean,
+    ) =>
       control
-        .request({ command: "push", secret: threadPhasePayload({ threadId, title, phase }) })
+        .request({
+          command: "push",
+          secret: threadPhasePayload({ threadId, title, phase, skipSlack }),
+        })
         .pipe(
           Effect.asVoid,
           Effect.tap(() => Effect.logDebug("infinitus.push-bridge.pushed", { threadId, phase })),
@@ -116,8 +131,10 @@ export const InfinitusPushBridgeLive = Layer.effectDiscard(
         const previous = phases.get(threadId);
         phases.set(threadId, state.phase);
         if (!shouldPushPhase(previous, state.phase)) return;
-        if (!(yield* manifestReady)) return;
-        yield* push(threadId, state.threadTitle, state.phase);
+        const manifest = yield* manifestReady;
+        if (manifest === null) return;
+        const skipSlack = manifest.skipsSlack && (yield* slackBindings.isBound(threadId));
+        yield* push(threadId, state.threadTitle, state.phase, skipSlack);
       }).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("infinitus.push-bridge.event-failed", {
