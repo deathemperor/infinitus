@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Phone
+- Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer with its files, as the desktop does (#971).
 
 ## 0.5.0-alpha.3
 
