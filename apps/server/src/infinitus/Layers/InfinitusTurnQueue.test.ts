@@ -1,6 +1,7 @@
 import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   MessageId,
+  OrchestrationMessageContext,
   QUEUED_TURN_GONE,
   QueueId,
   ThreadId,
@@ -19,6 +20,7 @@ import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { orderKeyBetween } from "@t3tools/shared/orderKeys";
 import { describe, expect } from "vite-plus/test";
@@ -34,11 +36,21 @@ const one = ThreadId.make("thread-1");
 const two = ThreadId.make("thread-2");
 const now = "2026-09-12T10:00:00.000Z";
 
-const row = (queueId: string, orderKey: string): OrchestrationQueuedTurn => ({
+const context = Schema.decodeUnknownSync(OrchestrationMessageContext)({
+  version: 1,
+  records: [{ version: 1, contextId: "ctx-1", label: "a.ts", kind: "mention", path: "src/a.ts" }],
+});
+
+const row = (
+  queueId: string,
+  orderKey: string,
+  context?: OrchestrationQueuedTurn["context"],
+): OrchestrationQueuedTurn => ({
   queueId: QueueId.make(queueId),
   messageId: MessageId.make(`${queueId}-message`),
   text: `queued ${queueId}`,
   attachments: [],
+  ...(context !== undefined ? { context } : {}),
   orderKey,
   createdAt: now,
   updatedAt: now,
@@ -202,6 +214,9 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
                     threadId: command.threadId,
                     queuedFrom: command.queuedFrom,
                     text: command.message.text,
+                    ...(command.message.context !== undefined
+                      ? { context: command.message.context }
+                      : {}),
                   },
                 ]
               : [],
@@ -403,6 +418,18 @@ describe("InfinitusTurnQueueLive (#806)", () => {
         yield* h.setPaused([]);
         yield* settle(h.starts, (list) => list.length === 1);
         expect(yield* h.starts).toEqual([{ threadId: one, queuedFrom: "q1", text: "queued q1" }]);
+      }),
+    ),
+  );
+  effectIt.effect("sends the row's context records with the message (#969)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one, { queuedTurns: [row("q1", "m", context)] })]);
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.starts, (list) => list.length === 1);
+        expect(yield* h.starts).toEqual([
+          { threadId: one, queuedFrom: "q1", text: "queued q1", context },
+        ]);
       }),
     ),
   );

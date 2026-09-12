@@ -7568,6 +7568,35 @@ export default function ChatView(props: ChatViewProps) {
     }
 
     let turnStartSucceeded = false;
+    // The message's context records (upstream #11265) — or, for a server
+    // from before inline context, their legacy text form — shared by the
+    // queue (#969) and the start dispatches below.
+    const messageContextFields = (
+      attachments: ReadonlyArray<{ readonly id?: string | undefined }>,
+    ) => {
+      const context = buildOutgoingMessageContext(
+        attachments.map((attachment, index) =>
+          attachment.id !== undefined ? attachment.id : composerAttachmentsSnapshot[index]!.id,
+        ),
+      );
+      if (context === undefined) return {};
+      // Read the capability at dispatch time: the upload and persistence
+      // awaits above can span a server reconnect that changes it. Servers
+      // from before inline context drop the records and forward the links
+      // as literal text, so their turns carry the payload the legacy way.
+      const supportsInlineMessageContext =
+        appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment
+          .capabilities.inlineMessageContext === true;
+      if (!supportsInlineMessageContext) {
+        return {
+          text: serializeLegacyContextMessage({
+            text: outgoingMessageText,
+            records: context.records,
+          }),
+        };
+      }
+      return { context };
+    };
     if (failure === null && turnAttachmentsResult._tag === "Success" && isQueueSubmission) {
       const queueResult = await queueThreadTurn({
         environmentId,
@@ -7579,6 +7608,7 @@ export default function ChatView(props: ChatViewProps) {
             role: "user",
             text: outgoingMessageText,
             attachments: turnAttachmentsResult.value,
+            ...messageContextFields(turnAttachmentsResult.value),
           },
           modelSelection: ctxSelectedModelSelection,
           createdAt: messageCreatedAt,
@@ -7678,32 +7708,7 @@ export default function ChatView(props: ChatViewProps) {
               role: "user",
               text: outgoingMessageText,
               attachments: turnAttachmentsResult.value,
-              ...(() => {
-                const context = buildOutgoingMessageContext(
-                  turnAttachmentsResult.value.map((attachment, index) =>
-                    "id" in attachment && attachment.id !== undefined
-                      ? attachment.id
-                      : composerAttachmentsSnapshot[index]!.id,
-                  ),
-                );
-                if (context === undefined) return {};
-                // Read the capability at dispatch time: the upload and persistence
-                // awaits above can span a server reconnect that changes it. Servers
-                // from before inline context drop the records and forward the links
-                // as literal text, so their turns carry the payload the legacy way.
-                const supportsInlineMessageContext =
-                  appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment
-                    .capabilities.inlineMessageContext === true;
-                if (!supportsInlineMessageContext) {
-                  return {
-                    text: serializeLegacyContextMessage({
-                      text: outgoingMessageText,
-                      records: context.records,
-                    }),
-                  };
-                }
-                return { context };
-              })(),
+              ...messageContextFields(turnAttachmentsResult.value),
             },
             modelSelection: start.member
               ? memberModelSelection(start.member)

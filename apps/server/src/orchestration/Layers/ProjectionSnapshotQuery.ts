@@ -475,6 +475,7 @@ function mapQueuedTurnRow(row: QueuedTurnDbRow): OrchestrationQueuedTurn {
     text: row.text,
     attachments: row.attachments,
     ...(row.modelSelection === null ? {} : { modelSelection: row.modelSelection }),
+    ...(row.context === null ? {} : { context: row.context }),
     orderKey: row.orderKey,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -839,6 +840,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           text,
           attachments_json AS "attachments",
           model_selection_json AS "modelSelection",
+          context_json AS "context",
           order_key AS "orderKey",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -1508,6 +1510,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           text,
           attachments_json AS "attachments",
           model_selection_json AS "modelSelection",
+          context_json AS "context",
           order_key AS "orderKey",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
