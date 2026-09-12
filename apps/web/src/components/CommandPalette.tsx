@@ -46,7 +46,6 @@ import {
   ArrowLeftIcon,
   ChartLineIcon,
   CornerLeftUpIcon,
-  CpuIcon,
   FileSearchIcon,
   FolderIcon,
   FolderPlusIcon,
@@ -1901,16 +1900,6 @@ function OpenCommandPaletteDialog(props: {
         icon: <ActivityIcon className={ITEM_ICON_CLASS} />,
         run: async () => {
           await navigate({ to: "/activity" });
-        },
-      },
-      {
-        kind: "action",
-        value: "action:open-machine",
-        searchTerms: ["machine", "infinitus", "health", "load", "hooks", "processes"],
-        title: "Open machine",
-        icon: <CpuIcon className={ITEM_ICON_CLASS} />,
-        run: async () => {
-          await navigate({ to: "/machine" });
         },
       },
       {

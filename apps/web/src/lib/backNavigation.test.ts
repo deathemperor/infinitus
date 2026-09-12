@@ -15,7 +15,6 @@ describe("isBackablePathname", () => {
       "/accounts",
       "/stats",
       "/activity",
-      "/machine",
       "/utilization",
     ]) {
       expect(isBackablePathname(pathname), pathname).toBe(true);

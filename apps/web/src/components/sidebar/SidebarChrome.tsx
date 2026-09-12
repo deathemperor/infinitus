@@ -3,7 +3,6 @@ import {
   ArrowLeftIcon,
   ChartLineIcon,
   ChartNoAxesColumnIcon,
-  CpuIcon,
   GaugeIcon,
   GitPullRequestIcon,
   SettingsIcon,
@@ -148,11 +147,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
                   ? "stats"
                   : location.pathname === "/activity"
                     ? "activity"
-                    : location.pathname === "/machine"
-                      ? "machine"
-                      : location.pathname === "/utilization"
-                        ? "utilization"
-                        : null,
+                    : location.pathname === "/utilization"
+                      ? "utilization"
+                      : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
@@ -195,11 +192,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleActivityClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/activity" });
-  }, [closeMobileSidebar, navigate]);
-
-  const handleMachineClick = useCallback(() => {
-    closeMobileSidebar();
-    void navigate({ to: "/machine" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUtilizationClick = useCallback(() => {
@@ -262,9 +254,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               label="Activity"
               onClick={handleActivityClick}
             />
-          ) : null}
-          {accountsSupported ? (
-            <SidebarUtilityItem icon={<CpuIcon />} label="Machine" onClick={handleMachineClick} />
           ) : null}
           {accountsSupported ? (
             <SidebarUtilityItem
