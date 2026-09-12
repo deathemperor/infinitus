@@ -679,6 +679,8 @@ export type TaskAgentLinkage = typeof TaskAgentLinkage.Type;
 const TaskStartedPayload = Schema.Struct({
   taskId: RuntimeTaskId,
   description: Schema.optional(TrimmedNonEmptyStringSchema),
+  /** Registered in the background from the start (a later move arrives on task.updated). */
+  isBackgrounded: Schema.optional(Schema.Boolean),
   ...taskAgentLinkageFields,
 });
 export type TaskStartedPayload = typeof TaskStartedPayload.Type;

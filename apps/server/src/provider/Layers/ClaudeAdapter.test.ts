@@ -51,7 +51,11 @@ import { ProviderAdapterProcessError, ProviderAdapterValidationError } from "../
 import type { ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import type { ClaudeScopedLimitNames } from "./claudeUsageLimits.ts";
 import { RECONNECT_EXHAUSTED_MESSAGE } from "./claudeReconnect.logic.ts";
-import { makeClaudeAdapter, type ClaudeAdapterLiveOptions } from "./ClaudeAdapter.ts";
+import {
+  liveBackgroundAgentsMessage,
+  makeClaudeAdapter,
+  type ClaudeAdapterLiveOptions,
+} from "./ClaudeAdapter.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 const encodeUnknownJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -3050,6 +3054,146 @@ describe("ClaudeAdapterLive", () => {
         assert.equal(stoppedTaskEvent.payload.taskType, "local_agent");
         assert.equal(stoppedTaskEvent.payload.title, "Agent A");
       }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  const startedAgentSession = (harness: ReturnType<typeof makeHarness>) =>
+    Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "spawn agents",
+        attachments: [],
+      });
+      const emitAgentStarted = (taskId: string, extra: Record<string, unknown>) =>
+        harness.query.emit({
+          type: "system",
+          subtype: "task_started",
+          task_id: taskId,
+          description: `Agent ${taskId}`,
+          task_type: "local_agent",
+          uuid: `${taskId}-uuid`,
+          session_id: "sdk-session",
+          ...extra,
+        } as unknown as SDKMessage);
+      /** The exit's rows: the error row (if any), then the stopped tasks, then the exit. */
+      const exitRows = (count: number) =>
+        adapter.streamEvents.pipe(
+          Stream.filter(
+            (event) =>
+              event.type === "runtime.error" ||
+              event.type === "task.completed" ||
+              event.type === "session.exited",
+          ),
+          Stream.take(count),
+          Stream.runCollect,
+          Effect.forkChild,
+        );
+      return { adapter, session, emitAgentStarted, exitRows };
+    });
+
+  it.effect("stopping with background agents live leaves one error row naming them (#974)", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { adapter, session, emitAgentStarted, exitRows } = yield* startedAgentSession(harness);
+      const startedFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.type === "task.started"),
+        Stream.take(3),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      emitAgentStarted("bg", { is_backgrounded: true });
+      emitAgentStarted("fg", { is_backgrounded: false });
+      emitAgentStarted("monitor", { is_backgrounded: true, ambient: true });
+      const started = Array.from(yield* Fiber.join(startedFiber));
+      // The registration flag reaches the runtime event (the footer's rule).
+      assert.deepEqual(
+        started.map((event) =>
+          event.type === "task.started" ? event.payload.isBackgrounded : undefined,
+        ),
+        [true, false, true],
+      );
+
+      const rowsFiber = yield* exitRows(5);
+      yield* adapter.interruptTurn(session.threadId);
+      const rows = Array.from(yield* Fiber.join(rowsFiber));
+      assert.deepEqual(
+        rows.map((event) => event.type),
+        ["runtime.error", "task.completed", "task.completed", "task.completed", "session.exited"],
+      );
+      const error = rows[0];
+      if (error?.type === "runtime.error") {
+        assert.equal(error.payload.message, liveBackgroundAgentsMessage(1));
+        assert.equal(error.payload.class, "provider_error");
+      }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("an agent moved to the background later counts on stop (#974)", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { adapter, session, emitAgentStarted, exitRows } = yield* startedAgentSession(harness);
+      const seenFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.type === "task.updated"),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      emitAgentStarted("later", {});
+      harness.query.emit({
+        type: "system",
+        subtype: "task_updated",
+        task_id: "later",
+        patch: { is_backgrounded: true },
+        uuid: "later-bg-uuid",
+        session_id: "sdk-session",
+      } as unknown as SDKMessage);
+      yield* Fiber.join(seenFiber);
+
+      const rowsFiber = yield* exitRows(3);
+      yield* adapter.interruptTurn(session.threadId);
+      const rows = Array.from(yield* Fiber.join(rowsFiber));
+      assert.deepEqual(
+        rows.map((event) => event.type),
+        ["runtime.error", "task.completed", "session.exited"],
+      );
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("stopping with only foreground agents live leaves no error row (#974)", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { adapter, session, emitAgentStarted, exitRows } = yield* startedAgentSession(harness);
+      const seenFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.type === "task.started"),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      emitAgentStarted("fg", {});
+      yield* Fiber.join(seenFiber);
+
+      const rowsFiber = yield* exitRows(2);
+      yield* adapter.interruptTurn(session.threadId);
+      const rows = Array.from(yield* Fiber.join(rowsFiber));
+      assert.deepEqual(
+        rows.map((event) => event.type),
+        ["task.completed", "session.exited"],
+      );
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),

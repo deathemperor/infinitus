@@ -304,6 +304,10 @@ interface ClaudeTaskAgentState {
   taskType: string | undefined;
   workflowName: string | undefined;
   skipTranscript: boolean;
+  /** Runs detached from the turn (#974): registered so, or moved there later. */
+  backgrounded: boolean;
+  /** An ambient helper (a monitor, a transcript-less task), never the user's work. */
+  ambient: boolean;
   runHandles: TaskRunHandles | undefined;
   /** Set when this task was launched from inside a subagent. */
   owningAgentId: string | undefined;
@@ -1328,6 +1332,32 @@ function agentIdForParentToolUse(
  * remembered identity (from task_started) so progress/terminal rows are
  * self-describing even when the start row ages out of activity retention.
  */
+/**
+ * The background subagents still running when a session ends (#974): live
+ * tasks of agent kind that were registered in, or moved to, the background
+ * and are not ambient helpers. Their work dies with the SDK process.
+ */
+function liveBackgroundAgentCount(
+  agents: Map<string, ClaudeTaskAgentState>,
+  liveTaskIds: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const taskId of liveTaskIds) {
+    const agent = agents.get(taskId);
+    if (!agent || !agent.backgrounded || agent.ambient) continue;
+    const kind = classifyTaskAgentKind({
+      taskType: agent.taskType,
+      ...(agent.owningAgentId ? { agentId: agent.owningAgentId } : {}),
+    });
+    if (kind === "agent") count += 1;
+  }
+  return count;
+}
+
+export function liveBackgroundAgentsMessage(count: number): string {
+  return `Session ended with ${count} background ${count === 1 ? "agent" : "agents"} running — their work is not finished.`;
+}
+
 function taskLinkageFor(
   agents: Map<string, ClaudeTaskAgentState>,
   taskId: string,
@@ -3226,6 +3256,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
             taskType: existing?.taskType ?? "local_workflow",
             workflowName: existing?.workflowName,
             skipTranscript: existing?.skipTranscript ?? false,
+            backgrounded: existing?.backgrounded ?? false,
+            ambient: existing?.ambient ?? false,
             runHandles,
             owningAgentId: existing?.owningAgentId,
             model: existing?.model,
@@ -3686,6 +3718,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           taskType: message.task_type,
           workflowName: message.workflow_name,
           skipTranscript: message.skip_transcript === true,
+          backgrounded: message.is_backgrounded === true,
+          ambient: message.ambient === true || message.skip_transcript === true,
           runHandles: context.taskAgents.get(message.task_id)?.runHandles,
           owningAgentId,
           model,
@@ -3699,6 +3733,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
             taskId: RuntimeTaskId.make(message.task_id),
             description: message.description,
             ...(message.task_type ? { taskType: message.task_type } : {}),
+            ...(message.is_backgrounded !== undefined
+              ? { isBackgrounded: message.is_backgrounded }
+              : {}),
             ...(owningAgentId ? { agentId: owningAgentId } : {}),
             ...(message.description ? { title: message.description } : {}),
             ...(message.subagent_type ? { role: message.subagent_type } : {}),
@@ -3750,6 +3787,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         // Status patch (killed/paused/backgrounded/end_time/error) — main
         // previously dropped this on the floor, losing all transitions.
         const patch = message.patch;
+        if (patch.is_backgrounded === true) {
+          const agent = context.taskAgents.get(message.task_id);
+          if (agent) agent.backgrounded = true;
+        }
         const status =
           patch.status !== undefined ? CLAUDE_TASK_PATCH_STATUS[patch.status] : undefined;
         if (status === "completed" || status === "failed" || status === "cancelled") {
@@ -4348,7 +4389,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
   const stopSessionInternal = Effect.fn("stopSessionInternal")(function* (
     context: ClaudeSessionContext,
-    options?: { readonly emitExitEvent?: boolean },
+    options?: { readonly emitExitEvent?: boolean; readonly shutdown?: boolean },
   ) {
     if (context.stopped) return;
 
@@ -4374,6 +4415,17 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     });
 
     context.stopped = true;
+
+    // #974: a session exit or a server shutdown takes the background subagents
+    // with it. One error row names them before their stopped rows, so the
+    // thread does not read as finished work. Internal restarts (a replaced
+    // session, a fork) are not exits and stay quiet.
+    if (options?.emitExitEvent !== false || options?.shutdown === true) {
+      const liveAgents = liveBackgroundAgentCount(context.taskAgents, context.liveTaskIds);
+      if (liveAgents > 0) {
+        yield* emitRuntimeError(context, liveBackgroundAgentsMessage(liveAgents));
+      }
+    }
 
     for (const taskId of Array.from(context.liveTaskIds)) {
       if (!context.liveTaskIds.delete(taskId)) {
@@ -5683,9 +5735,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
   const stopSessions = Effect.fn("stopSessions")(function* (
     contexts: ReadonlyArray<ClaudeSessionContext>,
     emitExitEvent: boolean,
+    shutdown = false,
   ) {
     const results = yield* Effect.forEach(contexts, (context) =>
-      stopSessionInternal(context, { emitExitEvent }).pipe(Effect.result),
+      stopSessionInternal(context, { emitExitEvent, shutdown }).pipe(Effect.result),
     );
 
     for (const result of results) {
@@ -5699,7 +5752,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     stopSessions(Array.from(sessions.values()), true);
 
   yield* Effect.addFinalizer(() =>
-    stopSessions(Array.from(sessions.values()), false).pipe(
+    stopSessions(Array.from(sessions.values()), false, true).pipe(
       Effect.catch((cause) =>
         Effect.logError("Failed to emit Claude session shutdown event.", { cause }),
       ),
