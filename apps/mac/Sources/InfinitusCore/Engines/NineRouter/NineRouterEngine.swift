@@ -120,7 +120,10 @@ public actor NineRouterEngine: AccountEngine {
         var followers: [String: [String]] = [:]
         for c in known where c.isActive != false {
             let email = c.email?.lowercased()
-            if let email, let shared = sharedUsage[email], fresh(shared.at) {
+            // Usage another engine fetched is Anthropic's per-account
+            // window: only a Claude connection may wear it. A Codex login
+            // with the same email is a different account (#899).
+            if NineRouterMapping.isClaude(c), let email, let shared = sharedUsage[email], fresh(shared.at) {
                 usage[c.id] = shared.usage
                 continue
             }
@@ -129,12 +132,15 @@ public actor NineRouterEngine: AccountEngine {
                 continue
             }
             guard usageBackoff[c.id].map({ $0 <= now }) ?? true else { continue }
+            // Leaders and followers pair within one provider, for the
+            // same reason (#899).
             if let email, !expiredIDs.contains(c.id) {
-                if let leader = leaderByEmail[email] {
+                let key = "\(ProxyMapping.provider(for: c.provider))|\(email)"
+                if let leader = leaderByEmail[key] {
                     followers[leader, default: []].append(c.id)
                     continue
                 }
-                leaderByEmail[email] = c.id
+                leaderByEmail[key] = c.id
             }
             wanted.append(c)
         }

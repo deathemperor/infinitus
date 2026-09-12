@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
 - The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
 - Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
+- A Codex (or any non-Claude) account no longer reads dead because a Claude account with the same email hit its limit: usage is shared between engines for Claude accounts only, and 9Router pairs same-email connections within one provider (#899).
 
 ## 0.5.0-alpha.1
 
