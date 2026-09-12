@@ -334,7 +334,7 @@ struct SwapdEnginePane: View {
                        isOn: $model.swapdEnabled)
                     .disabled(model.swapd == nil && !model.swapdEnabled)
                 if model.swapd == nil {
-                    Text("Install the binary first \u{2014} the toggle turns on once it is found:")
+                    Text("Install a current Infinitus release to restore the bundled engine, then relaunch. For source builds:")
                         .font(.caption).foregroundStyle(.secondary)
                     Text(OnboardingBrief.swapdInstallCommand)
                         .font(.system(.caption, design: .monospaced))
@@ -380,7 +380,7 @@ struct SwapdEnginePane: View {
                 Text("Binary")
             } footer: {
                 Text("Looked for in /opt/homebrew/bin, /usr/local/bin, ~/.cargo/bin and "
-                     + "~/.local/bin, in that order; INFINITUS_SWAPD_CLI pins another path. "
+                     + "~/.local/bin, then inside the app bundle; INFINITUS_SWAPD_CLI pins another path. "
                      + "Infinitus only ever runs `swapd \u{2026} --json` \u{2014} it never reads "
                      + "the engine's own files.")
                     .font(.caption2).foregroundStyle(.secondary)

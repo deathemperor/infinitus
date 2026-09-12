@@ -10,7 +10,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusPref, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
-import { usePrimaryEnvironment } from "~/state/environments";
+import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -52,9 +52,9 @@ import {
   type PrefRowModel,
 } from "./prefsForm.logic";
 
-/** The primary environment's Infinitus view: the capability that says whether
-    to draw anything at all, and the latest whole snapshot. */
-export function useInfinitusEnvironment(): {
+/** Read the selected host, or the primary environment when no host was selected.
+    An explicit null must not fall back to another host after disconnection. */
+export function useInfinitusEnvironment(targetEnvironment?: EnvironmentPresentation | null): {
   readonly environmentId: EnvironmentId | null;
   readonly capability: boolean | undefined;
   readonly snapshot: InfinitusSnapshot | null;
@@ -62,7 +62,8 @@ export function useInfinitusEnvironment(): {
       it reports none or predates the field. */
   readonly serverLanOrigins: ReadonlyArray<string>;
 } {
-  const environment = usePrimaryEnvironment();
+  const primary = usePrimaryEnvironment();
+  const environment = targetEnvironment === undefined ? primary : targetEnvironment;
   const environmentId = environment?.environmentId ?? null;
   const capability = environment?.serverConfig?.environment.capabilities.infinitus;
   const serverLanOrigins = environment?.serverConfig?.environment.lanHttpBaseUrls ?? EMPTY_ORIGINS;
@@ -208,12 +209,14 @@ export function RestartConfirmDialog({
 }
 
 export function InfinitusPrefsPanel({
+  environment,
   sectionSlugs,
   title,
   children,
   lead,
   footer,
 }: {
+  readonly environment?: EnvironmentPresentation | null;
   readonly sectionSlugs: ReadonlyArray<string>;
   readonly title: string;
   /** The Engines pane's status list, drawn above the toggles. */
@@ -225,7 +228,7 @@ export function InfinitusPrefsPanel({
   /** The Devices pane's pairing card, drawn under the prefs once they answer. */
   readonly footer?: ReactNode;
 }) {
-  const { environmentId, capability, snapshot } = useInfinitusEnvironment();
+  const { environmentId, capability, snapshot } = useInfinitusEnvironment(environment);
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const [writeState, dispatch] = useReducer(reducePrefWrite, initialPrefWriteState);
   const [pendingRestart, setPendingRestart] = useState<PendingRestart | null>(null);
@@ -307,7 +310,12 @@ export function InfinitusPrefsPanel({
           <InfinitusPanelNotice
             message={infinitusPanelMessage(state, snapshot?.unavailableReason)}
           />
-          {state === "unavailable" ? <InfinitusLaunchButton className="px-3 pb-3 sm:px-4" /> : null}
+          {state === "unavailable" ? (
+            <InfinitusLaunchButton
+              {...(environment !== undefined ? { environment } : {})}
+              className="px-3 pb-3 sm:px-4"
+            />
+          ) : null}
         </SettingsSection>
       </SettingsPageContainer>
     );

@@ -89,6 +89,20 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertEqual(log.calls[1].body, "{\"threadId\":\"t2\"}")
     }
 
+    func testRenameDispatchesTheSameMetadataCommandAsTheUI() throws {
+        let log = Log()
+        let a = api([(200, "{\"sequence\":43}")], log: log)
+        XCTAssertEqual(try a.dispatch(DesktopRows.renameThread(threadId: "t1", title: "Current work", id: { "cmd" })), 43)
+        XCTAssertEqual(log.calls[0].body, "{\"commandId\":\"cmd\",\"threadId\":\"t1\",\"title\":\"Current work\",\"type\":\"thread.meta.update\"}")
+    }
+
+    func testThreadContextUsesExplicitIDBeforeEnvironmentAndRejectsMissingContext() {
+        XCTAssertEqual(DesktopRows.resolveThreadID(explicit: "other", environment: ["T3_THREAD_ID": "current"]), "other")
+        XCTAssertEqual(DesktopRows.resolveThreadID(explicit: nil, environment: ["T3_THREAD_ID": "current"]), "current")
+        XCTAssertNil(DesktopRows.resolveThreadID(explicit: nil, environment: [:]))
+        XCTAssertNil(DesktopRows.resolveThreadID(explicit: "  ", environment: ["T3_THREAD_ID": "current"]))
+    }
+
     // MARK: rows
 
     func testStatusVocabularyIsDerivedFromTheTurnTheSessionTheFlagsAndTheHold() throws {

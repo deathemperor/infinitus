@@ -536,12 +536,6 @@ extension TeamControl {
             case "off": return LocalVerb(command: "unhold", args: [f, n])
             default: return nil
             }
-        case TeamGrants.kill:
-            guard words.count == 1, let p = number(words[0]), p != "1" else { return nil }
-            return LocalVerb(command: "machine-kill", args: [p], options: ["yes": ""])
-        case TeamGrants.reclaim:
-            guard words.isEmpty else { return nil }
-            return LocalVerb(command: "machine-reclaim", options: ["yes": ""])
         default:
             return nil
         }

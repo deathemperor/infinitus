@@ -486,6 +486,7 @@ export function AccountsPage() {
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide">
             <AccountsBody
+              environmentId={environmentId}
               state={state}
               snapshot={snapshot}
               nowMs={Date.parse(minute)}
@@ -517,6 +518,7 @@ export function AccountsPage() {
 }
 
 function AccountsBody({
+  environmentId,
   state,
   snapshot,
   nowMs,
@@ -532,6 +534,7 @@ function AccountsBody({
   onSignIn,
   onAdd,
 }: {
+  readonly environmentId: EnvironmentId | null;
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
@@ -591,12 +594,23 @@ function AccountsBody({
           Infinitus is running, but no engine reports accounts — install and configure an engine
           (swapd) for Infinitus to manage them.
         </p>
-        <Link
-          to="/settings/infinitus/engines"
-          className="w-fit text-sm text-foreground underline underline-offset-2"
-        >
-          Open Settings › Infinitus › Engines
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            to="/settings/infinitus/engines"
+            search={environmentId ? { environmentId } : {}}
+            className="w-fit text-sm text-foreground underline underline-offset-2"
+          >
+            Open Settings › Infinitus › Engines
+          </Link>
+          <a
+            href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-foreground underline underline-offset-2"
+          >
+            Read the accounts setup guide
+          </a>
+        </div>
         {signInsSection}
       </div>
     );

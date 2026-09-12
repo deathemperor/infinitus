@@ -3,6 +3,7 @@ import { expect, it } from "@effect/vitest";
 import {
   AntigravitySettings,
   ApprovalRequestId,
+  EnvironmentId,
   ProviderInstanceId,
   ThreadId,
   type ProviderRuntimeEvent,
@@ -23,6 +24,7 @@ import * as AcpErrors from "effect-acp/errors";
 import type * as AcpSchema from "effect-acp/schema";
 
 import { ServerConfig } from "../../config.ts";
+import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE } from "../antigravityAuthSupport.ts";
 import type { AcpSessionRuntimeEvent } from "../acp/AcpSessionRuntime.ts";
 import { makeAntigravityAcpRuntime } from "../acp/AntigravityAcpSupport.ts";
@@ -400,6 +402,26 @@ it.layer(layer)("AntigravityAdapter", (it) => {
             .map((request) => request.params),
         ).toContainEqual({ sessionId: "mock-session-1", configId: "mode", value: "auto_edit" });
       }),
+  );
+
+  it.effect("exports the environment identity of the server that owns the session", () =>
+    Effect.gen(function* () {
+      const environmentId = EnvironmentId.make("owning-host");
+      const h = yield* makeHarness().pipe(
+        Effect.provideService(ServerEnvironment, {
+          getEnvironmentId: Effect.succeed(environmentId),
+          getDescriptor: Effect.die("not used by provider adapters"),
+        }),
+      );
+      yield* h.adapter.startSession({
+        threadId,
+        cwd: process.cwd(),
+        runtimeMode: "auto-accept-edits",
+        modelSelection: { instanceId, model: nativeAlternative },
+      });
+      expect(h.launches[0]?.threadId).toBe(threadId);
+      expect(h.launches[0]?.environmentId).toBe(environmentId);
+    }),
   );
 
   it.effect("reapplies the exact saved model and mode after a native resume", () =>

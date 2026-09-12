@@ -1,3 +1,4 @@
+import type { EnvironmentPresentation } from "../../../state/environments";
 import { InfinitusCommandFailed, type InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import { act, StrictMode, type ReactNode } from "react";
@@ -9,6 +10,7 @@ const { fake } = vi.hoisted(() => ({
     capability: undefined as boolean | undefined,
     snapshot: null as InfinitusSnapshot | null,
     run: vi.fn(),
+    query: vi.fn(),
   },
 }));
 
@@ -25,7 +27,7 @@ vi.mock("../../../state/environments", () => ({
 }));
 vi.mock("../../../state/infinitus", () => ({
   infinitusEnvironment: {
-    snapshot: () => null,
+    snapshot: fake.query,
     command: { label: "infinitus:command" },
     launch: { label: "infinitus:launch" },
   },
@@ -115,6 +117,7 @@ let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  fake.query.mockReset().mockReturnValue(null);
   fake.capability = true;
   fake.snapshot = snapshot();
   fake.run = vi.fn().mockResolvedValue({ _tag: "Success", value: { result: {} } });
@@ -126,11 +129,16 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function renderPanel(lead?: ReactNode) {
+async function renderPanel(lead?: ReactNode, environment?: EnvironmentPresentation | null) {
   await act(() => {
     renderer = create(
       <StrictMode>
-        <InfinitusPrefsPanel sectionSlugs={["display"]} title="Infinitus" lead={lead} />
+        <InfinitusPrefsPanel
+          {...(environment !== undefined ? { environment } : {})}
+          sectionSlugs={["display"]}
+          title="Infinitus"
+          lead={lead}
+        />
       </StrictMode>,
     );
   });
@@ -204,6 +212,54 @@ describe("InfinitusPrefsPanel states", () => {
     expect(output).toContain("Popup layout");
     // popup_layout is "stacked" while the app's default is "wide".
     expect(output).toContain("Default: Wide rows");
+  });
+});
+
+describe("InfinitusPrefsPanel selected environment", () => {
+  const secondary = {
+    environmentId: "env-2",
+    label: "Remote Mac",
+    serverConfig: {
+      environment: {
+        capabilities: { infinitus: true },
+        platform: { os: "darwin", arch: "arm64" },
+      },
+    },
+  } as EnvironmentPresentation;
+
+  it("reads and changes preferences on the selected host", async () => {
+    await renderPanel(undefined, secondary);
+    expect(fake.query).toHaveBeenCalledWith({ environmentId: "env-2", input: {} });
+    await act(async () => {
+      (
+        control("Show only the icon").props as { onCheckedChange: (next: boolean) => void }
+      ).onCheckedChange(true);
+    });
+    expect(fake.run).toHaveBeenCalledWith({
+      environmentId: "env-2",
+      input: { command: "prefs", args: ["set", "title_icon_only", "true"], options: {} },
+    });
+  });
+
+  it("launches the app on the selected host when its socket is unavailable", async () => {
+    fake.snapshot = snapshot({ available: false, prefs: undefined });
+    await renderPanel(undefined, secondary);
+    const button = renderer!.root
+      .findAllByType("button")
+      .find((node) => node.children.includes("Launch Infinitus"));
+    expect(button).toBeDefined();
+    await act(async () => {
+      button!.props.onClick();
+    });
+    expect(fake.run).toHaveBeenCalledWith({ environmentId: "env-2", input: {} });
+  });
+
+  it("never falls back to the primary host when the selected host disappears", async () => {
+    await renderPanel(undefined, null);
+    expect(fake.query).not.toHaveBeenCalled();
+    expect(rendered()).not.toContain("Show only the icon");
+    expect(rendered()).not.toContain("Launch Infinitus");
+    expect(fake.run).not.toHaveBeenCalled();
   });
 });
 

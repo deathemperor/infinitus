@@ -3,13 +3,20 @@ import Foundation
 #if !os(iOS)
 /// Where the `swapd` binary lives. Checked in order; first hit wins.
 public enum SwapdLocator {
-    public static func defaultCandidates(home: String = NSHomeDirectory()) -> [String] {
-        [
+    public static func defaultCandidates(
+        home: String = NSHomeDirectory(),
+        bundledExecutableDirectory: String? = Bundle.main.executableURL?.deletingLastPathComponent().path
+    ) -> [String] {
+        var paths = [
             "/opt/homebrew/bin/swapd",
             "/usr/local/bin/swapd",
             "\(home)/.cargo/bin/swapd",   // `cargo install --path .`
             "\(home)/.local/bin/swapd",
         ]
+        if let bundledExecutableDirectory {
+            paths.append("\(bundledExecutableDirectory)/swapd")
+        }
+        return paths
     }
 
     public static func locate(

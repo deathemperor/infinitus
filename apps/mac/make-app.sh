@@ -20,6 +20,16 @@ cp "$(dirname "$BIN")/infinitusctl" "$APP/Contents/MacOS/infinitusctl"
 # `ictl`: the same binary under a name that is quick to type (usage text
 # follows whichever name ran it).
 ln -s infinitusctl "$APP/Contents/MacOS/ictl"
+# macOS volumes are usually case-insensitive: `infinitus` cannot sit beside
+# the native `Infinitus` executable. Keep the short command in Resources/bin.
+mkdir -p "$APP/Contents/Resources/bin"
+ln -s ../../MacOS/infinitusctl "$APP/Contents/Resources/bin/infinitus"
+# Releases pass the pinned engine built by build-swapd.sh. Keep source-only
+# development builds usable without requiring a Rust toolchain.
+if [ -n "${INFINITUS_BUNDLED_SWAPD:-}" ]; then
+    [ -x "$INFINITUS_BUNDLED_SWAPD" ] || { echo "Bundled swapd is not executable" >&2; exit 2; }
+    cp "$INFINITUS_BUNDLED_SWAPD" "$APP/Contents/MacOS/swapd"
+fi
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp tools/demo-swapd "$APP/Contents/Resources/demo-swapd"
@@ -98,6 +108,13 @@ if [ -n "${PROVISIONING_PROFILE:-}" ]; then
     [ -f "$PROVISIONING_PROFILE" ] || { echo "PROVISIONING_PROFILE not found: $PROVISIONING_PROFILE"; exit 2; }
     cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"
     ENTITLEMENTS="--entitlements Infinitus.entitlements"
+fi
+if [ -f "$APP/Contents/MacOS/swapd" ]; then
+    case "$IDENTITY" in
+        "Developer ID Application"*)
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP/Contents/MacOS/swapd" ;;
+        *) codesign --force --sign "${IDENTITY:--}" "$APP/Contents/MacOS/swapd" ;;
+    esac
 fi
 case "$IDENTITY" in
     "Developer ID Application"*)

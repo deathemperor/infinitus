@@ -16,6 +16,12 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
+      - name: Build bundled account engine
+        env:
+          INFINITUS_ENGINE_BUILD_ROOT: ${{ runner.temp }}/infinitus-engine
+        run: |
+          ./build-swapd.sh
+          echo "INFINITUS_BUNDLED_SWAPD=$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" >> "$GITHUB_ENV"
       - name: Build app bundle
         run: ./make-app.sh
       - name: Zip

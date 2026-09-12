@@ -57,6 +57,8 @@ import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as SynchronizedRef from "effect/SynchronizedRef";
 
+import { withProviderSessionEnvironment } from "../mcp/McpProviderSession.ts";
+import { ServerEnvironment } from "../environment/ServerEnvironment.ts";
 import * as ServerConfig from "../config.ts";
 import { mergeProviderInstanceEnvironment } from "../provider/ProviderInstanceEnvironment.ts";
 import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
@@ -1434,6 +1436,10 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   // things like PSModulePath, DISPLAY, proxies, and toolchain variables.
   // `options.env` is the test seam.
   const baseEnv = options.env ?? process.env;
+  const environment = yield* Effect.serviceOption(ServerEnvironment);
+  const environmentId = Option.isSome(environment)
+    ? yield* environment.value.getEnvironmentId
+    : undefined;
   const shellResolver = options.shellResolver ?? (() => defaultShellResolver(platform, baseEnv));
   const processRunner = yield* ProcessRunner.ProcessRunner;
   const resolveLaunchInputEnvironment = Effect.fn("terminal.resolveLaunchInputEnvironment")(
@@ -2222,7 +2228,10 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         Effect.andThen(
           Effect.gen(function* () {
             const shellCandidates = resolveShellCandidates(shellResolver, platform, baseEnv);
-            const terminalEnv = createTerminalSpawnEnv(baseEnv, session.runtimeEnv);
+            const terminalEnv = withProviderSessionEnvironment(
+              createTerminalSpawnEnv(baseEnv, session.runtimeEnv),
+              { threadId: session.threadId, ...(environmentId ? { environmentId } : {}) },
+            );
             const spawnResult = yield* trySpawn(shellCandidates, terminalEnv, session);
             ptyProcess = spawnResult.process;
             startedShell = spawnResult.shellLabel;

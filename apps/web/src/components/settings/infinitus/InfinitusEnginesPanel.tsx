@@ -5,6 +5,7 @@
  *
  * @module InfinitusEnginesPanel
  */
+import type { EnvironmentPresentation } from "~/state/environments";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
@@ -19,8 +20,12 @@ const KEY_STATUS: Readonly<Record<"present" | "missing", string>> = {
   missing: "No key",
 };
 
-function InfinitusEngineStatusList() {
-  const { environmentId, snapshot } = useInfinitusEnvironment();
+function InfinitusEngineStatusList({
+  environment,
+}: {
+  readonly environment?: EnvironmentPresentation | null;
+}) {
+  const { environmentId, snapshot } = useInfinitusEnvironment(environment);
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const rows = buildEngineStatusRows(snapshot?.status);
   if (rows.length === 0) return null;
@@ -68,10 +73,29 @@ function InfinitusEngineStatusList() {
   );
 }
 
-export function InfinitusEnginesPanel() {
+export function InfinitusEnginesPanel({
+  environment,
+}: {
+  readonly environment?: EnvironmentPresentation | null;
+}) {
+  const target = environment === undefined ? {} : { environment };
   return (
-    <InfinitusPrefsPanel sectionSlugs={["engines"]} title="Engines">
-      <InfinitusEngineStatusList />
+    <InfinitusPrefsPanel {...target} sectionSlugs={["engines"]} title="Engines">
+      {environment ? (
+        <p className="px-3 text-sm sm:px-4">Managing engines on {environment.label}.</p>
+      ) : null}
+      <p className="px-3 text-sm text-muted-foreground sm:px-4">
+        Engines manage your provider accounts and switching.{" "}
+        <a
+          href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
+          Read the accounts setup guide
+        </a>
+      </p>
+      <InfinitusEngineStatusList {...target} />
     </InfinitusPrefsPanel>
   );
 }

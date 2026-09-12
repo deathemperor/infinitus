@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
         makeStatusItem?()
+        if model?.engineMissing == true, model?.swapd == nil {
+            statusHolder?.controller.showPinnedWindow()
+        }
         Lifecycle.log.notice("finished launching")
     }
 
@@ -1014,20 +1017,19 @@ struct OnboardingCard: View {
     @ViewBuilder private var installCopy: some View {
         Text("Welcome to Infinitus")
             .font(.headline)
-        Text("The swapd engine isn't installed — it does the "
-             + "account switching and usage reading. Infinitus is "
-             + "the cockpit; swapd is the engine.")
+        Text("The account engine is missing. Install a current Infinitus release "
+             + "to restore the bundled swapd engine, then relaunch.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-        Text("Install it, then relaunch:  \(OnboardingBrief.swapdInstallCommand)")
+        Text("For source builds:  \(OnboardingBrief.swapdInstallCommand)")
             .font(.caption).monospaced()
             .foregroundStyle(.tertiary)
             .textSelection(.enabled)
             .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-        Text("Then add your first account:  swapd add")
+        Text("Then sign in with Claude Code and add the detected login in Infinitus.")
             .font(.caption).monospaced()
             .foregroundStyle(.tertiary)
             .textSelection(.enabled)
@@ -1099,7 +1101,7 @@ struct FirstAccountCard: View {
                     .frame(width: onboardingTextWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Sign in with Claude Code first, then:  swapd add")
+                Text("Sign in with Claude Code, then relaunch Infinitus to add the detected login.")
                     .font(.caption).monospaced()
                     .foregroundStyle(.tertiary)
                     .textSelection(.enabled)

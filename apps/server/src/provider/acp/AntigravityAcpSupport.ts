@@ -35,6 +35,8 @@ export interface AntigravityAcpRuntimeInput extends Omit<
   | "transformSessionUpdate"
   | "transformStdout"
 > {
+  readonly threadId?: string;
+  readonly environmentId?: string;
   /** Device CLI environment supplied for this provider session. */
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
   readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];

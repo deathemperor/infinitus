@@ -86,6 +86,18 @@ public enum DesktopRows {
         return .object(bootstrap)
     }
 
+    /// An explicit rename uses the same metadata command as the UI. It also
+    /// supersedes any in-flight title regeneration on the server.
+    public static func renameThread(threadId: String, title: String, id: () -> String = newID) -> JSONValue {
+        .object(["type": .string("thread.meta.update"), "commandId": .string(id()),
+                 "threadId": .string(threadId), "title": .string(title)])
+    }
+
+    public static func resolveThreadID(explicit: String?, environment: [String: String]) -> String? {
+        let value = (explicit ?? environment["T3_THREAD_ID"])?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
+    }
+
     public static func turnInterrupt(threadId: String, turnId: String?, now: Date = Date(), id: () -> String = newID) -> JSONValue {
         var command: [String: JSONValue] = [
             "type": .string("thread.turn.interrupt"), "commandId": .string(id()), "threadId": .string(threadId),

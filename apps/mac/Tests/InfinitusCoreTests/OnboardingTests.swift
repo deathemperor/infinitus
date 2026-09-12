@@ -19,3 +19,15 @@ final class OnboardingBriefTests: XCTestCase {
         XCTAssertTrue(text.contains("NOT installed"))
     }
 }
+
+#if !os(iOS)
+final class SwapdLocatorTests: XCTestCase {
+    func testFreshInstallFallsBackToBundledEngine() {
+        let paths = SwapdLocator.defaultCandidates(home: "/fixture", bundledExecutableDirectory: "/fixture/Infinitus.app/Contents/MacOS")
+        let bundled = "/fixture/Infinitus.app/Contents/MacOS/swapd"
+        XCTAssertEqual(SwapdLocator.locate(candidates: paths, exists: { $0 == bundled }), bundled)
+        XCTAssertEqual(SwapdLocator.locate(candidates: paths, exists: { $0 == bundled || $0 == "/fixture/.cargo/bin/swapd" }), "/fixture/.cargo/bin/swapd")
+        XCTAssertNil(SwapdLocator.locate(candidates: paths, exists: { _ in false }))
+    }
+}
+#endif

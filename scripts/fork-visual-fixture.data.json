@@ -624,39 +624,6 @@
         "replyShape": "{outcome, channel?, detail?}",
         "stdin": "payload",
         "summary": "Text on stdin goes to that session as if typed into its prompt (peer socket first, then its terminal)."
-      },
-      {
-        "args": [],
-        "effect": "read",
-        "name": "machine",
-        "options": [],
-        "replyShape": "MachineReport | {sampling:true}",
-        "summary": "The machine-health guardian's last sample (#115): load, swap, processes, hooks with live instances, runaway processes, residue counts, session health, warnings. Triggers a sample when none has run yet."
-      },
-      {
-        "args": ["<pid>"],
-        "effect": "destructive",
-        "name": "machine-kill",
-        "options": ["--yes"],
-        "replyShape": "{result}",
-        "summary": "SIGTERM a runaway the last `machine` report flagged (its own process group when it has one, never a session's), SIGKILL after 3 s if it's still alive. Refused without --yes."
-      },
-      {
-        "args": [],
-        "effect": "destructive",
-        "name": "machine-reclaim",
-        "options": ["--yes"],
-        "replyShape": "{result}",
-        "summary": "Remove stale cc-socks, stale session-env dirs, and temp files older than an hour that no process holds open. Refused without --yes."
-      },
-      {
-        "args": ["disable|restore|kill", "<owner>"],
-        "effect": "destructive",
-        "name": "machine-hook",
-        "options": ["--yes"],
-        "replyShape": "{result}",
-        "stdin": "payload",
-        "summary": "disable: move a tool's hook registrations out of ~/.claude/settings.json (a timestamped backup is written beside it); restore: put them back; kill: SIGTERM every live instance of its hooks and their helpers from the last `machine` sample (never a session's own pid), SIGKILL the survivors after 3 s. Refused without --yes."
       }
     ],
     "schemaVersion": 1
