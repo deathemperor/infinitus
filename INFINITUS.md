@@ -1702,17 +1702,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@t3tools/client-runtime/state/infinitusAccounts`), which also carries each
-  Mac's Sessions card (`features/infinitus/InfinitusSessions.tsx` +
-  `sessions.logic.ts`, rows from
-  `@t3tools/client-runtime/state/infinitusSessions`; `session-mode` per row).
-  Its row menu's "Move to a thread" (#648, rows with a session id) is the
-  web flow on the phone: the cwd becomes a project when it is not one
-  (`projectEnvironment.create` + a `waitForProject` in `state/entities.ts`),
-  `agentSessions.import` (`apps/mobile/src/state/agentSessions.ts`) runs
-  with the row's id, then the Thread screen opens; the row keeps a "close
-  the terminal session" line, nothing reaches the Infinitus socket. No bulk
-  "Move idle" on the phone.
+  `@t3tools/client-runtime/state/infinitusAccounts`). The per-Mac Sessions
+  card it carried (rows from `@t3tools/client-runtime/state/infinitusSessions`,
+  "Move to a thread" over `agentSessions.import`) was dropped on the #941
+  walk — the phone's surface is threads; only `sessions.logic.ts`'s
+  `attentionSessionCount` (the home chip's badge) remains.
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -1915,7 +1909,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   terminal session is never killed or typed into. The pure parts
   (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
   shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
-  the row-model module; mobile's Sessions card uses them (above).
+  the row-model module.
 
 - `packages/contracts/src/agentSessions.ts`,
   `apps/server/src/project/AgentSessionScanner.ts`,
