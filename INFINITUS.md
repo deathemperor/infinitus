@@ -380,11 +380,21 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   on every thread read. Known drift: the in-memory read model and a
   client's reducer keep the pre-revert sum until the next bootstrap; the
   stored rollup is the truth. All figures are estimates, never billing
-  truth — UIs show "≈". Backfill from `provider_session_id` (a
-  `transcript` rollup) is a follow-up. Tests: `threadUsage.test.ts`,
+  truth — UIs show "≈". Web: `apps/web/src/components/chat/ThreadUsagePopover.tsx`
+  (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's
+  action group ("≈ $0.35", or "N turns" while no turn carried a cost)
+  opening the thread-info popover: turns (with the subagent count), the
+  token counts that moved, models, cost ("Cost not recorded", never
+  $0.00, for none) and the last turn in the user's timestamp format, plus
+  "Estimated from the transcript" for a `transcript` rollup; drawn only
+  when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional
+  `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`.
+  Backfill from `provider_session_id` (a `transcript` rollup) is a
+  follow-up; the phone sheet is its own PR. Tests: `threadUsage.test.ts`,
   `claudeTurnUsage.logic.test.ts`, `threadTurnUsage.test.ts`,
   `decider.turnUsage.test.ts`, `ProjectionPipeline.usage.test.ts`,
-  `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`.
+  `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`,
+  `threadUsage.logic.test.ts`.
 - Side question (#269 C, Cursor's `/btw` on #820's fork-at-turn):
   `packages/contracts/src/orchestration.ts` — `sideOf?` on `thread.create`,
   `thread.created`, `OrchestrationThread` and `OrchestrationThreadShell`
