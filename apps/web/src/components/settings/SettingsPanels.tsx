@@ -1,4 +1,5 @@
 import { Spinner } from "~/components/ui/spinner";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { ArchiveIcon, ArchiveX, ChevronRightIcon, SettingsIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
@@ -3005,7 +3006,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description={`Notices for dependencies, assets, and optional tools used by ${PRODUCT_NAME}.`}
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
