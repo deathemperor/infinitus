@@ -739,6 +739,14 @@
         "value": true
       },
       {
+        "default": true,
+        "effect": "live",
+        "key": "menu_bar_enabled",
+        "section": "display",
+        "type": "bool",
+        "value": true
+      },
+      {
         "choices": ["wide", "stacked", "hstack"],
         "default": "wide",
         "effect": "live",

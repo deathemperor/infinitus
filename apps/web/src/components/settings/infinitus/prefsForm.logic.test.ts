@@ -125,6 +125,17 @@ describe("buildPrefSections controls", () => {
     });
   });
 
+  it("words the menu bar icon switch after the Mac's Display pane, with the headless note", () => {
+    const shown = pref({ key: "menu_bar_enabled", type: "bool", default: true, value: false });
+    const row = rowOf(catalog([displaySection], [shown]), "menu_bar_enabled");
+
+    expect(row.label).toBe("Show the icon in the menu bar");
+    expect(row.description).toBe(
+      "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
+    );
+    expect(row.control).toEqual({ kind: "switch", value: false });
+  });
+
   it("humanises a key the copy map does not know and leaves it without a description", () => {
     const unknown = pref({ key: "push_all_dead", type: "bool", default: true, value: true });
     const invented = pref({ key: "brand_new_knob", type: "bool", default: false, value: false });
