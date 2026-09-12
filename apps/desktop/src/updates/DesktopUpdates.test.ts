@@ -535,6 +535,102 @@ describe("DesktopUpdates", () => {
     );
   });
 
+  it.effect("keeps a downloaded update while the next release is still being built", () => {
+    // electron-updater sees the pushed tag in releases.atom before its release
+    // exists and throws ERR_UPDATER_CHANNEL_FILE_NOT_FOUND until the assets land.
+    let checks = 0;
+    const harness = makeHarness({
+      checkForUpdates: Effect.suspend(() => {
+        checks += 1;
+        return checks === 1
+          ? Effect.fail(
+              new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({
+                channel: "alpha",
+                cause: Object.assign(
+                  new Error("Cannot find alpha-mac.yml in the latest release artifacts"),
+                  {
+                    code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+                  },
+                ),
+              }),
+            )
+          : Effect.void;
+      }),
+    });
+    const errorTagsLogged: Array<unknown> = [];
+    const logger = Logger.make(({ fiber }) => {
+      const annotations = fiber.getRef(References.CurrentLogAnnotations);
+      if (annotations.errorTag !== undefined) errorTagsLogged.push(annotations.errorTag);
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        harness.emit("update-downloaded", { version: "1.2.4" });
+        yield* flushCallbacks;
+
+        yield* updates.check("manual");
+
+        const missed = yield* updates.getState;
+        assert.equal(missed.status, "downloaded");
+        assert.equal(missed.downloadedVersion, "1.2.4");
+        assert.isNull(missed.message);
+        assert.isNull(missed.errorContext);
+        assert.deepEqual(errorTagsLogged, []);
+
+        yield* updates.check("manual");
+        harness.emit("update-available", { version: "1.2.4" });
+        yield* flushCallbacks;
+
+        const served = yield* updates.getState;
+        assert.equal(harness.checkCount(), 2);
+        assert.equal(served.status, "downloaded");
+        assert.equal(served.downloadedVersion, "1.2.4");
+      }),
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          TestClock.layer(),
+          harness.layer,
+          Logger.layer([logger], { mergeWithExisting: false }),
+        ),
+      ),
+    );
+  });
+
+  it.effect("leaves a quiet updater quiet while the next release is still being built", () => {
+    const harness = makeHarness({
+      checkForUpdates: Effect.fail(
+        new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({
+          channel: "alpha",
+          cause: Object.assign(
+            new Error("Cannot find alpha-mac.yml in the latest release artifacts"),
+            {
+              code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+            },
+          ),
+        }),
+      ),
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        const before = yield* updates.getState;
+
+        yield* updates.check("manual");
+
+        const after = yield* updates.getState;
+        assert.equal(after.status, before.status);
+        assert.notEqual(after.status, "error");
+        assert.isNull(after.message);
+        assert.isNull(after.errorContext);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
   it.effect("recovers download state after an unexpected setup failure", () => {
     let disableDifferentialCalls = 0;
     const harness = makeHarness({
