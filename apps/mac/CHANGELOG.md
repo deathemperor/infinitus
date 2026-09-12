@@ -9,7 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
-- Settings › Themes, Utilization and the Animations debug pane are retired — the desktop app's Themes/Animations (#763) and Utilization (#774) settings replace them over the pref catalog and `infinitusctl utilization`; Display, Push, Profiles, Stats, Machine and Activity stay until their desktop counterparts ship (#654).
+- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
 
 ## 0.5.0-alpha.1
 

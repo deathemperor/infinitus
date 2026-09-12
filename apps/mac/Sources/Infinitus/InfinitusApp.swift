@@ -130,7 +130,6 @@ struct InfinitusApp: App {
                 settingsTabs: {
                     settingsTabs(
                         model: model, reliabilityModel: reliabilityModel,
-                        statsModel: model.statsModel,
                         appRelease: release, brew: brew)
                 })
         }
@@ -159,7 +158,6 @@ struct InfinitusApp: App {
         Settings {
             SettingsRoot(tabs: settingsTabs(
                 model: model, reliabilityModel: reliabilityModel,
-                statsModel: model.statsModel,
                 appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
@@ -182,7 +180,6 @@ struct InfinitusApp: App {
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
     model: AppModel, reliabilityModel: ResumeReliabilityModel,
-    statsModel: StatsModel,
     appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
@@ -202,25 +199,6 @@ struct InfinitusApp: App {
                     tint: .red,
                     keywords: ["push", "phone", "notification", "sessions", "accounts"],
                     view: AnyView(NotifyPane(app: model))),
-        SettingsTab(title: "Stats", symbol: "chart.bar.xaxis", tint: .indigo,
-                    keywords: ["stats", "metrics", "commits", "prs", "lines",
-                               "messages", "sessions", "week", "month", "year"],
-                    view: AnyView(StatsPane(model: statsModel, app: model))),
-    ]
-    + (MachineModel.paneShown
-       ? [SettingsTab(title: "Machine", symbol: "cpu", tint: .brown,
-                      keywords: ["machine", "health", "hooks", "runaway", "temp",
-                                 "swap", "memory", "residue", "guardian"],
-                      view: AnyView(MachinePane(model: model.machineModel)))]
-       : [])
-    + [
-        SettingsTab(title: "Profiles", symbol: "person.text.rectangle", tint: .pink,
-                    keywords: ["profile", "preset", "start", "session", "model",
-                               "permission", "system prompt", "launch"],
-                    view: AnyView(ProfilesPane(profiles: model.sessionProfiles))),
-        SettingsTab(title: "Activity", symbol: "clock.arrow.circlepath", tint: .teal,
-                    keywords: ["history", "switches", "log", "events"],
-                    view: AnyView(ActivityPane(model: model))),
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
