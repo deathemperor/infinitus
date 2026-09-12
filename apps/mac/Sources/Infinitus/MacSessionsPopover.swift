@@ -91,8 +91,9 @@ struct MacSessionsPopover: View {
     /// Off the main thread: a directory walk plus up to 30 transcript heads.
     private func load() {
         loading = true
+        let hidden = model.hiddenSessions.withLock { $0 }
         Task.detached(priority: .userInitiated) {
-            let list = PastSessions.list(claudeDir: ClaudeSessions.configHome(), limit: 30)
+            let list = PastSessions.list(claudeDir: ClaudeSessions.configHome(), limit: 30, hidden: hidden)
             await MainActor.run {
                 past = list
                 loading = false

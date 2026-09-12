@@ -32,12 +32,33 @@ public enum PastSessions {
         public init(sessions: [PastSession]) { self.sessions = sessions }
     }
 
+    /// A past session `session-delete`d off every list on this Mac
+    /// (#220 Phase 2): the transcript is never touched, only kept out of
+    /// `scan`/`find`. `<AppSupport.root()>/hidden-sessions.json`.
+    public struct Hidden: Codable, Equatable, Sendable {
+        public var ids: Set<String> = []
+        public init() {}
+
+        public static func file(root: URL) -> URL { root.appendingPathComponent("hidden-sessions.json") }
+
+        public static func load(root: URL) -> Hidden {
+            guard let data = try? Data(contentsOf: file(root: root)),
+                  let hidden = try? JSONDecoder().decode(Hidden.self, from: data) else { return Hidden() }
+            return hidden
+        }
+
+        public func save(root: URL) throws {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try JSONEncoder().encode(self).write(to: Self.file(root: root), options: .atomic)
+        }
+    }
+
     /// `scan` with the live set filled in from Claude Code's own session
     /// records — what the control socket and the mirror both answer.
-    public static func list(claudeDir: URL, limit: Int = 50, search: String? = nil,
+    public static func list(claudeDir: URL, limit: Int = 50, search: String? = nil, hidden: Set<String> = [],
                             alive: (Int32) -> Bool = ClaudeSessions.isAlive) -> [PastSession] {
         let live = Set(ClaudeSessions.list(claudeDir: claudeDir, alive: alive).map(\.sessionId))
-        return scan(claudeDir: claudeDir, liveIds: live, limit: limit, search: search)
+        return scan(claudeDir: claudeDir, liveIds: live, limit: limit, search: search, hidden: hidden)
     }
 
     /// Only the head of each transcript is read — the cwd and the opening
@@ -51,12 +72,12 @@ public enum PastSessions {
     /// it never reaches past the newest `limit` transcripts. Sessions
     /// whose head has no user prompt yet (opened and closed) are dropped.
     public static func scan(claudeDir: URL, liveIds: Set<String> = [], limit: Int = 50,
-                            search: String? = nil) -> [PastSession] {
+                            search: String? = nil, hidden: Set<String> = []) -> [PastSession] {
         let needle = search?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         let files = files(claudeDir: claudeDir)
         heads.keep(paths: Set(files.map(\.url.path)))
         return files.prefix(max(limit, 0)).compactMap { file in
-            guard let session = session(of: file, liveIds: liveIds) else { return nil }
+            guard let session = session(of: file, liveIds: liveIds), !hidden.contains(session.sessionId) else { return nil }
             guard needle.isEmpty || [session.repo, session.cwd, session.firstMessage]
                 .contains(where: { $0.lowercased().contains(needle) }) else { return nil }
             return session
@@ -65,9 +86,10 @@ public enum PastSessions {
 
     /// The session with that id, however old — found by file name in the
     /// listing, so only its own head is read. What `resume-session`
-    /// resolves the folder from.
-    public static func find(sessionId: String, claudeDir: URL, liveIds: Set<String> = []) -> PastSession? {
-        files(claudeDir: claudeDir).first { $0.url.lastPathComponent == sessionId + ".jsonl" }
+    /// resolves the folder from. A hidden id answers nil, like a gone one.
+    public static func find(sessionId: String, claudeDir: URL, liveIds: Set<String> = [], hidden: Set<String> = []) -> PastSession? {
+        guard !hidden.contains(sessionId) else { return nil }
+        return files(claudeDir: claudeDir).first { $0.url.lastPathComponent == sessionId + ".jsonl" }
             .flatMap { session(of: $0, liveIds: liveIds) }
     }
 
