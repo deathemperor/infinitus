@@ -1066,6 +1066,48 @@ final class ControlServer {
                 "detail": decided.ack.detail.map { .string($0) } ?? .null,
             ]))
 
+        case "team-grants":
+            guard model.team.snapshot != nil else { throw Fail("not in a team") }
+            return ControlReply(ok: true, result: try JSONValue.of(model.team.grants))
+
+        case "team-grant":
+            let usage = "usage: team-grant <leaders|team|kid,…> --cap <a,b> [--sessions <id,id>] [--pre <a,b>] [--expires <seconds>]"
+            guard let first = r.args.first, let target = TeamShares.parseTarget([first]), target != .off else {
+                throw Fail(usage)
+            }
+            let audience: TeamRoster.ShareTarget
+            switch target {
+            case .members(let names): audience = .members(try names.map { try teammate($0) })
+            default: audience = target
+            }
+            let caps = (r.options["cap"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty }
+            guard !caps.isEmpty, caps.allSatisfy({ TeamGrants.capabilities.contains($0) }) else {
+                throw Fail("--cap takes a comma list of \(TeamGrants.capabilities.joined(separator: ", "))")
+            }
+            let sessions: TeamGrants.Sessions
+            if let s = r.options["sessions"], s != "true" {
+                sessions = .some(s.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            } else {
+                sessions = .all
+            }
+            let preauthorized = Set((r.options["pre"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            var expires: Int?
+            if let e = r.options["expires"] {
+                guard let seconds = Int(e), seconds > 0 else { throw Fail("--expires takes seconds from now") }
+                expires = Int(Date().timeIntervalSince1970) + seconds
+            }
+            let grant = await model.team.addGrant(audience: audience, sessions: sessions, capabilities: Set(caps),
+                                                   preauthorized: preauthorized, expires: expires)
+            if let err = model.team.lastError { throw Fail(err) }
+            guard let grant else { throw Fail("grant not saved") }
+            return ControlReply(ok: true, result: try JSONValue.of(grant))
+
+        case "team-revoke":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: team-revoke <id>") }
+            let removed = await model.team.revokeGrant(id: id)
+            if let err = model.team.lastError { throw Fail(err) }
+            return ControlReply(ok: true, result: .object(["removed": .bool(removed)]))
+
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {
                 throw Fail("no status item yet")

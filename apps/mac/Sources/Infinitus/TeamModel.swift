@@ -1010,26 +1010,34 @@ final class TeamModel: ObservableObject {
     /// Local setting (never sent): where one kind goes. Applies to the
     /// next publish; `reshare(days:)` re-wraps history on request.
     /// Team session control (#220): who may drive which of my sessions.
+    @discardableResult
     func addGrant(audience: TeamRoster.ShareTarget, sessions: TeamGrants.Sessions, capabilities: Set<String>,
-                  preauthorized: Set<String> = [], expires: Int? = nil) async {
+                  preauthorized: Set<String> = [], expires: Int? = nil) async -> TeamGrants.Grant? {
+        let saved = OSAllocatedUnfairLock<TeamGrants.Grant?>(initialState: nil)
         await action("Saving…") { paths, _ in
             guard let id = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
             let dir = paths.teamDir(id)
             var grants = TeamGrants.load(teamDir: dir)
-            grants.add(audience: audience, sessions: sessions, capabilities: capabilities,
-                       preauthorized: preauthorized, expires: expires, now: Int(Date().timeIntervalSince1970))
+            let grant = grants.add(audience: audience, sessions: sessions, capabilities: capabilities,
+                                   preauthorized: preauthorized, expires: expires, now: Int(Date().timeIntervalSince1970))
             try grants.save(teamDir: dir)
+            saved.withLock { $0 = grant }
         }
+        return saved.withLock { $0 }
     }
 
-    func revokeGrant(id: String) async {
+    @discardableResult
+    func revokeGrant(id: String) async -> Bool {
+        let removed = OSAllocatedUnfairLock(initialState: false)
         await action("Saving…") { paths, _ in
             guard let team = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
             let dir = paths.teamDir(team)
             var grants = TeamGrants.load(teamDir: dir)
-            _ = grants.remove(id: id)
+            let did = grants.remove(id: id)
             try grants.save(teamDir: dir)
+            removed.withLock { $0 = did }
         }
+        return removed.withLock { $0 }
     }
 
     func setShare(kind: String, target: TeamRoster.ShareTarget) async {

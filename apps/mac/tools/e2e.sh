@@ -839,6 +839,20 @@ AGAIN="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" e2e-aws sto
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$AGAIN']==['noGrant']" || fail "a revoked grant is refused"
 echo "team control: ok (Phase 2 stop → pending → allow → done; revoked → noGrant)"
 
+# Phase 2 (#220, PR 4a): the same grants over the socket, for the desktop's Team page.
+"$CTL" team-grants | expect "d['grants']==[]" || fail "team-grants starts empty"
+"$CTL" team-grant "$KID" --cap send,stop,delete --sessions e2e-aws --pre stop,delete --expires 600 \
+    | expect "d['audience']==['$KID'] and d['sessions']==['e2e-aws'] and d['capabilities']==['delete','send','stop'] and d['preauthorized']==['stop'] and d['expires']>0" \
+    || fail "team-grant (delete is never pre-authorised)"
+SOCK_GRANT="$("$CTL" team-grants | json "d['grants'][0]['id']")"
+"$CTL" team-grant Bo --cap view | expect "d['audience']==['$KID'] and d['capabilities']==['view'] and 'preauthorized' not in d and 'expires' not in d" || fail "team-grant by name"
+"$CTL" team-grant leaders --cap fly >/dev/null 2>&1 && fail "team-grant took an unknown capability"
+"$CTL" team-revoke "$SOCK_GRANT" | expect "d['removed']" || fail "team-revoke"
+"$CTL" team-revoke "$SOCK_GRANT" | expect "d['removed'] is False" || fail "team-revoke twice"
+"$CTL" team-grants | expect "len(d['grants'])==1 and d['grants'][0]['capabilities']==['view']" || fail "the second grant stays"
+"$CTL" team-revoke "$("$CTL" team-grants | json "d['grants'][0]['id']")" | expect "d['removed']" || fail "revoke the second"
+echo "team grants over the socket: ok"
+
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window
 # or a scenario swap shows up as idle cost.
