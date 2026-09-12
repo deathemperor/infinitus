@@ -449,7 +449,16 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `apps/web/src/components/SideQuestionPanel.tsx` — the drawer (only what
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
   drops the imported history by the ids the fork minted; "Bring to main"
-  appends the latest answer to the main composer's draft);
+  puts the latest answer at the main composer's caret through
+  `ChatComposerHandle.insertTextAtCursor`, or appends it to the draft when
+  the composer cannot take an insert; a side thread deleted from the sidebar
+  reads "This side question was deleted" with a Close button, decided by
+  `isSideQuestionGone` once the shell index is bootstrapped and the drawer
+  has seen the thread or waited 3 s, since the fork's reply can land before
+  the thread's shell); closing the tab archives the side thread
+  (`ChatView.cleanupRightPanelSurfaces`: a running answer is interrupted
+  first, a refusal only logged), and Settings › Archived skips `sideOf`
+  threads like the sidebar does;
   `ChatView.tsx` `askSideQuestion` forks with `side: true` and no
   `turnCount`: the server takes the session's latest completed turn from
   its own anchors (`latestClaudeForkAnchor`, `forkSeedMessagesByTurns`),

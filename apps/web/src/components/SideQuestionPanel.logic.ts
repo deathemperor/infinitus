@@ -45,3 +45,27 @@ export function hasCompletedTurn(thread: {
 
 /** The reason the Aside button is off, or null when a side question can be asked. */
 export const SIDE_QUESTION_NEEDS_TURN = "Ask a side question once a turn has completed.";
+
+/**
+ * Whether the drawer's side thread is gone (deleted from the sidebar, or
+ * while the app was closed). Only once the environment's shell index is
+ * bootstrapped is a missing shell authoritative, and only once the drawer
+ * has either seen the thread or waited out `SIDE_QUESTION_GONE_GRACE_MS`:
+ * the fork's reply can land before the created thread's shell does.
+ */
+export function isSideQuestionGone(input: {
+  readonly hasThread: boolean;
+  readonly bootstrapped: boolean;
+  readonly settled: boolean;
+}): boolean {
+  return !input.hasThread && input.bootstrapped && input.settled;
+}
+
+export const SIDE_QUESTION_GONE_GRACE_MS = 3000;
+
+/** The main composer's draft with the answer brought over, for a composer
+    that cannot take a caret insert (not mounted, connecting, answering an
+    approval): appended after a blank line, or the answer alone. */
+export function appendAnswerToDraft(currentDraft: string, answer: string): string {
+  return currentDraft.trim().length > 0 ? `${currentDraft.trimEnd()}\n\n${answer}` : answer;
+}
