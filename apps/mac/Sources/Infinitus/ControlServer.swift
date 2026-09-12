@@ -288,7 +288,8 @@ final class ControlServer {
                                 "sessionId": .string(row.sessionId),
                                 "account": account.map { .string($0) } ?? .null,
                                 "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null,
-                                "needs": .array(needs.map { .string($0) })])
+                                "needs": .array(needs.map { .string($0) }),
+                                "remote": .bool(model.permissionAsks.isRemote(sessionId: row.sessionId))])
             }))
 
         case "nudge":
@@ -518,6 +519,58 @@ final class ControlServer {
             }
             let pid = model.handleHookEvent(event)
             return ControlReply(ok: true, result: .object(["pid": pid.map { .number(Double($0)) } ?? .null]))
+
+        case "permission":
+            // #79 item 3: the plugin's PermissionRequest hook. A session
+            // not opted in gets {remote: false} and the hook steps aside;
+            // an opted-in one gets an id to park on with permission-wait.
+            guard let payload = r.secret, let request = PermissionAsks.Request.parse(payload) else {
+                throw Fail("permission: a PermissionRequest hook payload (JSON with hook_event_name) is expected on stdin")
+            }
+            guard model.permissionAsks.isRemote(sessionId: request.sessionId) else {
+                return ControlReply(ok: true, result: .object(["remote": .bool(false)]))
+            }
+            let row = model.sessionRows().first { $0.sessionId == request.sessionId }
+            let ask = model.permissionAsks.register(request, pid: row?.pid)
+            // The tool's name, never its input: the input reaches the card.
+            model.logEvent("other", icon: "hand.raised", "Permission asked: \(ask.tool) in \(row?.name ?? row.map { "\($0.pid)" } ?? request.sessionId)")
+            return ControlReply(ok: true, result: .object(["remote": .bool(true), "id": .string(ask.id),
+                                                          "expiresAt": .string(Self.iso.string(from: ask.expiresAt))]))
+
+        case "permission-wait":
+            // A read, so it parks outside the busy gate (like wait-add)
+            // for the window at most; ask = no decision, the terminal's own
+            // prompt takes over.
+            guard let id = r.args.first else { throw Fail("usage: permission-wait <id>") }
+            let answer = await model.permissionAsks.wait(id)
+            return ControlReply(ok: true, result: .object(["decision": .string(answer.decision.rawValue),
+                                                          "message": answer.message.map { .string($0) } ?? .null]))
+
+        case "permission-decide":
+            guard r.args.count == 2, let decision = PermissionAsks.Decision(rawValue: r.args[1]), decision != .ask else {
+                throw Fail("usage: permission-decide <id> <allow|deny> [--message <text>]")
+            }
+            let decided = model.permissionAsks.decide(r.args[0], decision, message: r.options["message"])
+            guard decided else { throw Fail("no open ask \(r.args[0]); see `infinitusctl permission-pending`") }
+            model.logEvent("other", icon: decision == .allow ? "checkmark.circle" : "xmark.circle", "Permission \(decision == .allow ? "allowed" : "denied") from the desktop")
+            return ControlReply(ok: true, result: .object(["decided": .bool(true), "decision": .string(decision.rawValue)]))
+
+        case "permission-pending":
+            let iso = Self.iso
+            return ControlReply(ok: true, result: .array(model.permissionAsks.pending().map { ask in
+                .object(["id": .string(ask.id), "pid": ask.pid.map { .number(Double($0)) } ?? .null,
+                         "sessionId": .string(ask.sessionId), "tool": .string(ask.tool), "input": .string(ask.input),
+                         "askedAt": .string(iso.string(from: ask.askedAt)), "expiresAt": .string(iso.string(from: ask.expiresAt))])
+            }))
+
+        case "session-remote":
+            guard r.args.count == 2, ["on", "off"].contains(r.args[1]) else { throw Fail("usage: session-remote <pid|name> on|off") }
+            guard let pid = model.sessionPid(matching: r.args[0]),
+                  let row = model.sessionRows().first(where: { $0.pid == pid })
+            else { throw Fail("no live session matches \(r.args[0]); see `infinitusctl sessions`") }
+            model.permissionAsks.setRemote(r.args[1] == "on", sessionId: row.sessionId)
+            model.logEvent("other", icon: "hand.raised", "Remote permission asks \(r.args[1]) for \(row.name ?? "\(pid)")")
+            return ControlReply(ok: true, result: .object(["pid": .number(Double(pid)), "remote": .bool(r.args[1] == "on")]))
 
         case "push":
             // #269 G: the desktop's thread phase changes ride the Mac's

@@ -35,6 +35,13 @@
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/event.sh\"", "timeout": 1 }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/permission.sh\"", "timeout": 75 }
+        ]
+      }
     ]
   }
 }

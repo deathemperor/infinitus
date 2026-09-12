@@ -90,7 +90,7 @@ while i < args.count {
 // read (`activities-token --forget` hung a run for 90 min, 2026-09-11).
 let stdinPiped = isatty(0) == 0
 var secret: String?
-if stdinPiped, ["proxy-key", "9router-password", "push-slack", "push-telegram", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "push", "send", "approve", "team-create", "team-join", "team-hostname", "desktop-credential"].contains(command) {
+if stdinPiped, ["proxy-key", "9router-password", "push-slack", "push-telegram", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "push", "send", "approve", "permission", "team-create", "team-join", "team-hostname", "desktop-credential"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
