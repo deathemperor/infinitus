@@ -266,6 +266,22 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   the menu's "Restore files only" between the full revert and the chat
   rewind, its own confirm text, and the mode skips the conversation-rollback
   check. Test beside the E1 one.
+- Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
+  exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
+turnId)` → `{durationMs, completedAt, runningShells}` for a completed
+  turn, `turnFooterLabel(footer, time)` → "Done in 49s · 12:59 PM · 1 shell
+  still running". Derived, no contract: the latest turn's `startedAt →
+completedAt`, an older turn's user message → last assistant `updatedAt`
+  (the on-screen durations' rule; overstates by a hold or queue wait — the
+  per-turn `durationMs` row never reaches the client, only the rollup),
+  shells from the turn's `task.started` bash/shell tasks that went
+  `isBackgrounded` and have no end (`endedAt`, a terminal status,
+  `task.completed`) anywhere in the thread, zero once the session stopped.
+  Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
+  while entries are equal, so a running turn's ticks repaint nothing),
+  `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity
+  context, drawn by `AssistantMessageMeta` in place of the bare time;
+  `ChatView.tsx` — the hook and the prop. The phone reuses the module.
 - Server-side message queue (#806, the server half of #270 F):
   `packages/contracts/src/baseSchemas.ts` — `QueueId`;
   `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,

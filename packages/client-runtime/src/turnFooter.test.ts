@@ -1,0 +1,150 @@
+import { TurnId, type OrchestrationThread } from "@t3tools/contracts";
+import { describe, expect, it } from "vite-plus/test";
+
+import { turnFooter, turnFooterLabel } from "./turnFooter.ts";
+
+const turn1 = TurnId.make("turn-1");
+const turn2 = TurnId.make("turn-2");
+
+const message = (
+  id: string,
+  role: "user" | "assistant",
+  turnId: TurnId,
+  createdAt: string,
+  updatedAt = createdAt,
+) => ({ id, role, turnId, createdAt, updatedAt, streaming: false });
+
+const activity = (
+  id: string,
+  kind: string,
+  turnId: TurnId | null,
+  payload: Record<string, unknown>,
+) => ({
+  id,
+  kind,
+  turnId,
+  payload,
+  tone: "info",
+  summary: kind,
+  createdAt: "2026-09-12T12:00:00Z",
+});
+
+const thread = (input: {
+  messages?: ReadonlyArray<ReturnType<typeof message>>;
+  activities?: ReadonlyArray<ReturnType<typeof activity>>;
+  latestTurn?: Record<string, unknown> | null;
+  session?: { status: string } | null;
+}): OrchestrationThread =>
+  ({
+    messages: input.messages ?? [],
+    activities: input.activities ?? [],
+    latestTurn: input.latestTurn ?? null,
+    session: input.session === undefined ? { status: "idle" } : input.session,
+  }) as unknown as OrchestrationThread;
+
+const shellStarted = (taskId: string, turnId: TurnId) =>
+  activity(`s-${taskId}`, "task.started", turnId, { taskId, taskType: "local_bash" });
+const backgrounded = (taskId: string, turnId: TurnId | null) =>
+  activity(`b-${taskId}`, "task.updated", turnId, { taskId, isBackgrounded: true });
+
+describe("turnFooter (#952)", () => {
+  it("times the latest turn by its start and completion, older turns by their messages", () => {
+    const messages = [
+      message("u1", "user", turn1, "2026-09-12T12:00:00Z"),
+      message("a1", "assistant", turn1, "2026-09-12T12:00:05Z", "2026-09-12T12:00:49Z"),
+      message("u2", "user", turn2, "2026-09-12T12:05:00Z"),
+      message("a2", "assistant", turn2, "2026-09-12T12:05:01Z", "2026-09-12T12:05:20Z"),
+    ];
+    const latestTurn = {
+      turnId: turn2,
+      state: "completed",
+      requestedAt: "2026-09-12T12:05:00Z",
+      startedAt: "2026-09-12T12:05:02Z",
+      completedAt: "2026-09-12T12:05:21Z",
+    };
+    const t = thread({ messages, latestTurn });
+    expect(turnFooter(t, turn2)).toEqual({
+      durationMs: 19_000,
+      completedAt: "2026-09-12T12:05:21Z",
+      runningShells: 0,
+    });
+    expect(turnFooter(t, turn1)).toEqual({
+      durationMs: 49_000,
+      completedAt: "2026-09-12T12:00:49Z",
+      runningShells: 0,
+    });
+  });
+
+  it("is null while the turn runs or when the thread has no such turn", () => {
+    const running = thread({
+      messages: [message("u1", "user", turn1, "2026-09-12T12:00:00Z")],
+      latestTurn: {
+        turnId: turn1,
+        state: "running",
+        requestedAt: "2026-09-12T12:00:00Z",
+        startedAt: "2026-09-12T12:00:01Z",
+        completedAt: null,
+      },
+    });
+    expect(turnFooter(running, turn1)).toBeNull();
+    expect(turnFooter(thread({}), turn2)).toBeNull();
+  });
+
+  it("counts a backgrounded shell of the turn until it ends, wherever the end lands", () => {
+    const messages = [
+      message("u1", "user", turn1, "2026-09-12T12:00:00Z"),
+      message("a1", "assistant", turn1, "2026-09-12T12:00:01Z", "2026-09-12T12:00:30Z"),
+    ];
+    const openActivities = [
+      shellStarted("t-1", turn1),
+      backgrounded("t-1", turn1),
+      shellStarted("t-2", turn1),
+      backgrounded("t-2", turn1),
+      activity("s-agent", "task.started", turn1, { taskId: "t-3", taskType: "local_agent" }),
+      backgrounded("t-3", turn1),
+      // A foreground shell that never went to the background.
+      shellStarted("t-4", turn1),
+    ];
+    const open = thread({ messages, activities: openActivities });
+    expect(turnFooter(open, turn1)?.runningShells).toBe(2);
+
+    // The end arrives under the next turn, or no turn at all.
+    const ended = thread({
+      messages,
+      activities: [
+        ...openActivities,
+        activity("e-1", "task.completed", turn2, { taskId: "t-1", status: "completed" }),
+        activity("e-2", "task.updated", null, { taskId: "t-2", endedAt: "2026-09-12T12:01:00Z" }),
+      ],
+    });
+    expect(turnFooter(ended, turn1)?.runningShells).toBe(0);
+
+    // A killed shell is not running either.
+    const killed = thread({
+      messages,
+      activities: [
+        ...openActivities,
+        activity("k-1", "task.updated", null, { taskId: "t-1", status: "cancelled" }),
+      ],
+    });
+    expect(turnFooter(killed, turn1)?.runningShells).toBe(1);
+
+    // The session that owned the shells is gone.
+    const gone = (session: { status: string } | null) =>
+      thread({ messages, activities: openActivities, session });
+    expect(turnFooter(gone({ status: "stopped" }), turn1)?.runningShells).toBe(0);
+    expect(turnFooter(gone(null), turn1)?.runningShells).toBe(0);
+  });
+
+  it("words the label", () => {
+    expect(
+      turnFooterLabel({ durationMs: 49_000, completedAt: "x", runningShells: 0 }, "12:59 PM"),
+    ).toBe("Done in 49s · 12:59 PM");
+    expect(
+      turnFooterLabel({ durationMs: 125_000, completedAt: "x", runningShells: 1 }, "12:59 PM"),
+    ).toBe("Done in 2m 5s · 12:59 PM · 1 shell still running");
+    expect(
+      turnFooterLabel({ durationMs: null, completedAt: "x", runningShells: 2 }, "12:59 PM"),
+    ).toBe("Done · 12:59 PM · 2 shells still running");
+  });
+});

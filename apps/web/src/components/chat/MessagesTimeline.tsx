@@ -19,6 +19,8 @@ import {
   type TurnId,
 } from "@t3tools/contracts";
 import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
+import { turnFooterLabel } from "@t3tools/client-runtime/turnFooter";
+import type { TurnFooters } from "./useTurnFooters";
 import type { CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
 import {
   resolveWorkEntryToolPresentation,
@@ -248,8 +250,11 @@ interface TimelineRowActivityState {
   /** Fork (#270 E2): the thread's provider records a fork point per turn. */
   supportsThreadFork: boolean;
   latestTurnId: TurnId | null;
+  /** Fork (#952): the completed turns' footers, drawn in place of the meta row's time. */
+  turnFooters: TurnFooters;
 }
 
+const EMPTY_TURN_FOOTERS: TurnFooters = new Map();
 const TimelineRowCtx = createContext<TimelineRowSharedState>(null!);
 const TimelineRowActivityCtx = createContext<TimelineRowActivityState>(null!);
 
@@ -336,6 +341,7 @@ interface MessagesTimelineProps {
   timelineEntries: ReturnType<typeof deriveTimelineEntries>;
   latestTurn: TimelineLatestTurn | null;
   runningTurnId: TurnId | null;
+  turnFooters?: TurnFooters;
   turnDiffSummaries: ReadonlyArray<TurnDiffSummary>;
   routeThreadKey: string;
   /**
@@ -405,6 +411,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   timelineEntries,
   latestTurn,
   runningTurnId,
+  turnFooters = EMPTY_TURN_FOOTERS,
   turnDiffSummaries,
   routeThreadKey,
   displayThreadKey,
@@ -838,6 +845,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isRevertingCheckpoint,
       supportsThreadFork,
       latestTurnId: latestTurn?.turnId ?? null,
+      turnFooters,
     }),
     [
       isCompacting,
@@ -846,6 +854,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isPreparingWorktree,
       supportsThreadFork,
       latestTurn?.turnId,
+      turnFooters,
     ],
   );
 
@@ -1770,6 +1779,8 @@ function AssistantMessageMeta({
   alwaysVisible?: boolean;
 }) {
   const ctx = use(TimelineRowCtx);
+  const { turnFooters } = use(TimelineRowActivityCtx);
+  const footer = message.turnId === null ? undefined : turnFooters.get(message.turnId);
 
   return (
     <div
@@ -1789,7 +1800,12 @@ function AssistantMessageMeta({
       {!message.streaming && (
         <Tooltip>
           <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
-            {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat)}
+            {footer === undefined
+              ? formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat)
+              : turnFooterLabel(
+                  footer,
+                  formatDayAwareTimestamp(footer.completedAt, ctx.timestampFormat),
+                )}
           </TooltipTrigger>
           <TooltipPopup>
             {formatChatTimestampTooltip(message.updatedAt, ctx.timestampFormat)}
