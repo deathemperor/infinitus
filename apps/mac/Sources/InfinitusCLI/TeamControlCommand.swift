@@ -26,8 +26,8 @@ private func controlFail(_ message: String, code: Int32 = 1) -> Int32 {
 
 /// nil when `args` is not one of ours.
 func runTeamControl(_ args: [String]) -> Int32? {
-    guard let sub = args.first, ["grant", "revoke", "grants", "send", "approve", "mode", "tail", "acks", "hostname"].contains(sub) else { return nil }
-    let capabilityFlags: Set<String> = [TeamGrants.view, TeamGrants.send, TeamGrants.approve, TeamGrants.mode, TeamGrants.resume, TeamGrants.key]
+    guard let sub = args.first, ["grant", "revoke", "grants", "send", "approve", "mode", "tail", "acks", "hostname", "drive"].contains(sub) else { return nil }
+    let capabilityFlags = Set(TeamGrants.capabilities)
     var positional: [String] = []
     var options: [String: String] = [:]
     var flags: Set<String> = []
@@ -65,14 +65,26 @@ func runTeamControl(_ args: [String]) -> Int32? {
                 return controlFail(teamUsage(), code: 2)
             }
             let capabilities = flags.intersection(capabilityFlags)
-            guard !capabilities.isEmpty else { return controlFail("pick at least one of --view --send --approve --mode --resume --key", code: 2) }
+            guard !capabilities.isEmpty else {
+                return controlFail("pick at least one of \(capabilityFlags.sorted().map { "--\($0)" }.joined(separator: " "))", code: 2)
+            }
             if case .members(let kids) = audience {
                 let known = Set(client.roster?.doc.everyone.map(\.keys.kid) ?? [])
                 for kid in kids where !known.contains(kid) { return controlFail("unknown kid \(kid)", code: 2) }
             }
             let sessions: TeamGrants.Sessions = options["sessions"]
                 .map { .some($0.split(separator: ",").map(String.init).filter { !$0.isEmpty }) } ?? .all
+            let preauthorized: Set<String> = options["pre"]
+                .map { Set($0.split(separator: ",").map(String.init).filter { !$0.isEmpty }) } ?? []
+            let expires: Int?
+            if let text = options["expires"] {
+                guard let seconds = Int(text), seconds > 0 else { return controlFail("--expires takes seconds from now", code: 2) }
+                expires = Int(Date().timeIntervalSince1970) + seconds
+            } else {
+                expires = nil
+            }
             let grant = grants.add(audience: audience, sessions: sessions, capabilities: capabilities,
+                                   preauthorized: preauthorized, expires: expires,
                                    now: Int(Date().timeIntervalSince1970))
             try grants.save(teamDir: teamDir)
             emit(grant)
@@ -103,6 +115,20 @@ func runTeamControl(_ args: [String]) -> Int32? {
             var deliver = TeamControl.Deliver(http: controlHTTP, interfaces: InterfaceAddresses.ipv4())
             let command = TeamControl.Command(id: TeamControl.newCommandID(), to: kid, session: session, action: sub, text: text,
                                               at: Int(Date().timeIntervalSince1970))
+            emit(try TeamControl.Drive.send(command, client: client, endpoints: endpoints, deliver: &deliver))
+        case "drive":
+            // #220 Phase 2: any granted capability, not just the drive
+            // set — the grantor's own verbs (stop, resume-past, delete,
+            // swap, hold, kill, reclaim) ride the same envelope.
+            guard positional.count >= 3 else { return controlFail(teamUsage(), code: 2) }
+            let (kid, session, action) = (positional[0], positional[1], positional[2])
+            guard action != TeamGrants.view, TeamGrants.capabilities.contains(action) else { return controlFail(teamUsage(), code: 2) }
+            let text = positional.dropFirst(3).joined(separator: " ")
+            _ = try client.fetch()
+            let endpoints = try TeamReader.load(client: client).members[kid]?.now?.endpoints
+            var deliver = TeamControl.Deliver(http: controlHTTP, interfaces: InterfaceAddresses.ipv4())
+            let command = TeamControl.Command(id: TeamControl.newCommandID(), to: kid, session: session, action: action,
+                                              text: text.isEmpty ? nil : text, at: Int(Date().timeIntervalSince1970))
             emit(try TeamControl.Drive.send(command, client: client, endpoints: endpoints, deliver: &deliver))
         case "tail":
             guard positional.count >= 2 else { return controlFail(teamUsage(), code: 2) }
