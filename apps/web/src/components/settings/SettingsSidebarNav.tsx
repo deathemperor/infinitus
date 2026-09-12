@@ -54,11 +54,13 @@ import { scrollToSettingsTarget } from "./settingsLayout";
 import {
   isSettingsSectionActive,
   searchSettings,
+  isSettingsOverviewVisible,
   SETTINGS_SECTION_LABELS,
   type SettingsPath,
   type SettingsSearchItem,
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
+import { validateSettingsScopeSearch } from "./settingsScope";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -140,6 +142,8 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
+  const currentSearch = useLocation({ select: (location) => location.search });
+  const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -151,12 +155,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const infinitusSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
   );
+  // Upstream hides Projects outside the overview scope; the fork hides the
+  // Infinitus pages when no connected environment runs the menu bar app.
   const navItems = useMemo(
     () =>
       SETTINGS_NAV_ITEMS.filter(
-        (item) => infinitusSupported || !INFINITUS_SETTINGS_PATHS.has(item.to),
+        (item) =>
+          (item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch)) &&
+          (infinitusSupported || !INFINITUS_SETTINGS_PATHS.has(item.to)),
       ),
-    [infinitusSupported],
+    [infinitusSupported, scopeSearch],
   );
   const results = useMemo(() => searchSettings(query, searchableItems), [query, searchableItems]);
   const isSearching = query.trim().length > 0;
@@ -231,18 +239,12 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         setOpenMobile(false);
       }
       const targetId = item.targetId ?? item.id;
-      if (
-        item.to !== "/settings/projects" &&
-        pathname === item.to &&
-        currentHash.replace(/^#/, "") === targetId
-      ) {
+      if (pathname === item.to && currentHash.replace(/^#/, "") === targetId) {
         scrollToSettingsTarget(targetId);
         return;
       }
       void navigate({
         to: item.to,
-        search: (previous) =>
-          item.to === "/settings/projects" ? { ...previous, project: undefined } : previous,
         hash: targetId,
         replace: true,
         hashScrollIntoView: false,
