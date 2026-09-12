@@ -16,6 +16,7 @@ import {
   sessionActions,
   sessionModeCommandArgs,
   sessionMoveBatches,
+  sessionRemoteCommandArgs,
   sessionRow,
   sessionRows,
   sessionState,
@@ -64,6 +65,7 @@ describe("sessionRow", () => {
       needs: [],
       kind: "interactive",
       permissionMode: "supervised",
+      remote: false,
     });
     expect(sessionRow(session({ name: null, cwd: "/tmp/proj/" }), NOW).title).toBe("proj");
   });
@@ -97,6 +99,8 @@ describe("sessionRow", () => {
       "needs sign-in",
     ]);
     expect(row.needsAttention).toBe(true);
+    expect(row.remote).toBe(false);
+    expect(sessionRow(session({ remote: true }), NOW).remote).toBe(true);
     expect(sessionRow(session({ startedAt: "garbage" }), NOW).age).toBeNull();
     expect(sessionRow(session({ startedAt: null, account: null }), NOW).account).toBeNull();
   });
@@ -145,15 +149,21 @@ describe("sessionRows", () => {
 
 describe("sessionActions", () => {
   it("offers each verb only when the manifest lists it, and show only with a session arg", () => {
-    expect(sessionActions([])).toEqual({ setMode: false, show: false, nudge: false });
+    expect(sessionActions([])).toEqual({
+      setMode: false,
+      show: false,
+      nudge: false,
+      remote: false,
+    });
     expect(
       sessionActions([
         command("session-mode", ["<pid|name>", "<supervised|acceptEdits|bypassPermissions>"]),
         command("show", [
           "popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]",
         ]),
+        command("session-remote", ["<pid|name>", "<on|off>"]),
       ]),
-    ).toEqual({ setMode: true, show: false, nudge: false });
+    ).toEqual({ setMode: true, show: false, nudge: false, remote: true });
     expect(
       sessionActions([
         command("show", [
@@ -161,7 +171,7 @@ describe("sessionActions", () => {
         ]),
         command("nudge", ["<pid|name>"]),
       ]),
-    ).toEqual({ setMode: false, show: true, nudge: true });
+    ).toEqual({ setMode: false, show: true, nudge: true, remote: false });
   });
 });
 
@@ -174,6 +184,11 @@ describe("command args", () => {
     });
     expect(showSessionCommandArgs(row)).toEqual({ command: "show", args: ["session", "4321"] });
     expect(nudgeCommandArgs(row)).toEqual({ command: "nudge", args: ["4321"] });
+    expect(sessionRemoteCommandArgs(row, true)).toEqual({
+      command: "session-remote",
+      args: ["4321", "on"],
+    });
+    expect(sessionRemoteCommandArgs(row, false).args).toEqual(["4321", "off"]);
   });
 });
 

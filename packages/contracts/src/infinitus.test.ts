@@ -268,6 +268,8 @@ describe("InfinitusSession", () => {
 
     expect(decoded.name).toBeNull();
     expect(decoded.permissionMode).toBeNull();
+    expect(decoded.remote).toBeUndefined();
+    expect(decodeSession({ pid: 1, cwd: "/w", kind: "claude", remote: true }).remote).toBe(true);
   });
 
   it("decodes a fully described session", () => {
