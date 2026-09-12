@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AndroidAnchoredMenu, type AndroidAnchoredMenuProps } from "./AndroidAnchoredMenu";
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
 import { cn } from "../lib/cn";
@@ -11,6 +12,11 @@ export interface AndroidHeaderAction {
   readonly icon: AppSymbolName;
   readonly onPress: () => void;
   readonly disabled?: boolean;
+  /** Infinitus (fork, #269 F): an action whose tap opens an anchored menu of
+      these choices instead of running `onPress` — the Android form of an
+      iOS header menu item, with no cap on the number of choices (an
+      `Alert` shows at most three buttons). */
+  readonly menu?: Pick<AndroidAnchoredMenuProps, "actions" | "title" | "onPressAction">;
 }
 
 export function AndroidHeaderIconButton(props: {
@@ -92,15 +98,33 @@ export function AndroidScreenHeader(props: {
           ) : null}
         </View>
 
-        {props.actions?.map((action) => (
-          <AndroidHeaderIconButton
-            key={action.accessibilityLabel}
-            accessibilityLabel={action.accessibilityLabel}
-            disabled={action.disabled}
-            icon={action.icon}
-            onPress={action.onPress}
-          />
-        ))}
+        {props.actions?.map((action) =>
+          action.menu ? (
+            <AndroidAnchoredMenu
+              key={action.accessibilityLabel}
+              actions={action.menu.actions}
+              title={action.menu.title}
+              onPressAction={action.menu.onPressAction}
+            >
+              {(open) => (
+                <AndroidHeaderIconButton
+                  accessibilityLabel={action.accessibilityLabel}
+                  disabled={action.disabled}
+                  icon={action.icon}
+                  onPress={open}
+                />
+              )}
+            </AndroidAnchoredMenu>
+          ) : (
+            <AndroidHeaderIconButton
+              key={action.accessibilityLabel}
+              accessibilityLabel={action.accessibilityLabel}
+              disabled={action.disabled}
+              icon={action.icon}
+              onPress={action.onPress}
+            />
+          ),
+        )}
         {props.trailing}
       </View>
     </View>

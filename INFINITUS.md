@@ -670,6 +670,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `connectionCatalogRoamedHost`; `authorization/service.ts` —
   `authorizeBearer` takes `descriptorTimeoutMs` and returns the descriptor's
   alternates (#663).
+- `apps/mobile/src/components/AndroidScreenHeader.tsx` — `AndroidHeaderAction`
+  gains an optional `menu` (`AndroidAnchoredMenuProps`' actions, title and
+  `onPressAction`); an action carrying one renders the icon button inside
+  `AndroidAnchoredMenu` with the function child, so its tap opens the
+  choices — the Android form of an iOS header menu item, uncapped (an
+  `Alert` shows at most three buttons; #269 F's PR menu reaches four).
 - `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
   `roamingHostsLine` under a saved environment's host (#663).
 - `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
@@ -815,7 +821,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 {babysit}` while the PR is open or the thread is already babysat — the
   web toggle's gate, #269 A, the menu's status line reading "Babysitting
   r/10" while on; on Android the hook's `androidAction` is a header button
-  before the git controls whose tap opens the same choices as an alert;
+  before the git controls carrying the same choices as its `menu` (an
+  anchored menu, the phase line inert at the top);
   `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
@@ -1629,7 +1636,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   of steering; creations and every other action pass through. `mode` at
   both call sites is `outboxQueueMode` of this phone's preferences
   (`infinitusComposerSendMode`, the desktop's "Sending while a turn runs",
-  a picker row in `SettingsInfinitusSection.tsx`): `"queue"` by default and
+  a `PickerRow` in `SettingsInfinitusSection.tsx` — `ControlPillMenu` on
+  iOS, `AndroidAnchoredMenu` with the row as its function child on Android
+  so the row's own press opens it): `"queue"` by default and
   while the store loads, `"steer"` sends into the running turn as upstream
   does — but a thread the server's hold list names waits in either mode.
   `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when

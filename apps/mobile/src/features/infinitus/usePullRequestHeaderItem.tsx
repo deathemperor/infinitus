@@ -180,16 +180,33 @@ export function usePullRequestHeaderItem(
         type: "menu",
         variant: "plain",
       },
+      // Android's in-flow header opens the same choices as an anchored menu
+      // (not an Alert: that shows three buttons at most, and a draft with a
+      // checks page plus babysit is four).
       androidAction: {
         accessibilityLabel: `Pull request ${status}`,
         icon: "arrow.triangle.pull",
-        onPress: (): void =>
-          Alert.alert(
-            `Pull request #${number}`,
-            babysitting === null ? phaseLabel : `${phaseLabel} · ${babysitting}`,
-            items.map((item) => ({ text: item.label, onPress: (): void => run(item.action) })),
-            { cancelable: true },
-          ),
+        onPress: (): void => {},
+        menu: {
+          title: `Pull request #${number}`,
+          actions: [
+            {
+              id: "phase",
+              title: phaseLabel,
+              subtitle: babysitting ?? status,
+              attributes: { disabled: true },
+            },
+            ...items.map((item) => ({
+              id: item.action,
+              title: item.label,
+              subtitle: item.description,
+            })),
+          ],
+          onPressAction: ({ nativeEvent }): void => {
+            const item = items.find((candidate) => candidate.action === nativeEvent.event);
+            if (item !== undefined) run(item.action);
+          },
+        },
       },
       version: [number, url, phaseLabel, babysitting, ...items.map((item) => item.label)].join(":"),
     };

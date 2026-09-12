@@ -16,6 +16,7 @@ publishes the matching section as the GitHub release body.
 - "Fork a new thread from here" and side questions work on Codex threads too: the fork continues the Codex conversation from that turn in a new thread (#819).
 
 ### Phone
+- Android: the pull request menu in the thread header and the pickers under Settings › Infinitus open as anchored menus, so every choice shows (an alert capped them at three) and a tap on the row opens it.
 - A best-of-N member thread carries the group card: every live sibling with its model and a status word, a tap opens it; keeping one stays on the desktop (#269).
 - A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
