@@ -138,6 +138,12 @@ def provider_view(st, refreshed_slot=None):
     if order:
         by_slot = {a["slot"]: a for a in accounts}
         accounts = [by_slot[n] for n in order if n in by_slot] + [a for a in accounts if a["slot"] not in order]
+    if st.get("scenario") == "stalefetch":
+        # Every usage read an hour old, forced fetches included (tools/e2e.sh,
+        # #964): swapd degrades the active slot to `stale` while a CLI holds
+        # its lock, so a limit stop lands with no poll fresher than it.
+        for a in accounts:
+            a["fetchedAt"] = iso(-1); a["ageSeconds"] = 3600.0
     view = {"provider": "claude", "installed": True, "activeSlot": st["active"],
             "nextCandidate": next_candidate(st), "accounts": accounts}
     if st.get("scenario") == "alldead" or os.environ.get("SHIM_ALLDEAD"):

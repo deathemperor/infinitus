@@ -126,6 +126,7 @@ defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
 defaults write "$DOMAIN" mock_mode -bool true   # demo fleet: the swapd engine is $INFINITUS_SWAPD_CLI (the locator honours it)
+defaults write "$DOMAIN" resume_stopped_sessions -bool true   # the limit-stop round below; off by default, read at launch
 
 # --- AWS sign-in fixtures (must exist before launch: env is read at start) --
 # A stub `aws` in place of the real CLI: `login --remote --profile P`
@@ -697,6 +698,59 @@ while aws_login_item; do
 done
 "$CTL" aws-login e2e-login --status | expect "'outside the app' in d['state']['message']" || fail "probe outcome not recorded"
 echo "aws: lapse met outside the app cleared by the probe"
+# --- limit stop, supervisor switch, resume nudge (#964) ------------------
+# The session's transcript ends in a plan-limit stop while every usage
+# read is stale (swapd degrades the active slot to `stale` while a CLI
+# holds its lock): the resume gate holds. A switch to another account is
+# the target's fresh poll (#964), so the nudge lands once that account
+# has been active for ResumeGate.stableSeconds (30 s, #136's ping-pong
+# guard) with no usage poll after the switch. The fake session takes the
+# nudge over its peer socket; the Activity line names the account.
+"$INFINITUS_SWAPD_CLI" simulate stalefetch >/dev/null
+"$CTL" refresh | expect "d[0]['activeNumber']==1" || fail "account 1 must be active before the limit stop"
+cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
+{"type":"assistant","uuid":"e2e-stop-1","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)","isApiErrorMessage":true,"error":"rate_limit","message":{"role":"assistant","content":[{"type":"text","text":"You've hit your usage limit."}]}}
+EOF
+held_line() { "$CTL" events --limit 100 | expect "any(e['kind']=='nudge' and 'stopped session(s) held' in e['text'] for e in d)"; }
+nudged() { grep -q "hit its usage limit" "$INBOX"; }
+"$CTL" refresh >/dev/null || fail "refresh after the limit stop"
+i=0
+until held_line; do
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "the limit-stopped session was not held on a stale usage read (#964)"
+    sleep 1
+done
+nudged && fail "a resume nudge landed before any switch"
+echo "resume: limit stop held on a stale usage read"
+SWITCHED_AT=$(date +%s)
+# The account's shown name (the run's RPG theme renames it) is what the
+# resumed line carries.
+NAME2="$("$CTL" switch swapd/claude 2 | json "$(acct 2)['alias'] if d['fleet']['activeNumber']==2 else ''")"
+[ -n "$NAME2" ] || fail "switch to 2 after the stop"
+sleep 5
+"$CTL" refresh >/dev/null || fail "refresh 5 s after the switch"
+sleep 3
+nudged && fail "a resume nudge landed before the account had been active for 30 s (#136)"
+"$INFINITUS_SWAPD_CLI" list | expect "all(a['ageSeconds']>=3600 for a in d['providers'][0]['accounts'])" || fail "the stale-fetch scenario lapsed"
+until [ $(( $(date +%s) - SWITCHED_AT )) -ge 31 ]; do sleep 1; done
+"$CTL" refresh >/dev/null || fail "refresh once the account is stable"
+i=0
+until nudged; do
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "the stopped session was never nudged after the switch (#964)"
+    sleep 1
+done
+# The session continues: its transcript moves, so the resume round's
+# watch ends and the Activity line lands.
+cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
+{"type":"assistant","uuid":"e2e-cont-1","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)","message":{"role":"assistant","content":[{"type":"text","text":"Continuing."}]}}
+EOF
+i=0
+until "$CTL" events --limit 100 | expect "any(e['kind']=='nudge' and e['text']=='resumed e2e-aws via socket on $NAME2' for e in d)"; do
+    i=$((i + 1)); [ "$i" -lt 30 ] || fail "no Activity line naming the account the session resumed on"
+    sleep 1
+done
+"$INFINITUS_SWAPD_CLI" simulate off >/dev/null
+"$CTL" switch swapd/claude 1 | expect "d['fleet']['activeNumber']==1" || fail "switch back to 1 after the resume round"
+echo "resume: nudged after the switch with no usage poll, the Activity line names the account"
 
 # --- team (spec §11) -------------------------------------------------------
 # The app creates a team on a bare repo; a second identity — the CLI
