@@ -57,6 +57,7 @@ import {
   ThreadRevertedPayload,
   ThreadSessionSetPayload,
   ThreadTurnUsageRecordedPayload,
+  ThreadUsageBackfilledPayload,
   ThreadTurnDiffCompletedPayload,
 } from "./Schemas.ts";
 
@@ -890,6 +891,19 @@ export function projectEvent(
     case "thread.turn-usage-recorded":
       return decodeForEvent(
         ThreadTurnUsageRecordedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, { usage: payload.usage }),
+        })),
+      );
+
+    case "thread.usage-backfilled":
+      return decodeForEvent(
+        ThreadUsageBackfilledPayload,
         event.payload,
         event.type,
         "payload",

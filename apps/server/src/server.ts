@@ -91,6 +91,7 @@ import { ProviderRuntimeIngestionLive } from "./orchestration/Layers/ProviderRun
 import { ProviderCommandReactorLive } from "./orchestration/Layers/ProviderCommandReactor.ts";
 import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.ts";
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
+import { ThreadUsageBackfillLive } from "./orchestration/Layers/ThreadUsageBackfill.ts";
 import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
 import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
 import * as ThreadPullRequestReactor from "./orchestration/ThreadPullRequestReactor.ts";
@@ -301,6 +302,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(CheckpointReactorLive),
   Layer.provideMerge(ThreadDeletionReactorLive),
   Layer.provideMerge(ThreadSettlementReactor.layer),
+  // Fork (#834): estimates a legacy thread's usage from its Claude transcript
+  // once; reads the usage service provided further down.
+  Layer.provideMerge(ThreadUsageBackfillLive),
   // Fork (#269 A): queues a fix round for a babysat thread's red pull
   // request through `thread.turn.queue`; reads the sync reactor below.
   Layer.provideMerge(InfinitusBabysitLive),

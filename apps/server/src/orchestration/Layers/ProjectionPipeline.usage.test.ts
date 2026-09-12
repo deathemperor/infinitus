@@ -15,6 +15,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { ServerConfig } from "../../config.ts";
 import { OrchestrationCommandReceiptRepositoryLive } from "../../persistence/Layers/OrchestrationCommandReceipts.ts";
+import { ProjectionTurnUsageRepository } from "../../persistence/ProjectionTurnUsage.ts";
 import { OrchestrationEventStoreLive } from "../../persistence/Layers/OrchestrationEventStore.ts";
 import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
 import * as RepositoryIdentityResolver from "../../project/RepositoryIdentityResolver.ts";
@@ -156,6 +157,218 @@ engineLayer("turn usage on the thread projection (#834)", (it) => {
         threadId,
       });
       assert.strictEqual(yield* rowCount(), 0);
+    }),
+  );
+
+  it.effect("a transcript backfill is the baseline later turns fold onto and a revert keeps", () =>
+    Effect.gen(function* () {
+      const engine = yield* OrchestrationEngineService;
+      const snapshotQuery = yield* ProjectionSnapshotQuery;
+      const createdAt = "2026-09-12T00:00:00.000Z";
+      const projectId = ProjectId.make("project-backfill");
+      const threadId = ThreadId.make("thread-backfill");
+      const modelSelection = { instanceId: ProviderInstanceId.make("claude"), model: "opus" };
+      const shell = () =>
+        snapshotQuery.getThreadShellById(threadId).pipe(Effect.map(Option.getOrThrow));
+      const transcript = {
+        source: "transcript" as const,
+        turns: 3,
+        inputTokens: 500,
+        outputTokens: 50,
+        cachedInputTokens: 400,
+        cacheCreationTokens: 20,
+        reasoningTokens: 0,
+        subagentTurns: 0,
+        costUsd: 0.1,
+        models: ["claude-sonnet-5"],
+        lastTurnAt: "2026-09-11T00:00:00.000Z",
+      };
+
+      yield* engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-backfill-project"),
+        projectId,
+        title: "Backfill",
+        workspaceRoot: "/tmp/project-backfill",
+        defaultModelSelection: modelSelection,
+        createdAt,
+      });
+      yield* engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("cmd-backfill-thread"),
+        threadId,
+        projectId,
+        title: "Legacy",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdAt,
+      });
+      yield* engine.dispatch({
+        type: "thread.usage.backfill",
+        commandId: CommandId.make("cmd-backfill-1"),
+        threadId,
+        usage: transcript,
+        createdAt: "2026-09-12T00:01:00.000Z",
+      });
+      assert.deepStrictEqual((yield* shell()).usage, transcript);
+
+      // A runtime turn folds onto the estimate, which keeps its source.
+      yield* engine.dispatch({
+        type: "thread.turn.usage.record",
+        commandId: CommandId.make("cmd-backfill-record"),
+        threadId,
+        turnUsage: turn("turn-1", "2026-09-12T00:02:00.000Z", 0.25),
+        createdAt: "2026-09-12T00:02:00.000Z",
+      });
+      const folded = (yield* shell()).usage;
+      assert.strictEqual(folded?.source, "transcript");
+      assert.strictEqual(folded?.turns, 4);
+      assert.strictEqual(folded?.inputTokens, 1500);
+      assert.closeTo(folded?.costUsd ?? -1, 0.35, 1e-9);
+      assert.deepStrictEqual(folded?.models, ["claude-sonnet-5", "claude-opus-4-7"]);
+      assert.strictEqual(folded?.lastTurnAt, "2026-09-12T00:02:00.000Z");
+
+      // A second estimate is refused: the thread has a rollup.
+      const refused = yield* engine
+        .dispatch({
+          type: "thread.usage.backfill",
+          commandId: CommandId.make("cmd-backfill-2"),
+          threadId,
+          usage: transcript,
+          createdAt: "2026-09-12T00:03:00.000Z",
+        })
+        .pipe(Effect.flip);
+      assert.include(String(refused), "already has a usage rollup");
+
+      // Reverting prunes the runtime row; the transcript estimate stays.
+      yield* engine.dispatch({
+        type: "thread.revert.complete",
+        commandId: CommandId.make("cmd-backfill-revert"),
+        threadId,
+        turnCount: 0,
+        createdAt: "2026-09-12T00:04:00.000Z",
+      });
+      assert.deepStrictEqual((yield* shell()).usage, transcript);
+    }),
+  );
+
+  it.effect("the backfill candidates are the Claude bindings with no rollup and no live turn", () =>
+    Effect.gen(function* () {
+      const engine = yield* OrchestrationEngineService;
+      const repository = yield* ProjectionTurnUsageRepository;
+      const sql = yield* SqlClient.SqlClient;
+      const createdAt = "2026-09-12T00:00:00.000Z";
+      const projectId = ProjectId.make("project-candidates");
+      const modelSelection = { instanceId: ProviderInstanceId.make("claude"), model: "opus" };
+      const candidates = () => repository.listBackfillCandidates({ limit: 10 });
+      const bind = (threadId: ThreadId, providerName: string, cursor: string | null) => sql`
+        INSERT INTO provider_session_runtime (
+          thread_id, provider_name, adapter_key, runtime_mode, status, last_seen_at,
+          resume_cursor_json, runtime_payload_json
+        )
+        VALUES (
+          ${threadId}, ${providerName}, ${providerName}, 'full-access', 'idle', ${createdAt},
+          ${cursor}, NULL
+        )
+      `;
+      const createThread = (threadId: ThreadId, commandId: string) =>
+        engine.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(commandId),
+          threadId,
+          projectId,
+          title: threadId,
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdAt,
+        });
+
+      yield* engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-candidates-project"),
+        projectId,
+        title: "Candidates",
+        workspaceRoot: "/tmp/project-candidates",
+        defaultModelSelection: modelSelection,
+        createdAt,
+      });
+      const legacy = ThreadId.make("thread-candidate-legacy");
+      const codex = ThreadId.make("thread-candidate-codex");
+      const unbound = ThreadId.make("thread-candidate-unbound");
+      yield* createThread(legacy, "cmd-candidates-legacy");
+      yield* createThread(codex, "cmd-candidates-codex");
+      yield* createThread(unbound, "cmd-candidates-unbound");
+      yield* bind(legacy, "claudeAgent", `{"threadId":"${legacy}","resume":"session-x"}`);
+      yield* bind(codex, "codex", `{"threadId":"${codex}","resume":"session-codex"}`);
+      yield* bind(unbound, "claudeAgent", `{"threadId":"${unbound}"}`);
+
+      // Only the Claude binding whose cursor names a session; no turns yet.
+      assert.deepStrictEqual(yield* candidates(), [
+        { threadId: legacy, providerSessionId: "session-x", turns: 0, lastTurnAt: null },
+      ]);
+
+      // A turn in flight hides the thread; its row, of any state, is the marker.
+      yield* sql`
+        INSERT INTO projection_turns (thread_id, turn_id, state, requested_at, checkpoint_files_json)
+        VALUES (${legacy}, 'turn-live', 'running', '2026-09-12T00:05:00.000Z', '[]')
+      `;
+      assert.deepStrictEqual(yield* candidates(), []);
+      yield* sql`
+        UPDATE projection_turns SET state = 'interrupted', completed_at = NULL
+        WHERE thread_id = ${legacy} AND turn_id = 'turn-live'
+      `;
+      assert.deepStrictEqual(yield* candidates(), [
+        {
+          threadId: legacy,
+          providerSessionId: "session-x",
+          turns: 0,
+          lastTurnAt: "2026-09-12T00:05:00.000Z",
+        },
+      ]);
+      yield* sql`
+        UPDATE projection_turns SET state = 'completed', completed_at = '2026-09-12T00:06:00.000Z'
+        WHERE thread_id = ${legacy} AND turn_id = 'turn-live'
+      `;
+      assert.deepStrictEqual(yield* candidates(), [
+        {
+          threadId: legacy,
+          providerSessionId: "session-x",
+          turns: 1,
+          lastTurnAt: "2026-09-12T00:06:00.000Z",
+        },
+      ]);
+      assert.deepStrictEqual(
+        yield* repository.listBackfillCandidates({ threadId: codex, limit: 10 }),
+        [],
+      );
+
+      // A rollup, from a backfill or the runtime, retires the thread.
+      yield* engine.dispatch({
+        type: "thread.usage.backfill",
+        commandId: CommandId.make("cmd-candidates-backfill"),
+        threadId: legacy,
+        usage: {
+          source: "transcript",
+          turns: 1,
+          inputTokens: 10,
+          outputTokens: 1,
+          cachedInputTokens: 0,
+          cacheCreationTokens: 0,
+          reasoningTokens: 0,
+          subagentTurns: 0,
+          costUsd: null,
+          models: [],
+          lastTurnAt: "2026-09-12T00:06:00.000Z",
+        },
+        createdAt: "2026-09-12T00:07:00.000Z",
+      });
+      assert.deepStrictEqual(yield* candidates(), []);
     }),
   );
 });

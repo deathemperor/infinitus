@@ -73,4 +73,17 @@ describe("thread usage rollup (#834)", () => {
     expect(foldTurnUsage([])).toBeUndefined();
     expect(foldTurnUsage([turn("t1"), turn("t2")])?.turns).toBe(2);
   });
+
+  it("folds onto a transcript baseline, which no rows leaves as it is", () => {
+    const base = {
+      ...addTurnUsage(undefined, turn("t0", { costUsd: 1 })),
+      source: "transcript" as const,
+    };
+    expect(foldTurnUsage([], base)).toEqual(base);
+    const folded = foldTurnUsage([turn("t1"), turn("t2", { costUsd: null })], base);
+    expect(folded?.source).toBe("transcript");
+    expect(folded?.turns).toBe(3);
+    expect(folded?.inputTokens).toBe(3000);
+    expect(folded?.costUsd).toBe(1.25);
+  });
 });

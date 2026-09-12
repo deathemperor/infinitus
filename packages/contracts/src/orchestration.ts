@@ -1624,6 +1624,19 @@ const ThreadTurnUsageRecordCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+/**
+ * Fork (#834): the transcript backfill sets a thread's rollup once, for a
+ * thread whose turns ran before usage was recorded. Refused when the thread
+ * already has one.
+ */
+const ThreadUsageBackfillCommand = Schema.Struct({
+  type: Schema.Literal("thread.usage.backfill"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  usage: ThreadUsageRollup,
+  createdAt: IsoDateTime,
+});
+
 const ThreadMessageAssistantDeltaCommand = Schema.Struct({
   type: Schema.Literal("thread.message.assistant.delta"),
   commandId: CommandId,
@@ -1735,6 +1748,7 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadPullRequestLinkSyncCommand,
   ThreadSessionSetCommand,
   ThreadTurnUsageRecordCommand,
+  ThreadUsageBackfillCommand,
   ThreadMessageAssistantDeltaCommand,
   ThreadMessageAssistantCompleteCommand,
   ThreadHistoryImportCommand,
@@ -1790,6 +1804,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.session-stop-requested",
   "thread.session-set",
   "thread.turn-usage-recorded",
+  "thread.usage-backfilled",
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
@@ -2079,6 +2094,12 @@ export const ThreadTurnUsageRecordedPayload = Schema.Struct({
   usage: ThreadUsageRollup,
 });
 
+/** Fork (#834): the rollup estimated from the transcript; assigned, never summed. */
+export const ThreadUsageBackfilledPayload = Schema.Struct({
+  threadId: ThreadId,
+  usage: ThreadUsageRollup,
+});
+
 export const ThreadProposedPlanUpsertedPayload = Schema.Struct({
   threadId: ThreadId,
   proposedPlan: OrchestrationProposedPlan,
@@ -2310,6 +2331,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.turn-usage-recorded"),
     payload: ThreadTurnUsageRecordedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.usage-backfilled"),
+    payload: ThreadUsageBackfilledPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,
