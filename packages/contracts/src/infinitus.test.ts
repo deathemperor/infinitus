@@ -18,6 +18,7 @@ import {
   InfinitusRevivalActivityState,
   InfinitusSession,
   InfinitusSnapshot,
+  InfinitusThreadForkRefused,
   InfinitusStatus,
   InfinitusWorkingActivityState,
 } from "./infinitus.ts";
@@ -747,5 +748,17 @@ describe("InfinitusSecretInput", () => {
 
   it("keeps the secret redacted once decoded", () => {
     expect(String(decode(input({})).secret)).toBe("<redacted>");
+  });
+});
+
+describe("InfinitusThreadForkRefused", () => {
+  it("carries its reason as the message the clients show", () => {
+    const refused = new InfinitusThreadForkRefused({ reason: "Nothing to fork at this turn." });
+    expect(refused.message).toBe("Nothing to fork at this turn.");
+    const decoded = Schema.decodeUnknownSync(InfinitusThreadForkRefused)({
+      _tag: "InfinitusThreadForkRefused",
+      reason: "The thread was not found.",
+    });
+    expect(decoded.message).toBe("The thread was not found.");
   });
 });
