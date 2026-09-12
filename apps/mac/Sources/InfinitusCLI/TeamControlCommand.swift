@@ -6,7 +6,10 @@ import FoundationNetworking
 
 // `infinitusctl team grant | revoke | grants` (#220 §7.3): who may drive
 // which of this machine's sessions. Writes <teamDir>/grants.json, which
-// the Mac's grantor endpoint reads per request — no socket needed.
+// the Mac's grantor endpoint reads per request. With the app running and
+// its manifest carrying the three verbs, these three route through its
+// control socket instead, so its pane and the now.json hints see the
+// change at once (#220 follow-up); the file path is otherwise unchanged.
 // `send | approve | mode | tail | acks`: driving a teammate's session from
 // this machine's own identity — LAN, tunnel, then the store (§5.3).
 
@@ -47,6 +50,19 @@ func runTeamControl(_ args: [String]) -> Int32? {
         }
         i += 1
     }
+    #if os(macOS)
+    if (ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] ?? "").isEmpty,
+       let request = TeamGrantsRouting.request(sub: sub, positional: positional, options: options, flags: flags) {
+        let socket = ControlProtocol.socketURL().path
+        if let manifest = ControlClient.roundTrip(ControlRequest(command: "manifest"), path: socket),
+           TeamGrantsRouting.appAnswers(manifest: manifest.result),
+           let reply = ControlClient.roundTripRetrying(request, path: socket) {
+            guard reply.ok else { return controlFail(reply.error ?? "\(request.command) failed") }
+            emit(reply.result ?? .null)
+            return 0
+        }
+    }
+    #endif
     let paths = TeamPaths.standard()
     let secrets = FileSecrets(dir: paths.secretsDir)
     do {
