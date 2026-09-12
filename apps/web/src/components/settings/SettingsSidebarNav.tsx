@@ -373,7 +373,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             <SidebarMenu className="ps-px">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = isSettingsSectionActive(pathname, item.to);
+                const isGeneralDetailPage =
+                  item.to === "/settings/general" && pathname === "/settings/open-source-licenses";
+                const isActive = isGeneralDetailPage || isSettingsSectionActive(pathname, item.to);
                 return (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton

@@ -3003,6 +3003,19 @@ export function GeneralSettingsPanel() {
             </Button>
           }
         />
+        <SettingsRow
+          {...searchableSetting("open-source-licenses")}
+          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          control={
+            <Button
+              render={<Link to="/settings/open-source-licenses" />}
+              size="xs"
+              variant="outline"
+            >
+              View licenses
+            </Button>
+          }
+        />
       </SettingsSection>
 
       <LegacyFeaturesSection />
