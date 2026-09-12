@@ -66,7 +66,7 @@ cleanup() {
     # scratchpad runs, 2026-09-11).
     pkill -f "${INFINITUS_SWAPD_CLI#/private} auto" 2>/dev/null || true
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
-    pkill -f "nc -l 127.0.0.1 4[0-9]{4}$" 2>/dev/null || true
+    pkill -f "aws-own-login-listener" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
@@ -149,8 +149,8 @@ while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; [ "$1" = "--remot
 # a callback listener; any callback ends the wait and it fails on the state.
 if [ -z "$remote" ]; then
     # A port nothing holds (#1007): `40000 + $$ % 10000` alone could land
-    # on a listener already there, and `nc -l` on a busy port exits in
-    # 10 ms — the stub then dies before the app can release it, and the
+    # on a listener already there, and a listen on a busy port fails at
+    # once — the stub then dies before the app can release it, and the
     # nudge never says it was stopped. Kept out of the ephemeral range: on
     # a port from `bind(0)` the released stub lingered 10 s+ (2 of 2 runs,
     # unexplained). A listen that still fails leaves a marker the fail()
@@ -163,7 +163,27 @@ for p in [int(sys.argv[1])] + list(range(40000, 50000)):
     finally: s.close()' "$((40000 + $$ % 10000))")
     echo "Attempting to open your default browser. If the browser does not open, open the following URL."
     echo "https://e2e.invalid/authorize?profile=$profile&redirect_uri=http://127.0.0.1:$port/oauth/callback"
-    printf 'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n' | nc -l 127.0.0.1 "$port" >/dev/null \
+    # The callback listener answers like the CLI's own server: it reads
+    # the whole request before replying and closing. `nc -l` closed with
+    # the request unread, and a close over unread bytes is a TCP reset —
+    # the app's callback GET then failed after connecting, counted nothing
+    # released, and the nudge lacked the clause while the stub had ended
+    # (#1007, third sighting: CI 2026-09-12, nudge 3.3 s after the need,
+    # stub gone, no release row).
+    python3 -c 'import socket, sys  # aws-own-login-listener
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", int(sys.argv[1]))); s.listen(1)
+c, _ = s.accept(); c.settimeout(5); buf = b""
+try:
+    while b"\r\n\r\n" not in buf:
+        chunk = c.recv(4096)
+        if not chunk: break
+        buf += chunk
+except socket.timeout: pass
+c.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+try: c.shutdown(socket.SHUT_WR)
+except OSError: pass
+c.close(); s.close()' "$port" \
         || touch "$(dirname "$0")/aws-own-login-nc-failed"
     echo "aws: [ERROR]: Error loading or redeeming a login authorization code: State parameter infinitus does not match expected value e2e."; exit 255
 fi
@@ -620,10 +640,11 @@ echo "aws: code flow signed in, need cleared, session nudged"
 # and the nudge says so.
 i=0
 while pgrep -f "aws login --profile e2e-login" >/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|nc -l' | grep -v grep | head -4 | tr '\n' ';'))"
+    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|aws-own-login-listener' | grep -v grep | head -4 | tr '\n' ';'))"
     sleep 1
 done
-grep -q "Your own .aws login. was stopped" "$INBOX" || fail "nudge does not say the session's own login was stopped"
+grep -q "Your own .aws login. was stopped" "$INBOX" \
+    || fail "nudge does not say the session's own login was stopped (inbox: $(tail -c 400 "$INBOX" 2>/dev/null | tr '\n' ' '))"
 echo "aws: the session's own stuck login released, nudge says so"
 # --- gcloud sign-in from the phone (#367) --------------------------------
 # The same session's gcloud call dies on lapsed credentials: the need
