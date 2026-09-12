@@ -35,6 +35,7 @@ import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 import {
   resolveDefaultDesktopUpdateChannel,
   resolveEffectiveDesktopUpdateChannel,
+  resolveElectronUpdaterFeed,
 } from "./updateChannels.ts";
 import {
   createInitialDesktopUpdateState,
@@ -379,16 +380,19 @@ export const make = Effect.gen(function* () {
     channel: DesktopUpdateChannel,
   ) {
     yield* Effect.annotateCurrentSpan({ channel });
-    const allowsPrerelease = channel === "nightly" || channel === "infinitus";
-    yield* electronUpdater.setChannel(channel);
-    yield* electronUpdater.setAllowPrerelease(allowsPrerelease);
-    yield* electronUpdater.setAllowDowngrade(allowsPrerelease);
-    yield* electronUpdater.setFullChangelog(allowsPrerelease);
+    // The feed electron-updater follows for this track (#924). Its channel
+    // setter turns allowDowngrade on, so the downgrade flag is set after it.
+    const feed = resolveElectronUpdaterFeed(environment.appVersion, channel);
+    yield* electronUpdater.setChannel(feed.channel);
+    yield* electronUpdater.setAllowPrerelease(feed.allowPrerelease);
+    yield* electronUpdater.setAllowDowngrade(feed.allowDowngrade);
+    yield* electronUpdater.setFullChangelog(feed.allowPrerelease);
     yield* logUpdaterInfo("using update channel", {
       channel,
-      allowPrerelease: allowsPrerelease,
-      allowDowngrade: allowsPrerelease,
-      fullChangelog: allowsPrerelease,
+      updaterChannel: feed.channel,
+      allowPrerelease: feed.allowPrerelease,
+      allowDowngrade: feed.allowDowngrade,
+      fullChangelog: feed.allowPrerelease,
     });
   });
 

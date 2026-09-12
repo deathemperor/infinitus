@@ -301,7 +301,7 @@ jobs:
         shell: bash
         env:
           # The updater feed is this repo, so the published release is the
-          # one an installed build finds on the `infinitus` channel.
+          # one an installed build finds on its feed.
           T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
           T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit == 'true' }}
           T3CODE_APPLE_TEAM_ID: Q783W6B4FA
@@ -362,28 +362,36 @@ jobs:
         shell: bash
         run: security delete-keychain "${{ steps.signing.outputs.keychain }}" || true
 
-      # The DMG installs the app; the zip and `infinitus-mac.yml` are what
-      # electron-updater downloads for an in-place update on the `infinitus`
-      # channel. One arch, so no per-arch manifest renaming or merging.
+      # The DMG installs the app; the zip and the manifest are what
+      # electron-updater downloads for an in-place update. The manifest is
+      # named after the version's prerelease id (`alpha-mac.yml` for
+      # `0.5.0-alpha.N`, `latest-mac.yml` for a plain version): that is the
+      # name an installed build asks for (#924). One arch, so no per-arch
+      # manifest renaming or merging.
       - name: Collect release assets
         shell: bash
+        env:
+          VERSION: ${{ needs.mac.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p release-publish
+          channel="${VERSION#*-}"
+          [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
+          manifest="${channel}-mac.yml"
 
           shopt -s nullglob
           for pattern in \
             "release/*.dmg" \
             "release/*.zip" \
             "release/*.blockmap" \
-            "release/infinitus-mac.yml"; do
+            "release/$manifest"; do
             for file in $pattern; do
               cp "$file" release-publish/
             done
           done
 
-          if [[ ! -f release-publish/infinitus-mac.yml ]]; then
-            echo "electron-builder wrote no infinitus-mac.yml; the update feed would be broken." >&2
+          if [[ ! -f "release-publish/$manifest" ]]; then
+            echo "electron-builder wrote no $manifest; the update feed would be broken." >&2
             ls -1 release >&2
             exit 1
           fi
@@ -437,9 +445,9 @@ jobs:
           name: linux-${{ matrix.arch }}
           path: apps/mac/dist/
 
-  # One release for the tag: the DMG, its zip, blockmaps and
-  # `infinitus-mac.yml` (what electron-updater installs on the `infinitus`
-  # channel), both menu bar zips, the Linux binaries. A prerelease while the
+  # One release for the tag: the DMG, its zip, blockmaps and the
+  # `<prerelease id>-mac.yml` manifest electron-updater installs from
+  # (#924), both menu bar zips, the Linux binaries. A prerelease while the
   # version carries a prerelease tag (`-alpha.N`, `-beta.N`, `-rc.N`), a full
   # release otherwise, so `releases/latest` is the one-app release once a
   # plain version ships. Notes are that version's section of
@@ -468,8 +476,10 @@ jobs:
           cp artifacts/linux-x86_64/infinitus-tray-linux-x86_64 \
              artifacts/linux-aarch64/infinitus-tray-linux-aarch64 \
              artifacts/linux-x86_64/infinitus-omarchy.tar.gz release-assets/
+          channel="${VERSION#*-}"
+          [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
           for want in "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
-                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" infinitus-mac.yml; do
+                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" "${channel}-mac.yml"; do
             [[ -f "release-assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 release-assets >&2; exit 1; }
           done
           ls -l release-assets

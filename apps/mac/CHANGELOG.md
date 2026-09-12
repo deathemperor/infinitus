@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- The desktop's updater offers the next alpha, beta or plain release again: it follows the version's own prerelease channel, so an installed 0.5.0-alpha.1 must be replaced by hand once and every release after that arrives on its own (#924).
 - Settings › Infinitus › Menu bar carries the "Show the icon in the menu bar" switch: off hides the Mac's icon across relaunches while Infinitus keeps running, and this page turns it back on (#828).
 
 ### Phone

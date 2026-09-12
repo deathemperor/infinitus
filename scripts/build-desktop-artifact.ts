@@ -2653,9 +2653,19 @@ export function resolveDesktopRuntimeDependencies(
   return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
 }
 
+/** The prerelease id of a version (`alpha` for `0.5.0-alpha.1`, `nightly` for
+    an upstream nightly), or `null` for a plain one. electron-updater's GitHub
+    provider names the manifest after it and offers a release only to
+    clients whose channel equals it (#924), so the publish channel is this,
+    never a track name. */
+export function resolveDesktopPublishChannel(version: string): string | null {
+  return /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(version)?.[1] ?? null;
+}
+
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
-  updateChannel: DesktopUpdateChannel,
+  version: string,
 ) {
+  const publishChannel = resolveDesktopPublishChannel(version);
   const env = yield* Config.all({
     updateRepository: Config.string("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
     githubRepository: Config.string("GITHUB_REPOSITORY").pipe(Config.option),
@@ -2674,17 +2684,18 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
     provider: "github",
     owner,
     repo,
-    releaseType: updateChannel === "latest" ? "release" : "prerelease",
-    ...(updateChannel === "latest" ? {} : { channel: updateChannel }),
+    releaseType: publishChannel === null ? "release" : "prerelease",
+    ...(publishChannel === null ? {} : { channel: publishChannel }),
   };
 });
 
 /**
- * One product, one version (#823): every build of this repo publishes on the
- * `infinitus` channel — the product version carries no channel suffix — and
- * only an upstream nightly keeps its own. `latest` is upstream's stable
- * channel; nothing built here lands there. The same rule decides the desktop's
- * default channel at runtime (`apps/desktop/src/updates/updateChannels.ts`).
+ * One product, one version (#823): every build of this repo is on the
+ * `infinitus` track (its artwork and DMG background) and only an upstream
+ * nightly keeps its own. `latest` is upstream's stable track; nothing built
+ * here lands there. The same rule decides the desktop's default at runtime
+ * (`apps/desktop/src/updates/updateChannels.ts`). The feed a build publishes
+ * to is `resolveDesktopPublishChannel`, from the version alone.
  */
 export function resolveDesktopUpdateChannel(version: string): DesktopUpdateChannel {
   return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "infinitus";
@@ -2802,7 +2813,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
   if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
+    const publishConfig = yield* resolveGitHubPublishConfig(version);
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
     } else if (mockUpdates) {
