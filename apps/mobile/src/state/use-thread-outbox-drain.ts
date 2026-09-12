@@ -58,9 +58,11 @@ import {
   type ThreadOutboxCommandStage,
 } from "./thread-outbox-model";
 import { environmentThreadShells, threadEnvironment } from "./threads";
+import { mobilePreferencesAtom } from "./preferences";
 import { readHeldThreads } from "./threadOutboxHolds";
 import {
   isThreadHeld,
+  outboxQueueMode,
   queueTurnCommandInput,
   resolveThreadOutboxDelivery,
   type ThreadOutboxDelivery,
@@ -1124,7 +1126,7 @@ export function useThreadOutboxDrain(): void {
           readHeldThreads(nextQueuedMessage.environmentId, serverConfigs),
           nextQueuedMessage.threadId,
         ),
-        mode: "queue",
+        mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
         serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
       });
       // The delivery action resolves first; capability checks apply only to
@@ -1249,7 +1251,7 @@ export function useThreadOutboxDrain(): void {
               readHeldThreads(nextQueuedMessage.environmentId, serverConfigs),
               nextQueuedMessage.threadId,
             ),
-            mode: "queue",
+            mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
             serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
           });
           if (liveDeliveryAction !== deliveryAction) {

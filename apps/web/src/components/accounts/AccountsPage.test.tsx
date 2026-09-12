@@ -25,6 +25,13 @@ vi.mock("@effect/atom-react", () => ({
   useAtomValue: () =>
     new Map([["test-environment", { environment: { capabilities: { infinitus: true } } }]]),
 }));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 vi.mock("../../state/environments", () => ({
   useEnvironments: () => ({
     environments: [{ environmentId: "test-environment", label: "Test environment" }],
@@ -202,7 +209,9 @@ describe("AccountsPage", () => {
 
     const markup = renderToStaticMarkup(<AccountsPage />);
 
-    expect(markup).toContain("No engines report accounts on this host.");
+    expect(markup).toContain("Infinitus is running, but no engine reports accounts");
+    expect(markup).toContain('href="/settings/infinitus/engines"');
+    expect(markup).toContain("Open Settings › Infinitus › Engines");
   });
 
   it("draws every fleet with its accounts, badges, windows and forecast", () => {
@@ -749,7 +758,7 @@ describe("AccountsPage", () => {
 
     testState.snapshot = { available: true, fleets: [], sessions: [], commands: [], awsLogins };
     const empty = renderToStaticMarkup(<AccountsPage />);
-    expect(empty).toContain("No engines report accounts on this host.");
+    expect(empty).toContain("Infinitus is running, but no engine reports accounts");
     expect(empty).toContain("Sign in: AWS dev");
   });
 

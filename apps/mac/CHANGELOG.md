@@ -8,15 +8,22 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- The checkpoint after every turn no longer re-reads the whole repository: on a large checkout it took 13 s and often hit the 30 s limit, ending each turn with "Checkpoint capture failed"; it now reuses git's own index cache (upstream fix #10792 carried ahead).
+- The desktop's updater offers the next alpha, beta or plain release again: it follows the version's own prerelease channel, so an installed 0.5.0-alpha.1 must be replaced by hand once and every release after that arrives on its own (#924).
 - Settings › Infinitus › Menu bar carries the "Show the icon in the menu bar" switch: off hides the Mac's icon across relaunches while Infinitus keeps running, and this page turns it back on (#828).
 - The thread-info popover counts the tool calls and the duration of the turns this server ran, per thread (#834).
+- A queued message the server could not send stays in the queue and says why in the timeline instead of silently waiting; one the provider failed to start is put back at the head of the queue, once, so it is never lost (#806).
 
 ### Phone
+- A best-of-N member thread carries the group card: every live sibling with its model and a status word, a tap opens it; keeping one stays on the desktop (#269).
 - A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
+- Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).
 - The thread header's pull request menu can babysit the PR — a fix round is queued whenever it conflicts, fails its checks or gets changes requested, up to ten — and stop it; a babysat thread's list row reads "Babysitting r/10" (#269).
 
 ### Mac
+- The quick tunnel no longer spawns at all while the named tunnel is running: a relaunch with both toggles on starts one `cloudflared`, not two, the quick tunnel still returns as the fallback the moment the named one exits, and the named hostname is no longer offered to the rendezvous, which takes quick-tunnel addresses only (the "rendezvous publish failed: HTTP 400" line on every connect) (#697).
+- The last traces of the cswap engine are gone: the engine table, settings catalog, proxy help text and contributor guides name swapd, and the cswap Arch package left the tree (#756).
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
 - `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
 

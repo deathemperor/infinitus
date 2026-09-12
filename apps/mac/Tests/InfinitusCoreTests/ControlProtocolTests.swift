@@ -3,7 +3,7 @@ import XCTest
 
 final class ControlProtocolTests: XCTestCase {
     func testRequestRoundTripsAsOneLine() throws {
-        let req = ControlRequest(command: "rename", args: ["cswap/claude", "2", "work"],
+        let req = ControlRequest(command: "rename", args: ["swapd/claude", "2", "work"],
                                  options: ["yes": "true"], secret: "s3")
         let line = try ControlCodec.encode(req)
         XCTAssertEqual(line.last, 0x0A)

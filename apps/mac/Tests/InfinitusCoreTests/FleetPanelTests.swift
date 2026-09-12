@@ -58,7 +58,11 @@ final class FleetPanelTests: XCTestCase {
     /// One table for engine names, so the Mac popup, the phone's mirror
     /// and the Windows panel can't drift into three spellings.
     func testEngineCatalogNamesEveryEngineTheHostsMirror() {
-        XCTAssertEqual(EngineCatalog.displayName(for: "cswap"), "cswap")
+        XCTAssertEqual(EngineCatalog.displayName(for: "swapd"), "swapd")
+        #if !os(iOS)
+        XCTAssertEqual(EngineCatalog.capabilities(for: "swapd"), SwapdEngine.engineCapabilities,
+                       "the id-only table must not drift from the live engine")
+        #endif
         XCTAssertEqual(EngineCatalog.displayName(for: "cliproxy"), "CLIProxyAPI")
         XCTAssertEqual(EngineCatalog.displayName(for: "9router"), "9Router")
         XCTAssertEqual(EngineCatalog.displayName(for: "claude-code-windows"), "Claude Code")
@@ -186,7 +190,7 @@ final class FleetPanelTests: XCTestCase {
     func testEmptyStatesDistinguishNoEngineFromNoAccounts() {
         let none = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false)
         XCTAssertEqual(none.empty, "No account engine installed.")
-        XCTAssertFalse(none.empty?.contains("cswap") == true, "core copy names no engine")
+        XCTAssertFalse(none.empty?.contains("swapd") == true, "core copy names no engine")
         let hinted = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false,
                                       installHint: "`pip install claude-swap` adds one.")
         XCTAssertEqual(hinted.empty, "No account engine installed. `pip install claude-swap` adds one.")
@@ -196,10 +200,10 @@ final class FleetPanelTests: XCTestCase {
         XCTAssertEqual(reading.empty, "Reading accounts\u{2026}")
 
         let bare = FleetPanel.panel(
-            fleets: [EngineFleet(engineID: "cswap", provider: .claude, accounts: [])],
+            fleets: [EngineFleet(engineID: "swapd", provider: .claude, accounts: [])],
             live: nil, engineInstalled: true)
         XCTAssertTrue(bare.empty?.contains("register the account you are logged into") == true)
-        XCTAssertFalse(bare.empty?.contains("cswap") == true, "core copy names no engine")
+        XCTAssertFalse(bare.empty?.contains("swapd") == true, "core copy names no engine")
     }
 
     /// The footer counts sessions and accounts and names the engine —
@@ -213,7 +217,7 @@ final class FleetPanelTests: XCTestCase {
                        "3 sessions \u{00B7} 1 busy \u{00B7} 1 waiting \u{00B7} 4 accounts \u{00B7} 9Router \u{00B7} routed")
         XCTAssertEqual(panel.engine?.routed, true)
         // Not routed: the engine is named without claiming the traffic.
-        XCTAssertEqual(FleetPanel.EngineIndicator(name: "cswap", routed: false).text, "cswap")
+        XCTAssertEqual(FleetPanel.EngineIndicator(name: "swapd", routed: false).text, "swapd")
         XCTAssertEqual(FleetPanel.footer(live: nil, accounts: 0), "no sessions")
     }
 
@@ -235,7 +239,7 @@ final class FleetPanelTests: XCTestCase {
         ])
         let panel = FleetPanel.panel(list: list, live: nil, engineInstalled: true)
         XCTAssertEqual(panel.sections.count, 1)
-        XCTAssertEqual(panel.sections[0].key, "cswap/claude")
+        XCTAssertEqual(panel.sections[0].key, "swapd/claude")
         XCTAssertEqual(panel.activeNumber, 2)
         XCTAssertTrue(panel.rows[1].active, "activeAccountNumber marks the row")
         XCTAssertTrue(panel.lines.allSatisfy {
@@ -251,7 +255,7 @@ final class FleetPanelTests: XCTestCase {
     func testWeeklyWindowRollsOverInTheGauge() {
         let usage = Usage(fiveHour: UsageWindow(pct: 10),
                           sevenDay: UsageWindow(pct: 88, resetsAt: "2026-09-04T12:00:00Z"))
-        let fleet = EngineFleet(engineID: "cswap", provider: .claude,
+        let fleet = EngineFleet(engineID: "swapd", provider: .claude,
                                 accounts: [account(1, "a@example.com", usage: usage)])
         let before = FleetPanel.panel(fleets: [fleet], live: nil, engineInstalled: true,
                                       now: WeeklyRoll.parse("2026-09-04T11:00:00Z")!)
@@ -287,7 +291,7 @@ final class FleetPanelTests: XCTestCase {
         // Without an override the fleet's own sessions ride along.
         let fleetSessions = LiveSessions(busy: 0, total: 1, idle: 1, waiting: 0, shell: 0,
                                          unknown: 0, sessions: nil)
-        let own = EngineFleet(engineID: "cswap", provider: .claude, accounts: [],
+        let own = EngineFleet(engineID: "swapd", provider: .claude, accounts: [],
                               liveSessions: fleetSessions)
         XCTAssertEqual(EngineFleet.primaryList([own])?.liveSessions?.total, 1)
         XCTAssertNil(EngineFleet.primaryList([]))

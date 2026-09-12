@@ -1,4 +1,11 @@
-import { CommandId, type OrchestrationEvent, type ThreadId } from "@t3tools/contracts";
+import {
+  CommandId,
+  EventId,
+  MessageId,
+  type OrchestrationEvent,
+  type OrchestrationQueuedTurn,
+  type ThreadId,
+} from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -15,12 +22,25 @@ import { threadHasQueuedTurnStart } from "../../orchestration/ThreadSettlementPo
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
-import { queueDrainVerdict, releasedThreads } from "./infinitusTurnQueue.logic.ts";
+import {
+  isRetryQueueId,
+  queueDrainVerdict,
+  queueHeadOrderKey,
+  queueSendRefusal,
+  queuedTurnSignature,
+  releasedThreads,
+  retryQueueId,
+} from "./infinitusTurnQueue.logic.ts";
 
 type Input =
   | { readonly kind: "thread"; readonly threadId: ThreadId }
   | { readonly kind: "held"; readonly threadIds: ReadonlyArray<ThreadId> }
   | { readonly kind: "paused"; readonly threadIds: ReadonlyArray<ThreadId> }
+  | {
+      readonly kind: "start-failed";
+      readonly threadId: ThreadId;
+      readonly requestId: string | null;
+    }
   | { readonly kind: "sweep" };
 
 /** The events after which a thread's queue is looked at again: a session
@@ -47,6 +67,14 @@ const eventThreadId = (event: OrchestrationEvent): ThreadId | null => {
   return typeof payload.threadId === "string" ? (payload.threadId as ThreadId) : null;
 };
 
+/** The message a failed-start activity names (`requestId` on the reactor's
+    `provider.turn.start.failed` payload). */
+const failedStartRequestId = (event: OrchestrationEvent): string | null => {
+  if (event.type !== "thread.activity-appended") return null;
+  const payload = event.payload.activity.payload as { readonly requestId?: unknown } | null;
+  return typeof payload?.requestId === "string" ? payload.requestId : null;
+};
+
 /**
  * Fork (#806): the server-side message queue's drain. Queued rows live in
  * the projection (`OrchestrationThread.queuedTurns`); this layer sends the
@@ -60,11 +88,20 @@ const eventThreadId = (event: OrchestrationEvent): ThreadId | null => {
  * It wakes on the watched events, on a hold or pause letting a thread go,
  * and once at boot: the sweep runs after the hold and interrupt layers have
  * published their first lists (or `SWEEP_GATE_TIMEOUT`), so a thread held
- * at startup is not drained once before the hold is known. A send the
- * decider rejects leaves the row where it is and is logged; the next event
- * on the thread tries again. A send the provider fails later has already
- * consumed the row: the text is in the timeline as a failed send, like a
- * manual one. `error` sessions are never drained (see the logic module).
+ * at startup is not drained once before the hold is known. `error`
+ * sessions are never drained (see the logic module).
+ *
+ * A send the decider refuses leaves the row where it is, appends an `error`
+ * activity (`queue.send.failed`, the refusal in its payload) and skips the
+ * row until it is edited, moved or removed; a row already sent or removed
+ * is the one refusal that only logs. A send the provider fails to start
+ * has consumed the row and left the message in the timeline as a failed
+ * send; the drain puts it back once, at the head of the queue under
+ * `retryQueueId` with a fresh message id, and says so with an `info`
+ * activity (`queue.requeued`). The session reads `error` after such a
+ * failure, so the retry waits in the card until the next manual turn
+ * recovers the session. Only the drain's own sends are put back: "Send now"
+ * from the card is a manual send.
  */
 export const InfinitusTurnQueueLive = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -78,7 +115,93 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
     let held: ReadonlySet<ThreadId> = new Set();
     let paused: ReadonlySet<ThreadId> = new Set();
     const inFlight = new Set<ThreadId>();
+    /** Rows the decider refused, by `queuedTurnSignature`. */
+    const failed = new Set<string>();
+    /** The last row sent per thread, until the provider starts it or
+        fails it: what a failed-start activity's `requestId` is matched to. */
+    const sent = new Map<ThreadId, OrchestrationQueuedTurn>();
     const heldKnown = yield* Deferred.make<void>();
+    const serverCommandId = (tag: string) =>
+      crypto.randomUUIDv4.pipe(
+        Effect.map((uuid) => CommandId.make(`server:turn-queue-${tag}:${uuid}`)),
+      );
+
+    const appendActivity = (input: {
+      readonly threadId: ThreadId;
+      readonly tone: "error" | "info";
+      readonly kind: string;
+      readonly summary: string;
+      readonly payload: unknown;
+      readonly createdAt: string;
+    }) =>
+      Effect.gen(function* () {
+        yield* orchestrationEngine.dispatch({
+          type: "thread.activity.append",
+          commandId: yield* serverCommandId("activity"),
+          threadId: input.threadId,
+          activity: {
+            id: EventId.make(yield* crypto.randomUUIDv4),
+            tone: input.tone,
+            kind: input.kind,
+            summary: input.summary,
+            payload: input.payload,
+            turnId: null,
+            createdAt: input.createdAt,
+          },
+          createdAt: input.createdAt,
+        });
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("infinitus.turn-queue.activity-failed", {
+            threadId: input.threadId,
+            kind: input.kind,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      );
+
+    /** A provider failed to start the row `requestId` names: put it back
+        once (never a row that is itself the retry), ahead of the queue. */
+    const onStartFailed = (threadId: ThreadId, requestId: string | null) =>
+      Effect.gen(function* () {
+        const row = sent.get(threadId);
+        if (row === undefined || requestId === null || row.messageId !== requestId) return;
+        sent.delete(threadId);
+        if (isRetryQueueId(row.queueId)) {
+          yield* Effect.logInfo("infinitus.turn-queue.retry-failed", {
+            threadId,
+            queueId: row.queueId,
+          });
+          return;
+        }
+        const shell = yield* projectionSnapshotQuery
+          .getThreadShellById(threadId)
+          .pipe(Effect.option, Effect.map(Option.flatten));
+        if (Option.isNone(shell)) return;
+        const createdAt = DateTime.formatIso(yield* DateTime.now);
+        const queueId = retryQueueId(row.queueId);
+        const messageId = MessageId.make(yield* crypto.randomUUIDv4);
+        const orderKey = queueHeadOrderKey(shell.value.queuedTurns);
+        yield* orchestrationEngine.dispatch({
+          type: "thread.turn.queue",
+          commandId: yield* serverCommandId("retry"),
+          threadId,
+          queueId,
+          message: { messageId, role: "user", text: row.text, attachments: row.attachments },
+          ...(row.modelSelection !== undefined ? { modelSelection: row.modelSelection } : {}),
+          ...(orderKey !== undefined ? { orderKey } : {}),
+          createdAt,
+        });
+        yield* Effect.logInfo("infinitus.turn-queue.requeued", { threadId, queueId });
+        yield* appendActivity({
+          threadId,
+          tone: "info",
+          kind: "queue.requeued",
+          summary: "Queued message returned to the queue after the send failed",
+          payload: { queueId, from: row.queueId, messageId },
+          createdAt,
+        });
+      });
     const pausedKnown = yield* Deferred.make<void>();
 
     const consider = (threadId: ThreadId) =>
@@ -88,15 +211,26 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
           .pipe(Effect.option, Effect.map(Option.flatten));
         if (Option.isNone(shell)) return;
         const createdAt = DateTime.formatIso(yield* DateTime.now);
+        // A refused row that was edited, moved or removed is forgotten.
+        const live = new Set(
+          (shell.value.queuedTurns ?? []).map((row) => queuedTurnSignature(threadId, row)),
+        );
+        for (const signature of failed) {
+          if (signature.startsWith(`${threadId}\n`) && !live.has(signature)) {
+            failed.delete(signature);
+          }
+        }
         const verdict = queueDrainVerdict(shell.value, {
           held: held.has(threadId),
           paused: paused.has(threadId),
           inFlight: inFlight.has(threadId),
           pendingStart: threadHasQueuedTurnStart(shell.value, createdAt),
+          failed,
         });
         if (verdict.kind !== "send") return;
         const row = verdict.row;
         inFlight.add(threadId);
+        sent.set(threadId, row);
         yield* orchestrationEngine
           .dispatch({
             type: "thread.turn.start",
@@ -118,12 +252,27 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
             Effect.tap(() =>
               Effect.logInfo("infinitus.turn-queue.sent", { threadId, queueId: row.queueId }),
             ),
-            // The row stays; the next event on the thread tries again.
+            // The row stays. A refusal is shown and the row skipped until
+            // it changes; a row already gone is nobody's failure.
             Effect.catchCause((cause) =>
-              Effect.logWarning("infinitus.turn-queue.send-failed", {
-                threadId,
-                queueId: row.queueId,
-                cause: Cause.pretty(cause),
+              Effect.gen(function* () {
+                sent.delete(threadId);
+                yield* Effect.logWarning("infinitus.turn-queue.send-failed", {
+                  threadId,
+                  queueId: row.queueId,
+                  cause: Cause.pretty(cause),
+                });
+                const detail = queueSendRefusal(Cause.squash(cause));
+                if (detail === null) return;
+                failed.add(queuedTurnSignature(threadId, row));
+                yield* appendActivity({
+                  threadId,
+                  tone: "error",
+                  kind: "queue.send.failed",
+                  summary: "Queued message was not sent",
+                  payload: { queueId: row.queueId, detail },
+                  createdAt,
+                });
               }),
             ),
             Effect.ensuring(Effect.sync(() => inFlight.delete(threadId))),
@@ -151,6 +300,9 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
             for (const threadId of released) yield* consider(threadId);
             return;
           }
+          case "start-failed":
+            yield* onStartFailed(input.threadId, input.requestId);
+            return yield* consider(input.threadId);
           case "sweep": {
             const snapshot = yield* projectionSnapshotQuery.getShellSnapshot();
             for (const thread of snapshot.threads) {
@@ -184,7 +336,12 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         ),
         Stream.runForEach((event) => {
           const threadId = eventThreadId(event);
-          return threadId === null ? Effect.void : worker.enqueue({ kind: "thread", threadId });
+          if (threadId === null) return Effect.void;
+          return worker.enqueue(
+            event.type === "thread.activity-appended"
+              ? { kind: "start-failed", threadId, requestId: failedStartRequestId(event) }
+              : { kind: "thread", threadId },
+          );
         }),
       ),
     );

@@ -5,12 +5,14 @@ before that the `native` branch). Split out of
 `~/death/claude-swap/swift/CswapBar` on 2026-08-29 with history.
 
 ## Non-negotiables
-- **Infinitus is not tied to cswap — forever** (user 2026-09-05: "Infinitus
-  has nothing tight to cswap, not anymore. this is a forever decision").
-  cswap is one `AccountEngine` adapter among several; no feature, design,
-  data format, CLI or publisher may depend on cswap existing. Anything
-  cross-platform ships from THIS repo (InfinitusCore + InfinitusCLI on
-  Swift for macOS/Linux/Windows), never as a cswap subcommand.
+- **Infinitus is not tied to any one engine — forever** (user 2026-09-05,
+  about cswap, the engine of the day: "Infinitus has nothing tight to
+  cswap, not anymore. this is a forever decision"; cswap itself went in
+  #756). swapd is one `AccountEngine` adapter among several; no feature,
+  design, data format, CLI or publisher may depend on swapd existing.
+  Anything cross-platform ships from THIS repo (InfinitusCore +
+  InfinitusCLI on Swift for macOS/Linux/Windows), never as an engine
+  subcommand.
 - **Everything is Swift; the engine is fully isolated.** Every engine
   touchpoint is a `swapd … --json` subprocess (InfinitusCore/Engines/Swapd/SwapdCLI.swift).
   Never read engine internals (`~/.claude-swap-backup/*`). Reading
@@ -78,8 +80,8 @@ before that the `native` branch). Split out of
   issue"). `gh issue create` / `gh issue comment`; docs/TODO.md is the
   shipped log only.
 - **Account policy lives in the engines** (user 2026-09-03). Auto-swap,
-  pick-first, ordering come from each engine's own knobs (cswap
-  `autoswitch.*`, the proxy's priority); the app only sets those and
+  pick-first, ordering come from each engine's own knobs (swapd
+  `config`, the proxy's priority); the app only sets those and
   never runs a second policy on top (the app-side auto-order writer was
   removed for this). Missing knob → upstream PR, never a fork.
 - **Keep performance in check with every feature** (user 2026-09-03):

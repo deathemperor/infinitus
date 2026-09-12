@@ -80,6 +80,7 @@ import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { threadEnvironment } from "../../state/threads";
 import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
 import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
+import { InfinitusBestOfCard } from "../infinitus/InfinitusBestOfCard";
 import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
 import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
@@ -910,6 +911,11 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusBestOfCard={
+            creationState === null && selectedThread.groupId != null ? (
+              <InfinitusBestOfCard thread={selectedThread} />
+            ) : null
+          }
           infinitusReconnectingNotice={
             creationState === null && reconnectingNoticeText !== null ? (
               <InfinitusReconnectingNotice notice={reconnectingNoticeText} />

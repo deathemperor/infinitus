@@ -32,8 +32,9 @@ makes wrong, in its own PR.
   Expected on every sync (#823 layer 3): upstream's tests assume a plain
   `x.y.z` is a `latest` build titled "(Alpha)"; here every non-nightly
   version is an `infinitus` build, so their fixture expectations in
-  `scripts/build-desktop-artifact.test.ts` (0.0.17 icons and brand, 0.0.33
-  publish config, DMG background), `apps/desktop/src/settings/DesktopAppSettings.test.ts`
+  `scripts/build-desktop-artifact.test.ts` (0.0.17 icons and brand, DMG
+  background; the publish config follows the version's prerelease id and
+  matches upstream's expectation), `apps/desktop/src/settings/DesktopAppSettings.test.ts`
   (default channel), `apps/desktop/src/app/DesktopEnvironment.test.ts`,
   `DesktopAppIdentity.test.ts` and `DesktopPreReadyPlatform.test.ts` (plain
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
@@ -56,7 +57,7 @@ makes wrong, in its own PR.
   notarizes and staples both Swift bundles on `macos-26`; `desktop` nests
   that run's `Infinitus-Menu-Bar-<v>.zip` and builds the DMG with
   `--build-version "$VERSION"`; `linux` builds the tray; `publish` creates
-  the one GitHub release — DMG, zip, blockmaps, `infinitus-mac.yml`, both
+  the one GitHub release — DMG, zip, blockmaps, the updater manifest, both
   menu bar zips, the Linux binaries — titled `Infinitus <version>`, notes
   from the `## <version>` section of `apps/mac/CHANGELOG.md` (no section, no
   release), `--prerelease` iff the version carries a prerelease tag, then
@@ -64,13 +65,33 @@ makes wrong, in its own PR.
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
   `nightly` tag: `latest` becomes the one-app release with the first plain
-  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build. Desktop
-  updates ride the `infinitus` channel (manifest `infinitus-mac.yml`); on it
-  an available update downloads itself
+  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build — one
+  release created once and only edited in place (tag re-pointed, asset
+  clobbered, title edited), never deleted and recreated: the desktop
+  updater takes the first entry of `releases.atom`, an edited `nightly`
+  keeps its place below the newest versioned tag, a recreated one would
+  not (#924). Desktop
+  updates follow electron-updater's own GitHub rule (#924): the client's
+  channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
+  `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
+  offers a release only when the tag's prerelease id equals it, and it
+  downloads `<id>-mac.yml` from that release (`latest-mac.yml` for a plain
+  version), which is why the build publishes on that id
+  (`resolveDesktopPublishChannel`) and the workflow checks for that file.
+  An `alpha` client follows a newer `beta` tag and, through the library's
+  `latest-mac.yml` fallback, the first plain version; a plain version reads
+  `releases/latest` and never sees a prerelease. A release whose tag is not
+  a semver version has no channel: a prerelease client would take it and
+  fail its polls (no manifest) were it the feed's first entry, which is why
+  the `nightly` release must keep its place below the newest versioned tag
+  (its rule is with `nightly` above). The `infinitus` track name lives only
+  in the desktop's settings and UI. On the track an available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over. History:
   before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
-  prereleases from "Fork desktop release" and the Mac app from
+  prereleases from "Fork desktop release" (channel `infinitus`, manifest
+  `infinitus-mac.yml`: those clients, and `0.5.0-alpha.1`, which still told
+  the updater `infinitus`, can only be updated by hand) and the Mac app from
   `mac-v<version>` tags with a `native-helper.json` pin.
 - **One version (#823 layer 3).** The root `VERSION` file (one line,
   `0.5.0-alpha.N`) is the only place the product version is written:
@@ -78,20 +99,15 @@ makes wrong, in its own PR.
   `infinitus-release.yml` passes it as `--build-version`, and
   `apps/mobile/app.config.ts` carries it as `extra.productVersion` for the
   phone's Settings (the store's `version` stays a dotted-integer marketing
-  version, and cannot go down). A client older than the rule below maps
-  `0.5.0-alpha.1` to `latest` and `handleUpdateAvailable` drops updates off
-  its channel, which is why one `0.0.40-infinitus.<date>.<run>` bridge build
-  carrying the rule shipped before the first `v0.5.0-alpha.N` tag.
+  version, and cannot go down).
   `apps/desktop/package.json`'s version is upstream's and never edited. The
-  `infinitus` channel id is internal and follows from the version, not a
-  flag: every version that is not an upstream nightly
-  (`-nightly.<date>.<run>`) builds on, defaults to and brands as `infinitus`
-  (`resolveDesktopUpdateChannel`, `resolveDefaultDesktopUpdateChannel`,
-  `resolveWebAssetBrandForPackageVersion`), so `0.5.0-alpha.1` and the older
-  `0.0.40-infinitus.<date>.<run>` sit on one feed and semver orders them
-  (`0.0.40-infinitus.… < 0.5.0-alpha.1 < 0.5.0`). Upstream's `latest`
-  channel is never a default here; a persisted `latest` resolves to
-  `infinitus`.
+  `infinitus` track is internal and follows from the version, not a flag:
+  every version that is not an upstream nightly (`-nightly.<date>.<run>`)
+  defaults to and brands as `infinitus` (`resolveDesktopUpdateChannel`,
+  `resolveDefaultDesktopUpdateChannel`,
+  `resolveWebAssetBrandForPackageVersion`). Upstream's `latest` track is
+  never a default here; a persisted `latest` resolves to `infinitus`. The
+  feed a build follows is a separate thing, above.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
@@ -210,27 +226,34 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
   before it (#743), a consumer of that gate. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
+- `apps/server/src/vcs/GitVcsDriver.ts` (+ its test) — upstream's open PR
+  pingdotgg/t3code#10792 carried ahead of upstream (2026-09-12, upstream
+  #3646): checkpoint capture seeds its private index from the workspace
+  index and resets it to HEAD keeping matching stat metadata, so `git add
+-A` re-hashes only what changed instead of every tracked file (banyan:
+  13 s → 1.2 s; the fresh index crossed the 30 s `VcsProcess` timeout under
+  load and every turn ended with "Checkpoint capture failed"). Falls back to
+  the fresh-index path when the index is missing, corrupt, truncated or
+  carries assume-unchanged / skip-worktree flags. Drops on the upstream
+  sync that brings #10792 in; until then a sync conflict here is resolved
+  toward upstream.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does
   the same. Their test harnesses (`ProviderCommandReactor.test.ts`,
   `serverRuntimeStartup.reconcile.test.ts`, `AgentSessionImporter.test.ts`)
   provide the passthrough gate, with a `turnStartGate` override in the first two.
-- Chat-only rewind (#270 E1): `packages/contracts/src/orchestration.ts` —
-  `thread.chat.rewind {threadId, turnCount}` (client-dispatchable, beside
-  `thread.checkpoint.revert`) and the `thread.chat-rewind-requested` event
-  (same payload as the revert request); `apps/server/src/orchestration/decider.ts`
-  — its case; `Layers/CheckpointReactor.ts` — `handleChatRewindRequested`: the
-  revert's guards and provider rollback, no checkpoint restore, workspace
-  refresh or ref deletion, completing through the existing
-  `thread.revert.complete` → `thread.reverted` so every projection prunes the
-  later turns as for a revert (files and git checkpoint refs stay; the span
-  carries `filesRestored: false`); `packages/client-runtime` `commands.ts` /
-  `threadCommands.ts` — `rewindThreadChat` / `rewindChat`; `threadReducer.ts`
-  — the event is a no-op; `apps/web` `ChatView.tsx` `onRevertToTurnCount(turnCount, mode)`
-  with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
-  — the user-row revert button is a menu: "Revert files and chat" /
-  "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Chat-only rewind (#270 E1) is upstream's since the 2026-09-12 sync
+  (`thread.conversation.revert` → `thread.checkpoint-revert-requested`
+  with `restoreFiles: false`, #11358); the fork's `thread.chat.rewind`
+  command, its event and `handleChatRewindRequested` are gone. What stays
+  fork: `MessagesTimeline.tsx`'s revert menu ("Revert files and chat" /
+  "Restore files only" / "Rewind chat only" / "Fork from here",
+  `TimelineRevertMode`) and `ChatView.tsx`'s
+  `onRevertToTurnCount(turnCount, messageId, mode)`, whose `chat` mode sends
+  `revertThreadCheckpoint({ restoreFiles: false })` through the same
+  composer hand-back as the full revert; upstream's two-button AlertDialog
+  (`pendingRevert`) is dropped at every sync because the menu already asks.
 - Restore files, keep the chat (#269 E, Cursor's default checkpoint
   action): `thread.checkpoint.revert` and its `-requested` event carry
   `keepChat?: boolean`; `CheckpointReactor.handleRevertRequested` with it
@@ -281,8 +304,13 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   never, see #832), one send per thread at a time; wakes on session-set,
   the queue events, unarchive, a failed start, a hold or pause letting the
   thread go, and once at boot after the hold and interrupt layers have
-  published their first lists (5 s cap). A send the decider rejects leaves
-  the row; a provider failure after the send has already consumed it.
+  published their first lists (5 s cap). A send the decider refuses stays
+  in the queue with an `error` activity `queue.send.failed` and is skipped
+  until edited, moved or removed (the queue blocks behind it; a row already
+  sent or removed only logs); a send the provider fails to start after the
+  row was consumed is put back once, at the head, as `<queueId>~retry` with
+  a fresh message id and an `info` activity `queue.requeued` — the drain's
+  own sends only, "Send now" stays a manual send.
 - Update idle gate (#829): a server update is gated on the server's own
   turn state, never on process heuristics. `packages/contracts/src/server.ts`
   — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`
@@ -745,7 +773,8 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
-  `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
+  `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
+  `"queue" | "steer"`) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
   `infinitusReconnectingNotice` slot above the hold banner (#832: "Waiting
   for the network. Reconnect attempt n of 5." while the session's
@@ -765,7 +794,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
   queued creation), `InfinitusQueuedTurns` from the thread shell's
-  `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
+  `queuedTurns`, `InfinitusBestOfCard` (#269 B, read-only: the group's live
+  siblings from the shells by `groupId`, `features/infinitus/bestOf.logic.ts`
+  carrying the web `bestOf.logic.ts` sibling and status helpers kept local;
+  no "Keep this one", which removes worktrees) for the `infinitusBestOfCard`
+  slot first in the composer stack, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`, and on an `infinitus`
@@ -807,10 +840,10 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
   no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
   reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
-  worded like the web popover (#907): turns (with the subagent count), each
-  non-zero token share, model(s), cost ("Cost not recorded" for null, never
-  $0.00), last turn — every estimate prefixed "≈", and the caveat lines
-  under them.
+  worded like the web popover (#907): turns (with the subagent count), tool
+  calls and duration when the server counted them (#927), each non-zero
+  token share, model(s), cost ("Cost not recorded" for null, never $0.00),
+  last turn — every estimate prefixed "≈", and the caveat lines under them.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
   `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
   control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
@@ -1584,9 +1617,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   turns an existing thread's `send` into `wait` while the thread's session is
   `starting` / `running` or the server's hold list names it (any kind: held,
   paused, limited), so a follow-up typed during a turn lands after it instead
-  of steering; creations and every other action pass through. `mode` is
-  `"queue"` at both call sites — the phone has no copy of the desktop's
-  `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  of steering; creations and every other action pass through. `mode` at
+  both call sites is `outboxQueueMode` of this phone's preferences
+  (`infinitusComposerSendMode`, the desktop's "Sending while a turn runs",
+  a picker row in `SettingsInfinitusSection.tsx`): `"queue"` by default and
+  while the store loads, `"steer"` sends into the running turn as upstream
+  does — but a thread the server's hold list names waits in either mode.
   `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when
   the server's capabilities carry `turnQueue` (fork capability in
   `packages/contracts/src/environment.ts`, set true in

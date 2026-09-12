@@ -33,6 +33,7 @@ export interface UpdatesHarnessOptions {
   readonly startBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
   readonly settings?: Partial<DesktopAppSettings.DesktopSettings>;
+  readonly appVersion?: string;
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -40,7 +41,9 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   let quitAndInstallCount = 0;
   let downloadCount = 0;
   let allowDowngrade = false;
+  let allowPrerelease = false;
   let fullChangelog = false;
+  const channels: string[] = [];
   const feedUrls: ElectronUpdater.ElectronUpdaterFeedUrl[] = [];
   const listeners = new Map<string, Set<(...args: readonly unknown[]) => void>>();
   const sentStates: DesktopUpdateState[] = [];
@@ -70,8 +73,14 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
       }),
     setAutoDownload: () => Effect.void,
     setAutoInstallOnAppQuit: () => Effect.void,
-    setChannel: () => Effect.void,
-    setAllowPrerelease: () => Effect.void,
+    setChannel: (channel) =>
+      Effect.sync(() => {
+        channels.push(channel);
+      }),
+    setAllowPrerelease: (value) =>
+      Effect.sync(() => {
+        allowPrerelease = value;
+      }),
     allowDowngrade: Effect.sync(() => allowDowngrade),
     setAllowDowngrade: (value) =>
       Effect.sync(() => {
@@ -148,7 +157,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     homeDirectory: `/tmp/t3-desktop-updates-home-${process.pid}`,
     platform: "darwin",
     processArch: "x64",
-    appVersion: "1.2.3",
+    appVersion: options.appVersion ?? "1.2.3",
     appPath: "/repo",
     isPackaged: true,
     resourcesPath: "/missing/resources",
@@ -234,6 +243,9 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     downloadCount: () => downloadCount,
     feedUrls: () => feedUrls,
     fullChangelog: () => fullChangelog,
+    channels: () => channels,
+    allowPrerelease: () => allowPrerelease,
+    allowDowngrade: () => allowDowngrade,
     listenerCount: () =>
       Array.from(listeners.values()).reduce(
         (total, eventListeners) => total + eventListeners.size,

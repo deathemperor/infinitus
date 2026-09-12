@@ -1,4 +1,5 @@
 import type { ThreadUsageRollup } from "@t3tools/contracts";
+import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import { formatDateTimeShort, formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
 
 /** One card of the thread usage sheet. */
@@ -13,13 +14,21 @@ export interface ThreadUsageRow {
  * own estimate, so each value carries "≈" itself rather than a caption a
  * reader can skip; a token share that is zero is left out; a rollup no turn
  * of which carried a cost says so instead of showing $0.00 (Codex turns
- * record tokens and no cost).
+ * record tokens and no cost). Tool calls and the time working (#927) show
+ * only when the server counted them — absent, never zero, on turns it did
+ * not see start.
  */
 export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
   const tokens = (label: string, count: number): ThreadUsageRow[] =>
     count === 0 ? [] : [{ label, value: `≈ ${formatTokens(count)}` }];
   return [
     { label: "Turns", value: turnsValue(usage) },
+    ...(usage.toolCalls === undefined
+      ? []
+      : [{ label: "Tool calls", value: String(usage.toolCalls) }]),
+    ...(usage.durationMs === undefined
+      ? []
+      : [{ label: "Duration", value: formatDuration(usage.durationMs) }]),
     ...tokens("Input tokens", usage.inputTokens),
     ...tokens("Output tokens", usage.outputTokens),
     ...tokens("Cached input", usage.cachedInputTokens),

@@ -24,7 +24,7 @@ ambiguous or an input is missing, return `NEEDS_CONTEXT` — don't guess.
 ## Rules: read, don't restate
 
 `apps/mac/CLAUDE.md` is the single source of truth for the Mac app — the
-non-negotiables (engine isolation via `cswap … --json` subprocess only;
+non-negotiables (engine isolation via `swapd … --json` subprocess only;
 never read `~/.claude-swap-backup/*`; bundle id untouchable; secrets
 over stdin; never `cp` over a running binary — pkill first; no pushes
 unless asked) and the hard-won macOS facts. It is auto-loaded into your
