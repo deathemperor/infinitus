@@ -307,6 +307,34 @@ const titleUpdated = (title: string, sequence = 2): OrchestrationThreadStreamIte
   },
 });
 
+const activityAppended = (index: number, sequence: number): OrchestrationThreadStreamItem => ({
+  kind: "event",
+  event: {
+    eventId: EventId.make(`event-activity-${index}`),
+    sequence,
+    occurredAt: "2026-04-01T01:00:00.000Z",
+    commandId: null,
+    causationEventId: null,
+    correlationId: null,
+    metadata: {},
+    aggregateKind: "thread",
+    aggregateId: THREAD_ID,
+    type: "thread.activity-appended",
+    payload: {
+      threadId: THREAD_ID,
+      activity: {
+        id: EventId.make(`activity-${index}`),
+        tone: "tool",
+        kind: "file-edit",
+        summary: `Edited file ${index}`,
+        payload: {},
+        turnId: TurnId.make("turn-1"),
+        createdAt: "2026-04-01T01:00:00.000Z",
+      },
+    },
+  },
+});
+
 const deleted = (): OrchestrationThreadStreamItem => ({
   kind: "event",
   event: {
@@ -890,21 +918,22 @@ describe("EnvironmentThreads", () => {
         harness.inputs,
         titleUpdated("Caught-up title", CACHED_SNAPSHOT_SEQUENCE + 1),
       );
-      const catchingUp = yield* awaitThreadState(
-        harness.observed,
-        (value) =>
-          value.status === "synchronizing" &&
-          Option.isSome(value.data) &&
-          value.data.value.title === "Caught-up title",
-      );
-      expect(catchingUp.status).toBe("synchronizing");
-
       yield* Queue.offer(harness.inputs, synchronized());
-      const live = yield* awaitThreadState(
-        harness.observed,
-        (value) => value.status === "live" && Option.isSome(value.data),
-      );
+
+      // The replayed title reaches the state with the marker, as live; the
+      // cached thread stays on screen as synchronizing until then.
+      const seen: Array<EnvironmentThreadState> = [];
+      while (true) {
+        const state = yield* Queue.take(harness.observed);
+        seen.push(state);
+        if (state.status === "live" && Option.isSome(state.data)) break;
+      }
+      const live = seen[seen.length - 1]!;
       expect(Option.getOrThrow(live.data).title).toBe("Caught-up title");
+      for (const state of seen.slice(0, -1)) {
+        expect(state.status).toBe("synchronizing");
+        expect(Option.getOrThrow(state.data).title).toBe("Cached thread");
+      }
     }),
   );
 
@@ -987,6 +1016,40 @@ describe("EnvironmentThreads", () => {
         yield* Effect.yieldNow;
       }
       expect(yield* Ref.get(harness.subscriptionCount)).toBe(3);
+    }),
+  );
+
+  it.effect("writes a resume replay to the state once, when the completion marker arrives", () =>
+    Effect.gen(function* () {
+      // A resume can replay up to a thousand events in one burst. Each state
+      // write is a render on the phone; writing per replayed event blocked
+      // its JS thread for seconds, so the replay must land as one write.
+      const harness = yield* makeHarness({ cached: BASE_THREAD, completionMarker: true });
+      const replayed = 300;
+      for (let index = 0; index < replayed; index += 1) {
+        yield* Queue.offer(
+          harness.inputs,
+          activityAppended(index, CACHED_SNAPSHOT_SEQUENCE + 1 + index),
+        );
+      }
+      yield* Queue.offer(harness.inputs, synchronized());
+
+      const seen: Array<EnvironmentThreadState> = [];
+      while (true) {
+        const state = yield* Queue.take(harness.observed);
+        seen.push(state);
+        if (state.status === "live" && Option.isSome(state.data)) break;
+      }
+
+      const live = seen[seen.length - 1]!;
+      expect(Option.getOrThrow(live.data).activities).toHaveLength(replayed);
+      const partial = seen.filter(
+        (state) =>
+          Option.isSome(state.data) &&
+          state.data.value.activities.length > 0 &&
+          state.data.value.activities.length < replayed,
+      );
+      expect(partial).toHaveLength(0);
     }),
   );
 });
