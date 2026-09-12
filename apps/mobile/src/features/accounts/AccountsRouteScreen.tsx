@@ -96,7 +96,13 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         />
       ) : null}
       {model.state === "empty" ? (
-        <EmptyState title="No accounts yet" detail="Add accounts in Infinitus on the Mac." />
+        // #869: the socket answered and no engine reports a fleet — the
+        // web's copy (#934); the phone has no Engines pane, so it points at
+        // the desktop app's.
+        <EmptyState
+          title="Infinitus is running, but no engine reports accounts"
+          detail="Install and configure an engine (swapd) for Infinitus to manage them. Engines are set up on the Mac, under Settings › Infinitus › Engines in the desktop app."
+        />
       ) : null}
       {model.sections.map((section) => (
         <SettingsSection key={section.key} title={section.title} card>
