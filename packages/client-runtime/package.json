@@ -143,6 +143,10 @@
       "types": "./src/state/infinitusStats.ts",
       "default": "./src/state/infinitusStats.ts"
     },
+    "./state/infinitusUtilization": {
+      "types": "./src/state/infinitusUtilization.ts",
+      "default": "./src/state/infinitusUtilization.ts"
+    },
     "./state/infinitusActivity": {
       "types": "./src/state/infinitusActivity.ts",
       "default": "./src/state/infinitusActivity.ts"

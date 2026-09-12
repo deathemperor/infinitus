@@ -271,6 +271,78 @@ const statsDay = (scale) => ({
   minutesLostToLimits: 0,
 });
 
+// #747: the Utilization page's history and run rate — one sample per
+// bucket per account over the range, the 5h window wobbling around each
+// account's fixture percentage, the 7d one flat.
+const utilization = (days) => {
+  const bucket = days <= 1 ? 300 : days <= 7 ? 1800 : 7200;
+  const points = 48;
+  const step = Math.floor((days * 86_400) / points);
+  const now = Math.floor(Date.now() / 1000);
+  const samples = [];
+  for (let index = 0; index < points; index += 1) {
+    const t = now - (points - 1 - index) * step;
+    for (const account of ACCOUNTS) {
+      const wobble = Math.round(10 * Math.sin((index / points) * Math.PI * 2 + account.number));
+      samples.push({
+        t,
+        email: account.email,
+        number: account.number,
+        active: account.active,
+        fiveHour: { pct: Math.max(0, Math.min(100, account.five + wobble)), resetsAt: t + 3600 },
+        sevenDay: { pct: account.seven, resetsAt: t + 86_400 },
+      });
+    }
+  }
+  return {
+    days,
+    bucketSeconds: bucket,
+    samples,
+    generations: [],
+    fiveHourWindows: [],
+    replay: {
+      from: now - days * 86_400,
+      to: now,
+      switches: 2,
+      coldSwitches: 0,
+      stalledSeconds: 0,
+      sawActiveFlag: true,
+    },
+    windows: ["5h", "7d"],
+    emails: ACCOUNTS.map((account) => account.email),
+    rates: {
+      computedAt: now,
+      lastHour: {
+        input: 12_400,
+        output: 3100,
+        cacheRead: 88_000,
+        cacheWrite: 2200,
+        usd: 0.61,
+        messages: 14,
+      },
+      lastDay: {
+        input: 210_000,
+        output: 48_000,
+        cacheRead: 1_900_000,
+        cacheWrite: 31_000,
+        usd: 9.8,
+        messages: 260,
+      },
+      lastWeek: {
+        input: 1_300_000,
+        output: 290_000,
+        cacheRead: 12_000_000,
+        cacheWrite: 190_000,
+        usd: 58.2,
+        messages: 1620,
+      },
+      files: 41,
+      unpricedModels: [],
+    },
+    liveRate: { perMinute: 1200, peakPerMinute: 3900 },
+  };
+};
+
 const stats = (period) => {
   const days = period === "day" ? 1 : period === "month" ? 30 : period === "year" ? 365 : 7;
   const shown = Math.min(days, 7);
@@ -341,6 +413,8 @@ function answer(request, socketPath) {
       return profiles();
     case "stats":
       return stats(typeof options.period === "string" ? options.period : "week");
+    case "utilization":
+      return utilization(Number(options.days) || 7);
     case "events":
       return options.after === undefined
         ? events()

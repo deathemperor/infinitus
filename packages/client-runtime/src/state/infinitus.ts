@@ -25,6 +25,12 @@ const INFINITUS_SNAPSHOT_IDLE_TTL_MS = 60_000;
 const INFINITUS_STATS_STALE_MS = 60_000;
 const INFINITUS_STATS_REFRESH_MS = 300_000;
 const INFINITUS_STATS_IDLE_TTL_MS = 60_000;
+/** The Utilization page's history read (#747): `utilization --days n`, the
+    same cadence as Stats — the Mac records a sample per engine poll, so a
+    re-read every 5 min adds a handful of points. */
+const INFINITUS_UTILIZATION_STALE_MS = 60_000;
+const INFINITUS_UTILIZATION_REFRESH_MS = 300_000;
+const INFINITUS_UTILIZATION_IDLE_TTL_MS = 60_000;
 /** The Activity page's read (#659): `events --limit 100` once on mount; the
     snapshot subscription's deltas carry everything after. No re-read. */
 const INFINITUS_EVENTS_STALE_MS = 60_000;
@@ -110,6 +116,13 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       staleTimeMs: INFINITUS_STATS_STALE_MS,
       refreshIntervalMs: INFINITUS_STATS_REFRESH_MS,
       idleTtlMs: INFINITUS_STATS_IDLE_TTL_MS,
+    }),
+    utilization: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:utilization",
+      tag: WS_METHODS.infinitusCommand,
+      staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
+      refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
+      idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
     }),
     // Approve-on-Mac pairing (#710): the server's pending requests, resent
     // whole on every change (metadata and the match code only — never the
