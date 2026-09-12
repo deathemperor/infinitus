@@ -41,8 +41,16 @@ public struct TeamReader {
 
     /// Pure: `read` returns an envelope's plaintext (the client's `read`
     /// in practice). A document that fails to decode or carries a
-    /// schema this build does not know is skipped.
+    /// schema this build does not know is skipped. `unfetched` are the
+    /// transcript chunks listed but not fetched (#414): they join their
+    /// member's `transcripts` by path. A branch is in the mirror because
+    /// its author's hint named this reader, or this reader asked for it;
+    /// the current hint is not the audience the chunks were sealed to
+    /// (a member who turned transcripts off leaves what the leaders
+    /// already had), so the path is listed and `read` verifies the
+    /// envelope when the session is opened, as it always did.
     public static func fold(headers: [(entry: StoreEntry, header: Envelope.Header)], roster: TeamRoster,
+                            unfetched: [StoreEntry] = [],
                             read: (String) throws -> Data) -> TeamReader {
         var reader = TeamReader()
         for m in roster.everyone {
@@ -78,12 +86,7 @@ public struct TeamReader {
             case TeamKinds.fleet:
                 if let doc = decode(TeamDocs.FleetDoc.self, entry.path), doc.schema == 1 { member.fleet = doc }
             case TeamKinds.transcripts:
-                // m/<kid>/transcripts/<key…>/<seq>.jsonl
-                let parts = entry.path.split(separator: "/").map(String.init)
-                if parts.count >= 5 {
-                    let key = parts[3..<(parts.count - 1)].joined(separator: "/")
-                    member.transcripts[key, default: []].append(entry.path)
-                }
+                if let key = Self.transcriptKey(entry.path) { member.transcripts[key, default: []].append(entry.path) }
             case TeamKinds.command:
                 member.commands.append(entry.path)
             case TeamKinds.ack:
@@ -92,6 +95,16 @@ public struct TeamReader {
                 break
             }
             reader.members[header.from] = member
+        }
+        // A chunk whose bytes are not here has no header to scan; it is
+        // listed all the same, so the session shows and can be opened —
+        // `fetchTranscripts(from:session:)` then brings its chunks.
+        for entry in unfetched {
+            guard let (from, kind) = TeamKinds.expected(at: entry.path), kind == TeamKinds.transcripts,
+                  let from, var member = reader.members[from], let key = Self.transcriptKey(entry.path) else { continue }
+            member.transcripts[key, default: []].append(entry.path)
+            member.kinds.insert(kind)
+            reader.members[from] = member
         }
         for kid in reader.members.keys {
             let transcripts = reader.members[kid]!.transcripts
@@ -104,6 +117,13 @@ public struct TeamReader {
 
     /// Every command id someone acked, whoever the grantor was.
     public var ackIDs: Set<String> { Set(members.values.flatMap { $0.acks.keys }) }
+
+    /// `m/<kid>/transcripts/<key…>/<seq>.jsonl` (or `t/`): the key.
+    static func transcriptKey(_ path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 5 else { return nil }
+        return parts[3..<(parts.count - 1)].joined(separator: "/")
+    }
 
     static func seq(_ path: String) -> Int {
         Int(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent) ?? 0
@@ -201,10 +221,12 @@ public struct TeamReader {
                             cache: DocCache? = nil) throws -> TeamReader {
         guard let roster = client.roster?.doc else { throw TeamClient.ClientError.noRoster }
         let scanned = try headers ?? client.readableHeaders()
-        guard let cache else { return fold(headers: scanned, roster: roster) { try client.read($0).1 } }
+        // Chunks a transcript fetch left out (#414): listed, not read.
+        let unfetched = try client.store.list("t/").filter { !$0.present }
+        guard let cache else { return fold(headers: scanned, roster: roster, unfetched: unfetched) { try client.read($0).1 } }
         let versions = Dictionary(scanned.map { ($0.entry.path, $0.entry.version) }, uniquingKeysWith: { a, _ in a })
         cache.keep(only: Set(versions.keys))
-        return fold(headers: scanned, roster: roster) { path in
+        return fold(headers: scanned, roster: roster, unfetched: unfetched) { path in
             try cache.read(path, version: versions[path] ?? "") { try client.read(path).1 }
         }
     }
@@ -230,8 +252,12 @@ public struct TeamReader {
     /// `transcripts["<session>/subagents/<agent>"]` for a later view.
     public func transcript(kid: String, session: String, client: TeamClient, limit: Int = 200) throws -> [SessionFeedItem] {
         guard let paths = members[kid]?.transcripts[session], !paths.isEmpty else { return [] }
+        // A chunk listed without its bytes (#414: the prefetch could not
+        // run, or brought only part) is left out, not an error for the
+        // whole session — what is here shows.
+        let absent = Set(try client.store.list("t/\(kid)/transcripts/\(session)/").filter { !$0.present }.map(\.path))
         var lines: [String] = []
-        for path in paths {
+        for path in paths where !absent.contains(path) {
             let text = String(decoding: try client.read(path).1, as: UTF8.self)
             lines += text.split(separator: "\n").map(String.init)
         }

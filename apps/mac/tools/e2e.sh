@@ -639,6 +639,9 @@ echo "aws: lapse met outside the app cleared by the probe"
 # publishes a fixture transcript; the app approves and reads it back.
 "$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
 git init -q --bare "$SOCKDIR/team.git"
+# Transcript branches are fetched without their blobs (#414); a bare
+# repo honours the filter only when told to, as the hosted remotes do.
+git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
 "$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
     | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder']" || fail "team-create"
 CODE="$("$CTL" team-code --days 1 | json "d['code']")"

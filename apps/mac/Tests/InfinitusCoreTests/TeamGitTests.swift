@@ -22,6 +22,9 @@ final class TeamGitTests: XCTestCase {
         p.arguments = ["git", "init", "--bare", "-q", bare.path]
         try p.run(); p.waitUntilExit()
         XCTAssertEqual(p.terminationStatus, 0)
+        // As the hosted remotes do: without it a filtered fetch is a
+        // warning and a full one, and the partial-fetch tests prove nothing.
+        try git(["--git-dir", bare.path, "config", "uploadpack.allowFilter", "true"])
         return "file://" + bare.path
     }
 
@@ -121,6 +124,60 @@ final class TeamGitTests: XCTestCase {
         XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("v4".utf8))
         XCTAssertEqual(try b.changes(since: cursor).0.map(\.path), ["m/kid-a/now.json"])
         XCTAssertEqual(try depth("m/kid-a"), 1)
+    }
+
+    /// Transcript branches come without their blobs (#414): listed in
+    /// full from the first fetch, the bytes of one session arrive when
+    /// asked for, and never by a read of something absent. Member
+    /// branches keep theirs. The mirror's config never names a promisor
+    /// (which would turn every such read into a fetch). Publishing on
+    /// top of a blob-less own branch and compacting it both work.
+    func testTranscriptBranchesComeWithoutTheirBlobsUntilASessionIsAsked() throws {
+        let remote = try makeRemote()
+        let a = TeamGit(dir: scratch.appendingPathComponent("a"), remote: remote, token: nil, author: "kid-a")
+        try a.open()
+        try a.put("m/kid-a/now.json", Data("now".utf8))
+        try a.putAll(["t/kid-a/transcripts/s/1.jsonl": Data("chunk1".utf8), "t/kid-a/transcripts/s/2.jsonl": Data("chunk2".utf8),
+                      "t/kid-a/transcripts/u/1.jsonl": Data("other".utf8)])
+
+        let b = TeamGit(dir: scratch.appendingPathComponent("b"), remote: remote, token: nil, author: "kid-b")
+        try b.open()
+        let bGit = scratch.appendingPathComponent("b/store.git").path
+        XCTAssertEqual(try git(["--git-dir", bGit, "config", "--local", "--get-regexp", "promisor|partialclone"]), "")
+        let listed = try b.list("t/kid-a/")
+        XCTAssertEqual(listed.map(\.path), ["t/kid-a/transcripts/s/1.jsonl", "t/kid-a/transcripts/s/2.jsonl", "t/kid-a/transcripts/u/1.jsonl"])
+        XCTAssertEqual(listed.map(\.present), [false, false, false])
+        XCTAssertEqual(listed.map(\.size), [0, 0, 0])
+        XCTAssertNil(try b.get("t/kid-a/transcripts/s/1.jsonl"))
+        XCTAssertEqual(try b.get("m/kid-a/now.json"), Data("now".utf8))
+        XCTAssertEqual(try b.list("m/kid-a/").map(\.present), [true])
+        // Still absent: a read does not fetch behind the store's back.
+        XCTAssertEqual(try b.list("t/kid-a/").map(\.present), [false, false, false])
+
+        XCTAssertEqual(try b.prefetch("t/kid-a/transcripts/s/"), 2)
+        let after = try b.list("t/kid-a/")
+        XCTAssertEqual(after.map(\.present), [true, true, false])
+        XCTAssertEqual(after.map(\.size), [6, 6, 0])
+        XCTAssertEqual(try b.get("t/kid-a/transcripts/s/2.jsonl"), Data("chunk2".utf8))
+        XCTAssertNil(try b.get("t/kid-a/transcripts/u/1.jsonl"))
+        XCTAssertEqual(try b.prefetch("t/kid-a/transcripts/s/"), 0)
+        XCTAssertEqual(try git(["--git-dir", bGit, "config", "--local", "--get-regexp", "promisor|partialclone"]), "")
+
+        // Another device of kid-a's: its own branch is blob-less too, and
+        // it publishes and compacts on top of it all the same.
+        let a2 = TeamGit(dir: scratch.appendingPathComponent("a2"), remote: remote, token: nil, author: "kid-a")
+        try a2.open()
+        XCTAssertEqual(try a2.list("t/kid-a/").map(\.present), [false, false, false])
+        try a2.put("t/kid-a/transcripts/s/3.jsonl", Data("chunk3".utf8))
+        try a.sync()
+        XCTAssertEqual(try a.list("t/kid-a/transcripts/s/").map(\.path).count, 3)
+        XCTAssertEqual(try a2.compact(branch: "t/kid-a", dropping: "transcripts/u/"), 1)
+        try b.sync()
+        XCTAssertEqual(try b.list("t/kid-a/").map(\.path),
+                       ["t/kid-a/transcripts/s/1.jsonl", "t/kid-a/transcripts/s/2.jsonl", "t/kid-a/transcripts/s/3.jsonl"])
+        XCTAssertEqual(try b.list("t/kid-a/").map(\.present), [true, true, false])
+        XCTAssertEqual(try b.prefetch("t/kid-a/transcripts/s/"), 1)
+        XCTAssertEqual(try b.get("t/kid-a/transcripts/s/3.jsonl"), Data("chunk3".utf8))
     }
 
     func testTwoClonesExchangeFilesThroughTheRemote() throws {
