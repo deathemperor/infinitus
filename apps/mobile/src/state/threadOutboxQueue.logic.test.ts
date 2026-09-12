@@ -1,7 +1,12 @@
-import { ThreadId } from "@t3tools/contracts";
+import { CommandId, MessageId, ProviderInstanceId, QueueId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { isThreadHeld, queueBehindRunningTurn } from "./threadOutboxQueue.logic";
+import {
+  isThreadHeld,
+  queueBehindRunningTurn,
+  queueTurnCommandInput,
+  resolveThreadOutboxDelivery,
+} from "./threadOutboxQueue.logic";
 
 const thread = ThreadId.make("thread-1");
 
@@ -58,5 +63,93 @@ describe("threadOutboxQueue.logic (#807)", () => {
     expect(
       isThreadHeld([{ threadId: ThreadId.make("other"), since: "now", summary: "held" }], thread),
     ).toBe(false);
+  });
+});
+
+describe("resolveThreadOutboxDelivery (#812)", () => {
+  const base = {
+    action: "send" as const,
+    isCreation: false,
+    threadHeld: false,
+    mode: "queue" as const,
+  };
+
+  it("hands a send behind a running or held turn to a server with the queue", () => {
+    expect(resolveThreadOutboxDelivery({ ...base, threadBusy: true, serverQueues: true })).toBe(
+      "queue",
+    );
+    expect(
+      resolveThreadOutboxDelivery({
+        ...base,
+        threadBusy: false,
+        threadHeld: true,
+        serverQueues: true,
+      }),
+    ).toBe("queue");
+    expect(resolveThreadOutboxDelivery({ ...base, threadBusy: false, serverQueues: true })).toBe(
+      "send",
+    );
+  });
+
+  it("keeps the wait on a server without the queue, and every other outcome", () => {
+    expect(resolveThreadOutboxDelivery({ ...base, threadBusy: true, serverQueues: false })).toBe(
+      "wait",
+    );
+    expect(
+      resolveThreadOutboxDelivery({
+        ...base,
+        action: "wait",
+        threadBusy: true,
+        serverQueues: true,
+      }),
+    ).toBe("wait");
+    expect(
+      resolveThreadOutboxDelivery({
+        ...base,
+        action: "remove",
+        threadBusy: true,
+        serverQueues: true,
+      }),
+    ).toBe("remove");
+    expect(
+      resolveThreadOutboxDelivery({
+        ...base,
+        isCreation: true,
+        threadBusy: true,
+        serverQueues: true,
+      }),
+    ).toBe("send");
+  });
+});
+
+describe("queueTurnCommandInput (#812)", () => {
+  it("keeps the outbox ids and stamps the given queue id", () => {
+    const attachments = [
+      { type: "file" as const, id: "f1", name: "a.txt", mimeType: "text/plain", sizeBytes: 1 },
+    ];
+    expect(
+      queueTurnCommandInput({
+        message: {
+          commandId: CommandId.make("cmd-1"),
+          threadId: thread,
+          messageId: MessageId.make("msg-1"),
+          text: "later",
+          createdAt: "2026-09-12T00:00:00.000Z",
+        },
+        attachments,
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claude-agent"),
+          model: "claude-opus-5",
+        },
+        queueId: QueueId.make("q-1"),
+      }),
+    ).toEqual({
+      commandId: "cmd-1",
+      threadId: "thread-1",
+      queueId: "q-1",
+      message: { messageId: "msg-1", role: "user", text: "later", attachments },
+      modelSelection: { instanceId: "claude-agent", model: "claude-opus-5" },
+      createdAt: "2026-09-12T00:00:00.000Z",
+    });
   });
 });

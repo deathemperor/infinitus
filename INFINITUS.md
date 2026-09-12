@@ -132,8 +132,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   routes (#710), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing` and `./captures` subpath exports.
-- `packages/contracts/src/environment.ts` — the `infinitus` capability on
-  `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+- `packages/contracts/src/environment.ts` — the `infinitus` and `turnQueue`
+  (#812) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
   beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
@@ -590,7 +590,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   pass and the live re-check before a send) are wrapped in
   `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
   its turn runs or the server holds it, the phone's copy of the desktop
-  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too.
+  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too. Since
+  #812 that wait becomes a `thread.turn.queue` when the server advertises
+  `turnQueue` (`resolveThreadOutboxDelivery`, `queueTurnCommandInput`):
+  `sendQueuedMessage` takes `via: "start" | "queue"` and, for a queue, sends
+  `threadEnvironment.queueTurn` with the outbox's command id and a fresh
+  queue id after the same settings sync and uploads, and
+  `completeQueuedMessageDelivery` takes `{ retainInFeed: false }` so no
+  "Pending" feed row waits for an echo the timeline only gives at drain.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -1349,6 +1356,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   of steering; creations and every other action pass through. `mode` is
   `"queue"` at both call sites — the phone has no copy of the desktop's
   `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when
+  the server's capabilities carry `turnQueue` (fork capability in
+  `packages/contracts/src/environment.ts`, set true in
+  `apps/server/src/environment/ServerEnvironment.ts`); `queueTurnCommandInput`
+  is the `thread.turn.queue` an outbox message becomes.
   `readHeldThreads` reads the environment's `infinitusEnvironment.holds` atom
   from the registry (the web sidebar's idiom), null without the `infinitus`
   capability and before the list's first delivery, so the first pass after
