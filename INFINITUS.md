@@ -582,7 +582,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
-  ready for review over `pullRequests.runAction`;
+  ready for review over `pullRequests.runAction`; on Android the hook's
+  `androidAction` is a header button before the git controls whose tap
+  opens the same choices as an alert;
   `apps/mobile/src/features/infinitus/prHeader.logic.ts`, `pullRequestActions.ts`).
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
