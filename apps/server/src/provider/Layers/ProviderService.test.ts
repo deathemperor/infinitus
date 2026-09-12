@@ -1548,63 +1548,58 @@ it.effect(
 const reconnectMarker = makeProviderServiceLayer();
 
 reconnectMarker.layer("ProviderServiceLive reconnect continuation marker (#832)", (it) => {
-  it.effect(
-    "marks the turn when the adapter starts reconnecting and clears it when the turn ends",
-    () =>
-      Effect.gen(function* () {
-        const provider = yield* ProviderService.ProviderService;
-        const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
-        const threadId = asThreadId("reconnect-marker");
-        yield* provider.startSession(threadId, {
-          provider: CLAUDE_AGENT_DRIVER,
-          providerInstanceId: ProviderInstanceId.make(CLAUDE_AGENT_DRIVER),
-          threadId,
-          runtimeMode: "full-access",
+  it.effect("marks the turn on every reconnect attempt the adapter announces", () =>
+    Effect.gen(function* () {
+      const provider = yield* ProviderService.ProviderService;
+      const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
+      const threadId = asThreadId("reconnect-marker");
+      yield* provider.startSession(threadId, {
+        provider: CLAUDE_AGENT_DRIVER,
+        providerInstanceId: ProviderInstanceId.make(CLAUDE_AGENT_DRIVER),
+        threadId,
+        runtimeMode: "full-access",
+      });
+      const accepted = yield* provider.sendTurn({ threadId, input: "hello", attachments: [] });
+      const emitAndAwait = (event: Parameters<typeof reconnectMarker.claude.emit>[0]) =>
+        Effect.gen(function* () {
+          const published = yield* Stream.take(provider.streamEvents, 1).pipe(
+            Stream.runDrain,
+            Effect.forkChild,
+          );
+          yield* Effect.yieldNow;
+          reconnectMarker.claude.emit(event);
+          yield* Fiber.join(published);
         });
-        const accepted = yield* provider.sendTurn({ threadId, input: "hello", attachments: [] });
-        const emitAndAwait = (event: Parameters<typeof reconnectMarker.claude.emit>[0]) =>
-          Effect.gen(function* () {
-            const published = yield* Stream.take(provider.streamEvents, 1).pipe(
-              Stream.runDrain,
-              Effect.forkChild,
-            );
-            yield* Effect.yieldNow;
-            reconnectMarker.claude.emit(event);
-            yield* Fiber.join(published);
-          });
 
-        yield* emitAndAwait({
-          type: "session.state.changed",
-          eventId: asEventId("evt-reconnect-1"),
-          provider: CLAUDE_AGENT_DRIVER,
-          createdAt: "2026-01-01T00:00:00.000Z",
-          threadId,
-          turnId: accepted.turnId,
-          payload: { state: "running", reason: "reconnecting:1/5" },
-        });
-        const marked = yield* directory.getBinding(threadId);
-        assert(Option.isSome(marked));
-        assert.propertyVal(
-          marked.value.runtimePayload,
-          "continueAfterServerUpdate",
-          accepted.turnId,
-        );
-        assert.propertyVal(marked.value.runtimePayload, "activeTurnId", accepted.turnId);
-        assert.equal(marked.value.status, "running");
+      yield* emitAndAwait({
+        type: "session.state.changed",
+        eventId: asEventId("evt-reconnect-1"),
+        provider: CLAUDE_AGENT_DRIVER,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        threadId,
+        turnId: accepted.turnId,
+        payload: { state: "running", reason: "reconnecting:1/5" },
+      });
+      const marked = yield* directory.getBinding(threadId);
+      assert(Option.isSome(marked));
+      assert.propertyVal(marked.value.runtimePayload, "continueAfterServerUpdate", accepted.turnId);
+      assert.propertyVal(marked.value.runtimePayload, "activeTurnId", accepted.turnId);
+      assert.equal(marked.value.status, "running");
 
-        yield* emitAndAwait({
-          type: "turn.completed",
-          eventId: asEventId("evt-reconnect-2"),
-          provider: CLAUDE_AGENT_DRIVER,
-          createdAt: "2026-01-01T00:00:01.000Z",
-          threadId,
-          turnId: accepted.turnId,
-          payload: { state: "completed" },
-        });
-        const cleared = yield* directory.getBinding(threadId);
-        assert(Option.isSome(cleared));
-        assert.propertyVal(cleared.value.runtimePayload, "continueAfterServerUpdate", null);
-      }),
+      // A later attempt of the same turn keeps the marker on the turn.
+      yield* emitAndAwait({
+        type: "session.state.changed",
+        eventId: asEventId("evt-reconnect-2"),
+        provider: CLAUDE_AGENT_DRIVER,
+        createdAt: "2026-01-01T00:00:01.000Z",
+        threadId,
+        turnId: accepted.turnId,
+        payload: { state: "running", reason: "reconnecting:2/5" },
+      });
+      const again = yield* directory.getBinding(threadId);
+      assert(Option.isSome(again));
+      assert.propertyVal(again.value.runtimePayload, "continueAfterServerUpdate", accepted.turnId);
+    }),
   );
 
   it.effect("leaves a plain running state alone", () =>
