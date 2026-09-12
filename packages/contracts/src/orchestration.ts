@@ -1507,18 +1507,11 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
-/**
- * Fork (#270 E1): rewind the chat to a checkpoint's turn count without
- * touching files. The later turns leave every projection the way a revert's
- * do (the event log keeps them); the workspace and the git checkpoint refs
- * stay as they are.
- */
-const ThreadChatRewindCommand = Schema.Struct({
-  type: Schema.Literal("thread.chat.rewind"),
-  commandId: CommandId,
-  threadId: ThreadId,
-  turnCount: NonNegativeInt,
-  createdAt: IsoDateTime,
+// A separate command makes older servers reject history-only rewinds rather than
+// ignoring an unfamiliar option and restoring files.
+const ThreadConversationRevertCommand = Schema.Struct({
+  ...ThreadCheckpointRevertCommand.fields,
+  type: Schema.Literal("thread.conversation.revert"),
 });
 
 const ThreadSessionStopCommand = Schema.Struct({
@@ -1565,7 +1558,7 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
-  ThreadChatRewindCommand,
+  ThreadConversationRevertCommand,
   ThreadSessionStopCommand,
 ]);
 export type DispatchableClientOrchestrationCommand =
@@ -1602,7 +1595,7 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
-  ThreadChatRewindCommand,
+  ThreadConversationRevertCommand,
   ThreadSessionStopCommand,
 ]);
 export type ClientOrchestrationCommand = typeof ClientOrchestrationCommand.Type;
@@ -1799,7 +1792,6 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.approval-response-requested",
   "thread.user-input-response-requested",
   "thread.checkpoint-revert-requested",
-  "thread.chat-rewind-requested",
   "thread.reverted",
   "thread.session-stop-requested",
   "thread.session-set",
@@ -2069,6 +2061,7 @@ export const ThreadCheckpointRevertRequestedPayload = Schema.Struct({
   turnCount: NonNegativeInt,
   /** Fork (#269 E): files only, see `thread.checkpoint.revert`. */
   keepChat: Schema.optional(Schema.Boolean),
+  restoreFiles: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -2305,11 +2298,6 @@ export const OrchestrationEvent = Schema.Union([
   Schema.Struct({
     ...EventBaseFields,
     type: Schema.Literal("thread.checkpoint-revert-requested"),
-    payload: ThreadCheckpointRevertRequestedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
-    type: Schema.Literal("thread.chat-rewind-requested"),
     payload: ThreadCheckpointRevertRequestedPayload,
   }),
   Schema.Struct({

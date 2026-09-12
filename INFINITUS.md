@@ -216,21 +216,17 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   the same. Their test harnesses (`ProviderCommandReactor.test.ts`,
   `serverRuntimeStartup.reconcile.test.ts`, `AgentSessionImporter.test.ts`)
   provide the passthrough gate, with a `turnStartGate` override in the first two.
-- Chat-only rewind (#270 E1): `packages/contracts/src/orchestration.ts` —
-  `thread.chat.rewind {threadId, turnCount}` (client-dispatchable, beside
-  `thread.checkpoint.revert`) and the `thread.chat-rewind-requested` event
-  (same payload as the revert request); `apps/server/src/orchestration/decider.ts`
-  — its case; `Layers/CheckpointReactor.ts` — `handleChatRewindRequested`: the
-  revert's guards and provider rollback, no checkpoint restore, workspace
-  refresh or ref deletion, completing through the existing
-  `thread.revert.complete` → `thread.reverted` so every projection prunes the
-  later turns as for a revert (files and git checkpoint refs stay; the span
-  carries `filesRestored: false`); `packages/client-runtime` `commands.ts` /
-  `threadCommands.ts` — `rewindThreadChat` / `rewindChat`; `threadReducer.ts`
-  — the event is a no-op; `apps/web` `ChatView.tsx` `onRevertToTurnCount(turnCount, mode)`
-  with the chat-only confirm ("Files stay as they are"), `MessagesTimeline.tsx`
-  — the user-row revert button is a menu: "Revert files and chat" /
-  "Rewind chat only" (`TimelineRevertMode`). Test in `CheckpointReactor.test.ts`.
+- Chat-only rewind (#270 E1) is upstream's since the 2026-09-12 sync
+  (`thread.conversation.revert` → `thread.checkpoint-revert-requested`
+  with `restoreFiles: false`, #11358); the fork's `thread.chat.rewind`
+  command, its event and `handleChatRewindRequested` are gone. What stays
+  fork: `MessagesTimeline.tsx`'s revert menu ("Revert files and chat" /
+  "Restore files only" / "Rewind chat only" / "Fork from here",
+  `TimelineRevertMode`) and `ChatView.tsx`'s
+  `onRevertToTurnCount(turnCount, messageId, mode)`, whose `chat` mode sends
+  `revertThreadCheckpoint({ restoreFiles: false })` through the same
+  composer hand-back as the full revert; upstream's two-button AlertDialog
+  (`pendingRevert`) is dropped at every sync because the menu already asks.
 - Restore files, keep the chat (#269 E, Cursor's default checkpoint
   action): `thread.checkpoint.revert` and its `-requested` event carry
   `keepChat?: boolean`; `CheckpointReactor.handleRevertRequested` with it

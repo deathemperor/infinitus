@@ -1500,7 +1500,6 @@ export default function ChatView(props: ChatViewProps) {
   const revertThreadCheckpoint = useAtomCommand(threadEnvironment.revertCheckpoint, {
     reportFailure: false,
   });
-  const rewindThreadChat = useAtomCommand(threadEnvironment.rewindChat, { reportFailure: false });
   const forkThreadAtTurn = useAtomCommand(infinitusEnvironment.forkThread, {
     reportFailure: false,
   });
@@ -6642,8 +6641,9 @@ export default function ChatView(props: ChatViewProps) {
   }, [activeThreadId, composerRef]);
 
   // Fork (#270 E1): `mode` picks the full revert (files and chat, handing the
-  // prompt back to the composer), the chat-only rewind, the files-only restore
-  // or a fork; they all share the guards and the reverting flag.
+  // prompt back to the composer), the chat-only rewind (upstream's
+  // `thread.conversation.revert`, same composer hand-back), the files-only
+  // restore or a fork; they all share the guards and the reverting flag.
   const onRevertToTurnCount = useCallback(
     async (turnCount: number, messageId: MessageId, mode: TimelineRevertMode = "files") => {
       const localApi = readLocalApi();
@@ -6697,7 +6697,7 @@ export default function ChatView(props: ChatViewProps) {
           ? [
               "Rewind the chat to this message? Files stay as they are.",
               "Newer messages leave this thread; the workspace is untouched.",
-              "This action cannot be undone.",
+              "Your prompt and attachments return to the composer.",
             ]
           : mode === "restore-files"
             ? [
@@ -6722,7 +6722,7 @@ export default function ChatView(props: ChatViewProps) {
       }));
       setThreadError(activeThread.id, null);
       try {
-        if (mode === "files") {
+        if (mode === "files" || mode === "chat") {
           if (composerRef.current?.hasPendingAttachments()) {
             throw new Error("Wait for attachments to finish preparing before rewinding.");
           }
@@ -6747,7 +6747,11 @@ export default function ChatView(props: ChatViewProps) {
           await waitForRevertedMessage(routeThreadRef, messageId, turnCount, async () => {
             const result = await revertThreadCheckpoint({
               environmentId,
-              input: { threadId: activeThread.id, turnCount },
+              input: {
+                threadId: activeThread.id,
+                turnCount,
+                ...(mode === "chat" ? { restoreFiles: false } : {}),
+              },
             });
             if (result._tag === "Failure") throw squashAtomCommandFailure(result);
           });
@@ -6790,16 +6794,12 @@ export default function ChatView(props: ChatViewProps) {
             });
           }
         } else {
-          // Fork (#270 E1, #269 E): the chat-only rewind and the files-only
-          // restore touch no composer draft, so they just run the command.
-          const input = { threadId: activeThread.id, turnCount };
-          const result =
-            mode === "chat"
-              ? await rewindThreadChat({ environmentId, input })
-              : await revertThreadCheckpoint({
-                  environmentId,
-                  input: { ...input, keepChat: true },
-                });
+          // Fork (#269 E): the files-only restore touches no composer draft,
+          // so it just runs the command.
+          const result = await revertThreadCheckpoint({
+            environmentId,
+            input: { threadId: activeThread.id, turnCount, keepChat: true },
+          });
           if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
             throw squashAtomCommandFailure(result);
           }
@@ -6830,7 +6830,6 @@ export default function ChatView(props: ChatViewProps) {
       isSendBusy,
       phase,
       revertThreadCheckpoint,
-      rewindThreadChat,
       forkThreadAtTurn,
       navigate,
       routeThreadKey,
