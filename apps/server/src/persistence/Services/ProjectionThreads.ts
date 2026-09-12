@@ -15,6 +15,7 @@ import {
   ProviderInteractionMode,
   RuntimeMode,
   ThreadBabysit,
+  ThreadUsageRollup,
   ThreadLinkedPullRequest,
   ThreadId,
   TurnId,
@@ -48,6 +49,8 @@ export const ProjectionThread = Schema.Struct({
   snoozedAt: Schema.NullOr(IsoDateTime),
   // Fork (#269 A). Optional so callers that build rows predate it.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#834). Optional for the same reason.
+  usage: Schema.optional(Schema.NullOr(ThreadUsageRollup)),
   // Fork (#269 C). Optional for the same reason.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   // Fork (#269 B). Optional for the same reason.
