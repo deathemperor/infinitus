@@ -327,7 +327,13 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
       const latest = latestClaudeForkAnchor(binding.value.resumeCursor);
       if (latest !== null) {
         return {
-          cursor: { resume: latest.sessionId, resumeSessionAt: latest.at, fork: true },
+          cursor: {
+            resume: latest.sessionId,
+            resumeSessionAt: latest.at,
+            // The adapter may fall back to the session's end for this anchor.
+            resumeSessionAtLatest: true,
+            fork: true,
+          },
           turnCount: latest.turnCount,
           seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
         };
@@ -355,8 +361,16 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
         "No fork point was recorded for this turn; turns completed before forking existed cannot be forked.",
       );
     }
+    // The latest turn's anchor may fall back to the session's end (same
+    // fork point); an earlier turn's never — see `claudeForkFallback.logic.ts`.
+    const latestAt = latestClaudeForkAnchor(binding.value.resumeCursor)?.at;
     return {
-      cursor: { resume: anchor.sessionId, resumeSessionAt: anchor.at, fork: true },
+      cursor: {
+        resume: anchor.sessionId,
+        resumeSessionAt: anchor.at,
+        ...(anchor.at === latestAt ? { resumeSessionAtLatest: true } : {}),
+        fork: true,
+      },
       turnCount: input.turnCount,
       seed: forkSeedMessages(source.value, input.turnCount),
     };

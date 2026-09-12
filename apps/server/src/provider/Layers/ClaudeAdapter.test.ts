@@ -53,6 +53,7 @@ import { ProviderAdapterProcessError, ProviderAdapterValidationError } from "../
 import type { ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import type { ClaudeScopedLimitNames } from "./claudeUsageLimits.ts";
 import { RECONNECT_EXHAUSTED_MESSAGE } from "./claudeReconnect.logic.ts";
+import { FORK_AT_END_MESSAGE, FORK_POINT_MISSING_MESSAGE } from "./claudeForkFallback.logic.ts";
 import { liveBackgroundAgentsMessage } from "../../infinitus/backgroundAgents.logic.ts";
 import { makeClaudeAdapter, type ClaudeAdapterLiveOptions } from "./ClaudeAdapter.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
@@ -6290,6 +6291,69 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  it.effect(
+    "anchors a completed turn at the first line of its last assistant message (#270 E2)",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const adapter = yield* ClaudeAdapter;
+        const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+        const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+          Effect.sync(() => {
+            runtimeEvents.push(event);
+          }),
+        ).pipe(Effect.forkChild);
+        yield* adapter.startSession({
+          threadId: THREAD_ID,
+          provider: ProviderDriverKind.make("claudeAgent"),
+          runtimeMode: "full-access",
+        });
+        const started = yield* adapter.sendTurn({
+          threadId: THREAD_ID,
+          input: "hello",
+          attachments: [],
+        });
+        const assistant = (uuid: string, id: string, parentToolUseId: string | null = null) =>
+          harness.query.emit({
+            type: "assistant",
+            session_id: "sdk-session-1",
+            uuid,
+            parent_tool_use_id: parentToolUseId,
+            message: { id, content: [{ type: "text", text: uuid }] },
+          } as unknown as SDKMessage);
+        // One API message reaches the SDK as one message per content block,
+        // and Claude Code's transcript keeps one line per block: only the
+        // first line of an id is a fork point the CLI finds.
+        assistant("assistant-1a", "message-1");
+        assistant("assistant-1b", "message-1");
+        assistant("assistant-2a", "message-2");
+        assistant("assistant-2b", "message-2");
+        // A subagent's snapshot lives in its own transcript.
+        assistant("subagent-1", "message-sub", "toolu-1");
+        harness.query.emit({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          errors: [],
+          session_id: "sdk-session-1",
+          uuid: "result-1",
+        } as unknown as SDKMessage);
+        while (!runtimeEvents.some((event) => event.type === "turn.completed")) {
+          yield* Effect.yieldNow;
+        }
+        runtimeEventsFiber.interruptUnsafe();
+
+        const cursor = (yield* adapter.listSessions())[0]?.resumeCursor as
+          | { anchors?: ReadonlyArray<{ turnId: string; at: string }> }
+          | undefined;
+        assert.deepEqual(cursor?.anchors, [{ turnId: started.turnId, at: "assistant-2a" }]);
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
   it.effect("passes Claude resume ids without pinning a stale assistant checkpoint", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
@@ -7961,6 +8025,153 @@ describe("reconnect (#832)", () => {
       if (completed?.type === "turn.completed") {
         assert.equal(completed.payload.state, "interrupted");
       }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+});
+
+describe("fork fallback (side questions)", () => {
+  const SOURCE_SESSION = "550e8400-e29b-41d4-a716-446655440000";
+  const settle = Effect.gen(function* () {
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+    yield* Effect.yieldNow;
+  });
+  const init = (query: FakeClaudeQuery, sessionId: string) =>
+    query.emit({
+      type: "system",
+      subtype: "init",
+      apiKeySource: "none",
+      claude_code_version: "test",
+      cwd: "/tmp/claude-adapter-test",
+      tools: [],
+      mcp_servers: [],
+      model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+      permissionMode: "bypassPermissions",
+      slash_commands: [],
+      output_style: "default",
+      skills: [],
+      plugins: [],
+      session_id: sessionId,
+      uuid: `init-${sessionId}`,
+    } as unknown as SDKMessage);
+  const anchorRefused = (query: FakeClaudeQuery) =>
+    query.emit({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      num_turns: 0,
+      errors: ["No message found with message.uuid of: assistant-9"],
+      session_id: "4d0ab993-0250-49c3-9702-42f3e9986c9f",
+      uuid: "result-refused",
+    } as unknown as SDKMessage);
+
+  const setup = (harness: ReturnType<typeof makeHarness>, latest: boolean) =>
+    Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+        resumeCursor: {
+          threadId: THREAD_ID,
+          resume: SOURCE_SESSION,
+          resumeSessionAt: "assistant-9",
+          ...(latest ? { resumeSessionAtLatest: true } : {}),
+          fork: true,
+        },
+      });
+      yield* adapter.sendTurn({ threadId: THREAD_ID, input: "a side question", attachments: [] });
+      // The CLI reads its prompt before refusing the fork point.
+      yield* Effect.promise(() => readFirstPromptText(harness.getLastCreateQueryInput()));
+      anchorRefused(harness.query);
+      yield* settle;
+      return { runtimeEvents, runtimeEventsFiber };
+    });
+
+  it.effect(
+    "forks the latest turn's anchor at the session's end when the CLI cannot find it",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness, true);
+        assert.equal(harness.queries.length, 2);
+        const retry = harness.getLastCreateQueryInput();
+        assert.equal(retry?.options.resume, SOURCE_SESSION);
+        assert.equal(retry?.options.forkSession, true);
+        assert.equal(retry?.options.resumeSessionAt, undefined);
+        assert.equal(yield* Effect.promise(() => readFirstPromptText(retry)), "a side question");
+        const repair = runtimeEvents.find((event) => event.type === "runtime.warning");
+        assert.equal(
+          repair?.type === "runtime.warning" && repair.payload.message,
+          FORK_AT_END_MESSAGE,
+        );
+        assert.equal(
+          runtimeEvents.some((event) => event.type === "turn.completed"),
+          false,
+        );
+        assert.equal(
+          runtimeEvents.some((event) => event.type === "runtime.error"),
+          false,
+        );
+
+        const second = harness.queries[1]!;
+        init(second, "7c9e6679-7425-40de-944b-e07fc1f90ae7");
+        second.emit({
+          type: "assistant",
+          session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          uuid: "assistant-answer",
+          parent_tool_use_id: null,
+          message: { id: "message-answer", content: [{ type: "text", text: "An answer." }] },
+        } as unknown as SDKMessage);
+        second.emit({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          errors: [],
+          session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          uuid: "result-answer",
+        } as unknown as SDKMessage);
+        while (!runtimeEvents.some((event) => event.type === "turn.completed")) {
+          yield* Effect.yieldNow;
+        }
+        runtimeEventsFiber.interruptUnsafe();
+        const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+        assert.equal(completed?.type === "turn.completed" && completed.payload.state, "completed");
+        assert.equal(harness.queries.length, 2);
+      }).pipe(
+        Effect.provideService(Random.Random, makeDeterministicRandomService()),
+        Effect.provide(harness.layer),
+      );
+    },
+  );
+
+  it.effect("fails an earlier turn's anchor plainly instead of forking elsewhere", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const { runtimeEvents, runtimeEventsFiber } = yield* setup(harness, false);
+      runtimeEventsFiber.interruptUnsafe();
+      assert.equal(harness.queries.length, 1);
+      const error = runtimeEvents.find((event) => event.type === "runtime.error");
+      assert.equal(
+        error?.type === "runtime.error" && error.payload.message,
+        FORK_POINT_MISSING_MESSAGE,
+      );
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type === "turn.completed" && completed.payload.state, "failed");
+      assert.equal(
+        completed?.type === "turn.completed" && completed.payload.errorMessage,
+        FORK_POINT_MISSING_MESSAGE,
+      );
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),

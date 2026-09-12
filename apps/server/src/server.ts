@@ -78,6 +78,7 @@ import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairin
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
 import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
+import { InfinitusForkAnchorGate } from "./infinitus/Layers/InfinitusForkAnchorGate.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
@@ -326,6 +327,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#743): pauses background turns running on a fleet that reads
   // critical headroom, and continues them through the gate below.
   Layer.provideMerge(InfinitusSessionInterruptLive),
+  // Fork (#1013): every start first re-checks a fork's fallback flag against
+  // the source's latest anchor; wraps the gate below.
+  Layer.provideMerge(InfinitusForkAnchorGate),
   // Fork (#616): the TurnStartGate every provider turn start passes — holds a
   // background thread's start while its fleet's headroom reads low.
   Layer.provideMerge(InfinitusSessionHoldLayers),

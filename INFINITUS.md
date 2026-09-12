@@ -232,7 +232,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
-  before it (#743), a consumer of that gate. `CaptureStore.layer` (#433) in the
+  before it (#743), a consumer of that gate. `InfinitusForkAnchorGate` just above
+  the hold layers (#1013): wraps the gate with the fork-anchor re-check. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
 - `apps/server/src/vcs/GitVcsDriver.ts` (+ its test) — upstream's open PR
   pingdotgg/t3code#10792 carried ahead of upstream (2026-09-12, upstream
@@ -640,11 +641,22 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
   `RpcAuthorization.ts`); `apps/server/src/ws.ts` — the handler;
   `apps/server/src/provider/Layers/ClaudeAdapter.ts` — the resume cursor
-  carries `anchors` (`{turnId, at}`: each completed turn's last assistant uuid keyed
-  by the orchestration turn id, so a session restart cannot renumber them;
-  ≤ 200, trimmed on rollback) and `fork: true`; a forked thread's first start
-  passes `forkSession` + `resumeSessionAt` to the SDK and starts its own
-  anchors; `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
+  carries `anchors` (`{turnId, at}`: per completed turn the uuid of the
+  first SDK message of its last assistant API message — Claude Code keeps
+  one transcript line per content block, all sharing the message id, and
+  `--resume-session-at` finds only the first — keyed by the orchestration
+  turn id, so a session restart cannot renumber them; ≤ 200, trimmed on
+  rollback) and `fork: true`; a forked thread's first start passes
+  `forkSession` + `resumeSessionAt` to the SDK and starts its own anchors.
+  An anchor the CLI cannot find (`No message found with message.uuid`;
+  every anchor recorded before this rule on a turn whose last message had
+  more than one block) is retried once without the anchor when the binding
+  says `resumeSessionAtLatest` (`ThreadFork.ts` sets it for a side question
+  and for a fork at the latest anchored turn: the session's end is that
+  turn, #941; `InfinitusForkAnchorGate` re-checks at every turn start and
+  drops the flag once the source's latest anchor moved past the fork point), with a `runtime.warning` row naming the repair; an earlier
+  turn's anchor fails the turn plainly instead
+  (`claudeForkFallback.logic.ts`); `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
   `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude and Codex),
   mode `fork` on `onRevertToTurnCount` (no confirm; navigates to the new
   thread), `MessagesTimeline.tsx` — the third menu item. Fork-only:
