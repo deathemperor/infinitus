@@ -8,6 +8,13 @@ ctl="${INFINITUS_CTL:-$(command -v infinitusctl 2>/dev/null)}"
 [ -x "$ctl" ] || ctl="$HOME/.local/bin/infinitusctl"
 [ -x "$ctl" ] || exit 0
 payload=$(cat)
+# SessionEnd's hook budget is 1.5s (#79): fire and forget, no retry wait.
+case "$payload" in
+  *'"hook_event_name":"SessionEnd"'*|*'"hook_event_name": "SessionEnd"'*)
+    ( printf '%s' "$payload" | "$ctl" event >/dev/null 2>&1 ) &
+    exit 0
+    ;;
+esac
 # One retry: the app answers one control command at a time, and two
 # sessions' hooks can land together.
 printf '%s' "$payload" | "$ctl" event >/dev/null 2>&1 \
