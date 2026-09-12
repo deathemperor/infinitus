@@ -135,8 +135,37 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
     ).not.toHaveProperty("usageUnavailable");
   });
 
-  it("records nothing without usage or a counted start", () => {
+  it("records nothing without usage or a counted start, nor an interrupted turn without usage", () => {
     expect(turnUsageFromCompletedTurn({ state: "failed" }, turnId, at)).toBeUndefined();
+    // Claude answers `unavailable` for a turn interrupted before any usage: not a turn.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "interrupted",
+          tokenUsage: { usageScope: "main_agent", usageStatus: "unavailable", hasSubagents: false },
+        },
+        turnId,
+        at,
+        { toolCalls: 2, durationMs: 3_000 },
+      ),
+    ).toBeUndefined();
+    // An interrupted turn that did report usage records as before.
+    expect(
+      turnUsageFromCompletedTurn(
+        {
+          state: "interrupted",
+          tokenUsage: {
+            usageScope: "main_agent",
+            usageStatus: "partial",
+            outputTokens: 12,
+            hasSubagents: false,
+          },
+        },
+        turnId,
+        at,
+        { toolCalls: 2, durationMs: 3_000 },
+      ),
+    ).toMatchObject({ outputTokens: 12, toolCalls: 2 });
     expect(
       turnUsageFromCompletedTurn(
         {

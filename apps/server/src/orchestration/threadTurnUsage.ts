@@ -12,11 +12,13 @@ export interface TurnTelemetry {
  * cost and models, and the tool calls and wall time the ingestion counted
  * when it saw the turn start. A turn whose provider reported no usage
  * (Cursor and Grok send no `tokenUsage`; an adapter can answer
- * `unavailable`) is still recorded when the ingestion counted something:
- * zero tokens, `usageUnavailable: true`, so the tool calls and wall time
- * survive and the rollup knows those zeros are "not reported". Undefined
- * only when there is neither: a turn with nothing to record is not
- * recorded, so the rollup never counts zeros as figures.
+ * `unavailable`) is still recorded when it completed and the ingestion
+ * counted something: zero tokens, `usageUnavailable: true`, so the tool
+ * calls and wall time survive and the rollup knows those zeros are "not
+ * reported". Only a completed one: Claude, Codex and OpenCode answer
+ * `unavailable` for a turn interrupted or errored before any usage, and
+ * an Escape is not a turn. Undefined otherwise: a turn with nothing to
+ * record is not recorded, so the rollup never counts zeros as figures.
  */
 export function turnUsageFromCompletedTurn(
   payload: TurnCompletedPayload,
@@ -26,7 +28,7 @@ export function turnUsageFromCompletedTurn(
 ): ThreadTurnUsage | undefined {
   const tokens = payload.tokenUsage;
   const unavailable = tokens === undefined || tokens.usageStatus === "unavailable";
-  if (unavailable && telemetry === undefined) return undefined;
+  if (unavailable && (telemetry === undefined || payload.state !== "completed")) return undefined;
   return {
     turnId,
     model: payload.turnModels?.[0] ?? null,

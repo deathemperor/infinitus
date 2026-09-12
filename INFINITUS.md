@@ -464,9 +464,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
   dispatch, a `turn.completed` naming its turn dispatches the command
   (`orchestration/threadTurnUsage.ts`; a refusal is logged, never blocks)
-  when it reported usage or the ingestion counted its tool calls and wall
-  time: a turn whose provider reported none (Cursor and Grok send no
-  `tokenUsage`) is a `usageUnavailable: true` row with zero tokens, the
+  when it reported usage, or when it completed and the ingestion counted
+  its tool calls and wall time: a turn whose provider reported none (Cursor
+  and Grok send no `tokenUsage`; the others answer `unavailable` for a turn
+  interrupted before any usage, which stays unrecorded) is a
+  `usageUnavailable: true` row with zero tokens, the
   rollup counts it in `unreportedTurns`, and the popover shows tokens and
   cost only while `threadUsageReported` (a turn reported, or a transcript
   estimate), else "Usage not reported by this provider"; a turn with
