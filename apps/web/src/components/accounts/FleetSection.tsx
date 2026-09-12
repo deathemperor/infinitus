@@ -141,8 +141,10 @@ export function FleetSection({
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
+            // Duck-typed, not `instanceof HTMLInputElement`: the unit suite
+            // runs in node, where that global does not exist.
             const field = event.currentTarget.elements.namedItem("code");
-            if (field instanceof HTMLInputElement) {
+            if (field !== null && "value" in field && typeof field.value === "string") {
               signIn.onSubmitCode(field.value);
               field.value = "";
             }

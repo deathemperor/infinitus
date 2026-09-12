@@ -32,10 +32,15 @@ export function SideQuestionPanel({
   environmentId,
   threadId,
   composerDraftTarget,
+  forking,
+  onRetry,
 }: {
   environmentId: EnvironmentId;
   threadId: ThreadId;
   composerDraftTarget: ComposerThreadTarget;
+  /** While the fork is being made: no error yet, or the reason it failed. */
+  forking?: { readonly error: string | null } | undefined;
+  onRetry?: (() => void) | undefined;
 }) {
   const sideRef = useMemo(() => scopeThreadRef(environmentId, threadId), [environmentId, threadId]);
   const thread = useThread(sideRef);
@@ -100,6 +105,33 @@ export function SideQuestionPanel({
       void send();
     }
   };
+
+  if (forking) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"
+        data-testid="side-question-forking"
+      >
+        {forking.error === null ? (
+          <>
+            <Spinner className="size-4 text-muted-foreground" />
+            <p className="text-muted-foreground text-xs">
+              Forking the thread at its latest completed turn…
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-error text-xs">{forking.error}</p>
+            {onRetry ? (
+              <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+                Try again
+              </Button>
+            ) : null}
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (!thread) {
     return (

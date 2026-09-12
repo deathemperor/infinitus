@@ -430,6 +430,34 @@ describe("rightPanelStore", () => {
     expect(state.isOpen).toBe(true);
   });
 
+  it("opens a pending side question on the click, shows a failure in it, and swaps in the fork (#269 C)", () => {
+    const store = useRightPanelStore.getState();
+    store.openSideQuestionPending(refA);
+    let state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.isOpen).toBe(true);
+    expect(state.activeSurfaceId).toBe("side-question:pending");
+    expect(state.surfaces).toEqual([
+      {
+        id: "side-question:pending",
+        kind: "side-question",
+        threadId: refA.threadId,
+        forking: { error: null },
+      },
+    ]);
+
+    store.failSideQuestionPending(refA, "Ask a side question once a turn has completed.");
+    state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.surfaces[0]).toMatchObject({
+      forking: { error: "Ask a side question once a turn has completed." },
+    });
+
+    store.openSideQuestionPending(refA);
+    store.openSideQuestion(refA, ThreadId.make("side-9"));
+    state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.surfaces.map((surface) => surface.id)).toEqual(["side-question:side-9"]);
+    expect(state.activeSurfaceId).toBe("side-question:side-9");
+  });
+
   it("reopening an inactive singleton activates its existing surface", () => {
     useRightPanelStore.getState().open(refA, "diff");
     useRightPanelStore.getState().open(refA, "agents");

@@ -175,6 +175,11 @@ before that the `native` branch). Split out of
 - Every release updates **site/** (infinitus.run) and the **GitHub
   README** with the new features so app, site and README stay in sync
   (user 2026-09-03). Do it in the release commit, not after.
+- **The site deploys by hand** (ruling 2026-09-12, #823: no deploy
+  workflow, none ever existed): after the release merges, from
+  `apps/mac/site` run `npx wrangler deploy` (the Cloudflare login is the
+  user's; the custom domain and the RENDEZVOUS KV bind from
+  `wrangler.jsonc`). Nothing in CI touches infinitus.run.
 
 - Any dev/smoke instance of the app (debug binary, `-mock_mode`, a
   second bundle) MUST run with `INFINITUS_CONTROL_SOCKET=/tmp/<short>.sock`

@@ -9,6 +9,7 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+  QueueId,
   type MessageId,
 } from "@t3tools/contracts";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
@@ -21,7 +22,7 @@ import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildProjectThreadStartTurnInput } from "../lib/projectThreadStartTurn";
 import { prepareTurnAttachments, type PreparedTurnAttachments } from "../lib/attachmentUpload";
 import { usePinAtCreation } from "../features/infinitus/pinAtCreation";
-import { randomHex } from "../lib/uuid";
+import { randomHex, uuidv4 } from "../lib/uuid";
 import { isModelSelectionUnavailable } from "../lib/modelOptions";
 import {
   retainAcknowledgedThreadMessage,
@@ -58,7 +59,12 @@ import {
 } from "./thread-outbox-model";
 import { environmentThreadShells, threadEnvironment } from "./threads";
 import { readHeldThreads } from "./threadOutboxHolds";
-import { isThreadHeld, queueBehindRunningTurn } from "./threadOutboxQueue.logic";
+import {
+  isThreadHeld,
+  queueTurnCommandInput,
+  resolveThreadOutboxDelivery,
+  type ThreadOutboxDelivery,
+} from "./threadOutboxQueue.logic";
 import {
   appendComposerDraftAttachments,
   composerDraftsAtom,
@@ -194,6 +200,9 @@ function isQueuedMessagePayloadCurrent(
 export async function completeQueuedMessageDelivery(
   queuedMessage: QueuedThreadMessage,
   deliveryRevision: number,
+  // Infinitus (fork, #812): a message parked on the server's queue is not in
+  // the timeline until it drains, so its feed row must not wait for an echo.
+  options?: { readonly retainInFeed?: boolean },
 ): Promise<"removed" | "edited" | "failed"> {
   try {
     await removeDeliveredCloudQueuedMessage(queuedMessage).catch((error) => {
@@ -208,7 +217,7 @@ export async function completeQueuedMessageDelivery(
     if (appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId]) {
       return "edited";
     }
-    retainAcknowledgedThreadMessage(queuedMessage);
+    if (options?.retainInFeed !== false) retainAcknowledgedThreadMessage(queuedMessage);
     // Removal also releases the message's local attachment files.
     const removed = await removeThreadOutboxMessage(
       queuedMessage,
@@ -541,6 +550,8 @@ async function preserveUploadedAttachmentsForEditor(
 
 export function useThreadOutboxDrain(): void {
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+  // Infinitus (fork, #812): the server-side queue for a busy thread.
+  const queueTurn = useAtomCommand(threadEnvironment.queueTurn, { reportFailure: false });
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
@@ -687,7 +698,14 @@ export function useThreadOutboxDrain(): void {
   }, []);
 
   const sendQueuedMessage = useCallback(
-    async (queuedMessage: QueuedThreadMessage, thread: EnvironmentThreadShell) => {
+    async (
+      queuedMessage: QueuedThreadMessage,
+      thread: EnvironmentThreadShell,
+      // Infinitus (fork, #812): "queue" parks the message on the server's
+      // queue (#806) instead of starting the turn; the settings sync and the
+      // attachment uploads are the same.
+      via: "start" | "queue" = "start",
+    ) => {
       const serverConfig = appAtomRegistry.get(
         serverEnvironment.configValueAtom(queuedMessage.environmentId),
       );
@@ -797,23 +815,34 @@ export function useThreadOutboxDrain(): void {
         settings,
         currentConfig.providers,
       );
-      const deliveryResult = await startTurn({
-        environmentId: queuedMessage.environmentId,
-        input: {
-          commandId: queuedMessage.commandId,
-          threadId: queuedMessage.threadId,
-          message: {
-            messageId: queuedMessage.messageId,
-            role: "user",
-            text: queuedMessage.text,
-            attachments: prepared.attachments,
-          },
-          modelSelection: sendSettings.modelSelection,
-          runtimeMode: sendSettings.runtimeMode,
-          interactionMode: sendSettings.interactionMode,
-          createdAt: queuedMessage.createdAt,
-        },
-      });
+      const deliveryResult =
+        via === "queue"
+          ? await queueTurn({
+              environmentId: queuedMessage.environmentId,
+              input: queueTurnCommandInput({
+                message: queuedMessage,
+                attachments: prepared.attachments,
+                modelSelection: sendSettings.modelSelection,
+                queueId: QueueId.make(uuidv4()),
+              }),
+            })
+          : await startTurn({
+              environmentId: queuedMessage.environmentId,
+              input: {
+                commandId: queuedMessage.commandId,
+                threadId: queuedMessage.threadId,
+                message: {
+                  messageId: queuedMessage.messageId,
+                  role: "user",
+                  text: queuedMessage.text,
+                  attachments: prepared.attachments,
+                },
+                modelSelection: sendSettings.modelSelection,
+                runtimeMode: sendSettings.runtimeMode,
+                interactionMode: sendSettings.interactionMode,
+                createdAt: queuedMessage.createdAt,
+              },
+            });
       const failure = reportFailure(deliveryResult, "start-turn");
       if (failure?.action === "retry") {
         return false;
@@ -823,7 +852,9 @@ export function useThreadOutboxDrain(): void {
       }
       acknowledgedExistingThreadMessageIdsRef.current.add(persistedMessage.messageId);
       const delivered =
-        (await completeQueuedMessageDelivery(persistedMessage, deliveryRevision)) === "removed";
+        (await completeQueuedMessageDelivery(persistedMessage, deliveryRevision, {
+          retainInFeed: via === "start",
+        })) === "removed";
       if (delivered) {
         acknowledgedExistingThreadMessageIdsRef.current.delete(persistedMessage.messageId);
       }
@@ -831,6 +862,7 @@ export function useThreadOutboxDrain(): void {
     },
     [
       makeDeliveryHelpers,
+      queueTurn,
       setThreadInteractionMode,
       setThreadRuntimeMode,
       startTurn,
@@ -1074,9 +1106,11 @@ export function useThreadOutboxDrain(): void {
       const shellStatus = shellStatuses.get(nextQueuedMessage.environmentId) ?? "empty";
       const threadBusy =
         thread?.session?.status === "running" || thread?.session?.status === "starting";
-      // Infinitus (fork, #807): a follow-up waits behind a running or held
-      // turn instead of steering it, like the desktop composer's queue (#270 F).
-      const deliveryAction = queueBehindRunningTurn({
+      // Infinitus (fork, #807/#812): a follow-up behind a running or held
+      // turn goes to the server's queue (#806), or waits on a server without
+      // one, instead of steering the turn — the desktop composer's queue (#270 F).
+      const serverConfig = serverConfigs.get(nextQueuedMessage.environmentId);
+      const deliveryAction: ThreadOutboxDelivery = resolveThreadOutboxDelivery({
         action: resolveThreadOutboxDeliveryAction({
           isCreation: creation !== undefined,
           threadExists: thread !== undefined,
@@ -1091,14 +1125,14 @@ export function useThreadOutboxDrain(): void {
           nextQueuedMessage.threadId,
         ),
         mode: "queue",
+        serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
       });
       // The delivery action resolves first; capability checks apply only to
       // a message that will send. Checking earlier would restore a
       // creation whose startTurn already made the thread as a duplicate draft
       // instead of removing it.
-      const serverConfig = serverConfigs.get(nextQueuedMessage.environmentId);
       const dispatchStep = resolveThreadOutboxDispatchStep({
-        deliveryAction,
+        deliveryAction: deliveryAction === "queue" ? "send" : deliveryAction,
         fileAttachments: nextQueuedMessage.attachments.filter(
           (attachment) => attachment.type === "file",
         ),
@@ -1191,15 +1225,17 @@ export function useThreadOutboxDrain(): void {
         // The shell state is equally stale. Re-run the same delivery policy
         // against the live thread snapshot so a vanished thread or newly
         // created target defers, while busy existing threads can still steer.
-        if (deliveryAction === "send") {
+        if (deliveryAction === "send" || deliveryAction === "queue") {
           const liveThread = findThread(
             appAtomRegistry.get(environmentThreadShells.threadShellsAtom),
             nextQueuedMessage,
           );
           const liveThreadBusy =
             liveThread?.session?.status === "running" || liveThread?.session?.status === "starting";
-          // Infinitus (fork, #807): the same queue rule against the live thread.
-          const liveDeliveryAction = queueBehindRunningTurn({
+          // Infinitus (fork, #807/#812): the same rule against the live
+          // thread; a turn that started or finished meanwhile defers to the
+          // next pass, which picks the other path.
+          const liveDeliveryAction = resolveThreadOutboxDelivery({
             action: resolveThreadOutboxDeliveryAction({
               isCreation: creation !== undefined,
               threadExists: liveThread !== undefined,
@@ -1214,8 +1250,9 @@ export function useThreadOutboxDrain(): void {
               nextQueuedMessage.threadId,
             ),
             mode: "queue",
+            serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
           });
-          if (liveDeliveryAction !== "send") {
+          if (liveDeliveryAction !== deliveryAction) {
             return true;
           }
         }
@@ -1233,7 +1270,11 @@ export function useThreadOutboxDrain(): void {
               ? sendQueuedCreation(nextQueuedMessage, creation, creationProjectCwd)
               : removeQueuedMessage("[thread-outbox] dropped pending task for a missing project")
             : thread !== undefined
-              ? sendQueuedMessage(nextQueuedMessage, thread)
+              ? sendQueuedMessage(
+                  nextQueuedMessage,
+                  thread,
+                  deliveryAction === "queue" ? "queue" : "start",
+                )
               : Promise.resolve(false);
       });
       void delivery

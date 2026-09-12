@@ -4,6 +4,7 @@ import { addPushToStartTokenListener, type LiveActivityFactory } from "expo-widg
 import { useEffect, useMemo } from "react";
 import { AppState, Platform } from "react-native";
 
+import { appAtomRegistry } from "../../state/atom-registry";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { mobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
@@ -17,6 +18,7 @@ import {
   type LiveActivityTokenKind,
   pusherMac,
 } from "./liveActivity.logic";
+import { localLiveActivityStartsAtom } from "./liveActivityStarts";
 import { useForgetOnSwitchOff } from "./pushForget";
 import { tokenSender } from "./pushRegistration";
 
@@ -28,7 +30,8 @@ const FACTORIES: ReadonlyArray<readonly [LiveActivityFactory<object>, LiveActivi
 /** Headless. Hands this phone's Live Activity tokens to the Mac that drives
     its cards (#572 task 4): the push-to-start token under both start kinds,
     and each running card's update token, re-read on every foreground because
-    a Mac may have started a card while the app was closed. iOS only; nothing
+    a Mac may have started a card while the app was closed, and after a card
+    this app starts itself (the test card, #845). iOS only; nothing
     runs until the preferences have loaded, and nothing when the toggle is off
     or no paired Mac runs Infinitus. The toggle going off withdraws the four
     registrations from the Mac (#702). */
@@ -86,9 +89,11 @@ export function InfinitusLiveActivityBridge() {
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") attach();
     });
+    const localStarts = appAtomRegistry.subscribe(localLiveActivityStartsAtom, attach);
     return () => {
       cancelled = true;
       appState.remove();
+      localStarts();
       for (const subscription of subscriptions) subscription.remove();
     };
   }, [enabled, environmentId, run]);

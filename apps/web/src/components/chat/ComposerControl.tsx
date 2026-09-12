@@ -107,16 +107,33 @@ export function ComposerSelectControl({
   className,
   size = "sm",
   variant = "ghost",
+  chevronOnHover = false,
   ...props
-}: ComposerSelectControlProps) {
+}: ComposerSelectControlProps & {
+  /** Fork (#843): the chevron fades in on hover, focus or while open — an
+      icon-only control reads as a plain icon at rest. Opacity only, so the
+      control's width never changes. */
+  chevronOnHover?: boolean;
+}) {
   return (
     <SelectTrigger
       className={cn(
         composerControlClassName,
         size === "xs" ? restingComposerControlClassName : expandedComposerControlClassName,
+        chevronOnHover ? "group/select" : undefined,
         className,
       )}
-      icon={<ComposerControlChevron size={size} />}
+      icon={
+        <ComposerControlChevron
+          size={size}
+          {...(chevronOnHover
+            ? {
+                className:
+                  "opacity-0 transition-opacity group-hover/select:opacity-100 group-focus-visible/select:opacity-100 group-aria-expanded/select:opacity-100 group-data-[popup-open]/select:opacity-100",
+              }
+            : {})}
+        />
+      }
       size={size}
       variant={variant}
       {...props}

@@ -132,8 +132,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   routes (#710), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing` and `./captures` subpath exports.
-- `packages/contracts/src/environment.ts` — the `infinitus` capability on
-  `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+- `packages/contracts/src/environment.ts` — the `infinitus` and `turnQueue`
+  (#812) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
   beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
@@ -323,8 +323,15 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   was asked here shows: `SideQuestionPanel.logic.ts` `isSideQuestionMessage`
   drops the imported history by the ids the fork minted; "Bring to main"
   appends the latest answer to the main composer's draft);
-  `ChatView.tsx` `askSideQuestion` forks the latest completed turn with
-  `side: true` and opens the drawer, gated on a Claude session and
+  `ChatView.tsx` `askSideQuestion` forks with `side: true` and no
+  `turnCount`: the server takes the session's latest completed turn from
+  its own anchors (`latestClaudeForkAnchor`, `forkSeedMessagesByTurns`),
+  so a thread in a plain directory, which never gets a checkpoint, forks
+  too. The drawer opens on the click in a forking state
+  (`openSideQuestionPending`, `failSideQuestionPending`; the pending
+  surface is never persisted) and shows a failure inside with "Try again";
+  until a turn has completed (`hasCompletedTurn`) the button is off and
+  its tooltip says so. Gated on a Claude session and
   `capabilities.infinitus`; the button sits after the mode toggle in
   `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in
   `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and
@@ -563,9 +570,16 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `infinitusPinAtCreation` (#742) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
   `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
-  feedback notices, #742); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  feedback notices, #742) and the `infinitusQueuedTurns` slot right after it
+  (#806: the thread's server-side queue as a card — one row per queued
+  message with earlier/later, edit, send now, remove;
+  `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
+  `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
+  the web's `composerSendQueue.logic.ts`, kept local so neither app edits
+  the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation), and prepends `usePullRequestHeaderItem`'s menu to the
+  queued creation), `InfinitusQueuedTurns` from the thread shell's
+  `queuedTurns`, and prepends `usePullRequestHeaderItem`'s menu to the
   iOS header's git items with its `version` in `optionsVersion` (#269 F: the
   PR's phase from the linked snapshot, Open pull request / View checks / Mark
   ready for review over `pullRequests.runAction`;
@@ -590,7 +604,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   pass and the live re-check before a send) are wrapped in
   `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
   its turn runs or the server holds it, the phone's copy of the desktop
-  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too.
+  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too. Since
+  #812 that wait becomes a `thread.turn.queue` when the server advertises
+  `turnQueue` (`resolveThreadOutboxDelivery`, `queueTurnCommandInput`):
+  `sendQueuedMessage` takes `via: "start" | "queue"` and, for a queue, sends
+  `threadEnvironment.queueTurn` with the outbox's command id and a fresh
+  queue id after the same settings sync and uploads, and
+  `completeQueuedMessageDelivery` takes `{ retainInFeed: false }` so no
+  "Pending" feed row waits for an echo the timeline only gives at drain.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
@@ -1349,6 +1370,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   of steering; creations and every other action pass through. `mode` is
   `"queue"` at both call sites — the phone has no copy of the desktop's
   `composerSendMode` yet, `"steer"` is the upstream path kept for it.
+  `resolveThreadOutboxDelivery` (#812) turns that `wait` into `"queue"` when
+  the server's capabilities carry `turnQueue` (fork capability in
+  `packages/contracts/src/environment.ts`, set true in
+  `apps/server/src/environment/ServerEnvironment.ts`); `queueTurnCommandInput`
+  is the `thread.turn.queue` an outbox message becomes.
   `readHeldThreads` reads the environment's `infinitusEnvironment.holds` atom
   from the registry (the web sidebar's idiom), null without the `infinitus`
   capability and before the list's first delivery, so the first pass after
@@ -1422,6 +1448,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (ActivityKit's message in an alert) blames the phone's settings; with
   working cards live the same row reads "End the working card(s)" and ends
   them all — the Mac cannot end a card it never got an update token for.
+  A started test card bumps `liveActivityStarts.ts`'s atom, which
+  `InfinitusLiveActivityBridge` watches to re-scan the live cards and file
+  the new card's `working` update token with the Mac (the bridge otherwise
+  scans only at mount and on foreground); `pushRegistration.ts` logs a
+  refused `activities-token` (`[infinitus-push]`) since the bridges send
+  with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.

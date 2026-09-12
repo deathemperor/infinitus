@@ -42,6 +42,9 @@ final class TeamClientTests: XCTestCase {
     /// behind — a config-less directory `teamIDs()` ignores but the user's
     /// disk keeps (one was still on the 2026-09-06 machine).
     func testAFailedCreateLeavesNoHalfMadeTeamBehind() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts / POSIX file modes are not ported to Windows yet")
+        #endif
         let (paths, secrets) = machine("solo")
         XCTAssertThrowsError(try TeamClient.create(name: "Papaya", remote: "file:///nonexistent/nope.git", token: "t0ken",
                                                    paths: paths, secrets: secrets, now: 1_000))
@@ -57,6 +60,9 @@ final class TeamClientTests: XCTestCase {
     /// history — and a member joining later would fetch a store nobody
     /// meant to share.
     func testCreateRefusesARemoteThatAlreadyHasContent() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts / POSIX file modes are not ported to Windows yet")
+        #endif
         let remote = try makeRemote()
         // Seed the bare repo through the store adapter itself: one commit
         // on the `roster` branch is all "not empty" takes.
@@ -463,6 +469,9 @@ final class TeamClientTests: XCTestCase {
     /// store never accepted must leave none of it behind — nor a
     /// config-less team dir.
     func testARefusedJoinLeavesNoCredentialOnDisk() throws {
+        #if os(Windows)
+        try XCTSkipIf(true, "Team git shellouts / POSIX file modes are not ported to Windows yet")
+        #endif
         let remote = try makeRemote()
         let (lp, ls) = machine("leader")
         let leader = try TeamClient.create(name: "Papaya", remote: remote, token: "t0ken", paths: lp, secrets: ls, now: 1_000)
