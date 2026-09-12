@@ -226,6 +226,17 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
   before it (#743), a consumer of that gate. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
+- `apps/server/src/vcs/GitVcsDriver.ts` (+ its test) — upstream's open PR
+  pingdotgg/t3code#10792 carried ahead of upstream (2026-09-12, upstream
+  #3646): checkpoint capture seeds its private index from the workspace
+  index and resets it to HEAD keeping matching stat metadata, so `git add
+-A` re-hashes only what changed instead of every tracked file (banyan:
+  13 s → 1.2 s; the fresh index crossed the 30 s `VcsProcess` timeout under
+  load and every turn ended with "Checkpoint capture failed"). Falls back to
+  the fresh-index path when the index is missing, corrupt, truncated or
+  carries assume-unchanged / skip-worktree flags. Drops on the upstream
+  sync that brings #10792 in; until then a sync conflict here is resolved
+  toward upstream.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does
