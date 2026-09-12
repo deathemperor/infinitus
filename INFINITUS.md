@@ -878,7 +878,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
   `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
   the web's `composerSendQueue.logic.ts`, kept local so neither app edits
-  the other's file); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
+  the other's file; edit puts the row's context records back with fresh ids
+  through `restoredQueuedTurn` + `insertComposerDraftContext`, #971, the
+  text alone when the draft's record cap refuses); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
   builds `InfinitusHoldBanner` from the thread's detail for it (never for a
   queued creation), `InfinitusQueuedTurns` from the thread shell's
   `queuedTurns`, `InfinitusBestOfCard` (#269 B, read-only: the group's live

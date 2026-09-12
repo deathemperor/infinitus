@@ -28,8 +28,14 @@ import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import {
   appendComposerDraftAttachments,
   appendComposerDraftText,
+  insertComposerDraftContext,
 } from "../../state/use-composer-drafts";
-import { orderedQueuedTurns, queuedTurnEditableText, queuedTurnMoveKey } from "./queuedTurns.logic";
+import {
+  orderedQueuedTurns,
+  queuedTurnEditableText,
+  queuedTurnMoveKey,
+  restoredQueuedTurn,
+} from "./queuedTurns.logic";
 
 export interface QueuedTurnActions {
   /** The thread's queued messages in send order. */
@@ -212,9 +218,20 @@ export function useQueuedTurnActions(input: {
           return;
         }
         const draftKey = scopedThreadKey(environmentId, thread.id);
-        appendComposerDraftText(draftKey, queuedTurnEditableText(row.text));
         // Its own attachments always come back, like a restored failed send.
         appendComposerDraftAttachments(draftKey, attachments, { allowOverflow: true });
+        // Its context records come back too (#971); over the draft's record cap
+        // the text alone does, as the terminal sheet refuses.
+        const restored = restoredQueuedTurn(row, attachments, uuidv4);
+        if (restored === null) {
+          appendComposerDraftText(draftKey, queuedTurnEditableText(row.text));
+        } else if (!insertComposerDraftContext(draftKey, restored)) {
+          appendComposerDraftText(draftKey, queuedTurnEditableText(row.text));
+          Alert.alert(
+            "Too many context items",
+            "The message is back without its context. Remove some context from the draft to add it again.",
+          );
+        }
       } finally {
         editingRef.current = false;
       }
