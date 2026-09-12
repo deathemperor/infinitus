@@ -961,6 +961,9 @@ final class AppModel: ObservableObject {
         if let sessionId = event.sessionId, let hint = event.statusHint() {
             sessionStatusHints.withLock { $0.note(sessionId: sessionId, hint) }
         }
+        if event.name == "StopFailure", !isPlayground {
+            logEvent("hook", icon: "bolt.horizontal", event.logLine)
+        }
         if let line = event.pushLine, !isPlayground, !forkDriven {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
             if let pid { pushTriggers.announceWaiting(pid: pid) }

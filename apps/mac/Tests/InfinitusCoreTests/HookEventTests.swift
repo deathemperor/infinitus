@@ -74,4 +74,18 @@ final class HookEventTests: XCTestCase {
         let notification = HookEvent(name: "Notification", cwd: "/r/app", notificationType: "auth_success")
         XCTAssertNil(notification.statusHint())
     }
+
+    /// StopFailure hints idle and its log line carries the error kind
+    /// only — never the API's own text or the assistant's (#79).
+    func testStopFailureParsesTheErrorKindHintsIdleAndLogsNoText() {
+        let event = HookEvent.parse(#"""
+        {"session_id":"s1","cwd":"/tmp/repo","hook_event_name":"StopFailure","error":"rate_limit","error_details":"You've hit your limit","last_assistant_message":"SECRET TEXT"}
+        """#)
+        XCTAssertEqual(event?.error, "rate_limit")
+        XCTAssertEqual(event?.errorDetails, "You've hit your limit")
+        XCTAssertEqual(event?.statusHint()?.status, "idle")
+        XCTAssertEqual(event?.logLine, "StopFailure — repo (rate_limit)")
+        XCTAssertFalse(event?.logLine.contains("SECRET TEXT") ?? true)
+        XCTAssertFalse(event?.logLine.contains("hit your limit") ?? true)
+    }
 }

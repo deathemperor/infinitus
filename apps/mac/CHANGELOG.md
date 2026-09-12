@@ -12,9 +12,11 @@ publishes the matching section as the GitHub release body.
 - The control socket manages session-control grants — `team-grants`, `team-grant`, `team-revoke` — so the desktop app's Team page can add and remove them on the running app (#220).
 - Settings › Team shows a teammate's request to stop or delete a session, resume a past one, or swap or hold an account, with Allow and Deny; the grant sheet has the tiers, "without asking" and an expiry (#220).
 - `infinitusctl team grant`, `grants` and `revoke` go through the running app, so a grant made from the terminal shows in Settings › Team and in teammates' hints at once; with no app they edit the file as before (#220).
+- A session that stops on an API error — a usage limit, an outage — reads idle at once and the error kind shows in Activity, from Claude Code's StopFailure hook (#79).
 
 ### Desktop
 - Installing an update while threads run asks in a dialog again, not a toast: Later, Install now, or Install when they finish — and that wait no longer lapses at the next update check, which read as "checking" for a moment and silently cancelled it; clicking the armed update button opens the dialog to keep, cancel or skip the wait (#829).
+- Settings › Infinitus › Team manages the Mac's session-control grants: the tiers, "without asking", an expiry, and Remove (#220).
 
 ### Phone
 - Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer with its files, as the desktop does (#971).

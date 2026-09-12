@@ -543,6 +543,22 @@ cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
 EOF
+# #79: the StopFailure hook hints idle the same way and logs the error
+# kind only — never error_details or last_assistant_message.
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
+ "statusUpdatedAt":1700000000000}
+EOF
+printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"StopFailure","error":"rate_limit","error_details":"e2e","last_assistant_message":"e2e assistant text"}' "$SESSION_CWD" \
+    | "$CTL" event >/dev/null || fail "event StopFailure"
+"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "StopFailure hint did not read idle (#79)"
+"$CTL" events --limit 50 | expect "any(e['text']=='StopFailure — $(basename "$SESSION_CWD") (rate_limit)' for e in d)" || fail "StopFailure log line missing (#79)"
+"$CTL" events --limit 50 | expect "not any('assistant text' in e['text'] for e in d)" || fail "StopFailure logged assistant text (#79)"
+cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
+ "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
+EOF
 "$CTL" nudge "$SESSION_PID" | expect "d['pid']==$SESSION_PID and d['nudged']==False and d['reason'].startswith('not resumable')" || fail "nudge no-op"
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the

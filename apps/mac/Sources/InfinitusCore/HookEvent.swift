@@ -18,11 +18,18 @@ public struct HookEvent: Equatable, Sendable {
     public let stopHookActive: Bool?
     /// SessionEnd's own field; unused beyond `statusHint` today.
     public let reason: String?
+    /// StopFailure: the error kind (`rate_limit`, `overloaded`, …) — the
+    /// only part of the payload ever logged. `errorDetails` is the API's
+    /// own text and, like `last_assistant_message`, is never parsed into
+    /// anything the app logs (#79).
+    public let error: String?
+    public let errorDetails: String?
 
     public init(name: String, sessionId: String? = nil, cwd: String? = nil,
                 message: String? = nil, notificationType: String? = nil,
                 toolName: String? = nil, toolCommand: String? = nil, prompt: String? = nil,
-                stopHookActive: Bool? = nil, reason: String? = nil) {
+                stopHookActive: Bool? = nil, reason: String? = nil,
+                error: String? = nil, errorDetails: String? = nil) {
         self.name = name
         self.sessionId = sessionId
         self.cwd = cwd
@@ -33,6 +40,8 @@ public struct HookEvent: Equatable, Sendable {
         self.prompt = prompt
         self.stopHookActive = stopHookActive
         self.reason = reason
+        self.error = error
+        self.errorDetails = errorDetails
     }
 
     public static func parse(_ json: String) -> HookEvent? {
@@ -47,7 +56,9 @@ public struct HookEvent: Equatable, Sendable {
                          toolCommand: (object["tool_input"] as? [String: Any])?["command"] as? String,
                          prompt: object["prompt"] as? String,
                          stopHookActive: object["stop_hook_active"] as? Bool,
-                         reason: object["reason"] as? String)
+                         reason: object["reason"] as? String,
+                         error: object["error"] as? String,
+                         errorDetails: object["error_details"] as? String)
     }
 
     public var repo: String {
@@ -80,6 +91,7 @@ public struct HookEvent: Equatable, Sendable {
     public func statusHint(now: Date = Date()) -> SessionStatusHints.Hint? {
         switch name {
         case "Stop": return stopHookActive == true ? nil : .init(status: "idle", at: now)
+        case "StopFailure": return .init(status: "idle", at: now)
         case "SessionEnd": return .init(status: nil, at: now)
         default: return nil
         }
@@ -87,7 +99,7 @@ public struct HookEvent: Equatable, Sendable {
 
     public var logLine: String {
         var line = "\(name) — \(repo)"
-        if let type = notificationType { line += " (\(type))" }
+        if let type = notificationType ?? (name == "StopFailure" ? error : nil) { line += " (\(type))" }
         if let message, !message.isEmpty { line += ": \(message)" }
         return line
     }
