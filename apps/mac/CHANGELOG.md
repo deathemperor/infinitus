@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
 - `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
 - `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.

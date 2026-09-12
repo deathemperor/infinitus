@@ -16,7 +16,13 @@ final class LiveActivityPusher: ObservableObject {
     static let teamIDKey = "apns_team_id"
     private static let registrationsKey = "apns_activity_registrations"
 
-    @Published var keyID: String { didSet { AppDefaults.standard.set(keyID, forKey: Self.keyIDKey) } }
+    @Published var keyID: String {
+        didSet {
+            AppDefaults.standard.set(keyID, forKey: Self.keyIDKey)
+            keyStored = false
+            recheckKey()
+        }
+    }
     @Published var teamID: String { didSet { AppDefaults.standard.set(teamID, forKey: Self.teamIDKey) } }
     @Published private(set) var keyStored = false
     @Published private(set) var registrations: [String: ActivityPushRegistration] = [:]
@@ -43,6 +49,15 @@ final class LiveActivityPusher: ObservableObject {
     }
 
     var configured: Bool { keyStored && !teamID.isEmpty && !keyID.isEmpty }
+
+    /// The keychain answer is not final: a key stored by another instance,
+    /// or a grant made after launch, used to need a relaunch before any
+    /// push went out (#845). While the answer is no, ask again — one
+    /// attribute lookup, never a prompt (`Keychain.read` skips UI).
+    private func recheckKey() {
+        guard !keyStored, !keyID.isEmpty else { return }
+        keyStored = Keychain.read(account: keyID, service: Keychain.apnsService) != nil
+    }
 
     /// The pasted .p8 (PEM) goes to the keychain under the key id; an
     /// empty paste forgets it.
@@ -126,6 +141,7 @@ final class LiveActivityPusher: ObservableObject {
     /// Called after every fleet refresh with what the phone would see.
     func tick(fleet: EngineFleet, machine: String, themes: [RowTheme], macTheme: RowTheme,
               report: UsageReport?, tokenRate: TokenRate?) {
+        recheckKey()
         guard configured, !registrations.isEmpty else { return }
         for registration in registrations.values {
             let theme = registration.themeID.flatMap { id in themes.first { $0.id == id } } ?? macTheme
