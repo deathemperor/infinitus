@@ -6,6 +6,7 @@ import {
   threadUsageBadgeLabel,
   threadUsageCostLabel,
   threadUsageRows,
+  threadUsageSourceDetail,
   threadUsageSourceLine,
 } from "./threadUsage.logic";
 
@@ -72,6 +73,10 @@ describe("threadUsageSourceLine", () => {
     expect(threadUsageSourceLine(rollup())).toBeNull();
     expect(threadUsageSourceLine(rollup({ source: "transcript" }))).toBe(
       "Estimated from the transcript",
+    );
+    expect(threadUsageSourceDetail(rollup())).toBeNull();
+    expect(threadUsageSourceDetail(rollup({ source: "transcript" }))).toContain(
+      "default Claude home",
     );
   });
 });
