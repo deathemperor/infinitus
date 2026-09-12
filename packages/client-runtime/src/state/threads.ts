@@ -446,8 +446,9 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         }
         yield* SubscriptionRef.set(lastSequence, pending.sequence);
         yield* setThread(pending.thread, "keep");
-        yield* tryMergePendingOlderPage();
       }
+      // A page parked behind the replay (#931) merges onto the flushed thread.
+      yield* tryMergePendingOlderPage();
       yield* SubscriptionRef.update(state, (current) =>
         Option.isSome(current.data) && current.status !== "deleted" && Option.isNone(current.error)
           ? { ...current, status: "live" as const, error: Option.none() }
@@ -534,6 +535,10 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
           ...value,
           page: Option.map(value.page, (existing) => ({ ...existing, loadingOlder: false })),
         }));
+        return;
+      }
+      // A pending replay's flush is the earliest safe merge (#931).
+      if ((yield* Ref.get(replay)) !== null) {
         return;
       }
       const watermark = pending.snapshot.page?.threadSequence;
@@ -712,9 +717,15 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         // the page's thread-scoped watermark; loadingOlder stays true so
         // the UI shows progress and no second fetch starts. Pages from
         // pre-watermark servers (threadSequence absent) merge immediately,
-        // preserving the old behavior.
+        // preserving the old behavior — except while a resume replay is
+        // pending (#897): the flush writes the replayed thread whole, so a
+        // page merged before it would be dropped (#931). Every page parks
+        // until the flush then, watermark or not.
         const watermark = response.value.page?.threadSequence;
-        if (watermark !== undefined && watermark > loadedSequence) {
+        if (
+          (yield* Ref.get(replay)) !== null ||
+          (watermark !== undefined && watermark > loadedSequence)
+        ) {
           yield* Ref.set(pendingOlderPage, {
             snapshot: response.value,
             epoch: epochNow,
