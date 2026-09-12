@@ -3186,9 +3186,12 @@ final class AppModel: ObservableObject {
         // mtime, and nothing else changes what the walk would find. The
         // ten-minute backstop covers a clock or filesystem oddity.
         let liveKey = live.map(\.sessionId).sorted().joined(separator: ",")
-        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir)
+        // A `session-delete` (#220 Phase 2) changes the list without moving
+        // any mtime: the hidden count is part of the key.
+        let hidden = hiddenSessions.withLock { $0 }
+        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir) + "|" + String(hidden.count)
         let past = pastSessionsMemo.value(key: key, maxAge: 600) {
-            PastSessions.list(claudeDir: claudeDir, limit: 200, hidden: hiddenSessions.withLock { $0 })
+            PastSessions.list(claudeDir: claudeDir, limit: 200, hidden: hidden)
         }
         let recentCwds = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
         // The branch is one HEAD-file read per cwd (#346) — no spawn, no
