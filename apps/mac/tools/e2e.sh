@@ -92,6 +92,11 @@ fail() {
         # the signal (141 SIGPIPE, 143 SIGTERM, 137 SIGKILL).
         # (`|| st=$?`: under set -e a bare non-zero `wait` ends the script before the echo.)
         if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else st=0; wait "$APP_PID" 2>/dev/null || st=$?; echo "--- app gone: wait status $st"; fi
+        # #1007: what the app did on the way here — the mirror-input and
+        # hook lines name a released login, a nudge's outcome, a refused
+        # write; kind and text only (the feed carries no secret).
+        echo "--- events (last 40)"; "$CTL" events --limit 40 2>/dev/null | python3 -c "import json,sys
+for e in json.load(sys.stdin): print(e.get('kind',''), '|', e.get('text',''))" 2>/dev/null | cut -c1-200
         echo "--- status retry"; "$CTL" status 2>&1 | head -c 300; echo
     fi
     exit 1
