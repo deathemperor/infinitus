@@ -3,6 +3,7 @@ import {
   IsoDateTime,
   MessageId,
   ModelSelection,
+  OrchestrationMessageContext,
   QueueId,
   ThreadId,
   TrimmedNonEmptyString,
@@ -29,6 +30,7 @@ export const ProjectionThreadQueuedTurn = Schema.Struct({
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
   modelSelection: Schema.NullOr(ModelSelection),
+  context: Schema.NullOr(OrchestrationMessageContext),
   orderKey: TrimmedNonEmptyString,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -57,6 +59,7 @@ export const ProjectionThreadQueuedTurnDbRow = ProjectionThreadQueuedTurn.mapFie
   Struct.assign({
     attachments: Schema.fromJsonString(Schema.Array(ChatAttachment)),
     modelSelection: Schema.NullOr(Schema.fromJsonString(ModelSelection)),
+    context: Schema.NullOr(Schema.fromJsonString(OrchestrationMessageContext)),
   }),
 );
 
@@ -98,6 +101,7 @@ const make = Effect.gen(function* () {
         text,
         attachments_json,
         model_selection_json,
+        context_json,
         order_key,
         created_at,
         updated_at
@@ -109,6 +113,7 @@ const make = Effect.gen(function* () {
         ${row.text},
         ${JSON.stringify(row.attachments)},
         ${row.modelSelection === null ? null : JSON.stringify(row.modelSelection)},
+        ${row.context === null ? null : JSON.stringify(row.context)},
         ${row.orderKey},
         ${row.createdAt},
         ${row.updatedAt}
@@ -120,6 +125,7 @@ const make = Effect.gen(function* () {
         text = excluded.text,
         attachments_json = excluded.attachments_json,
         model_selection_json = excluded.model_selection_json,
+        context_json = excluded.context_json,
         order_key = excluded.order_key,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
@@ -137,6 +143,7 @@ const make = Effect.gen(function* () {
         text,
         attachments_json AS "attachments",
         model_selection_json AS "modelSelection",
+        context_json AS "context",
         order_key AS "orderKey",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
@@ -157,6 +164,7 @@ const make = Effect.gen(function* () {
         text,
         attachments_json AS "attachments",
         model_selection_json AS "modelSelection",
+        context_json AS "context",
         order_key AS "orderKey",
         created_at AS "createdAt",
         updated_at AS "updatedAt"

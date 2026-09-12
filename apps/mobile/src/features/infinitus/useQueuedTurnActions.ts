@@ -107,6 +107,7 @@ export function useQueuedTurnActions(input: {
             role: "user",
             text: row.text,
             attachments: row.attachments,
+            ...(row.context !== undefined ? { context: row.context } : {}),
           },
           modelSelection: row.modelSelection ?? thread.modelSelection,
           runtimeMode: thread.runtimeMode,

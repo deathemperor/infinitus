@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Struct from "effect/Struct";
+import { OrchestrationMessageContext } from "./composerContext.ts";
 import { ProviderOptionSelections } from "./model.ts";
 import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
 import {
@@ -346,6 +347,8 @@ export type ChatUnknownAttachment = typeof ChatUnknownAttachment.Type;
 
 const UploadChatImageAttachment = Schema.Struct({
   type: Schema.Literal("image"),
+  /** Client-side id, so context records can bind to the attachment before it has a server id. */
+  id: Schema.optional(ChatAttachmentId),
   name: TrimmedNonEmptyString.check(Schema.isMaxLength(255)),
   mimeType: TrimmedNonEmptyString.check(Schema.isMaxLength(100), Schema.isPattern(/^image\//i)),
   sizeBytes: NonNegativeInt.check(Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_IMAGE_BYTES)),
@@ -489,6 +492,7 @@ export const OrchestrationMessage = Schema.Struct({
   role: OrchestrationMessageRole,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
+  context: Schema.optional(OrchestrationMessageContext),
   turnId: Schema.NullOr(TurnId),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,
@@ -712,6 +716,8 @@ export const OrchestrationQueuedTurn = Schema.Struct({
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
   modelSelection: Schema.optional(ModelSelection),
+  /** The message's context records (upstream #11265), sent with it by the drain (#969). */
+  context: Schema.optional(OrchestrationMessageContext),
   orderKey: TrimmedNonEmptyString,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -1357,6 +1363,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
     role: Schema.Literal("user"),
     text: Schema.String,
     attachments: Schema.Array(ChatAttachment),
+    context: Schema.optional(OrchestrationMessageContext),
   }),
   modelSelection: Schema.optional(ModelSelection),
   titleSeed: Schema.optional(TrimmedNonEmptyString),
@@ -1381,6 +1388,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
     role: Schema.Literal("user"),
     text: Schema.String,
     attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+    context: Schema.optional(OrchestrationMessageContext),
   }),
   modelSelection: Schema.optional(ModelSelection),
   titleSeed: Schema.optional(TrimmedNonEmptyString),
@@ -1406,12 +1414,14 @@ const QueuedTurnMessage = Schema.Struct({
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
+  context: Schema.optional(OrchestrationMessageContext),
 });
 const ClientQueuedTurnMessage = Schema.Struct({
   messageId: MessageId,
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+  context: Schema.optional(OrchestrationMessageContext),
 });
 
 export const ThreadTurnQueueCommand = Schema.Struct({
@@ -2026,6 +2036,7 @@ export const ThreadMessageSentPayload = Schema.Struct({
   role: OrchestrationMessageRole,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
+  context: Schema.optional(OrchestrationMessageContext),
   turnId: Schema.NullOr(TurnId),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,

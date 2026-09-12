@@ -5,12 +5,14 @@ import {
   ProviderInstanceId,
   QueueId,
   ThreadId,
+  OrchestrationMessageContext,
   type OrchestrationQueuedTurn,
   type OrchestrationReadModel,
 } from "@t3tools/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import { decideOrchestrationCommand } from "./decider.ts";
 
@@ -64,6 +66,11 @@ function makeReadModel(input: {
     updatedAt: NOW,
   };
 }
+
+const context = Schema.decodeUnknownSync(OrchestrationMessageContext)({
+  version: 1,
+  records: [{ version: 1, contextId: "ctx-1", label: "a.ts", kind: "mention", path: "src/a.ts" }],
+});
 
 const message = (id: string, text: string) => ({
   messageId: MessageId.make(id),
@@ -260,5 +267,39 @@ it.layer(NodeServices.layer)("turn queue decider (#806)", (it) => {
         }).pipe(Effect.flip);
         expect(String(withoutRow)).toContain("already sent or removed");
       }),
+  );
+  it.effect("keeps the message's context on the row; an edit without one clears it (#969)", () =>
+    Effect.gen(function* () {
+      const queued = events(
+        yield* decideOrchestrationCommand({
+          command: {
+            type: "thread.turn.queue",
+            commandId: CommandId.make("cmd-ctx"),
+            threadId,
+            queueId: QueueId.make("qc"),
+            message: { ...message("mc", "with context"), context },
+            createdAt: LATER,
+          },
+          readModel: makeReadModel({}),
+        }),
+      );
+      expect(queued[0]?.payload.queuedTurn).toMatchObject({ queueId: "qc", context });
+
+      const cleared = events(
+        yield* decideOrchestrationCommand({
+          command: {
+            type: "thread.turn.queue.update",
+            commandId: CommandId.make("cmd-ctx-edit"),
+            threadId,
+            queueId: QueueId.make("qc"),
+            message: message("mc2", "edited away"),
+            createdAt: LATER,
+          },
+          readModel: makeReadModel({ queuedTurns: [{ ...row("qc", "m"), context }] }),
+        }),
+      );
+      expect(cleared[0]?.payload.queuedTurn).toMatchObject({ queueId: "qc", text: "edited away" });
+      expect(cleared[0]?.payload.queuedTurn).not.toHaveProperty("context");
+    }),
   );
 });

@@ -1,5 +1,12 @@
 import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
-import type { CommandId, MessageId, ModelSelection, QueueId, ThreadId } from "@t3tools/contracts";
+import type {
+  CommandId,
+  MessageId,
+  ModelSelection,
+  OrchestrationMessageContext,
+  QueueId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
 
 import type { PreparedTurnAttachments } from "../lib/attachmentUpload";
@@ -90,6 +97,7 @@ export function queueTurnCommandInput(input: {
     readonly threadId: ThreadId;
     readonly messageId: MessageId;
     readonly text: string;
+    readonly context?: OrchestrationMessageContext | undefined;
     readonly createdAt: string;
   };
   readonly attachments: PreparedTurnAttachments["attachments"];
@@ -104,6 +112,7 @@ export function queueTurnCommandInput(input: {
       messageId: input.message.messageId,
       role: "user" as const,
       text: input.message.text,
+      ...(input.message.context ? { context: input.message.context } : {}),
       attachments: input.attachments,
     },
     modelSelection: input.modelSelection,

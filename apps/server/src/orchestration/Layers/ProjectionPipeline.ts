@@ -839,6 +839,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             text: queued.text,
             attachments: queued.attachments,
             modelSelection: queued.modelSelection ?? null,
+            context: queued.context ?? null,
             orderKey: queued.orderKey,
             createdAt: queued.createdAt,
             updatedAt: queued.updatedAt,
@@ -1288,6 +1289,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               role: event.payload.role,
               text: event.payload.text,
               ...(attachments !== undefined ? { attachments: [...attachments] } : {}),
+              ...(event.payload.context !== undefined ? { context: event.payload.context } : {}),
               createdAt: event.payload.createdAt,
               updatedAt: event.payload.updatedAt,
             });
@@ -1316,6 +1318,9 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             role: event.payload.role,
             text: nextText,
             ...(nextAttachments !== undefined ? { attachments: [...nextAttachments] } : {}),
+            ...((event.payload.context ?? previousMessage?.context) !== undefined
+              ? { context: event.payload.context ?? previousMessage?.context }
+              : {}),
             isStreaming: false,
             createdAt: previousMessage?.createdAt ?? event.payload.createdAt,
             updatedAt: event.payload.updatedAt,

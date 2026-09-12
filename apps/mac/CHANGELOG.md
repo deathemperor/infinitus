@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 - Team control runs the whole grant menu: a teammate you grant stop, resume-past, delete, swap, hold, kill or reclaim runs that Mac verb here; anything not pre-authorised waits for your Allow (`infinitusctl team-pending / team-allow / team-deny`, two minutes) and delete, kill, reclaim always wait (#220).
 
 ### Desktop
+- Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
 - A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
 
 ## 0.5.0-alpha.2

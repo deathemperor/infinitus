@@ -40,6 +40,13 @@ makes wrong, in its own PR.
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
   (upstream-channel tests start on a nightly feed via the harness `settings`
   option) are re-flipped to `infinitus` after each merge, never the rule.
+  An upstream migration whose number collides with the fork's own
+  (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
+  (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
+  is the fork's `058`), so an existing fork database never skips it. Upstream commits
+  `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
+  fork ignores the file and drops it from the merge (`git rm --cached`), so
+  each sync meets it as a modify/delete conflict resolved the same way.
 - **`apps/mac` is the Swift app** (#823 layer 2, 2026-09-12). Today's
   native Infinitus (menu bar, engines, team, tunnels, mirror API, control
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
@@ -301,7 +308,9 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   the idle drain racing on one row send it once); `projector.ts`,
   `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
   the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
-  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`),
+  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`;
+  `context_json`, migration `059`, keeps the message's context records
+  upstream #11265 added, and the drain sends them with it — #969),
   dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
   every thread read (snapshot, command read model, shells, detail);
   `Normalizer.ts` — the queue commands' uploads stored like a sent
@@ -649,12 +658,17 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   title step; runtime/interaction mode still persist so the drain reads
   them); `components/chat/useQueuedTurnActions.ts` — the rows from
   `thread.queuedTurns` and their actions (send now = `thread.turn.start`
-  with `queuedFrom`; edit = fetch the attachments back through the asset
-  URL, `.queue.remove`, text and files into the composer; move =
-  `.queue.move` with `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
+  with `queuedFrom`; edit = `.queue.remove`, then for a row with context
+  records (#969) the composer's `importContextRecords` from this
+  environment — the stash restore's path, chips back and attachments
+  transferred by id — and the text with its links rewritten to the
+  re-minted ids (`restoredQueuedTurnText`, #971); a row without records
+  has its attachments fetched back through the asset URL first, then text
+  and files into the composer; move = `.queue.move` with
+  `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
   renders them; `composerSendQueue.logic.ts` (+ test) — `orderedQueuedTurns`,
-  `queuedTurnSnippet`, `queuedTurnEditableText`, `queuedTurnMoveKey`, and
-  the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
+  `queuedTurnSnippet`, `queuedTurnEditableText`, `restoredQueuedTurnText`,
+  `queuedTurnMoveKey`, and the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
   `routes/_chat.tsx`) — moves entries the stash still holds with `queuedFor`
   (#270 F, pre-#806) to the server once, ids derived from the entry, a
   refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
