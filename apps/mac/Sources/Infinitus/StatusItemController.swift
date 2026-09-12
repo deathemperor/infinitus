@@ -607,19 +607,19 @@ final class StatusItemController {
         // loop: fitPinned → setContentSize → re-measure → fitPinned, ~450
         // times a second with the main thread never idle (bundle b82d3d9
         // froze after 1h30 with the rounding fix in, 2026-09-04). Two
-        // ways it loops, two guards: a size AppKit didn't take (a screen
-        // clamp) is never asked for again while it's refused; a size
-        // asked for again within a second means the content measures
+        // ways it loops, two guards (`PopoutFit.ask`, #229 for the
+        // refused-vs-settled mismatch): a size AppKit didn't take (a
+        // screen clamp) is never asked for again while it's refused; a
+        // size asked for again within a second means the content measures
         // differently in each of two window sizes — settle on the larger,
         // which clips nothing, and stop.
-        if let refusedFit, abs(refusedFit.width - want.width) < 0.5,
-           abs(refusedFit.height - want.height) < 0.5 { return }
         let now = Date()
         recentFits.removeAll { now.timeIntervalSince($0.at) > 1 }
-        var target = want
-        if recentFits.contains(where: { $0.size == want }) {
-            target = NSSize(width: max(want.width, current.width), height: max(want.height, current.height))
-            if abs(target.width - current.width) < 0.5, abs(target.height - current.height) < 0.5 { return }
+        func pts(_ s: NSSize) -> PopoutFit.Size { .init(width: s.width, height: s.height) }
+        guard let ask = PopoutFit.ask(want: pts(want), current: pts(current), refused: refusedFit.map(pts),
+                                      recent: recentFits.map { pts($0.size) }) else { return }
+        let target = NSSize(width: ask.size.width, height: ask.size.height)
+        if ask.settled {
             NSLog("Infinitus pop-out: fit loop — content asks %.0f×%.0f in a %.0f×%.0f window; settling on %.0f×%.0f",
                   want.width, want.height, current.width, current.height, target.width, target.height)
         }
