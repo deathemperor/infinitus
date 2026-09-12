@@ -14,9 +14,6 @@ import * as Schema from "effect/Schema";
  * transcripts, never billing truth.
  */
 
-export const UTILIZATION_DAYS = [1, 7, 30] as const;
-export type UtilizationDays = (typeof UTILIZATION_DAYS)[number];
-
 const decode = Schema.decodeUnknownOption(InfinitusUtilization);
 
 /** The `utilization` reply as a value, or null for anything else. */
