@@ -397,7 +397,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's
   action group ("≈ $0.35", or "N turns" while no turn carried a cost)
   opening the thread-info popover: turns (with the subagent count), tool
-  calls and time working when counted, the
+  calls and duration (wall time, waits included) when counted, the
   token counts that moved, models, cost ("Cost not recorded", never
   $0.00, for none) and the last turn in the user's timestamp format, plus
   "Estimated from the transcript" for a `transcript` rollup; drawn only

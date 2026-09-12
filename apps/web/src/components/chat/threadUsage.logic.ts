@@ -35,7 +35,7 @@ export interface ThreadUsageRow {
 }
 
 /** The popover's label/value rows: turns first, the tool calls and the
-    time spent when the server counted them, then the token counts that
+    wall time when the server counted them, then the token counts that
     moved (a zero row is left out), then the models. */
 export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
   const turns =
@@ -46,7 +46,7 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
   if (usage.toolCalls !== undefined)
     rows.push({ label: "Tool calls", value: `${usage.toolCalls}` });
   if (usage.durationMs !== undefined) {
-    rows.push({ label: "Time working", value: formatDuration(usage.durationMs) });
+    rows.push({ label: "Duration", value: formatDuration(usage.durationMs) });
   }
   const tokens: ReadonlyArray<readonly [string, number]> = [
     ["Input tokens", usage.inputTokens],

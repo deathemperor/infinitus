@@ -56,12 +56,12 @@ describe("threadUsageRows", () => {
     ]);
   });
 
-  it("adds the tool calls and the time working when the server counted them", () => {
+  it("adds the tool calls and the duration when the server counted them", () => {
     const rows = threadUsageRows(rollup({ toolCalls: 17, durationMs: 3_723_000 }));
     expect(rows.slice(0, 3)).toEqual([
       { label: "Turns", value: "3" },
       { label: "Tool calls", value: "17" },
-      { label: "Time working", value: "1h 2m 3s" },
+      { label: "Duration", value: "1h 2m 3s" },
     ]);
     expect(threadUsageRows(rollup({ toolCalls: 0 }))[1]).toEqual({
       label: "Tool calls",
