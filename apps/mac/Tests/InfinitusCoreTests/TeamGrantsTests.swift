@@ -148,4 +148,30 @@ final class TeamGrantsTests: XCTestCase {
         let bytes = String(decoding: (try? CanonicalJSON.encode(drive.hints)) ?? Data(), as: UTF8.self)
         XCTAssertFalse(bytes.contains("approval"), "a drive-only hint is byte-identical to Phase 1's")
     }
+
+    func testTiersCoverEveryCapabilityOnce() {
+        let fromTiers = TeamGrants.tiers.flatMap { $0.capabilities }
+        XCTAssertEqual(Set(fromTiers), Set(TeamGrants.capabilities))
+        XCTAssertEqual(fromTiers.count, Set(fromTiers).count, "no duplicates across tiers")
+        for cap in TeamGrants.capabilities {
+            XCTAssertNotNil(TeamGrants.meanings[cap], "\(cap) has no meaning")
+        }
+    }
+
+    func testExpiryAndCapabilityLabels() {
+        let now = 10_000
+        let untilRevoked = TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all, capabilities: [TeamGrants.send], since: 1)
+        XCTAssertEqual(untilRevoked.expiryLabel(now: now), "until revoked")
+        func withExpiry(_ expires: Int) -> TeamGrants.Grant {
+            TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all, capabilities: [TeamGrants.send], since: 1, expires: expires)
+        }
+        XCTAssertEqual(withExpiry(now + 90).expiryLabel(now: now), "expires in 1 m")
+        XCTAssertEqual(withExpiry(now + 7_500).expiryLabel(now: now), "expires in 2 h 05 m")
+        XCTAssertEqual(withExpiry(now + 3 * 86_400).expiryLabel(now: now), "expires in 3 d")
+        XCTAssertEqual(withExpiry(now - 1).expiryLabel(now: now), "expired")
+        let g = TeamGrants.Grant(id: "g-1", audience: .team, sessions: .all,
+                                 capabilities: [TeamGrants.send, TeamGrants.stop, TeamGrants.hold], since: 1,
+                                 preauthorized: [TeamGrants.hold])
+        XCTAssertEqual(g.capabilitiesLabel(), "hold (no ask), send, stop (asks)")
+    }
 }
