@@ -284,6 +284,14 @@
       {
         "args": [],
         "effect": "read",
+        "name": "utilization",
+        "options": ["days"],
+        "replyShape": "{days, bucketSeconds, samples:[{t, email, number, active?, fiveHour?:{pct, resetsAt}, sevenDay?:{pct, resetsAt}, scoped?:{name:{pct, resetsAt}}}], generations:[{email, window, resetAt, finalPct, observationGap}], fiveHourWindows:[{email, number?, start, resetsAt, peakPct, samples, closed}], replay:{from, to, switches, coldSwitches, stalledSeconds, sawActiveFlag}, dryRunPlan?, windows:[name], emails:[email], rates?:{computedAt, lastHour:{input, output, cacheRead, cacheWrite, usd, messages}, lastDay, lastWeek, files, unpricedModels}, liveRate?:{perMinute, peakPerMinute}}",
+        "summary": "The Utilization pane's data over the last N days (default 7): the recorded usage samples downsampled to the pane's bucket, weekly-window waste generations, five-hour windows, the replay report, the dry-run plan, and the transcript token run rate."
+      },
+      {
+        "args": [],
+        "effect": "read",
         "name": "perf",
         "options": [],
         "replyShape": "{cpuSeconds, rssBytes, heapBytes, threads, uptimeSeconds, leases, leaseScopes: {clientId: [scope]}}",
