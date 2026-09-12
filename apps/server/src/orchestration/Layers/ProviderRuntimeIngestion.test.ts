@@ -442,7 +442,7 @@ describe("ProviderRuntimeIngestion", () => {
   });
 
   // Fork (#834): a completed turn's usage lands on the thread; an
-  // unavailable one records nothing.
+  // unavailable one whose start this server did not see records nothing.
   it("records a completed turn's usage on the thread", async () => {
     const harness = await createHarness();
     const now = "2026-01-01T00:00:00.000Z";

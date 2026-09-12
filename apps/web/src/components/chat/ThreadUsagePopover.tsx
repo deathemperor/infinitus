@@ -13,6 +13,7 @@ import {
   threadUsageRows,
   threadUsageSourceDetail,
   threadUsageSourceLine,
+  threadUsageUnreportedLine,
 } from "./threadUsage.logic";
 
 /**
@@ -27,6 +28,7 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
   const rows = threadUsageRows(usage);
   const sourceLine = threadUsageSourceLine(usage);
   const sourceDetail = threadUsageSourceDetail(usage);
+  const unreportedLine = threadUsageUnreportedLine(usage);
   return (
     <Popover>
       <PopoverTrigger
@@ -62,12 +64,16 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
                 </dd>
               </div>
             ))}
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-secondary-label">Cost</dt>
-              <dd className="font-medium tabular-nums text-secondary-label">
-                {threadUsageCostLabel(usage.costUsd)}
-              </dd>
-            </div>
+            {unreportedLine ? (
+              <div className="text-pretty text-secondary-label">{unreportedLine}</div>
+            ) : (
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-secondary-label">Cost</dt>
+                <dd className="font-medium tabular-nums text-secondary-label">
+                  {threadUsageCostLabel(usage.costUsd)}
+                </dd>
+              </div>
+            )}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-secondary-label">Last turn</dt>
               <dd className="font-medium tabular-nums text-secondary-label">

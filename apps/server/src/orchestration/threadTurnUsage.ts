@@ -10,9 +10,13 @@ export interface TurnTelemetry {
  * Fork (#834): the usage record of a completed turn, from the runtime's
  * normalized `tokenUsage` (any provider) plus the Claude adapter's per-turn
  * cost and models, and the tool calls and wall time the ingestion counted
- * when it saw the turn start. Undefined when the provider reported no
- * usage: a turn with nothing to record is not recorded, so the rollup never
- * counts zeros.
+ * when it saw the turn start. A turn whose provider reported no usage
+ * (Cursor and Grok send no `tokenUsage`; an adapter can answer
+ * `unavailable`) is still recorded when the ingestion counted something:
+ * zero tokens, `usageUnavailable: true`, so the tool calls and wall time
+ * survive and the rollup knows those zeros are "not reported". Undefined
+ * only when there is neither: a turn with nothing to record is not
+ * recorded, so the rollup never counts zeros as figures.
  */
 export function turnUsageFromCompletedTurn(
   payload: TurnCompletedPayload,
@@ -21,22 +25,24 @@ export function turnUsageFromCompletedTurn(
   telemetry?: TurnTelemetry,
 ): ThreadTurnUsage | undefined {
   const tokens = payload.tokenUsage;
-  if (tokens === undefined || tokens.usageStatus === "unavailable") return undefined;
+  const unavailable = tokens === undefined || tokens.usageStatus === "unavailable";
+  if (unavailable && telemetry === undefined) return undefined;
   return {
     turnId,
     model: payload.turnModels?.[0] ?? null,
-    inputTokens: tokens.inputTokens ?? 0,
-    outputTokens: tokens.outputTokens ?? 0,
-    cachedInputTokens: tokens.cachedInputTokens ?? 0,
-    cacheCreationTokens: tokens.cacheCreationTokens ?? 0,
-    reasoningTokens: tokens.reasoningTokens ?? null,
-    complete: tokens.usageStatus === "complete",
-    hasSubagents: tokens.hasSubagents,
+    inputTokens: tokens?.inputTokens ?? 0,
+    outputTokens: tokens?.outputTokens ?? 0,
+    cachedInputTokens: tokens?.cachedInputTokens ?? 0,
+    cacheCreationTokens: tokens?.cacheCreationTokens ?? 0,
+    reasoningTokens: tokens?.reasoningTokens ?? null,
+    complete: tokens?.usageStatus === "complete",
+    hasSubagents: tokens?.hasSubagents ?? false,
     costUsd: payload.turnCostUsd ?? null,
     completedAt,
     ...(telemetry !== undefined
       ? { toolCalls: telemetry.toolCalls, durationMs: telemetry.durationMs }
       : {}),
+    ...(unavailable ? { usageUnavailable: true as const } : {}),
   };
 }
 

@@ -775,6 +775,11 @@ export const ThreadTurnUsage = Schema.Struct({
   /** Wall time from the turn's start to its completion, reconnects
       included; absent with `toolCalls`. */
   durationMs: Schema.optional(NonNegativeInt),
+  /** Present on a turn whose provider reported no usage (Cursor and Grok
+      report none; an adapter can answer `unavailable`): its tokens are zero
+      for "not reported", and the row exists so the tool calls and wall
+      time survive. Absent on every turn that reported. */
+  usageUnavailable: Schema.optional(Schema.Literal(true)),
 });
 export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
 
@@ -805,6 +810,10 @@ export const ThreadUsageRollup = Schema.Struct({
   /** Summed over the turns that carried one; absent while none did. */
   toolCalls: Schema.optional(NonNegativeInt),
   durationMs: Schema.optional(NonNegativeInt),
+  /** Turns whose provider reported no usage (`usageUnavailable` rows);
+      absent while none did. Tokens and cost mean something only while
+      `turns` exceeds it (`threadUsageReported`). */
+  unreportedTurns: Schema.optional(NonNegativeInt),
 });
 export type ThreadUsageRollup = typeof ThreadUsageRollup.Type;
 

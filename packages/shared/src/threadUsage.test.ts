@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { TurnId, type ThreadTurnUsage } from "@t3tools/contracts";
 
-import { addTurnUsage, foldTurnUsage } from "./threadUsage.ts";
+import { addTurnUsage, foldTurnUsage, threadUsageReported } from "./threadUsage.ts";
 
 const turn = (id: string, overrides: Partial<ThreadTurnUsage> = {}): ThreadTurnUsage => ({
   turnId: TurnId.make(id),
@@ -79,6 +79,50 @@ describe("thread usage rollup (#834)", () => {
     expect(more).toMatchObject({ toolCalls: 5, durationMs: 65_000 });
     // A turn the server did not time leaves the sums as they were.
     expect(addTurnUsage(more, turn("t4"))).toMatchObject({ toolCalls: 5, durationMs: 65_000 });
+  });
+
+  it("counts the turns whose provider reported no usage, and knows when none did", () => {
+    const unreported = (id: string, toolCalls: number): ThreadTurnUsage => ({
+      ...turn(id, { toolCalls, durationMs: 10_000, model: null, costUsd: null }),
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheCreationTokens: 0,
+      reasoningTokens: null,
+      complete: false,
+      usageUnavailable: true,
+    });
+    const reported = addTurnUsage(undefined, turn("t1"));
+    expect(reported).not.toHaveProperty("unreportedTurns");
+    expect(threadUsageReported(reported)).toBe(true);
+
+    const onlyUnreported = addTurnUsage(
+      addTurnUsage(undefined, unreported("u1", 3)),
+      unreported("u2", 2),
+    );
+    expect(onlyUnreported).toMatchObject({
+      turns: 2,
+      unreportedTurns: 2,
+      inputTokens: 0,
+      costUsd: null,
+      models: [],
+      toolCalls: 5,
+      durationMs: 20_000,
+    });
+    expect(threadUsageReported(onlyUnreported)).toBe(false);
+
+    // One turn that reported makes the figures mean something.
+    const mixed = addTurnUsage(onlyUnreported, turn("t3"));
+    expect(mixed).toMatchObject({ turns: 3, unreportedTurns: 2, inputTokens: 1000 });
+    expect(threadUsageReported(mixed)).toBe(true);
+
+    // A transcript estimate's tokens are the transcript's, whatever ran since.
+    const transcript = foldTurnUsage([unreported("u3", 1)], {
+      ...reported,
+      source: "transcript",
+    });
+    expect(transcript).toMatchObject({ unreportedTurns: 1 });
+    expect(threadUsageReported(transcript!)).toBe(true);
   });
 
   it("folds a list, and none is absence", () => {
