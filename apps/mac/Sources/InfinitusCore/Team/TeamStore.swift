@@ -6,8 +6,12 @@ public struct StoreEntry: Equatable, Sendable {
     public var size: Int
     /// Opaque per-object version (the git blob sha).
     public var version: String
-    public init(path: String, size: Int, version: String) {
-        self.path = path; self.size = size; self.version = version
+    /// Whether the bytes are in the local mirror: a transcript chunk is
+    /// listed from its first fetch on but comes down only when its
+    /// session is opened (#414). `size` is 0 until then, and `get` nil.
+    public var present: Bool
+    public init(path: String, size: Int, version: String, present: Bool = true) {
+        self.path = path; self.size = size; self.version = version; self.present = present
     }
 }
 

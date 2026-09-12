@@ -17,6 +17,12 @@ final class TeamClientTests: XCTestCase {
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         p.arguments = ["git", "init", "--bare", "-q", bare.path]
         try p.run(); p.waitUntilExit()
+        // As the hosted remotes do: transcript branches are fetched
+        // without their blobs (#414) only where the server allows the filter.
+        let c = Process()
+        c.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        c.arguments = ["git", "--git-dir", bare.path, "config", "uploadpack.allowFilter", "true"]
+        try c.run(); c.waitUntilExit()
         return "file://" + bare.path
     }
 
@@ -401,19 +407,27 @@ final class TeamClientTests: XCTestCase {
         let chunk = "t/\(ann.identity.kid)/transcripts/s1/2.jsonl"
         XCTAssertEqual(paths, ["m/\(ann.identity.kid)/now.json", chunk])
 
-        // The leader's routine fetch brings Ann's transcript branch by hint…
+        // The leader's routine fetch brings Ann's transcript branch by hint —
+        // the listing, not the chunk (#414): the session shows by its path
+        // and the bytes come when it is opened.
         _ = try leader.fetch()
         XCTAssertTrue(remoteBranches(in: lp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try leader.store.list(chunk).map(\.present), [false])
         XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
+        XCTAssertThrowsError(try leader.read(chunk))
+        try leader.fetchTranscripts(from: ann.identity.kid, session: "s1")
         XCTAssertEqual(try leader.read(chunk).1, Data("new\n".utf8))
+        XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
         // …and Bo's does not: the hint names the leaders, so the bytes never move to him.
         _ = try bo.fetch()
         XCTAssertFalse(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
         XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
-        // On demand the branch arrives; the envelope still isn't his to read.
+        // On demand the branch arrives; the envelope still isn't his to
+        // read, and the listing does not name a session that is not for him.
         try bo.fetchTranscripts(from: ann.identity.kid)
         XCTAssertTrue(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
         XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        XCTAssertNil(try TeamReader.load(client: bo).members[ann.identity.kid]?.transcripts["s1"])
         XCTAssertThrowsError(try bo.fetchTranscripts(from: "../x"))
 
         // Leaving clears m/ and t/ alike.
