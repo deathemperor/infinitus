@@ -295,6 +295,7 @@
       "types": "./src/desktopAppControl.ts",
       "import": "./src/desktopAppControl.ts"
     },
+<<<<<<< HEAD
     "./infinitusControl": {
       "types": "./src/infinitusControl.ts",
       "import": "./src/infinitusControl.ts"
@@ -302,6 +303,11 @@
     "./infinitusControlSocket": {
       "types": "./src/infinitusControlSocket.ts",
       "import": "./src/infinitusControlSocket.ts"
+=======
+    "./thirdPartyLicenses": {
+      "types": "./src/thirdPartyLicenses.ts",
+      "import": "./src/thirdPartyLicenses.ts"
+>>>>>>> upstream/main
     },
     "./claudeCompaction": {
       "types": "./src/claudeCompaction.ts",
