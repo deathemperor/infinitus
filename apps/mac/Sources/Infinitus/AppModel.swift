@@ -198,6 +198,8 @@ final class AppModel: ObservableObject {
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
+    /// Permission asks routed to the desktop and the web (#79 item 3).
+    let permissionAsks = PermissionAsks()
 
     private func profileAllowRules(_ birth: SessionBirth) -> [ToolApproval.Rule] {
         guard let name = birth.profile else { return [] }

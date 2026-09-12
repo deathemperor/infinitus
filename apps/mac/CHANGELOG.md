@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- Permission prompts can be answered from the desktop and the web (#79): `infinitusctl session-remote <pid> on` routes a session's PermissionRequest hook to `permission-pending` / `permission-decide`, parking the terminal's own prompt for up to 60 s; no decision falls through to that prompt, never a silent allow. Plugin 0.2.0 adds the hook.
 - The pop-out no longer re-asks for a window size the screen refused: the loop guard compared the refusal with the content's ideal instead of the settled size it had asked for, so a clamped settle was retried on every re-measure for a second (#229).
 - The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
 - Team control runs the whole grant menu: a teammate you grant stop, resume-past, delete, swap, hold, kill or reclaim runs that Mac verb here; anything not pre-authorised waits for your Allow (`infinitusctl team-pending / team-allow / team-deny`, two minutes) and delete, kill, reclaim always wait (#220).

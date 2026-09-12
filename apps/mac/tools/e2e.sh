@@ -732,6 +732,33 @@ rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
 kill "$DESK_PID" 2>/dev/null || true
 echo "desktop verbs: ok"
 
+# --- permission asks (#79 item 3) --------------------------------------
+# The real hook script against the fake session: a session not opted in
+# is stepped aside from; opted in, the hook registers the ask, parks on
+# permission-wait, and prints the allow once the desktop decides. Before
+# the team round: its stop grant signals the fake session.
+PERM_HOOK="$(dirname "$0")/../plugins/infinitus/hooks/permission.sh"
+PERM_PAYLOAD='{"session_id":"e2e-aws","hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"/r","tool_input":{"command":"git push origin main"},"permission_suggestions":[]}'
+printf '%s' "$PERM_PAYLOAD" | "$CTL" permission | expect "d=={'remote': False}" || fail "permission steps aside for a session not opted in"
+[ -z "$(printf '%s' "$PERM_PAYLOAD" | INFINITUS_CTL="$CTL" sh "$PERM_HOOK")" ] || fail "the hook prints nothing for a session not opted in"
+"$CTL" session-remote e2e-aws on | expect "d['remote'] is True and d['pid']==$SESSION_PID" || fail "session-remote on"
+"$CTL" sessions | expect "[s['remote'] for s in d if s['sessionId']=='e2e-aws']==[True]" || fail "sessions carries remote"
+PERM_OUT="$SOCKDIR/perm-hook.out"
+printf '%s' "$PERM_PAYLOAD" | INFINITUS_CTL="$CTL" sh "$PERM_HOOK" >"$PERM_OUT" &
+PERM_HOOK_PID=$!
+i=0; until [ "$("$CTL" permission-pending | json "len(d)")" = 1 ]; do i=$((i + 1)); [ "$i" -lt 40 ] || fail "the ask never registered ($("$CTL" permission-pending 2>&1 | head -c 200))"; sleep 0.25; done
+"$CTL" permission-pending | expect "d[0]['tool']=='Bash' and d[0]['input']=='git push origin main' and d[0]['pid']==$SESSION_PID and d[0]['sessionId']=='e2e-aws'" || fail "permission-pending carries the ask"
+PERM_ID="$("$CTL" permission-pending | json "d[0]['id']")"
+kill -0 "$PERM_HOOK_PID" 2>/dev/null || fail "the hook did not park"
+"$CTL" permission-decide "$PERM_ID" allow | expect "d['decided'] is True and d['decision']=='allow'" || fail "permission-decide"
+wait "$PERM_HOOK_PID" || fail "the hook exited non-zero"
+grep -q '"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}' "$PERM_OUT" || fail "the hook printed no allow (got: $(head -c 200 "$PERM_OUT"))"
+"$CTL" permission-pending | expect "d==[]" || fail "the ask is gone once answered"
+"$CTL" permission-decide "$PERM_ID" allow 2>&1 | grep -q 'no open ask' || fail "a second decision is refused"
+"$CTL" session-remote e2e-aws off | expect "d['remote'] is False" || fail "session-remote off"
+printf '%s' "$PERM_PAYLOAD" | "$CTL" permission | expect "d=={'remote': False}" || fail "off steps aside again"
+echo "permission asks: ok (not remote → aside; remote → register → wait → allow → hook exit)"
+
 # --- team control (#220, grantor) ------------------------------------------
 # Bo lets leaders send to one session; the hint rides Bo's now.json and
 # Ann's snapshot says what Bo lets her do. Driving itself lands with the
