@@ -1709,14 +1709,13 @@ final class AppModel: ObservableObject {
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
-        namedTunnel.onConnected = { [weak self] up in
-            guard let self else { return }
-            applyQuickTunnel()
-            if up, let url = namedTunnel.endpoint { publishRendezvous(url) }
-        }
+        // Up or down, the named tunnel decides whether the quick one runs;
+        // its hostname is never published to the rendezvous (`publicURL`).
+        namedTunnel.onConnected = { [weak self] _ in self?.applyQuickTunnel() }
         // The tunnels can only point at a bound port, which arrives later.
+        // Named first: it ends by applying the quick tunnel, which must see
+        // the named process already running to stay down (#697).
         mirrorServer.onReady = { [weak self] _ in
-            self?.applyQuickTunnel()
             self?.applyNamedTunnel()
         }
         applyMirrorLAN()
@@ -1971,8 +1970,7 @@ final class AppModel: ObservableObject {
             self?.deliverSessionInput(pid: pid, request, from: "phone")
                 ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
         }
-        applyQuickTunnel()
-        applyNamedTunnel()
+        applyNamedTunnel()  // ends by applying the quick tunnel (#697)
         applyForkTunnel()
     }
 
@@ -2446,11 +2444,14 @@ final class AppModel: ObservableObject {
 
     /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
     /// fronts the listener, so it follows the LAN toggle too. While the
-    /// named hostname answers it stands down (#697: one public door is
-    /// enough) and comes back as the fallback the moment that drops.
+    /// named tunnel's cloudflared runs it stands down (#697: one public
+    /// door is enough — gated on the process, not on `connected`, so a
+    /// relaunch never spawns a quick tunnel just to kill it seconds later
+    /// when the named one registers) and comes back as the fallback the
+    /// moment that process exits (`NamedTunnel.ended`).
     private func applyQuickTunnel() {
-        if namedTunnel.connected {
-            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel is up") }
+        if namedTunnel.isRunning {
+            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel has the door") }
             quickTunnel.stop()
             return
         }
@@ -2517,9 +2518,12 @@ final class AppModel: ObservableObject {
         if let url = publicURL { publishRendezvous(url) }
     }
 
-    /// The one public address the rendezvous carries: the named hostname
-    /// while it answers, else the quick tunnel's (#697).
-    private var publicURL: String? { namedTunnel.endpoint ?? quickTunnel.url }
+    /// The address the rendezvous carries: the quick tunnel's only. The
+    /// named hostname is stable, so nothing needs a lookup for it, and
+    /// infinitus.run's worker and the phone's `parseLookup` accept
+    /// `*.trycloudflare.com` alone — offering it answered HTTP 400 on
+    /// every named connect (#697).
+    private var publicURL: String? { quickTunnel.url }
 
     /// PUTs the public tunnel URL under this token's rendezvous key
     /// (MirrorRendezvous). Best effort: the QR still carries the URL, this
