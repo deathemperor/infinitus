@@ -220,7 +220,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
+  (#648). `InfinitusSlackLive` (provided `SlackClientInert`) beside it
+  (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
@@ -996,6 +997,44 @@ dispatchNotificationActivated`). Fork-thread events only: the account
 
 ## Fork-only files
 
+- `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+
+  `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts`, tests) —
+  the Slack bridge's reactor (#574, PR 2 of 4). `SlackClient` is the
+  transport seam (inbound `mention` / `reply` / `action` events with an
+  envelope id, `post`); `SlackClientInert` (nothing arrives, a post fails)
+  fills it in `server.ts` until the Socket Mode client lands (PR 4). A
+  mention `@Infinitus <project> [build] <task>` from an allowed user
+  (`infinitusSlack.allowedUserIds`; `enabled` and both tokens are the
+  gate, anyone else gets no reply and an id-only log line) resolves the
+  project like the desktop's deep links (id, title, folder,
+  case-insensitive; no match → one reply naming the folders), dispatches
+  `thread.create` (`approval-required` + `default` interaction — a plan
+  interaction would end in a proposed plan Slack cannot approve; `build`
+  → `auto-accept-edits`, never `full-access`; model = the project's
+  default, else the server's, else a reply asking for one; on the project
+  checkout — the worktree bootstrap is ws.ts-only, a follow-up) and
+  `thread.turn.start`, and binds the Slack thread to the Infinitus thread
+  in memory and in `<stateDir>/infinitus-slack/threads.json` (atomic
+  writes, ≤ 500 rows; dropped on `thread.deleted` / `thread.archived`).
+  Replies in the Slack thread: `stop` → `thread.turn.interrupt`,
+  `babysit` → `thread.meta.update {babysit: true}`, anything else →
+  `thread.turn.queue` while a turn runs (#806) else `thread.turn.start`
+  in the mention's mode. Posts, one line each: started; an approval
+  (`request.opened`) with Approve / Approve for this session / Deny
+  buttons and a question (`user-input.requested`) with the first
+  question's options — the target rides in the action id
+  (`infinitus:approval:<threadId>:<requestId>`, `…:answer:…:<questionId>`),
+  answered through `thread.approval.respond` / `thread.user-input.respond`;
+  `PR opened` / `PR merged` once per state from `thread.pull-request-synced`;
+  the turn's end (`thread.session-set` with no active turn, once per
+  turn id) as "Done." / "Failed." plus the last assistant message cut at
+  1500 chars and the PR link; the fork's activity rows (limited, held,
+  paused, resumed, babysit) as fixed lines — a row's summary can name an
+  account and never travels. Inbound envelopes are deduped; message text
+  reaches no log, only its length; a failed post is logged and the thread
+  runs on. Tests: `infinitusSlack.logic.test.ts`, `InfinitusSlack.test.ts`
+  (mocked engine, projection, provider stream, settings, Slack client, an
+  in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
   (preferences, Engines, Profiles) and their pure logic, and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):

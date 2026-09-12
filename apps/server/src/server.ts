@@ -76,6 +76,8 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
+import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
+import { SlackClientInert } from "./infinitus/Services/InfinitusSlackClient.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
@@ -314,6 +316,8 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#574): the Slack bridge, inert until the Socket Mode client lands.
+  Layer.provideMerge(InfinitusSlackLive.pipe(Layer.provide(SlackClientInert))),
   // Fork (#806): sends queued messages when their thread is idle, not held
   // and not paused; needs both layers below.
   Layer.provideMerge(InfinitusTurnQueueLive),
