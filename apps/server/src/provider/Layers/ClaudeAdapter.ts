@@ -35,6 +35,12 @@ import {
   reconnectQueryOptions,
   reconnectReason,
 } from "./claudeReconnect.logic.ts";
+import {
+  FORK_AT_END_MESSAGE,
+  FORK_POINT_MISSING_MESSAGE,
+  forkAtEndQueryOptions,
+  isForkAnchorMissingResult,
+} from "./claudeForkFallback.logic.ts";
 import { TURN_CONTINUATION_PROMPT } from "../turnContinuation.ts";
 import {
   ApprovalRequestId,
@@ -182,6 +188,8 @@ interface ClaudeResumeState {
   readonly threadId?: ThreadId;
   readonly resume?: string;
   readonly resumeSessionAt?: string;
+  /** The anchor was the source's latest completed turn when the fork was bound (fallback, see `claudeForkFallback.logic.ts`). */
+  readonly resumeSessionAtLatest?: true;
   readonly turnCount?: number;
   readonly anchors?: ReadonlyArray<ClaudeTurnAnchor>;
   /** The next start forks `resume` at `resumeSessionAt` into a new session (#270 E2). */
@@ -376,6 +384,8 @@ interface ClaudeSessionContext {
    * from the current `promptQueue`, and forks its stream.
    */
   readonly reopenStream: Effect.Effect<void, ProviderAdapterProcessError>;
+  /** Fork fallback: reopens the fork without its anchor, otherwise like `reopenStream`. */
+  readonly reopenForkAtEnd: Effect.Effect<void, ProviderAdapterProcessError>;
   readonly startedAt: string;
   readonly basePermissionMode: PermissionMode | undefined;
   currentApiModelId: string | undefined;
@@ -413,8 +423,22 @@ interface ClaudeSessionContext {
   lastKnownTokenUsage: ThreadTokenUsageSnapshot | undefined;
   lastKnownTotalProcessedTokens: number | undefined;
   lastAssistantUuid: string | undefined;
+  /**
+   * Fork (#270 E2): the first SDK message of the latest assistant API
+   * message (`lastAssistantMessageId`). Claude Code writes one transcript
+   * line per content block, all sharing the id, and `--resume-session-at`
+   * finds only the first, so that is the line a turn's anchor names.
+   */
+  lastAssistantHeadUuid: string | undefined;
+  lastAssistantMessageId: string | undefined;
   /** Fork (#270 E2): one anchor per completed turn, oldest first. */
   anchors: Array<ClaudeTurnAnchor>;
+  /**
+   * Fork fallback: set while the first start's fork at `resumeSessionAt`
+   * can still be refused; `latest` says the session's end may stand in for
+   * the anchor once (`claudeForkFallback.logic.ts`).
+   */
+  forkAnchor: { readonly latest: boolean; state: "pending" | "reopening" | "spent" } | undefined;
   /** Fork (#834): the last result's cumulative totals, differenced per turn. */
   lastResultTotals: ClaudeResultTotals | undefined;
   lastThreadStartedId: string | undefined;
@@ -942,6 +966,7 @@ function readClaudeResumeState(resumeCursor: unknown): ClaudeResumeState | undef
     resume?: unknown;
     sessionId?: unknown;
     resumeSessionAt?: unknown;
+    resumeSessionAtLatest?: unknown;
     turnCount?: unknown;
     anchors?: unknown;
     fork?: unknown;
@@ -983,6 +1008,9 @@ function readClaudeResumeState(resumeCursor: unknown): ClaudeResumeState | undef
     ...(threadId ? { threadId } : {}),
     ...(resume ? { resume } : {}),
     ...(resumeSessionAt ? { resumeSessionAt } : {}),
+    ...(resumeSessionAt && cursor.resumeSessionAtLatest === true
+      ? { resumeSessionAtLatest: true as const }
+      : {}),
     ...(turnStartMessageIds ? { turnStartMessageIds } : {}),
     ...(turnCountValue !== undefined && Number.isInteger(turnCountValue) && turnCountValue >= 0
       ? { turnCount: turnCountValue }
@@ -2750,8 +2778,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     });
     // Fork (#270 E2): a completed turn's last assistant message is where a
     // fork of this session at this turn resumes.
-    if (status === "completed" && context.lastAssistantUuid) {
-      context.anchors.push({ turnId: turnState.turnId, at: context.lastAssistantUuid });
+    const anchorAt = context.lastAssistantHeadUuid ?? context.lastAssistantUuid;
+    if (status === "completed" && anchorAt) {
+      context.anchors.push({ turnId: turnState.turnId, at: anchorAt });
       if (context.anchors.length > MAX_CLAUDE_TURN_ANCHORS) {
         context.anchors.splice(0, context.anchors.length - MAX_CLAUDE_TURN_ANCHORS);
       }
@@ -3430,6 +3459,11 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       yield* backfillAssistantTextBlocksFromSnapshot(context, message);
     }
 
+    const assistantMessageId = message.message.id as string | undefined;
+    if (assistantMessageId === undefined || assistantMessageId !== context.lastAssistantMessageId) {
+      context.lastAssistantHeadUuid = message.uuid;
+      context.lastAssistantMessageId = assistantMessageId;
+    }
     context.lastAssistantUuid = message.uuid;
     yield* updateResumeCursor(context);
   });
@@ -3449,6 +3483,46 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ? "Claude usage limit reached. Send the message again once the limit resets."
         : undefined);
     const { status, errorMessage } = resultOutcome(message, failureHint);
+
+    const forkAnchor = context.forkAnchor;
+    if (
+      status === "failed" &&
+      turn &&
+      forkAnchor?.state === "pending" &&
+      isForkAnchorMissingResult(message)
+    ) {
+      if (!forkAnchor.latest) {
+        yield* emitRuntimeError(context, FORK_POINT_MISSING_MESSAGE);
+        yield* completeTurn(context, status, FORK_POINT_MISSING_MESSAGE, message);
+        return;
+      }
+      // The anchor was the latest completed turn, which is where an
+      // anchorless fork lands (#941): once more without it.
+      forkAnchor.state = "reopening";
+      yield* Effect.logInfo("Claude fork point not found; forking at the session's end.", {
+        threadId: context.session.threadId,
+        turnId: turn.turnId,
+      });
+      yield* emitRuntimeWarning(context, FORK_AT_END_MESSAGE);
+      context.runFork(
+        reopenForForkAtEnd(context).pipe(
+          Effect.catch((error) =>
+            Effect.gen(function* () {
+              if (context.stopped || context.turnState === undefined) return;
+              yield* emitRuntimeError(context, error.detail);
+              yield* completeTurn(context, "failed", error.detail);
+              yield* stopSessionInternal(context, { emitExitEvent: true });
+            }),
+          ),
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.void
+              : Effect.logError("Claude fork fallback failed.", { cause: Cause.pretty(cause) }),
+          ),
+        ),
+      );
+      return;
+    }
 
     if (status === "failed" && turn && isTransportResult(message, failureHint)) {
       // Reconnect (#832): the API was unreachable, not wrong. The CLI may
@@ -4334,6 +4408,46 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     yield* context.reopenStream;
   });
 
+  /**
+   * Fork fallback: the refused query is closed and the fork reopened without
+   * its anchor, the turn's own message sent again (unless the CLI never read
+   * it, in which case it is still queued).
+   */
+  const reopenForForkAtEnd = Effect.fn("reopenForForkAtEnd")(function* (
+    context: ClaudeSessionContext,
+  ) {
+    const turn = context.turnState;
+    const forkAnchor = context.forkAnchor;
+    if (context.stopped || turn === undefined || forkAnchor?.state !== "reopening") {
+      return;
+    }
+    const oldStreamFiber = context.streamFiber;
+    context.streamFiber = undefined;
+    if (oldStreamFiber !== undefined) {
+      yield* Fiber.interrupt(oldStreamFiber);
+    }
+    yield* Effect.try(() => context.query.close()).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning("Failed to close the Claude runtime query before forking again.", {
+          cause,
+        }),
+      ),
+    );
+    const oldQueue = context.promptQueue;
+    const carried = (yield* Queue.clear(oldQueue)).filter((item) => item.type === "message");
+    yield* Queue.shutdown(oldQueue);
+    const promptQueue = yield* Queue.unbounded<PromptQueueItem>();
+    yield* Queue.offerAll(
+      promptQueue,
+      carried.length > 0 || turn.lastUserMessage === undefined
+        ? carried
+        : [{ type: "message" as const, message: turn.lastUserMessage }],
+    );
+    context.promptQueue = promptQueue;
+    forkAnchor.state = "spent";
+    yield* context.reopenForkAtEnd;
+  });
+
   const handleStreamExit = Effect.fn("handleStreamExit")(function* (
     context: ClaudeSessionContext,
     exit: Exit.Exit<void, ProviderAdapterProcessError>,
@@ -4342,7 +4456,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       return;
     }
     // Reconnect (#832): the old query going away while a reopen is pending.
-    if (context.reconnect?.waiting === true) {
+    // The fork fallback's refused query goes away the same way.
+    if (context.reconnect?.waiting === true || context.forkAnchor?.state === "reopening") {
       return;
     }
 
@@ -5183,6 +5298,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           ...(threadId ? { threadId } : {}),
           ...(sessionId ? { resume: sessionId } : {}),
           ...(resumeState?.resumeSessionAt ? { resumeSessionAt: resumeState.resumeSessionAt } : {}),
+          ...(resumeState?.resumeSessionAtLatest ? { resumeSessionAtLatest: true } : {}),
           turnCount: resumeState?.turnCount ?? 0,
           // Until system/init reports the forked session's own id, a restart
           // must fork again rather than continue the source.
@@ -5230,6 +5346,15 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
                 }),
               ),
         ),
+        reopenForkAtEnd: Effect.suspend(() =>
+          openQuery(promptStreamOf(context.promptQueue), forkAtEndQueryOptions(queryOptions)).pipe(
+            Effect.map((query) => {
+              context.query = query;
+              context.lastResultTotals = undefined;
+              forkStream(context);
+            }),
+          ),
+        ),
         startedAt,
         basePermissionMode: permissionMode,
         currentApiModelId: apiModelId,
@@ -5249,8 +5374,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         lastKnownTokenUsage: undefined,
         lastKnownTotalProcessedTokens: undefined,
         lastAssistantUuid: resumeState?.resumeSessionAt,
+        lastAssistantHeadUuid: undefined,
+        lastAssistantMessageId: undefined,
         // A fork starts its own turn numbering; the source's anchors stay with the source.
         anchors: resumeState?.fork ? [] : [...(resumeState?.anchors ?? [])],
+        forkAnchor:
+          resumeState?.fork && existingResumeSessionId && resumeState.resumeSessionAt
+            ? { latest: resumeState.resumeSessionAtLatest === true, state: "pending" }
+            : undefined,
         lastResultTotals: undefined,
         lastThreadStartedId: undefined,
         announcedUsageLimits: undefined,

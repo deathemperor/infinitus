@@ -132,6 +132,13 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
         agentKind: "background",
         isBackgrounded: true,
       });
+      // A row with no task id (a payload persisted outside ingestion) is
+      // skipped, not a decode failure that loses the whole batch.
+      yield* append(orphaned, "task.started", {
+        taskType: "local_agent",
+        agentKind: "agent",
+        isBackgrounded: true,
+      });
       // A thread the provider-sessions reconcile is about to continue.
       yield* append(continuing, "task.started", agent("c1", { isBackgrounded: true }));
       // The other thread's agent failed before the server died.
