@@ -13,6 +13,7 @@ import * as EffectCodexSchema from "effect-codex-app-server/schema";
 import { buildCodexDeveloperInstructions } from "../CodexDeveloperInstructions.ts";
 import { codexSessionAppServerArgs } from "./codexLaunchArgs.ts";
 import {
+  CodexResumeCursorSchema,
   buildTurnStartParams,
   describeMcpElicitation,
   hasConfiguredMcpServer,
@@ -872,6 +873,15 @@ describe("isRecoverableThreadResumeError", () => {
   });
 });
 
+describe("CodexResumeCursorSchema (#819)", () => {
+  it("accepts a fork cursor, so the adapter passes it through to the first start", () => {
+    const isCursor = Schema.is(CodexResumeCursorSchema);
+    NodeAssert.ok(isCursor({ threadId: "source-thread", fork: true, lastTurnId: "turn-3" }));
+    NodeAssert.ok(isCursor({ threadId: "source-thread" }));
+    NodeAssert.equal(isCursor({ fork: true, lastTurnId: "turn-3" }), false);
+  });
+});
+
 describe("openCodexThread", () => {
   it.effect("resumes metadata when historical turns contain unknown error values", () =>
     Effect.gen(function* () {
@@ -965,15 +975,93 @@ describe("openCodexThread", () => {
     }),
   );
 
+  it.effect("forks the source thread at the turn on a fork cursor (#819)", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = [];
+      const opened = yield* openCodexThread({
+        client: {
+          request: () => Effect.die("A fork must not start fresh"),
+          raw: {
+            request: (method, payload) => {
+              calls.push({ method, payload });
+              return Effect.succeed(makeThreadOpenResponse("forked-thread"));
+            },
+          },
+        },
+        threadId: ThreadId.make("thread-2"),
+        runtimeMode: "auto",
+        cwd: "/tmp/project",
+        requestedModel: "gpt-5.3-codex",
+        serviceTier: undefined,
+        resumeThreadId: "source-thread",
+        fork: { lastTurnId: "turn-3" },
+      });
+
+      NodeAssert.equal(opened.thread.id, "forked-thread");
+      NodeAssert.deepStrictEqual(calls, [
+        {
+          method: "thread/fork",
+          payload: {
+            threadId: "source-thread",
+            lastTurnId: "turn-3",
+            cwd: "/tmp/project",
+            model: "gpt-5.3-codex",
+            approvalPolicy: "on-request",
+            sandbox: "workspace-write",
+            approvalsReviewer: "auto_review",
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("a refused fork fails the start instead of falling back to a fresh thread (#819)", () =>
+    Effect.gen(function* () {
+      const calls: string[] = [];
+      const error = yield* openCodexThread({
+        client: {
+          request: (method) => {
+            calls.push(method);
+            return Effect.succeed(makeThreadOpenResponse("fresh-thread"));
+          },
+          raw: {
+            request: (method) => {
+              calls.push(method);
+              return Effect.fail(
+                new CodexErrors.CodexAppServerRequestError({
+                  code: -32603,
+                  errorMessage: "thread not found",
+                }),
+              );
+            },
+          },
+        },
+        threadId: ThreadId.make("thread-2"),
+        runtimeMode: "auto",
+        cwd: "/tmp/project",
+        requestedModel: undefined,
+        serviceTier: undefined,
+        resumeThreadId: "source-thread",
+        fork: { lastTurnId: "turn-3" },
+      }).pipe(Effect.flip);
+
+      NodeAssert.ok(isCodexAppServerRequestError(error));
+      NodeAssert.deepStrictEqual(calls, ["thread/fork"]);
+    }),
+  );
+
   it.effect("falls back to thread/start when resume fails recoverably", () =>
     Effect.gen(function* () {
-      const calls: Array<{ method: "thread/start" | "thread/resume"; payload: unknown }> = [];
+      const calls: Array<{
+        method: "thread/start" | "thread/resume" | "thread/fork";
+        payload: unknown;
+      }> = [];
       const started = makeThreadOpenResponse("fresh-thread");
       const client = {
         raw: {
           request: (
-            method: "thread/resume",
-            payload: CodexRpc.ClientRequestParamsByMethod["thread/resume"],
+            method: "thread/resume" | "thread/fork",
+            payload: CodexRpc.ClientRequestParamsByMethod[typeof method],
           ) => {
             calls.push({ method, payload });
             return Effect.fail(

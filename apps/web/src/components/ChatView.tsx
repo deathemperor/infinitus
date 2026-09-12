@@ -2676,10 +2676,12 @@ export default function ChatView(props: ChatViewProps) {
   const supportsConversationRollback =
     conversationProviderStatus !== null &&
     conversationProviderStatus.supportsConversationRollback !== false;
-  // Fork (#270 E2): only Claude sessions record a fork point per turn.
+  // Fork (#270 E2, #819): Claude records a fork point per turn; Codex's
+  // turn ids are its own, so both drivers fork. Nothing else has a point.
   const supportsThreadFork =
     conversationProviderStatus !== null &&
-    String(conversationProviderStatus.driver) === "claudeAgent";
+    (String(conversationProviderStatus.driver) === "claudeAgent" ||
+      String(conversationProviderStatus.driver) === "codex");
   const phase = derivePhase(activeThread?.session ?? null);
   const threadActivities = activeThread?.activities ?? EMPTY_ACTIVITIES;
   const latestCheckpointCompletedAt = activeThread?.checkpoints.at(-1)?.completedAt ?? null;
@@ -4251,7 +4253,7 @@ export default function ChatView(props: ChatViewProps) {
   }, [activeThreadRef]);
   // Fork (#269 C): a side question forks the latest completed turn into a
   // read-only sibling and opens it beside this thread; the running turn, if
-  // any, is left alone (the fork is its own Claude session).
+  // any, is left alone (the fork is its own provider session).
   const supportsSideQuestion =
     supportsThreadFork && serverConfig?.environment.capabilities.infinitus === true;
   // The server forks at the session's latest completed turn (no checkpoint

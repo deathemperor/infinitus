@@ -570,7 +570,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   ≤ 200, trimmed on rollback) and `fork: true`; a forked thread's first start
   passes `forkSession` + `resumeSessionAt` to the SDK and starts its own
   anchors; `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
-  `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude driver only),
+  `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude and Codex),
   mode `fork` on `onRevertToTurnCount` (no confirm; navigates to the new
   thread), `MessagesTimeline.tsx` — the third menu item. Fork-only:
   `apps/server/src/infinitus/ThreadFork.ts` (+ test): `forkThreadAtTurn` —
@@ -580,7 +580,15 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `thread.history.import` of a provenance marker ("Forked from **title** at
   turn N") plus the source's user/assistant text up to that turn
   (`forkSeedMessages`: by turn id, unattributed rows by time). The source
-  thread is never mutated. Codex has no fork point yet (issue filed).
+  thread is never mutated. Codex (#819): the orchestration turn id on a
+  Codex thread is Codex's own (`CodexSessionRuntime` mints it from
+  `turn/started`), so no anchors: a fork's binding is `{threadId: <the
+source's Codex thread>, fork: true, lastTurnId: <the turn>}`
+  (`CodexResumeCursorSchema`), and `openCodexThread` calls `thread/fork`
+  in place of `thread/resume` on that cursor — no fresh-start fallback, a
+  refused fork is a failed start — after which the cursor is rewritten to
+  the new thread as on any open. A side question takes the detail's
+  `latestTurn` once completed. The other drivers have no fork point.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
   `PromptSnippet` schema with its caps and `projectPromptSnippets`

@@ -3,11 +3,13 @@ import { MessageId, ThreadId, TurnId } from "@t3tools/contracts";
 
 import {
   claudeForkAnchor,
+  codexForkPoint,
   forkCreateFields,
   forkMarkerText,
   forkSeedMessages,
   forkSeedMessagesByTurns,
   latestClaudeForkAnchor,
+  latestCodexForkPoint,
 } from "./ThreadFork.ts";
 
 const threadId = ThreadId.make("thread-1");
@@ -55,6 +57,54 @@ describe("latestClaudeForkAnchor (#269 C)", () => {
     expect(latestClaudeForkAnchor({ resume: "sess-1" })).toBeNull();
     expect(latestClaudeForkAnchor({ anchors: [{ turnId: "turn-1", at: "uuid-1" }] })).toBeNull();
     expect(latestClaudeForkAnchor(undefined)).toBeNull();
+  });
+});
+
+describe("codexForkPoint (#819)", () => {
+  it("forks the cursor's Codex thread at the orchestration turn id, which is Codex's own", () => {
+    expect(codexForkPoint({ threadId: "codex-thread" }, TurnId.make("turn-2"))).toEqual({
+      threadId: "codex-thread",
+      lastTurnId: "turn-2",
+    });
+    expect(codexForkPoint({ threadId: "" }, TurnId.make("turn-2"))).toBeNull();
+    expect(codexForkPoint(null, TurnId.make("turn-2"))).toBeNull();
+  });
+});
+
+describe("latestCodexForkPoint (#819)", () => {
+  const message = (turnId: string | null) => ({
+    turnId: turnId === null ? null : TurnId.make(turnId),
+  });
+  const latestTurn = (state: string, turnId = "turn-2") => ({ turnId: TurnId.make(turnId), state });
+
+  it("takes the latest turn once it completed and keeps every turn the messages name", () => {
+    const latest = latestCodexForkPoint(
+      { threadId: "codex-thread" },
+      {
+        latestTurn: latestTurn("completed"),
+        messages: [message(null), message("turn-1"), message("turn-1"), message("turn-2")],
+      },
+    );
+    expect(latest?.threadId).toBe("codex-thread");
+    expect(latest?.lastTurnId).toBe("turn-2");
+    expect(latest?.turnCount).toBe(2);
+    expect([...(latest?.turnIds ?? [])]).toEqual(["turn-1", "turn-2"]);
+  });
+
+  it("is null while a turn runs, before any turn, or without a Codex thread", () => {
+    const messages = [message("turn-1")];
+    expect(
+      latestCodexForkPoint(
+        { threadId: "codex-thread" },
+        { latestTurn: latestTurn("running"), messages },
+      ),
+    ).toBeNull();
+    expect(
+      latestCodexForkPoint({ threadId: "codex-thread" }, { latestTurn: null, messages }),
+    ).toBeNull();
+    expect(
+      latestCodexForkPoint(undefined, { latestTurn: latestTurn("completed"), messages }),
+    ).toBeNull();
   });
 });
 

@@ -21,13 +21,17 @@ import * as ProviderSessionDirectory from "../provider/Services/ProviderSessionD
  * anchor as `resumeSessionAt` and `fork: true`, so the first turn forks the
  * session there instead of continuing it. The source thread is not touched.
  *
- * Claude only: the adapter records an anchor (the last assistant uuid) per
+ * Claude: the adapter records an anchor (the last assistant uuid) per
  * completed turn in the resume cursor, keyed by the orchestration turn id so
- * it survives session restarts; nothing else has an addressable fork point
- * yet.
+ * it survives session restarts. Codex (#819): the orchestration turn id on a
+ * Codex thread is Codex's own turn id (the runtime mints it from
+ * `turn/started`), so a checkpoint's turn id is the `lastTurnId` of
+ * `thread/fork`; the binding names the source's Codex thread with
+ * `fork: true` and that turn. Other drivers have no addressable fork point.
  */
 
 const CLAUDE_DRIVER = "claudeAgent";
+const CODEX_DRIVER = "codex";
 
 /** The anchor a Claude resume cursor carries for a turn, or none. */
 export function claudeForkAnchor(
@@ -86,6 +90,50 @@ export function latestClaudeForkAnchor(resumeCursor: unknown): {
     turnCount: anchors.length,
     turnIds: new Set(anchors.map((anchor) => anchor.turnId)),
   };
+}
+
+/** The Codex thread a Codex resume cursor names, or none. */
+function codexThreadIdOf(resumeCursor: unknown): string | null {
+  if (!resumeCursor || typeof resumeCursor !== "object") return null;
+  const cursor = resumeCursor as { threadId?: unknown };
+  return typeof cursor.threadId === "string" && cursor.threadId.length > 0 ? cursor.threadId : null;
+}
+
+/** The fork point of a Codex thread at a turn (#819): its own thread and the turn id. */
+export function codexForkPoint(
+  resumeCursor: unknown,
+  turnId: TurnId,
+): { readonly threadId: string; readonly lastTurnId: string } | null {
+  const threadId = codexThreadIdOf(resumeCursor);
+  return threadId === null ? null : { threadId, lastTurnId: turnId };
+}
+
+/**
+ * The latest completed turn of a Codex thread as a fork point (#819, for a
+ * side question): the thread's latest turn once it has completed, with every
+ * turn the messages name so the seed keeps them all — nothing runs, so they
+ * are all done. Null while no turn has completed, or one is running.
+ */
+export function latestCodexForkPoint(
+  resumeCursor: unknown,
+  thread: {
+    readonly latestTurn: { readonly turnId: TurnId; readonly state: string } | null;
+    readonly messages: ReadonlyArray<{ readonly turnId: TurnId | null }>;
+  },
+): {
+  readonly threadId: string;
+  readonly lastTurnId: string;
+  readonly turnCount: number;
+  readonly turnIds: ReadonlySet<TurnId>;
+} | null {
+  const threadId = codexThreadIdOf(resumeCursor);
+  if (threadId === null || thread.latestTurn === null) return null;
+  if (thread.latestTurn.state !== "completed") return null;
+  const turnIds = new Set(
+    thread.messages.flatMap((message) => (message.turnId === null ? [] : [message.turnId])),
+  );
+  turnIds.add(thread.latestTurn.turnId);
+  return { threadId, lastTurnId: thread.latestTurn.turnId, turnCount: turnIds.size, turnIds };
 }
 
 /** The source's user and assistant messages up to the turn, in order. */
@@ -200,10 +248,37 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
   const binding = yield* directory
     .getBinding(input.threadId)
     .pipe(Effect.mapError(() => refuse("The thread's provider session could not be read.")));
-  if (Option.isNone(binding) || binding.value.provider !== CLAUDE_DRIVER) {
-    return yield* refuse("Forking a thread needs a Claude session.");
+  if (
+    Option.isNone(binding) ||
+    (binding.value.provider !== CLAUDE_DRIVER && binding.value.provider !== CODEX_DRIVER)
+  ) {
+    return yield* refuse("Forking a thread needs a Claude or Codex session.");
   }
   const point = yield* Effect.gen(function* () {
+    if (binding.value.provider === CODEX_DRIVER) {
+      if (input.turnCount === undefined) {
+        const latest = latestCodexForkPoint(binding.value.resumeCursor, source.value);
+        if (latest === null) {
+          return yield* refuse("Ask a side question once a turn has completed.");
+        }
+        return {
+          cursor: { threadId: latest.threadId, fork: true, lastTurnId: latest.lastTurnId },
+          turnCount: latest.turnCount,
+          seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
+        };
+      }
+      const checkpoint = source.value.checkpoints.find(
+        (candidate) => candidate.checkpointTurnCount === input.turnCount,
+      );
+      if (!checkpoint) return yield* refuse("Nothing to fork at this turn.");
+      const at = codexForkPoint(binding.value.resumeCursor, checkpoint.turnId);
+      if (at === null) return yield* refuse("The thread has no Codex session to fork.");
+      return {
+        cursor: { threadId: at.threadId, fork: true, lastTurnId: at.lastTurnId },
+        turnCount: input.turnCount,
+        seed: forkSeedMessages(source.value, input.turnCount),
+      };
+    }
     if (input.turnCount === undefined) {
       // Fork (#269 C): a side question takes the session's latest completed
       // turn from its own anchors. A checkpoint needs a git repository; a
@@ -213,7 +288,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
         return yield* refuse("Ask a side question once a turn has completed.");
       }
       return {
-        anchor: { sessionId: latest.sessionId, at: latest.at },
+        cursor: { resume: latest.sessionId, resumeSessionAt: latest.at, fork: true },
         turnCount: latest.turnCount,
         seed: forkSeedMessagesByTurns(source.value, latest.turnIds),
       };
@@ -229,12 +304,12 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
       );
     }
     return {
-      anchor,
+      cursor: { resume: anchor.sessionId, resumeSessionAt: anchor.at, fork: true },
       turnCount: input.turnCount,
       seed: forkSeedMessages(source.value, input.turnCount),
     };
   });
-  const { anchor, turnCount, seed } = point;
+  const { cursor, turnCount, seed } = point;
   if (seed.length === 0) return yield* refuse("Nothing to fork at this turn.");
 
   const now = DateTime.formatIso(yield* DateTime.now);
@@ -246,6 +321,8 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
 
   // The binding first, so the thread never exists without its fork point;
   // insert-ignore keeps a concurrent real session's binding if one appears.
+  // A Claude cursor carries the new thread's id (the source session is
+  // `resume`); a Codex cursor's `threadId` is the source's Codex thread.
   yield* directory
     .upsert(
       {
@@ -256,12 +333,7 @@ export const forkThreadAtTurn = Effect.fn("forkThreadAtTurn")(function* (
           : {}),
         status: "stopped",
         runtimeMode: source.value.runtimeMode,
-        resumeCursor: {
-          threadId,
-          resume: anchor.sessionId,
-          resumeSessionAt: anchor.at,
-          fork: true,
-        },
+        resumeCursor: "resume" in cursor ? { threadId, ...cursor } : cursor,
         ...(typeof cwd === "string" ? { runtimePayload: { cwd } } : {}),
       },
       { onConflict: "ignore" },
