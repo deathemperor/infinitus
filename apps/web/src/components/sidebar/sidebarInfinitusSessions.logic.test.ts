@@ -54,7 +54,12 @@ describe("sidebarSessionsView", () => {
     });
     expect(without?.rows.map((row) => row.pid)).toEqual([1, 3, 2]);
     expect(without?.attentionCount).toBe(2);
-    expect(without?.actions).toEqual({ setMode: false, show: false, nudge: false });
+    expect(without?.actions).toEqual({
+      setMode: false,
+      show: false,
+      nudge: false,
+      remote: false,
+    });
 
     const withVerbs = sidebarSessionsView({
       capability: true,
@@ -64,11 +69,12 @@ describe("sidebarSessionsView", () => {
           command("session-mode"),
           command("show", ["popout|settings|session <pid|name>"]),
           command("nudge", ["<pid|name>"]),
+          command("session-remote", ["<pid|name>", "<on|off>"]),
         ],
       }),
       now: NOW,
     });
-    expect(withVerbs?.actions).toEqual({ setMode: true, show: true, nudge: true });
+    expect(withVerbs?.actions).toEqual({ setMode: true, show: true, nudge: true, remote: true });
   });
 });
 
