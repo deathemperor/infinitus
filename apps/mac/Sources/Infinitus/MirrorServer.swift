@@ -404,6 +404,10 @@ final class MirrorTeamControlBox: @unchecked Sendable {
     private var endpoint: TeamControl.Endpoint?
     private var teamDir: URL?
     private var deliverer: (@Sendable (Int32, SessionInput.Request, String) -> SessionInput.Reply)?
+    /// A non-drive verb (#220 Phase 2): runs through `ControlServer.run` on
+    /// the main actor (`AppModel.setRunVerb`). nil while the app is
+    /// starting or shutting down.
+    private var verbRunner: (@Sendable (TeamControl.LocalVerb) -> SessionInput.Reply)?
     /// Verification, the replay set and the rate limit are single-threaded
     /// here for BOTH lanes (#220); delivery hops to `mirrorInputQueue`.
     static let queue = DispatchQueue(label: "run.infinitus.team-control")
@@ -412,8 +416,19 @@ final class MirrorTeamControlBox: @unchecked Sendable {
     /// Every command, accepted or refused, with the driver's roster name.
     var onAudit: (@Sendable (TeamControl.Audit, String?) -> Void)?
 
+    /// A team reload must not forget a wait or an unsent ack: `pending`
+    /// and `outbox` carry over from the old endpoint (#220 Phase 2).
     func set(_ new: TeamControl.Endpoint?, teamDir dir: URL?) {
-        lock.lock(); endpoint = new; teamDir = dir; lock.unlock()
+        lock.lock()
+        if var e = new, let old = endpoint {
+            e.pending = old.pending
+            e.outbox = old.outbox
+            endpoint = e
+        } else {
+            endpoint = new
+        }
+        teamDir = dir
+        lock.unlock()
     }
 
     /// The shared input deliverer (AppModel.deliverSessionInput), read at
@@ -429,6 +444,23 @@ final class MirrorTeamControlBox: @unchecked Sendable {
         return current(pid, request, origin)
     }
 
+    /// The runner for a non-drive verb (`AppModel`, beside `setDeliver`).
+    func setRunVerb(_ new: @escaping @Sendable (TeamControl.LocalVerb) -> SessionInput.Reply) {
+        lock.lock(); verbRunner = new; lock.unlock()
+    }
+
+    func runVerb(_ verb: TeamControl.LocalVerb) -> SessionInput.Reply {
+        lock.lock(); let current = verbRunner; lock.unlock()
+        guard let current else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
+        return current(verb)
+    }
+
+    /// Waits for the grantor's Allow/Deny (Settings › Team, `infinitusctl team-pending`).
+    func pending() -> [TeamControl.PendingCommand] {
+        lock.lock(); defer { lock.unlock() }
+        return Array((endpoint?.pending ?? [:]).values)
+    }
+
     /// `Self.queue` only.
     func respond(_ request: MirrorTransport.Request) -> Data? {
         lock.lock(); var ep = endpoint; let dir = teamDir; lock.unlock()
@@ -438,13 +470,44 @@ final class MirrorTeamControlBox: @unchecked Sendable {
         lock.lock()
         endpoint?.seen = ep.seen
         endpoint?.limit = ep.limit
+        endpoint?.heavyLimit = ep.heavyLimit
+        endpoint?.pending = ep.pending
+        endpoint?.outbox = ep.outbox
         lock.unlock()
         if let audit = ep.lastAudit {
-            if let dir { try? ep.seen.save(teamDir: dir) }
+            if let dir {
+                try? ep.seen.save(teamDir: dir)
+                try? ep.outbox.save(teamDir: dir)
+            }
             let name = ep.roster()?.everyone.first { $0.keys.kid == audit.driver }?.name
             onAudit?(audit, name)
         }
         return response
+    }
+
+    /// The grantor's tap (#220 Phase 2 §4): on `Self.queue`, like the
+    /// other two lanes, so it cannot interleave with a fetch's store pass
+    /// or an inbound command.
+    func decide(_ id: String, allow: Bool, completion: @escaping @Sendable ((ack: TeamControl.Ack, audit: TeamControl.Audit)?) -> Void) {
+        Self.queue.async {
+            self.lock.lock(); let current = self.endpoint; let dir = self.teamDir; self.lock.unlock()
+            guard var ep = current else { completion(nil); return }
+            guard let decided = TeamControl.decide(id, allow: allow, endpoint: &ep) else { completion(nil); return }
+            self.lock.lock()
+            self.endpoint?.seen = ep.seen
+            self.endpoint?.limit = ep.limit
+            self.endpoint?.heavyLimit = ep.heavyLimit
+            self.endpoint?.pending = ep.pending
+            self.endpoint?.outbox = ep.outbox
+            self.lock.unlock()
+            if let dir {
+                try? ep.outbox.save(teamDir: dir)
+                try? ep.seen.save(teamDir: dir)
+            }
+            let name = ep.roster()?.everyone.first { $0.keys.kid == decided.audit.driver }?.name
+            self.onAudit?(decided.audit, name)
+            completion((decided.ack, decided.audit))
+        }
     }
 
     /// Lane 4 (#220 §5.3): after a fetch, the commands under the store
@@ -458,7 +521,17 @@ final class MirrorTeamControlBox: @unchecked Sendable {
             let audits: [TeamControl.Audit]
             do { audits = try TeamControl.Store.grantorPass(client: client, endpoint: &ep, handled: &handled) }
             catch { Lifecycle.log.error("team control store pass: \(TeamGit.masked("\(error)"), privacy: .public)"); return }
-            lock.lock(); endpoint?.seen = ep.seen; endpoint?.limit = ep.limit; lock.unlock()
+            lock.lock()
+            endpoint?.seen = ep.seen
+            endpoint?.limit = ep.limit
+            endpoint?.heavyLimit = ep.heavyLimit
+            endpoint?.pending = ep.pending
+            endpoint?.outbox = ep.outbox
+            lock.unlock()
+            // The pass drains the outbox (published straight to the store
+            // above); the disk copy must not resurrect what already went
+            // out on the next relaunch.
+            try? ep.outbox.save(teamDir: dir)
             guard !audits.isEmpty else { return }
             try? ep.seen.save(teamDir: dir)
             try? handled.save(teamDir: dir)
@@ -666,7 +739,7 @@ final class MirrorServer: ObservableObject {
                 Dictionary(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { ($0.sessionId, $0.pid) },
                            uniquingKeysWith: { _, newer in newer })
             }
-            let endpoint = TeamControl.Endpoint(
+            var endpoint = TeamControl.Endpoint(
                 identity: identity,
                 roster: {
                     (try? Data(contentsOf: paths.rosterFile(id)))
@@ -674,16 +747,29 @@ final class MirrorServer: ObservableObject {
                 },
                 grants: { TeamGrants.load(teamDir: dir) },
                 liveSessions: live,
-                execute: { action, text, _, pid in
-                    // Phase 2's non-drive actions (`TeamControl.localVerb`)
-                    // land with their verbs; until then nobody can grant
-                    // them and an unexpected one is refused here.
-                    guard let pid, let request = TeamControl.request(action: action, text: text) else {
-                        return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
+                execute: { action, text, session, pid in
+                    // #220 Phase 2: a drive action is `SessionInput` into
+                    // a live session; everything else is one of the
+                    // grantor's own control verbs, run through
+                    // `box.runVerb` so a teammate, the phone and the CLI
+                    // share one dispatch.
+                    if TeamGrants.driveCapabilities.contains(action) {
+                        guard let pid, let request = TeamControl.request(action: action, text: text) else {
+                            return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
+                        }
+                        return mirrorInputQueue.sync { box.deliver(pid, request, from: "team") }
                     }
-                    return mirrorInputQueue.sync { box.deliver(pid, request, from: "team") }
+                    guard let verb = TeamControl.localVerb(action: action, text: text, session: session, pid: pid) else {
+                        return SessionInput.Reply(outcome: TeamControl.Outcome.badRequest, detail: "nothing to run for \(action)")
+                    }
+                    return box.runVerb(verb)
                 },
                 seen: TeamControl.SeenIDs.load(teamDir: dir), limit: TeamControl.RateLimit())
+            // The disk copy is what there is on a cold start; `set`'s
+            // carry-over then keeps a running endpoint's own outbox across
+            // a reload, so neither a relaunch nor a team-standing change
+            // drops an ack the grantor already minted.
+            endpoint.outbox = TeamControl.Outbox.load(teamDir: dir)
             box.tail = TeamControlRoute.Tail { sessionId, since in
                 guard let pid = live()[sessionId] else { return nil }
                 return feed.call(pid, 200, since: since, wait: 0)

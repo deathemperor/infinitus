@@ -337,4 +337,13 @@ final class TeamControlTests: XCTestCase {
         XCTAssertNil(verb("send", "hi"), "drive actions are SessionInput, never a verb")
         XCTAssertNil(TeamControl.request(action: "stop", text: nil), "and the reverse")
     }
+
+    func testAVerbsAnswerIsOneWordAndAccountErrorsStayHome() {
+        let stop = TeamControl.LocalVerb(command: "session-stop", args: ["4242"], options: ["yes": ""])
+        XCTAssertEqual(TeamControl.verbReply(stop, ok: true, error: "ignored"), .init(outcome: "done", detail: nil))
+        XCTAssertEqual(TeamControl.verbReply(stop, ok: false, error: "no live session with pid 4242"),
+                       .init(outcome: "refused", detail: "no live session with pid 4242"))
+        let swap = TeamControl.LocalVerb(command: "switch", args: ["claude", "3"])
+        XCTAssertEqual(TeamControl.verbReply(swap, ok: false, error: "no account 3 on claude"), .init(outcome: "refused", detail: nil))
+    }
 }

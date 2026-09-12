@@ -765,7 +765,30 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
 LAST_EVENT=$("$CTL" events --limit 100 | python3 -c "import json,sys; print(json.load(sys.stdin)[-1]['id'])")
 "$CTL" events --after "$LAST_EVENT" | expect "d['known'] is True and d['after']=='$LAST_EVENT' and d['rows']==[]" || fail "events --after the newest id is known with no rows (#346)"
 "$CTL" events --after nope --limit 3 | expect "d['known'] is False and len(d['rows'])==3" || fail "events --after an unknown id re-seeds with the full tail (#346)"
-echo "team control: ok (grantor + store-lane driver)"
+
+# Phase 2 (#220): a `stop` grant without --pre waits for Ann's tap; the tap
+# runs the Mac's own session-stop (Esc — no PTY here — then SIGTERM after
+# the grace) and the answer rides the outbox to Bo's next fetch. Revoked ⇒
+# noGrant, judged before liveness, so the dead session does not matter.
+"$CTL" team grant "$KID" --sessions e2e-aws --stop | expect "d['capabilities']==['stop'] and 'preauthorized' not in d" || fail "stop grant"
+STOP_GRANT="$("$CTL" team grants | json "d['grants'][0]['id']")"
+DRIVE="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" e2e-aws stop)" || fail "team drive stop"
+echo "$DRIVE" | expect "d['lane']=='store' and d['outcome']=='queued'" || fail "team drive stop lands in the store (got: $DRIVE)"
+STOP_CMD="$(echo "$DRIVE" | json "d['id']")"
+"$CTL" team-fetch >/dev/null || fail "grantor fetch (stop)"
+PENDING_ID="$("$CTL" team-pending | json "[p['id'] for p in d if p['action']=='stop' and p['session']=='e2e-aws'][0]")" || fail "team-pending lists the wait ($("$CTL" team-pending 2>&1 | head -c 300))"
+[ "$PENDING_ID" = "$STOP_CMD" ] || fail "the wait carries the command's id"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$STOP_CMD']==['pending']" || fail "Bo reads pending"
+"$CTL" team-allow "$STOP_CMD" | expect "d['outcome']=='done'" || fail "team-allow (got: $("$CTL" team-pending 2>&1 | head -c 200))"
+"$CTL" team-pending | expect "d==[]" || fail "the wait is gone after the tap"
+i=0; until ! kill -0 "$SESSION_PID" 2>/dev/null; do i=$((i + 1)); [ "$i" -lt 40 ] || fail "session-stop never signalled the session after the grace"; sleep 0.5; done
+"$CTL" team-fetch >/dev/null || fail "grantor fetch (outbox)"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$STOP_CMD']==['done']" || fail "the decision reached Bo (got: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 300))"
+"$CTL" team revoke "$STOP_GRANT" | expect "d['removed']" || fail "stop revoke"
+AGAIN="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" e2e-aws stop | json "d['id']")" || fail "team drive stop again"
+"$CTL" team-fetch >/dev/null || fail "grantor fetch (revoked)"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$AGAIN']==['noGrant']" || fail "a revoked grant is refused"
+echo "team control: ok (Phase 2 stop → pending → allow → done; revoked → noGrant)"
 
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window

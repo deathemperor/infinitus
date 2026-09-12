@@ -82,6 +82,11 @@ public enum TeamControl {
         public static let revoked = "revoked"
         public static let refusals: Set<String> = [noGrant, notLive, expired, replayed, unknownSender, badRequest, rateLimited,
                                                    alreadyPending, denied, revoked]
+        /// A non-drive action's answer (#220 Phase 2): the verb ran, or it
+        /// refused — its own result never travels, an account verb's error
+        /// text neither.
+        public static let done = "done"
+        public static let refused = "refused"
     }
 
     // MARK: envelopes
@@ -540,5 +545,14 @@ extension TeamControl {
         default:
             return nil
         }
+    }
+
+    /// A local verb's `ControlReply` as the driver's ack: `done` with no
+    /// detail, or `refused` with the verb's error — except the account verbs
+    /// (`switch`, `hold`, `unhold`), whose errors can name accounts (#220 §4).
+    public static func verbReply(_ verb: LocalVerb, ok: Bool, error: String?) -> SessionInput.Reply {
+        if ok { return SessionInput.Reply(outcome: Outcome.done, detail: nil) }
+        let account = ["switch", "hold", "unhold"].contains(verb.command)
+        return SessionInput.Reply(outcome: Outcome.refused, detail: account ? nil : error)
     }
 }

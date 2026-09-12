@@ -10,11 +10,13 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - The pop-out no longer re-asks for a window size the screen refused: the loop guard compared the refusal with the content's ideal instead of the settled size it had asked for, so a clamped settle was retried on every re-measure for a second (#229).
 - The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
+- Team control runs the whole grant menu: a teammate you grant stop, resume-past, delete, swap, hold, kill or reclaim runs that Mac verb here; anything not pre-authorised waits for your Allow (`infinitusctl team-pending / team-allow / team-deny`, two minutes) and delete, kill, reclaim always wait (#220).
 
 ### Desktop
 - Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
 - A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
 - The turn footer also counts the background agents a turn left running, and a session that ends with agents still running (Stop, or the app quitting) leaves an error row saying how many, instead of the thread reading as finished work (#974).
+- A side question the server refused now says why, on the desktop and the phone: the refusal reached both with a title and an empty reason (#941).
 - A side question works on threads from before forking existed: with no recorded fork point the session forks at its latest turn (#941).
 
 ## 0.5.0-alpha.2
