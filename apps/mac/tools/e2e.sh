@@ -213,7 +213,13 @@ SESSION_PID=$!
 SESSION_CWD="$SOCKDIR/proj"
 export DEMO_SESSION_PID="$SESSION_PID" DEMO_SESSION_CWD="$SESSION_CWD"
 mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+# A session record lands whole (#1002): `cat >` truncates first, and the
+# app lists the records the moment a hook's refresh fires — one second
+# after the Stop event, exactly when the #79 rounds rewrite this file —
+# so an empty file read in that window dropped the session, its AWS
+# need and the aws-logins row until the next poll, a minute away.
+write_record() { cat >"$1.tmp" && mv -f "$1.tmp" "$1"; }
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
 EOF
@@ -232,7 +238,7 @@ EOF
 # every relaunch showed the met need as "Log in here" (2026-09-07).
 sleep 3600 &
 SEED_PID=$!
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SEED_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SEED_PID.json" <<EOF
 {"pid":$SEED_PID,"sessionId":"e2e-seed","cwd":"$SESSION_CWD","kind":"interactive","status":"idle","name":"e2e-seed"}
 EOF
 cat >"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-seed.jsonl" <<EOF
@@ -523,7 +529,7 @@ echo "aws: need surfaced after ${i}s"
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
 # #79: the Stop hook hints idle at once; the record's next statusUpdatedAt
 # still wins.
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
  "statusUpdatedAt":1700000000000}
@@ -533,19 +539,19 @@ printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"Stop","stop_hook_a
     | "$CTL" event >/dev/null || fail "event Stop"
 "$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "Stop hint did not read idle ahead of the record (#79)"
 sleep 1
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
  "statusUpdatedAt":$(date +%s)000}
 EOF
 "$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='busy'" || fail "a fresh record status did not override the Stop hint (#79)"
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
 EOF
 # #79: the StopFailure hook hints idle the same way and logs the error
 # kind only — never error_details or last_assistant_message.
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
  "statusUpdatedAt":1700000000000}
@@ -555,7 +561,7 @@ printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"StopFailure","erro
 "$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "StopFailure hint did not read idle (#79)"
 "$CTL" events --limit 50 | expect "any(e['text']=='StopFailure — $(basename "$SESSION_CWD") (rate_limit)' for e in d)" || fail "StopFailure log line missing (#79)"
 "$CTL" events --limit 50 | expect "not any('assistant text' in e['text'] for e in d)" || fail "StopFailure logged assistant text (#79)"
-cat >"$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
+write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
  "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
 EOF
