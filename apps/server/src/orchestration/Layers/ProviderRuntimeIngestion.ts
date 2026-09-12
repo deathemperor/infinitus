@@ -1605,6 +1605,13 @@ const make = Effect.gen(function* () {
               : status === "ready" || status === "interrupted"
                 ? null
                 : (thread.session?.lastError ?? null);
+        // Fork (#832): the provider's reason travels with a running status
+        // (`reconnecting:n/max` while the Claude adapter waits to reopen the
+        // turn's transport); any other lifecycle event clears it.
+        const statusReason =
+          event.type === "session.state.changed" && status === "running"
+            ? (event.payload.reason ?? null)
+            : null;
 
         if (shouldApplyThreadLifecycle) {
           if (event.type === "turn.started" && acceptedTurnStartedSourcePlan !== null) {
@@ -1641,6 +1648,7 @@ const make = Effect.gen(function* () {
               runtimeMode: thread.session?.runtimeMode ?? "full-access",
               activeTurnId: nextActiveTurnId,
               lastError,
+              statusReason,
               updatedAt: now,
             },
             createdAt: now,

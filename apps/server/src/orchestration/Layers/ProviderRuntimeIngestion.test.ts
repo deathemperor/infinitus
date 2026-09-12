@@ -714,6 +714,49 @@ describe("ProviderRuntimeIngestion", () => {
     });
   });
 
+  it("carries the provider's reconnecting reason on a running session and clears it when the turn ends (#832)", async () => {
+    const harness = await createHarness();
+    const threadId = asThreadId("thread-1");
+    const turnId = asTurnId("turn-reconnect");
+    const base = {
+      provider: ProviderDriverKind.make("claudeAgent"),
+      threadId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    } as const;
+
+    harness.emit({
+      ...base,
+      type: "turn.started",
+      eventId: asEventId("evt-reconnect-started"),
+      turnId,
+    });
+    harness.emit({
+      ...base,
+      type: "session.state.changed",
+      eventId: asEventId("evt-reconnect-waiting"),
+      turnId,
+      payload: { state: "running", reason: "reconnecting:1/5" },
+    });
+
+    let thread = await waitForThread(
+      harness.readModel,
+      (entry) => entry.session?.statusReason === "reconnecting:1/5",
+    );
+    expect(thread.session?.status).toBe("running");
+    expect(thread.session?.activeTurnId).toBe(turnId);
+
+    harness.emit({
+      ...base,
+      type: "turn.completed",
+      eventId: asEventId("evt-reconnect-completed"),
+      turnId,
+      createdAt: "2026-01-01T00:00:01.000Z",
+      payload: { state: "completed" },
+    });
+    thread = await waitForThread(harness.readModel, (entry) => entry.session?.status === "ready");
+    expect(thread.session?.statusReason ?? null).toBeNull();
+  });
+
   it("applies provider session.state.changed transitions directly", async () => {
     const harness = await createHarness();
     const waitingAt = "2026-01-01T00:00:00.000Z";

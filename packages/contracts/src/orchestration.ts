@@ -536,6 +536,12 @@ export const OrchestrationSession = Schema.Struct({
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE))),
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(TrimmedNonEmptyString),
+  /**
+   * Fork (#832): the provider's reason for the current `running` status,
+   * `reconnecting:<attempt>/<max>` while the Claude adapter waits to reopen a
+   * turn whose transport went away; null for every other status.
+   */
+  statusReason: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   updatedAt: IsoDateTime,
 });
 export type OrchestrationSession = typeof OrchestrationSession.Type;
