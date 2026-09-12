@@ -278,7 +278,7 @@
         "Priority mode: a headroom verdict per fleet so clients pause background work before a window binds",
         "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
         "Session chat from the phone: streamed replies, prompts answered, photo and file attachments, Share sheet from any app",
-        "infinitusctl control CLI and an onboarding brief for coding agents",
+        "infinitusctl control CLI for the Mac app and Infinitus desktop's threads, and an onboarding brief for coding agents",
         "Linux tray daemon with an Omarchy Quickshell panel plugin"
       ],
       "sameAs": ["https://github.com/deathemperor/infinitus"],
@@ -304,7 +304,7 @@
         { "@type": "Question", "name": "Is Infinitus free?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
         { "@type": "Question", "name": "How do I install Infinitus?",
-          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app — or the desktop app's DMG, which carries the menu bar app inside — from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
         { "@type": "Question", "name": "Are the usage numbers Infinitus shows exact?",
           "acceptedAnswer": { "@type": "Answer", "text": "Usage percentages come from Anthropic's own limits reporting; usage-cost figures in the app are estimates, never billing truth." } }
       ]
@@ -375,7 +375,7 @@
 <section id="how">
   <div class="wrap">
     <h2>How it works</h2>
-    <p class="sub">A native Swift app over the <a href="https://github.com/deathemperor/swapd"><b>swapd</b></a> engine.
+    <p class="sub">A Swift menu bar app over the <a href="https://github.com/deathemperor/swapd"><b>swapd</b></a> engine.
       Every engine touchpoint is an isolated <code>swapd --json</code>
       subprocess — Infinitus never touches your credentials directly.</p>
     <div class="steps">
@@ -425,8 +425,9 @@
         <p>Evidence-gated nudges: only after a real switch or a fresh
         capacity verdict, never into a busy session, with cooldowns.</p></div>
       <div class="card"><h3><span class="dot">●</span>All-dead countdown</h3>
-        <p>When every account is limited, a giant countdown to the first
-        revival — and how many sessions are waiting on it.</p></div>
+        <p>When every account is limited, the popup, the desktop app and the
+        phone count down to the first revival — and say how many sessions
+        are waiting on it.</p></div>
       <div class="card"><h3><span class="dot">●</span>At this pace</h3>
         <p>Measured burn per window, when each runs out, when the whole
         fleet is out — and a full forecast dashboard behind it.</p></div>
@@ -453,7 +454,7 @@
         app's Share sheet straight into a session.</p></div>
       <div class="card"><h3><span class="dot">●</span>Headless sessions</h3>
         <p>Start a session with no terminal at all — from the popup, the
-        phone, or as the default. The Mac window, the phone and the
+        phone, or as the default. The desktop app, the phone and the
         browser page are its chat; its prompts, questions, plans and
         images reach all three.</p></div>
       <div class="card"><h3><span class="dot">●</span>New session screens (preview)</h3>
@@ -562,8 +563,10 @@
         <p>A Quickshell panel for Omarchy / Arch with the same gauges,
         dead-account flash, and session rows.</p></div>
       <div class="card"><h3><span class="dot">●</span>Agent-ready</h3>
-        <p><code>infinitusctl</code> drives the app over a local socket, and
-        an onboarding brief hands a coding agent the whole setup.</p></div>
+        <p><code>infinitusctl</code> drives the app over a local socket and
+        Infinitus desktop's projects and threads (<code>threads</code>,
+        <code>thread send|new|interrupt</code>), and an onboarding brief
+        hands a coding agent the whole setup.</p></div>
       <div class="card"><h3><span class="dot">●</span>CLIProxyAPI &amp; 9Router</h3>
         <p>Fleets behind a proxy plug in as more engines — CLIProxyAPI's
         management API, 9Router's dashboard (Claude, Kiro credits, Codex,
@@ -585,7 +588,7 @@
     <h2>Fifteen skins, one fleet</h2>
     <p class="sub">Every theme renames the windows, restyles the gauges,
       and brings its own intro, death, and revival effects. Pick one in
-      Settings.</p>
+      the desktop app's Settings › Infinitus › Themes.</p>
     <div class="themes">
       <div><b>Off</b><span>plain numbers</span>
         <img src="/img/themes/off.png" loading="lazy" width="1600" height="439"
@@ -648,12 +651,12 @@
         <pre><span class="c"># Homebrew</span>
 <span class="g">brew</span> install --cask deathemperor/tap/infinitus
 
-<span class="c"># or grab Infinitus.app from the latest release</span>
+<span class="c"># or grab Infinitus.app — or the whole desktop app, Infinitus-&lt;version&gt;-arm64.dmg, menu bar app included — from the latest release</span>
 <span class="g">open</span> https://github.com/deathemperor/infinitus/releases
 
 <span class="c"># or build it yourself</span>
 <span class="g">git</span> clone https://github.com/deathemperor/infinitus
-<span class="g">cd</span> infinitus &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
+<span class="g">cd</span> infinitus/apps/mac &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
         <p class="fineprint">Releases are Developer ID signed and notarized
         (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI on your PATH
         (<code>cargo install --git https://github.com/deathemperor/swapd swapd</code>);
@@ -663,9 +666,9 @@
         <h3>Linux (Omarchy / Arch)</h3>
         <pre><span class="c"># tray daemon + Quickshell panel plugin</span>
 <span class="g">git</span> clone https://github.com/deathemperor/infinitus
-<span class="g">cd</span> infinitus
+<span class="g">cd</span> infinitus/apps/mac
 <span class="g">swift</span> build -c release --product infinitus-tray
-<span class="c"># panel: packaging/omarchy/quickshell-plugin/</span></pre>
+<span class="c"># panel: apps/mac/packaging/omarchy/quickshell-plugin/ (Waybar module beside it)</span></pre>
         <p class="fineprint">Same core, same gauges — rendered in your
         Quickshell bar. On the AUR.</p>
       </div>
