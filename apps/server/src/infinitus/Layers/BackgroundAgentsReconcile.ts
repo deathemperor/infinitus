@@ -116,12 +116,20 @@ export const reconcileBackgroundAgents = Effect.gen(function* () {
     const thread = threads.find((candidate) => candidate.id === threadId);
     const session = thread?.session;
     if (!thread || !session || thread.deletedAt !== null || thread.archivedAt !== null) continue;
+    // A session the provider-sessions reconcile just flipped to `starting` is
+    // about to be continued (the post-update continuation): its dead agents
+    // still get their stopped rows, but the continuation prompt is the wake,
+    // so no error row and no error state on a thread that is resuming.
+    const continuing = session.status === "starting";
     yield* Effect.gen(function* () {
       const createdAt = DateTime.formatIso(yield* DateTime.now);
-      const ids = yield* Effect.forEach(agents.concat([agents[0]!]), () =>
+      const ids = yield* Effect.forEach(Array.from({ length: agents.length + 1 }), () =>
         crypto.randomUUIDv4.pipe(Effect.map(EventId.make)),
       );
-      for (const activity of orphanedBackgroundAgentRows({ threadId, agents, ids, createdAt })) {
+      const rows = orphanedBackgroundAgentRows({ threadId, agents, ids, createdAt });
+      for (const activity of continuing
+        ? rows.filter((row) => row.kind !== "runtime.error")
+        : rows) {
         yield* engine.dispatch({
           type: "thread.activity.append",
           commandId: CommandId.make(yield* crypto.randomUUIDv4),
@@ -129,6 +137,14 @@ export const reconcileBackgroundAgents = Effect.gen(function* () {
           activity,
           createdAt,
         });
+      }
+      if (continuing) {
+        yield* Effect.logInfo("infinitus.background-agents.reconciled", {
+          threadId,
+          agents: agents.length,
+          continuing,
+        });
+        return;
       }
       yield* engine.dispatch({
         type: "thread.session.set",

@@ -306,8 +306,11 @@ completedAt`, an older turn's user message → last assistant `updatedAt`
   ready/running/starting threads whose agent-kind `task.started` rows went
   to the background and never ended, then — for the ones not live — writes
   the stopped rows a graceful stop would have, the error row, and the
-  session's error state. The stopped rows make it idempotent; a #974 error
-  row after the start row excludes the thread as well.
+  session's error state — except a thread the provider-sessions reconcile
+  just flipped to `starting` for the post-update continuation, which gets
+  the stopped rows only: the continuation prompt is its wake. The stopped
+  rows make it idempotent; a #974 error row after the start row excludes
+  the thread as well.
   Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
   while entries are equal, so a running turn's ticks repaint nothing),
   `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity

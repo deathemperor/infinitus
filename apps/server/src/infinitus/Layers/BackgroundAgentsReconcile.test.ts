@@ -49,6 +49,7 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
       const projectId = ProjectId.make("project-bg");
       const orphaned = ThreadId.make("thread-orphaned");
       const finished = ThreadId.make("thread-finished");
+      const continuing = ThreadId.make("thread-continuing");
       const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" };
       let seq = 0;
       const nextId = () => `bg-${seq++}`;
@@ -62,7 +63,7 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
         defaultModelSelection: modelSelection,
         createdAt,
       });
-      for (const threadId of [orphaned, finished]) {
+      for (const threadId of [orphaned, finished, continuing]) {
         yield* engine.dispatch({
           type: "thread.create",
           commandId: CommandId.make(nextId()),
@@ -82,7 +83,7 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
           threadId,
           session: {
             threadId,
-            status: "ready",
+            status: threadId === continuing ? "starting" : "ready",
             providerName: "codex",
             providerInstanceId: modelSelection.instanceId,
             runtimeMode: "full-access",
@@ -131,6 +132,8 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
         agentKind: "background",
         isBackgrounded: true,
       });
+      // A thread the provider-sessions reconcile is about to continue.
+      yield* append(continuing, "task.started", agent("c1", { isBackgrounded: true }));
       // The other thread's agent failed before the server died.
       yield* append(finished, "task.started", agent("e1", { isBackgrounded: true }));
       yield* append(finished, "task.updated", { taskId: "e1", status: "failed" });
@@ -138,6 +141,7 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
       const detail = (threadId: ThreadId) =>
         snapshotQuery.getThreadDetailById(threadId).pipe(Effect.map(Option.getOrThrow));
       const beforeIds = new Set((yield* detail(orphaned)).activities.map((a) => a.id));
+      const continuingBefore = (yield* detail(continuing)).activities.length;
 
       const run = reconcileBackgroundAgents.pipe(
         Effect.provideService(ProviderService.ProviderService, noLiveSessions),
@@ -165,6 +169,23 @@ engineLayer("background agents reconcile at boot (#977)", (it) => {
       assert.deepStrictEqual(error?.payload, { message: liveBackgroundAgentsMessage(2) });
       assert.strictEqual(after.session?.status, "error");
       assert.strictEqual(after.session?.lastError, liveBackgroundAgentsMessage(2));
+
+      // The continuing thread: its dead agent's stopped row only, the session
+      // left for the continuation to wake.
+      const resumed = yield* detail(continuing);
+      assert.strictEqual(resumed.activities.length, continuingBefore + 1);
+      assert.strictEqual(
+        resumed.activities.some((a) => a.kind === "runtime.error"),
+        false,
+      );
+      assert.deepStrictEqual(resumed.activities.find((a) => a.kind === "task.completed")?.payload, {
+        taskId: "c1",
+        status: "stopped",
+        agentKind: "agent",
+        title: "Agent c1",
+      });
+      assert.strictEqual(resumed.session?.status, "starting");
+      assert.strictEqual(resumed.session?.lastError, null);
 
       const untouched = yield* detail(finished);
       assert.strictEqual(untouched.session?.status, "ready");
