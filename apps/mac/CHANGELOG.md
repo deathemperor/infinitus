@@ -14,6 +14,7 @@ publishes the matching section as the GitHub release body.
 ### Phone
 - A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
+- The thread header's pull request menu can babysit the PR — a fix round is queued whenever it conflicts, fails its checks or gets changes requested, up to ten — and stop it; a babysat thread's list row reads "Babysitting r/10" (#269).
 
 ### Mac
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
