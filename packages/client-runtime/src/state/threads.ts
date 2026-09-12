@@ -227,6 +227,16 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   };
   if (resumeCache?.owner === owner) resumeCache.snapshot = committed;
   const awaitingCompletion = yield* Ref.make(false);
+  // A resume replays up to THREAD_RESUME_MAX_EVENTS events in one burst, and
+  // every state write is a render. While the completion marker is awaited the
+  // replay folds in here and reaches the state in one write at `synchronized`;
+  // lastSequence advances with that write, so a stream lost mid-replay resumes
+  // from the last rendered event and replays the rest again.
+  const replay = yield* Ref.make<{
+    readonly thread: OrchestrationThread;
+    readonly sequence: number;
+    readonly reverted: boolean;
+  } | null>(null);
   // Bumped whenever loaded history may have been rewritten out from under an
   // in-flight older-page fetch (snapshot replacement, revert, deletion). A
   // page response captured under an older epoch is discarded, not merged.
@@ -330,6 +340,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   );
   const setDisconnected = Effect.gen(function* () {
     yield* Ref.set(awaitingCompletion, false);
+    yield* Ref.set(replay, null);
     // The capability belongs to the session that advertised it. During a
     // reconnect, a new prepared connection can exist before the new session's
     // config arrives; leaving the old value would let loadOlderTurns send
@@ -343,6 +354,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   });
   const setStreamError = (message: string) =>
     Ref.set(awaitingCompletion, false).pipe(
+      Effect.andThen(Ref.set(replay, null)),
       Effect.andThen(
         SubscriptionRef.update(state, (current) => ({
           ...current,
@@ -427,6 +439,15 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   ) {
     if (item.kind === "synchronized") {
       yield* Ref.set(awaitingCompletion, false);
+      const pending = yield* Ref.getAndSet(replay, null);
+      if (pending !== null) {
+        if (pending.reverted) {
+          yield* Ref.update(historyEpoch, (epoch) => epoch + 1);
+        }
+        yield* SubscriptionRef.set(lastSequence, pending.sequence);
+        yield* setThread(pending.thread, "keep");
+        yield* tryMergePendingOlderPage();
+      }
       yield* SubscriptionRef.update(state, (current) =>
         Option.isSome(current.data) && current.status !== "deleted" && Option.isNone(current.error)
           ? { ...current, status: "live" as const, error: Option.none() }
@@ -441,24 +462,42 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
       // in the preserved history with no event left to remove it. The
       // epoch bump discards any older-page fetch racing this snapshot.
       yield* Ref.update(historyEpoch, (epoch) => epoch + 1);
+      yield* Ref.set(replay, null);
       yield* SubscriptionRef.set(lastSequence, item.snapshot.snapshotSequence);
       yield* setThread(item.snapshot.thread, pageStateFromSnapshot(item.snapshot.page));
       return;
     }
 
-    const sequence = yield* SubscriptionRef.get(lastSequence);
+    const pending = yield* Ref.get(replay);
+    const sequence = pending?.sequence ?? (yield* SubscriptionRef.get(lastSequence));
     if (item.event.sequence <= sequence) {
       return;
     }
-    yield* SubscriptionRef.set(lastSequence, item.event.sequence);
 
     const current = yield* SubscriptionRef.get(state);
     if (Option.isNone(current.data)) {
+      yield* SubscriptionRef.set(lastSequence, item.event.sequence);
       if (item.event.type === "thread.deleted") {
         yield* setDeleted();
       }
       return;
     }
+    if (yield* Ref.get(awaitingCompletion)) {
+      const result = applyThreadDetailEvent(pending?.thread ?? current.data.value, item.event);
+      if (result.kind === "deleted") {
+        yield* Ref.set(replay, null);
+        yield* SubscriptionRef.set(lastSequence, item.event.sequence);
+        yield* setDeleted();
+        return;
+      }
+      yield* Ref.set(replay, {
+        thread: result.kind === "updated" ? result.thread : (pending?.thread ?? current.data.value),
+        sequence: item.event.sequence,
+        reverted: pending?.reverted === true || item.event.type === "thread.reverted",
+      });
+      return;
+    }
+    yield* SubscriptionRef.set(lastSequence, item.event.sequence);
     if (item.event.type === "thread.reverted") {
       // A revert rewrites loaded history (whole turns disappear), so an
       // older-page fetch in flight may straddle the removed range; the epoch
@@ -696,6 +735,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         const supportsPagination = config.threadSnapshotPagination === true;
         yield* Ref.set(paginationSupported, supportsPagination);
         yield* Ref.set(awaitingCompletion, supportsCompletionMarker);
+        yield* Ref.set(replay, null);
         yield* markSynchronizing;
         yield* Ref.set(resumingLive, false);
 
