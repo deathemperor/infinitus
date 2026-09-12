@@ -54,6 +54,16 @@ final class StatsModel: ObservableObject {
     /// the same corpus a second time). nil until a scan of this launch
     /// has run to its end.
     private(set) var scanEntries: [String: StatsScanner.FileEntry]?
+    /// Bumped with every table handed over; the team's `ScanMemo` keys
+    /// on it and gives the table back through `dropScanEntries` (#499).
+    private(set) var scanGeneration = 0
+    /// The team folded what it needs from `scanEntries` of `generation`
+    /// (#499): the table — ~40 MB decoded on a year of transcripts, and
+    /// the one reference left after `CacheHandle.release` — goes. A
+    /// newer scan's table stays; its own memo miss will take it.
+    func dropScanEntries(generation: Int) {
+        if generation == scanGeneration { scanEntries = nil }
+    }
 
     /// What the mirror exporter sends: eight folds, two of them
     /// full-year. Built OFF the main actor after every `recomputeDays`
@@ -268,6 +278,7 @@ final class StatsModel: ObservableObject {
             if unwatched { cacheHandle.release(to: cacheURL) }
             await MainActor.run {
                 self.progress = nil
+                self.scanGeneration += 1
                 self.scanEntries = entries
                 self.markTranscriptsDone()
             }

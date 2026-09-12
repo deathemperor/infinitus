@@ -1705,6 +1705,10 @@ final class AppModel: ObservableObject {
         let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"] ?? ""
         team.ownsScan = { [weak self] in fixture.isEmpty && self?.statsModel.enabled == true }
         team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
+        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
+        // The memo holds what the team needs of a scan; the table goes back (#499).
+        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
+        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
         team.load()
         crashReports = crashStore.list()
         scanMacCrashReports()
