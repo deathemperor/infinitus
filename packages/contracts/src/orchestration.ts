@@ -1412,12 +1412,16 @@ const QueuedTurnMessage = Schema.Struct({
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
+  // Accepted like `thread.turn.start`'s (upstream #11265); the queued row does
+  // not keep it yet, so a queued message is sent without its records.
+  context: Schema.optional(OrchestrationMessageContext),
 });
 const ClientQueuedTurnMessage = Schema.Struct({
   messageId: MessageId,
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+  context: Schema.optional(OrchestrationMessageContext),
 });
 
 export const ThreadTurnQueueCommand = Schema.Struct({
