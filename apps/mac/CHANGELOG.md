@@ -13,6 +13,7 @@ publishes the matching section as the GitHub release body.
 - Settings › Team shows a teammate's request to stop or delete a session, resume a past one, or swap or hold an account, with Allow and Deny; the grant sheet has the tiers, "without asking" and an expiry (#220).
 - `infinitusctl team grant`, `grants` and `revoke` go through the running app, so a grant made from the terminal shows in Settings › Team and in teammates' hints at once; with no app they edit the file as before (#220).
 - A session that stops on an API error — a usage limit, an outage — reads idle at once and the error kind shows in Activity, from Claude Code's StopFailure hook (#79).
+- Resume after a limit no longer waits for a usage read of the account swapd just switched to — the switch is that read, so stopped sessions get their nudge about two minutes sooner (#964).
 - An account whose usage swapd could not refresh shows how old its numbers are — "· 6 min ago" beside the plan, "Stale · 6 min ago" on the Accounts page — instead of reading like a fresh one (#965).
 
 ### Desktop
