@@ -328,7 +328,9 @@ public enum ResumeGate {
     ///   first observed (nil = the stop is new this tick).
     /// - currentActive: the active account number now.
     /// - activeFetchedAt: when the engine last fetched the active
-    ///   account's usage (the "alive" verdict is only as fresh as this).
+    ///   account's usage (the "alive" verdict is only as fresh as this;
+    ///   the switched path does not read it — the switch itself is the
+    ///   target's fresh poll, see below).
     /// - lastNudge: when this SESSION was last nudged, any stop entry.
     /// - activeSince: when the current active account became active
     ///   (nil = unknown; the switched path then trusts the switch).
@@ -343,15 +345,17 @@ public enum ResumeGate {
             return false
         }
         // A switch since the stop was first seen: the session rides new
-        // credentials — nudge regardless of how old the poll BEFORE the
-        // switch was, but only once the account has held for
-        // `stableSeconds` and a poll taken since the switch says alive
-        // (the caller only ticks when the active account is alive).
+        // credentials — nudge once the account has held for
+        // `stableSeconds` (#136: the engine can ping-pong for a minute).
+        // The switch instant is itself the target's fresh poll (#964:
+        // swapd polls the candidate right before switching; requiring a
+        // poll taken AFTER the switch too was held up 3 min by swapd's
+        // own lock degrading the slot to stale, which only delayed the
+        // nudge).
         if let firstSeenActive, let currentActive,
            firstSeenActive != currentActive {
             guard let activeSince else { return true }
-            guard now.timeIntervalSince(activeSince) >= stableSeconds,
-                  let activeFetchedAt, activeFetchedAt >= activeSince else { return false }
+            guard now.timeIntervalSince(activeSince) >= stableSeconds else { return false }
             return true
         }
         // Same account: the alive verdict must postdate the stop, or it
