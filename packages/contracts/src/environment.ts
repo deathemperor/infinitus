@@ -160,6 +160,10 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       control-socket path. Reachability is the snapshot's `available`, never
       this flag. */
   infinitus: Schema.optionalKey(Schema.Boolean),
+  /** Fork (#806): the server parks messages sent while a thread is busy
+      (`thread.turn.queue`) and starts them itself once it is idle. Absent on
+      builds that predate the queue, where the phone's outbox waits instead. */
+  turnQueue: Schema.optionalKey(Schema.Boolean),
 });
 export type ExecutionEnvironmentCapabilities = typeof ExecutionEnvironmentCapabilities.Type;
 

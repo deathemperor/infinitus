@@ -264,6 +264,7 @@ export const make = Effect.gen(function* () {
         : {}),
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
       infinitus: infinitusSocketPath !== null,
+      turnQueue: true,
     },
     ...(lanBaseUrls.length === 0 ? {} : { lanHttpBaseUrls: lanBaseUrls }),
   };
