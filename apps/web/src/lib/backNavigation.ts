@@ -16,7 +16,6 @@ const BACKABLE_PAGES: ReadonlySet<string> = new Set([
   "/accounts",
   "/stats",
   "/activity",
-  "/machine",
   "/utilization",
 ]);
 

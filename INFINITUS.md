@@ -1336,24 +1336,6 @@ configured}` and drawn as the configured row with Forget token, which is
   on native; `isPollRow` reads the text) stay in the store but are hidden until
   the header's "Show polls" toggle, persisted like the Stats period (#696).
   Sidebar "Activity" beside Stats.
-- `apps/web/src/routes/machine.tsx`, `apps/web/src/components/machine/` — the
-  `/machine` page (#659): the pop-out's Machine pane in the fork, read-only —
-  the sample summary (load, swap, processes, WindowServer, temp entries,
-  Claude sessions' RSS), warnings, hooks grouped by owner, runaways, residue
-  and the sessions table. Reads `machine` through
-  `infinitusEnvironment.machine`, a query atom re-read every minute only
-  while the page is mounted (native samples at most once per 55 s) and
-  dropped a minute after it leaves; a `{sampling: true}` first reply is
-  re-read once after 5 s. Its read model is
-  `packages/client-runtime/src/state/infinitusMachine.ts` (exported as
-  `@t3tools/client-runtime/state/infinitusMachine`): only the rendered
-  fields are declared (Swift enums such as `source` travel in their
-  `{"case": {"_0": …}}` shape and are ignored), `heavy`/`risky`/`stuck`
-  ported verbatim from `HookInventory`/`MachineReport`. Unlike native's
-  owner-name order, hook owners sort by what needs a look — stuck, then
-  live instances, then expected spawns an hour — with the top 12 shown and
-  the rest behind "Show all". `machine-kill`, `machine-reclaim` and
-  `machine-hook` are not exposed. Sidebar "Machine" beside Activity.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/`
   — the `/utilization` page (#747): the native Utilization pane in the fork.
   Today the forecast section only: every account's projection at its own
@@ -1365,7 +1347,7 @@ configured}` and drawn as the configured row with Forget token, which is
   lines leniently (the contract leaves them opaque; an odd line or window
   is dropped alone). The history chart and the run-rate table follow the
   `utilization --days` verb native is adding. Sidebar "Utilization" beside
-  Machine.
+  Activity.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:
@@ -1389,7 +1371,7 @@ configured}` and drawn as the configured row with Forget token, which is
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
   nothing lapsed); row/section/sign-in models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
-  `infinitusPageState` gates Accounts, Stats, Activity and Machine alike (#693):
+  `infinitusPageState` gates Accounts, Stats and Activity alike (#693):
   a server whose config arrived with `false` or without the field
   (`infinitusCapabilityOf`) gets the missing-adapter copy; a config that has not
   arrived waits like a missing snapshot, and Accounts folds every environment's
