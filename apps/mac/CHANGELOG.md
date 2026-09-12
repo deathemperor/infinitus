@@ -10,11 +10,6 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
 - `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
-- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
-- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
-- The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
-- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
-- A Codex (or any non-Claude) account no longer reads dead because a Claude account with the same email hit its limit: usage is shared between engines for Claude accounts only, and 9Router pairs same-email connections within one provider (#899).
 
 ## 0.5.0-alpha.1
 
@@ -22,6 +17,11 @@ publishes the matching section as the GitHub release body.
 - One release: the desktop app, the menu bar app nested inside it, the Linux tray and the phone share one version number and ship from one `v<version>` tag (#823).
 
 ### Mac
+- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
+- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
+- The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
+- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
+- A Codex (or any non-Claude) account no longer reads dead because a Claude account with the same email hit its limit: usage is shared between engines for Claude accounts only, and 9Router pairs same-email connections within one provider (#899).
 - The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
 - `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
 - `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads over the credential it hands the app at port publish (#822).
@@ -30,6 +30,25 @@ publishes the matching section as the GitHub release body.
 
 ### Linux tray
 - `infinitus-tray` drives swapd like the Mac (`swapd list/switch/rotate/hold`), and `serve`'s pushes post to a Slack webhook and/or Telegram bot from `INFINITUS_SLACK_WEBHOOK` / `INFINITUS_TELEGRAM_TOKEN` + `INFINITUS_TELEGRAM_CHAT` — the cswap adapter is gone (#756).
+
+### Desktop
+- The mouse's back and forward buttons walk history on the pages that show a back arrow, and Cmd+[ / Cmd+] step to the previous and next thread (#840).
+- On a started thread the runtime-mode control is its icon alone, with the label in the tooltip and the chevron on hover; a new thread keeps the label (#843).
+- Draw on a draft image before sending — pen, arrow, rectangle, colours, undo — and the marked copy replaces the attachment (#875).
+- A side question forks the latest completed turn into a small plan-mode thread in the right panel, on any thread with a completed turn, and "Bring to main" pastes the answer into the composer (#269).
+- Queued messages live on the server: ordered, editable, visible on every device, sent when the thread goes idle; a message sent while a turn runs joins the queue (#806).
+- Babysit a pull request until it merges, best-of-N across models in separate worktrees, a needs-attention section in the sidebar, restore files without losing the chat, and a cap on threads holding a worktree (#269).
+- A turn that loses the network stays open and reconnects with backoff, shown as "waiting for the network" instead of a failed turn (#832).
+- Updating with turns running refuses, waits or interrupts by your choice — "Install when they finish" is the default in the update pill (#829).
+- The sidebar's utility icons wrap instead of overflowing, and Enter confirms the confirm dialog (#826).
+
+### Phone
+- Settings › Infinitus › "Show a test card" starts a working Live Activity locally, to tell a render problem from a push problem; live cards end from the same row (#845).
+- A thread with a pull request shows "#N" in its header with the phase, Open pull request, View checks and Mark ready, on iOS and Android; an idle thread whose PR is ready reads "Ready for review" in the list (#269).
+- A pencil on a draft image opens iOS markup; the drawing replaces the attachment (#269).
+- Ask a side question from a thread's header; it opens as a sheet over the parent and "Bring to main" appends the answer to the draft (#881).
+- Queued messages show as a card under the composer with edit, send now and remove; a send during a running turn joins the queue (#806).
+- A thread reconnecting after a network loss shows an amber notice instead of an error (#832).
 
 ## 0.4.5-alpha.1
 
