@@ -44,7 +44,7 @@ final class TeamInsightsTests: XCTestCase {
                                                                         fleets: [], blockers: ["AWS login: prod"], crashesToday: 2,
                                                                         sharesTo: ["stats": .team, "transcripts": .members([l.kid, b.kid]), "now": .leaders])),
             "m/\(b.kid)/now.json": try CanonicalJSON.encode(TeamDocs.Now(at: nowSec - 3_600, sessions: [TeamDocs.LiveSession(id: "x", project: "site", status: "busy")],
-                                                                        fleets: [], blockers: ["cswap: every account limited"], crashesToday: 0, sharesTo: ["stats": .leaders])),
+                                                                        fleets: [], blockers: ["swapd: every account limited"], crashesToday: 0, sharesTo: ["stats": .leaders])),
             "m/\(a.kid)/sessions/index.json": try CanonicalJSON.encode(TeamDocs.SessionsIndex(at: nowSec, sessions: [s1, s3], fleets: [])),
             "m/\(b.kid)/sessions/index.json": try CanonicalJSON.encode(TeamDocs.SessionsIndex(at: nowSec, sessions: [s2], fleets: [])),
             "m/\(a.kid)/crashes.json": try CanonicalJSON.encode(TeamDocs.Crashes(crashes: ["Mac · crash · x", "Mac · crash · y"])),

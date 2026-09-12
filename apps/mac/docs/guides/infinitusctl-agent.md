@@ -49,7 +49,7 @@ infinitusctl rotate  <fleet>                 switch to the engine's next candida
 infinitusctl hold    <fleet> <n>
 infinitusctl unhold  <fleet> <n>
 infinitusctl rename  <fleet> <n> <alias>     "" clears
-infinitusctl prefer  <fleet> <n> on|off        star: the engine lands on it first (cswap autoswitch.preferred, proxy priority)
+infinitusctl prefer  <fleet> <n> on|off        star: the engine lands on it first (swapd `prefer`, proxy priority)
 infinitusctl reorder <fleet> <n>...          every account once, top first
 infinitusctl remove  <fleet> <n> --yes
 infinitusctl add     <fleet>                 opens the in-app sign-in; human finishes it
@@ -59,13 +59,13 @@ infinitusctl windows                         every app window: visible? size, co
 infinitusctl events [--limit 100]            the app's event log (switches, deaths, revivals, nudges), oldest first
 infinitusctl stats [--period week]          engineering metrics: commits, lines, PRs, messages by source, sessions, waiting, switches, cost
 infinitusctl perf                            cpuSeconds/rssBytes/heapBytes/threads — sample twice for an idle % and heap growth
-infinitusctl engine  cswap|cliproxy on|off   restarts the app
+infinitusctl engine  swapd|cliproxy|9router on|off   restarts the app
 infinitusctl proxy                           base URL, key stored?, routing strategy
 infinitusctl proxy-key [--url U] < keyfile   key from stdin, never argv; restarts the app
 infinitusctl proxy-routing fill-first|round-robin|weighted-round-robin
 ```
 
-`<fleet>` is a key from `fleets`, e.g. `cswap/claude` or `cliproxy/claude`.
+`<fleet>` is a key from `fleets`, e.g. `swapd/claude` or `cliproxy/claude`.
 `<n>` is the account number inside that fleet. Every account action
 returns the refreshed fleet so you can verify without a second call.
 
@@ -74,9 +74,9 @@ returns the refreshed fleet so you can verify without a second call.
 Pick the account with the most weekly headroom and switch to it:
 
 ```sh
-infinitusctl fleets | jq -r '.[] | select(.key=="cswap/claude") | .accounts
+infinitusctl fleets | jq -r '.[] | select(.key=="swapd/claude") | .accounts
   | map(select(.usageStatus=="ok")) | min_by(.usage.sevenDay.pct) | .number' \
-  | xargs infinitusctl switch cswap/claude
+  | xargs infinitusctl switch swapd/claude
 ```
 
 Set up the CLIProxyAPI engine (after the proxy itself is configured, see

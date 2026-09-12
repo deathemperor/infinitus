@@ -47,13 +47,13 @@ public struct FleetLabel: Sendable, Equatable {
 /// `engine.displayName`; this is for the hosts that only ever see an id
 /// (a mirrored snapshot, a cached fleet).
 ///
-/// The ids are literals rather than `CswapEngine.engineID` &c. on
-/// purpose: `CswapEngine` is `#if !os(iOS)` (it spawns a subprocess) and
+/// The ids are literals rather than `SwapdEngine.engineID` &c. on
+/// purpose: `SwapdEngine` is `#if !os(iOS)` (it spawns a subprocess) and
 /// the phone still has to name the fleets it mirrors.
 public enum EngineCatalog {
     public static func displayName(for engineID: String) -> String {
         switch engineID {
-        case "cswap": return "cswap"
+        case "swapd": return "swapd"
         case "cliproxy": return "CLIProxyAPI"
         case "9router": return "9Router"
         // The Windows daemon's engine-less fleets (Snapshot.swift): the
@@ -69,7 +69,10 @@ public enum EngineCatalog {
     /// hosts that only hold an id (the Windows tray, a mirrored snapshot).
     public static func capabilities(for engineID: String) -> EngineCapabilities {
         switch engineID {
-        case "cswap": return .all
+        // `SwapdEngine.engineCapabilities`, spelled out (FleetPanelTests pins them equal).
+        case "swapd": return [.switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
+                              .addToken, .autoSwitch, .history, .settings, .prefer, .ignite,
+                              .backup, .refreshAccount]
         case "cliproxy": return [.switch, .hold, .rename, .remove, .addOAuth, .costReport, .prefer]
         case "9router": return [.switch, .hold, .remove]
         default: return []
@@ -133,7 +136,7 @@ public enum FleetPanel {
         public let name: String
         public let email: String
         public let active: Bool
-        /// Held out of auto-rotation (`cswap disable`).
+        /// Held out of auto-rotation (`swapd hold`).
         public let disabled: Bool
         /// Every window this account can't work in is spent.
         public let dead: Bool
@@ -256,12 +259,12 @@ public enum FleetPanel {
                      empty: nil, engine: engine)
     }
 
-    /// Single-fleet convenience for a host that only has a `cswap list
-    /// --json` payload (the panel's `INFINITUS_ACCOUNTS_JSON` fixture,
-    /// an older mirror).
+    /// Single-fleet convenience for a host that only has one flat
+    /// `AccountList` (the panel's `INFINITUS_ACCOUNTS_JSON` fixture, an
+    /// older mirror).
     public static func panel(list: AccountList?, live: LiveSessions?,
                              engineInstalled: Bool,
-                             engineID: String = "cswap",
+                             engineID: String = "swapd",
                              engine: EngineIndicator? = nil,
                              now: Date = Date()) -> Panel {
         guard let list else {

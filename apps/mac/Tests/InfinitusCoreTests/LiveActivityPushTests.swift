@@ -186,7 +186,7 @@ final class LiveActivityBuilderTests: XCTestCase {
 
     private func fleet(accounts: [Account], next: Int?, recovery: NextRecovery? = nil,
                        busy: Int) -> EngineFleet {
-        EngineFleet(engineID: "cswap", provider: .claude, accounts: accounts, activeNumber: nil,
+        EngineFleet(engineID: "swapd", provider: .claude, accounts: accounts, activeNumber: nil,
                     nextCandidate: next, nextRecovery: recovery,
                     liveSessions: LiveSessions(busy: busy, total: 12, idle: nil, waiting: 2, shell: nil,
                                                unknown: nil, sessions: nil), raw: nil)

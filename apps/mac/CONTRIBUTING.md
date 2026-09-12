@@ -30,7 +30,7 @@ added to [.github/VOUCHED.td](.github/VOUCHED.td).
 ## Least likely to be accepted
 
 - Large PRs or drive-by feature work.
-- Anything that ties the app to one account engine (cswap is one adapter
+- Anything that ties the app to one account engine (swapd is one adapter
   among several, forever).
 - Rewrites, reformatting, or "improvements" to code the PR does not need
   to touch.

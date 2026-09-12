@@ -14,7 +14,7 @@ final class TeamFleetDocTests: XCTestCase {
     }
 
     func testRowLabelsStatusesAndWindowsAndNeverCarriesTheEmail() throws {
-        let fleet = EngineFleet(engineID: "cswap", provider: .claude, accounts: [
+        let fleet = EngineFleet(engineID: "swapd", provider: .claude, accounts: [
             account(1, alias: "ann", five: 42, seven: 10, scoped: [("Fable", 95)]),
             account(2, five: 100, seven: 30),
             account(3, alias: "lee", status: "relogin_required"),
@@ -22,7 +22,7 @@ final class TeamFleetDocTests: XCTestCase {
             account(5, alias: "sam", status: "api_key"),
         ], activeNumber: 1, nextCandidate: 5)
         let row = TeamDocs.FleetDoc.row(fleet, tokensPerMinute: 1234.5, lastSwitchAt: 77)
-        XCTAssertEqual(row.engine, "cswap")
+        XCTAssertEqual(row.engine, "swapd")
         XCTAssertEqual(row.active, "ann")
         XCTAssertEqual(row.next, "sam")
         XCTAssertEqual(row.tokensPerMinute, 1234.5)
@@ -79,7 +79,7 @@ final class TeamFleetDocTests: XCTestCase {
                                                  windows: [.init(label: "5h", pct: used), .init(label: "7d", pct: 3)], models: [])]
         rows += spare.map { .init(label: $0, tier: nil, status: "ok", active: false, windows: [], models: []) }
         rows += dead.map { .init(label: $0, tier: nil, status: "dead", active: false, windows: [.init(label: "5h", pct: 100)], models: []) }
-        return TeamDocs.FleetDoc(at: at, fleets: [.init(engine: "cswap", active: active, next: spare.first, accounts: rows)])
+        return TeamDocs.FleetDoc(at: at, fleets: [.init(engine: "swapd", active: active, next: spare.first, accounts: rows)])
     }
 
     func testFoldCarriesTheFleetOntoTheMemberAndTheSnapshotRow() throws {
