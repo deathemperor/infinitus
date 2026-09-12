@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Desktop
 - Settings › Infinitus › Menu bar carries the "Show the icon in the menu bar" switch: off hides the Mac's icon across relaunches while Infinitus keeps running, and this page turns it back on (#828).
+- The thread-info popover counts the tool calls and the time working of the turns this server ran, per thread (#834).
 
 ### Phone
 - A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).

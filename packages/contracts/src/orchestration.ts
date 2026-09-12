@@ -762,6 +762,13 @@ export const ThreadTurnUsage = Schema.Struct({
   /** The provider's estimate in USD, null when it gave none. */
   costUsd: Schema.NullOr(Schema.Number),
   completedAt: IsoDateTime,
+  /** Tool calls the runtime announced during the turn. Absent when this
+      server did not see the turn start (a restart mid-turn), never zero for
+      "not counted". */
+  toolCalls: Schema.optional(NonNegativeInt),
+  /** Wall time from the turn's start to its completion, reconnects
+      included; absent with `toolCalls`. */
+  durationMs: Schema.optional(NonNegativeInt),
 });
 export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
 
@@ -789,6 +796,9 @@ export const ThreadUsageRollup = Schema.Struct({
   /** Distinct, first seen first. */
   models: Schema.Array(TrimmedNonEmptyString),
   lastTurnAt: IsoDateTime,
+  /** Summed over the turns that carried one; absent while none did. */
+  toolCalls: Schema.optional(NonNegativeInt),
+  durationMs: Schema.optional(NonNegativeInt),
 });
 export type ThreadUsageRollup = typeof ThreadUsageRollup.Type;
 

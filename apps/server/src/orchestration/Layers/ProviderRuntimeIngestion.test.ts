@@ -491,6 +491,85 @@ describe("ProviderRuntimeIngestion", () => {
     expect((await harness.readModel()).threads[0]?.usage?.turns).toBe(1);
   });
 
+  // Fork (#834): the tool calls and wall time of a turn whose start this
+  // server saw; a turn it did not see start records neither.
+  it("records a turn's tool calls and wall time when it saw the turn start", async () => {
+    const harness = await createHarness();
+    const base = {
+      provider: ProviderDriverKind.make("claude"),
+      threadId: asThreadId("thread-1"),
+    };
+    const tokenUsage = {
+      usageScope: "main_agent" as const,
+      usageStatus: "complete" as const,
+      inputTokens: 10,
+      outputTokens: 1,
+      cachedInputTokens: 0,
+      cacheCreationTokens: 0,
+      hasSubagents: false,
+    };
+    const tool = (
+      eventId: string,
+      turnId: string,
+      itemId: string,
+      type: "item.started" | "item.completed",
+    ) =>
+      harness.emit({
+        ...base,
+        type,
+        eventId: asEventId(eventId),
+        createdAt: "2026-01-01T00:00:10.000Z",
+        turnId: asTurnId(turnId),
+        itemId: asItemId(itemId),
+        payload: {
+          itemType: "command_execution",
+          status: type === "item.started" ? "inProgress" : "completed",
+          title: "ls",
+        },
+      });
+
+    harness.emit({
+      ...base,
+      type: "turn.started",
+      eventId: asEventId("evt-timed-start"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+      turnId: asTurnId("turn-timed"),
+    });
+    tool("evt-timed-tool-1-start", "turn-timed", "tool-1", "item.started");
+    tool("evt-timed-tool-1-done", "turn-timed", "tool-1", "item.completed");
+    tool("evt-timed-tool-2-done", "turn-timed", "tool-2", "item.completed");
+    harness.emit({
+      ...base,
+      type: "item.started",
+      eventId: asEventId("evt-timed-text"),
+      createdAt: "2026-01-01T00:00:20.000Z",
+      turnId: asTurnId("turn-timed"),
+      itemId: asItemId("text-1"),
+      payload: { itemType: "assistant_message", status: "inProgress" },
+    });
+    harness.emit({
+      ...base,
+      type: "turn.completed",
+      eventId: asEventId("evt-timed-done"),
+      createdAt: "2026-01-01T00:01:30.000Z",
+      turnId: asTurnId("turn-timed"),
+      payload: { state: "completed", tokenUsage },
+    });
+    const timed = await waitForThread(harness.readModel, (entry) => entry.usage?.turns === 1);
+    expect(timed.usage).toMatchObject({ toolCalls: 2, durationMs: 90_000 });
+
+    harness.emit({
+      ...base,
+      type: "turn.completed",
+      eventId: asEventId("evt-untimed-done"),
+      createdAt: "2026-01-01T00:02:00.000Z",
+      turnId: asTurnId("turn-untimed"),
+      payload: { state: "completed", tokenUsage },
+    });
+    const untimed = await waitForThread(harness.readModel, (entry) => entry.usage?.turns === 2);
+    expect(untimed.usage).toMatchObject({ toolCalls: 2, durationMs: 90_000 });
+  });
+
   it.each([
     { delivery: "buffered", enableLegacyTokenStreaming: false },
     { delivery: "streamed", enableLegacyTokenStreaming: true },

@@ -384,11 +384,20 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ProjectionThreads.ts` and `ProjectionSnapshotQuery.ts` carry the column
   on every thread read. Known drift: the in-memory read model and a
   client's reducer keep the pre-revert sum until the next bootstrap; the
-  stored rollup is the truth. All figures are estimates, never billing
+  stored rollup is the truth. Tool calls and wall time (`toolCalls?`,
+  `durationMs?` on the turn record and, summed over the turns that carry
+  them, the rollup): `threadTurnUsage.ts`'s `TurnTelemetryTracker` in the
+  ingestion counts distinct tool-lifecycle item ids on `item.started` /
+  `item.completed` from the first `turn.started` it saw to the
+  `turn.completed` (a reconnect's second start keeps the first clock);
+  an aborted turn, a turn started before a server restart, or one whose
+  start the server never saw records neither, and the transcript backfill
+  has neither, so both stay absent — never zero for "not counted". All figures are estimates, never billing
   truth — UIs show "≈". Web: `apps/web/src/components/chat/ThreadUsagePopover.tsx`
   (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's
   action group ("≈ $0.35", or "N turns" while no turn carried a cost)
-  opening the thread-info popover: turns (with the subagent count), the
+  opening the thread-info popover: turns (with the subagent count), tool
+  calls and time working when counted, the
   token counts that moved, models, cost ("Cost not recorded", never
   $0.00, for none) and the last turn in the user's timestamp format, plus
   "Estimated from the transcript" for a `transcript` rollup; drawn only

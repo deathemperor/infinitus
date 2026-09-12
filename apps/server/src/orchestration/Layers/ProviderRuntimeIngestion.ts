@@ -31,7 +31,7 @@ import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
-import { turnUsageFromCompletedTurn } from "../threadTurnUsage.ts";
+import { TurnTelemetryTracker, turnUsageFromCompletedTurn } from "../threadTurnUsage.ts";
 import { ProjectionTurnRepository } from "../../persistence/Services/ProjectionTurns.ts";
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
@@ -1476,6 +1476,10 @@ const make = Effect.gen(function* () {
     },
   );
 
+  // Fork (#834): per-turn tool calls and wall time, in memory for the life
+  // of this ingestion (a restart mid-turn leaves that turn's figures absent).
+  const turnTelemetry = new TurnTelemetryTracker();
+
   const processRuntimeEvent = (event: ProviderRuntimeEvent) =>
     Effect.gen(function* () {
       if (event.type === "content.delta" && event.payload.streamKind !== "assistant_text") {
@@ -1658,12 +1662,37 @@ const make = Effect.gen(function* () {
         }
       }
 
-      // Fork (#834): what the completed turn cost, once per turn the runtime
-      // named. Independent of the lifecycle gate: a completion that lost the
-      // race for the session status still happened. A refusal is logged, so
+      // Fork (#834): the tool calls and wall time of the running turn, then
+      // what the completed turn cost, once per turn the runtime named.
+      // Independent of the lifecycle gate: a completion that lost the race
+      // for the session status still happened. A refusal is logged, so
       // usage never blocks the events after it.
+      if (eventTurnId !== undefined) {
+        switch (event.type) {
+          case "turn.started":
+            turnTelemetry.started(thread.id, eventTurnId, now);
+            break;
+          case "item.started":
+          case "item.completed":
+            if (isToolLifecycleItemType(event.payload.itemType)) {
+              turnTelemetry.toolSeen(thread.id, eventTurnId, event.itemId ?? event.eventId);
+            }
+            break;
+          case "turn.aborted":
+            turnTelemetry.aborted(thread.id, eventTurnId);
+            break;
+          default:
+            break;
+        }
+      }
+      if (event.type === "session.exited") turnTelemetry.threadEnded(thread.id);
       if (event.type === "turn.completed" && eventTurnId !== undefined) {
-        const turnUsage = turnUsageFromCompletedTurn(event.payload, eventTurnId, now);
+        const turnUsage = turnUsageFromCompletedTurn(
+          event.payload,
+          eventTurnId,
+          now,
+          turnTelemetry.completed(thread.id, eventTurnId, now),
+        );
         if (turnUsage !== undefined) {
           yield* orchestrationEngine
             .dispatch({
