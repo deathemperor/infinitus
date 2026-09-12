@@ -64,6 +64,9 @@ type Input =
  * `infinitus.thread.limited` row and joins the `stopped` list the sidebar
  * reads (#270 I), until it resumes or is forgotten.
  */
+const resetsAtIso = (stop: LimitStop): string | null =>
+  stop.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(stop.resetsAt));
+
 export const InfinitusResumeOnLimitLive = Layer.effect(
   InfinitusLimitStops,
   Effect.gen(function* () {
@@ -180,11 +183,13 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
       Effect.gen(function* () {
         const createdAt = DateTime.formatIso(yield* DateTime.now);
         const summary = limitMarkerSummary(stop);
+        const resetsAt = resetsAtIso(stop);
         marks.set(stop.threadId, {
           threadId: stop.threadId,
           since: createdAt,
           summary,
           kind: "limited",
+          ...(resetsAt === null ? {} : { resetsAt }),
         });
         yield* publish;
         yield* orchestrationEngine.dispatch({
@@ -200,6 +205,7 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
               turnId: stop.turnId,
               stop: stop.kind,
               accounts: [...stop.activeAtStop.values()],
+              resetsAt,
             },
             turnId: stop.turnId,
             createdAt,
@@ -215,6 +221,18 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
         ),
       );
 
+    /** The SDK re-announces a parked turn as its reset advances: the stream
+        entry follows (the sidebar's tooltip is live), the row stays as written. */
+    const remark = (stop: LimitStop) =>
+      Effect.suspend(() => {
+        const entry = marks.get(stop.threadId);
+        if (entry === undefined) return Effect.void;
+        const resetsAt = resetsAtIso(stop);
+        const { resetsAt: _dropped, ...rest } = entry;
+        marks.set(stop.threadId, { ...rest, ...(resetsAt === null ? {} : { resetsAt }) });
+        return publish;
+      });
+
     const onRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
         const existing = stops.get(event.threadId);
@@ -225,9 +243,10 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
         const stop = limitStopFromEvent(event, yield* nowMillis, snapshot);
         if (stop === null) return;
         if (stop.turnId !== null && resumed.has(stop.turnId)) return;
-        const known = stops.has(stop.threadId);
+        const known = stops.get(stop.threadId);
         stops.set(stop.threadId, stop);
-        if (!known) yield* mark(stop);
+        if (known === undefined) yield* mark(stop);
+        else if (known.resetsAt !== stop.resetsAt) yield* remark(stop);
         yield* Effect.logInfo("infinitus.resume-on-limit.stopped", {
           threadId: stop.threadId,
           turnId: stop.turnId,

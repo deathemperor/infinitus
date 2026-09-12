@@ -15,6 +15,7 @@ const marker = (
   kind: string,
   createdAt: string,
   id: string = `${kind}@${createdAt}`,
+  payload: Record<string, unknown> = {},
 ): OrchestrationThreadActivity => ({
   id: EventId.make(id),
   tone: "info",
@@ -27,7 +28,7 @@ const marker = (
         : kind === LIMIT_MARKER_KIND
           ? "Limit hit on one@example.com"
           : "Released",
-  payload: {},
+  payload,
   turnId: null,
   createdAt,
 });
@@ -63,6 +64,7 @@ describe("threadHold", () => {
       markerId: "h1",
       since: "2026-09-11T10:00:00Z",
       summary: "Held for headroom on claude, 5h window 84 %",
+      resetsAt: null,
     });
   });
 
@@ -112,6 +114,7 @@ describe("threadHold", () => {
       markerId: "p1",
       since: "2026-09-11T10:00:00Z",
       summary: "Paused for headroom on claude, 5h window 92 %",
+      resetsAt: null,
     });
     expect(
       threadHold({
@@ -163,7 +166,25 @@ describe("threadHold", () => {
       markerId: "l1",
       since: "2026-09-11T10:00:00Z",
       summary: "Limit hit on one@example.com",
+      resetsAt: null,
     });
+    // The reset the row carries travels along; anything but a string is none.
+    expect(
+      threadHold({
+        activities: [
+          marker(LIMIT_MARKER_KIND, "2026-09-11T10:00:00Z", "l2", {
+            resetsAt: "2026-09-11T14:00:00.000Z",
+          }),
+        ],
+        latestTurn: null,
+      })?.resetsAt,
+    ).toBe("2026-09-11T14:00:00.000Z");
+    expect(
+      threadHold({
+        activities: [marker(LIMIT_MARKER_KIND, "2026-09-11T10:00:00Z", "l3", { resetsAt: 5 })],
+        latestTurn: null,
+      })?.resetsAt,
+    ).toBeNull();
     expect(
       threadHold({
         activities: [
