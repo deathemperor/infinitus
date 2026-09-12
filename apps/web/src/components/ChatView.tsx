@@ -207,6 +207,7 @@ import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavaila
 import { RightPanelTabs } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
 import { SideQuestionPanel } from "./SideQuestionPanel";
+import { hasCompletedTurn, SIDE_QUESTION_NEEDS_TURN } from "./SideQuestionPanel.logic";
 import { BestOfGroupCard } from "./BestOfGroupCard";
 import { planBestOfMembers, type BestOfChip, type BestOfMember } from "./chat/bestOf.logic";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
@@ -4199,29 +4200,32 @@ export default function ChatView(props: ChatViewProps) {
   // any, is left alone (the fork is its own Claude session).
   const supportsSideQuestion =
     supportsThreadFork && serverConfig?.environment.capabilities.infinitus === true;
+  // The server forks at the session's latest completed turn (no checkpoint
+  // needed, so a thread in a plain directory works too); until one exists
+  // the button is off and says why. The drawer opens on the click itself,
+  // in its forking state, and a failure shows inside it.
+  const sideQuestionUnavailable =
+    activeThread && hasCompletedTurn(activeThread) ? undefined : SIDE_QUESTION_NEEDS_TURN;
   const askSideQuestion = useCallback(async () => {
     if (!activeThread || !activeThreadRef) return;
-    const turnCount = activeThread.checkpoints.at(-1)?.checkpointTurnCount;
-    if (turnCount === undefined) {
-      setThreadError(activeThread.id, "Ask a side question once a turn has completed.");
-      return;
-    }
-    setThreadError(activeThread.id, null);
+    useRightPanelStore.getState().openSideQuestionPending(activeThreadRef);
     const forked = await forkThreadAtTurn({
       environmentId,
-      input: { threadId: activeThread.id, turnCount, side: true },
+      input: { threadId: activeThread.id, side: true },
     });
     if (forked._tag === "Failure") {
       if (isAtomCommandInterrupted(forked)) return;
       const error = squashAtomCommandFailure(forked);
-      setThreadError(
-        activeThread.id,
-        error instanceof Error ? error.message : "Could not open a side question.",
-      );
+      useRightPanelStore
+        .getState()
+        .failSideQuestionPending(
+          activeThreadRef,
+          error instanceof Error ? error.message : "Could not open a side question.",
+        );
       return;
     }
     useRightPanelStore.getState().openSideQuestion(activeThreadRef, forked.value.threadId);
-  }, [activeThread, activeThreadRef, environmentId, forkThreadAtTurn, setThreadError]);
+  }, [activeThread, activeThreadRef, environmentId, forkThreadAtTurn]);
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
   const addPullRequestsSurface = useCallback(() => {
@@ -8516,6 +8520,8 @@ export default function ChatView(props: ChatViewProps) {
         environmentId={activeThreadRef.environmentId}
         threadId={renderedRightPanelSurface.threadId}
         composerDraftTarget={composerDraftTarget}
+        forking={renderedRightPanelSurface.forking}
+        onRetry={askSideQuestion}
       />
     ) : renderedRightPanelSurface?.kind === "agents" ? (
       <AgentsPanel
@@ -8954,6 +8960,9 @@ export default function ChatView(props: ChatViewProps) {
                             onPageScrollRelease={onComposerPageScrollRelease}
                             onCompactContext={onCompactContext}
                             onAskSideQuestion={supportsSideQuestion ? askSideQuestion : undefined}
+                            sideQuestionUnavailable={
+                              supportsSideQuestion ? sideQuestionUnavailable : undefined
+                            }
                             onBestOf={
                               supportsBestOf
                                 ? (chips) => void onSend(undefined, "foreground", undefined, chips)

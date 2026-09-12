@@ -422,7 +422,10 @@ export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.T
     touched. `turnCount` is the checkpoint turn count shown on the message. */
 export const InfinitusThreadForkInput = Schema.Struct({
   threadId: ThreadId,
-  turnCount: Schema.Int,
+  /** A checkpoint's turn number; absent, the session's latest completed
+      turn (#269 C) — a checkpoint needs a git repository, an anchor only a
+      completed turn. */
+  turnCount: Schema.optional(Schema.Int),
   /** Fork (#269 C): a side question — read-only (plan mode), marked `sideOf`
       the source, so it opens in a drawer instead of the thread list. */
   side: Schema.optional(Schema.Literal(true)),

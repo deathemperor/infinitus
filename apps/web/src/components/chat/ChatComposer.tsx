@@ -1054,6 +1054,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   /** Fork (#269 C): opens a read-only side question in the right panel. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 C): set, the Aside button is off and says why. */
+  sideQuestionUnavailable?: string | undefined;
 }) {
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -1178,6 +1180,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                   )}
                   type="button"
                   onClick={props.onAskSideQuestion}
+                  disabled={props.sideQuestionUnavailable !== undefined}
                   aria-label="Ask a side question"
                   data-testid="composer-side-question"
                 />
@@ -1187,8 +1190,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
               <span className="sr-only sm:not-sr-only">Aside</span>
             </TooltipTrigger>
             <TooltipPopup side="top">
-              Ask a side question: a read-only tangent in the right panel that leaves this turn
-              alone
+              {props.sideQuestionUnavailable ??
+                "Ask a side question: a read-only tangent in the right panel that leaves this turn alone"}
             </TooltipPopup>
           </Tooltip>
         </>
@@ -1445,6 +1448,8 @@ export interface ChatComposerProps {
   onCompactContext: () => void;
   /** Fork (#269 C): absent when the thread cannot host a side question. */
   onAskSideQuestion?: (() => void) | undefined;
+  /** Fork (#269 C): set while no turn has completed; the button is off and says why. */
+  sideQuestionUnavailable?: string | undefined;
   /** Fork (#269 B): absent unless this draft can start once per model (a worktree draft). */
   onBestOf?: ((chips: ReadonlyArray<BestOfChip>) => void) | undefined;
   onSend: (e?: { preventDefault: () => void }, intent?: ComposerSubmissionIntent) => void;
@@ -1555,6 +1560,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onPageScrollRelease,
     onCompactContext,
     onAskSideQuestion,
+    sideQuestionUnavailable,
     onBestOf,
     onSend,
     onInterrupt,
@@ -4266,6 +4272,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
           onAskSideQuestion={onAskSideQuestion}
+          sideQuestionUnavailable={sideQuestionUnavailable}
         />
       ),
     },
@@ -4363,6 +4370,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           onToggleInteractionMode={toggleInteractionMode}
           onRuntimeModeChange={handleRuntimeModeChange}
           onAskSideQuestion={onAskSideQuestion}
+          sideQuestionUnavailable={sideQuestionUnavailable}
         />
       ) : (
         <>
@@ -4412,6 +4420,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 onAskSideQuestion={
                   hiddenRestingBlockIds.includes("mode") ? onAskSideQuestion : undefined
                 }
+                sideQuestionUnavailable={sideQuestionUnavailable}
               />
             </div>
           ) : null}
