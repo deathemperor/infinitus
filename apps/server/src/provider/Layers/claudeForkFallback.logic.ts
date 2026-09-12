@@ -33,7 +33,7 @@ export const FORK_AT_END_MESSAGE =
   "The fork point was not found in the session's transcript; forked at the session's end instead.";
 
 export const FORK_POINT_MISSING_MESSAGE =
-  "Fork point not found in the session's transcript; complete a turn on this thread and try again.";
+  "Fork point not found in the session's transcript: this turn was recorded before fork points were fixed and cannot be forked. Fork the latest turn instead.";
 
 /** The query options the retry forks with: the same fork, no anchor. */
 export function forkAtEndQueryOptions(options: ClaudeQueryOptions): ClaudeQueryOptions {

@@ -651,8 +651,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   every anchor recorded before this rule on a turn whose last message had
   more than one block) is retried once without the anchor when the binding
   says `resumeSessionAtLatest` (`ThreadFork.ts` sets it for a side question
-  and for a fork at the latest anchored turn: the session's end is that
-  turn, #941), with a `runtime.warning` row naming the repair; an earlier
+  and for a fork at the latest anchored turn: the session's end was that
+  turn when the fork was bound, #941 — a source that completed more turns
+  before the fork's first start moves the fallback past the intended turn), with a `runtime.warning` row naming the repair; an earlier
   turn's anchor fails the turn plainly instead
   (`claudeForkFallback.logic.ts`); `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
   `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude and Codex),
