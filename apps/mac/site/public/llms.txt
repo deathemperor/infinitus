@@ -14,7 +14,7 @@
 - Rotates to the best candidate account automatically when a limit binds, via the `swapd` CLI. Infinitus never modifies Claude Code and never reads the engine's internal files; every engine touchpoint is a `swapd … --json` subprocess.
 - Resume nudges: after a switch, stopped Claude Code sessions are nudged back to work (peer socket / PTY based, lives in Infinitus).
 - Session progress: what each running agent is doing right now, todo counts, retries, quiet minutes, the session's goal — parsed from Claude Code's own transcript files.
-- All-dead countdown: when every account is limited, a large countdown to the next recovery.
+- All-dead countdown: when every account is limited, the popup, the desktop app and the phone count down to the next recovery.
 - Usage history and utilization estimates (usage-cost figures are estimates, never billing truth).
 - 15 themes (Off, RPG, Cyber, MGS, Sci-fi, Cosmo, Ocean, Earth, Gothic, Hades, Movie, Musical, Agent, SWE, West) each renaming the windows and bringing its own intro, death and revival effects.
 - Team (preview): a team lives on any git remote you already have — a leader creates it from Settings › Team on an empty repo with a push token (a fine-grained PAT scoped to that repo, or an ssh URL); that token rides inside every invite link and team code, so those are shared like passwords.
@@ -23,14 +23,15 @@
 - Team (preview), session control: a member grants leaders, the whole team or named members the right to view, send, approve, mode, resume or key on all or chosen sessions (Settings › Team or `infinitusctl team grant`); commands are sealed envelopes verified against the roster and the grant on the member's own Mac, every one is audited, and the driven session shows who is driving.
 - Team (preview), hostnames: a leader pastes a Cloudflare API token (Tunnel Edit + DNS Edit on one zone) once, then mints `<name>.<label>.<zone>` per member from Settings › Team › Hostnames or `infinitusctl team hostname give`; the tunnel token travels sealed to that member in the team store, their Mac keeps it in the keychain and runs the named tunnel, and removing the member deletes the tunnel and DNS record.
 - Team (preview), driving: from a teammate's detail on the Mac (a chat window over their session's live tail, controls gated on the grant) or `infinitusctl team send|approve|mode|tail|acks`; a command tries their LAN address on the same subnet, then their tunnel, then waits in the team store for their next fetch, and reports the lane it took and the grantor's outcome.
-- Headless sessions: a session with no terminal, run by the Mac; the Mac window, the phone and the browser page are its chat, and its prompts, questions, plans and images reach all three.
+- Headless sessions: a session with no terminal, run by the Mac; the desktop app, the phone and the browser page are its chat, and its prompts, questions, plans and images reach all three.
+- `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads from a shell, over the credential the desktop hands the Mac app.
 - Browser page: machines without the app get the sessions list, a chat with a session and Start a session at the "Copy Browser Link" address in Settings › Devices.
 - New phone screens (preview, Settings › Appearance › "New session screens"): a flat thread list with shelves and search, a session as a chat thread, a task sheet, thread settings and a git pill.
 
 ## Platforms
 
-- macOS 14+ (Apple silicon): `brew install --cask deathemperor/tap/infinitus`, or download `Infinitus.app` from the latest release. Releases are Developer ID signed and notarized.
-- Linux: static `infinitus-tray` binaries for x86_64 and aarch64; Omarchy / Arch panel plugin for Quickshell (`packaging/omarchy/`), also on the AUR.
+- macOS 14+ (Apple silicon): `brew install --cask deathemperor/tap/infinitus`, or download `Infinitus.app` from the latest release — or the whole desktop app, `Infinitus-<version>-arm64.dmg`, which carries the menu bar app inside as a login item. One `v<version>` release ships all of them. Releases are Developer ID signed and notarized.
+- Linux: static `infinitus-tray` binaries for x86_64 and aarch64; Omarchy / Arch panel plugin for Quickshell and a Waybar module (`apps/mac/packaging/omarchy/`), also on the AUR.
 - iOS companion app: fleet mirror, session chat, Live Activities, widgets and the share sheet; device builds from the repo, not on the App Store yet.
 
 ## Requirements
