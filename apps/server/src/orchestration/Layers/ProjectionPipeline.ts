@@ -341,7 +341,7 @@ const decodeQuestionAttachmentAnswer = Schema.decodeUnknownOption(UserInputAttac
 
 function collectThreadAttachmentRelativePaths(
   threadId: string,
-  messages: ReadonlyArray<ProjectionThreadMessage>,
+  messages: ReadonlyArray<Pick<ProjectionThreadMessage, "attachments">>,
 ): Set<string> {
   const threadSegment = toSafeThreadAttachmentSegment(threadId);
   if (!threadSegment) {
@@ -817,6 +817,21 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         case "thread.turn-queued":
         case "thread.turn-queue-updated": {
           const queued = event.payload.queuedTurn;
+          // An edit that dropped an upload leaves its copy on disk (#847);
+          // the prune keeps whatever the thread still references.
+          if (event.type === "thread.turn-queue-updated") {
+            const rows = yield* projectionThreadQueuedTurnRepository.listByThreadId({
+              threadId: event.payload.threadId,
+            });
+            const previous = rows.find((row) => row.queueId === queued.queueId);
+            const kept = new Set(queued.attachments.map((attachment) => attachment.id));
+            if (previous?.attachments.some((attachment) => !kept.has(attachment.id))) {
+              attachmentSideEffects.prunedThreadRelativePaths.set(
+                event.payload.threadId,
+                new Set(),
+              );
+            }
+          }
           yield* projectionThreadQueuedTurnRepository.upsert({
             threadId: event.payload.threadId,
             queueId: queued.queueId,
@@ -833,6 +848,11 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
 
         case "thread.turn-queue-removed": {
           yield* projectionThreadQueuedTurnRepository.delete({ queueId: event.payload.queueId });
+          // Removed without sending: its uploads are referenced by nothing
+          // (#847). A sent row's uploads are the turn's message's now.
+          if (event.payload.reason === "user") {
+            attachmentSideEffects.prunedThreadRelativePaths.set(event.payload.threadId, new Set());
+          }
           return;
         }
 
@@ -2113,6 +2133,13 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             threadId: ThreadId.make(threadId),
           });
           const retainedPaths = collectThreadAttachmentRelativePaths(threadId, messages);
+          // A queued message's uploads (#806) live here too, until it is sent or removed.
+          const queuedRows = yield* projectionThreadQueuedTurnRepository.listByThreadId({
+            threadId: ThreadId.make(threadId),
+          });
+          for (const relativePath of collectThreadAttachmentRelativePaths(threadId, queuedRows)) {
+            retainedPaths.add(relativePath);
+          }
           const activities = yield* projectionThreadActivityRepository.listByThreadId({
             threadId: ThreadId.make(threadId),
           });
