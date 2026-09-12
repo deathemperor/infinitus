@@ -40,16 +40,26 @@ public struct SessionTail: @unchecked Sendable {
     /// was left of a progress read (#346).
     private var need: SessionProgress.LoginNeeds = (nil, nil)
 
+    /// A progress tail keeps of each entry only what `SessionProgress.parse`
+    /// reads (`slim`, #499): decoded whole, a 512 KB window held ~1.25 MB
+    /// of dictionaries and strings per tracked session, four fifths of it
+    /// thinking blocks, signatures, attachments and bookkeeping the parser
+    /// never looks at. The feed reader's window renders the timeline and
+    /// keeps its entries whole.
+    private let slims: Bool
+
     public init(url: URL, maxBytes: Int = 512 * 1024) {
         self.init(url: url, maxBytes: maxBytes, scansAgents: true)
     }
 
     /// `scansAgents: false` reads this one file and nothing else — a
-    /// sub-agent's tail, or the feed reader's incremental window.
-    init(url: URL, maxBytes: Int, scansAgents: Bool) {
+    /// sub-agent's tail, or the feed reader's incremental window
+    /// (`slims: false`).
+    init(url: URL, maxBytes: Int, scansAgents: Bool, slims: Bool = true) {
         self.url = url
         self.maxBytes = maxBytes
         self.scansAgents = scansAgents
+        self.slims = slims
     }
 
     /// Reads the bytes appended since the last call, to this transcript
@@ -110,7 +120,7 @@ public struct SessionTail: @unchecked Sendable {
         for line in SessionFeedReader.lines(of: Data(complete)) {
             guard line.utf8.first == UInt8(ascii: "{"),
                   let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
-            entries.append(entry)
+            entries.append(slims ? Self.slim(entry) : entry)
             sizes.append(line.utf8.count + 1)
             bytesHeld += line.utf8.count + 1
             moved = true
@@ -121,6 +131,78 @@ public struct SessionTail: @unchecked Sendable {
         }
         if scansAgents, headGoal == nil { headGoal = SessionProgress.readGoal(at: url) }
         return moved
+    }
+
+    /// The entry reduced to the keys `SessionProgress.parse` and its
+    /// helpers read — `describe`/`classify` (tool name, command, path,
+    /// pattern), the todos, `goal`/`nowDoing` (a text's head), the token
+    /// usage, model, branch, retry flag, summary, and `loginNeed` (tool
+    /// result text, kept whole: the sign-in detectors regex over it).
+    /// A parser that starts reading a new key adds it here;
+    /// `SessionTailSlimTests` compares the slimmed and the whole parse.
+    static func slim(_ entry: [String: Any]) -> [String: Any] {
+        var out: [String: Any] = [:]
+        for key in ["type", "timestamp", "gitBranch", "isApiErrorMessage", "summary", "subtype"] {
+            if let value = entry[key] { out[key] = value }
+        }
+        guard let message = entry["message"] as? [String: Any] else { return out }
+        var slimMessage: [String: Any] = [:]
+        if let model = message["model"] { slimMessage["model"] = model }
+        if let tokens = (message["usage"] as? [String: Any])?["output_tokens"] {
+            slimMessage["usage"] = ["output_tokens": tokens]
+        }
+        if let text = message["content"] as? String {
+            slimMessage["content"] = head(of: text)
+        } else if let blocks = message["content"] as? [[String: Any]] {
+            slimMessage["content"] = blocks.map(slim(block:))
+        }
+        out["message"] = slimMessage
+        return out
+    }
+
+    private static func slim(block: [String: Any]) -> [String: Any] {
+        var out: [String: Any] = [:]
+        let type = block["type"] as? String
+        if let type { out["type"] = type }
+        switch type {
+        case "tool_use":
+            if let name = block["name"] { out["name"] = name }
+            if let id = block["id"] { out["id"] = id }
+            if let input = block["input"] as? [String: Any] {
+                var kept: [String: Any] = [:]
+                for key in ["command", "file_path", "pattern"] {
+                    if let value = input[key] { kept[key] = value }
+                }
+                if let todos = input["todos"] as? [[String: Any]] {
+                    kept["todos"] = todos.map { todo -> [String: Any] in
+                        var item: [String: Any] = [:]
+                        if let status = todo["status"] { item["status"] = status }
+                        if let active = todo["activeForm"] { item["activeForm"] = active }
+                        return item
+                    }
+                }
+                out["input"] = kept
+            }
+        case "tool_result":
+            if let id = block["tool_use_id"] { out["tool_use_id"] = id }
+            if let text = block["content"] as? String {
+                out["content"] = text
+            } else if let parts = block["content"] as? [[String: Any]] {
+                out["content"] = parts.map { part -> [String: Any] in
+                    part["text"].map { ["text": $0] } ?? [:]
+                }
+            }
+        default:
+            if let text = block["text"] as? String { out["text"] = head(of: text) }
+        }
+        return out
+    }
+
+    /// What `goal` and `nowDoing` can read of a text: they take the first
+    /// line after any leading whitespace and at most 100 characters of it.
+    private static func head(of text: String) -> String {
+        let leading = text.prefix(while: \.isWhitespace).count
+        return String(text.prefix(leading + 200))
     }
 
     public func progress(name: String? = nil, now: Date = Date()) -> SessionProgress {
