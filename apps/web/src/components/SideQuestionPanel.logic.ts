@@ -69,3 +69,74 @@ export const SIDE_QUESTION_GONE_GRACE_MS = 3000;
 export function appendAnswerToDraft(currentDraft: string, answer: string): string {
   return currentDraft.trim().length > 0 ? `${currentDraft.trimEnd()}\n\n${answer}` : answer;
 }
+
+/** What the drawer says when the side thread's turn failed, and the question to re-ask. */
+export interface SideQuestionFailure {
+  readonly text: string;
+  readonly question: string;
+}
+
+const asText = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+/**
+ * Fork (#269 C follow-up): why the latest side question got no answer, the
+ * way the main timeline would say it — the turn's error activity after the
+ * question (`runtime.error`'s message, a `*.failed` row's detail, else its
+ * summary), or the session's error state with its `lastError`. Null while
+ * a turn runs, before anything was asked here, or once an answer landed
+ * after the failure.
+ */
+export function sideQuestionFailure(
+  threadId: ThreadId,
+  thread: {
+    readonly messages: ReadonlyArray<{
+      readonly id: string;
+      readonly role: string;
+      readonly text: string;
+      readonly streaming: boolean;
+      readonly createdAt: string;
+    }>;
+    readonly activities: ReadonlyArray<{
+      readonly tone: string;
+      readonly summary: string;
+      readonly payload: unknown;
+      readonly createdAt: string;
+    }>;
+    readonly session: {
+      readonly status: string;
+      readonly activeTurnId: TurnId | null;
+      readonly lastError: string | null;
+    } | null;
+  },
+): SideQuestionFailure | null {
+  if ((thread.session?.activeTurnId ?? null) !== null) return null;
+  const asked = thread.messages.filter((message) => isSideQuestionMessage(threadId, message));
+  const question = asked.findLast((message) => message.role === "user");
+  if (!question) return null;
+  const answeredAfter = (at: string) =>
+    asked.some(
+      (message) => message.role === "assistant" && !message.streaming && message.createdAt >= at,
+    );
+  const failed = thread.activities.findLast(
+    (activity) => activity.tone === "error" && activity.createdAt >= question.createdAt,
+  );
+  if (failed) {
+    if (answeredAfter(failed.createdAt)) return null;
+    const payload =
+      typeof failed.payload === "object" && failed.payload !== null
+        ? (failed.payload as { readonly message?: unknown; readonly detail?: unknown })
+        : null;
+    return {
+      text: asText(payload?.message) ?? asText(payload?.detail) ?? failed.summary,
+      question: question.text,
+    };
+  }
+  if (thread.session?.status === "error" && !answeredAfter(question.createdAt)) {
+    return {
+      text: thread.session.lastError ?? "The side question failed.",
+      question: question.text,
+    };
+  }
+  return null;
+}
