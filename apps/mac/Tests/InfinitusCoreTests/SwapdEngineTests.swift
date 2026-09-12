@@ -42,6 +42,7 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(account.icon, "🩸")
         XCTAssertEqual(account.plan, "Max 20x")
         XCTAssertEqual(account.usageStatus, "ok")
+        XCTAssertNil(account.stale, "a plain ok row is not stale")
         XCTAssertEqual(account.disabled, false)
         XCTAssertEqual(account.preferred, false)
         XCTAssertEqual(account.usageFetchedAt, "2026-09-09T01:11:03Z")
@@ -125,6 +126,7 @@ final class SwapdMappingTests: XCTestCase {
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
         XCTAssertEqual(account.usageStatus, "ok")
+        XCTAssertEqual(account.stale, true)
         XCTAssertNil(SentinelNotes.note(for: account.usageStatus), "stale is not a sentinel")
         // Without this the row would be both noteless and dataless, and
         // `usage == nil` drops an account out of liveness and revival.
@@ -149,6 +151,7 @@ final class SwapdMappingTests: XCTestCase {
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
         XCTAssertEqual(account.usageStatus, "ok")
+        XCTAssertEqual(account.stale, true)
         XCTAssertEqual(account.usage?.fiveHour?.pct, 41)
         XCTAssertEqual(account.usageAgeSeconds, 900)
     }
@@ -167,6 +170,7 @@ final class SwapdMappingTests: XCTestCase {
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
         XCTAssertEqual(account.usageStatus, "relogin_required")
+        XCTAssertNil(account.stale)
         XCTAssertNil(account.usage)
         XCTAssertNil(account.windows)
         XCTAssertNotNil(SentinelNotes.note(for: account.usageStatus))

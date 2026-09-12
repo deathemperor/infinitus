@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - The control socket manages session-control grants — `team-grants`, `team-grant`, `team-revoke` — so the desktop app's Team page can add and remove them on the running app (#220).
 - Settings › Team shows a teammate's request to stop or delete a session, resume a past one, or swap or hold an account, with Allow and Deny; the grant sheet has the tiers, "without asking" and an expiry (#220).
 - A session that stops on an API error — a usage limit, an outage — reads idle at once and the error kind shows in Activity, from Claude Code's StopFailure hook (#79).
+- An account whose usage swapd could not refresh shows how old its numbers are — "· 6 min ago" beside the plan, "Stale · 6 min ago" on the Accounts page — instead of reading like a fresh one (#965).
 
 ### Desktop
 - Installing an update while threads run asks in a dialog again, not a toast: Later, Install now, or Install when they finish — and that wait no longer lapses at the next update check, which read as "checking" for a moment and silently cancelled it; clicking the armed update button opens the dialog to keep, cancel or skip the wait (#829).
