@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - A thread stopped on a usage limit says when its window resets on the phone too — "Limit hit on x · resets 2:13 PM" on the banner, in the device's clock format, dropped once the instant is past (#270 I).
+- The thread usage sheet says "Usage not reported by this provider" on a Cursor or Grok thread instead of "Cost not recorded" with zero tokens; turns, tool calls and duration stay (#834).
 
 ## 0.5.0-alpha.5
 
