@@ -748,6 +748,10 @@ function ThreadRouteContent(
         onPress: () => handleOpenTerminal(null),
       });
     }
+    // Infinitus (#269 F): the pull request leads the git controls, as on iOS.
+    if (pullRequestHeader.androidAction !== null) {
+      actions.push(pullRequestHeader.androidAction);
+    }
     actions.push({
       accessibilityLabel: "Open git controls",
       icon: "point.topleft.down.curvedto.point.bottomright.up",
@@ -772,6 +776,7 @@ function ThreadRouteContent(
     handleToggleInspector,
     props.onReturnToThread,
     selectedThreadCwd,
+    pullRequestHeader.androidAction,
     selectedThreadProject?.workspaceRoot,
     sideQuestionHeader.androidAction,
   ]);
