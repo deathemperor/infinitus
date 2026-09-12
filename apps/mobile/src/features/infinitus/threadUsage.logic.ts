@@ -1,5 +1,6 @@
 import type { ThreadUsageRollup } from "@t3tools/contracts";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+import { threadUsageReported } from "@t3tools/shared/threadUsage";
 import { formatDateTimeShort, formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
 
 /** One card of the thread usage sheet. */
@@ -16,11 +17,15 @@ export interface ThreadUsageRow {
  * of which carried a cost says so instead of showing $0.00 (Codex turns
  * record tokens and no cost). Tool calls and the time working (#927) show
  * only when the server counted them — absent, never zero, on turns it did
- * not see start.
+ * not see start. A thread no recorded turn of which reported usage (a Cursor
+ * or Grok thread, `threadUsageReported` false) keeps those counts and the
+ * last turn; its zero tokens and missing cost are not figures, so the token
+ * and cost rows go and the first note says so.
  */
 export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
+  const reported = threadUsageReported(usage);
   const tokens = (label: string, count: number): ThreadUsageRow[] =>
-    count === 0 ? [] : [{ label, value: `≈ ${formatTokens(count)}` }];
+    count === 0 || !reported ? [] : [{ label, value: `≈ ${formatTokens(count)}` }];
   return [
     { label: "Turns", value: turnsValue(usage) },
     ...(usage.toolCalls === undefined
@@ -39,10 +44,14 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
       : [
           { label: usage.models.length === 1 ? "Model" : "Models", value: usage.models.join(", ") },
         ]),
-    {
-      label: "Cost",
-      value: usage.costUsd === null ? "Cost not recorded" : `≈ ${formatUsd(usage.costUsd)}`,
-    },
+    ...(reported
+      ? [
+          {
+            label: "Cost",
+            value: usage.costUsd === null ? "Cost not recorded" : `≈ ${formatUsd(usage.costUsd)}`,
+          },
+        ]
+      : []),
     { label: "Last turn", value: formatDateTimeShort(usage.lastTurnAt) },
   ];
 }
@@ -57,7 +66,11 @@ function turnsValue(usage: ThreadUsageRollup): string {
  * understate. Always at least the first.
  */
 export function threadUsageNotes(usage: ThreadUsageRollup): ReadonlyArray<string> {
-  const notes = ["Estimates from the provider, not billing."];
+  const notes = [
+    threadUsageReported(usage)
+      ? "Estimates from the provider, not billing."
+      : "Usage not reported by this provider.",
+  ];
   if (usage.source === "transcript") notes.push("Estimated from the transcript.");
   if (usage.subagentTurns > 0) notes.push("Subagent tokens are not counted.");
   return notes;
