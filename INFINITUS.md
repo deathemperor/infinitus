@@ -65,7 +65,12 @@ makes wrong, in its own PR.
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
   `nightly` tag: `latest` becomes the one-app release with the first plain
-  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build. Desktop
+  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build — one
+  release created once and only edited in place (tag re-pointed, asset
+  clobbered, title edited), never deleted and recreated: the desktop
+  updater takes the first entry of `releases.atom`, an edited `nightly`
+  keeps its place below the newest versioned tag, a recreated one would
+  not (#924). Desktop
   updates follow electron-updater's own GitHub rule (#924): the client's
   channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
   `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
