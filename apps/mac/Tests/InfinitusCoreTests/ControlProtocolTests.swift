@@ -141,7 +141,7 @@ final class ControlProtocolTests: XCTestCase {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
         XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "team-create", "team-join", "team-hostname", "proxy-key", "9router-password", "push-slack", "push-telegram", "desktop-credential"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
-        XCTAssertEqual(Set(payload), ["send", "approve", "event", "machine-hook"])
+        XCTAssertEqual(Set(payload), ["send", "approve", "event", "machine-hook", "push"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
     }
 

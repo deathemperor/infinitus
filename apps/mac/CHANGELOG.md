@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
 
 ## 0.5.0-alpha.1
