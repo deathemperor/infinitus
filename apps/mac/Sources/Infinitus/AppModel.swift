@@ -871,15 +871,17 @@ final class AppModel: ObservableObject {
     /// `local: false` skips the Mac's own Notification Center notice and
     /// still reaches the phone and the away channels (#1020: the desktop
     /// shows its own banner for its threads, and two banners per phase
-    /// change kept the bridge off).
-    func push(_ msg: String, local: Bool = true) {
+    /// change kept the bridge off). `slack: false` skips the Slack
+    /// webhook alone (#574: a Slack-started thread reports in its own
+    /// Slack thread already).
+    func push(_ msg: String, local: Bool = true, slack: Bool = true) {
         if local {
             notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
         } else {
             liveActivityPusher.pushAlert(title: "Infinitus", body: msg,
                                          unlessRevival: PushTriggers.isAllDeadMessage(msg))
         }
-        awayPush.send(msg)
+        awayPush.send(msg, slack: slack)
     }
     /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
     lazy var awayPush: AwayPush = {

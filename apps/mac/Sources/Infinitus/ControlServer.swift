@@ -544,7 +544,7 @@ final class ControlServer {
             guard let payload = r.secret, let push = ThreadPhasePush.parse(payload) else {
                 throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} is expected on stdin")
             }
-            model.push(push.line, local: push.local)
+            model.push(push.line, local: push.local, slack: push.slack)
             return ControlReply(ok: true, result: .object(["pushed": .bool(true)]))
 
         case "switch", "hold", "unhold", "rename", "remove":

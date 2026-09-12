@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - A thread phase alert sent from the desktop can skip the Mac's own notification banner and still reach the phone, Slack and Telegram.
+- A thread phase alert can skip the Mac's Slack post alone, so a thread started from Slack is not told twice; Telegram and the phone still get it.
 
 ### Desktop
 - A Cursor or Grok thread's usage popover now keeps its tool calls and time working even though the provider reports no tokens; it says "Usage not reported by this provider" instead of a cost.

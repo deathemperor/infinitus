@@ -26,6 +26,16 @@ final class ThreadPhasePushTests: XCTestCase {
         XCTAssertTrue(loud.local, "a non-bool never silences the Mac")
     }
 
+    func testSlackDefaultsOnAndReadsFalseOnlyFromABool() throws {
+        let plain = try XCTUnwrap(ThreadPhasePush.parse(#"{"kind":"thread.phase","threadId":"t1","title":"X","phase":"completed"}"#))
+        XCTAssertTrue(plain.slack)
+        let quiet = try XCTUnwrap(ThreadPhasePush.parse(#"{"kind":"thread.phase","threadId":"t1","title":"X","phase":"completed","slack":false}"#))
+        XCTAssertFalse(quiet.slack)
+        XCTAssertTrue(quiet.local, "slack: false leaves the other channels alone")
+        let loud = try XCTUnwrap(ThreadPhasePush.parse(#"{"kind":"thread.phase","threadId":"t1","title":"X","phase":"completed","slack":"no"}"#))
+        XCTAssertTrue(loud.slack, "a non-bool never silences Slack")
+    }
+
     func testRefusesAnyOtherShape() {
         XCTAssertNil(ThreadPhasePush.parse(#"{"kind":"thread.turn","threadId":"t1","phase":"completed"}"#))
         XCTAssertNil(ThreadPhasePush.parse(#"{"kind":"thread.phase","title":"no id","phase":"completed"}"#))
