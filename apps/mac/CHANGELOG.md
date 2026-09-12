@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.4
+
 ### Mac
 - The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 - The control socket manages session-control grants — `team-grants`, `team-grant`, `team-revoke` — so the desktop app's Team page can add and remove them on the running app (#220).
