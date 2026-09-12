@@ -296,8 +296,21 @@ completedAt`, an older turn's user message → last assistant `updatedAt`
   background agents running — their work is not finished",
   `liveBackgroundAgentsMessage`) before the stopped rows: ingestion turns
   that into the error activity and marks the session `error`, so the
-  thread stops reading as finished work. A killed server writes nothing;
-  a boot-time reconcile is a follow-up.
+  thread stops reading as finished work. A killed server writes nothing,
+  so `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+
+  test; `infinitus/backgroundAgents.logic.ts` holds the wording and the
+  rows, shared with the adapter) runs as the `background-agents.reconcile`
+  startup phase right after `provider-sessions.reconcile` in
+  `serverRuntimeStartup.ts` (#977): one SQL statement over the sessions
+  table with correlated lookups on each thread's activity index finds the
+  ready/running/starting threads whose agent-kind `task.started` rows went
+  to the background and never ended, then — for the ones not live — writes
+  the stopped rows a graceful stop would have, the error row, and the
+  session's error state — except a thread the provider-sessions reconcile
+  just flipped to `starting` for the post-update continuation, which gets
+  the stopped rows only: the continuation prompt is its wake. The stopped
+  rows make it idempotent; a #974 error row after the start row excludes
+  the thread as well.
   Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
   while entries are equal, so a running turn's ticks repaint nothing),
   `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity

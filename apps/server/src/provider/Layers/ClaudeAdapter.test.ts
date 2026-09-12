@@ -51,11 +51,8 @@ import { ProviderAdapterProcessError, ProviderAdapterValidationError } from "../
 import type { ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import type { ClaudeScopedLimitNames } from "./claudeUsageLimits.ts";
 import { RECONNECT_EXHAUSTED_MESSAGE } from "./claudeReconnect.logic.ts";
-import {
-  liveBackgroundAgentsMessage,
-  makeClaudeAdapter,
-  type ClaudeAdapterLiveOptions,
-} from "./ClaudeAdapter.ts";
+import { liveBackgroundAgentsMessage } from "../../infinitus/backgroundAgents.logic.ts";
+import { makeClaudeAdapter, type ClaudeAdapterLiveOptions } from "./ClaudeAdapter.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 const encodeUnknownJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 

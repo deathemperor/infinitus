@@ -94,6 +94,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
+import { liveBackgroundAgentsMessage } from "../../infinitus/backgroundAgents.logic.ts";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
@@ -1352,10 +1353,6 @@ function liveBackgroundAgentCount(
     if (kind === "agent") count += 1;
   }
   return count;
-}
-
-export function liveBackgroundAgentsMessage(count: number): string {
-  return `Session ended with ${count} background ${count === 1 ? "agent" : "agents"} running — their work is not finished.`;
 }
 
 function taskLinkageFor(
