@@ -3351,13 +3351,10 @@ extension AppModel: FleetModel {
     /// status item injects.
     func openSettings() { showSettings?() }
 
-    /// The "at this pace" line's click: Settings on the Utilization pane
-    /// (the forecast dashboard), selected through the same notification
-    /// the playground's `playctl settings` uses.
+    /// The "at this pace" line's click. The Utilization pane is the
+    /// desktop app's now (#654, #774); Settings is what the Mac still opens.
     func openForecast() {
         showSettings?()
-        NotificationCenter.default.post(name: Notification.Name("infinitus.selectPane"),
-                                        object: "Utilization")
     }
 
     /// The primary fleet's engine decides what the mac-only panes may do.

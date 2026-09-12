@@ -10,6 +10,7 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
 - `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
+- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
 
 ## 0.5.0-alpha.1
 
