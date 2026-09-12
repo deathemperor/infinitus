@@ -9,6 +9,8 @@ import {
   type OrchestrationThreadShell,
   type ProviderRuntimeEvent,
 } from "@t3tools/contracts";
+import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -25,11 +27,18 @@ import * as Stream from "effect/Stream";
 
 import { writeFileStringAtomically } from "../../atomicWrite.ts";
 import { ServerConfig } from "../../config.ts";
+import { GitWorkflowService } from "../../git/GitWorkflowService.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import {
+  WORKTREE_CAP_SUGGESTIONS,
+  worktreeCapRefusal,
+} from "../../orchestration/worktreeCap.logic.ts";
+import { ProjectSetupScriptRunner } from "../../project/ProjectSetupScriptRunner.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import {
   SlackClient,
   type SlackInbound,
@@ -59,9 +68,13 @@ import {
  * there steer it (queued while a turn runs), `stop` interrupts, `babysit`
  * turns babysit on; approval and question buttons answer the provider's
  * requests. Inert until the setting is on, both tokens exist and at least
- * one user is allowed; anyone else gets no reply. Threads start on the
- * project checkout: the worktree bootstrap lives in ws.ts (follow-up).
- * Message text never reaches a log, only its length.
+ * one user is allowed; anyone else gets no reply. A thread starts where
+ * the project's settings say (#957, ws.ts's bootstrap): in a worktree off
+ * the checkout's current branch — the worktree limit (#269 H) checked
+ * first, its refusal posted to Slack; a git failure deletes the thread
+ * and posts the error — or on the checkout itself when the mode is local,
+ * the project is no repo, or its HEAD is detached. The setup script runs
+ * best-effort. Message text never reaches a log, only its length.
  */
 
 const BindingsJson = fromJsonStringPretty(SlackThreadBindings);
@@ -74,6 +87,9 @@ export const InfinitusSlackLive = Layer.effectDiscard(
     const orchestrationEngine = yield* OrchestrationEngineService;
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const providerService = yield* ProviderService;
+    const gitWorkflow = yield* GitWorkflowService;
+    const vcsStatusBroadcaster = yield* VcsStatusBroadcaster;
+    const projectSetupScriptRunner = yield* ProjectSetupScriptRunner;
     const slack = yield* SlackClient;
     const crypto = yield* Crypto.Crypto;
     const config = yield* ServerConfig;
@@ -182,6 +198,38 @@ export const InfinitusSlackLive = Layer.effectDiscard(
         .getThreadShellById(threadId)
         .pipe(Effect.option, Effect.map(Option.flatten));
 
+    /** ws.ts's worktree step: a temporary branch off the base, from origin's copy when asked. */
+    const createWorktree = (cwd: string, baseBranch: string, startFromOrigin: boolean) =>
+      Effect.gen(function* () {
+        let baseRef = baseBranch;
+        if (startFromOrigin && (yield* gitWorkflow.remoteExists({ cwd, remoteName: "origin" }))) {
+          yield* gitWorkflow.fetchRemote({ cwd, remoteName: "origin" });
+          const remoteBaseExists = yield* gitWorkflow.remoteBranchExists({
+            cwd,
+            refName: baseBranch,
+            remoteName: "origin",
+          });
+          if (remoteBaseExists) {
+            const remote = yield* gitWorkflow.resolveRemoteTrackingCommit({
+              cwd,
+              refName: baseBranch,
+              fallbackRemoteName: "origin",
+            });
+            baseRef = remote.commitSha;
+          }
+        }
+        const bytes = yield* crypto.randomBytes(4);
+        const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+        const worktree = yield* gitWorkflow.createWorktree({
+          cwd,
+          refName: baseRef,
+          newRefName: buildTemporaryWorktreeBranchName(() => hex),
+          baseRefName: baseBranch,
+          path: null,
+        });
+        return worktree.worktree;
+      });
+
     const startThread = (
       event: Extract<SlackInbound, { kind: "mention" }>,
       defaultModelSelection: ModelSelection | null,
@@ -212,6 +260,28 @@ export const InfinitusSlackLive = Layer.effectDiscard(
             text: "No default model: set one in Infinitus › Settings first.",
           });
         }
+        const current = yield* settings.getSettings;
+        const resolved = resolveProjectSettings(current, project.id, project).settings;
+        // The base branch: null keeps the thread on the checkout.
+        let baseBranch: string | null = null;
+        if (resolved.defaultThreadEnvMode === "worktree") {
+          const status = yield* vcsStatusBroadcaster
+            .getStatus({ cwd: project.workspaceRoot })
+            .pipe(Effect.option);
+          baseBranch = status._tag === "Some" && status.value.isRepo ? status.value.refName : null;
+          if (baseBranch !== null && current.worktreeMaxCount > 0) {
+            const holders =
+              yield* projectionSnapshotQuery.getWorktreeHolders(WORKTREE_CAP_SUGGESTIONS);
+            const refusal = worktreeCapRefusal(holders, current.worktreeMaxCount);
+            if (refusal !== null) {
+              return yield* post({
+                channel: event.channel,
+                threadTs: event.threadTs,
+                text: refusal,
+              });
+            }
+          }
+        }
         const threadId = ThreadId.make(yield* crypto.randomUUIDv4);
         const createdAt = yield* now;
         yield* orchestrationEngine.dispatch({
@@ -227,6 +297,59 @@ export const InfinitusSlackLive = Layer.effectDiscard(
           worktreePath: null,
           createdAt,
         });
+        let branch: string | null = null;
+        if (baseBranch !== null) {
+          const worktree = yield* createWorktree(
+            project.workspaceRoot,
+            baseBranch,
+            resolved.newWorktreesStartFromOrigin,
+          ).pipe(
+            Effect.catch((error) =>
+              Effect.gen(function* () {
+                yield* orchestrationEngine.dispatch({
+                  type: "thread.delete",
+                  commandId: yield* serverCommandId("delete"),
+                  threadId,
+                });
+                yield* Effect.logWarning("infinitus.slack.worktree-failed", {
+                  threadId,
+                  projectId: project.id,
+                  error: error.message,
+                });
+                yield* post({
+                  channel: event.channel,
+                  threadTs: event.threadTs,
+                  text: `Could not create a worktree for ${project.title}: ${error.message}`,
+                });
+                return null;
+              }),
+            ),
+          );
+          if (worktree === null) return;
+          branch = worktree.refName;
+          yield* orchestrationEngine.dispatch({
+            type: "thread.meta.update",
+            commandId: yield* serverCommandId("meta"),
+            threadId,
+            branch: worktree.refName,
+            worktreePath: worktree.path,
+          });
+          yield* vcsStatusBroadcaster
+            .refreshStatus(worktree.path)
+            .pipe(Effect.ignoreCause({ log: true }), Effect.forkDetach);
+          yield* projectSetupScriptRunner
+            .runForThread({
+              threadId,
+              projectId: project.id,
+              projectCwd: project.workspaceRoot,
+              worktreePath: worktree.path,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("infinitus.slack.setup-script-failed", { threadId, cause }),
+              ),
+            );
+        }
         yield* bind({
           channel: event.channel,
           threadTs: event.threadTs,
@@ -259,7 +382,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
         yield* post({
           channel: event.channel,
           threadTs: event.threadTs,
-          text: `Started in ${project.title} (${mention.runtimeMode === "auto-accept-edits" ? "build" : "approval required"}).`,
+          text: `Started in ${project.title}${branch === null ? "" : ` on ${branch}`} (${mention.runtimeMode === "auto-accept-edits" ? "build" : "approval required"}).`,
         });
       });
 
