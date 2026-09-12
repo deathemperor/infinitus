@@ -599,7 +599,10 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   with a `worktree_path` and lists the oldest archived ones;
   `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`)
   words the one-line refusal, which names those threads (deleting one frees
-  its worktree) and the setting. Settings → General "Worktree limit"
+  its worktree) and the setting. The direct `vcs.createWorktree` RPC runs the
+  same check (refused as a `GitCommandError`), and bootstraps reserve a slot
+  in `worktreesInFlight` before the reads, so Best-of members starting
+  together count each other. Settings → General "Worktree limit"
   (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.

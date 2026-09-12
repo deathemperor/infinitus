@@ -73,6 +73,7 @@ import {
   type PullRequestRef,
   WS_METHODS,
   WsRpcGroup,
+  GitCommandError,
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import {
@@ -180,6 +181,11 @@ import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as SessionStore from "./auth/SessionStore.ts";
 import { failEnvironmentAuthInvalid, failEnvironmentInternal } from "./auth/http.ts";
 import * as RelayClient from "@t3tools/shared/relayClient";
+
+// Fork (#269 H): worktree bootstraps that passed the limit check but whose
+// worktree the projection may not hold yet — one set per process, since
+// Best-of starts its members together and clients hold their own connections.
+const worktreesInFlight = new Set<string>();
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
@@ -576,6 +582,16 @@ const makeWsRpcLayer = (
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      // Fork (#269 H): `self` is 1 when the caller has already reserved its
+      // own slot in `worktreesInFlight`.
+      const worktreeCapRefusalNow = (self: 0 | 1) =>
+        Effect.gen(function* () {
+          const { worktreeMaxCount } = yield* serverSettings.getSettings;
+          if (worktreeMaxCount <= 0) return null;
+          const holders =
+            yield* projectionSnapshotQuery.getWorktreeHolders(WORKTREE_CAP_SUGGESTIONS);
+          return worktreeCapRefusal(holders, worktreeMaxCount, worktreesInFlight.size - self);
+        });
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
@@ -1143,16 +1159,14 @@ const makeWsRpcLayer = (
             // Fork (#269 H): the worktree limit is checked before anything is
             // created, so an over-limit send costs no thread.
             if (bootstrap?.prepareWorktree) {
-              const { worktreeMaxCount } = yield* serverSettings.getSettings;
-              if (worktreeMaxCount > 0) {
-                const holders =
-                  yield* projectionSnapshotQuery.getWorktreeHolders(WORKTREE_CAP_SUGGESTIONS);
-                const refusal = worktreeCapRefusal(holders, worktreeMaxCount);
-                if (refusal !== null) {
-                  return yield* Effect.fail(
-                    new OrchestrationDispatchCommandError({ message: refusal }),
-                  );
-                }
+              // Reserved before the reads, so members started together see each other.
+              worktreesInFlight.add(command.threadId);
+              const refusal = yield* worktreeCapRefusalNow(1);
+              if (refusal !== null) {
+                worktreesInFlight.delete(command.threadId);
+                return yield* Effect.fail(
+                  new OrchestrationDispatchCommandError({ message: refusal }),
+                );
               }
             }
             if (bootstrap?.createThread) {
@@ -1234,6 +1248,7 @@ const makeWsRpcLayer = (
           });
 
           return yield* bootstrapProgram.pipe(
+            Effect.ensuring(Effect.sync(() => worktreesInFlight.delete(command.threadId))),
             Effect.catchCause((cause) => {
               const dispatchError = toBootstrapDispatchCommandCauseError(cause);
               if (Cause.hasInterruptsOnly(cause)) {
@@ -2680,7 +2695,27 @@ const makeWsRpcLayer = (
         [WS_METHODS.vcsCreateWorktree]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsCreateWorktree,
-            gitWorkflow.createWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            // Fork (#269 H): the direct route is capped like a bootstrap; a
+            // failed check lets the worktree through rather than blocking it.
+            worktreeCapRefusalNow(0).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("worktree limit check failed", { cause }).pipe(Effect.as(null)),
+              ),
+              Effect.flatMap((refusal) =>
+                refusal === null
+                  ? gitWorkflow
+                      .createWorktree(input)
+                      .pipe(Effect.tap(() => refreshGitStatus(input.cwd)))
+                  : Effect.fail(
+                      new GitCommandError({
+                        operation: "createWorktree",
+                        command: "git worktree add",
+                        cwd: input.cwd,
+                        detail: refusal,
+                      }),
+                    ),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsRemoveWorktree]: (input) =>
