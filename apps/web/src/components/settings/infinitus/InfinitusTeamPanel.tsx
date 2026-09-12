@@ -21,7 +21,9 @@ import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
+import { Checkbox } from "../../ui/checkbox";
 import { Input } from "../../ui/input";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../../ui/select";
 import {
   SettingsPageContainer,
   SettingsRow,
@@ -33,6 +35,9 @@ import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsP
 import { infinitusCommandFailure, infinitusPanelMessage } from "./panel.logic";
 import {
   infinitusSecretFailure,
+  NEVER_PREAUTHORIZED,
+  parseTeamGrant,
+  parseTeamGrants,
   parseTeamStatus,
   relativeUnix,
   teamCommandInput,
@@ -40,16 +45,30 @@ import {
   teamCreateDraft,
   teamCreateSecretArgs,
   teamCreateSupported,
+  TEAM_GRANT_EXPIRY_CHOICES,
+  teamGrantAudienceLabel,
+  teamGrantCapabilitiesLabel,
+  teamGrantCommandInput,
+  teamGrantDraftProblem,
+  teamGrantExpiryLabel,
+  teamGrantsCommandInput,
+  teamGrantSessionsLabel,
+  teamGrantsSupported,
+  TEAM_GRANT_MEANINGS,
+  TEAM_GRANT_TIERS,
   parseTeamHostnameReply,
   teamHostnameClearInput,
   teamHostnameDraft,
   teamHostnameSecretArgs,
   teamHostnameSupported,
+  type TeamGrant,
+  type TeamGrantDraft,
   type TeamHostnameReply,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
   teamMemberSummary,
+  teamRevokeCommandInput,
   teamRoleLabel,
   teamStatusSupported,
   type TeamAction,
@@ -67,7 +86,15 @@ export function InfinitusTeamPanel() {
   const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<
-    TeamAction["type"] | "join" | "create" | "hostname" | "clear-hostname" | null
+    | TeamAction["type"]
+    | "join"
+    | "create"
+    | "hostname"
+    | "clear-hostname"
+    | "grants"
+    | "grant"
+    | "revoke"
+    | null
   >(null);
   const [joinName, setJoinName] = useState("");
   /** The code, a secret (#747): in memory only, cleared on submit, gone with the page. */
@@ -98,11 +125,24 @@ export function InfinitusTeamPanel() {
   /** What the last `team-hostname` answered; the Mac has no read for it. */
   const [hostnames, setHostnames] = useState<TeamHostnameReply | null>(null);
 
+  /** Session-control grants (#220); null before the first read or on error. */
+  const [grants, setGrants] = useState<ReadonlyArray<TeamGrant> | null>(null);
+  const [grantsError, setGrantsError] = useState<string | null>(null);
+  const [grantFormOpen, setGrantFormOpen] = useState(false);
+  const [grantAudience, setGrantAudience] = useState<TeamGrantDraft["audience"]>("team");
+  const [grantKids, setGrantKids] = useState<ReadonlySet<string>>(new Set());
+  const [grantCapabilities, setGrantCapabilities] = useState<ReadonlySet<string>>(new Set());
+  const [grantPreauthorized, setGrantPreauthorized] = useState<ReadonlySet<string>>(new Set());
+  const [grantSessions, setGrantSessions] = useState("");
+  const [grantExpiresSeconds, setGrantExpiresSeconds] = useState<number | null>(null);
+  const [grantError, setGrantError] = useState<string | null>(null);
+
   const supported =
     snapshot !== null && snapshot.available && teamStatusSupported(snapshot.commands);
   const joinSupported = snapshot !== null && teamJoinSupported(snapshot.commands);
   const createSupported = snapshot !== null && teamCreateSupported(snapshot.commands);
   const hostnameSupported = snapshot !== null && teamHostnameSupported(snapshot.commands);
+  const grantsSupported = snapshot !== null && teamGrantsSupported(snapshot.commands);
 
   const applyStatus = useCallback((result: unknown) => {
     const parsed = parseTeamStatus(result);
@@ -260,6 +300,124 @@ export function InfinitusTeamPanel() {
     setHostnames(parsed);
   }
 
+  const refreshGrants = useCallback(async () => {
+    if (environmentId === null) return;
+    setBusy("grants");
+    const result = await runCommand({ environmentId, input: teamGrantsCommandInput() });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setGrantsError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    const parsed = parseTeamGrants(result.value.result);
+    if (parsed === null) {
+      setGrantsError("Infinitus answered team-grants with a shape this build cannot read.");
+      return;
+    }
+    setGrantsError(null);
+    setGrants(parsed);
+  }, [environmentId, runCommand]);
+
+  const grantsVisible = team !== null && team !== undefined && team.role !== "pending";
+  useEffect(() => {
+    if (!grantsSupported || !grantsVisible) return;
+    void refreshGrants();
+  }, [refreshGrants, grantsSupported, grantsVisible]);
+
+  const resetGrantDraft = () => {
+    setGrantAudience("team");
+    setGrantKids(new Set());
+    setGrantCapabilities(new Set());
+    setGrantPreauthorized(new Set());
+    setGrantSessions("");
+    setGrantExpiresSeconds(null);
+    setGrantError(null);
+  };
+
+  const toggleGrantKid = (kid: string, checked: boolean) => {
+    setGrantKids((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(kid);
+      else next.delete(kid);
+      return next;
+    });
+  };
+
+  const toggleGrantCapability = (capability: string, checked: boolean) => {
+    setGrantCapabilities((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(capability);
+      else next.delete(capability);
+      return next;
+    });
+    if (!checked) {
+      setGrantPreauthorized((previous) => {
+        const next = new Set(previous);
+        next.delete(capability);
+        return next;
+      });
+    }
+  };
+
+  const toggleGrantPreauthorized = (capability: string, checked: boolean) => {
+    setGrantPreauthorized((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(capability);
+      else next.delete(capability);
+      return next;
+    });
+  };
+
+  const grantDraft: TeamGrantDraft = {
+    audience: grantAudience,
+    kids: [...grantKids],
+    capabilities: [...grantCapabilities],
+    preauthorized: [...grantPreauthorized],
+    sessions: grantSessions
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
+    expiresSeconds: grantExpiresSeconds,
+  };
+  const grantDraftProblem = teamGrantDraftProblem(grantDraft);
+
+  const submitGrant = async () => {
+    if (environmentId === null) return;
+    const problem = teamGrantDraftProblem(grantDraft);
+    if (problem !== null) {
+      setGrantError(problem);
+      return;
+    }
+    setBusy("grant");
+    setGrantError(null);
+    const result = await runCommand({ environmentId, input: teamGrantCommandInput(grantDraft) });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setGrantError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    if (parseTeamGrant(result.value.result) === null) {
+      setGrantError("Infinitus answered team-grant with a shape this build cannot read.");
+      return;
+    }
+    setGrantFormOpen(false);
+    resetGrantDraft();
+    await refreshGrants();
+  };
+
+  const revokeGrant = async (id: string) => {
+    if (environmentId === null) return;
+    setBusy("revoke");
+    setGrantsError(null);
+    const result = await runCommand({ environmentId, input: teamRevokeCommandInput(id) });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setGrantsError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    await refreshGrants();
+  };
+
   if (capability !== true || snapshot === null || !snapshot.available || !supported) {
     const state =
       capability !== true
@@ -341,6 +499,213 @@ export function InfinitusTeamPanel() {
                 description={teamMemberSummary(member, nowMs)}
               />
             ))
+          )}
+        </SettingsSection>
+      )}
+      {team === null || team === undefined || team.role === "pending" ? null : (
+        <SettingsSection id="infinitus-team-grants" title="Session control">
+          {!grantsSupported ? (
+            <InfinitusPanelNotice message="This Infinitus build has no grant commands from here; use the Mac's Settings › Team." />
+          ) : (
+            <>
+              {grants === null ? null : grants.length === 0 ? (
+                <InfinitusPanelNotice message="Nobody can drive your sessions." />
+              ) : (
+                grants.map((grant) => (
+                  <SettingsRow
+                    key={grant.id}
+                    title={`${teamGrantAudienceLabel(grant, team.members)} · ${teamGrantSessionsLabel(grant)} · ${teamGrantCapabilitiesLabel(grant)}`}
+                    description={teamGrantExpiryLabel(grant, nowMs)}
+                    control={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy !== null}
+                        onClick={() => void revokeGrant(grant.id)}
+                      >
+                        {busy === "revoke" ? "Removing…" : "Remove"}
+                      </Button>
+                    }
+                  />
+                ))
+              )}
+              {grantsError === null ? null : (
+                <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+                  {grantsError}
+                </p>
+              )}
+              {grantFormOpen ? (
+                <form
+                  className="flex flex-col gap-3 px-3 py-2 sm:px-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitGrant();
+                  }}
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[13px] font-medium">Who</span>
+                    <Select
+                      value={grantAudience}
+                      onValueChange={(value) =>
+                        setGrantAudience((value ?? "team") as TeamGrantDraft["audience"])
+                      }
+                    >
+                      <SelectTrigger size="sm" aria-label="Who">
+                        <SelectValue>
+                          {grantAudience === "leaders"
+                            ? "Leaders"
+                            : grantAudience === "team"
+                              ? "Whole team"
+                              : "Only these members"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectPopup align="start" alignItemWithTrigger={false}>
+                        <SelectItem value="leaders">Leaders</SelectItem>
+                        <SelectItem value="team">Whole team</SelectItem>
+                        <SelectItem value="members">Only these members</SelectItem>
+                      </SelectPopup>
+                    </Select>
+                    {grantAudience === "members" ? (
+                      <div className="flex flex-col gap-1 pl-2">
+                        {team.members
+                          .filter((member) => !member.isMe)
+                          .map((member) => (
+                            <label key={member.kid} className="flex items-center gap-2 text-[13px]">
+                              <Checkbox
+                                checked={grantKids.has(member.kid)}
+                                onCheckedChange={(checked) => toggleGrantKid(member.kid, checked)}
+                              />
+                              {member.name}
+                            </label>
+                          ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Input
+                    size="sm"
+                    aria-label="Session ids"
+                    placeholder="Session ids, comma-separated (empty = all sessions, now and later; this app has no live list of the Mac's terminals)"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={grantSessions}
+                    disabled={busy !== null}
+                    onChange={(event) => setGrantSessions(event.currentTarget.value)}
+                  />
+                  {TEAM_GRANT_TIERS.map((tier) => (
+                    <div key={tier.name} className="flex flex-col gap-1">
+                      <span className="text-[13px] font-medium">{tier.name}</span>
+                      <p className="text-[12px] text-muted-foreground">
+                        {tier.asks ?? "never asks"}
+                      </p>
+                      {tier.capabilities.map((capability) => (
+                        <div key={capability} className="flex flex-col gap-0.5 pl-2">
+                          <label className="flex items-center gap-2 text-[13px]">
+                            <Checkbox
+                              checked={grantCapabilities.has(capability)}
+                              onCheckedChange={(checked) =>
+                                toggleGrantCapability(capability, checked)
+                              }
+                            />
+                            {capability}
+                          </label>
+                          <span className="pl-6 text-[12px] text-muted-foreground">
+                            {TEAM_GRANT_MEANINGS[capability]}
+                          </span>
+                          {tier.asks !== null && grantCapabilities.has(capability) ? (
+                            NEVER_PREAUTHORIZED.includes(capability) ? (
+                              <span className="pl-6 text-[12px] text-muted-foreground">
+                                always asks
+                              </span>
+                            ) : (
+                              <label className="flex items-center gap-2 pl-6 text-[13px]">
+                                <Checkbox
+                                  checked={grantPreauthorized.has(capability)}
+                                  onCheckedChange={(checked) =>
+                                    toggleGrantPreauthorized(capability, checked)
+                                  }
+                                />
+                                without asking
+                              </label>
+                            )
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[13px] font-medium">Expires</span>
+                    <Select
+                      value={grantExpiresSeconds === null ? "none" : String(grantExpiresSeconds)}
+                      onValueChange={(value) =>
+                        setGrantExpiresSeconds(
+                          value === null || value === "none" ? null : Number(value),
+                        )
+                      }
+                    >
+                      <SelectTrigger size="sm" aria-label="Expires">
+                        <SelectValue>
+                          {TEAM_GRANT_EXPIRY_CHOICES.find(
+                            (choice) => choice.seconds === grantExpiresSeconds,
+                          )?.label ?? "Until revoked"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectPopup align="start" alignItemWithTrigger={false}>
+                        {TEAM_GRANT_EXPIRY_CHOICES.map((choice) => (
+                          <SelectItem
+                            key={choice.label}
+                            value={choice.seconds === null ? "none" : String(choice.seconds)}
+                          >
+                            {choice.label}
+                          </SelectItem>
+                        ))}
+                      </SelectPopup>
+                    </Select>
+                  </div>
+                  {grantError === null ? null : (
+                    <p role="alert" className="text-[13px] text-destructive">
+                      {grantError}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        setGrantFormOpen(false);
+                        resetGrantDraft();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={busy !== null || grantDraftProblem !== null}
+                    >
+                      {busy === "grant" ? "Adding…" : "Add grant"}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex justify-end px-3 py-2 sm:px-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy !== null}
+                    onClick={() => setGrantFormOpen(true)}
+                  >
+                    Add grant
+                  </Button>
+                </div>
+              )}
+              <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+                A grant lets the people named drive the sessions named — from their Mac, this app or
+                infinitusctl. Stop, resume-past, delete, swap and hold ask you on the Mac first
+                unless the grant says otherwise; delete always asks.
+              </p>
+            </>
           )}
         </SettingsSection>
       )}

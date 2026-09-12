@@ -4,6 +4,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   infinitusSecretFailure,
+  NEVER_PREAUTHORIZED,
+  parseTeamGrant,
+  parseTeamGrants,
   parseTeamStatus,
   relativeUnix,
   teamCommandInput,
@@ -11,6 +14,14 @@ import {
   teamCreateDraft,
   teamCreateSecretArgs,
   teamCreateSupported,
+  teamGrantAudienceLabel,
+  teamGrantCapabilitiesLabel,
+  teamGrantCommandInput,
+  teamGrantDraftProblem,
+  teamGrantExpiryLabel,
+  teamGrantsCommandInput,
+  teamGrantSessionsLabel,
+  teamGrantsSupported,
   parseTeamHostnameReply,
   teamHostnameClearInput,
   teamHostnameDraft,
@@ -20,7 +31,9 @@ import {
   teamJoinSupported,
   teamMemberName,
   teamMemberSummary,
+  teamRevokeCommandInput,
   teamStatusSupported,
+  type TeamGrant,
 } from "./team.logic";
 
 const command = (name: string, stdin?: string) => ({
@@ -220,5 +233,147 @@ describe("team.logic hostnames (#747)", () => {
       configured: false,
     });
     expect(parseTeamHostnameReply({ ok: true })).toBeNull();
+  });
+});
+
+describe("team.logic grants (#220)", () => {
+  it("gates on all three grant verbs", () => {
+    expect(
+      teamGrantsSupported([command("team-grants"), command("team-grant"), command("team-revoke")]),
+    ).toBe(true);
+    expect(teamGrantsSupported([command("team-grants"), command("team-grant")])).toBe(false);
+  });
+
+  it("builds the write verbs, omitting a never-preauthorised capability from pre", () => {
+    expect(
+      teamGrantDraftProblem({
+        audience: "team",
+        kids: [],
+        capabilities: [],
+        preauthorized: [],
+        sessions: [],
+        expiresSeconds: null,
+      }),
+    ).toBe("Pick at least one capability.");
+    expect(
+      teamGrantDraftProblem({
+        audience: "members",
+        kids: [],
+        capabilities: ["send"],
+        preauthorized: [],
+        sessions: [],
+        expiresSeconds: null,
+      }),
+    ).toBe("Pick at least one member.");
+    expect(
+      teamGrantDraftProblem({
+        audience: "team",
+        kids: [],
+        capabilities: ["send"],
+        preauthorized: [],
+        sessions: [],
+        expiresSeconds: null,
+      }),
+    ).toBeNull();
+
+    expect(
+      teamGrantCommandInput({
+        audience: "members",
+        kids: ["k-2", "k-1"],
+        capabilities: ["stop", "delete"],
+        preauthorized: NEVER_PREAUTHORIZED,
+        sessions: [],
+        expiresSeconds: 3600,
+      }),
+    ).toEqual({
+      command: "team-grant",
+      args: ["k-2,k-1"],
+      options: { cap: "delete,stop", expires: "3600" },
+    });
+
+    expect(
+      teamGrantCommandInput({
+        audience: "team",
+        kids: [],
+        capabilities: ["send"],
+        preauthorized: [],
+        sessions: [],
+        expiresSeconds: null,
+      }),
+    ).toEqual({ command: "team-grant", args: ["team"], options: { cap: "send" } });
+
+    expect(teamRevokeCommandInput("g-1")).toEqual({
+      command: "team-revoke",
+      args: ["g-1"],
+      options: {},
+    });
+    expect(teamGrantsCommandInput()).toEqual({ command: "team-grants", args: [], options: {} });
+  });
+
+  it("reads team-grants leniently and rejects garbage", () => {
+    const full: TeamGrant = {
+      id: "g-1",
+      audience: "leaders",
+      sessions: "all",
+      capabilities: ["stop"],
+      preauthorized: ["stop"],
+      since: 1_699_000_000,
+      expires: 1_699_100_000,
+    };
+    const bare: TeamGrant = {
+      id: "g-2",
+      audience: "team",
+      sessions: ["s-1"],
+      capabilities: ["view"],
+      since: 1_699_000_000,
+    };
+    expect(parseTeamGrants({ schema: 1, grants: [full, bare] })).toEqual([full, bare]);
+    expect(parseTeamGrant(bare)).toEqual(bare);
+    expect(parseTeamGrants({ grants: "nope" })).toBeNull();
+    expect(parseTeamGrants(null)).toBeNull();
+    expect(parseTeamGrant({ id: "g-1" })).toBeNull();
+  });
+
+  it("words audience, sessions, capabilities and expiry", () => {
+    const members = [
+      { kid: "k-1", name: "Ada", role: "leader", isMe: false },
+      { kid: "k-2", name: "Bo", role: "member", isMe: false },
+    ];
+    const leadersGrant: TeamGrant = {
+      id: "g-1",
+      audience: "leaders",
+      sessions: "all",
+      capabilities: ["view", "send"],
+      since: 1,
+    };
+    expect(teamGrantAudienceLabel(leadersGrant, members)).toBe("leaders");
+    expect(teamGrantAudienceLabel({ ...leadersGrant, audience: "team" }, members)).toBe(
+      "whole team",
+    );
+    expect(
+      teamGrantAudienceLabel({ ...leadersGrant, audience: ["k-2", "k-1", "k-9999999"] }, members),
+    ).toBe("Bo, Ada, k-999999");
+    expect(teamGrantSessionsLabel(leadersGrant)).toBe("all sessions");
+    expect(teamGrantSessionsLabel({ ...leadersGrant, sessions: ["s-1"] })).toBe("1 session");
+    expect(teamGrantSessionsLabel({ ...leadersGrant, sessions: ["s-1", "s-2"] })).toBe(
+      "2 sessions",
+    );
+    expect(teamGrantCapabilitiesLabel(leadersGrant)).toBe("send, view");
+    expect(
+      teamGrantCapabilitiesLabel({
+        ...leadersGrant,
+        capabilities: ["stop", "hold"],
+        preauthorized: ["hold"],
+      }),
+    ).toBe("hold (no ask), stop (asks)");
+
+    const NOW = 1_700_000_000_000;
+    expect(teamGrantExpiryLabel(leadersGrant, NOW)).toBe("until revoked");
+    expect(teamGrantExpiryLabel({ ...leadersGrant, expires: NOW / 1000 + 7500 }, NOW)).toBe(
+      "expires in 2 h 05 m",
+    );
+    expect(teamGrantExpiryLabel({ ...leadersGrant, expires: NOW / 1000 - 10 }, NOW)).toBe(
+      "expired",
+    );
   });
 });
