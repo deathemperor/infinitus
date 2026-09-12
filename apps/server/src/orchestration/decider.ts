@@ -1514,6 +1514,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             ...(command.modelSelection !== undefined
               ? { modelSelection: command.modelSelection }
               : {}),
+            ...(command.message.context !== undefined ? { context: command.message.context } : {}),
             orderKey,
             createdAt: command.createdAt,
             updatedAt: command.createdAt,
@@ -1545,11 +1546,19 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         type: "thread.turn-queue-updated",
         payload: {
           threadId: command.threadId,
+          // The command carries the whole message, so a context it lacks is
+          // cleared, not kept from the row being replaced.
           queuedTurn: {
-            ...existing,
+            queueId: existing.queueId,
+            ...(existing.modelSelection !== undefined
+              ? { modelSelection: existing.modelSelection }
+              : {}),
+            orderKey: existing.orderKey,
+            createdAt: existing.createdAt,
             messageId: command.message.messageId,
             text: command.message.text,
             attachments: command.message.attachments,
+            ...(command.message.context !== undefined ? { context: command.message.context } : {}),
             updatedAt: command.createdAt,
           },
         },

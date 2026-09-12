@@ -41,7 +41,7 @@ makes wrong, in its own PR.
   (upstream-channel tests start on a nightly feed via the harness `settings`
   option) are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
-  (`051`–`057`, #806 onward) is renumbered after them in the merge
+  (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
   is the fork's `058`), so an existing fork database never skips it. Upstream commits
   `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
@@ -308,7 +308,9 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   the idle drain racing on one row send it once); `projector.ts`,
   `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
   the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
-  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`),
+  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`;
+  `context_json`, migration `059`, keeps the message's context records
+  upstream #11265 added, and the drain sends them with it — #969),
   dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
   every thread read (snapshot, command read model, shells, detail);
   `Normalizer.ts` — the queue commands' uploads stored like a sent
