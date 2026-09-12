@@ -551,6 +551,9 @@ export function runtimeEventToActivities(
           payload: {
             taskId: event.payload.taskId,
             ...(event.payload.taskType ? { taskType: event.payload.taskType } : {}),
+            ...(event.payload.isBackgrounded !== undefined
+              ? { isBackgrounded: event.payload.isBackgrounded }
+              : {}),
             ...(event.payload.description
               ? { detail: truncateDetail(event.payload.description) }
               : {}),

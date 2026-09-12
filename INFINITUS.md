@@ -275,15 +275,29 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   check. Test beside the E1 one.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
   exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
-turnId)` → `{durationMs, completedAt, runningShells}` for a completed
-  turn, `turnFooterLabel(footer, time)` → "Done in 49s · 12:59 PM · 1 shell
-  still running". Derived, no contract: the latest turn's `startedAt →
+turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
+  completed turn, `turnFooterLabel(footer, time)` → "Done in 49s · 12:59 PM
+  · 1 shell still running · 1 agent still running". Derived, no contract: the latest turn's `startedAt →
 completedAt`, an older turn's user message → last assistant `updatedAt`
   (the on-screen durations' rule; overstates by a hold or queue wait — the
   per-turn `durationMs` row never reaches the client, only the rollup),
   shells from the turn's `task.started` bash/shell tasks that went
   `isBackgrounded` and have no end (`endedAt`, a terminal status,
-  `task.completed`) anywhere in the thread, zero once the session stopped.
+  `task.completed`) anywhere in the thread, zero once the session stopped;
+  agents (#974) by the same rule for the turn's `agentKind: "agent"` tasks
+  (an unstamped row is classified from its task type) — a foreground agent
+  finished inside the turn, so only a backgrounded one can still run. For
+  that the Claude adapter (`ClaudeAdapter.ts`) forwards the SDK's
+  `is_backgrounded` on `task.started` (`TaskStartedPayload.isBackgrounded`
+  in `packages/contracts/src/providerRuntime.ts`, passed through by
+  `ProviderRuntimeIngestion.ts`), keeps each task's backgrounded/ambient
+  state, and on a session exit or the server's shutdown finalizer — never
+  an internal restart — emits one `runtime.error` ("Session ended with N
+  background agents running — their work is not finished",
+  `liveBackgroundAgentsMessage`) before the stopped rows: ingestion turns
+  that into the error activity and marks the session `error`, so the
+  thread stops reading as finished work. A killed server writes nothing;
+  a boot-time reconcile is a follow-up.
   Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
   while entries are equal, so a running turn's ticks repaint nothing),
   `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity

@@ -1,7 +1,7 @@
 import { TurnId, type OrchestrationThread } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { turnFooter, turnFooterLabel } from "./turnFooter.ts";
+import { turnFooter, turnFooterLabel, type TurnFooter } from "./turnFooter.ts";
 
 const turn1 = TurnId.make("turn-1");
 const turn2 = TurnId.make("turn-2");
@@ -67,11 +67,13 @@ describe("turnFooter (#952)", () => {
       durationMs: 19_000,
       completedAt: "2026-09-12T12:05:21Z",
       runningShells: 0,
+      runningAgents: 0,
     });
     expect(turnFooter(t, turn1)).toEqual({
       durationMs: 49_000,
       completedAt: "2026-09-12T12:00:49Z",
       runningShells: 0,
+      runningAgents: 0,
     });
   });
 
@@ -107,6 +109,8 @@ describe("turnFooter (#952)", () => {
     ];
     const open = thread({ messages, activities: openActivities });
     expect(turnFooter(open, turn1)?.runningShells).toBe(2);
+    // The agent is not a shell; it is counted on its own (#974).
+    expect(turnFooter(open, turn1)?.runningAgents).toBe(1);
 
     // The end arrives under the next turn, or no turn at all.
     const ended = thread({
@@ -136,15 +140,88 @@ describe("turnFooter (#952)", () => {
     expect(turnFooter(gone(null), turn1)?.runningShells).toBe(0);
   });
 
+  it("counts the turn's background agents until they end (#974)", () => {
+    const messages = [
+      message("u1", "user", turn1, "2026-09-12T12:00:00Z"),
+      message("a1", "assistant", turn1, "2026-09-12T12:00:01Z", "2026-09-12T12:00:30Z"),
+    ];
+    const agent = (id: string, payload: Record<string, unknown>) =>
+      activity(`s-${id}`, "task.started", turn1, {
+        taskId: id,
+        taskType: "local_agent",
+        agentKind: "agent",
+        ...payload,
+      });
+    const openActivities = [
+      // Registered in the background from the start.
+      agent("a-1", { isBackgrounded: true }),
+      // Moved to the background later.
+      agent("a-2", {}),
+      backgrounded("a-2", turn1),
+      // A foreground agent finished inside the turn.
+      agent("a-3", {}),
+      // A monitor is never counted, backgrounded or not.
+      activity("s-m", "task.started", turn1, {
+        taskId: "m-1",
+        taskType: "local_monitor",
+        agentKind: "background",
+        isBackgrounded: true,
+      }),
+      // A backgrounded shell is a shell.
+      shellStarted("t-1", turn1),
+      backgrounded("t-1", turn1),
+    ];
+    const open = thread({ messages, activities: openActivities });
+    expect(turnFooter(open, turn1)).toMatchObject({ runningShells: 1, runningAgents: 2 });
+
+    // An unstamped row (older activity) is classified from its task type.
+    const legacy = thread({
+      messages,
+      activities: [
+        activity("s-l", "task.started", turn1, {
+          taskId: "l-1",
+          taskType: "local_agent",
+          isBackgrounded: true,
+        }),
+      ],
+    });
+    expect(turnFooter(legacy, turn1)?.runningAgents).toBe(1);
+
+    const ended = thread({
+      messages,
+      activities: [
+        ...openActivities,
+        activity("e-1", "task.completed", null, { taskId: "a-1", status: "completed" }),
+        activity("e-2", "task.updated", null, { taskId: "a-2", status: "failed" }),
+      ],
+    });
+    expect(turnFooter(ended, turn1)?.runningAgents).toBe(0);
+
+    // The session that ran the agents is gone: its exit row said so.
+    const gone = thread({ messages, activities: openActivities, session: { status: "error" } });
+    expect(turnFooter(gone, turn1)?.runningAgents).toBe(0);
+  });
+
   it("words the label", () => {
-    expect(
-      turnFooterLabel({ durationMs: 49_000, completedAt: "x", runningShells: 0 }, "12:59 PM"),
-    ).toBe("Done in 49s · 12:59 PM");
-    expect(
-      turnFooterLabel({ durationMs: 125_000, completedAt: "x", runningShells: 1 }, "12:59 PM"),
-    ).toBe("Done in 2m 5s · 12:59 PM · 1 shell still running");
-    expect(
-      turnFooterLabel({ durationMs: null, completedAt: "x", runningShells: 2 }, "12:59 PM"),
-    ).toBe("Done · 12:59 PM · 2 shells still running");
+    const footer = (parts: Partial<TurnFooter>): TurnFooter => ({
+      durationMs: 49_000,
+      completedAt: "x",
+      runningShells: 0,
+      runningAgents: 0,
+      ...parts,
+    });
+    expect(turnFooterLabel(footer({}), "12:59 PM")).toBe("Done in 49s · 12:59 PM");
+    expect(turnFooterLabel(footer({ durationMs: 125_000, runningShells: 1 }), "12:59 PM")).toBe(
+      "Done in 2m 5s · 12:59 PM · 1 shell still running",
+    );
+    expect(turnFooterLabel(footer({ durationMs: null, runningShells: 2 }), "12:59 PM")).toBe(
+      "Done · 12:59 PM · 2 shells still running",
+    );
+    expect(turnFooterLabel(footer({ runningAgents: 1 }), "12:59 PM")).toBe(
+      "Done in 49s · 12:59 PM · 1 agent still running",
+    );
+    expect(turnFooterLabel(footer({ runningShells: 1, runningAgents: 3 }), "12:59 PM")).toBe(
+      "Done in 49s · 12:59 PM · 1 shell still running · 3 agents still running",
+    );
   });
 });
