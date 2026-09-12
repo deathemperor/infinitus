@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.2
+
 ### Desktop
 - The checkpoint after every turn no longer re-reads the whole repository: on a large checkout it took 13 s and often hit the 30 s limit, ending each turn with "Checkpoint capture failed"; it now reuses git's own index cache (upstream fix #10792 carried ahead).
 - The desktop's updater offers the next alpha, beta or plain release again: it follows the version's own prerelease channel, so an installed 0.5.0-alpha.1 must be replaced by hand once and every release after that arrives on its own (#924).

@@ -452,7 +452,8 @@ jobs:
   # One release for the tag: the DMG, its zip, blockmaps and the
   # `<prerelease id>-mac.yml` manifest electron-updater installs from
   # (#924), both menu bar zips, the Linux binaries. A prerelease while the
-  # version carries a prerelease tag (`-alpha.N`, `-beta.N`, `-rc.N`), a full
+  # version carries a prerelease tag (`-alpha.N` or `-beta.N`; electron-updater
+  # knows no other id, #924), a full
   # release otherwise, so `releases/latest` is the one-app release once a
   # plain version ships. Notes are that version's section of
   # apps/mac/CHANGELOG.md; a tag without notes cannot ship.
