@@ -210,6 +210,7 @@ import { RightPanelTabs } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
 import { SideQuestionPanel } from "./SideQuestionPanel";
 import { hasCompletedTurn, SIDE_QUESTION_NEEDS_TURN } from "./SideQuestionPanel.logic";
+import { usePendingSideQuestionStore } from "./pendingSideQuestion";
 import { BestOfGroupCard } from "./BestOfGroupCard";
 import { planBestOfMembers, type BestOfChip, type BestOfMember } from "./chat/bestOf.logic";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
@@ -4265,26 +4266,34 @@ export default function ChatView(props: ChatViewProps) {
   // in its forking state, and a failure shows inside it.
   const sideQuestionUnavailable =
     activeThread && hasCompletedTurn(activeThread) ? undefined : SIDE_QUESTION_NEEDS_TURN;
-  const askSideQuestion = useCallback(async () => {
-    if (!activeThread || !activeThreadRef) return;
-    useRightPanelStore.getState().openSideQuestionPending(activeThreadRef);
-    const forked = await forkThreadAtTurn({
-      environmentId,
-      input: { threadId: activeThread.id, side: true },
-    });
-    if (forked._tag === "Failure") {
-      if (isAtomCommandInterrupted(forked)) return;
-      const error = squashAtomCommandFailure(forked);
-      useRightPanelStore
-        .getState()
-        .failSideQuestionPending(
-          activeThreadRef,
-          error instanceof Error ? error.message : "Could not open a side question.",
-        );
-      return;
-    }
-    useRightPanelStore.getState().openSideQuestion(activeThreadRef, forked.value.threadId);
-  }, [activeThread, activeThreadRef, environmentId, forkThreadAtTurn]);
+  // `question`: a failed side question's Retry re-asks it on the fresh fork
+  // (the composer's buttons pass their click event, never a string).
+  const askSideQuestion = useCallback(
+    async (question?: unknown) => {
+      if (!activeThread || !activeThreadRef) return;
+      useRightPanelStore.getState().openSideQuestionPending(activeThreadRef);
+      const forked = await forkThreadAtTurn({
+        environmentId,
+        input: { threadId: activeThread.id, side: true },
+      });
+      if (forked._tag === "Failure") {
+        if (isAtomCommandInterrupted(forked)) return;
+        const error = squashAtomCommandFailure(forked);
+        useRightPanelStore
+          .getState()
+          .failSideQuestionPending(
+            activeThreadRef,
+            error instanceof Error ? error.message : "Could not open a side question.",
+          );
+        return;
+      }
+      if (typeof question === "string" && question.trim().length > 0) {
+        usePendingSideQuestionStore.getState().offer(forked.value.threadId, question);
+      }
+      useRightPanelStore.getState().openSideQuestion(activeThreadRef, forked.value.threadId);
+    },
+    [activeThread, activeThreadRef, environmentId, forkThreadAtTurn],
+  );
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
   const pullRequestsSurfaceAvailable =
@@ -8823,6 +8832,10 @@ export default function ChatView(props: ChatViewProps) {
         composerRef={composerRef}
         forking={renderedRightPanelSurface.forking}
         onRetry={askSideQuestion}
+        onRetryQuestion={(question) => {
+          closeRightPanelSurface(renderedRightPanelSurface);
+          void askSideQuestion(question);
+        }}
         onClose={() => closeRightPanelSurface(renderedRightPanelSurface)}
       />
     ) : renderedRightPanelSurface?.kind === "agents" ? (

@@ -7,7 +7,7 @@ import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import { MessageCircleQuestionMarkIcon } from "lucide-react";
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { useComposerDraftStore, type ComposerThreadTarget } from "../composerDraftStore";
 import type { ComposerHandleRef } from "../composerHandleContext";
@@ -20,7 +20,9 @@ import {
   isSideQuestionGone,
   isSideQuestionMessage,
   SIDE_QUESTION_GONE_GRACE_MS,
+  sideQuestionFailure,
 } from "./SideQuestionPanel.logic";
+import { usePendingSideQuestionStore } from "./pendingSideQuestion";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import ChatMarkdown from "./ChatMarkdown";
@@ -38,7 +40,9 @@ import { Textarea } from "./ui/textarea";
  * main" puts the latest answer at the main composer's caret (appended to
  * its draft when the composer cannot take an insert). Closing the tab
  * archives the side thread (`ChatView`); a side thread deleted from the
- * sidebar shows as gone here, with the tab left to close.
+ * sidebar shows as gone here, with the tab left to close. A question whose
+ * turn failed shows the failure the main timeline would (the error activity,
+ * else the session's error) with a Retry that re-asks it on a fresh fork.
  */
 export function SideQuestionPanel({
   environmentId,
@@ -47,6 +51,7 @@ export function SideQuestionPanel({
   composerRef,
   forking,
   onRetry,
+  onRetryQuestion,
   onClose,
 }: {
   environmentId: EnvironmentId;
@@ -57,6 +62,8 @@ export function SideQuestionPanel({
   /** While the fork is being made: no error yet, or the reason it failed. */
   forking?: { readonly error: string | null } | undefined;
   onRetry?: (() => void) | undefined;
+  /** Re-asks a failed question on a fresh fork (closing this drawer). */
+  onRetryQuestion?: ((question: string) => void) | undefined;
   /** Closes the drawer's tab, offered when the side thread is gone. */
   onClose?: (() => void) | undefined;
 }) {
@@ -100,33 +107,48 @@ export function SideQuestionPanel({
       null,
     [messages],
   );
+  const failure = useMemo(
+    () => (thread ? sideQuestionFailure(threadId, thread) : null),
+    [thread, threadId],
+  );
 
-  const send = async () => {
-    const asked = text.trim();
-    if (!thread || asked.length === 0 || busy) return;
-    setSending(true);
-    setError(null);
-    const createdAt = new Date().toISOString();
-    const result = await startTurn({
-      environmentId,
-      input: {
-        threadId,
-        message: { messageId: newMessageId(), role: "user", text: asked, attachments: [] },
-        modelSelection: thread.modelSelection,
-        runtimeMode: thread.runtimeMode,
-        interactionMode: "plan",
-        createdAt,
-      },
-    });
-    setSending(false);
-    if (result._tag === "Failure") {
-      if (isAtomCommandInterrupted(result)) return;
-      const failure = squashAtomCommandFailure(result);
-      setError(failure instanceof Error ? failure.message : "Could not ask.");
-      return;
-    }
-    setText("");
-  };
+  const ask = useCallback(
+    async (asked: string) => {
+      if (!thread || asked.length === 0 || busy) return;
+      setSending(true);
+      setError(null);
+      const createdAt = new Date().toISOString();
+      const result = await startTurn({
+        environmentId,
+        input: {
+          threadId,
+          message: { messageId: newMessageId(), role: "user", text: asked, attachments: [] },
+          modelSelection: thread.modelSelection,
+          runtimeMode: thread.runtimeMode,
+          interactionMode: "plan",
+          createdAt,
+        },
+      });
+      setSending(false);
+      if (result._tag === "Failure") {
+        if (isAtomCommandInterrupted(result)) return;
+        const failed = squashAtomCommandFailure(result);
+        setError(failed instanceof Error ? failed.message : "Could not ask.");
+        return;
+      }
+      setText("");
+    },
+    [busy, environmentId, startTurn, thread, threadId],
+  );
+  const send = () => ask(text.trim());
+  // A Retry's question, offered by ChatView for this fresh fork: sent once
+  // the thread is here and idle.
+  const ready = thread !== null && !busy;
+  useEffect(() => {
+    if (!ready) return;
+    const pending = usePendingSideQuestionStore.getState().take(threadId);
+    if (pending !== null) void ask(pending);
+  }, [ask, ready, threadId]);
 
   const bringToMain = () => {
     if (answer === null) return;
@@ -232,6 +254,24 @@ export function SideQuestionPanel({
             </div>
           ))}
           {running ? <Spinner className="size-3.5 text-muted-foreground" /> : null}
+          {failure !== null ? (
+            <div
+              className="flex items-start justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2"
+              data-testid="side-question-failure"
+            >
+              <p className="text-destructive text-xs">{failure.text}</p>
+              {onRetryQuestion ? (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onRetryQuestion(failure.question)}
+                >
+                  Retry
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
       {error !== null ? <p className="px-3 pb-1 text-destructive text-xs">{error}</p> : null}
