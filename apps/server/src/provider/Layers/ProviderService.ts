@@ -1078,22 +1078,21 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     });
 
   // Fork (#832): a turn whose transport went away is marked for the boot
-  // continuation the moment the adapter starts waiting to reconnect
-  // (`session.state.changed {running, reason: "reconnecting:<n>/<max>"}`),
-  // so a server that dies mid-backoff picks the turn up on restart whatever
+  // continuation on every reconnect attempt the adapter announces
+  // (`session.state.changed {running, reason: "reconnecting:<n>/<max>"}`,
+  // at most a handful per turn, seconds apart), so a server that dies
+  // mid-backoff picks the turn up on restart whatever
   // `continueThreadsAfterServerUpdate` says: the boot reads the marker
-  // before the setting. `sendTurn` and `stopSession` null the key on their
-  // own; clearing it when the turn ends is hygiene (a finished turn is not
-  // orphaned at boot, so a stale marker would be ignored) kept cheap by
-  // remembering which threads this process marked.
-  const reconnectMarked = new Set<ThreadId>();
+  // before the setting. Nothing clears it here: a finished turn is not
+  // orphaned at boot, so a left-over marker is inert, and `sendTurn` and
+  // `stopSession` null the key on the next admission.
   const writeReconnectContinuationMarker = (
     source: {
       readonly instanceId: ProviderInstanceId;
       readonly provider: ProviderDriverKind;
     },
     threadId: ThreadId,
-    turnId: TurnId | null,
+    turnId: TurnId,
   ) =>
     directory
       .upsert({
@@ -1165,17 +1164,12 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
             ),
           );
         }
-        if (reconnectMarked.delete(canonicalEvent.threadId)) {
-          yield* writeReconnectContinuationMarker(source, canonicalEvent.threadId, null);
-        }
       } else if (
         canonicalEvent.type === "session.state.changed" &&
         canonicalEvent.payload.state === "running" &&
         canonicalEvent.payload.reason?.startsWith("reconnecting:") === true &&
-        canonicalEvent.turnId !== undefined &&
-        !reconnectMarked.has(canonicalEvent.threadId)
+        canonicalEvent.turnId !== undefined
       ) {
-        reconnectMarked.add(canonicalEvent.threadId);
         yield* writeReconnectContinuationMarker(
           source,
           canonicalEvent.threadId,
