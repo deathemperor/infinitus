@@ -1504,6 +1504,17 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (#346): `known: true` replies are all new, `known: false` (the app
   restarted) re-seeds the cursor and publishes only rows newer than the last
   one seen; builds without the option get the full-list read as before.
+- `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+
+  `slack.logic.ts`, test) — Settings › Infinitus › Slack (#574, PR 3), the
+  "Slack" section under Threads on the Menu bar page (`settings.infinitus.index.tsx`
+  footer, search item `infinitus-slack`): the bridge's switch (helper text:
+  a mention starts a thread that asks before edits; `build` lets it edit
+  without asking), the app-level and bot tokens as `type="password"`
+  `autoComplete="off"` fields typed once — the server stores them (#951)
+  and the card only ever sees the marker, so a row reads "Set." / "Not
+  set." with Replace and Clear (Clear sends "") — and the allowed member
+  ids (comma-separated, parsed by `parseAllowedUserIds`); `slackStatusLine`
+  says what is still missing before the bridge is live.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
   resume-on-limit for the threads this server runs (#648), the fork's
   counterpart to native's terminal nudge: the Claude adapter's parked-turn
