@@ -50,6 +50,18 @@ extension TeamControl {
             for (entry, header) in headers where header.kind == TeamKinds.ack && header.from == me && header.at + 2 * storeTTL < now {
                 try client.unpublish(path: String(entry.path.dropFirst("m/\(me)/".count)))
             }
+            // Phase 2: the answers minted after an inline `pending` — a
+            // decision, a wait that timed out — go out here, on the same
+            // path as the first ack (replaced, so the reader sees one per
+            // id). A driver no longer in the roster gets nothing.
+            expirePending(&endpoint, now: now)
+            let roster = client.roster?.doc
+            for entry in endpoint.outbox.entries {
+                guard let keys = roster?.keys(for: entry.to, at: now) else { continue }
+                try client.publish(kind: TeamKinds.ack, path: "control/acks/\(entry.ack.id).json", plaintext: try CanonicalJSON.encode(entry.ack),
+                                   audience: .members([keys.kid]), now: entry.ack.at)
+            }
+            endpoint.outbox.entries.removeAll()
             return audits
         }
 
