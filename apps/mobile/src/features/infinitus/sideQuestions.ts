@@ -1,4 +1,4 @@
-import type { ThreadId } from "@t3tools/contracts";
+import type { ThreadId, TurnId } from "@t3tools/contracts";
 
 /**
  * Fork (#269 C, #863): a thread with `sideOf` set is a hidden side question
@@ -31,4 +31,70 @@ export function withoutSideQuestionSnapshots<
       ? entry
       : { ...entry, snapshot: { ...entry.snapshot, threads } };
   });
+}
+
+/**
+ * Fork (#269 C, #881): whether a message of a side thread was asked or
+ * answered there. The fork seeds the thread with the main thread's history
+ * through `thread.history.import`, whose messages carry the ids the fork
+ * minted (`<threadId>:000000`, `:000001`, …); a question asked from the
+ * sheet gets a fresh random id, and its answer streams in under a turn.
+ * The web's `SideQuestionPanel.logic.ts`, kept local so neither app edits
+ * the other's file.
+ */
+export function isSideQuestionMessage(
+  threadId: ThreadId,
+  message: { readonly id: string; readonly role: string; readonly text: string },
+): boolean {
+  return (
+    !message.id.startsWith(`${threadId}:`) &&
+    (message.role === "user" || message.role === "assistant") &&
+    message.text.trim().length > 0
+  );
+}
+
+/**
+ * Whether the thread has a turn a side question can fork from. The server
+ * forks at the session's latest completed turn; here the proxy is an
+ * assistant message that finished under a turn other than the one running.
+ * Imported history (no turn) does not count.
+ */
+export function hasCompletedTurn(thread: {
+  readonly messages: ReadonlyArray<{
+    readonly role: string;
+    readonly turnId: TurnId | null;
+    readonly streaming: boolean;
+  }>;
+  readonly session: { readonly activeTurnId: TurnId | null } | null;
+}): boolean {
+  const activeTurnId = thread.session?.activeTurnId ?? null;
+  return thread.messages.some(
+    (message) =>
+      message.role === "assistant" &&
+      !message.streaming &&
+      message.turnId !== null &&
+      message.turnId !== activeTurnId,
+  );
+}
+
+/** Why the side question cannot be asked yet; the web's wording. */
+export const SIDE_QUESTION_NEEDS_TURN = "Ask a side question once a turn has completed.";
+
+/** The latest finished answer among the side thread's own messages, or null. */
+export function latestSideAnswer(
+  messages: ReadonlyArray<{
+    readonly role: string;
+    readonly text: string;
+    readonly streaming: boolean;
+  }>,
+): string | null {
+  return (
+    messages.findLast((message) => message.role === "assistant" && !message.streaming)?.text ?? null
+  );
+}
+
+/** The main composer's draft with the answer brought over: appended after a
+    blank line, or the answer alone when the draft is blank. */
+export function bringToMainText(currentDraft: string, answer: string): string {
+  return currentDraft.trim().length > 0 ? `${currentDraft.trimEnd()}\n\n${answer}` : answer;
 }
