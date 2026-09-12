@@ -24,6 +24,16 @@ import { parseCliArgs } from "@t3tools/shared/cliArgs";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import { type ClaudeScopedLimitNames, claudeRateLimitEventToUpdate } from "./claudeUsageLimits.ts";
 import {
+  isTransportErrorMessage,
+  isTransportResult,
+  RECONNECT_BACKOFF_MILLIS,
+  RECONNECT_EXHAUSTED_MESSAGE,
+  RECONNECT_MAX_ATTEMPTS,
+  reconnectQueryOptions,
+  reconnectReason,
+} from "./claudeReconnect.logic.ts";
+import { TURN_CONTINUATION_PROMPT } from "../turnContinuation.ts";
+import {
   ApprovalRequestId,
   classifyTaskAgentKind,
   type CanonicalItemType,
@@ -69,6 +79,7 @@ import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
@@ -174,6 +185,12 @@ interface ClaudeTurnState {
   authenticationFailureMessage: string | undefined;
   rejectedRateLimitTypes: Set<string>;
   latestAssistantRateLimited: boolean;
+  /** Reconnect (#832): the message that opened the turn, re-sent when nothing answered it. */
+  lastUserMessage: SDKUserMessage | undefined;
+  /** Reconnect (#832): true once the model answered anything in this turn. */
+  sawAssistantOutput: boolean;
+  /** Reconnect (#832): the CLI reported API retries; a process exit after them is a lost transport. */
+  apiRetrySeen: boolean;
 }
 
 interface AssistantTextBlockState {
@@ -300,11 +317,34 @@ function rememberPendingTaskModel(
   }
 }
 
+/** Reconnect (#832): one lost transport being retried, attempt by attempt. */
+interface ClaudeReconnectState {
+  /** The attempt about to run or running, 1-based. */
+  attempt: number;
+  /**
+   * True from scheduling until the query is reopened: a stream exit in this
+   * window is the old query going away, not a new failure.
+   */
+  waiting: boolean;
+  /** The backoff sleep; interrupted when the session stops. */
+  fiber: Fiber.Fiber<void> | undefined;
+}
+
 interface ClaudeSessionContext {
   session: ProviderSession;
-  readonly promptQueue: Queue.Queue<PromptQueueItem>;
-  readonly query: ClaudeQueryRuntime;
+  /** Replaced on a reconnect (#832): the reopened query reads a fresh queue. */
+  promptQueue: Queue.Queue<PromptQueueItem>;
+  query: ClaudeQueryRuntime;
   streamFiber: Fiber.Fiber<void, Error> | undefined;
+  /** Reconnect (#832): set while a lost transport is being retried. */
+  reconnect: ClaudeReconnectState | undefined;
+  /** Forks a root fiber in the session's runtime (the stream, a reconnect backoff). */
+  readonly runFork: <A, E>(effect: Effect.Effect<A, E>) => Fiber.Fiber<A, E>;
+  /**
+   * Reconnect (#832): reopens the query on `resumeSessionId`, reading prompts
+   * from the current `promptQueue`, and forks its stream.
+   */
+  readonly reopenStream: Effect.Effect<void, ProviderAdapterProcessError>;
   readonly startedAt: string;
   readonly basePermissionMode: PermissionMode | undefined;
   currentApiModelId: string | undefined;
@@ -1462,6 +1502,18 @@ function buildPromptText(
 
   const promptEffort = resolvePromptInjectedEffort(caps, rawEffort);
   return applyClaudePromptEffortPrefix(input.input?.trim() ?? "", promptEffort);
+}
+
+/** The CLI's prompt input: the queue's messages, ended quietly when the queue shuts down. */
+function promptStreamOf(promptQueue: Queue.Queue<PromptQueueItem>): AsyncIterable<SDKUserMessage> {
+  return Stream.fromQueue(promptQueue).pipe(
+    Stream.filter((item) => item.type === "message"),
+    Stream.map((item) => item.message),
+    Stream.catchCause((cause) =>
+      Cause.hasInterruptsOnly(cause) ? Stream.empty : Stream.failCause(cause),
+    ),
+    Stream.toAsyncIterable,
+  );
 }
 
 function buildUserMessage(input: {
@@ -2664,6 +2716,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
     const updatedAt = yield* nowIso;
     context.turnState = undefined;
+    context.reconnect = undefined;
     context.session = {
       ...context.session,
       status: "ready",
@@ -3207,6 +3260,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         authenticationFailureMessage: undefined,
         rejectedRateLimitTypes: new Set(),
         latestAssistantRateLimited: false,
+        lastUserMessage: undefined,
+        sawAssistantOutput: false,
+        apiRetrySeen: false,
       };
       context.session = {
         ...context.session,
@@ -3309,6 +3365,18 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ? "Claude usage limit reached. Send the message again once the limit resets."
         : undefined);
     const { status, errorMessage } = resultOutcome(message, failureHint);
+
+    if (status === "failed" && turn && isTransportResult(message, failureHint)) {
+      // Reconnect (#832): the API was unreachable, not wrong. The CLI may
+      // still be alive; the reconnect closes it and resumes the session.
+      if (yield* scheduleReconnect(context, errorMessage ?? "Claude API error.")) {
+        return;
+      }
+      const failure = reconnectExhausted(context) ? RECONNECT_EXHAUSTED_MESSAGE : errorMessage;
+      yield* emitRuntimeError(context, failure ?? "Claude turn failed.");
+      yield* completeTurn(context, status, failure, message);
+      return;
+    }
 
     if (status === "failed") {
       yield* emitRuntimeError(context, errorMessage ?? "Claude turn failed.");
@@ -3714,6 +3782,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         // warning row spammed the work log (10 rows during a 502 storm);
         // the terminal result/error path reports the actual failure. Keep
         // the session visibly alive instead.
+        if (context.turnState) {
+          context.turnState.apiRetrySeen = true;
+        }
         yield* offerRuntimeEvent({
           ...base,
           type: "session.state.changed",
@@ -3723,22 +3794,27 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           },
         });
         return;
-      case "session_state_changed":
+      case "session_state_changed": {
         // Authoritative turn-over signal from the CLI.
+        const state =
+          message.state === "running"
+            ? "running"
+            : message.state === "requires_action"
+              ? "waiting"
+              : "ready";
+        // Reconnect (#832): a reopened session may report idle before it
+        // reads the continuation; `ready` would let the #806 drain start
+        // the next queued turn on top of this one.
+        if (state === "ready" && context.reconnect !== undefined && !context.reconnect.waiting) {
+          return;
+        }
         yield* offerRuntimeEvent({
           ...base,
           type: "session.state.changed",
-          payload: {
-            state:
-              message.state === "running"
-                ? "running"
-                : message.state === "requires_action"
-                  ? "waiting"
-                  : "ready",
-            reason: `session_state:${message.state}`,
-          },
+          payload: { state, reason: `session_state:${message.state}` },
         });
         return;
+      }
       case "notification":
         // User-facing CLI notification (e.g. context-limit warnings). Only
         // high-priority ones warrant a work-log row.
@@ -3976,6 +4052,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         yield* handleUserMessage(context, message);
         return;
       case "assistant":
+        // Reconnect (#832): an answer proves the transport is back; the next
+        // outage starts its own attempt count.
+        if (context.turnState) {
+          context.turnState.sawAssistantOutput = true;
+        }
+        if (context.reconnect !== undefined && !context.reconnect.waiting) {
+          context.reconnect = undefined;
+        }
         yield* handleAssistantMessage(context, message);
         return;
       case "result":
@@ -4040,11 +4124,132 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       ),
     );
 
+  /**
+   * Reconnect (#832): keeps the turn open and schedules a reopen of the query
+   * after the attempt's backoff. False when no attempt is left, or the CLI
+   * never reported a session id to resume; the caller then fails the turn.
+   */
+  /** Every attempt was used: the turn's failure is the lost connection. */
+  const reconnectExhausted = (context: ClaudeSessionContext) =>
+    context.reconnect?.attempt === RECONNECT_MAX_ATTEMPTS;
+
+  const scheduleReconnect = Effect.fn("scheduleReconnect")(function* (
+    context: ClaudeSessionContext,
+    detail: string,
+  ) {
+    const turn = context.turnState;
+    // Only a session the CLI reported can be resumed; before its first
+    // message the id is one the CLI never created.
+    if (!turn || context.stopped || context.lastThreadStartedId === undefined) {
+      return false;
+    }
+    const attempt = (context.reconnect?.attempt ?? 0) + 1;
+    const backoffMillis = RECONNECT_BACKOFF_MILLIS[attempt - 1];
+    if (backoffMillis === undefined) {
+      return false;
+    }
+    const state: ClaudeReconnectState = { attempt, waiting: true, fiber: undefined };
+    context.reconnect = state;
+    yield* Effect.logInfo("Claude turn lost its transport; reconnecting.", {
+      threadId: context.session.threadId,
+      turnId: turn.turnId,
+      attempt,
+      backoffMillis,
+      detail,
+    });
+    const stamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "session.state.changed",
+      eventId: stamp.eventId,
+      provider: PROVIDER,
+      createdAt: stamp.createdAt,
+      threadId: context.session.threadId,
+      turnId: asCanonicalTurnId(turn.turnId),
+      payload: { state: "running", reason: reconnectReason(attempt) },
+      providerRefs: nativeProviderRefs(context),
+    });
+    state.fiber = context.runFork(
+      Effect.sleep(Duration.millis(backoffMillis)).pipe(
+        Effect.andThen(reopenForReconnect(context, state)),
+        Effect.catch((error) =>
+          Effect.gen(function* () {
+            // The CLI could not be relaunched: that is not the network.
+            state.fiber = undefined;
+            if (context.stopped || context.turnState === undefined) return;
+            yield* emitRuntimeError(context, error.detail);
+            yield* completeTurn(context, "failed", error.detail);
+            yield* stopSessionInternal(context, { emitExitEvent: true });
+          }),
+        ),
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.void
+            : Effect.logError("Claude reconnect failed.", { cause: Cause.pretty(cause) }),
+        ),
+      ),
+    );
+    return true;
+  });
+
+  /**
+   * The attempt itself: the old query is closed, whatever the user queued
+   * meanwhile carries over, and the reopened session gets the continuation
+   * prompt (the turn's own message again when nothing ever answered it).
+   */
+  const reopenForReconnect = Effect.fn("reopenForReconnect")(function* (
+    context: ClaudeSessionContext,
+    state: ClaudeReconnectState,
+  ) {
+    state.fiber = undefined;
+    const turn = context.turnState;
+    if (context.stopped || turn === undefined || context.reconnect !== state) {
+      return;
+    }
+    const oldStreamFiber = context.streamFiber;
+    context.streamFiber = undefined;
+    if (oldStreamFiber !== undefined) {
+      yield* Fiber.interrupt(oldStreamFiber);
+    }
+    yield* Effect.try(() => context.query.close()).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning("Failed to close the Claude runtime query before reconnecting.", {
+          cause,
+        }),
+      ),
+    );
+    const oldQueue = context.promptQueue;
+    const carried = (yield* Queue.clear(oldQueue)).filter((item) => item.type === "message");
+    yield* Queue.shutdown(oldQueue);
+    const promptQueue = yield* Queue.unbounded<PromptQueueItem>();
+    const continuation =
+      carried.length > 0
+        ? carried
+        : [
+            {
+              type: "message" as const,
+              message:
+                !turn.sawAssistantOutput && turn.lastUserMessage !== undefined
+                  ? turn.lastUserMessage
+                  : buildUserMessage({
+                      sdkContent: [{ type: "text", text: TURN_CONTINUATION_PROMPT }],
+                    }),
+            },
+          ];
+    yield* Queue.offerAll(promptQueue, continuation);
+    context.promptQueue = promptQueue;
+    state.waiting = false;
+    yield* context.reopenStream;
+  });
+
   const handleStreamExit = Effect.fn("handleStreamExit")(function* (
     context: ClaudeSessionContext,
     exit: Exit.Exit<void, ProviderAdapterProcessError>,
   ) {
     if (context.stopped) {
+      return;
+    }
+    // Reconnect (#832): the old query going away while a reopen is pending.
+    if (context.reconnect?.waiting === true) {
       return;
     }
 
@@ -4058,14 +4263,33 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           Cause.isFailReason(reason) ? [reason.error] : [],
         );
         const message = failures[0]?.detail ?? "Claude runtime stream failed.";
-        yield* emitRuntimeError(context, message, {
+        // Reconnect (#832): a socket error, or a process exit after the CLI
+        // reported API retries, is the network; anything else is a failure.
+        const transport =
+          failures.some((failure) => isTransportErrorMessage(toMessage(failure.cause, ""))) ||
+          context.turnState?.apiRetrySeen === true;
+        if (transport && (yield* scheduleReconnect(context, message))) {
+          return;
+        }
+        const failure = reconnectExhausted(context) ? RECONNECT_EXHAUSTED_MESSAGE : message;
+        yield* emitRuntimeError(context, failure, {
           failureCount: failures.length,
           failureTags: failures.map((failure) => failure._tag),
         });
-        yield* completeTurn(context, "failed", message);
+        yield* completeTurn(context, "failed", failure);
       }
     } else if (context.turnState) {
-      yield* completeTurn(context, "interrupted", "Claude runtime stream ended.");
+      // The CLI went away with the turn open (#832). Reconnect; when that is
+      // not possible the turn failed: `interrupted` reads as idle to the
+      // #806 queue drain, which would start the next queued turn on top.
+      if (yield* scheduleReconnect(context, "Claude runtime stream ended.")) {
+        return;
+      }
+      const failure = reconnectExhausted(context)
+        ? RECONNECT_EXHAUSTED_MESSAGE
+        : "Claude runtime stream ended.";
+      yield* emitRuntimeError(context, failure);
+      yield* completeTurn(context, "failed", failure);
     }
 
     yield* stopSessionInternal(context, {
@@ -4078,6 +4302,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     options?: { readonly emitExitEvent?: boolean },
   ) {
     if (context.stopped) return;
+
+    // Reconnect (#832): a backoff still sleeping is cancelled; the open turn
+    // then completes as interrupted below like any other stop.
+    const reconnectFiber = context.reconnect?.fiber;
+    context.reconnect = undefined;
+    if (reconnectFiber !== undefined) {
+      yield* Fiber.interrupt(reconnectFiber);
+    }
 
     // Schedule process termination before any cleanup that can wait on the
     // provider. The SDK closes stdin, then escalates from SIGTERM to SIGKILL.
@@ -4240,14 +4472,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       const runPromise = Effect.runPromiseWith(runtimeContext);
 
       const promptQueue = yield* Queue.unbounded<PromptQueueItem>();
-      const prompt = Stream.fromQueue(promptQueue).pipe(
-        Stream.filter((item) => item.type === "message"),
-        Stream.map((item) => item.message),
-        Stream.catchCause((cause) =>
-          Cause.hasInterruptsOnly(cause) ? Stream.empty : Stream.failCause(cause),
-        ),
-        Stream.toAsyncIterable,
-      );
+      const prompt = promptStreamOf(promptQueue);
 
       const pendingApprovals = new Map<ApprovalRequestId, PendingApproval>();
       const pendingUserInputs = new Map<ApprovalRequestId, PendingUserInput>();
@@ -4798,20 +5023,45 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         "claude.query.path_to_executable": claudeBinaryPath,
       });
 
-      const queryRuntime = yield* Effect.try({
-        try: () =>
-          createQuery({
-            prompt,
-            options: queryOptions,
-          }),
-        catch: (cause) =>
-          new ProviderAdapterProcessError({
-            provider: PROVIDER,
-            threadId,
-            detail: "Failed to start Claude runtime session.",
-            cause,
-          }),
-      });
+      const openQuery = (queryPrompt: AsyncIterable<SDKUserMessage>, options: ClaudeQueryOptions) =>
+        Effect.try({
+          try: () => createQuery({ prompt: queryPrompt, options }),
+          catch: (cause) =>
+            new ProviderAdapterProcessError({
+              provider: PROVIDER,
+              threadId,
+              detail: "Failed to start Claude runtime session.",
+              cause,
+            }),
+        });
+      const queryRuntime = yield* openQuery(prompt, queryOptions);
+
+      const forkStream = (streamContext: ClaudeSessionContext): void => {
+        let streamFiber: Fiber.Fiber<void, never>;
+        streamFiber = runFork(
+          Effect.exit(runSdkStream(streamContext)).pipe(
+            Effect.flatMap((exit) => {
+              if (streamContext.stopped) {
+                return Effect.void;
+              }
+              if (streamContext.streamFiber === streamFiber) {
+                streamContext.streamFiber = undefined;
+              }
+              return handleStreamExit(streamContext, exit).pipe(
+                Effect.catch((cause) =>
+                  Effect.logError("Failed to close Claude runtime stream.", { cause }),
+                ),
+              );
+            }),
+          ),
+        );
+        streamContext.streamFiber = streamFiber;
+        streamFiber.addObserver(() => {
+          if (streamContext.streamFiber === streamFiber) {
+            streamContext.streamFiber = undefined;
+          }
+        });
+      };
 
       const session: ProviderSession = {
         threadId,
@@ -4841,6 +5091,29 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         promptQueue,
         query: queryRuntime,
         streamFiber: undefined,
+        reconnect: undefined,
+        runFork,
+        // Reconnect (#832): the same options resumed on the id the CLI
+        // reported; `context` is read when this runs, never here.
+        reopenStream: Effect.suspend(() =>
+          context.resumeSessionId === undefined
+            ? Effect.fail(
+                new ProviderAdapterProcessError({
+                  provider: PROVIDER,
+                  threadId,
+                  detail: "Claude runtime session has no session id to resume.",
+                }),
+              )
+            : openQuery(
+                promptStreamOf(context.promptQueue),
+                reconnectQueryOptions(queryOptions, context.resumeSessionId),
+              ).pipe(
+                Effect.map((query) => {
+                  context.query = query;
+                  forkStream(context);
+                }),
+              ),
+        ),
         startedAt,
         basePermissionMode: permissionMode,
         currentApiModelId: apiModelId,
@@ -4912,30 +5185,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         providerRefs: {},
       });
 
-      let streamFiber: Fiber.Fiber<void, never>;
-      streamFiber = runFork(
-        Effect.exit(runSdkStream(context)).pipe(
-          Effect.flatMap((exit) => {
-            if (context.stopped) {
-              return Effect.void;
-            }
-            if (context.streamFiber === streamFiber) {
-              context.streamFiber = undefined;
-            }
-            return handleStreamExit(context, exit).pipe(
-              Effect.catch((cause) =>
-                Effect.logError("Failed to close Claude runtime stream.", { cause }),
-              ),
-            );
-          }),
-        ),
-      );
-      context.streamFiber = streamFiber;
-      streamFiber.addObserver(() => {
-        if (context.streamFiber === streamFiber) {
-          context.streamFiber = undefined;
-        }
-      });
+      forkStream(context);
 
       return {
         ...session,
@@ -5020,6 +5270,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         authenticationFailureMessage: undefined,
         rejectedRateLimitTypes: new Set(),
         latestAssistantRateLimited: false,
+        lastUserMessage: undefined,
+        sawAssistantOutput: false,
+        apiRetrySeen: false,
       };
 
       const updatedAt = yield* nowIso;
@@ -5069,6 +5322,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       ),
     });
 
+    if (steeringTurnState === null && context.turnState) {
+      context.turnState.lastUserMessage = message;
+    }
     yield* Queue.offer(context.promptQueue, {
       type: "message",
       message,
