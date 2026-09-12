@@ -44,6 +44,13 @@ final class TeamCollectTests: XCTestCase {
         XCTAssertEqual(main.session, "s1"); XCTAssertNil(main.agent); XCTAssertEqual(main.projectDir, "-r-app")
         let sub = TeamPublisher.transcriptIdentity("/h/.claude/projects/-r-app/s1/subagents/agent-a1.jsonl")
         XCTAssertEqual(sub.session, "s1"); XCTAssertEqual(sub.agent, "agent-a1"); XCTAssertEqual(sub.projectDir, "-r-app")
+        // #346: pure string work, the same answers URL path math gave —
+        // only the last extension goes, a dotless name stays whole.
+        let dotted = TeamPublisher.transcriptIdentity("/h/.claude/projects/-r-app/2026-09-12T10.00.jsonl")
+        XCTAssertEqual(dotted.session, "2026-09-12T10.00"); XCTAssertEqual(dotted.projectDir, "-r-app")
+        XCTAssertEqual(TeamPublisher.transcriptIdentity("/h/.codex/sessions/2026/09/12/rollout").session, "rollout")
+        XCTAssertEqual(TeamPublisher.lastPathComponent("/Users/me/dev/app/"), "app")
+        XCTAssertEqual(TeamPublisher.lastPathComponent("/"), "")
         let source = TeamPublisher.TranscriptSource(session: "s1", agent: "agent-a1", url: URL(fileURLWithPath: "/x"))
         XCTAssertEqual(source.key, "s1/subagents/agent-a1")
         XCTAssertEqual(source.chunkPath(seq: 3), "transcripts/s1/subagents/agent-a1/3.jsonl")
