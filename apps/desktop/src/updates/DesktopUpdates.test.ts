@@ -539,22 +539,19 @@ describe("DesktopUpdates", () => {
     // electron-updater sees the pushed tag in releases.atom before its release
     // exists and throws ERR_UPDATER_CHANNEL_FILE_NOT_FOUND until the assets land.
     let checks = 0;
+    const cause = Object.assign(
+      new Error("Cannot find alpha-mac.yml in the latest release artifacts"),
+      { code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND" },
+    );
     const harness = makeHarness({
       checkForUpdates: Effect.suspend(() => {
         checks += 1;
-        return checks === 1
-          ? Effect.fail(
-              new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({
-                channel: "alpha",
-                cause: Object.assign(
-                  new Error("Cannot find alpha-mac.yml in the latest release artifacts"),
-                  {
-                    code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
-                  },
-                ),
-              }),
-            )
-          : Effect.void;
+        if (checks !== 1) return Effect.void;
+        // electron-updater raises its `error` event and rejects the check.
+        harness.emit("error", cause);
+        return Effect.fail(
+          new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({ channel: "alpha", cause }),
+        );
       }),
     });
     const errorTagsLogged: Array<unknown> = [];
