@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- The machine-health guardian is gone: the `machine`, `machine-kill`, `machine-reclaim` and `machine-hook` verbs, its sampling and warnings, and the team grants kill and reclaim that ran the two destructive verbs (swap and hold stay).
 
 ## 0.5.0-alpha.3
 
