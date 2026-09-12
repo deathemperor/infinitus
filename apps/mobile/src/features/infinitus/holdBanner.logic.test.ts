@@ -7,7 +7,9 @@ import {
   holdBannerTitle,
   holdPhaseAfterPin,
   holdPhaseAfterRelease,
+  limitedLine,
   pinLabel,
+  resetLabelFor,
   runNowLabel,
 } from "./holdBanner.logic";
 
@@ -92,5 +94,28 @@ describe("banner copy", () => {
       description: "Limit hit on one@example.com",
       actionable: false,
     });
+    expect(
+      holdBannerText("Limit hit on one@example.com", { kind: "idle" }, "limited", "2:13 PM"),
+    ).toEqual({ description: "Limit hit on one@example.com · resets 2:13 PM", actionable: false });
+    expect(limitedLine("Limit hit on x", null)).toBe("Limit hit on x");
+  });
+
+  it("labels a reset still ahead in the device's clock format, none once it has passed", () => {
+    const now = new Date(2026, 8, 11, 10, 0, 0).getTime();
+    const clock = (ms: number) =>
+      new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(ms);
+    const ahead = now + 2 * 3_600_000;
+    expect(resetLabelFor(new Date(ahead).toISOString(), now)).toBe(clock(ahead));
+    const tomorrow = now + 24 * 3_600_000;
+    expect(resetLabelFor(new Date(tomorrow).toISOString(), now)).toBe(
+      `tomorrow at ${clock(tomorrow)}`,
+    );
+    const later = now + 3 * 24 * 3_600_000;
+    expect(resetLabelFor(new Date(later).toISOString(), now)).toBe(
+      `${new Intl.DateTimeFormat(undefined, { month: "numeric", day: "numeric" }).format(later)} ${clock(later)}`,
+    );
+    expect(resetLabelFor(new Date(now - 60_000).toISOString(), now)).toBeNull();
+    expect(resetLabelFor(null, now)).toBeNull();
+    expect(resetLabelFor("soon", now)).toBeNull();
   });
 });

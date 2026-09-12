@@ -76,14 +76,49 @@ export function holdBannerBusy(phase: HoldPhase): boolean {
   return phase.kind === "releasing" || phase.kind === "released" || phase.kind === "pinning";
 }
 
+/** The limited line with its reset (#270 I): "Limit hit on x · resets 2:13 PM". */
+export function limitedLine(summary: string, resetLabel: string | null): string {
+  return resetLabel === null ? summary : `${summary} · resets ${resetLabel}`;
+}
+
+const RESET_TIME = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const RESET_DATE = new Intl.DateTimeFormat(undefined, { month: "numeric", day: "numeric" });
+
+/** The reset's label for {@link limitedLine} in the device's clock format
+    (the phone has no timestamp setting): null with no reset, an unreadable
+    one, or one already past — resume-on-limit follows a reset within a
+    poll, so a past instant is stale, not upcoming. Tomorrow and later days
+    say so, like the web's `formatUpcomingTimestamp`. */
+export function resetLabelFor(resetsAt: string | null, nowMs: number = Date.now()): string | null {
+  if (resetsAt === null) return null;
+  const at = Date.parse(resetsAt);
+  if (!Number.isFinite(at) || at <= nowMs) return null;
+  const time = RESET_TIME.format(at);
+  const now = new Date(nowMs);
+  const target = new Date(at);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfTarget = new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  ).getTime();
+  const dayDiff = Math.round((startOfTarget - startOfToday) / 86_400_000);
+  if (dayDiff <= 0) return time;
+  if (dayDiff === 1) return `tomorrow at ${time}`;
+  return `${RESET_DATE.format(at)} ${time}`;
+}
+
 export function holdBannerText(
   summary: string,
   phase: HoldPhase,
   kind: HoldKind = "held",
+  resetLabel: string | null = null,
 ): { readonly description: string; readonly actionable: boolean } {
   // A limit stop has no button (#270 I): resume-on-limit continues the turn
-  // itself once the account swaps; the row says which account ran out.
-  if (kind === "limited") return { description: summary, actionable: false };
+  // itself once the account swaps; the row says which account ran out and,
+  // when the SDK named it, when its window resets.
+  if (kind === "limited")
+    return { description: limitedLine(summary, resetLabel), actionable: false };
   switch (phase.kind) {
     case "gone":
       return {

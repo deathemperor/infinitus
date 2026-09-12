@@ -1874,7 +1874,10 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   the server). Derived from the work-log marker rows via
   `@t3tools/client-runtime/state/infinitusThreadHold`; nothing persisted.
   A turn interrupt mode paused (#743) gets the same card as "Paused for
-  headroom" with **Resume now**.
+  headroom" with **Resume now**; a limit stop (#270 I) has no button and
+  adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
+  device's clock format — the phone has no timestamp setting — null once
+  the instant is past).
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown

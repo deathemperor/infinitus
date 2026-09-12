@@ -10,6 +10,9 @@ publishes the matching section as the GitHub release body.
 ### Desktop
 - A thread stopped on a usage limit now says when the limit resets, in the sidebar's tooltip and the thread's banner.
 
+### Phone
+- A thread stopped on a usage limit says when its window resets on the phone too — "Limit hit on x · resets 2:13 PM" on the banner, in the device's clock format, dropped once the instant is past (#270 I).
+
 ## 0.5.0-alpha.5
 
 ### Desktop
