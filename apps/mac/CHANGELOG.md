@@ -21,6 +21,7 @@ publishes the matching section as the GitHub release body.
 - Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).
 
 ### Mac
+- The quick tunnel no longer spawns at all while the named tunnel is running: a relaunch with both toggles on starts one `cloudflared`, not two, the quick tunnel still returns as the fallback the moment the named one exits, and the named hostname is no longer offered to the rendezvous, which takes quick-tunnel addresses only (the "rendezvous publish failed: HTTP 400" line on every connect) (#697).
 - The last traces of the cswap engine are gone: the engine table, settings catalog, proxy help text and contributor guides name swapd, and the cswap Arch package left the tree (#756).
 - The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
 - `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
