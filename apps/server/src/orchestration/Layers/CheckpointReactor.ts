@@ -704,16 +704,11 @@ const make = Effect.gen(function* () {
       thread,
       projects: yield* resolveThreadProjects(thread.projectId),
       preferSessionRuntime: true,
-    });
-    if (!checkpointCwd) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: "Checkpoint workspace is unavailable or is not a git repository.",
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
+    }).pipe(
+      Effect.catch((error) =>
+        event.payload.restoreFiles === false ? Effect.succeed(undefined) : Effect.fail(error),
+      ),
+    );
 
     const currentTurnCount = thread.checkpoints.reduce(
       (maxTurnCount, checkpoint) => Math.max(maxTurnCount, checkpoint.checkpointTurnCount),
@@ -730,23 +725,6 @@ const make = Effect.gen(function* () {
       return;
     }
 
-    const targetCheckpointRef =
-      event.payload.turnCount === 0
-        ? checkpointRefForThreadTurn(event.payload.threadId, 0)
-        : thread.checkpoints.find(
-            (checkpoint) => checkpoint.checkpointTurnCount === event.payload.turnCount,
-          )?.checkpointRef;
-
-    if (!targetCheckpointRef) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: `Checkpoint ref for turn ${event.payload.turnCount} is unavailable in read model.`,
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
-
     // Fork (#269 E): files only — no conversation rollback, so no need for
     // the provider to support one.
     const keepChat = event.payload.keepChat === true;
@@ -755,24 +733,53 @@ const make = Effect.gen(function* () {
       yield* providerService.assertConversationRollbackSupported(event.payload.threadId);
     }
 
-    const restored = yield* checkpointStore.restoreCheckpoint({
-      cwd: checkpointCwd,
-      checkpointRef: targetCheckpointRef,
-      fallbackToHead: event.payload.turnCount === 0,
-    });
-    if (!restored) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: `Filesystem checkpoint is unavailable for turn ${event.payload.turnCount}.`,
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
+    if (event.payload.restoreFiles !== false) {
+      if (!checkpointCwd) {
+        yield* appendRevertFailureActivity({
+          threadId: event.payload.threadId,
+          turnCount: event.payload.turnCount,
+          detail: "Checkpoint workspace is unavailable or is not a git repository.",
+          createdAt: now,
+        }).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
 
-    // Refresh the workspace entry index so the @-mention file picker
-    // reflects the reverted filesystem state.
-    yield* workspaceEntries.refresh(checkpointCwd);
+      const targetCheckpointRef =
+        event.payload.turnCount === 0
+          ? checkpointRefForThreadTurn(event.payload.threadId, 0)
+          : thread.checkpoints.find(
+              (checkpoint) => checkpoint.checkpointTurnCount === event.payload.turnCount,
+            )?.checkpointRef;
+
+      if (!targetCheckpointRef) {
+        yield* appendRevertFailureActivity({
+          threadId: event.payload.threadId,
+          turnCount: event.payload.turnCount,
+          detail: `Checkpoint ref for turn ${event.payload.turnCount} is unavailable in read model.`,
+          createdAt: now,
+        }).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
+
+      const restored = yield* checkpointStore.restoreCheckpoint({
+        cwd: checkpointCwd,
+        checkpointRef: targetCheckpointRef,
+        fallbackToHead: event.payload.turnCount === 0,
+      });
+      if (!restored) {
+        yield* appendRevertFailureActivity({
+          threadId: event.payload.threadId,
+          turnCount: event.payload.turnCount,
+          detail: `Filesystem checkpoint is unavailable for turn ${event.payload.turnCount}.`,
+          createdAt: now,
+        }).pipe(Effect.catch(() => Effect.void));
+        return;
+      }
+
+      // Refresh the workspace entry index so the @-mention file picker
+      // reflects the reverted filesystem state.
+      yield* workspaceEntries.refresh(checkpointCwd);
+    }
 
     // Fork (#269 E): the chat, the later turns and their checkpoint refs
     // stay (a later full revert can still reach them); one activity says
@@ -823,7 +830,7 @@ const make = Effect.gen(function* () {
       }
     }
 
-    if (staleCheckpointRefs.length > 0) {
+    if (checkpointCwd && staleCheckpointRefs.length > 0) {
       yield* checkpointStore.deleteCheckpointRefs({
         cwd: checkpointCwd,
         checkpointRefs: staleCheckpointRefs,
@@ -851,106 +858,10 @@ const make = Effect.gen(function* () {
       );
   });
 
-  /**
-   * Fork (#270 E1): the chat-only half of a revert. Same guards and the same
-   * provider rollback so the model's context matches the chat, but no
-   * checkpoint restore, no workspace refresh and no ref deletion: files and
-   * the git checkpoint refs stay. Completes through the same
-   * `thread.revert.complete` so every projection prunes the later turns the
-   * way it already does for a revert.
-   */
-  const handleChatRewindRequested = Effect.fn("handleChatRewindRequested")(function* (
-    event: Extract<OrchestrationEvent, { type: "thread.chat-rewind-requested" }>,
-  ) {
-    yield* Effect.annotateCurrentSpan({ filesRestored: false });
-    const now = DateTime.formatIso(yield* DateTime.now);
-
-    const thread = yield* resolveThreadDetail(event.payload.threadId);
-    if (!thread) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: "Thread was not found in read model.",
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
-
-    const sessionRuntime = yield* resolveSessionRuntimeForThread(event.payload.threadId);
-    if (Option.isNone(sessionRuntime)) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: "No active provider session is bound to this thread.",
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
-
-    const currentTurnCount = thread.checkpoints.reduce(
-      (maxTurnCount, checkpoint) => Math.max(maxTurnCount, checkpoint.checkpointTurnCount),
-      0,
-    );
-    if (event.payload.turnCount > currentTurnCount) {
-      yield* appendRevertFailureActivity({
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        detail: `Checkpoint turn count ${event.payload.turnCount} exceeds current turn count ${currentTurnCount}.`,
-        createdAt: now,
-      }).pipe(Effect.catch(() => Effect.void));
-      return;
-    }
-
-    yield* providerService.assertConversationRollbackSupported(event.payload.threadId);
-
-    const rolledBackTurns = Math.max(0, currentTurnCount - event.payload.turnCount);
-    if (rolledBackTurns > 0) {
-      yield* providerService.rollbackConversation({
-        threadId: sessionRuntime.value.threadId,
-        numTurns: rolledBackTurns,
-      });
-    }
-
-    yield* orchestrationEngine
-      .dispatch({
-        type: "thread.revert.complete",
-        commandId: yield* serverCommandId("chat-rewind-complete"),
-        threadId: event.payload.threadId,
-        turnCount: event.payload.turnCount,
-        createdAt: now,
-      })
-      .pipe(
-        Effect.catch((error) =>
-          appendRevertFailureActivity({
-            threadId: event.payload.threadId,
-            turnCount: event.payload.turnCount,
-            detail: error.message,
-            createdAt: now,
-          }),
-        ),
-      );
-  });
-
   const processDomainEvent = Effect.fn("processDomainEvent")(function* (event: OrchestrationEvent) {
     if (event.type === "thread.turn-start-requested" || event.type === "thread.message-sent") {
       if (event.type === "thread.turn-start-requested") pending.add(event.payload.threadId);
       yield* ensurePreTurnBaselineFromDomainTurnStart(event);
-      return;
-    }
-
-    if (event.type === "thread.chat-rewind-requested") {
-      yield* handleChatRewindRequested(event).pipe(
-        Effect.catch((error) =>
-          Effect.flatMap(nowIso, (createdAt) =>
-            appendRevertFailureActivity({
-              threadId: event.payload.threadId,
-              turnCount: event.payload.turnCount,
-              detail: error.message,
-              createdAt,
-            }),
-          ),
-        ),
-      );
       return;
     }
 
@@ -1067,8 +978,7 @@ const make = Effect.gen(function* () {
         if (
           event.type !== "thread.turn-start-requested" &&
           event.type !== "thread.message-sent" &&
-          event.type !== "thread.checkpoint-revert-requested" &&
-          event.type !== "thread.chat-rewind-requested"
+          event.type !== "thread.checkpoint-revert-requested"
         ) {
           return Effect.void;
         }
