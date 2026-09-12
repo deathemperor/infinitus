@@ -227,7 +227,10 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648), `InfinitusPushBridgeLive` after it (#269 G). `InfinitusSlackLive` (provided `SlackClientLive` over
+  (#648), `InfinitusPushBridgeLive` after it (#269 G; provided its own
+  `InfinitusControlClientLive`, the one in `InfinitusLayerLive` being
+  private to that block — the visual pass, which runs the server from
+  source, is what catches a layer the tests only ever mock). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,

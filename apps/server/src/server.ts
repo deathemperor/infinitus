@@ -319,7 +319,15 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
   // Fork (#269 G): thread phases a person acts on, pushed through the Mac.
-  Layer.provideMerge(InfinitusPushBridgeLive),
+  // The socket client is private to InfinitusLayerLive below, so the bridge
+  // gets its own (stateless: a path and a request function).
+  Layer.provideMerge(
+    InfinitusPushBridgeLive.pipe(
+      Layer.provide(
+        InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
+      ),
+    ),
+  ),
   // Fork (#574): the Slack bridge over Socket Mode.
   Layer.provideMerge(
     InfinitusSlackLive.pipe(Layer.provide(SlackClientLive), Layer.provide(FetchHttpClient.layer)),
