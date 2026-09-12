@@ -90,6 +90,8 @@ public enum PrefCatalog {
         Entry("refresh_interval", .int, .number(60), display, choices: ints(TitlePrefs.refreshChoices)),
         Entry("menubar_themed", .bool, .bool(true), display),
         Entry("menubar_effects", .bool, .bool(true), display),
+        // Off = no status item at all; the app keeps running headless (#828).
+        Entry("menu_bar_enabled", .bool, .bool(true), display),
         // Display: the popup.
         Entry("popup_layout", .string, .string("wide"), display, choices: strings(["wide", "stacked", "hstack"])),
         Entry("popup_text_size", .string, .string("default"), display,
