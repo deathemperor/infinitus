@@ -67,6 +67,11 @@ export const PREF_COPY: Readonly<
     label: "Animate switches and burn",
     description: "Needs the theme on.",
   },
+  menu_bar_enabled: {
+    label: "Show the icon in the menu bar",
+    description:
+      "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
+  },
   refresh_interval: {
     label: "Refresh interval",
     description: "How often Infinitus asks for new usage numbers.",

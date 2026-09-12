@@ -63,6 +63,15 @@ const activityOrder = O.combineAll<OrchestrationThreadActivity>([
   O.mapInput(O.String, (a) => a.id),
 ]);
 
+// A thread detail snapshot carries the most recent 500 activities (the
+// server's THREAD_DETAIL_ACTIVITY_LIMIT). Live appends have no such cap, so a
+// client that stays on a thread through a long turn keeps every activity the
+// turn streams (thousands of rows, a 1 MB cache record on the phone, #900).
+// Past the high-water mark the history is cut back to the snapshot's window,
+// so a live thread never holds more than a fresh load would give.
+const THREAD_ACTIVITY_WINDOW = 500;
+const THREAD_ACTIVITY_HIGH_WATER = THREAD_ACTIVITY_WINDOW * 2;
+
 // Per-array id index so the streaming append path can reject a re-delivered
 // id without rescanning the history. Only arrays this reducer produced are
 // indexed: presence also proves the array is activityOrder-sorted, which
@@ -110,6 +119,21 @@ function isResolvableContextWindowActivity(activity: OrchestrationThreadActivity
  * (e.g. resolving attachment preview URLs, normalising model slugs, adding
  * scoped fields like `environmentId`) is the caller's responsibility.
  */
+/**
+ * Cuts a sorted, indexed activity history back to the most recent
+ * THREAD_ACTIVITY_WINDOW rows once it passes the high-water mark; the returned
+ * array is indexed so the next append keeps the fast path.
+ */
+function trimActivityWindow(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyArray<OrchestrationThreadActivity> {
+  if (activities.length <= THREAD_ACTIVITY_HIGH_WATER) return activities;
+  const kept = activities.slice(-THREAD_ACTIVITY_WINDOW);
+  activityIdIndex.delete(activities);
+  activityIdIndex.set(kept, new Set(kept.map((entry) => entry.id)));
+  return kept;
+}
+
 export function applyThreadDetailEvent(
   thread: OrchestrationThread,
   event: OrchestrationEvent,
@@ -435,33 +459,32 @@ export function applyThreadDetailEvent(
         ...(event.payload.attachments !== undefined
           ? { attachments: event.payload.attachments }
           : {}),
+        ...(event.payload.context !== undefined ? { context: event.payload.context } : {}),
         turnId: event.payload.turnId,
         streaming: event.payload.streaming,
         createdAt: event.payload.createdAt,
         updatedAt: event.payload.updatedAt,
       };
 
-      const existingMessage = thread.messages.find((entry) => entry.id === message.id);
-      const messages = existingMessage
-        ? Arr.map(thread.messages, (entry) =>
-            entry.id !== message.id
-              ? entry
-              : {
-                  ...entry,
-                  text: message.streaming
-                    ? `${entry.text}${message.text}`
-                    : message.text.length > 0
-                      ? message.text
-                      : entry.text,
-                  streaming: message.streaming,
-                  ...(message.turnId !== undefined ? { turnId: message.turnId } : {}),
-                  ...(message.streaming ? {} : { updatedAt: message.updatedAt }),
-                  ...(message.attachments !== undefined
-                    ? { attachments: message.attachments }
-                    : {}),
-                },
-          )
-        : Arr.append(thread.messages, message);
+      let found = false;
+      const messages = thread.messages.map((entry) => {
+        if (entry.id !== message.id) return entry;
+        found = true;
+        return {
+          ...entry,
+          text: message.streaming
+            ? `${entry.text}${message.text}`
+            : message.text.length > 0
+              ? message.text
+              : entry.text,
+          streaming: message.streaming,
+          ...(message.turnId !== undefined ? { turnId: message.turnId } : {}),
+          ...(message.streaming ? {} : { updatedAt: message.updatedAt }),
+          ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
+          ...(message.context !== undefined ? { context: message.context } : {}),
+        };
+      });
+      if (!found) messages.push(message);
       // Update latestTurn for assistant messages bound to a turn. A completed
       // assistant message only settles the turn once the session is no longer
       // running it — providers may emit several assistant messages per turn
@@ -529,6 +552,11 @@ export function applyThreadDetailEvent(
     }
 
     // ── Session ─────────────────────────────────────────────────────
+    // Fork (#834): the rollup as the server folded it; no activity.
+    case "thread.turn-usage-recorded":
+    case "thread.usage-backfilled":
+      return { kind: "updated", thread: { ...thread, usage: event.payload.usage } };
+
     case "thread.session-set": {
       // Leaving the "running" session status is the turn-end signal: settle a
       // still-running latest turn so its duration reflects the whole turn.
@@ -750,7 +778,7 @@ export function applyThreadDetailEvent(
           kind: "updated",
           thread: {
             ...thread,
-            activities,
+            activities: trimActivityWindow(activities),
             updatedAt: event.occurredAt,
           },
         };
@@ -787,7 +815,11 @@ export function applyThreadDetailEvent(
         activityIdIndex.set(activities, ids);
         return {
           kind: "updated",
-          thread: { ...thread, activities, updatedAt: event.occurredAt },
+          thread: {
+            ...thread,
+            activities: trimActivityWindow(activities),
+            updatedAt: event.occurredAt,
+          },
         };
       }
       const activities = pipe(
@@ -816,7 +848,6 @@ export function applyThreadDetailEvent(
     case "thread.approval-response-requested":
     case "thread.user-input-response-requested":
     case "thread.checkpoint-revert-requested":
-    case "thread.chat-rewind-requested":
       return { kind: "unchanged" };
   }
 
@@ -936,7 +967,9 @@ function retainMessagesAfterRevert(
           !retainedMessageIds.has(message.id) &&
           (message.turnId === null || retainedTurnIds.has(message.turnId)),
       )
-      .toSorted(
+      // `.sort()`, not `.toSorted()`: `.filter()` above already returned a fresh array, and
+      // this is shared with mobile, which runs on Hermes and has no ES2023 array methods.
+      .sort(
         (left, right) =>
           compareDateTimeStrings(left.createdAt, right.createdAt) ||
           left.id.localeCompare(right.id),

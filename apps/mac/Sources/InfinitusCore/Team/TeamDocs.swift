@@ -49,8 +49,14 @@ public enum TeamDocs {
         /// nil = every session.
         public var sessions: [String]?
         public var capabilities: [String]
-        public init(audience: TeamRoster.ShareTarget, sessions: [String]?, capabilities: [String]) {
+        /// Capabilities the grantor is asked about first (#220 Phase 2);
+        /// absent when none — a Phase 1 now.json is byte-identical.
+        public var approval: [String]?
+        public var expires: Int?
+        public init(audience: TeamRoster.ShareTarget, sessions: [String]?, capabilities: [String],
+                    approval: [String]? = nil, expires: Int? = nil) {
             self.audience = audience; self.sessions = sessions; self.capabilities = capabilities
+            self.approval = approval; self.expires = expires
         }
     }
 

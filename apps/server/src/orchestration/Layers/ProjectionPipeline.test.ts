@@ -1425,6 +1425,159 @@ it.layer(
 it.layer(
   Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-projection-attachments-overwrite-")),
 )("OrchestrationProjectionPipeline", (it) => {
+  it.effect(
+    "a queued message's uploads go with a removal or an edit, never with a send (#847)",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const projectionPipeline = yield* OrchestrationProjectionPipeline;
+        const eventStore = yield* OrchestrationEventStore;
+        const { attachmentsDir } = yield* ServerConfig;
+        const now = "2026-01-01T00:00:00.000Z";
+        const threadId = ThreadId.make("Thread Queue.Files");
+        const projectId = ProjectId.make("project-queue-files");
+        const keptId = "thread-queue-files-00000000-0000-4000-8000-000000000001";
+        const editedOutId = "thread-queue-files-00000000-0000-4000-8000-000000000002";
+        const sentId = "thread-queue-files-00000000-0000-4000-8000-000000000003";
+        const otherThreadId = "thread-queue-files-extra-00000000-0000-4000-8000-000000000004";
+        const image = (id: string) => ({
+          type: "image" as const,
+          id,
+          name: `${id}.png`,
+          mimeType: "image/png",
+          sizeBytes: 4,
+        });
+        const filePath = (id: string) => path.join(attachmentsDir, `${id}.png`);
+        let sequence = 0;
+        const appendAndProject = (
+          event: Omit<
+            Parameters<typeof eventStore.append>[0],
+            | "eventId"
+            | "commandId"
+            | "correlationId"
+            | "causationEventId"
+            | "occurredAt"
+            | "metadata"
+          >,
+        ) => {
+          sequence += 1;
+          const id = `queue-files-${sequence}`;
+          return eventStore
+            .append({
+              ...event,
+              eventId: EventId.make(`evt-${id}`),
+              commandId: CommandId.make(`cmd-${id}`),
+              correlationId: CorrelationId.make(`cmd-${id}`),
+              causationEventId: null,
+              occurredAt: now,
+              metadata: {},
+            } as Parameters<typeof eventStore.append>[0])
+            .pipe(Effect.flatMap((savedEvent) => projectionPipeline.projectEvent(savedEvent)));
+        };
+        const queued = (queueId: string, attachments: ReadonlyArray<ReturnType<typeof image>>) => ({
+          threadId,
+          queuedTurn: {
+            queueId: QueueId.make(queueId),
+            messageId: MessageId.make(`${queueId}-message`),
+            text: queueId,
+            attachments,
+            orderKey: queueId,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+
+        yield* appendAndProject({
+          type: "project.created",
+          aggregateKind: "project",
+          aggregateId: projectId,
+          payload: {
+            projectId,
+            title: "Project Queue Files",
+            workspaceRoot: "/tmp/project-queue-files",
+            defaultModelSelection: null,
+            scripts: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        yield* appendAndProject({
+          type: "thread.created",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: {
+            threadId,
+            projectId,
+            title: "Thread Queue Files",
+            modelSelection: { instanceId: ProviderInstanceId.make("claude"), model: "opus" },
+            runtimeMode: "full-access",
+            branch: null,
+            worktreePath: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        yield* fileSystem.makeDirectory(attachmentsDir, { recursive: true });
+        for (const id of [keptId, editedOutId, sentId, otherThreadId]) {
+          yield* fileSystem.writeFileString(filePath(id), id);
+        }
+        yield* appendAndProject({
+          type: "thread.turn-queued",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: queued("queue-edit", [image(keptId), image(editedOutId)]),
+        });
+        yield* appendAndProject({
+          type: "thread.turn-queued",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: queued("queue-send", [image(sentId)]),
+        });
+
+        // An edit that drops an upload removes its copy; the kept one stays.
+        yield* appendAndProject({
+          type: "thread.turn-queue-updated",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: queued("queue-edit", [image(keptId)]),
+        });
+        assert.isFalse(yield* exists(filePath(editedOutId)));
+        assert.isTrue(yield* exists(filePath(keptId)));
+        assert.isTrue(yield* exists(filePath(sentId)));
+
+        // Removed by the user: its upload goes; the other row's is still referenced.
+        yield* appendAndProject({
+          type: "thread.turn-queue-removed",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: {
+            threadId,
+            queueId: QueueId.make("queue-edit"),
+            reason: "user",
+            removedAt: now,
+          },
+        });
+        assert.isFalse(yield* exists(filePath(keptId)));
+        assert.isTrue(yield* exists(filePath(sentId)));
+
+        // Sent: the turn's message owns the upload now; nothing is pruned.
+        yield* appendAndProject({
+          type: "thread.turn-queue-removed",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: {
+            threadId,
+            queueId: QueueId.make("queue-send"),
+            reason: "sent",
+            removedAt: now,
+          },
+        });
+        assert.isTrue(yield* exists(filePath(sentId)));
+        assert.isTrue(yield* exists(filePath(otherThreadId)));
+      }),
+  );
+
   it.effect("prunes reverted attachments only after every projector commits", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;

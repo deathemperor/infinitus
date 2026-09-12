@@ -10,8 +10,10 @@ import type { AndroidHeaderAction } from "../../components/AndroidScreenHeader";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { resolveThreadPrSource } from "../../state/thread-pr-presentation";
+import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import {
+  babysitLabel,
   prChecksUrl,
   prHeaderLabel,
   prHeaderMenuItems,
@@ -59,7 +61,13 @@ export function usePullRequestHeaderItem(
     thread === null ? undefined : configs.get(thread.environmentId)?.environment.capabilities;
   const supportsLinks = capabilities?.threadPullRequests === true;
   const supportsActions = capabilities?.pullRequests === true;
+  // Fork (#269 A): babysit needs the fork's server; the menu item's own gate
+  // (an open PR, or already on) lives in `prHeaderMenuItems`.
+  const supportsBabysit = capabilities?.infinitus === true;
   const runAction = useAtomCommand(runPullRequestAction, { reportFailure: false });
+  const updateMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
+    reportFailure: false,
+  });
 
   return useMemo<PullRequestHeaderItem>(() => {
     if (thread === null) return NO_ITEM;
@@ -95,9 +103,25 @@ export function usePullRequestHeaderItem(
       // A stack's badge names its top PR; stack actions need fields the phone
       // does not send, so a stack stays read-only here.
       canRunActions: supportsActions && ref !== null && linkedPresentation?.kind !== "stack",
+      babysit: supportsBabysit ? { state: thread.babysit ?? null } : null,
     });
     const phaseLabel = prPhaseLabel(phase);
     const status = linkedPresentation?.accessibilityLabel ?? `#${number} pull request`;
+    const babysitting = babysitLabel(thread.babysit);
+    const setBabysit = (on: boolean): void => {
+      void updateMetadata({
+        environmentId: thread.environmentId,
+        input: { threadId: thread.id, babysit: on },
+      }).then((result) => {
+        if (result._tag === "Failure") {
+          const error = Cause.squash(result.cause);
+          Alert.alert(
+            on ? "Could not babysit" : "Still babysitting",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      });
+    };
     const run = (action: (typeof items)[number]["action"]): void => {
       switch (action) {
         case "open":
@@ -118,6 +142,12 @@ export function usePullRequestHeaderItem(
             }
           });
           return;
+        case "babysit-on":
+          setBabysit(true);
+          return;
+        case "babysit-off":
+          setBabysit(false);
+          return;
       }
     };
     return {
@@ -129,7 +159,7 @@ export function usePullRequestHeaderItem(
         menu: {
           items: [
             {
-              description: status,
+              description: babysitting ?? status,
               disabled: true,
               icon: PR_ICON,
               label: phaseLabel,
@@ -150,18 +180,35 @@ export function usePullRequestHeaderItem(
         type: "menu",
         variant: "plain",
       },
+      // Android's in-flow header opens the same choices as an anchored menu
+      // (not an Alert: that shows three buttons at most, and a draft with a
+      // checks page plus babysit is four).
       androidAction: {
         accessibilityLabel: `Pull request ${status}`,
         icon: "arrow.triangle.pull",
-        onPress: (): void =>
-          Alert.alert(
-            `Pull request #${number}`,
-            phaseLabel,
-            items.map((item) => ({ text: item.label, onPress: (): void => run(item.action) })),
-            { cancelable: true },
-          ),
+        onPress: (): void => {},
+        menu: {
+          title: `Pull request #${number}`,
+          actions: [
+            {
+              id: "phase",
+              title: phaseLabel,
+              subtitle: babysitting ?? status,
+              attributes: { disabled: true },
+            },
+            ...items.map((item) => ({
+              id: item.action,
+              title: item.label,
+              subtitle: item.description,
+            })),
+          ],
+          onPressAction: ({ nativeEvent }): void => {
+            const item = items.find((candidate) => candidate.action === nativeEvent.event);
+            if (item !== undefined) run(item.action);
+          },
+        },
       },
-      version: [number, url, phaseLabel, ...items.map((item) => item.action)].join(":"),
+      version: [number, url, phaseLabel, babysitting, ...items.map((item) => item.label)].join(":"),
     };
-  }, [runAction, supportsActions, supportsLinks, thread]);
+  }, [runAction, supportsActions, supportsBabysit, supportsLinks, thread, updateMetadata]);
 }

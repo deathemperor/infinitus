@@ -1,4 +1,5 @@
 import {
+  type ComposerContextRecord,
   type EnvironmentId,
   type OrchestrationQueuedTurn,
   QUEUED_TURN_GONE,
@@ -50,10 +51,16 @@ function reportFailure(title: string, result: AtomCommandResult<unknown, unknown
  * Fork (#806): the actions on a thread's server-side queue. "Send now" is a
  * plain turn start naming the row (`queuedFrom`), so the server drops the
  * row in the same batch. "Edit" brings the message back into the composer:
- * its attachments are fetched from the thread's store first (they become
- * fresh composer files, uploaded again on the next send), then the row is
- * removed, then the text and files land. Moves compute the new order key
- * from the neighbours the client sees.
+ * its attachments are fetched from the thread's store first — a row removed
+ * without being sent has its uploads pruned (#847), so the bytes must be in
+ * hand before `.queue.remove` — then the row is removed, then the message
+ * lands. A row with context records (#971) goes through the composer's
+ * record import, the stash restore's path: excerpts, comments and
+ * annotations become chips again and each fetched file is added under its
+ * record's own id, so the text's links resolve. A row without records
+ * (queued before #969, or on a server without inline context) gets the
+ * text and the files as fresh composer files, uploaded again on the next
+ * send. Moves compute the new order key from the neighbours the client sees.
  */
 export function useQueuedTurnActions(input: {
   readonly environmentId: EnvironmentId;
@@ -61,8 +68,15 @@ export function useQueuedTurnActions(input: {
   readonly thread: Thread | undefined;
   readonly appendPrompt: (text: string) => void;
   readonly addAttachments: (files: File[]) => Promise<void>;
+  /** Imports the row's records into the draft, then appends its text (#971). */
+  readonly restoreContext: (input: {
+    readonly text: string;
+    readonly records: ReadonlyArray<ComposerContextRecord>;
+    /** The row's attachments, fetched back, keyed by the id their records carry. */
+    readonly files: ReadonlyArray<{ readonly attachmentId: string; readonly file: File }>;
+  }) => void;
 }): QueuedTurnActions {
-  const { environmentId, thread, appendPrompt, addAttachments } = input;
+  const { environmentId, thread, appendPrompt, addAttachments, restoreContext } = input;
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const removeQueuedTurn = useAtomCommand(threadEnvironment.removeQueuedTurn, {
     reportFailure: false,
@@ -96,6 +110,7 @@ export function useQueuedTurnActions(input: {
             role: "user",
             text: row.text,
             attachments: row.attachments,
+            ...(row.context !== undefined ? { context: row.context } : {}),
           },
           modelSelection: row.modelSelection ?? thread.modelSelection,
           runtimeMode: thread.runtimeMode,
@@ -121,7 +136,7 @@ export function useQueuedTurnActions(input: {
   const edit = useCallback(
     async (row: OrchestrationQueuedTurn) => {
       if (!thread) return;
-      const files: File[] = [];
+      const files: Array<{ attachmentId: string; file: File }> = [];
       for (const attachment of row.attachments) {
         if (attachment.type !== "image" && attachment.type !== "file") continue;
         const connection = readPreparedConnection(environmentId);
@@ -153,7 +168,10 @@ export function useQueuedTurnActions(input: {
           const response = await fetch(url);
           if (!response.ok) throw new Error(`The server answered ${response.status}.`);
           const blob = await response.blob();
-          files.push(new File([blob], attachment.name, { type: attachment.mimeType }));
+          files.push({
+            attachmentId: attachment.id,
+            file: new File([blob], attachment.name, { type: attachment.mimeType }),
+          });
         } catch (error) {
           toastManager.add({
             type: "error",
@@ -176,10 +194,22 @@ export function useQueuedTurnActions(input: {
         reportFailure("Could not take the message out of the queue", removed);
         return;
       }
+      if (row.context !== undefined) {
+        restoreContext({ text: row.text, records: row.context.records, files });
+        return;
+      }
       appendPrompt(queuedTurnEditableText(row.text));
-      if (files.length > 0) await addAttachments(files);
+      if (files.length > 0) await addAttachments(files.map((entry) => entry.file));
     },
-    [addAttachments, appendPrompt, createAssetUrl, environmentId, removeQueuedTurn, thread],
+    [
+      addAttachments,
+      appendPrompt,
+      createAssetUrl,
+      environmentId,
+      removeQueuedTurn,
+      restoreContext,
+      thread,
+    ],
   );
 
   const move = useCallback(

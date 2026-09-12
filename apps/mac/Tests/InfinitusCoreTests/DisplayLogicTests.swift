@@ -94,16 +94,6 @@ final class WeeklyRollTests: XCTestCase {
     }
 }
 
-final class SwitchHistoryTests: XCTestCase {
-    func testDecodesHistoryJSON() throws {
-        let json = #"{"schemaVersion":1,"switches":[{"from":3,"to":1,"at":"2026-06-27 02:06"}],"logPath":"/tmp/x.log"}"#
-        let list = try JSONDecoder().decode(SwitchHistoryList.self, from: Data(json.utf8))
-        XCTAssertEqual(list.switches.first?.from, 3)
-        XCTAssertEqual(list.switches.first?.at, "2026-06-27 02:06")
-        XCTAssertEqual(list.logPath, "/tmp/x.log")
-    }
-}
-
 final class SentinelNotesTests: XCTestCase {
     func testOkIsNil() { XCTAssertNil(SentinelNotes.note(for: "ok")) }
 

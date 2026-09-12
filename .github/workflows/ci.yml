@@ -558,6 +558,9 @@ jobs:
           tag: 6.1-RELEASE
       - run: vcpkg install zlib:x64-windows
         if: needs.mac_changes.outputs.changed != 'false'
+      # vcpkg's paths ride the command line on purpose: never set INCLUDE
+      # or LIB for this step — a set LIB hides the MSVC lib directories
+      # from the link (2643ed93e3, the fact used to live only there).
       - run: >
           swift build --product infinitusctl
           -Xcc -IC:/vcpkg/installed/x64-windows/include

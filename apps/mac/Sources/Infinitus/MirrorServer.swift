@@ -344,196 +344,6 @@ final class MirrorFilesBox: @unchecked Sendable {
     }
 }
 
-/// The phone's terminal (#507 step 3): the five routes' handlers over
-/// `TerminalHost`, boxed with a `Handlers` struct like `files` because there
-/// are several of them. `nil` from any handler = no such session or terminal
-/// (404); every other refusal is Core's own `T3Terminal` validation, mapped
-/// to a status by `MirrorServer.terminalFailure`.
-final class MirrorTerminalBox: @unchecked Sendable {
-    struct Handlers: Sendable {
-        let open: @Sendable (Int32, T3Terminal.OpenRequest) -> Result<TerminalHost.OpenOutcome, TerminalHost.HostError>?
-        /// The sink is called on the host's queue, in frame order, starting
-        /// with the snapshot (or the ring replay a `since` earned).
-        let attach: @Sendable (Int32, String, Int?, @escaping TerminalHost.Sink) -> TerminalHost.Attachment?
-        let detach: @Sendable (TerminalHost.Attachment) -> Void
-        let write: @Sendable (Int32, String, T3Terminal.WriteRequest) -> Result<Void, TerminalHost.HostError>?
-        let resize: @Sendable (Int32, String, T3Terminal.ResizeRequest) -> Result<Void, TerminalHost.HostError>?
-        let close: @Sendable (Int32, String) -> Bool
-    }
-    private let lock = NSLock()
-    private var handlers: Handlers?
-
-    func set(_ new: Handlers) {
-        lock.lock(); handlers = new; lock.unlock()
-    }
-
-    var current: Handlers? {
-        lock.lock(); defer { lock.unlock() }
-        return handlers
-    }
-}
-
-/// One attached terminal stream (#507 spec F): the `NWConnection` the mirror
-/// would normally answer once and cancel is held instead, and every frame
-/// the host emits goes out as one chunk of a chunked NDJSON response that
-/// ends only when the terminal does (the zero-length chunk after `closed`).
-///
-/// Frames arrive on the host's serial queue and send completions on the
-/// mirror's — neither is the main actor, and neither is ever blocked here:
-/// the only shared state is a byte counter under a lock. A phone that falls
-/// more than `pendingCap` behind is dropped with
-/// `closed{reason:"backpressure"}` (#507 review ruling 5) and resumes with
-/// `since`.
-final class MirrorTerminalStream: @unchecked Sendable {
-    /// Unsent bytes past which the phone is too far behind to keep.
-    static let pendingCap = 1024 * 1024
-
-    private let connection: NWConnection
-    private let lock = NSLock()
-    private var pending = 0
-    private var headSent = false
-    private var finished = false
-    private var attachment: TerminalHost.Attachment?
-    private var detach: (@Sendable (TerminalHost.Attachment) -> Void)?
-
-    init(connection: NWConnection) {
-        self.connection = connection
-    }
-
-    /// The host's fan-out, on the host's queue.
-    func deliver(_ frames: [T3Terminal.Frame]) {
-        guard !frames.isEmpty else { return }
-        var payload = Data()
-        var last = false
-        for frame in frames {
-            guard let line = try? frame.encodeLine() else {
-                assertionFailure("a T3Terminal.Frame is Strings and Ints — encoding cannot fail")
-                continue
-            }
-            payload.append(line)
-            if case .closed = frame { last = true }
-        }
-        send(payload, end: last)
-    }
-
-    /// Keeps the host's handle so a hang-up can leave the fan-out. If the
-    /// stream already gave up while `attach` was still returning, this
-    /// detaches at once instead of storing a handle nobody will drop.
-    func hold(_ attachment: TerminalHost.Attachment,
-              detach: @escaping @Sendable (TerminalHost.Attachment) -> Void) {
-        lock.lock()
-        if finished {
-            lock.unlock()
-            detach(attachment)
-            return
-        }
-        self.attachment = attachment
-        self.detach = detach
-        lock.unlock()
-        // Three ways a phone goes away, all of them ending in `hangUp`: the
-        // connection failing, its read side reporting EOF (`curl -N` killed,
-        // the phone backgrounded), and a send that never lands.
-        connection.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .failed, .cancelled: self?.hangUp()
-            default: break
-            }
-        }
-        drain()
-    }
-
-    /// A refusal decided before anything was streamed — a plain response,
-    /// no chunked head.
-    func refuse(_ response: Data) {
-        lock.lock()
-        finished = true
-        lock.unlock()
-        connection.send(content: response,
-                        completion: .contentProcessed { [connection] _ in connection.cancel() })
-    }
-
-    private func send(_ payload: Data, end: Bool) {
-        lock.lock()
-        if finished {
-            lock.unlock()
-            return
-        }
-        var out = Data()
-        if !headSent {
-            headSent = true
-            out.append(Self.head)
-        }
-        if !end, pending + payload.count > Self.pendingCap {
-            finished = true
-            lock.unlock()
-            out.append(Self.chunk(Self.backpressureLine))
-            out.append(Self.terminator)
-            connection.send(content: out,
-                            completion: .contentProcessed { [weak self] _ in self?.hangUp() })
-            return
-        }
-        pending += payload.count
-        if end { finished = true }
-        lock.unlock()
-        out.append(Self.chunk(payload))
-        if end { out.append(Self.terminator) }
-        connection.send(content: out, completion: .contentProcessed { [weak self] error in
-            self?.sent(payload.count, error: error, end: end)
-        })
-    }
-
-    private func sent(_ bytes: Int, error: NWError?, end: Bool) {
-        lock.lock()
-        pending -= bytes
-        lock.unlock()
-        if error != nil || end { hangUp() }
-    }
-
-    /// Idempotent: out of the host's fan-out, then the connection goes.
-    private func hangUp() {
-        lock.lock()
-        finished = true
-        let attachment = self.attachment
-        let detach = self.detach
-        self.attachment = nil
-        self.detach = nil
-        lock.unlock()
-        if let attachment, let detach { detach(attachment) }
-        connection.cancel()
-    }
-
-    /// The client's side of a stream carries nothing — this read only exists
-    /// to notice it hanging up.
-    private func drain() {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] _, _, isComplete, error in
-            guard let self else { return }
-            if isComplete || error != nil {
-                self.hangUp()
-                return
-            }
-            self.drain()
-        }
-    }
-
-    private static let head = Data(("HTTP/1.1 200 OK\r\n"
-        + "Content-Type: application/x-ndjson\r\n"
-        + "Transfer-Encoding: chunked\r\n"
-        + "Cache-Control: no-store\r\n"
-        + "Connection: close\r\n\r\n").utf8)
-    private static let terminator = Data("0\r\n\r\n".utf8)
-    private static let backpressureLine: Data =
-        (try? T3Terminal.Frame.closed(.init(reason: T3Terminal.closedReasonBackpressure)).encodeLine()) ?? Data()
-
-    /// One HTTP/1.1 chunk: the size in hex, the bytes, CRLF.
-    private static func chunk(_ payload: Data) -> Data {
-        var out = Data(String(payload.count, radix: 16).utf8)
-        out.append(Data("\r\n".utf8))
-        out.append(payload)
-        out.append(Data("\r\n".utf8))
-        return out
-    }
-}
-
 /// `GET /.well-known/infinitus` (#223 phase 4): the descriptor, no token.
 final class MirrorDescriptorBox: @unchecked Sendable {
     private let lock = NSLock()
@@ -750,8 +560,6 @@ final class MirrorServer: ObservableObject {
     let commands = MirrorCommandsBox()
     /// Answers the file-browser routes (#223); set by AppModel once at start.
     let files = MirrorFilesBox()
-    /// Answers the terminal routes (#507); set by AppModel once at start.
-    let terminal = MirrorTerminalBox()
     /// Answers `GET /.well-known/infinitus`; set by AppModel once at start.
     let descriptor = MirrorDescriptorBox()
     /// Command receipts for input / start / attention (#223 phase 4).
@@ -866,8 +674,11 @@ final class MirrorServer: ObservableObject {
                 },
                 grants: { TeamGrants.load(teamDir: dir) },
                 liveSessions: live,
-                execute: { action, text, pid in
-                    guard let request = TeamControl.request(action: action, text: text) else {
+                execute: { action, text, _, pid in
+                    // Phase 2's non-drive actions (`TeamControl.localVerb`)
+                    // land with their verbs; until then nobody can grant
+                    // them and an unexpected one is refused here.
+                    guard let pid, let request = TeamControl.request(action: action, text: text) else {
                         return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
                     }
                     return mirrorInputQueue.sync { box.deliver(pid, request, from: "team") }
@@ -953,7 +764,6 @@ final class MirrorServer: ObservableObject {
         let timeline = self.timeline
         let commands = self.commands
         let files = self.files
-        let terminal = self.terminal
         let descriptor = self.descriptor
         let receipts = self.receipts
         let leases = self.leases
@@ -975,7 +785,7 @@ final class MirrorServer: ObservableObject {
         }
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
+                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                        team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -1056,7 +866,6 @@ final class MirrorServer: ObservableObject {
                                           timeline: MirrorTimelineBox,
                                           commands: MirrorCommandsBox,
                                           files: MirrorFilesBox,
-                                          terminal: MirrorTerminalBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -1069,7 +878,7 @@ final class MirrorServer: ObservableObject {
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
     }
@@ -1084,7 +893,6 @@ final class MirrorServer: ObservableObject {
                                           timeline: MirrorTimelineBox,
                                           commands: MirrorCommandsBox,
                                           files: MirrorFilesBox,
-                                          terminal: MirrorTerminalBox,
                                           descriptor: MirrorDescriptorBox,
                                           receipts: Receipts,
                                           leases: LeaseTable,
@@ -1527,14 +1335,6 @@ final class MirrorServer: ObservableObject {
                     } else {
                         response = MirrorTransport.badRequestResponse()
                     }
-                } else if let route = T3Terminal.parse(method: request.method, request: request) {
-                    // The phone's terminal (#507): four short routes plus the
-                    // stream, which keeps this connection instead of answering
-                    // it once. All of them off this queue — a fork, a pty write
-                    // and a never-ending response each.
-                    Self.serveTerminal(route, request: request, connection: connection,
-                                       terminal: terminal, onServed: onServed)
-                    return
                 } else {
                     response = MirrorTransport.notFoundResponse()
                 }
@@ -1550,141 +1350,10 @@ final class MirrorServer: ObservableObject {
                 return
             }
             receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, terminal: terminal, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs, checkpoints: checkpoints,
                    team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
         }
     }
 
-    // MARK: - Terminal routes (#507 step 3)
-
-    /// One of `T3Terminal`'s five routes onto `TerminalHost`. Every branch
-    /// leaves the serving queue first: `open` forks a shell, `write` may wait
-    /// on a full pty input buffer (#507 review ruling 4), and the stream never
-    /// finishes at all. `nil` from a handler is the route's 404.
-    private nonisolated static func serveTerminal(_ route: T3Terminal.Route,
-                                                  request: MirrorTransport.Request,
-                                                  connection: NWConnection,
-                                                  terminal: MirrorTerminalBox,
-                                                  onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
-        let answer: @Sendable (Data) -> Void = { response in
-            connection.send(content: response,
-                            completion: .contentProcessed { _ in connection.cancel() })
-        }
-        guard let handlers = terminal.current else {
-            answer(MirrorTransport.notFoundResponse())
-            return
-        }
-        let noContent = MirrorTransport.response(status: 204, reason: "No Content",
-                                                 contentType: "application/json", body: Data())
-        let missing = MirrorTransport.errorResponse(status: 404, message: "no such terminal")
-        switch route {
-        case .open(let pid):
-            guard let body = try? JSONDecoder().decode(T3Terminal.OpenRequest.self, from: request.body) else {
-                answer(MirrorTransport.badRequestResponse())
-                return
-            }
-            // forkpty + execve: off this queue, like `POST /sessions/start`.
-            DispatchQueue.global(qos: .userInitiated).async {
-                let response: Data
-                switch handlers.open(pid, body) {
-                case .success(let outcome)?:
-                    let json = (try? JSONEncoder().encode(outcome.reply)) ?? Data()
-                    // Upstream's `terminal.open` reuses a running session
-                    // rather than refusing (Manager.ts:152), so a second open
-                    // is the existing terminal's reply under a 200, never a 409.
-                    response = outcome.created
-                        ? MirrorTransport.response(status: 201, reason: "Created",
-                                                   contentType: "application/json", body: json)
-                        : MirrorTransport.jsonResponse(json)
-                case .failure(let error)?:
-                    response = terminalFailure(error)
-                case nil:
-                    response = MirrorTransport.errorResponse(status: 404, message: "no such session")
-                }
-                onServed(request)
-                answer(response)
-            }
-        case .stream(let pid, let id, let since):
-            // Ruling 7: the pairing token rides in `?t=` here because
-            // `URLSession.bytes` cannot set a header per chunk — so the only
-            // line that ever prints this target masks it.
-            Lifecycle.log.notice("terminal \(request.maskedDescription(method: "GET"), privacy: .public)")
-            let stream = MirrorTerminalStream(connection: connection)
-            // `attach` hands over the snapshot (or the ring replay `since`
-            // earned) inline on the host's queue; the chunked head goes out
-            // with those first frames, so a 404 is still a plain response.
-            DispatchQueue.global(qos: .utility).async {
-                guard let attachment = handlers.attach(pid, id, since, { stream.deliver($0) }) else {
-                    stream.refuse(missing)
-                    return
-                }
-                onServed(request)
-                stream.hold(attachment, detach: handlers.detach)
-            }
-        case .write(let pid, let id):
-            guard let body = try? JSONDecoder().decode(T3Terminal.WriteRequest.self, from: request.body) else {
-                answer(MirrorTransport.badRequestResponse())
-                return
-            }
-            DispatchQueue.global(qos: .userInitiated).async {
-                let response: Data
-                switch handlers.write(pid, id, body) {
-                case .success?: response = noContent
-                case .failure(let error)?: response = terminalFailure(error)
-                case nil: response = missing
-                }
-                onServed(request)
-                answer(response)
-            }
-        case .resize(let pid, let id):
-            guard let body = try? JSONDecoder().decode(T3Terminal.ResizeRequest.self, from: request.body) else {
-                answer(MirrorTransport.badRequestResponse())
-                return
-            }
-            DispatchQueue.global(qos: .userInitiated).async {
-                let response: Data
-                switch handlers.resize(pid, id, body) {
-                case .success?: response = noContent
-                case .failure(let error)?: response = terminalFailure(error)
-                case nil: response = missing
-                }
-                onServed(request)
-                answer(response)
-            }
-        case .close(let pid, let id):
-            // The shell is signalled and this answers; `exited` and `closed`
-            // reach the attached streams as the child is reaped.
-            DispatchQueue.global(qos: .utility).async {
-                let response = handlers.close(pid, id) ? noContent : missing
-                onServed(request)
-                answer(response)
-            }
-        }
-    }
-
-    /// A host refusal as its status: Core's caps decide, this only names them.
-    private nonisolated static func terminalFailure(_ error: TerminalHost.HostError) -> Data {
-        switch error {
-        case .validation(.colsOutOfRange):
-            return MirrorTransport.errorResponse(status: 400, message: "cols outside \(T3Terminal.minCols)…\(T3Terminal.maxCols)")
-        case .validation(.rowsOutOfRange):
-            return MirrorTransport.errorResponse(status: 400, message: "rows outside \(T3Terminal.minRows)…\(T3Terminal.maxRows)")
-        case .validation(.dataTooLarge):
-            let body = Data(#"{"error":"write over \#(T3Terminal.maxWriteBytes) bytes"}"#.utf8)
-            return MirrorTransport.response(status: 413, reason: "Payload Too Large",
-                                            contentType: "application/json", body: body)
-        case .validation(.terminalIdInvalid):
-            return MirrorTransport.errorResponse(status: 400,
-                                                 message: "terminalId must be non-blank and at most \(T3Terminal.maxTerminalIdLength) characters")
-        case .validation(.tooManyTerminals):
-            // The pid is full (`T3Terminal.maxTerminalsPerSession`): a
-            // conflict with the shells already open, not a bad request.
-            let body = Data(#"{"error":"too many terminals"}"#.utf8)
-            return MirrorTransport.response(status: 409, reason: "Conflict",
-                                            contentType: "application/json", body: body)
-        case .spawnFailed(let detail):
-            return MirrorTransport.errorResponse(status: 500, message: detail)
-        }
-    }
 }

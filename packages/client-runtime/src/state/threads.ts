@@ -446,8 +446,9 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         }
         yield* SubscriptionRef.set(lastSequence, pending.sequence);
         yield* setThread(pending.thread, "keep");
-        yield* tryMergePendingOlderPage();
       }
+      // A page parked behind the replay (#931) merges onto the flushed thread.
+      yield* tryMergePendingOlderPage();
       yield* SubscriptionRef.update(state, (current) =>
         Option.isSome(current.data) && current.status !== "deleted" && Option.isNone(current.error)
           ? { ...current, status: "live" as const, error: Option.none() }
@@ -536,6 +537,10 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         }));
         return;
       }
+      // A pending replay's flush is the earliest safe merge (#931).
+      if ((yield* Ref.get(replay)) !== null) {
+        return;
+      }
       const watermark = pending.snapshot.page?.threadSequence;
       const loadedSequence = yield* SubscriptionRef.get(lastSequence);
       if (watermark !== undefined && watermark > loadedSequence) {
@@ -550,6 +555,53 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
     item: OrchestrationThreadStreamItem,
   ) {
     yield* applyLock.withPermits(1)(applyItemLocked(item).pipe(Effect.andThen(remember)));
+  });
+
+  const applyItems = Effect.fn("EnvironmentThreadState.applyItems")(function* (
+    items: ReadonlyArray<OrchestrationThreadStreamItem>,
+  ) {
+    yield* applyLock.withPermits(1)(
+      Effect.gen(function* () {
+        const current = yield* SubscriptionRef.get(state);
+        // While the completion marker is awaited the per-item path folds the
+        // replay into one write at `synchronized` (#897); the batch path
+        // below would write each batch and skip the pending fold.
+        if (
+          Option.isNone(current.data) ||
+          (yield* Ref.get(awaitingCompletion)) ||
+          (yield* Ref.get(pendingOlderPage)) !== null ||
+          items.some(
+            (item) =>
+              item.kind === "snapshot" ||
+              (item.kind === "event" &&
+                (item.event.type === "thread.reverted" || item.event.type === "thread.deleted")),
+          )
+        ) {
+          for (const item of items) {
+            yield* applyItemLocked(item);
+            yield* remember;
+          }
+          return;
+        }
+
+        let thread = current.data.value;
+        let sequence = yield* SubscriptionRef.get(lastSequence);
+        let synchronized = false;
+        for (const item of items) {
+          if (item.kind === "synchronized") {
+            synchronized = true;
+          } else if (item.kind === "event" && item.event.sequence > sequence) {
+            sequence = item.event.sequence;
+            const result = applyThreadDetailEvent(thread, item.event);
+            if (result.kind === "updated") thread = result.thread;
+          }
+        }
+        yield* SubscriptionRef.set(lastSequence, sequence);
+        if (thread !== current.data.value) yield* setThread(thread, "keep");
+        if (synchronized) yield* applyItemLocked({ kind: "synchronized" });
+        yield* remember;
+      }),
+    );
   });
 
   // Merges an older disjoint page below the currently loaded window. All four
@@ -665,9 +717,15 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         // the page's thread-scoped watermark; loadingOlder stays true so
         // the UI shows progress and no second fetch starts. Pages from
         // pre-watermark servers (threadSequence absent) merge immediately,
-        // preserving the old behavior.
+        // preserving the old behavior — except while a resume replay is
+        // pending (#897): the flush writes the replayed thread whole, so a
+        // page merged before it would be dropped (#931). Every page parks
+        // until the flush then, watermark or not.
         const watermark = response.value.page?.threadSequence;
-        if (watermark !== undefined && watermark > loadedSequence) {
+        if (
+          (yield* Ref.get(replay)) !== null ||
+          (watermark !== undefined && watermark > loadedSequence)
+        ) {
           yield* Ref.set(pendingOlderPage, {
             snapshot: response.value,
             epoch: epochNow,
@@ -813,7 +871,11 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         retryExpectedFailureAfter: "250 millis",
         resubscribe: foregroundResubscriptions,
       },
-    ).pipe(Stream.runForEach(applyItem)),
+    ).pipe(
+      Stream.runForEachArray((items) =>
+        items.length === 1 ? applyItem(items[0]!) : applyItems(items),
+      ),
+    ),
   );
 
   // Expose loadOlderTurns to UI actions through the request registry.

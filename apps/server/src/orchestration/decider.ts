@@ -24,6 +24,7 @@ import {
 } from "@t3tools/shared/threadPullRequests";
 import { compareDateTimeStrings } from "@t3tools/shared/dateTime";
 import { isValidOrderKey, orderKeyBetween } from "@t3tools/shared/orderKeys";
+import { addTurnUsage } from "@t3tools/shared/threadUsage";
 import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -1347,6 +1348,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           role: "user",
           text: command.message.text,
           attachments: command.message.attachments,
+          ...(command.message.context !== undefined ? { context: command.message.context } : {}),
           turnId: null,
           streaming: false,
           createdAt: command.createdAt,
@@ -1512,6 +1514,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             ...(command.modelSelection !== undefined
               ? { modelSelection: command.modelSelection }
               : {}),
+            ...(command.message.context !== undefined ? { context: command.message.context } : {}),
             orderKey,
             createdAt: command.createdAt,
             updatedAt: command.createdAt,
@@ -1543,11 +1546,19 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         type: "thread.turn-queue-updated",
         payload: {
           threadId: command.threadId,
+          // The command carries the whole message, so a context it lacks is
+          // cleared, not kept from the row being replaced.
           queuedTurn: {
-            ...existing,
+            queueId: existing.queueId,
+            ...(existing.modelSelection !== undefined
+              ? { modelSelection: existing.modelSelection }
+              : {}),
+            orderKey: existing.orderKey,
+            createdAt: existing.createdAt,
             messageId: command.message.messageId,
             text: command.message.text,
             attachments: command.message.attachments,
+            ...(command.message.context !== undefined ? { context: command.message.context } : {}),
             updatedAt: command.createdAt,
           },
         },
@@ -1866,6 +1877,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
+    case "thread.conversation.revert":
     case "thread.checkpoint.revert": {
       yield* requireThread({
         readModel,
@@ -1884,6 +1896,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           threadId: command.threadId,
           turnCount: command.turnCount,
           ...(command.keepChat === true ? { keepChat: true } : {}),
+          ...(command.type === "thread.conversation.revert" ? { restoreFiles: false } : {}),
           createdAt: command.createdAt,
         },
       };
@@ -1928,6 +1941,58 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           threadId: command.threadId,
           createdAt: command.createdAt,
         },
+      };
+    }
+
+    // Fork (#834): a completed turn's usage. The event carries the thread's
+    // rollup folded with it, so projections assign instead of summing.
+    case "thread.turn.usage.record": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+          metadata: {},
+        })),
+        type: "thread.turn-usage-recorded",
+        payload: {
+          threadId: command.threadId,
+          turnUsage: command.turnUsage,
+          usage: addTurnUsage(thread.usage, command.turnUsage),
+        },
+      };
+    }
+
+    // Fork (#834): the transcript backfill. One rollup per thread, set once:
+    // a thread that already has one (a turn ran meanwhile) keeps it.
+    case "thread.usage.backfill": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      if (thread.usage !== undefined && thread.usage !== null) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Thread '${command.threadId}' already has a usage rollup.`,
+        });
+      }
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+          metadata: {},
+        })),
+        type: "thread.usage-backfilled",
+        payload: { threadId: command.threadId, usage: command.usage },
       };
     }
 
@@ -2165,28 +2230,6 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           files: command.files,
           assistantMessageId: command.assistantMessageId ?? null,
           completedAt: command.completedAt,
-        },
-      };
-    }
-
-    case "thread.chat.rewind": {
-      yield* requireThread({
-        readModel,
-        command,
-        threadId: command.threadId,
-      });
-      return {
-        ...(yield* withEventBase({
-          aggregateKind: "thread",
-          aggregateId: command.threadId,
-          occurredAt: command.createdAt,
-          commandId: command.commandId,
-        })),
-        type: "thread.chat-rewind-requested",
-        payload: {
-          threadId: command.threadId,
-          turnCount: command.turnCount,
-          createdAt: command.createdAt,
         },
       };
     }

@@ -56,30 +56,6 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(list.accounts[0].usageStatus, "no_credentials")
     }
 
-    func testConfigListCarriesSpecMetadata() throws {
-        let cfg = try JSONDecoder().decode(ConfigList.self, from: fixture("config.json"))
-        let threshold = cfg.settings.first { $0.key == "autoswitch.threshold" }!
-        XCTAssertEqual(threshold.kind, "float")
-        XCTAssertEqual(threshold.lo, 50.0)
-        XCTAssertEqual(threshold.hi, 99.9)
-        XCTAssertFalse(threshold.help.isEmpty)
-        let strategy = cfg.settings.first { $0.key == "autoswitch.strategy" }!
-        XCTAssertTrue(strategy.choices?.contains("consume-first") ?? false)
-        if case .string(let d) = strategy.defaultValue { XCTAssertEqual(d, "best") }
-        else { XCTFail("default should be a string") }
-    }
-
-    func testHeterogeneousSettingValuesDecode() throws {
-        let cfg = try JSONDecoder().decode(ConfigList.self, from: fixture("config.json"))
-        let kinds = Set(cfg.settings.map(\.kind))
-        XCTAssertTrue(kinds.contains("bool"))
-        XCTAssertTrue(kinds.contains("float"))
-        // Every value decoded into some JSONValue without throwing — the
-        // point of the enum. Spot-check a bool round-trips as a bool.
-        let resume = cfg.settings.first { $0.key == "autoswitch.resumeStoppedSessions" }!
-        if case .bool = resume.value {} else { XCTFail("bool value expected") }
-    }
-
     /// The owned status overlay (#151): the actor's word replaces the
     /// roster's empty one, the counts follow, everything else is untouched.
     func testLiveSessionsOverlayRewritesRowsAndCounts() {

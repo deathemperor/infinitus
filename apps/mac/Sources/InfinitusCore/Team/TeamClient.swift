@@ -296,9 +296,12 @@ public final class TeamClient {
 
     /// One teammate's transcript branch, now: what a transcript view
     /// calls before reading, so a sender the hint missed still opens.
-    public func fetchTranscripts(from kid: String) throws {
+    /// With `session`, that session's chunks too: the branch comes
+    /// without its blobs (#414) and they arrive in one round trip.
+    public func fetchTranscripts(from kid: String, session: String? = nil) throws {
         guard Self.isPathSegment(kid) else { throw ClientError.unknownMember }
         try store.sync(branches: ["t/\(kid)"])
+        if let session { _ = try store.prefetch("t/\(kid)/transcripts/\(session)/") }
     }
 
     /// The roster is computed from the roster we read, so a lost push
@@ -592,6 +595,9 @@ public final class TeamClient {
         var kept: [String: HeaderCache.Entry] = [:]
         var parsed = 0
         for entry in try store.list("m/") + (try store.list("t/")) + (try store.list("roster/aggregates/")) {
+            // A chunk whose bytes are not here yet has no header to read
+            // (#414); `TeamReader.fold` lists it by its path.
+            guard entry.present else { continue }
             let header: Envelope.Header
             if let cached = cache.entries[entry.path], cached.version == entry.version {
                 header = cached.header

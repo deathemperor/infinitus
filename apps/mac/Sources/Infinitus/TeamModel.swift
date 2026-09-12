@@ -102,6 +102,15 @@ final class TeamModel: ObservableObject {
     /// while that is still nil (the first scan after launch).
     var ownsScan: () -> Bool = { false }
     var scanEntries: () -> [String: StatsScanner.FileEntry]? = { nil }
+    /// The scan's generation, and the two ways back (#499): the table a
+    /// memo was folded from is given back through `scanConsumed`, and a
+    /// miss with nothing to fold asks StatsModel for a scan.
+    var scanGeneration: () -> Int = { 0 }
+    var scanConsumed: (Int) -> Void = { _ in }
+    var scanRequested: () -> Void = {}
+    /// What this instance keeps of the app's scan between passes: the
+    /// fold and the picker's list, not the table (#499).
+    private let scanMemo = TeamPublisher.ScanMemo()
     var showSettings: (() -> Void)?
 
     let paths: TeamPaths
@@ -232,8 +241,8 @@ final class TeamModel: ObservableObject {
     func load() -> Task<Void, Never> {
         guard enabled else { return Task {} }
         let fetch = lastFetchAt, publish = lastPublishAt, err = lastError
-        let scan = appScan()
-        let docs = docCache, scans = scanCache, memo = headerMemo
+        let scan = appScan(), window = sources()
+        let docs = docCache, scans = scanCache, memo = headerMemo, fold = scanMemo
         return Task {
             do {
                 let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, [Signed<TeamRequest>], TranscriptPicker, TeamGrants, HostnameState) = try await run { paths, secrets in
@@ -261,11 +270,12 @@ final class TeamModel: ObservableObject {
                     let choices = TeamTranscriptChoices.load(teamDir: dir)
                     let recent: [TeamPublisher.TranscriptSession]
                     if choices.mode != .chosen { recent = [] }
-                    else if let entries = scan.entries {
-                        recent = TeamPublisher.recentTranscriptSessions(entries: entries, days: TeamPublisher.Sources.defaultTranscriptDays,
-                                                                        exclusions: exclusions)
-                    } else if scan.owns { recent = [] }   // the app's first scan is still running
-                    else {
+                    else if scan.owns {
+                        // The memo's list, folded once per scan (#499): empty
+                        // while the app's first scan is still running.
+                        let key = TeamPublisher.ScanMemo.Key(generation: scan.generation, exclusions: exclusions, sources: window)
+                        recent = fold.resolve(key, entries: scan.entries)?.recent ?? []
+                    } else {
                         recent = TeamPublisher.recentTranscriptSessions(cacheURL: dir.appendingPathComponent("scan-cache.json"),
                                                                         days: TeamPublisher.Sources.defaultTranscriptDays,
                                                                         exclusions: exclusions)
@@ -273,6 +283,7 @@ final class TeamModel: ObservableObject {
                     let picker = TranscriptPicker(choices: choices, recent: recent)
                     return (snap, reader, TeamShares.load(teamDir: dir), exclusions, kid, client.roster, pendingNearby, picker, TeamGrants.load(teamDir: dir), hostnameState)
                 }
+                settleScan()
                 withAnimation(.easeInOut(duration: 0.2)) {
                     snapshot = result.0; reader = result.1; shares = result.2; exclusions = result.3; kid = result.4
                     roster = result.5; pendingNearby = result.6
@@ -283,9 +294,19 @@ final class TeamModel: ObservableObject {
                 onLoaded?()
                 if let fresh = result.9.fresh { onHostname?(fresh.hostname, fresh.from) }
             } catch {
+                settleScan()
                 lastError = Self.mask(error)
             }
         }
+    }
+
+    /// After a pass or a reload resolved the memo (#499): the table a
+    /// fresh fold came from goes back to StatsModel, and a miss with
+    /// nothing to fold from asks for the next scan (`refresh` is a no-op
+    /// while one runs; the next reload folds its table).
+    private func settleScan() {
+        if let generation = scanMemo.takeBuilt() { scanConsumed(generation) }
+        if scanMemo.wanted { scanRequested() }
     }
 
     // MARK: the loop (spec §7: fetch + publish, no prompt)
@@ -313,10 +334,7 @@ final class TeamModel: ObservableObject {
         let aggregatesDue = lastAggregatesAt.map { Int(Date().timeIntervalSince1970) - $0 >= Self.aggregatesInterval } ?? true
         var sources = sources
         let scan = appScan()
-        sources.entries = scan.entries
-        // The app's own scan has not finished since launch: fetch now,
-        // publish next tick — never scan the corpus a second time.
-        let publish = publish && (scan.entries != nil || !scan.owns)
+        let fold = scanMemo
         let stop = stopRequested, fetchedHook = onFetched
         sources.onProgress = { [weak self] p in Task { @MainActor in self?.progress = p } }
         // A user action queued behind this pass asks the publisher to
@@ -341,10 +359,23 @@ final class TeamModel: ObservableObject {
                 var aggregated = false
                 if publish, client.isMember {
                     var s = sources
-                    if s.entries == nil { s.cacheURL = paths.teamDir(client.config.id).appendingPathComponent("scan-cache.json") }
-                    report = try TeamPublisher(client: client, paths: paths).publish(sources: s)
-                    published = Int(Date().timeIntervalSince1970)
-                    if aggregatesDue, client.isLeader {
+                    var ready = true
+                    if scan.owns {
+                        // The app's scan, folded once per generation (#499).
+                        // No memo and no table — the first scan after launch
+                        // still running, or a miss after the table went back —
+                        // fetch now, publish next tick: never scan the corpus
+                        // a second time.
+                        let key = TeamPublisher.ScanMemo.Key(generation: scan.generation, exclusions: TeamExclusions.load(paths: paths), sources: s)
+                        if let entry = fold.resolve(key, entries: scan.entries) { s.collected = entry.collected } else { ready = false }
+                    } else {
+                        s.cacheURL = paths.teamDir(client.config.id).appendingPathComponent("scan-cache.json")
+                    }
+                    if ready {
+                        report = try TeamPublisher(client: client, paths: paths).publish(sources: s)
+                        published = Int(Date().timeIntervalSince1970)
+                    }
+                    if published != nil, aggregatesDue, client.isLeader {
                         // Don't let an aggregates-only failure erase the
                         // publish that just succeeded; retry next tick
                         // since `aggregated` stays false.
@@ -805,9 +836,10 @@ final class TeamModel: ObservableObject {
             return try await run { paths, secrets in
                 guard let client = try Self.openClient(paths, secrets) else { return [] }
                 // The sender's transcript branch is not part of the routine
-                // sync (#321); pull it now, and read what is local if the
-                // store is unreachable.
-                try? client.fetchTranscripts(from: kid)
+                // sync (#321) and comes without its chunks (#414); pull
+                // both now, and read what is local if the store is
+                // unreachable.
+                try? client.fetchTranscripts(from: kid, session: session)
                 return try TeamReader.load(client: client).transcript(kid: kid, session: session, client: client, limit: 400)
             }
         } catch {
@@ -829,13 +861,13 @@ final class TeamModel: ObservableObject {
         busy = "Publishing…"; defer { busy = nil }
         await loop(sources: sources(), publish: true)
         let scan = appScan()
-        if scan.owns, scan.entries == nil, lastError == nil { lastError = "publishing waits for this Mac's transcript scan to finish" }
+        if scan.owns, scan.entries == nil, scanMemo.isEmpty, lastError == nil { lastError = "publishing waits for this Mac's transcript scan to finish" }
     }
 
-    /// (owns, entries): what the publisher works from in this instance.
-    private func appScan() -> (owns: Bool, entries: [String: StatsScanner.FileEntry]?) {
+    /// (owns, entries, generation): what the publisher works from in this instance.
+    private func appScan() -> (owns: Bool, entries: [String: StatsScanner.FileEntry]?, generation: Int) {
         let owns = ownsScan()
-        return (owns, owns ? scanEntries() : nil)
+        return (owns, owns ? scanEntries() : nil, scanGeneration())
     }
 
     func create(name: String, remote: String, token: String?, leaderName: String) async {

@@ -1,51 +1,5 @@
 import Foundation
 
-// MARK: - cswap settings input validation
-
-/// Client-side validation for the spec-driven settings pane. The CLI's
-/// `config set` re-validates from the same SETTING_SPECS table, so this can
-/// only ever be too lenient, never the authority.
-public enum SettingDraft: Equatable, Sendable {
-    case valid(String)   // pass to `cswap config set`
-    case unset           // pass to `cswap config unset`
-    case invalid(String) // reason to show inline
-
-    public static func validate(_ input: String, for entry: SettingEntry) -> SettingDraft {
-        let text = input.trimmingCharacters(in: .whitespaces)
-        if text.isEmpty { return .unset }
-        switch entry.kind {
-        case "bool":
-            return ["true", "false"].contains(text.lowercased())
-                ? .valid(text.lowercased())
-                : .invalid("true or false")
-        case "int":
-            guard let n = Int(text) else { return .invalid("a whole number") }
-            return bounded(Double(n), entry, text)
-        case "float":
-            guard let n = Double(text) else { return .invalid("a number") }
-            return bounded(n, entry, text)
-        case "choice":
-            let choices = entry.choices ?? []
-            return choices.contains(text)
-                ? .valid(text)
-                : .invalid("one of: \(choices.joined(separator: ", "))")
-        default:
-            return .valid(text)
-        }
-    }
-
-    private static func bounded(_ n: Double, _ entry: SettingEntry, _ text: String) -> SettingDraft {
-        if let lo = entry.lo, n < lo { return .invalid("between \(fmt(lo)) and \(fmt(entry.hi))") }
-        if let hi = entry.hi, n > hi { return .invalid("between \(fmt(entry.lo)) and \(fmt(hi))") }
-        return .valid(text)
-    }
-
-    private static func fmt(_ v: Double?) -> String {
-        guard let v else { return "?" }
-        return v == v.rounded() ? String(Int(v)) : String(v)
-    }
-}
-
 // MARK: - Claude Code's own settings (the resume-reliability panel)
 
 /// Reads and writes the two Claude Code keys the resume flow depends on

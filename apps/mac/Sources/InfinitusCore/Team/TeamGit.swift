@@ -91,6 +91,17 @@ public final class TeamGit: TeamStore {
     private var branchNames: [String]?
     /// What the last `open()` cleared, for the log line and the tests.
     public private(set) var sweptLocks: [String] = []
+    /// Every fetch names the remote a promisor for its own duration, so
+    /// git's connectivity check and the auto gc a fetch may run treat the
+    /// chunk blobs a transcript fetch left out (#414) as missing by design
+    /// instead of failing on them. For its duration only: a promisor in
+    /// the mirror's config makes every read of a missing blob fetch it,
+    /// one round trip each (a listing of ten thousand chunks: ten thousand
+    /// fetches) on git before 2.45, where `GIT_NO_LAZY_FETCH` does not
+    /// exist yet — and `-c remote.origin.promisor=false` cannot undo it,
+    /// the config callback only ever adds promisors. Named on the command
+    /// line, the remote counts as registered and git writes nothing.
+    private static let promisor = ["-c", "remote.origin.promisor=true"]
 
     public init(dir: URL, remote: String, token: String?, author: String) {
         self.dir = dir; self.remote = remote; self.token = token; self.author = author
@@ -151,7 +162,7 @@ public final class TeamGit: TeamStore {
         let full = patterns.filter { !($0.hasPrefix("m/") || $0.hasPrefix("t/")) }
         if !full.isEmpty {
             let refspecs = full.map { "+refs/heads/\($0)*:refs/remotes/origin/\($0)*" }
-            _ = try run(["fetch", "--progress", "--prune", "origin"] + refspecs, network: true)
+            _ = try run(Self.promisor + ["fetch", "--progress", "--prune", "--no-filter", "origin"] + refspecs, network: true)
         }
         guard !shallow.isEmpty else { return }
         // A depth-1 fetch whose patterns match no remote head exits 1
@@ -165,8 +176,40 @@ public final class TeamGit: TeamStore {
             _ = try run(["update-ref", "-d", "refs/remotes/origin/\(gone)"])
         }
         guard !remote.isEmpty else { return }
-        let refspecs = remote.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
-        _ = try run(["fetch", "--progress", "--depth", "1", "origin"] + refspecs, network: true)
+        // Transcript branches come without their blobs: a chunk is bytes
+        // nobody reads until its session is opened, and every chunk ever
+        // published is 1.4 GB behind the Papaya leader's `t/` (#414).
+        // `tree` lists them all the same and `prefetch` brings a session's
+        // in one round trip. Member branches keep their blobs — a
+        // `now.json` is read every pass — so the filter is named per
+        // fetch, never left in the mirror's config, where every later
+        // fetch would inherit it and `m/` would arrive unreadable.
+        let members = remote.filter { $0.hasPrefix("m/") }.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
+        if !members.isEmpty {
+            _ = try run(Self.promisor + ["fetch", "--progress", "--depth", "1", "--no-filter", "origin"] + members, network: true)
+        }
+        let transcripts = remote.filter { $0.hasPrefix("t/") }.map { "+refs/heads/\($0):refs/remotes/origin/\($0)" }
+        if !transcripts.isEmpty {
+            _ = try run(Self.promisor + ["-c", "remote.origin.partialclonefilter=blob:none",
+                                         "fetch", "--progress", "--depth", "1", "--filter=blob:none", "origin"] + transcripts, network: true)
+        }
+    }
+
+    /// Brings the blobs under `prefix` that a transcript fetch left out
+    /// (#414) in one round trip — a session's chunks when it is opened —
+    /// and returns how many came. Exact wants and no negotiation: the
+    /// mirror's commits tell a fetch of blobs nothing. The server needs
+    /// nothing beyond protocol v2, which answers any object it holds.
+    public func prefetch(_ prefix: String) throws -> Int {
+        let absent = try list(prefix).filter { !$0.present }.map(\.version)
+        guard !absent.isEmpty else { return 0 }
+        _ = try run(Self.promisor + ["-c", "fetch.negotiationAlgorithm=noop", "fetch", "--progress", "--no-tags",
+                                     "--no-write-fetch-head", "origin", "--stdin"],
+                    stdin: Data((absent.joined(separator: "\n") + "\n").utf8), network: true)
+        // The commit did not move, so the cached listings would still say
+        // absent.
+        trees.removeAll()
+        return absent.count
     }
 
     /// The remote's branch names (`ls-remote --heads`), sorted.
@@ -352,7 +395,9 @@ public final class TeamGit: TeamStore {
             let lines = paths.map { "0 0000000000000000000000000000000000000000\t\($0)\n" }.joined()
             _ = try run(["update-index", "--index-info"], stdin: Data(lines.utf8), env: env)
         }
-        let treeSha = String(decoding: try run(["write-tree"], env: env), as: UTF8.self)
+        // `--missing-ok` as in `commitAndPush`: the kept entries are the
+        // tip's, which the remote has, so the push packs none of them.
+        let treeSha = String(decoding: try run(["write-tree", "--missing-ok"], env: env), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let commit = String(decoding: try run(["commit-tree", treeSha, "-m", "compacted (\(paths.count) dropped under \(prefix))"], env: [
             "GIT_AUTHOR_NAME": "Infinitus", "GIT_AUTHOR_EMAIL": "\(author)@infinitus.run",
@@ -375,15 +420,20 @@ public final class TeamGit: TeamStore {
         return sha
     }
 
-    /// `ls-tree -r -l` lines: `<mode> blob <sha> <size>\t<path>`.
+    /// `ls-tree -r -l` lines: `<mode> blob <sha> <size>\t<path>`, the
+    /// size reading `BAD` for a blob the mirror does not hold (a chunk a
+    /// transcript fetch left out, #414) — listed all the same, `present`
+    /// false.
     private func tree(commit: String, branch: String) throws -> [StoreEntry] {
         if let known = trees[branch + "@" + commit] { return known }
         let text = String(decoding: try run(["ls-tree", "-r", "-l", commit]), as: UTF8.self)
         let entries: [StoreEntry] = text.split(separator: "\n").compactMap { line in
             guard let tab = line.firstIndex(of: "\t") else { return nil }
             let meta = line[line.startIndex..<tab].split(separator: " ", omittingEmptySubsequences: true)
-            guard meta.count == 4, meta[1] == "blob", let size = Int(meta[3]) else { return nil }
-            return StoreEntry(path: branch + "/" + line[line.index(after: tab)...], size: size, version: String(meta[2]))
+            guard meta.count == 4, meta[1] == "blob" else { return nil }
+            let size = Int(meta[3])
+            return StoreEntry(path: branch + "/" + line[line.index(after: tab)...], size: size ?? 0, version: String(meta[2]),
+                              present: size != nil)
         }
         if trees.count >= 64 { trees.removeAll() }
         trees[branch + "@" + commit] = entries
@@ -418,7 +468,12 @@ public final class TeamGit: TeamStore {
             }
         }
         if removed > 0 { _ = try run(["update-index", "--index-info"], stdin: removals, env: env) }
-        let treeSha = String(decoding: try run(["write-tree"], env: env), as: UTF8.self)
+        // `--missing-ok`: this identity's own transcript branch is fetched
+        // without its blobs like every other (#414), and the new tree
+        // keeps the tip's entries whether or not their bytes are here.
+        // The push packs only what the remote lacks, and the remote has
+        // every one of them.
+        let treeSha = String(decoding: try run(["write-tree", "--missing-ok"], env: env), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         // The message names what was written; removals are counted, not
         // listed (the sweep's would be a 500 KB message).

@@ -210,6 +210,40 @@ describe("DesktopUpdates", () => {
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
 
+  it.effect("tells electron-updater the version's prerelease id, not the track's name", () => {
+    // #924: the GitHub provider matches a tag's prerelease id against the
+    // channel and names the manifest after it; told `infinitus`, it never
+    // offered `v0.5.0-alpha.1` and would have asked for `alpha-mac.yml`.
+    const harness = makeHarness({ appVersion: "0.5.0-alpha.1" });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        assert.equal((yield* updates.getState).channel, "infinitus");
+        assert.deepEqual(harness.channels(), ["alpha"]);
+        assert.isTrue(harness.allowPrerelease());
+        assert.isFalse(harness.allowDowngrade());
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("reads the stable feed once the version carries no prerelease id", () => {
+    const harness = makeHarness({ appVersion: "0.5.0" });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        assert.equal((yield* updates.getState).channel, "infinitus");
+        assert.deepEqual(harness.channels(), ["latest"]);
+        assert.isFalse(harness.allowPrerelease());
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
   it.effect("keeps the download behind a click on upstream channels", () => {
     const harness = makeHarness(UPSTREAM_CHANNEL);
 

@@ -1,6 +1,6 @@
 # Infinitus
 
-Infinitus is one product on three screens: the macOS menu bar app that runs your Claude Code accounts (usage windows, swapping, the sessions on the Mac), the desktop and web app that drive the agents, and the phone app. This repository's `main` holds the desktop, web and phone apps and their server; the menu bar app lives on the [`native`](https://github.com/deathemperor/infinitus/tree/native) branch until it moves in (#823). Site: [infinitus.run](https://infinitus.run).
+Infinitus is one product on three screens: the macOS menu bar app that runs your Claude Code accounts (usage windows, swapping, the sessions on the Mac), the desktop and web app that drive the agents, and the phone app. This repository's `main` holds the desktop, web and phone apps and their server; the menu bar app lives in [`apps/mac`](apps/mac/README.md), and one `v<version>` tag releases all of them together (#823). Site: [infinitus.run](https://infinitus.run).
 
 What the desktop, web and phone apps add to the agent client:
 
@@ -10,11 +10,13 @@ What the desktop, web and phone apps add to the agent client:
 - **Command palette** — "Open accounts".
 - **Event toasts** — the engine's events (a swap, a reset, a session that needs you) surface as toasts in the app shell.
 - **Phone** — Accounts and Sessions per paired Mac, and a Live Activity the Mac drives while an agent works.
-- **Desktop** — the `run.infinitus.desktop` app, state under `~/.infinitus`, the menu bar app nested as a login item, and an `infinitus` update channel fed by GitHub prereleases tagged `v<version>-infinitus.<date>.<run>`.
+- **Desktop** — the `run.infinitus.desktop` app, state under `~/.infinitus`, the menu bar app nested as a login item, and in-app updates from the GitHub releases.
+
+Install: `Infinitus-<version>-arm64.dmg` from the [latest release](https://github.com/deathemperor/infinitus/releases/latest) is the desktop app with the menu bar app nested inside as a login item — one download. The menu bar app alone: `brew install --cask deathemperor/tap/infinitus` (or `Infinitus-<version>.zip` from the same release); Linux gets `infinitus-tray-linux-x86_64` / `-aarch64` and `infinitus-omarchy.tar.gz` beside them. The engine is [swapd](https://github.com/deathemperor/swapd).
 
 How the apps talk to the menu bar app: only through its control socket (`INFINITUS_CONTROL_SOCKET` overrides the per-platform default), one JSON line each way; the engine's own files are never read.
 
-For contributors: this tree is a fork of [T3 Code](https://github.com/pingdotgg/t3code). Upstream's `main` is merged in daily by the [Upstream sync](.github/workflows/upstream-sync.yml) workflow as a pull request; the rules, registration points and the list of Infinitus-only files are in [INFINITUS.md](INFINITUS.md). Everything below the rule is upstream's README, untouched.
+For contributors: this tree builds on [T3 Code](https://github.com/pingdotgg/t3code), the upstream project. Upstream's `main` is merged in daily by the [Upstream sync](.github/workflows/upstream-sync.yml) workflow as a pull request; the rules, registration points and the list of Infinitus-only files are in [INFINITUS.md](INFINITUS.md). Everything below the rule is upstream's README, untouched.
 
 ---
 

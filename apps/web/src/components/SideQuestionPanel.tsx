@@ -4,14 +4,23 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import * as Option from "effect/Option";
 import { MessageCircleQuestionMarkIcon } from "lucide-react";
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { useComposerDraftStore, type ComposerThreadTarget } from "../composerDraftStore";
+import type { ComposerHandleRef } from "../composerHandleContext";
 import { cn } from "../lib/utils";
 import { newMessageId } from "../lib/utils";
-import { useThread } from "../state/entities";
-import { isSideQuestionMessage } from "./SideQuestionPanel.logic";
+import { useThread, useThreadShell } from "../state/entities";
+import { environmentShell } from "../state/shell";
+import {
+  appendAnswerToDraft,
+  isSideQuestionGone,
+  isSideQuestionMessage,
+  SIDE_QUESTION_GONE_GRACE_MS,
+} from "./SideQuestionPanel.logic";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import ChatMarkdown from "./ChatMarkdown";
@@ -26,24 +35,54 @@ import { Textarea } from "./ui/textarea";
  * mode), so it answers from the main thread's context without touching it,
  * even while the main turn runs. Only what was asked here is shown (the
  * imported history is told apart by `isSideQuestionMessage`). "Bring to
- * main" appends the latest answer to the main composer's draft.
+ * main" puts the latest answer at the main composer's caret (appended to
+ * its draft when the composer cannot take an insert). Closing the tab
+ * archives the side thread (`ChatView`); a side thread deleted from the
+ * sidebar shows as gone here, with the tab left to close.
  */
 export function SideQuestionPanel({
   environmentId,
   threadId,
   composerDraftTarget,
+  composerRef,
   forking,
   onRetry,
+  onClose,
 }: {
   environmentId: EnvironmentId;
   threadId: ThreadId;
   composerDraftTarget: ComposerThreadTarget;
+  /** The main composer, when mounted: "Bring to main" inserts at its caret. */
+  composerRef?: ComposerHandleRef | undefined;
   /** While the fork is being made: no error yet, or the reason it failed. */
   forking?: { readonly error: string | null } | undefined;
   onRetry?: (() => void) | undefined;
+  /** Closes the drawer's tab, offered when the side thread is gone. */
+  onClose?: (() => void) | undefined;
 }) {
   const sideRef = useMemo(() => scopeThreadRef(environmentId, threadId), [environmentId, threadId]);
-  const thread = useThread(sideRef);
+  const shell = useThreadShell(sideRef);
+  // Waiting for the shell keeps a deleted thread from being polled for.
+  const thread = useThread(sideRef, { waitForShell: true });
+  const bootstrapped = Option.isSome(
+    useAtomValue(environmentShell.stateValueAtom(environmentId)).snapshot,
+  );
+  // Adjusted during render: once the thread has been seen, its absence is real.
+  const [seenThread, setSeenThread] = useState(false);
+  if (shell !== null && !seenThread) setSeenThread(true);
+  const [graceElapsed, setGraceElapsed] = useState(false);
+  useEffect(() => {
+    if (forking !== undefined) return;
+    const timer = window.setTimeout(() => setGraceElapsed(true), SIDE_QUESTION_GONE_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [forking]);
+  const gone =
+    forking === undefined &&
+    isSideQuestionGone({
+      hasThread: shell !== null,
+      bootstrapped,
+      settled: seenThread || graceElapsed,
+    });
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -91,12 +130,12 @@ export function SideQuestionPanel({
 
   const bringToMain = () => {
     if (answer === null) return;
+    const inserted =
+      composerRef?.current?.insertTextAtCursor(answer, { ensureLeadingBoundary: true }) ?? false;
+    if (inserted) return;
     const store = useComposerDraftStore.getState();
     const current = store.getComposerDraft(composerDraftTarget)?.prompt ?? "";
-    store.setPrompt(
-      composerDraftTarget,
-      current.trim().length > 0 ? `${current.trimEnd()}\n\n${answer}` : answer,
-    );
+    store.setPrompt(composerDraftTarget, appendAnswerToDraft(current, answer));
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -129,6 +168,22 @@ export function SideQuestionPanel({
             ) : null}
           </>
         )}
+      </div>
+    );
+  }
+
+  if (gone) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"
+        data-testid="side-question-gone"
+      >
+        <p className="text-muted-foreground text-xs">This side question was deleted.</p>
+        {onClose ? (
+          <Button type="button" size="xs" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        ) : null}
       </div>
     );
   }

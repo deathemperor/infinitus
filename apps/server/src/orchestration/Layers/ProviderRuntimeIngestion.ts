@@ -31,6 +31,7 @@ import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
+import { TurnTelemetryTracker, turnUsageFromCompletedTurn } from "../threadTurnUsage.ts";
 import { ProjectionTurnRepository } from "../../persistence/Services/ProjectionTurns.ts";
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
@@ -51,6 +52,7 @@ import {
 import { projectActivityPayload } from "../ActivityPayloadProjection.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { canReplaceThreadTitle } from "../threadTitles.ts";
 
 const providerTurnKey = (threadId: ThreadId, turnId: TurnId) => `${threadId}:${turnId}`;
@@ -1474,6 +1476,10 @@ const make = Effect.gen(function* () {
     },
   );
 
+  // Fork (#834): per-turn tool calls and wall time, in memory for the life
+  // of this ingestion (a restart mid-turn leaves that turn's figures absent).
+  const turnTelemetry = new TurnTelemetryTracker();
+
   const processRuntimeEvent = (event: ProviderRuntimeEvent) =>
     Effect.gen(function* () {
       if (event.type === "content.delta" && event.payload.streamKind !== "assistant_text") {
@@ -1656,6 +1662,57 @@ const make = Effect.gen(function* () {
         }
       }
 
+      // Fork (#834): the tool calls and wall time of the running turn, then
+      // what the completed turn cost, once per turn the runtime named.
+      // Independent of the lifecycle gate: a completion that lost the race
+      // for the session status still happened. A refusal is logged, so
+      // usage never blocks the events after it.
+      if (eventTurnId !== undefined) {
+        switch (event.type) {
+          case "turn.started":
+            turnTelemetry.started(thread.id, eventTurnId, now);
+            break;
+          case "item.started":
+          case "item.completed":
+            if (isToolLifecycleItemType(event.payload.itemType)) {
+              turnTelemetry.toolSeen(thread.id, eventTurnId, event.itemId ?? event.eventId);
+            }
+            break;
+          case "turn.aborted":
+            turnTelemetry.aborted(thread.id, eventTurnId);
+            break;
+          default:
+            break;
+        }
+      }
+      if (event.type === "session.exited") turnTelemetry.threadEnded(thread.id);
+      if (event.type === "turn.completed" && eventTurnId !== undefined) {
+        const turnUsage = turnUsageFromCompletedTurn(
+          event.payload,
+          eventTurnId,
+          now,
+          turnTelemetry.completed(thread.id, eventTurnId, now),
+        );
+        if (turnUsage !== undefined) {
+          yield* orchestrationEngine
+            .dispatch({
+              type: "thread.turn.usage.record",
+              commandId: yield* providerCommandId(event, "thread-turn-usage-record"),
+              threadId: thread.id,
+              turnUsage,
+              createdAt: now,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("provider runtime ingestion failed to record turn usage", {
+                  eventId: event.eventId,
+                  cause: Cause.pretty(cause),
+                }),
+              ),
+            );
+        }
+      }
+
       const assistantDelta =
         event.type === "content.delta" && event.payload.streamKind === "assistant_text"
           ? event.payload.delta
@@ -1676,7 +1733,10 @@ const make = Effect.gen(function* () {
 
         const assistantDeliveryMode: AssistantDeliveryMode = yield* Effect.map(
           serverSettingsService.getSettings,
-          (settings) => (settings.enableLegacyTokenStreaming ? "streaming" : "buffered"),
+          (settings) =>
+            resolveProjectSettings(settings, thread.projectId).settings.enableLegacyTokenStreaming
+              ? "streaming"
+              : "buffered",
         );
         if (assistantDeliveryMode === "buffered") {
           const spillChunk = yield* appendBufferedAssistantText(assistantMessageId, assistantDelta);
@@ -1717,7 +1777,10 @@ const make = Effect.gen(function* () {
         });
         const assistantDeliveryMode: AssistantDeliveryMode = yield* Effect.map(
           serverSettingsService.getSettings,
-          (settings) => (settings.enableLegacyTokenStreaming ? "streaming" : "buffered"),
+          (settings) =>
+            resolveProjectSettings(settings, thread.projectId).settings.enableLegacyTokenStreaming
+              ? "streaming"
+              : "buffered",
         );
         const flushedMessageIds =
           assistantDeliveryMode === "buffered"

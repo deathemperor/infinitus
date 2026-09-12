@@ -123,3 +123,7 @@ export const SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL = "desktop:infinitus-submit-s
 // Fork: deep links (#270 D).
 export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-deep-link";
 export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";
+
+export const MAC_PERMISSION_HELPER_CHANNEL = "desktop:mac-permission-helper";
+
+export const CHECK_SYSTEM_PERMISSION_CHANNEL = "desktop:check-system-permission";

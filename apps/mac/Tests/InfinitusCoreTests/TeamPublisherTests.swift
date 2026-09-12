@@ -479,6 +479,62 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(TeamPublisher.recentTranscriptSessions(cacheURL: scratch.appendingPathComponent("nope.json"), days: 10_000), [])
     }
 
+    /// The app keeps a memo of its scan, not the table (#499): the fold
+    /// handed in as `collected` publishes the same set with no entries
+    /// and no cache of the publisher's own; the memo answers its key
+    /// again without a table, misses on a new generation, an exclusions
+    /// edit or midnight, and a miss with nothing to fold from clears it
+    /// and asks for a scan.
+    func testTheScanMemoPublishesWithoutTheTable() throws {
+        try skipOffPOSIX()
+        let t = try team()
+        let projects = try writeProjects(scratch)
+        let scanned = StatsScanner.scan(projectsDir: projects, cacheURL: nil).entries
+        let memo = TeamPublisher.ScanMemo()
+        XCTAssertTrue(memo.isEmpty)
+        let key = TeamPublisher.ScanMemo.Key(generation: 1, exclusions: TeamExclusions(), historyDays: 10_000, transcriptDays: 10_000)
+        // Nothing to fold from yet (the first scan still running): empty, wanted.
+        XCTAssertNil(memo.resolve(key, entries: nil))
+        XCTAssertTrue(memo.wanted)
+        XCTAssertNil(memo.takeBuilt())
+        let entry = try XCTUnwrap(memo.resolve(key, entries: scanned))
+        XCTAssertFalse(memo.wanted)
+        XCTAssertEqual(memo.takeBuilt(), 1)   // the table of generation 1 can go
+        XCTAssertNil(memo.takeBuilt())
+        XCTAssertEqual(entry.recent.map(\.id).sorted(), ["s1", "s2"])
+
+        var s = sources(scratch.appendingPathComponent("nonexistent"))
+        s.historyDays = 10_000; s.transcriptDays = 10_000
+        s.collected = entry.collected
+        s.cacheURL = scratch.appendingPathComponent("never.json")
+        let report = try TeamPublisher(client: t.alice, paths: t.alicePaths).publish(sources: s)
+        let me = "m/\(t.alice.identity.kid)/"
+        let mine = "t/\(t.alice.identity.kid)/"
+        XCTAssertEqual(Set(report.published), [
+            me + "days/2026-09-04.json", me + "sessions/index.json", me + "now.json", me + "crashes.json",
+            mine + "transcripts/s1/1.jsonl", mine + "transcripts/s1/subagents/agent-a1/1.jsonl", mine + "transcripts/s2/1.jsonl",
+        ])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: s.cacheURL!.path))
+
+        // A hit needs no table.
+        XCTAssertEqual(memo.resolve(key, entries: nil)?.collected, entry.collected)
+        XCTAssertFalse(memo.wanted)
+        // A new scan with the table already gone: cleared, wanted.
+        var next = key; next.generation = 2
+        XCTAssertNil(memo.resolve(next, entries: nil))
+        XCTAssertTrue(memo.isEmpty)
+        XCTAssertTrue(memo.wanted)
+        // An exclusions edit refolds; midnight is a different key.
+        var ex = TeamExclusions(); ex.set("/r/secret", excluded: true)
+        let excluded = TeamPublisher.ScanMemo.Key(generation: 2, exclusions: ex, historyDays: 10_000, transcriptDays: 10_000)
+        XCTAssertEqual(memo.resolve(excluded, entries: scanned)?.recent.map(\.id), ["s1"])
+        XCTAssertEqual(memo.takeBuilt(), 2)
+        let tomorrow = TeamPublisher.ScanMemo.Key(generation: 2, exclusions: ex, historyDays: 10_000, transcriptDays: 10_000,
+                                                  now: Date().addingTimeInterval(86_400))
+        XCTAssertNotEqual(tomorrow, excluded)
+        XCTAssertNil(memo.resolve(tomorrow, entries: nil))
+    }
+
     /// The app hands the publisher its own StatsModel scan (#251): the
     /// publisher then scans nothing — a projects dir that does not
     /// exist publishes the same set — and writes no cache of its own.

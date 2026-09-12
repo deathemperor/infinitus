@@ -13,15 +13,107 @@ import * as EffectCodexSchema from "effect-codex-app-server/schema";
 import { buildCodexDeveloperInstructions } from "../CodexDeveloperInstructions.ts";
 import { codexSessionAppServerArgs } from "./codexLaunchArgs.ts";
 import {
+  CodexResumeCursorSchema,
   buildTurnStartParams,
   describeMcpElicitation,
   hasConfiguredMcpServer,
   isRecoverableThreadResumeError,
   makeMemoryConsolidationNotificationFilter,
   openCodexThread,
+  readCodexThread,
+  rollbackCodexThread,
   toMcpElicitationResponse,
 } from "./CodexSessionRuntime.ts";
 const isCodexAppServerRequestError = Schema.is(CodexErrors.CodexAppServerRequestError);
+
+describe("Codex thread history", () => {
+  for (const numTurns of [1, 2, 3, 5]) {
+    it.effect(`reverts ${numTurns} paginated turns at the durable boundary`, () =>
+      Effect.gen(function* () {
+        let retained = ["turn-1", "turn-2", "turn-3"];
+        const client: Parameters<typeof rollbackCodexThread>[0] = {
+          request: () => Effect.die("Legacy history API must not be used for paginated threads"),
+          raw: {
+            request: (method, params) =>
+              Effect.sync(() => {
+                if (method === "thread/read") return { thread: { historyMode: "paginated" } };
+                if (method === "thread/turns/list") {
+                  const { cursor } = params as { cursor: string | null };
+                  const start = cursor === null ? 0 : Number(cursor);
+                  const ids = retained.slice(start, start + 2);
+                  return {
+                    data: ids.map((id) => ({ id, items: [], status: "completed" })),
+                    nextCursor: start + 2 < retained.length ? String(start + 2) : null,
+                  };
+                }
+                NodeAssert.equal(method, "thread/revert");
+                const { beforeTurnId } = params as { beforeTurnId: string };
+                retained = retained.slice(0, retained.indexOf(beforeTurnId));
+                return { thread: { id: "thread-1", turns: [] } };
+              }),
+          },
+        };
+        const result = yield* rollbackCodexThread(client, "thread-1", numTurns);
+        const expected = ["turn-1", "turn-2", "turn-3"].slice(0, Math.max(0, 3 - numTurns));
+        NodeAssert.deepEqual(
+          result.turns.map((turn) => turn.id),
+          expected,
+        );
+        NodeAssert.deepEqual(
+          (yield* readCodexThread(client, "thread-1")).turns.map((turn) => turn.id),
+          expected,
+        );
+      }),
+    );
+  }
+
+  for (const cursors of [
+    ["next", "next"],
+    ["first", "second", "first"],
+  ]) {
+    it.effect(`rejects a pagination cursor cycle: ${cursors.join(", ")}`, () =>
+      Effect.gen(function* () {
+        let pageCount = 0;
+        const client: Parameters<typeof readCodexThread>[0] = {
+          request: () => Effect.die("Unexpected legacy request"),
+          raw: {
+            request: (method) =>
+              Effect.sync(() => {
+                if (method === "thread/read") return { thread: { historyMode: "paginated" } };
+                NodeAssert.ok(pageCount < cursors.length, "Repeated cursor was requested");
+                return { data: [], nextCursor: cursors[pageCount++] };
+              }),
+          },
+        };
+        const error = yield* Effect.flip(readCodexThread(client, "thread-1"));
+        NodeAssert.ok(isCodexAppServerRequestError(error));
+        NodeAssert.equal(pageCount, cursors.length);
+      }),
+    );
+  }
+
+  it.effect("keeps the count-based rollback API for older threads", () =>
+    Effect.gen(function* () {
+      const client: Parameters<typeof rollbackCodexThread>[0] = {
+        raw: { request: () => Effect.succeed({ thread: {} }) },
+        request: <M extends CodexRpc.ClientRequestMethod>(
+          method: M,
+          params: CodexRpc.ClientRequestParamsByMethod[M],
+        ) => {
+          NodeAssert.equal(method, "thread/rollback");
+          NodeAssert.deepEqual(params, { threadId: "legacy-thread", numTurns: 2 });
+          return Effect.succeed({
+            thread: { id: "legacy-thread", turns: [] },
+          } as unknown as CodexRpc.ClientRequestResponsesByMethod[M]);
+        },
+      };
+      NodeAssert.deepEqual(yield* rollbackCodexThread(client, "legacy-thread", 2), {
+        threadId: "legacy-thread",
+        turns: [],
+      });
+    }),
+  );
+});
 
 describe("CodexSessionRuntimeIdentifierGenerationError", () => {
   it("retains identifier purpose and the random source failure", () => {
@@ -781,6 +873,15 @@ describe("isRecoverableThreadResumeError", () => {
   });
 });
 
+describe("CodexResumeCursorSchema (#819)", () => {
+  it("accepts a fork cursor, so the adapter passes it through to the first start", () => {
+    const isCursor = Schema.is(CodexResumeCursorSchema);
+    NodeAssert.ok(isCursor({ threadId: "source-thread", fork: true, lastTurnId: "turn-3" }));
+    NodeAssert.ok(isCursor({ threadId: "source-thread" }));
+    NodeAssert.equal(isCursor({ fork: true, lastTurnId: "turn-3" }), false);
+  });
+});
+
 describe("openCodexThread", () => {
   it.effect("resumes metadata when historical turns contain unknown error values", () =>
     Effect.gen(function* () {
@@ -874,15 +975,93 @@ describe("openCodexThread", () => {
     }),
   );
 
+  it.effect("forks the source thread at the turn on a fork cursor (#819)", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = [];
+      const opened = yield* openCodexThread({
+        client: {
+          request: () => Effect.die("A fork must not start fresh"),
+          raw: {
+            request: (method, payload) => {
+              calls.push({ method, payload });
+              return Effect.succeed(makeThreadOpenResponse("forked-thread"));
+            },
+          },
+        },
+        threadId: ThreadId.make("thread-2"),
+        runtimeMode: "auto",
+        cwd: "/tmp/project",
+        requestedModel: "gpt-5.3-codex",
+        serviceTier: undefined,
+        resumeThreadId: "source-thread",
+        fork: { lastTurnId: "turn-3" },
+      });
+
+      NodeAssert.equal(opened.thread.id, "forked-thread");
+      NodeAssert.deepStrictEqual(calls, [
+        {
+          method: "thread/fork",
+          payload: {
+            threadId: "source-thread",
+            lastTurnId: "turn-3",
+            cwd: "/tmp/project",
+            model: "gpt-5.3-codex",
+            approvalPolicy: "on-request",
+            sandbox: "workspace-write",
+            approvalsReviewer: "auto_review",
+          },
+        },
+      ]);
+    }),
+  );
+
+  it.effect("a refused fork fails the start instead of falling back to a fresh thread (#819)", () =>
+    Effect.gen(function* () {
+      const calls: string[] = [];
+      const error = yield* openCodexThread({
+        client: {
+          request: (method) => {
+            calls.push(method);
+            return Effect.succeed(makeThreadOpenResponse("fresh-thread"));
+          },
+          raw: {
+            request: (method) => {
+              calls.push(method);
+              return Effect.fail(
+                new CodexErrors.CodexAppServerRequestError({
+                  code: -32603,
+                  errorMessage: "thread not found",
+                }),
+              );
+            },
+          },
+        },
+        threadId: ThreadId.make("thread-2"),
+        runtimeMode: "auto",
+        cwd: "/tmp/project",
+        requestedModel: undefined,
+        serviceTier: undefined,
+        resumeThreadId: "source-thread",
+        fork: { lastTurnId: "turn-3" },
+      }).pipe(Effect.flip);
+
+      NodeAssert.ok(isCodexAppServerRequestError(error));
+      NodeAssert.deepStrictEqual(calls, ["thread/fork"]);
+    }),
+  );
+
   it.effect("falls back to thread/start when resume fails recoverably", () =>
     Effect.gen(function* () {
-      const calls: Array<{ method: "thread/start" | "thread/resume"; payload: unknown }> = [];
+      const calls: Array<{
+        method: "thread/start" | "thread/resume" | "thread/fork";
+        payload: unknown;
+      }> = [];
       const started = makeThreadOpenResponse("fresh-thread");
       const client = {
         raw: {
           request: (
-            method: "thread/resume",
-            payload: CodexRpc.ClientRequestParamsByMethod["thread/resume"],
+            method: "thread/resume" | "thread/fork",
+            payload: CodexRpc.ClientRequestParamsByMethod[typeof method],
           ) => {
             calls.push({ method, payload });
             return Effect.fail(

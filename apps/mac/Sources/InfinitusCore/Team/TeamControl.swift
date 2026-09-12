@@ -12,6 +12,10 @@ public enum TeamControl {
     public static let storeTTL = 600
     /// A command "from the future" beyond this is a bad clock or a forgery.
     public static let maxFutureSkew = 300
+    /// `Command.session` for a `TeamGrants.machineScoped` action: the Mac, not a session.
+    public static let machineSession = "-"
+    /// How long a command that needs the grantor's tap waits for it (#220 Phase 2 §4).
+    public static let approvalTTL = 120
 
     /// One action on one session, sealed by the driver to the grantor.
     public struct Command: Codable, Equatable, Sendable {
@@ -70,7 +74,14 @@ public enum TeamControl {
         public static let rateLimited = "rateLimited"
         /// Driver-side only: the store lane is waiting on the grantor's fetch.
         public static let queued = "queued"
-        public static let refusals: Set<String> = [noGrant, notLive, expired, replayed, unknownSender, badRequest, rateLimited]
+        /// Phase 2 approvals: the grantor is being asked; a second ask while
+        /// one waits; the grantor said no; the grant went away meanwhile.
+        public static let pending = "pending"
+        public static let alreadyPending = "alreadyPending"
+        public static let denied = "denied"
+        public static let revoked = "revoked"
+        public static let refusals: Set<String> = [noGrant, notLive, expired, replayed, unknownSender, badRequest, rateLimited,
+                                                   alreadyPending, denied, revoked]
     }
 
     // MARK: envelopes
@@ -211,12 +222,21 @@ extension TeamControl {
     public struct RateLimit: Equatable, Sendable {
         public static let commands = 5
         public static let window: TimeInterval = 10
+        /// The bucket for everything that is not a keystroke (#220 Phase 2):
+        /// a stop, a swap, a kill are rarer than prompts.
+        public static let heavyCommands = 6
+        public static let heavyWindow: TimeInterval = 60
+        public let commands: Int
+        public let window: TimeInterval
         private var stamps: [String: [Date]] = [:]
-        public init() {}
+        public init(commands: Int = RateLimit.commands, window: TimeInterval = RateLimit.window) {
+            self.commands = commands; self.window = window
+        }
+        public static var heavy: RateLimit { RateLimit(commands: heavyCommands, window: heavyWindow) }
 
         public mutating func allow(kid: String, now: Date) -> Bool {
-            let recent = (stamps[kid] ?? []).filter { now.timeIntervalSince($0) < Self.window }
-            guard recent.count < Self.commands else { stamps[kid] = recent; return false }
+            let recent = (stamps[kid] ?? []).filter { now.timeIntervalSince($0) < window }
+            guard recent.count < commands else { stamps[kid] = recent; return false }
             stamps[kid] = recent + [now]
             return true
         }
@@ -235,17 +255,29 @@ extension TeamControl {
         public var roster: () -> TeamRoster?
         public var grants: () -> TeamGrants
         public var liveSessions: () -> [String: Int32]
-        public var execute: (_ action: String, _ text: String?, _ pid: Int32) -> SessionInput.Reply
+        /// Runs one verified action. `pid` is nil for a `machineScoped`
+        /// or `pastScoped` action (the Mac, or a past transcript, is the
+        /// target); the session id travels for those.
+        public var execute: (_ action: String, _ text: String?, _ session: String, _ pid: Int32?) -> SessionInput.Reply
         public var seen: SeenIDs
         public var limit: RateLimit
+        /// The non-drive bucket (`RateLimit.heavy`).
+        public var heavyLimit: RateLimit = .heavy
         public var now: () -> Date
+        /// Commands waiting for the grantor's tap, by id (#220 Phase 2
+        /// §4). In memory: a process that forgets them has denied them,
+        /// which is the safe reading; the driver's ack says `expired`.
+        public var pending: [String: PendingCommand] = [:]
+        /// Acks minted after the inline answer went out (a decision, an
+        /// approval that timed out). The store lane drains it.
+        public var outbox: Outbox = Outbox()
         /// Set by `TeamControlRoute.respond` after each command so the
         /// mounting server can log it.
         public var lastAudit: Audit? = nil
 
         public init(identity: TeamIdentity, roster: @escaping () -> TeamRoster?, grants: @escaping () -> TeamGrants,
                     liveSessions: @escaping () -> [String: Int32],
-                    execute: @escaping (String, String?, Int32) -> SessionInput.Reply,
+                    execute: @escaping (String, String?, String, Int32?) -> SessionInput.Reply,
                     seen: SeenIDs, limit: RateLimit, now: @escaping () -> Date = Date.init) {
             self.identity = identity; self.roster = roster; self.grants = grants; self.liveSessions = liveSessions
             self.execute = execute; self.seen = seen; self.limit = limit; self.now = now
@@ -255,8 +287,44 @@ extension TeamControl {
     public struct Verified: Equatable {
         public var header: Envelope.Header
         public var command: Command
-        public var pid: Int32
+        /// nil for a machine- or past-scoped action.
+        public var pid: Int32?
         public var grant: TeamGrants.Grant
+    }
+
+    /// A verified command the grantor has not yet allowed or denied.
+    public struct PendingCommand: Equatable, Sendable {
+        public var driver: String
+        public var driverKeys: TeamKeys
+        public var command: Command
+        public var expires: Int
+        public init(driver: String, driverKeys: TeamKeys, command: Command, expires: Int) {
+            self.driver = driver; self.driverKeys = driverKeys; self.command = command; self.expires = expires
+        }
+    }
+
+    /// Acks to publish later, persisted beside `control-seen.json` so an
+    /// executed action's answer survives a relaunch (the driver's stop
+    /// ran; it must learn so).
+    public struct Outbox: Codable, Equatable, Sendable {
+        public struct Entry: Codable, Equatable, Sendable {
+            public var to: String
+            public var ack: Ack
+            public init(to: String, ack: Ack) { self.to = to; self.ack = ack }
+        }
+        public var entries: [Entry] = []
+        public init() {}
+
+        public static func file(teamDir: URL) -> URL { teamDir.appendingPathComponent("control-outbox.json") }
+
+        public static func load(teamDir: URL) -> Outbox {
+            (try? Data(contentsOf: file(teamDir: teamDir))).flatMap { try? CanonicalJSON.decode(Outbox.self, from: $0) } ?? Outbox()
+        }
+
+        public func save(teamDir: URL) throws {
+            try FileManager.default.createDirectory(at: teamDir, withIntermediateDirectories: true)
+            try CanonicalJSON.encode(self).write(to: Self.file(teamDir: teamDir), options: .atomic)
+        }
     }
 
     public enum Refusal: Error, Equatable {
@@ -286,19 +354,33 @@ extension TeamControl {
         guard (1...maxTTL).contains(command.ttl) else { return .failure(.outcome(Outcome.badRequest, detail: "ttl")) }
         guard command.at <= nowSec + maxFutureSkew else { return .failure(.outcome(Outcome.badRequest, detail: "from the future")) }
         guard nowSec <= command.at + command.ttl else { return .failure(.outcome(Outcome.expired, detail: nil)) }
-        guard TeamGrants.driveCapabilities.contains(command.action) else { return .failure(.outcome(Outcome.badRequest, detail: "action")) }
+        let action = command.action
+        guard action != TeamGrants.view, TeamGrants.capabilities.contains(action) else {
+            return .failure(.outcome(Outcome.badRequest, detail: "action"))
+        }
+        // A machine-scoped action names the Mac and nothing else; every
+        // other one names a session.
+        let machine = TeamGrants.machineScoped.contains(action)
+        guard machine == (command.session == machineSession), !command.session.isEmpty else {
+            return .failure(.outcome(Outcome.badRequest, detail: "session"))
+        }
         // Step 4 is checked here but SPENT only after 5–6 pass: a replay of
         // an executed id must say `replayed`, while a refused id stays free.
         if endpoint.seen.expiry[command.id].map({ $0 > nowSec }) == true {
             return .failure(.outcome(Outcome.replayed, detail: nil))
         }
-        guard let grant = endpoint.grants().permits(kid: header.from, session: command.session, capability: command.action, roster: roster) else {
+        guard let grant = endpoint.grants().permits(kid: header.from, session: command.session, capability: action,
+                                                    roster: roster, now: nowSec) else {
             return .failure(.outcome(Outcome.noGrant, detail: nil))
         }
-        guard let pid = endpoint.liveSessions()[command.session] else { return .failure(.outcome(Outcome.notLive, detail: nil)) }
-        guard endpoint.limit.allow(kid: header.from, now: endpoint.now()) else { return .failure(.outcome(Outcome.rateLimited, detail: nil)) }
+        let pid = endpoint.liveSessions()[command.session]
+        if !machine, !TeamGrants.pastScoped.contains(action), pid == nil { return .failure(.outcome(Outcome.notLive, detail: nil)) }
+        let drive = TeamGrants.driveCapabilities.contains(action)
+        let allowed = drive ? endpoint.limit.allow(kid: header.from, now: endpoint.now())
+                            : endpoint.heavyLimit.allow(kid: header.from, now: endpoint.now())
+        guard allowed else { return .failure(.outcome(Outcome.rateLimited, detail: nil)) }
         _ = endpoint.seen.admit(command.id, until: command.at + command.ttl, now: nowSec)
-        return .success(Verified(header: header, command: command, pid: pid, grant: grant))
+        return .success(Verified(header: header, command: command, pid: machine ? nil : pid, grant: grant))
     }
 
     public struct Audit: Equatable, Sendable {
@@ -321,10 +403,26 @@ extension TeamControl {
         let driverKeys = header.flatMap { h in roster?.keys(for: h.from, at: h.at) }
         switch verify(file, endpoint: &endpoint) {
         case .success(let v):
-            let reply = endpoint.execute(v.command.action, v.command.text, v.pid)
-            return (Ack(id: v.command.id, outcome: reply.outcome, detail: reply.detail, at: nowSec),
-                    Audit(driver: v.header.from, session: v.command.session, action: v.command.action, outcome: reply.outcome, detail: reply.detail),
-                    driverKeys)
+            let c = v.command
+            func answer(_ outcome: String, _ detail: String?) -> (ack: Ack, audit: Audit, driverKeys: TeamKeys?) {
+                (Ack(id: c.id, outcome: outcome, detail: detail, at: nowSec),
+                 Audit(driver: v.header.from, session: c.session, action: c.action, outcome: outcome, detail: detail),
+                 driverKeys)
+            }
+            // Phase 2 §4: a capability the grant did not pre-authorize waits
+            // for the grantor's tap. Its id is spent (a resend says
+            // `replayed`), one wait per (driver, action, session).
+            if v.grant.requiresApproval(c.action) {
+                expirePending(&endpoint, now: nowSec)
+                if endpoint.pending.values.contains(where: { $0.driver == v.header.from && $0.command.action == c.action && $0.command.session == c.session }) {
+                    return answer(Outcome.alreadyPending, nil)
+                }
+                guard let driverKeys else { return answer(Outcome.unknownSender, nil) }
+                endpoint.pending[c.id] = PendingCommand(driver: v.header.from, driverKeys: driverKeys, command: c, expires: nowSec + approvalTTL)
+                return answer(Outcome.pending, nil)
+            }
+            let reply = endpoint.execute(c.action, c.text, c.session, v.pid)
+            return answer(reply.outcome, reply.detail)
         case .failure(.outcome(let outcome, let detail)):
             let command = driverKeys != nil ? commandBody(file, as: endpoint.identity, roster: roster) : nil
             let unknown = outcome == Outcome.unknownSender || header == nil
@@ -341,5 +439,106 @@ extension TeamControl {
         guard let roster, let sealedAt = try? Envelope.header(of: file).at,
               let (_, body) = try? Envelope.open(file, as: me, senderKey: { roster.keys(for: $0, at: sealedAt) }) else { return nil }
         return try? CanonicalJSON.decode(Command.self, from: body)
+    }
+}
+
+// MARK: - approvals (#220 Phase 2 §4) and the local verb each action runs
+
+extension TeamControl {
+    /// Drops every wait past its TTL and tells its driver `expired`
+    /// through the outbox. Called before a new wait is recorded and by
+    /// the grantor's periodic pass.
+    public static func expirePending(_ endpoint: inout Endpoint, now: Int) {
+        for (id, entry) in endpoint.pending where entry.expires <= now {
+            endpoint.pending[id] = nil
+            endpoint.outbox.entries.append(Outbox.Entry(to: entry.driver, ack: Ack(id: id, outcome: Outcome.expired, detail: nil, at: now)))
+        }
+    }
+
+    /// The grantor's tap. Re-resolves everything at this instant: the
+    /// grant (revoked or expired meanwhile ⇒ `revoked`), the session's
+    /// pid (gone ⇒ `notLive`, never a signal to a reused pid). The
+    /// answer goes to the outbox — the inline ack said `pending` — and is
+    /// returned for the grantor's own log. nil: no such wait.
+    public static func decide(_ id: String, allow: Bool, endpoint: inout Endpoint) -> (ack: Ack, audit: Audit, driverKeys: TeamKeys)? {
+        let nowSec = Int(endpoint.now().timeIntervalSince1970)
+        expirePending(&endpoint, now: nowSec)
+        guard let entry = endpoint.pending.removeValue(forKey: id) else { return nil }
+        let c = entry.command
+        let outcome: String
+        let detail: String?
+        if !allow {
+            (outcome, detail) = (Outcome.denied, nil)
+        } else if let roster = endpoint.roster(),
+                  endpoint.grants().permits(kid: entry.driver, session: c.session, capability: c.action, roster: roster, now: nowSec) == nil {
+            (outcome, detail) = (Outcome.revoked, nil)
+        } else {
+            let machine = TeamGrants.machineScoped.contains(c.action)
+            let pid = machine ? nil : endpoint.liveSessions()[c.session]
+            if !machine, !TeamGrants.pastScoped.contains(c.action), pid == nil {
+                (outcome, detail) = (Outcome.notLive, nil)
+            } else {
+                let reply = endpoint.execute(c.action, c.text, c.session, pid)
+                (outcome, detail) = (reply.outcome, reply.detail)
+            }
+        }
+        let ack = Ack(id: id, outcome: outcome, detail: detail, at: nowSec)
+        endpoint.outbox.entries.append(Outbox.Entry(to: entry.driver, ack: ack))
+        return (ack, Audit(driver: entry.driver, session: c.session, action: c.action, outcome: outcome, detail: detail), entry.driverKeys)
+    }
+
+    /// One of the grantor's own control verbs, exactly as `infinitusctl`
+    /// would send it: the Mac runs it through the same dispatch, so a
+    /// teammate, the phone and the CLI share one code path and one set of
+    /// refusals. `text` is the action's argument line, validated here so
+    /// nothing shell-shaped reaches the verb: a fleet is `[a-z0-9-]`, a
+    /// number a positive int. nil = badRequest.
+    public struct LocalVerb: Equatable, Sendable {
+        public var command: String
+        public var args: [String]
+        public var options: [String: String]
+        public init(command: String, args: [String] = [], options: [String: String] = [:]) {
+            self.command = command; self.args = args; self.options = options
+        }
+    }
+
+    public static func localVerb(action: String, text: String?, session: String, pid: Int32?) -> LocalVerb? {
+        let words = (text ?? "").split(separator: " ").map(String.init)
+        func fleet(_ s: String) -> String? {
+            (1...32).contains(s.count) && s.allSatisfy { ($0.isASCII && $0.isLowercase && $0.isLetter) || ($0.isASCII && $0.isNumber) || $0 == "-" } ? s : nil
+        }
+        func number(_ s: String) -> String? { Int(s).map { $0 > 0 ? String($0) : nil } ?? nil }
+        switch action {
+        case TeamGrants.stop:
+            guard let pid, words.isEmpty else { return nil }
+            return LocalVerb(command: "session-stop", args: [String(pid)], options: ["yes": ""])
+        case TeamGrants.resumePast:
+            switch words {
+            case []: return LocalVerb(command: "resume-session", args: [session])
+            case ["fork"]: return LocalVerb(command: "resume-session", args: [session], options: ["fork": ""])
+            default: return nil
+            }
+        case TeamGrants.delete:
+            guard words.isEmpty else { return nil }
+            return LocalVerb(command: "session-delete", args: [session], options: ["yes": ""])
+        case TeamGrants.swap:
+            guard words.count == 2, let f = fleet(words[0]), let n = number(words[1]) else { return nil }
+            return LocalVerb(command: "switch", args: [f, n])
+        case TeamGrants.hold:
+            guard (2...3).contains(words.count), let f = fleet(words[0]), let n = number(words[1]) else { return nil }
+            switch words.count == 3 ? words[2] : "on" {
+            case "on": return LocalVerb(command: "hold", args: [f, n])
+            case "off": return LocalVerb(command: "unhold", args: [f, n])
+            default: return nil
+            }
+        case TeamGrants.kill:
+            guard words.count == 1, let p = number(words[0]), p != "1" else { return nil }
+            return LocalVerb(command: "machine-kill", args: [p], options: ["yes": ""])
+        case TeamGrants.reclaim:
+            guard words.isEmpty else { return nil }
+            return LocalVerb(command: "machine-reclaim", options: ["yes": ""])
+        default:
+            return nil
+        }
     }
 }

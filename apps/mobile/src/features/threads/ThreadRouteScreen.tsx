@@ -70,6 +70,7 @@ import {
 import { GitOverviewSheet } from "./git/GitOverviewSheet";
 import { usePullRequestHeaderItem } from "../infinitus/usePullRequestHeaderItem";
 import { useSideQuestionHeaderItem } from "../infinitus/useSideQuestionHeaderItem";
+import { useThreadUsageHeaderItem } from "../infinitus/useThreadUsageHeaderItem";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSelectedThreadGitActions } from "../../state/use-selected-thread-git-actions";
 import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-state";
@@ -79,7 +80,9 @@ import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { threadEnvironment } from "../../state/threads";
 import { InfinitusHoldBanner } from "../infinitus/InfinitusHoldBanner";
 import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
+import { InfinitusBestOfCard } from "../infinitus/InfinitusBestOfCard";
 import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
+import { useTurnFooters } from "../infinitus/useTurnFooters";
 import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -674,9 +677,16 @@ function ThreadRouteContent(
   const reconnectingNoticeText = reconnectingNotice(selectedThread?.session);
   // Infinitus (#269 C, #881): the side-question button follows it.
   const sideQuestionHeader = useSideQuestionHeaderItem(selectedThread, selectedThreadDetail);
+  // Infinitus (#834): the thread's usage, once a turn has been recorded.
+  const usageHeader = useThreadUsageHeaderItem(selectedThread);
+  // Infinitus (#952): the completed turns' footers for the feed.
+  const turnFooters = useTurnFooters(selectedThreadDetail);
   const infinitusHeaderItems = useMemo<NativeHeaderItems>(
-    () => [pullRequestHeader.item, sideQuestionHeader.item].filter((item) => item !== null),
-    [pullRequestHeader.item, sideQuestionHeader.item],
+    () =>
+      [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item].filter(
+        (item) => item !== null,
+      ),
+    [pullRequestHeader.item, sideQuestionHeader.item, usageHeader.item],
   );
   const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
     () => [...infinitusHeaderItems, ...gitCenterHeaderItems],
@@ -764,6 +774,9 @@ function ThreadRouteContent(
     if (sideQuestionHeader.androidAction !== null) {
       actions.push(sideQuestionHeader.androidAction);
     }
+    if (usageHeader.androidAction !== null) {
+      actions.push(usageHeader.androidAction);
+    }
     if (fileInspector.supported && selectedThreadCwd !== null) {
       actions.push({
         accessibilityLabel: "Toggle inspector",
@@ -783,6 +796,7 @@ function ThreadRouteContent(
     pullRequestHeader.androidAction,
     selectedThreadProject?.workspaceRoot,
     sideQuestionHeader.androidAction,
+    usageHeader.androidAction,
   ]);
 
   const handleEditFailedCreation = useCallback(async () => {
@@ -900,6 +914,12 @@ function ThreadRouteContent(
           activeWorkStartedAt={composer.activeWorkStartedAt}
           isCompacting={composer.isCompacting}
           creationState={creationState}
+          infinitusTurnFooters={turnFooters}
+          infinitusBestOfCard={
+            creationState === null && selectedThread.groupId != null ? (
+              <InfinitusBestOfCard thread={selectedThread} />
+            ) : null
+          }
           infinitusReconnectingNotice={
             creationState === null && reconnectingNoticeText !== null ? (
               <InfinitusReconnectingNotice notice={reconnectingNoticeText} />
@@ -970,6 +990,7 @@ function ThreadRouteContent(
           threadGitControlProps.projectScripts,
           pullRequestHeader.version,
           sideQuestionHeader.version,
+          usageHeader.version,
         ]}
         options={{
           // Android draws its own in-flow header (AndroidScreenHeader below);
@@ -1014,7 +1035,16 @@ function ThreadRouteContent(
         <AndroidScreenHeader
           title={selectedThread.title}
           subtitle={headerSubtitle}
-          onBack={layout.usesSplitView ? undefined : () => navigation.goBack()}
+          onBack={
+            layout.usesSplitView
+              ? undefined
+              : () => {
+                  // A deep link or cold start has no previous route; Home is the way out.
+                  // Read the history at press time: it changes without re-rendering this screen.
+                  if (navigation.canGoBack()) navigation.goBack();
+                  else navigation.dispatch(StackActions.replace("Home"));
+                }
+          }
           actions={androidHeaderActions}
           hideBottomBorder={materialYouStyleLayoutActive}
         />

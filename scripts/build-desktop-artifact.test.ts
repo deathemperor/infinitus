@@ -315,7 +315,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it.effect("resolves GitHub desktop publish config from Effect config", () =>
     Effect.gen(function* () {
-      const latestConfig = yield* resolveGitHubPublishConfig("latest").pipe(
+      const latestConfig = yield* resolveGitHubPublishConfig("0.0.33").pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -326,7 +326,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           ),
         ),
       );
-      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly").pipe(
+      const nightlyConfig = yield* resolveGitHubPublishConfig("0.0.33-nightly.20260901.1").pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -344,7 +344,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         repo: "t3code",
         releaseType: "release",
       });
-      const infinitusConfig = yield* resolveGitHubPublishConfig("infinitus").pipe(
+      const infinitusConfig = yield* resolveGitHubPublishConfig("0.5.0-alpha.2").pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -363,12 +363,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         releaseType: "prerelease",
         channel: "nightly",
       });
+      // #924: electron-updater names the manifest after the tag's prerelease
+      // id, so a `0.5.0-alpha.N` release publishes `alpha-mac.yml`.
       assert.deepStrictEqual(infinitusConfig, {
         provider: "github",
         owner: "deathemperor",
         repo: "infinitus",
         releaseType: "prerelease",
-        channel: "infinitus",
+        channel: "alpha",
       });
     }),
   );
@@ -395,14 +397,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       );
 
       assert.notProperty(preview, "publish");
-      // Every release of this repo publishes on the infinitus channel (#823).
+      // A plain version is a full release on the stable feed (`latest-mac.yml`,
+      // `releases/latest`), whatever repo it publishes to (#823, #924).
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
           owner: "pingdotgg",
           repo: "t3code",
-          releaseType: "prerelease",
-          channel: "infinitus",
+          releaseType: "release",
         },
       ]);
     }).pipe(

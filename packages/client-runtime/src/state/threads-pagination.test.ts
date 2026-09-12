@@ -133,6 +133,8 @@ type LoaderResponse = Option.Option<OrchestrationThreadDetailSnapshot>;
 
 const makeHarness = Effect.fn("TestThreadPagination.makeHarness")(function* (options?: {
   readonly paginationCapability?: boolean;
+  /** The server sends `synchronized` after a resume replay (#897). */
+  readonly completionMarker?: boolean;
   readonly initialResponse?: LoaderResponse;
   /** Cached snapshot returned by the cache store (simulates a warm cache). */
   readonly cached?: OrchestrationThreadDetailSnapshot;
@@ -156,6 +158,7 @@ const makeHarness = Effect.fn("TestThreadPagination.makeHarness")(function* (opt
     client,
     initialConfig: Effect.succeed({
       threadSnapshotPagination: options?.paginationCapability !== false,
+      threadResumeCompletionMarker: options?.completionMarker === true,
     } as never),
     subscribeServerConfig: (input) => client.subscribeServerConfig(input),
     ready: Effect.void,
@@ -473,10 +476,74 @@ describe("thread pagination state", () => {
       );
 
       // A live event at sequence 11 arrives; only then does the page merge.
-      yield* Queue.offer(harness.inputs, titleEvent("Advanced past watermark", 11));
-      const state = yield* harness.awaitState((value) => hasMessage(value, "message-old"));
+      yield* Queue.offerAll(harness.inputs, [
+        titleEvent("Advanced past watermark", 11),
+        {
+          kind: "event",
+          event: {
+            eventId: EventId.make("event-after-page"),
+            sequence: 12,
+            aggregateKind: "thread",
+            aggregateId: THREAD_ID,
+            occurredAt: BASE_THREAD.createdAt,
+            commandId: null,
+            causationEventId: null,
+            correlationId: null,
+            metadata: {},
+            type: "thread.message-sent",
+            payload: {
+              ...OLDER_MESSAGE,
+              threadId: THREAD_ID,
+              messageId: OLDER_MESSAGE.id,
+              text: " continued",
+              streaming: true,
+            },
+          },
+        },
+      ]);
+      const state = yield* harness.awaitState(
+        (value) => Option.getOrNull(value.data)?.messages[0]?.text.endsWith(" continued") === true,
+      );
+      expect(Option.getOrThrow(state.data).messages[0]?.text).toBe(
+        `${OLDER_MESSAGE.text} continued`,
+      );
       expect(hasMessage(state, "message-recent")).toBe(true);
       expect(Option.getOrThrow(state.page).loadingOlder).toBe(false);
+    }),
+  );
+
+  // Fork (#931, the #897 edge): while a resume replay is pending the flush
+  // writes the replayed thread whole, so an older page from a server that
+  // sends no thread watermark, merged in that window, would be dropped. It
+  // parks until the flush and merges onto the replayed thread.
+  it.effect("parks a watermark-less older page while a replay is pending", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness({
+        initialResponse: Option.some(WINDOWED_SNAPSHOT),
+        completionMarker: true,
+      });
+      yield* harness.awaitState((value) => Option.isSome(value.page));
+      // A replayed event folds without reaching the state until `synchronized`;
+      // the fold writes nothing observable, so the drain is given its turns
+      // before the page is asked for (a page merged first is the wrong order).
+      yield* Queue.offer(harness.inputs, titleEvent("Replayed title", 11));
+      for (let i = 0; i < 20; i += 1) yield* Effect.yieldNow;
+
+      requestOlderThreadTurns(TARGET.environmentId, THREAD_ID);
+      yield* harness.awaitState((value) =>
+        Option.match(value.page, { onNone: () => false, onSome: (page) => page.loadingOlder }),
+      );
+      yield* harness.resolveNextPage(Option.some(OLDER_PAGE));
+      yield* Queue.offer(harness.inputs, { kind: "synchronized" });
+
+      const state = yield* harness.awaitState(
+        (value) =>
+          value.status === "live" &&
+          Option.match(value.page, { onNone: () => false, onSome: (page) => !page.loadingOlder }),
+      );
+      const thread = Option.getOrThrow(state.data);
+      expect(thread.title).toBe("Replayed title");
+      expect(thread.messages.map((entry) => entry.id)).toEqual(["message-old", "message-recent"]);
     }),
   );
 

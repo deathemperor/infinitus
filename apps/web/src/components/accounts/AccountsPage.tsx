@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import {
   accountCommandArgs,
@@ -20,6 +19,7 @@ import {
 import { exhaustedBand } from "@t3tools/client-runtime/state/infinitusExhausted";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import { Link } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
 import { ChevronDownIcon } from "lucide-react";
@@ -590,37 +590,27 @@ function AccountsBody({
   if (state === "empty") {
     return (
       <div className="flex flex-col gap-6">
-        <section className="max-w-xl space-y-3 rounded-lg border p-4">
-          <h2 className="text-sm font-medium">Set up your first account fleet</h2>
-          <p className="text-sm text-muted-foreground">
-            An engine manages your provider logins as a fleet of accounts. This host is connected,
-            but no engine is reporting a fleet yet.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Enable an engine in Settings › Infinitus › Engines, then add an account on that host.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              render={
-                <Link
-                  to="/settings/infinitus/engines"
-                  search={environmentId ? { environmentId } : {}}
-                />
-              }
-              size="sm"
-            >
-              Set up engines
-            </Button>
-            <a
-              href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm underline underline-offset-4"
-            >
-              Read the accounts setup guide
-            </a>
-          </div>
-        </section>
+        <p className="text-muted-foreground text-sm">
+          Infinitus is running, but no engine reports accounts — install and configure an engine
+          (swapd) for Infinitus to manage them.
+        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            to="/settings/infinitus/engines"
+            search={environmentId ? { environmentId } : {}}
+            className="w-fit text-sm text-foreground underline underline-offset-2"
+          >
+            Open Settings › Infinitus › Engines
+          </Link>
+          <a
+            href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-foreground underline underline-offset-2"
+          >
+            Read the accounts setup guide
+          </a>
+        </div>
         {signInsSection}
       </div>
     );

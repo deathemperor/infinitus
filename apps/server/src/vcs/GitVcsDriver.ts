@@ -737,12 +737,45 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       yield* Effect.gen(function* () {
         const headExists = yield* hasHeadCommit(input.cwd);
         if (headExists) {
-          yield* execute({
-            operation,
-            cwd: input.cwd,
-            args: ["read-tree", "HEAD"],
-            env: commitEnv,
-          });
+          const reusedIndex = yield* Effect.gen(function* () {
+            const indexPath = yield* execute({
+              operation,
+              cwd: input.cwd,
+              args: ["rev-parse", "--path-format=absolute", "--git-path", "index"],
+            });
+            const { mtime } = yield* fileSystem.stat(indexPath.stdout.trim());
+            if (Option.isNone(mtime)) return false;
+            // Stay below the source timestamp even if Date rounded up, preserving Git's racy check.
+            const indexTime = Math.floor((mtime.value.getTime() - 1) / 1000);
+            if (indexTime <= 0) return false;
+            yield* fileSystem.copyFile(indexPath.stdout.trim(), tempIndexPath);
+            // Retain stat data only where the copied index already matches HEAD.
+            yield* execute({
+              operation,
+              cwd: input.cwd,
+              args: ["-c", "core.fsmonitor=false", "read-tree", "--reset", "HEAD"],
+              env: commitEnv,
+            });
+            // read-tree can rewrite the index, so restore its racy timestamp afterward.
+            yield* fileSystem.utimes(tempIndexPath, indexTime, indexTime);
+            const entries = yield* execute({
+              operation,
+              cwd: input.cwd,
+              args: ["ls-files", "-v"],
+              env: commitEnv,
+              maxOutputBytes: WORKSPACE_FILES_MAX_OUTPUT_BYTES,
+            });
+            // A fresh index must still capture assume-unchanged/skip-worktree files.
+            return !entries.stdoutTruncated && !/^[a-zS] /m.test(entries.stdout);
+          }).pipe(Effect.orElseSucceed(() => false));
+          if (!reusedIndex) {
+            yield* execute({
+              operation,
+              cwd: input.cwd,
+              args: ["read-tree", "HEAD"],
+              env: commitEnv,
+            });
+          }
         }
 
         yield* execute({
@@ -813,16 +846,56 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         return false;
       }
 
-      yield* execute({
+      const tracked = yield* execute({
         operation,
         cwd: input.cwd,
-        args: ["restore", "--source", commitOid, "--worktree", "--staged", "--", "."],
+        args: ["ls-files", "--cached", `--with-tree=${commitOid}`, "-z", "--", "."],
       });
-      yield* execute({
+      // An empty index and checkpoint have nothing for git restore's pathspec to match.
+      if (tracked.stdout.length > 0) {
+        yield* execute({
+          operation,
+          cwd: input.cwd,
+          args: ["restore", "--source", commitOid, "--worktree", "--staged", "--", "."],
+        });
+      }
+      // Restoring away the last tracked file can remove a nested workspace directory.
+      yield* fileSystem.makeDirectory(input.cwd, { recursive: true }).pipe(
+        Effect.mapError(
+          (cause) =>
+            new VcsProcessExitError({
+              operation,
+              command: "git restore",
+              cwd: input.cwd,
+              exitCode: 0,
+              detail: `Could not recreate the checkpoint workspace: ${cause.message}`,
+            }),
+        ),
+      );
+      const cleaned = yield* execute({
         operation,
         cwd: input.cwd,
         args: ["clean", "-fd", "--", "."],
+        allowNonZeroExit: true,
       });
+      if (cleaned.exitCode !== 0) {
+        // Git can remove every child, then fail trying to remove './' itself.
+        const emptiedWorkspace =
+          cleaned.exitCode === 1 &&
+          /^warning: failed to remove \.\/: [^\n]+$/.test(cleaned.stderr.trim()) &&
+          (yield* fileSystem.readDirectory(input.cwd).pipe(
+            Effect.map((entries) => entries.length === 0),
+            Effect.catch(() => Effect.succeed(false)),
+          ));
+        if (!emptiedWorkspace)
+          return yield* new VcsProcessExitError({
+            operation,
+            command: "git clean",
+            cwd: input.cwd,
+            exitCode: cleaned.exitCode,
+            detail: cleaned.stderr.trim() || "Could not clean the checkpoint workspace.",
+          });
+      }
 
       const headExists = yield* hasHeadCommit(input.cwd);
       if (headExists) {

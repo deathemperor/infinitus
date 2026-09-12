@@ -8,7 +8,7 @@ import Crypto
 public struct TeamPublisher {
     /// One transcript file to chunk: the session's own, or one of its
     /// sub-agents'.
-    public struct TranscriptSource: Equatable {
+    public struct TranscriptSource: Equatable, Sendable {
         public var session: String
         public var agent: String?
         public var url: URL
@@ -32,7 +32,7 @@ public struct TeamPublisher {
         }
     }
 
-    public struct Collected: Equatable {
+    public struct Collected: Equatable, Sendable {
         public var days: [String: Stats.Day] = [:]
         public var sessions: [TeamDocs.SessionRow] = []
         public var transcripts: [TranscriptSource] = []
@@ -57,15 +57,30 @@ public struct TeamPublisher {
     /// is a session, `<project>/<sid>/subagents/<agent>.jsonl` one of its
     /// sub-agents. For Codex files the "project dir" is a date; callers
     /// ignore it there.
+    /// String work only: `URL(fileURLWithPath:)` lstats the path to learn
+    /// whether it is a directory, and `collect` runs this over every
+    /// scan entry (~12k on a year-old corpus) every 300 s publish — one
+    /// lstat per entry was ~4 s of the pass on a Mac whose peers were
+    /// writing transcripts (#346).
     public static func transcriptIdentity(_ path: String) -> (session: String, agent: String?, projectDir: String) {
-        let url = URL(fileURLWithPath: path)
-        let parent = url.deletingLastPathComponent()
-        if parent.lastPathComponent == "subagents" {
-            let sessionDir = parent.deletingLastPathComponent()
-            return (sessionDir.lastPathComponent, url.deletingPathExtension().lastPathComponent,
-                    sessionDir.deletingLastPathComponent().lastPathComponent)
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        let n = parts.count
+        guard n >= 2 else { return (stem(parts.last ?? ""), nil, "") }
+        if parts[n - 2] == "subagents", n >= 4 {
+            return (String(parts[n - 3]), stem(parts[n - 1]), String(parts[n - 4]))
         }
-        return (url.deletingPathExtension().lastPathComponent, nil, parent.lastPathComponent)
+        return (stem(parts[n - 1]), nil, String(parts[n - 2]))
+    }
+
+    /// `URL.deletingPathExtension().lastPathComponent` without the URL.
+    private static func stem(_ name: Substring) -> String {
+        if let dot = name.lastIndex(of: "."), dot > name.startIndex { return String(name[..<dot]) }
+        return String(name)
+    }
+
+    /// `URL(fileURLWithPath:).lastPathComponent` without the lstat.
+    static func lastPathComponent(_ path: String) -> String {
+        String(path.split(separator: "/", omittingEmptySubsequences: true).last ?? "")
     }
 
     /// Folds the scan's per-file entries minus excluded projects: days
@@ -87,7 +102,7 @@ public struct TeamPublisher {
             let days = entry.daysWithOpenStretch()
             for (key, day) in days { out.days[key] = (out.days[key] ?? Stats.Day()) + day }
 
-            let project = entry.cwd.map { URL(fileURLWithPath: $0).lastPathComponent }
+            let project = entry.cwd.map(lastPathComponent)
             var row = rows[identity.session]
                 ?? TeamDocs.SessionRow(id: identity.session, project: project ?? String(identity.projectDir.split(separator: "-").last ?? ""), engine: entry.engine)
             // A sub-agent file seen first carries no cwd; the session's own file names the project.
@@ -132,7 +147,12 @@ public struct TeamPublisher {
                                                 exclusions: TeamExclusions = TeamExclusions(),
                                                 calendar: Calendar = .current, now: Date = Date()) -> [TranscriptSession] {
         let floorDate = calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: now)) ?? .distantPast
-        let floor = Stats.dayKey(floorDate, calendar: calendar)
+        return recentTranscriptSessions(entries: entries, floorDay: Stats.dayKey(floorDate, calendar: calendar), exclusions: exclusions)
+    }
+
+    /// The same list against a day key already computed (`ScanMemo`).
+    public static func recentTranscriptSessions(entries: [String: StatsScanner.FileEntry], floorDay floor: String,
+                                                exclusions: TeamExclusions = TeamExclusions()) -> [TranscriptSession] {
         var out: [String: TranscriptSession] = [:]
         for (path, entry) in entries {
             guard entry.engine == Stats.Engine.claude.rawValue else { continue }
@@ -142,7 +162,7 @@ public struct TeamPublisher {
             // session times (same rule as `collect`), and ISO day keys
             // compare as strings.
             guard let lastDay = entry.days.keys.max(), lastDay >= floor else { continue }
-            let project = entry.cwd.map { URL(fileURLWithPath: $0).lastPathComponent }
+            let project = entry.cwd.map(lastPathComponent)
             var row = out[identity.session]
                 ?? TranscriptSession(id: identity.session, project: project ?? String(identity.projectDir.split(separator: "-").last ?? ""),
                                      lastDay: lastDay, bytes: 0)
@@ -153,6 +173,85 @@ public struct TeamPublisher {
             out[identity.session] = row
         }
         return out.values.sorted { $0.lastDay == $1.lastDay ? $0.id < $1.id : $0.lastDay > $1.lastDay }
+    }
+
+    /// What the app keeps of a transcript scan between publishes (#499):
+    /// `collect` over the entry table and the picker's recent list — a
+    /// few MB — so the table itself can go. Decoded, a year of
+    /// transcripts is ~40 MB of Day maps, tallies and minute buckets;
+    /// `CacheHandle.release` let go of it between unwatched passes, but
+    /// the copy the app handed the publisher (`StatsModel.scanEntries`,
+    /// #251) kept every byte resident on any Mac in a team. One entry,
+    /// one generation: a new scan, an exclusions edit or a floor day
+    /// rolling past midnight misses; a miss with no table to rebuild
+    /// from clears the memo and asks for a scan (`wanted`), so a stale
+    /// fold is never published and no second copy grows. Callers run on
+    /// one serial queue; the lock only makes the reads safe from the
+    /// main actor.
+    public final class ScanMemo: @unchecked Sendable {
+        public struct Key: Equatable, Sendable {
+            public var generation: Int
+            public var exclusions: TeamExclusions
+            public var historyFloorDay: String
+            public var transcriptFloorDay: String
+            public init(generation: Int, exclusions: TeamExclusions, historyDays: Int, transcriptDays: Int,
+                        calendar: Calendar = .current, now: Date = Date()) {
+                self.generation = generation
+                self.exclusions = exclusions
+                let today = calendar.startOfDay(for: now)
+                historyFloorDay = Stats.dayKey(calendar.date(byAdding: .day, value: -historyDays, to: today) ?? .distantPast, calendar: calendar)
+                transcriptFloorDay = Stats.dayKey(calendar.date(byAdding: .day, value: -transcriptDays, to: today) ?? .distantPast, calendar: calendar)
+            }
+
+            /// The key every caller of one memo must build the same way:
+            /// two callers with two windows would miss each other's entry
+            /// and re-request a scan every tick.
+            public init(generation: Int, exclusions: TeamExclusions, sources: Sources, now: Date = Date()) {
+                self.init(generation: generation, exclusions: exclusions, historyDays: sources.historyDays,
+                          transcriptDays: sources.transcriptDays, calendar: sources.calendar, now: now)
+            }
+        }
+        public struct Entry: Sendable {
+            public var key: Key
+            public var collected: Collected
+            public var recent: [TranscriptSession]
+        }
+
+        private let lock = NSLock()
+        private var entry: Entry?
+        private var built: Int?
+        private var missed = false
+        public init() {}
+
+        /// The entry for `key`, rebuilt from `entries` on a miss; nil on
+        /// a miss with no table (the memo is then empty and `wanted`).
+        public func resolve(_ key: Key, entries: [String: StatsScanner.FileEntry]?) -> Entry? {
+            lock.lock()
+            if let entry, entry.key == key { lock.unlock(); return entry }
+            guard let entries else { entry = nil; missed = true; lock.unlock(); return nil }
+            lock.unlock()
+            let recent = entries.filter { ($0.value.days.keys.max() ?? "") >= key.historyFloorDay }
+            let fresh = Entry(key: key,
+                              collected: TeamPublisher.collect(entries: recent, exclusions: key.exclusions,
+                                                               transcriptFloorDay: key.transcriptFloorDay),
+                              recent: TeamPublisher.recentTranscriptSessions(entries: entries, floorDay: key.transcriptFloorDay,
+                                                                             exclusions: key.exclusions))
+            lock.lock(); entry = fresh; built = key.generation; missed = false; lock.unlock()
+            return fresh
+        }
+
+        /// The generation whose table a `resolve` just folded, once: the
+        /// owner can drop that table.
+        public func takeBuilt() -> Int? {
+            lock.lock(); defer { lock.unlock() }
+            defer { built = nil }
+            return built
+        }
+
+        /// A `resolve` missed with no table to rebuild from, since the
+        /// last build: the owner should ask for a scan.
+        public var wanted: Bool { lock.lock(); defer { lock.unlock() }; return missed }
+        public var isEmpty: Bool { lock.lock(); defer { lock.unlock() }; return entry == nil }
     }
 
     // MARK: publishing
@@ -172,6 +271,10 @@ public struct TeamPublisher {
         /// once took the app to 5.5 GB). Files without a day inside
         /// `historyDays` are dropped, as the scanner's `maxAge` drops them.
         public var entries: [String: StatsScanner.FileEntry]?
+        /// `collect` already run over such a scan (the app's `ScanMemo`,
+        /// #499): set, `publish` reads neither `entries` nor the corpus
+        /// and stages straight from it.
+        public var collected: Collected?
         public var liveSessions: [ClaudeSessionRecord] = []
         public var crashes: [CrashReport] = []
         public var fleets: [TeamDocs.Fleet] = []
@@ -187,7 +290,8 @@ public struct TeamPublisher {
         public var home: String
         public var includeImages = false
         /// Days of `days/` files published and files scanned (`maxAge`).
-        public var historyDays = 30
+        public static let defaultHistoryDays = 30
+        public var historyDays = Sources.defaultHistoryDays
         /// Transcripts are chunked only from sessions active within this
         /// many days — stats keep `historyDays`. A month of one Mac's
         /// transcripts was 9 GB (2026-09-06): every chunk sealed in memory
@@ -365,18 +469,23 @@ public struct TeamPublisher {
         var state = TeamPublishState.load(teamDir: teamDir)
         let at = Int(now.timeIntervalSince1970)
         let calendar = sources.calendar
-        let entries: [String: StatsScanner.FileEntry]
-        if let given = sources.entries {
-            let floor = calendar.date(byAdding: .day, value: -sources.historyDays, to: calendar.startOfDay(for: now)) ?? .distantPast
-            let floorDay = Stats.dayKey(floor, calendar: calendar)
-            entries = given.filter { ($0.value.days.keys.max() ?? "") >= floorDay }
+        let collected: Collected
+        if let given = sources.collected {
+            collected = given
         } else {
-            entries = StatsScanner.scan(projectsDir: sources.projectsDir, codexDir: sources.codexDir, cacheURL: sources.cacheURL,
-                                        calendar: calendar, maxAge: Double(sources.historyDays) * 86_400, now: now).entries
-        }
-        let transcriptFloor = calendar.date(byAdding: .day, value: -sources.transcriptDays, to: calendar.startOfDay(for: now)) ?? .distantPast
-        let collected = Self.collect(entries: entries, exclusions: exclusions,
+            let entries: [String: StatsScanner.FileEntry]
+            if let given = sources.entries {
+                let floor = calendar.date(byAdding: .day, value: -sources.historyDays, to: calendar.startOfDay(for: now)) ?? .distantPast
+                let floorDay = Stats.dayKey(floor, calendar: calendar)
+                entries = given.filter { ($0.value.days.keys.max() ?? "") >= floorDay }
+            } else {
+                entries = StatsScanner.scan(projectsDir: sources.projectsDir, codexDir: sources.codexDir, cacheURL: sources.cacheURL,
+                                            calendar: calendar, maxAge: Double(sources.historyDays) * 86_400, now: now).entries
+            }
+            let transcriptFloor = calendar.date(byAdding: .day, value: -sources.transcriptDays, to: calendar.startOfDay(for: now)) ?? .distantPast
+            collected = Self.collect(entries: entries, exclusions: exclusions,
                                      transcriptFloorDay: Stats.dayKey(transcriptFloor, calendar: calendar))
+        }
         let choices = TeamTranscriptChoices.load(teamDir: teamDir)
         let toChunk = transcriptsOff ? [] : collected.transcripts.filter { choices.includes($0.session) }
         var chunked = 0

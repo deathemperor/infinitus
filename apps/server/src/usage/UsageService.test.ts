@@ -162,6 +162,51 @@ describe("UsageService", () => {
     }).pipe(Effect.scoped),
   );
 
+  it.live("reads one session's transcript by name, deduped and priced (#834 backfill)", () =>
+    Effect.gen(function* () {
+      const { transcript, settings, home } = yield* setup;
+      const dir = NodePath.dirname(transcript);
+      yield* Effect.promise(() =>
+        NodeFSP.writeFile(
+          NodePath.join(dir, "abc-123.jsonl"),
+          claudeLine(1, 5) + claudeLine(2, 7) + claudeLine(1, 5),
+        ),
+      );
+      yield* Effect.promise(() => NodeFSP.writeFile(transcript, claudeLine(3, 100)));
+
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        const found = yield* service.readSessionUsage({
+          sessionIds: ["abc-123", "missing", "../abc-123", "session"],
+        });
+        assert.deepStrictEqual([...found.keys()], ["abc-123", "session"]);
+        const one = found.get("abc-123");
+        assert.deepStrictEqual(one?.totals, {
+          uncachedInputTokens: 20,
+          cachedInputTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 12,
+          reasoningTokens: 0,
+        });
+        assert.closeTo(one?.costUsd ?? -1, 20 * 1e-5 + 12 * 5e-5, 1e-12);
+        assert.deepStrictEqual(one?.models, ["claude-fable-5"]);
+        assert.strictEqual(one?.lastAt, "2026-08-01T10:00:00.000Z");
+        assert.strictEqual(found.get("session")?.totals.outputTokens, 100);
+      }).pipe(
+        Effect.provide(
+          serviceLayers({
+            prefix: "usage-service-session-test",
+            home,
+            settings,
+            ratesDocument: {
+              "claude-fable-5": { input_cost_per_token: 1e-5, output_cost_per_token: 5e-5 },
+            },
+          }),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.live("reprices unchanged transcripts when custom prices are added, edited, or removed", () =>
     Effect.gen(function* () {
       const { transcript, settings, home } = yield* setup;

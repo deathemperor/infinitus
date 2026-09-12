@@ -1,6 +1,8 @@
 import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   MessageId,
+  OrchestrationMessageContext,
+  QUEUED_TURN_GONE,
   QueueId,
   ThreadId,
   TurnId,
@@ -18,9 +20,12 @@ import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import { orderKeyBetween } from "@t3tools/shared/orderKeys";
 import { describe, expect } from "vite-plus/test";
 
+import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -31,11 +36,21 @@ const one = ThreadId.make("thread-1");
 const two = ThreadId.make("thread-2");
 const now = "2026-09-12T10:00:00.000Z";
 
-const row = (queueId: string, orderKey: string): OrchestrationQueuedTurn => ({
+const context = Schema.decodeUnknownSync(OrchestrationMessageContext)({
+  version: 1,
+  records: [{ version: 1, contextId: "ctx-1", label: "a.ts", kind: "mention", path: "src/a.ts" }],
+});
+
+const row = (
+  queueId: string,
+  orderKey: string,
+  context?: OrchestrationQueuedTurn["context"],
+): OrchestrationQueuedTurn => ({
   queueId: QueueId.make(queueId),
   messageId: MessageId.make(`${queueId}-message`),
   text: `queued ${queueId}`,
   attachments: [],
+  ...(context !== undefined ? { context } : {}),
   orderKey,
   createdAt: now,
   updatedAt: now,
@@ -65,8 +80,26 @@ const running = (threadId: ThreadId) =>
 const idle = (threadId: ThreadId, overrides: Partial<OrchestrationThreadShell> = {}) =>
   shellFor(threadId, { session: { activeTurnId: null, status: "ready" } as never, ...overrides });
 
-const domainEvent = (type: OrchestrationEvent["type"], threadId: ThreadId): OrchestrationEvent =>
-  ({ type, aggregateKind: "thread", aggregateId: threadId, payload: { threadId } }) as never;
+const domainEvent = (
+  type: OrchestrationEvent["type"],
+  threadId: ThreadId,
+  payload: Record<string, unknown> = {},
+): OrchestrationEvent =>
+  ({
+    type,
+    aggregateKind: "thread",
+    aggregateId: threadId,
+    payload: { threadId, ...payload },
+  }) as never;
+
+/** The reactor's activity after a provider failed to start `requestId`. */
+const startFailed = (threadId: ThreadId, requestId: string) =>
+  domainEvent("thread.activity-appended", threadId, {
+    activity: { kind: "provider.turn.start.failed", payload: { requestId } },
+  });
+
+const refusal = (detail: string) =>
+  new OrchestrationCommandInvariantError({ commandType: "thread.turn.start", detail });
 
 const testCrypto = Crypto.make({
   randomBytes: (size) => new Uint8Array(size).fill(1),
@@ -82,15 +115,21 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
       new Map(initial.map((shell) => [shell.id, shell])),
     );
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
+    const refuseStarts = yield* Ref.make<OrchestrationCommandInvariantError | null>(null);
 
     const layer = InfinitusTurnQueueLive.pipe(
       Layer.provide(
         Layer.mergeAll(
           Layer.mock(OrchestrationEngineService)({
             dispatch: (command) =>
-              Ref.update(dispatched, (previous) => [...previous, command]).pipe(
-                Effect.as({ sequence: 1 }),
-              ),
+              Effect.gen(function* () {
+                const refuse = yield* Ref.get(refuseStarts);
+                if (refuse !== null && command.type === "thread.turn.start") {
+                  return yield* Effect.fail(refuse);
+                }
+                yield* Ref.update(dispatched, (previous) => [...previous, command]);
+                return { sequence: 1 };
+              }),
             get streamDomainEvents() {
               return Stream.fromPubSub(domainEvents);
             },
@@ -131,6 +170,41 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
         Queue.offer(paused, threadIds).pipe(Effect.asVoid),
       setShell: (shell: OrchestrationThreadShell) =>
         Ref.update(shells, (map) => new Map([...map, [shell.id, shell]])),
+      refuseStarts: (error: OrchestrationCommandInvariantError | null) =>
+        Ref.set(refuseStarts, error),
+      activities: Ref.get(dispatched).pipe(
+        Effect.map((commands) =>
+          commands.flatMap((command) =>
+            command.type === "thread.activity.append"
+              ? [
+                  {
+                    threadId: command.threadId,
+                    tone: command.activity.tone,
+                    kind: command.activity.kind,
+                    payload: command.activity.payload,
+                  },
+                ]
+              : [],
+          ),
+        ),
+      ),
+      queued: Ref.get(dispatched).pipe(
+        Effect.map((commands) =>
+          commands.flatMap((command) =>
+            command.type === "thread.turn.queue"
+              ? [
+                  {
+                    threadId: command.threadId,
+                    queueId: command.queueId,
+                    messageId: command.message.messageId,
+                    text: command.message.text,
+                    orderKey: command.orderKey,
+                  },
+                ]
+              : [],
+          ),
+        ),
+      ),
       starts: Ref.get(dispatched).pipe(
         Effect.map((commands) =>
           commands.flatMap((command) =>
@@ -140,6 +214,9 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
                     threadId: command.threadId,
                     queuedFrom: command.queuedFrom,
                     text: command.message.text,
+                    ...(command.message.context !== undefined
+                      ? { context: command.message.context }
+                      : {}),
                   },
                 ]
               : [],
@@ -219,6 +296,114 @@ describe("InfinitusTurnQueueLive (#806)", () => {
     ),
   );
 
+  effectIt.effect("shows a refused send once and skips the row until it changes", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one)]);
+        yield* h.refuseStarts(refusal("Thread 'thread-1' has no session."));
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.activities, (list) => list.length === 1);
+        expect(yield* h.activities).toEqual([
+          {
+            threadId: one,
+            tone: "error",
+            kind: "queue.send.failed",
+            payload: { queueId: "q1", detail: "Thread 'thread-1' has no session." },
+          },
+        ]);
+
+        // The decider would accept now, but the row is the same one: no
+        // retry on the next event, and q2 does not jump it.
+        yield* h.refuseStarts(null);
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* nothingYet(h.starts);
+
+        // An edit bumps `updatedAt`: the row is tried again, quietly.
+        const edited = { ...row("q1", "m"), updatedAt: "2026-09-12T10:05:00.000Z" };
+        yield* h.setShell(idle(one, { queuedTurns: [edited, row("q2", "t")] }));
+        yield* h.emit(domainEvent("thread.turn-queue-updated", one));
+        yield* settle(h.starts, (list) => list.length === 1);
+        expect((yield* h.starts)[0]?.queuedFrom).toBe("q1");
+        expect((yield* h.activities).length).toBe(1);
+      }),
+    ),
+  );
+
+  effectIt.effect("a row already sent or removed is refused quietly", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one)]);
+        yield* h.refuseStarts(refusal(`Queued message 'q1' was ${QUEUED_TURN_GONE}.`));
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* nothingYet(h.activities);
+        yield* nothingYet(h.starts);
+      }),
+    ),
+  );
+
+  effectIt.effect("puts a row the provider failed to start back once, at the head", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one)]);
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.starts, (list) => list.length === 1);
+
+        // The reactor failed the start: the session reads error and the
+        // sent row is gone from the queue.
+        const failedSession = { activeTurnId: null, status: "error" } as never;
+        yield* h.setShell(idle(one, { session: failedSession, queuedTurns: [row("q2", "t")] }));
+        yield* h.emit(startFailed(one, "q1-message"));
+        yield* settle(h.queued, (list) => list.length === 1);
+        const retry = (yield* h.queued)[0]!;
+        expect(retry).toEqual({
+          threadId: one,
+          queueId: "q1~retry",
+          messageId: retry.messageId,
+          text: "queued q1",
+          orderKey: orderKeyBetween(null, "t"),
+        });
+        expect(retry.messageId).not.toBe("q1-message");
+        expect(yield* h.activities).toEqual([
+          {
+            threadId: one,
+            tone: "info",
+            kind: "queue.requeued",
+            payload: { queueId: "q1~retry", from: "q1", messageId: retry.messageId },
+          },
+        ]);
+        // The session is in error: the retry waits for a manual turn.
+        expect((yield* h.starts).length).toBe(1);
+
+        // The retry drains once the session recovers, and a second provider
+        // failure does not put it back again.
+        const retryRow = { ...row("q1~retry", "k"), messageId: retry.messageId };
+        yield* h.setShell(idle(one, { queuedTurns: [retryRow, row("q2", "t")] }));
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.starts, (list) => list.length === 2);
+        expect((yield* h.starts)[1]?.queuedFrom).toBe("q1~retry");
+        yield* h.setShell(idle(one, { session: failedSession, queuedTurns: [row("q2", "t")] }));
+        yield* h.emit(startFailed(one, retry.messageId));
+        yield* nothingYet(h.queued.pipe(Effect.map((list) => list.slice(1))));
+      }),
+    ),
+  );
+
+  effectIt.effect("leaves a failed start it did not send alone", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one)]);
+        yield* h.emit(startFailed(one, "manual-message"));
+        yield* nothingYet(h.queued);
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.starts, (list) => list.length === 1);
+        // A manual send's failure names another message.
+        yield* h.emit(startFailed(one, "manual-message"));
+        yield* nothingYet(h.queued);
+        yield* nothingYet(h.activities);
+      }),
+    ),
+  );
+
   effectIt.effect("sweeps every idle thread's queue at boot, after the first lists arrive", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -233,6 +418,18 @@ describe("InfinitusTurnQueueLive (#806)", () => {
         yield* h.setPaused([]);
         yield* settle(h.starts, (list) => list.length === 1);
         expect(yield* h.starts).toEqual([{ threadId: one, queuedFrom: "q1", text: "queued q1" }]);
+      }),
+    ),
+  );
+  effectIt.effect("sends the row's context records with the message (#969)", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one, { queuedTurns: [row("q1", "m", context)] })]);
+        yield* h.emit(domainEvent("thread.session-set", one));
+        yield* settle(h.starts, (list) => list.length === 1);
+        expect(yield* h.starts).toEqual([
+          { threadId: one, queuedFrom: "q1", text: "queued q1", context },
+        ]);
       }),
     ),
   );

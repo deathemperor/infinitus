@@ -127,7 +127,7 @@ final class TeamControlTests: XCTestCase {
 
     // MARK: verification
 
-    struct Executed: Equatable { var action: String; var text: String?; var pid: Int32 }
+    struct Executed: Equatable { var action: String; var text: String?; var pid: Int32? }
 
     func endpoint(grants: TeamGrants, roster: TeamRoster? = nil, live: [String: Int32] = ["s1": 4242],
                   now: Int = 1_010, reply: SessionInput.Reply = .init(outcome: "delivered", channel: "pty"),
@@ -136,7 +136,7 @@ final class TeamControlTests: XCTestCase {
                                           leaders: [TeamRoster.Member(keys: grantor.keys, name: "G", since: 1, founder: true)],
                                           members: [TeamRoster.Member(keys: driver.keys, name: "D", since: 2)], rev: 1)
         return TeamControl.Endpoint(identity: grantor, roster: { roster }, grants: { grants }, liveSessions: { live },
-                                    execute: { action, text, pid in executed(Executed(action: action, text: text, pid: pid)); return reply },
+                                    execute: { action, text, _, pid in executed(Executed(action: action, text: text, pid: pid)); return reply },
                                     seen: TeamControl.SeenIDs(), limit: TeamControl.RateLimit(),
                                     now: { Date(timeIntervalSince1970: Double(now)) })
     }
@@ -220,5 +220,121 @@ final class TeamControlTests: XCTestCase {
         var early = endpoint(grants: sendGrant(), roster: roster)
         XCTAssertEqual(TeamControl.handle(try sealed(command(at: 940, ttl: 100)), endpoint: &early).ack.outcome,
                        "noGrant", "verifies, but a removed kid is in no audience any more")
+    }
+
+    // MARK: Phase 2 (#220) — scope, the heavy bucket, approvals, the local verb map
+
+    func grant(_ capabilities: Set<String>, sessions: TeamGrants.Sessions = .some(["s1"]), preauthorized: Set<String> = []) -> TeamGrants {
+        var g = TeamGrants()
+        g.add(audience: .members([driver.kid]), sessions: sessions, capabilities: capabilities, preauthorized: preauthorized, now: 900)
+        return g
+    }
+
+    func testEachActionNamesTheMacOrASessionAndOnlyStopNeedsItLive() throws {
+        func outcome(_ cmd: TeamControl.Command, _ ep: inout TeamControl.Endpoint) throws -> String {
+            TeamControl.handle(try sealed(cmd), endpoint: &ep).ack.outcome
+        }
+        var ep = endpoint(grants: grant([TeamGrants.swap, TeamGrants.stop], preauthorized: [TeamGrants.swap, TeamGrants.stop]))
+        XCTAssertEqual(try outcome(command(id: "c-s000000001", session: "s1", action: "swap", text: "claude 2"), &ep), "badRequest", "a machine action names the Mac")
+        XCTAssertEqual(try outcome(command(id: "c-s000000002", session: "-", action: "stop", text: nil), &ep), "badRequest", "a session action names a session")
+        XCTAssertEqual(try outcome(command(id: "c-s000000003", session: "", action: "stop", text: nil), &ep), "badRequest")
+        XCTAssertEqual(try outcome(command(id: "c-s000000004", action: "view", text: nil), &ep), "badRequest", "view is never an action")
+        // A machine action runs with no pid and nothing live; the grant's sessions are not consulted.
+        var ran: [Executed] = []
+        var off = endpoint(grants: grant([TeamGrants.swap], preauthorized: [TeamGrants.swap]), live: [:]) { ran.append($0) }
+        XCTAssertEqual(try outcome(command(id: "c-s000000005", session: "-", action: "swap", text: "claude 2"), &off), "delivered")
+        XCTAssertEqual(ran, [Executed(action: "swap", text: "claude 2", pid: nil)])
+        // A past-scoped action names a session that need not be live; stop needs one.
+        var past = endpoint(grants: grant([TeamGrants.resumePast, TeamGrants.stop], sessions: .some(["old"]),
+                                          preauthorized: [TeamGrants.resumePast, TeamGrants.stop]), live: [:]) { ran.append($0) }
+        XCTAssertEqual(try outcome(command(id: "c-s000000006", session: "old", action: "resume-past", text: nil), &past), "delivered")
+        XCTAssertEqual(ran.last, Executed(action: "resume-past", text: nil, pid: nil))
+        XCTAssertEqual(try outcome(command(id: "c-s000000007", session: "old", action: "stop", text: nil), &past), "notLive")
+        // The heavy bucket: six a minute, apart from the drive bucket.
+        var busy = endpoint(grants: grant([TeamGrants.send, TeamGrants.stop], preauthorized: [TeamGrants.stop]))
+        for i in 0..<TeamControl.RateLimit.heavyCommands {
+            XCTAssertEqual(try outcome(command(id: "c-h00000000\(i)", action: "stop", text: nil), &busy), "delivered", "stop \(i)")
+        }
+        XCTAssertEqual(try outcome(command(id: "c-h000000009", action: "stop", text: nil), &busy), "rateLimited")
+        XCTAssertEqual(try outcome(command(id: "c-h000000010", action: "send", text: "still fine"), &busy), "delivered", "the drive bucket is its own")
+    }
+
+    func testAnActionTheGrantDidNotPreauthorizeWaitsForTheGrantorsTap() throws {
+        var ran: [Executed] = []
+        var ep = endpoint(grants: grant([TeamGrants.stop, TeamGrants.delete], preauthorized: [TeamGrants.delete])) { ran.append($0) }
+        let first = TeamControl.handle(try sealed(command(id: "c-p000000001", action: "stop", text: nil)), endpoint: &ep)
+        XCTAssertEqual(first.ack.outcome, "pending"); XCTAssertEqual(first.audit.outcome, "pending"); XCTAssertEqual(first.driverKeys, driver.keys)
+        XCTAssertTrue(ran.isEmpty)
+        XCTAssertEqual(ep.pending["c-p000000001"]?.expires, 1_010 + TeamControl.approvalTTL)
+        // The same ask again while one waits; a resend of the first id.
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000002", action: "stop", text: nil)), endpoint: &ep).ack.outcome, "alreadyPending")
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000001", action: "stop", text: nil)), endpoint: &ep).ack.outcome, "replayed")
+        XCTAssertEqual(ep.pending.count, 1)
+        // Allow: runs with the pid resolved now; the answer goes through the outbox.
+        let allowed = try XCTUnwrap(TeamControl.decide("c-p000000001", allow: true, endpoint: &ep))
+        XCTAssertEqual(allowed.ack, TeamControl.Ack(id: "c-p000000001", outcome: "delivered", detail: nil, at: 1_010))
+        XCTAssertEqual(allowed.audit.action, "stop"); XCTAssertEqual(allowed.driverKeys, driver.keys)
+        XCTAssertEqual(ran, [Executed(action: "stop", text: nil, pid: 4242)])
+        XCTAssertEqual(ep.outbox.entries, [TeamControl.Outbox.Entry(to: driver.kid, ack: allowed.ack)])
+        XCTAssertNil(TeamControl.decide("c-p000000001", allow: true, endpoint: &ep), "decided once")
+        // Deny: delete can never be pre-authorized, so it waited too.
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000003", action: "delete", text: nil)), endpoint: &ep).ack.outcome, "pending")
+        XCTAssertEqual(TeamControl.decide("c-p000000003", allow: false, endpoint: &ep)?.ack.outcome, "denied")
+        XCTAssertEqual(ran.count, 1)
+        // Revoked meanwhile: the grant is re-read at the tap.
+        var grants = grant([TeamGrants.stop])
+        var revocable = endpoint(grants: grants) { ran.append($0) }
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000004", action: "stop", text: nil)), endpoint: &revocable).ack.outcome, "pending")
+        grants = TeamGrants()
+        revocable.grants = { grants }
+        XCTAssertEqual(TeamControl.decide("c-p000000004", allow: true, endpoint: &revocable)?.ack.outcome, "revoked")
+        // Gone meanwhile: never a signal to a reused pid.
+        var dying = endpoint(grants: grant([TeamGrants.stop])) { ran.append($0) }
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000005", action: "stop", text: nil)), endpoint: &dying).ack.outcome, "pending")
+        dying.liveSessions = { [:] }
+        XCTAssertEqual(TeamControl.decide("c-p000000005", allow: true, endpoint: &dying)?.ack.outcome, "notLive")
+        XCTAssertEqual(ran.count, 1)
+        // Timed out: dropped, the driver hears `expired` through the outbox.
+        var slow = endpoint(grants: grant([TeamGrants.stop]))
+        XCTAssertEqual(TeamControl.handle(try sealed(command(id: "c-p000000006", action: "stop", text: nil)), endpoint: &slow).ack.outcome, "pending")
+        slow.now = { Date(timeIntervalSince1970: Double(1_010 + TeamControl.approvalTTL)) }
+        XCTAssertNil(TeamControl.decide("c-p000000006", allow: true, endpoint: &slow))
+        XCTAssertEqual(slow.outbox.entries.map { "\($0.ack.id)=\($0.ack.outcome)" }, ["c-p000000006=expired"])
+        XCTAssertTrue(slow.pending.isEmpty)
+    }
+
+    func testOutboxRoundTripsOnDisk() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("outbox-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        XCTAssertEqual(TeamControl.Outbox.load(teamDir: dir).entries, [])
+        var box = TeamControl.Outbox()
+        box.entries.append(.init(to: "k1", ack: .init(id: "c-0123456789", outcome: "denied", detail: nil, at: 5)))
+        try box.save(teamDir: dir)
+        XCTAssertEqual(TeamControl.Outbox.load(teamDir: dir), box)
+    }
+
+    func testEachActionMapsToOneLocalVerbAndNothingShellShaped() {
+        typealias V = TeamControl.LocalVerb
+        func verb(_ action: String, _ text: String?, session: String = "s1", pid: Int32? = 4242) -> V? {
+            TeamControl.localVerb(action: action, text: text, session: session, pid: pid)
+        }
+        XCTAssertEqual(verb("stop", nil), V(command: "session-stop", args: ["4242"], options: ["yes": ""]))
+        XCTAssertNil(verb("stop", nil, pid: nil)); XCTAssertNil(verb("stop", "now"))
+        XCTAssertEqual(verb("resume-past", nil, session: "old"), V(command: "resume-session", args: ["old"]))
+        XCTAssertEqual(verb("resume-past", "fork", session: "old"), V(command: "resume-session", args: ["old"], options: ["fork": ""]))
+        XCTAssertNil(verb("resume-past", "--fork"))
+        XCTAssertEqual(verb("delete", nil, session: "old"), V(command: "session-delete", args: ["old"], options: ["yes": ""]))
+        XCTAssertEqual(verb("swap", "claude 3", session: "-", pid: nil), V(command: "switch", args: ["claude", "3"]))
+        XCTAssertNil(verb("swap", "claude 0", session: "-", pid: nil))
+        XCTAssertNil(verb("swap", "claude; rm 3", session: "-", pid: nil))
+        XCTAssertNil(verb("swap", "Claude 3", session: "-", pid: nil))
+        XCTAssertEqual(verb("hold", "claude 3", session: "-", pid: nil), V(command: "hold", args: ["claude", "3"]))
+        XCTAssertEqual(verb("hold", "claude 3 off", session: "-", pid: nil), V(command: "unhold", args: ["claude", "3"]))
+        XCTAssertNil(verb("hold", "claude 3 maybe", session: "-", pid: nil))
+        XCTAssertEqual(verb("kill", "555", session: "-", pid: nil), V(command: "machine-kill", args: ["555"], options: ["yes": ""]))
+        XCTAssertNil(verb("kill", "1", session: "-", pid: nil)); XCTAssertNil(verb("kill", "-9 555", session: "-", pid: nil))
+        XCTAssertEqual(verb("reclaim", nil, session: "-", pid: nil), V(command: "machine-reclaim", options: ["yes": ""]))
+        XCTAssertNil(verb("send", "hi"), "drive actions are SessionInput, never a verb")
+        XCTAssertNil(TeamControl.request(action: "stop", text: nil), "and the reverse")
     }
 }

@@ -40,7 +40,7 @@ final class TeamControlStoreTests: XCTestCase {
     func endpoint(_ client: TeamClient, dir: URL, now: Int, executed: @escaping (String, String?) -> Void) -> TeamControl.Endpoint {
         TeamControl.Endpoint(identity: client.identity, roster: { client.roster?.doc }, grants: { TeamGrants.load(teamDir: dir) },
                              liveSessions: { ["s1": 4242] },
-                             execute: { action, text, _ in executed(action, text); return SessionInput.Reply(outcome: "delivered", detail: nil) },
+                             execute: { action, text, _, _ in executed(action, text); return SessionInput.Reply(outcome: "delivered", detail: nil) },
                              seen: TeamControl.SeenIDs(), limit: TeamControl.RateLimit(),
                              now: { Date(timeIntervalSince1970: TimeInterval(now)) })
     }
@@ -93,5 +93,31 @@ final class TeamControlStoreTests: XCTestCase {
         XCTAssertEqual(audits.map(\.outcome), ["noGrant"])
         _ = try driver.fetch()
         XCTAssertEqual(try TeamReader.load(client: driver).members[grantor.identity.kid]?.acks[cmd.id]?.outcome, "noGrant")
+    }
+
+    func testAPendingStoreCommandIsAnsweredTwiceOnOnePath() throws {
+        let (grantor, driver, dir) = try team()
+        var grants = TeamGrants.load(teamDir: dir)
+        grants.add(audience: .members([driver.identity.kid]), sessions: .some(["s1"]), capabilities: [TeamGrants.stop], now: 1_031)
+        try grants.save(teamDir: dir)
+        let now = 2_000
+        let cmd = TeamControl.Command(id: "c-p123456789", to: grantor.identity.kid, session: "s1", action: TeamGrants.stop, text: nil, at: now)
+        _ = try TeamControl.Drive.store(cmd, client: driver)
+        _ = try grantor.fetch()
+        var executed: [(String, String?)] = []
+        var ep = endpoint(grantor, dir: dir, now: now + 10) { executed.append(($0, $1)) }
+        var handled = TeamControl.Handled.load(teamDir: dir)
+        XCTAssertEqual(try TeamControl.Store.grantorPass(client: grantor, endpoint: &ep, handled: &handled, now: now + 10).map(\.outcome), ["pending"])
+        XCTAssertTrue(executed.isEmpty)
+        _ = try driver.fetch()
+        XCTAssertEqual(try TeamReader.load(client: driver).members[grantor.identity.kid]?.acks[cmd.id]?.outcome, "pending")
+        // The tap runs it; the next pass carries the answer on the same path.
+        XCTAssertEqual(TeamControl.decide(cmd.id, allow: true, endpoint: &ep)?.ack.outcome, "delivered")
+        XCTAssertEqual(executed.map(\.0), ["stop"])
+        XCTAssertEqual(try TeamControl.Store.grantorPass(client: grantor, endpoint: &ep, handled: &handled, now: now + 20).count, 0, "nothing new in the inbox")
+        XCTAssertTrue(ep.outbox.entries.isEmpty, "the decision went out with the pass")
+        _ = try driver.fetch()
+        XCTAssertEqual(try TeamReader.load(client: driver).members[grantor.identity.kid]?.acks[cmd.id]?.outcome, "delivered", "replaced, not duplicated")
+        XCTAssertEqual(try driver.readableHeaders().filter { $0.header.kind == TeamKinds.ack }.count, 1)
     }
 }

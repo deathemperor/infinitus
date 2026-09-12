@@ -1,5 +1,13 @@
 import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
-import type { CommandId, MessageId, ModelSelection, QueueId, ThreadId } from "@t3tools/contracts";
+import type {
+  CommandId,
+  MessageId,
+  ModelSelection,
+  OrchestrationMessageContext,
+  QueueId,
+  ThreadId,
+} from "@t3tools/contracts";
+import { AsyncResult } from "effect/unstable/reactivity";
 
 import type { PreparedTurnAttachments } from "../lib/attachmentUpload";
 import type { ThreadOutboxDeliveryAction } from "./thread-outbox-model";
@@ -10,7 +18,8 @@ import type { ThreadOutboxDeliveryAction } from "./thread-outbox-model";
  * turn runs (`starting` / `running`) or while the server holds or has paused
  * it, instead of steering the running turn. Creations are untouched — there
  * is no turn to steer — and so is every action but `send`. `steer` is the
- * upstream behaviour, kept for when the phone grows the desktop's setting.
+ * upstream behaviour: the send goes into the running turn. A held thread
+ * waits in either mode — a steer never bypasses the server's hold.
  */
 export type OutboxQueueMode = "queue" | "steer";
 
@@ -21,9 +30,32 @@ export function queueBehindRunningTurn(input: {
   readonly threadHeld: boolean;
   readonly mode: OutboxQueueMode;
 }): ThreadOutboxDeliveryAction {
-  if (input.action !== "send" || input.isCreation || input.mode === "steer") return input.action;
-  return input.threadBusy || input.threadHeld ? "wait" : "send";
+  if (input.action !== "send" || input.isCreation) return input.action;
+  if (input.threadHeld) return "wait";
+  if (input.mode === "steer") return "send";
+  return input.threadBusy ? "wait" : "send";
 }
+
+/** This phone's mode from its preferences (`infinitusComposerSendMode`,
+    the desktop's "Sending while a turn runs"): queue unless the store has
+    loaded a `steer`, so a message drained before the store is read waits
+    rather than steers. */
+export function outboxQueueMode(
+  preferences: AsyncResult.AsyncResult<
+    { readonly infinitusComposerSendMode?: OutboxQueueMode },
+    unknown
+  >,
+): OutboxQueueMode {
+  return AsyncResult.isSuccess(preferences) &&
+    preferences.value.infinitusComposerSendMode === "steer"
+    ? "steer"
+    : "queue";
+}
+
+export const COMPOSER_SEND_MODE_LABELS: Record<OutboxQueueMode, string> = {
+  queue: "Queue until it finishes",
+  steer: "Send into the running turn",
+};
 
 /** Whether the server's hold list names the thread: a start waiting for
     headroom, a turn paused, or a turn stopped on a usage limit — every kind
@@ -65,6 +97,7 @@ export function queueTurnCommandInput(input: {
     readonly threadId: ThreadId;
     readonly messageId: MessageId;
     readonly text: string;
+    readonly context?: OrchestrationMessageContext | undefined;
     readonly createdAt: string;
   };
   readonly attachments: PreparedTurnAttachments["attachments"];
@@ -79,6 +112,7 @@ export function queueTurnCommandInput(input: {
       messageId: input.message.messageId,
       role: "user" as const,
       text: input.message.text,
+      ...(input.message.context ? { context: input.message.context } : {}),
       attachments: input.attachments,
     },
     modelSelection: input.modelSelection,

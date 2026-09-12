@@ -2,6 +2,7 @@ import {
   AgentSessionImportSource,
   ApprovalRequestId,
   ChatAttachment,
+  OrchestrationMessageContext,
   CheckpointRef,
   IsoDateTime,
   MessageId,
@@ -29,6 +30,7 @@ import {
   ModelSelection,
   ProjectId,
   ThreadBabysit,
+  ThreadUsageRollup,
   ThreadLinkedPullRequest,
   ThreadId,
   ThreadPullRequestSnapshot,
@@ -114,6 +116,7 @@ const ProjectionThreadMessageDbRowSchema = ProjectionThreadMessage.mapFields(
   Struct.assign({
     isStreaming: Schema.Number,
     attachments: Schema.NullOr(Schema.fromJsonString(Schema.Array(ChatAttachment))),
+    context: Schema.NullOr(Schema.fromJsonString(OrchestrationMessageContext)),
   }),
 );
 const ProjectionTurnStartMessageDbRowSchema = ProjectionThreadMessageDbRowSchema.mapFields(
@@ -132,6 +135,7 @@ const ProjectionThreadDbRowSchema = ProjectionThread.mapFields(
     linkedPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     branchPullRequest: Schema.NullOr(Schema.fromJsonString(ThreadLinkedPullRequest)),
     babysit: Schema.NullOr(Schema.fromJsonString(ThreadBabysit)),
+    usage: Schema.NullOr(Schema.fromJsonString(ThreadUsageRollup)),
     sideOf: Schema.NullOr(ThreadId),
     groupId: Schema.NullOr(Schema.String),
   }),
@@ -148,6 +152,7 @@ const ProjectionThreadActivityIdRowSchema = Schema.Struct({
 const ProjectionThreadSessionDbRowSchema = ProjectionThreadSession;
 const ProjectionThreadRuntimeContextDbRowSchema = Schema.Struct({
   id: ThreadId,
+  projectId: ProjectId,
   title: Schema.String,
   session: Schema.NullOr(ProjectionThreadSessionDbRowSchema),
 });
@@ -470,6 +475,7 @@ function mapQueuedTurnRow(row: QueuedTurnDbRow): OrchestrationQueuedTurn {
     text: row.text,
     attachments: row.attachments,
     ...(row.modelSelection === null ? {} : { modelSelection: row.modelSelection }),
+    ...(row.context === null ? {} : { context: row.context }),
     orderKey: row.orderKey,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -493,6 +499,13 @@ function babysitField(babysit: ThreadBabysit | null | undefined): {
   readonly babysit?: ThreadBabysit;
 } {
   return babysit == null ? {} : { babysit };
+}
+
+/** Fork (#834): absent until a turn has been recorded. */
+function usageField(usage: ThreadUsageRollup | null | undefined): {
+  readonly usage?: ThreadUsageRollup;
+} {
+  return usage == null ? {} : { usage };
 }
 
 function queuedTurnsField(rows: ReadonlyArray<OrchestrationQueuedTurn> | undefined): {
@@ -590,9 +603,14 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
   });
 
   const listProjectRows = SqlSchema.findAll({
-    Request: Schema.Void,
+    Request: Schema.UndefinedOr(
+      Schema.Struct({
+        activeOnly: Schema.Boolean,
+        projectIds: Schema.optional(Schema.Array(ProjectId)),
+      }),
+    ),
     Result: ProjectionProjectDbRowSchema,
-    execute: () =>
+    execute: (filter) =>
       sql`
         SELECT
           project_id AS "projectId",
@@ -608,6 +626,8 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           updated_at AS "updatedAt",
           deleted_at AS "deletedAt"
         FROM projection_projects
+        WHERE ${filter?.activeOnly === true ? sql`deleted_at IS NULL` : sql`1 = 1`}
+          AND ${filter?.projectIds === undefined ? sql`1 = 1` : sql.in("project_id", filter.projectIds)}
         ORDER BY created_at ASC, project_id ASC
       `,
   });
@@ -638,6 +658,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -681,6 +702,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -726,6 +748,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -757,6 +780,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           role,
           text,
           attachments_json AS "attachments",
+          context_json AS "context",
           is_streaming AS "isStreaming",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -816,6 +840,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           text,
           attachments_json AS "attachments",
           model_selection_json AS "modelSelection",
+          context_json AS "context",
           order_key AS "orderKey",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -1341,6 +1366,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           snoozed_until AS "snoozedUntil",
           snoozed_at AS "snoozedAt",
           babysit_json AS "babysit",
+          usage_json AS "usage",
           side_of AS "sideOf",
           group_id AS "groupId",
           pinned_at AS "pinnedAt",
@@ -1368,6 +1394,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       sql`
         SELECT
           threads.thread_id AS id,
+          threads.project_id AS "projectId",
           threads.title,
           sessions.thread_id AS "threadId",
           sessions.status,
@@ -1389,6 +1416,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         Effect.map((rows) =>
           rows.map((row) => ({
             id: row.id,
+            projectId: row.projectId,
             title: row.title,
             session: row.threadId === null ? null : row,
           })),
@@ -1407,6 +1435,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         role,
         text,
         attachments_json AS "attachments",
+        context_json AS "context",
         is_streaming AS "isStreaming",
         created_at AS "createdAt",
         updated_at AS "updatedAt",
@@ -1439,6 +1468,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           role,
           text,
           attachments_json AS "attachments",
+          context_json AS "context",
           is_streaming AS "isStreaming",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -1480,6 +1510,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           text,
           attachments_json AS "attachments",
           model_selection_json AS "modelSelection",
+          context_json AS "context",
           order_key AS "orderKey",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -1839,6 +1870,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           role,
           text,
           attachments_json AS "attachments",
+          context_json AS "context",
           is_streaming AS "isStreaming",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
@@ -2258,6 +2290,7 @@ pending_approval_requests AS (
                   role: row.role,
                   text: row.text,
                   ...(row.attachments !== null ? { attachments: row.attachments } : {}),
+                  ...(row.context !== null ? { context: row.context } : {}),
                   turnId: row.turnId,
                   streaming: row.isStreaming === 1,
                   createdAt: row.createdAt,
@@ -2399,6 +2432,7 @@ pending_approval_requests AS (
                 snoozedUntil: row.snoozedUntil,
                 snoozedAt: row.snoozedAt,
                 ...babysitField(row.babysit),
+                ...usageField(row.usage),
                 ...sideOfField(row.sideOf),
                 ...groupIdField(row.groupId),
                 pinnedAt: row.pinnedAt,
@@ -2657,6 +2691,7 @@ pending_approval_requests AS (
                   snoozedUntil: row.snoozedUntil,
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
+                  ...usageField(row.usage),
                   ...sideOfField(row.sideOf),
                   ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
@@ -2833,6 +2868,7 @@ pending_approval_requests AS (
                         snoozedUntil: row.snoozedUntil,
                         snoozedAt: row.snoozedAt,
                         ...babysitField(row.babysit),
+                        ...usageField(row.usage),
                         ...sideOfField(row.sideOf),
                         ...groupIdField(row.groupId),
                         pinnedAt: row.pinnedAt,
@@ -3016,6 +3052,7 @@ pending_approval_requests AS (
                   snoozedUntil: row.snoozedUntil,
                   snoozedAt: row.snoozedAt,
                   ...babysitField(row.babysit),
+                  ...usageField(row.usage),
                   ...sideOfField(row.sideOf),
                   ...groupIdField(row.groupId),
                   pinnedAt: row.pinnedAt,
@@ -3155,6 +3192,25 @@ pending_approval_requests AS (
               ),
         ),
       );
+
+  const getProjectShells: ProjectionSnapshotQueryShape["getProjectShells"] = (projectIds) => {
+    if (projectIds?.length === 0) return Effect.succeed([]);
+    return listProjectRows({ activeOnly: true, projectIds }).pipe(
+      Effect.mapError(
+        toPersistenceSqlOrDecodeError(
+          "ProjectionSnapshotQuery.getProjectShells:query",
+          "ProjectionSnapshotQuery.getProjectShells:decodeRows",
+        ),
+      ),
+      Effect.flatMap((projects) =>
+        resolveRepositoryIdentitiesForProjects(projects).pipe(
+          Effect.map((identities) =>
+            projects.map((row) => mapProjectShellRow(row, identities.get(row.projectId) ?? null)),
+          ),
+        ),
+      ),
+    );
+  };
 
   const getProjectShellById: ProjectionSnapshotQueryShape["getProjectShellById"] = (projectId) =>
     getActiveProjectRowById({ projectId }).pipe(
@@ -3387,6 +3443,7 @@ pending_approval_requests AS (
         snoozedUntil: threadRow.value.snoozedUntil,
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
+        ...usageField(threadRow.value.usage),
         ...sideOfField(threadRow.value.sideOf),
         ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,
@@ -3418,6 +3475,7 @@ pending_approval_requests AS (
       );
       return Option.map(context, (row) => ({
         id: row.id,
+        projectId: row.projectId,
         title: row.title,
         session: row.session === null ? null : mapSessionRow(row.session),
       }));
@@ -3444,6 +3502,7 @@ pending_approval_requests AS (
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         ...(row.attachments !== null ? { attachments: row.attachments } : {}),
+        ...(row.context !== null ? { context: row.context } : {}),
       },
       hasOtherUserMessages: row.hasOtherUserMessages === 1,
     }));
@@ -3697,6 +3756,7 @@ pending_approval_requests AS (
         snoozedUntil: threadRow.value.snoozedUntil,
         snoozedAt: threadRow.value.snoozedAt,
         ...babysitField(threadRow.value.babysit),
+        ...usageField(threadRow.value.usage),
         ...sideOfField(threadRow.value.sideOf),
         ...groupIdField(threadRow.value.groupId),
         pinnedAt: threadRow.value.pinnedAt,
@@ -3716,7 +3776,10 @@ pending_approval_requests AS (
             updatedAt: row.updatedAt,
           };
           if (row.attachments !== null) {
-            return Object.assign(message, { attachments: row.attachments });
+            Object.assign(message, { attachments: row.attachments });
+          }
+          if (row.context !== null) {
+            Object.assign(message, { context: row.context });
           }
           return message;
         }),
@@ -3911,6 +3974,7 @@ pending_approval_requests AS (
     getEventReplayStats,
     getActiveProjectByWorkspaceRoot,
     getProjectShellById,
+    getProjectShells,
     getFirstActiveThreadIdByProjectId,
     getWorktreeHolders,
     getImportedAgentSessionSources,

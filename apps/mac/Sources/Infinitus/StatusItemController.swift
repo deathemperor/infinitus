@@ -61,7 +61,11 @@ final class StatusItemHolder: ObservableObject {
 
 @MainActor
 final class StatusItemController {
-    private let item: NSStatusItem
+    /// The status item, present only while `menu_bar_enabled` is on:
+    /// off removes it from the bar and on makes a fresh one (#828). Hiding
+    /// with `isVisible` instead left the app burning after the item came
+    /// back — the WindowServer kept notifying it every frame (#876).
+    private var item: NSStatusItem?
     /// The anchored popup is a borderless non-activating panel, NOT an
     /// NSPopover: popover windows refuse CABackdropLayer sampling at any
     /// level (probed 2026-08-30 — the layer renders a black slab), and
@@ -80,7 +84,7 @@ final class StatusItemController {
     private var pinnedIdeal: CGSize = .zero
     private(set) var settings: NSWindow?
     private lazy var desktopCapture = DesktopCaptureController(model: model)
-    private lazy var effects = MenuBarEffects(button: item.button)
+    private var effects = MenuBarEffects(button: nil)
     private let model: AppModel
     private let settingsTabs: () -> [SettingsTab]
     private var sink: AnyCancellable?
@@ -88,20 +92,8 @@ final class StatusItemController {
     init(model: AppModel, settingsTabs: @escaping () -> [SettingsTab]) {
         self.model = model
         self.settingsTabs = settingsTabs
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.behavior = []                       // not user-removable
-        item.button?.title = model.title
-        // The Infinitus glyph rides as a template image so the bar can
-        // tint it; the title is text-only percentages now (MenuBarGlyph
-        // replaced the "⇄" text prefix, user request 2026-08-30).
-        item.button?.image = MenuBarGlyph.image
-        item.button?.imagePosition = model.title.isEmpty ? .imageOnly : .imageLeading
-        item.button?.target = self
-        item.button?.action = #selector(togglePopover)
-        // Right-click = context menu (todo 2026-08-30). NEVER assign
-        // item.menu permanently — that hijacks left-click too; the menu
-        // is attached just-in-time inside togglePopover instead.
-        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // A launch with the icon off (#828) never makes one.
+        if model.menuBarIconShown { installItem() }
 
         // The title and visibility follow the model; receive AFTER the
         // change lands (objectWillChange fires before mutation).
@@ -135,14 +127,43 @@ final class StatusItemController {
                       self.pinned?.isVisible != true else { return }
                 if popOutRestore {
                     self.showPinnedWindow(activate: false)
-                } else if let button = self.item.button, button.window != nil {
+                } else if let button = self.item?.button, button.window != nil {
                     self.showAnchored()
                 }
             }
         }
     }
 
+    private func installItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.behavior = []                       // not user-removable
+        item.button?.title = model.title
+        // The Infinitus glyph rides as a template image so the bar can
+        // tint it; the title is text-only percentages now (MenuBarGlyph
+        // replaced the "⇄" text prefix, user request 2026-08-30).
+        item.button?.image = MenuBarGlyph.image
+        item.button?.imagePosition = model.title.isEmpty ? .imageOnly : .imageLeading
+        item.button?.target = self
+        item.button?.action = #selector(togglePopover)
+        // Right-click = context menu (todo 2026-08-30). NEVER assign
+        // item.menu permanently — that hijacks left-click too; the menu
+        // is attached just-in-time inside togglePopover instead.
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        self.item = item
+        effects = MenuBarEffects(button: item.button)
+    }
+
+    private func removeItem() {
+        guard let item else { return }
+        NSStatusBar.system.removeStatusItem(item)
+        self.item = nil
+        effects = MenuBarEffects(button: nil)
+    }
+
     private func apply() {
+        // Off = no status item at all; on = a fresh one (#828).
+        if model.menuBarIconShown, item == nil { installItem() }
+        if !model.menuBarIconShown { removeItem() }
         // The theme's color and icon on the item (#90), the template
         // loop under Off or with the toggle off.
         let theme = model.rowTheme
@@ -151,15 +172,12 @@ final class StatusItemController {
         if themed, !theme.activeIcon.isEmpty {
             title = title.isEmpty ? theme.activeIcon : theme.activeIcon + " " + title
         }
-        item.button?.image = themed
+        item?.button?.image = themed
             ? MenuBarGlyph.image(tint: NSColor(ThemeColor.flash(theme)), key: theme.flashColor)
             : MenuBarGlyph.image
-        item.button?.title = title
-        item.button?.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        item?.button?.title = title
+        item?.button?.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
         effects.sync(model: model, enabled: model.menuBarEffects && themed)
-        if item.isVisible != model.menuBarIconShown {
-            item.isVisible = model.menuBarIconShown
-        }
         // Pinned = survives click-outside; the status item still toggles
         // it closed, so a pinned popup can never strand.
         updateDismissMonitors()
@@ -250,7 +268,7 @@ final class StatusItemController {
     /// Hang the panel from the status item like the popover did: top edge
     /// under the menu bar, centered on the button, clamped to the screen.
     private func anchoredFrame(for content: CGSize) -> NSRect? {
-        guard let panel = anchored, let button = item.button,
+        guard let panel = anchored, let button = item?.button,
               let bw = button.window,
               let screen = bw.screen ?? NSScreen.main else { return nil }
         let rect = bw.convertToScreen(button.convert(button.bounds, to: nil))
@@ -393,9 +411,9 @@ final class StatusItemController {
         menu.addItem(menuItem("Restart Infinitus", #selector(menuRestart)))
         menu.addItem(menuItem("Quit Infinitus", #selector(menuQuit)))
 
-        item.menu = menu
-        item.button?.performClick(nil)
-        item.menu = nil
+        item?.menu = menu
+        item?.button?.performClick(nil)
+        item?.menu = nil
     }
 
     private func menuItem(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -589,19 +607,19 @@ final class StatusItemController {
         // loop: fitPinned → setContentSize → re-measure → fitPinned, ~450
         // times a second with the main thread never idle (bundle b82d3d9
         // froze after 1h30 with the rounding fix in, 2026-09-04). Two
-        // ways it loops, two guards: a size AppKit didn't take (a screen
-        // clamp) is never asked for again while it's refused; a size
-        // asked for again within a second means the content measures
+        // ways it loops, two guards (`PopoutFit.ask`, #229 for the
+        // refused-vs-settled mismatch): a size AppKit didn't take (a
+        // screen clamp) is never asked for again while it's refused; a
+        // size asked for again within a second means the content measures
         // differently in each of two window sizes — settle on the larger,
         // which clips nothing, and stop.
-        if let refusedFit, abs(refusedFit.width - want.width) < 0.5,
-           abs(refusedFit.height - want.height) < 0.5 { return }
         let now = Date()
         recentFits.removeAll { now.timeIntervalSince($0.at) > 1 }
-        var target = want
-        if recentFits.contains(where: { $0.size == want }) {
-            target = NSSize(width: max(want.width, current.width), height: max(want.height, current.height))
-            if abs(target.width - current.width) < 0.5, abs(target.height - current.height) < 0.5 { return }
+        func pts(_ s: NSSize) -> PopoutFit.Size { .init(width: s.width, height: s.height) }
+        guard let ask = PopoutFit.ask(want: pts(want), current: pts(current), refused: refusedFit.map(pts),
+                                      recent: recentFits.map { pts($0.size) }) else { return }
+        let target = NSSize(width: ask.size.width, height: ask.size.height)
+        if ask.settled {
             NSLog("Infinitus pop-out: fit loop — content asks %.0f×%.0f in a %.0f×%.0f window; settling on %.0f×%.0f",
                   want.width, want.height, current.width, current.height, target.width, target.height)
         }

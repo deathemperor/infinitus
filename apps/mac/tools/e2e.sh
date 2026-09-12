@@ -352,6 +352,10 @@ pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto m
 "$CTL" prefs set priority_low_pct 80 | expect "d['value']==80" || fail "prefs set priority_low_pct back"
 "$CTL" fleets | expect "[f for f in d if f['key']=='swapd/claude'][0]['headroom']['state']=='abundant'" || fail "headroom must release at 37% under priority_abundant_pct"
 "$CTL" prefs set priority_mode off | expect "d['value']=='off'" || fail "prefs set priority_mode off"
+# #828: the status item is a pref — off hides it live, the socket keeps answering, on restores it.
+"$CTL" prefs set menu_bar_enabled false | expect "d['value'] is False" || fail "prefs set menu_bar_enabled false"
+"$CTL" status | expect "d['badge']" || fail "the socket must keep answering with the menu bar off (#828)"
+"$CTL" prefs set menu_bar_enabled true | expect "d['value'] is True" || fail "prefs set menu_bar_enabled true"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
 echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 # #743: the interrupt mode says critical where hold says low, same line.
@@ -635,6 +639,9 @@ echo "aws: lapse met outside the app cleared by the probe"
 # publishes a fixture transcript; the app approves and reads it back.
 "$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
 git init -q --bare "$SOCKDIR/team.git"
+# Transcript branches are fetched without their blobs (#414); a bare
+# repo honours the filter only when told to, as the hosted remotes do.
+git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
 "$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
     | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder']" || fail "team-create"
 CODE="$("$CTL" team-code --days 1 | json "d['code']")"

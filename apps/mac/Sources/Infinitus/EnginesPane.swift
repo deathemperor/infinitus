@@ -296,8 +296,8 @@ struct RoutingNotes: View {
         case nil:
             return "Read from the proxy on the next refresh."
         default:
-            return "Highest priority wins until it is rate-limited \u{2014} cswap's "
-                + "consume-first. Switch in the Accounts tab raises a credential to the top."
+            return "Highest priority wins until it is rate-limited \u{2014} consume-first. "
+                + "Switch in the Accounts tab raises a credential to the top."
         }
     }
 }

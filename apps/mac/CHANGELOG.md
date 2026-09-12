@@ -8,11 +8,44 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
-- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
-- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
-- The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
-- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
-- A Codex (or any non-Claude) account no longer reads dead because a Claude account with the same email hit its limit: usage is shared between engines for Claude accounts only, and 9Router pairs same-email connections within one provider (#899).
+- The pop-out no longer re-asks for a window size the screen refused: the loop guard compared the refusal with the content's ideal instead of the settled size it had asked for, so a clamped settle was retried on every re-measure for a second (#229).
+- The mirror's PTY terminal host and its five /sessions/<pid>/terminal routes are gone: no client ever spoke them once the phone became T3 mobile (#963).
+
+### Desktop
+- Editing a queued message brings its terminal excerpts, review comments and annotations back into the composer as chips beside its files (#971).
+- A finished turn ends with a quiet footer under its last reply: how long it took, when it finished, and how many background shells it left running, like the CLI's own status line.
+
+## 0.5.0-alpha.2
+
+### Desktop
+- The checkpoint after every turn no longer re-reads the whole repository: on a large checkout it took 13 s and often hit the 30 s limit, ending each turn with "Checkpoint capture failed"; it now reuses git's own index cache (upstream fix #10792 carried ahead).
+- The desktop's updater offers the next alpha, beta or plain release again: it follows the version's own prerelease channel, so an installed 0.5.0-alpha.1 must be replaced by hand once and every release after that arrives on its own (#924).
+- Settings › Infinitus › Menu bar carries the "Show the icon in the menu bar" switch: off hides the Mac's icon across relaunches while Infinitus keeps running, and this page turns it back on (#828).
+- The thread-info popover counts the tool calls and the duration of the turns this server ran, per thread (#834).
+- A queued message the server could not send stays in the queue and says why in the timeline instead of silently waiting; one the provider failed to start is put back at the head of the queue, once, so it is never lost (#806).
+- "Fork a new thread from here" and side questions work on Codex threads too: the fork continues the Codex conversation from that turn in a new thread (#819).
+
+### Phone
+- A finished turn's last message ends with the CLI's status line — "Done in 49s · 12:59 PM · 1 shell still running" — in place of its bare time, like the desktop (#952).
+- Android: the pull request menu in the thread header and the pickers under Settings › Infinitus open as anchored menus, so every choice shows (an alert capped them at three) and a tap on the row opens it.
+- A best-of-N member thread carries the group card: every live sibling with its model and a status word, a tap opens it; keeping one stays on the desktop (#269).
+- A thread left open through a long turn keeps only the most recent 500 activities, like a fresh load, so its cache and re-renders stop growing with the turn (#900).
+- A long thread with running subagents opens and resumes without freezing the app: a resume replays into one render, and a subagent's progress updates no longer re-sort the whole history (#897, #898).
+- Settings › Infinitus › "Sending while a turn runs" chooses whether a follow-up waits for the running turn or is sent into it, as on the desktop; a held thread always waits (#807).
+- The thread header's pull request menu can babysit the PR — a fix round is queued whenever it conflicts, fails its checks or gets changes requested, up to ten — and stop it; a babysat thread's list row reads "Babysitting r/10" (#269).
+
+### Mac
+- A teammate's transcript branches are fetched without their chunk bytes: a new member's or a re-joined device's first fetch is a listing of kilobytes instead of every transcript ever published (1.4 GB behind the Papaya leader), and a session's chunks come down in one round trip the first time it is opened (#414).
+- The team publisher keeps a memo of what it needs from a transcript scan (the folded days, the session rows and the picker's list, ~5 MB) instead of the whole decoded entry table (~42 MB on a year of transcripts), which stayed resident on every Mac in a team after the stats cache release; an exclusions edit or midnight clears it and the next scan rebuilds it, so the team's stats docs and transcript chunks can lag one five-minute tick once a day and once per exclusions edit (#499).
+- The five-minute team publish no longer stats every transcript in the scan (two `lstat`s per transcript, about 23k a pass over the 11k transcripts of the last 30 days here, seconds of it while peers write): the session, agent and project identity is read off the path string (#346).
+- The quick tunnel no longer spawns at all while the named tunnel is running: a relaunch with both toggles on starts one `cloudflared`, not two, the quick tunnel still returns as the fallback the moment the named one exits, and the named hostname is no longer offered to the rendezvous, which takes quick-tunnel addresses only (the "rendezvous publish failed: HTTP 400" line on every connect) (#697).
+- The last traces of the cswap engine are gone: the engine table, settings catalog, proxy help text and contributor guides name swapd, and the cswap Arch package left the tree (#756).
+- The Live Activity pusher notices its APNs key once it is readable, so a key stored after launch or a keychain grant no longer needs a relaunch.
+- `menu_bar_enabled` (Settings › Display, `infinitusctl prefs set menu_bar_enabled false`) removes the menu bar icon live and keeps it off across relaunches; the app runs headless with the socket, the mirror and the pinned window untouched (#828).
+
+### Linux tray
+- The `infinitus-tray` release binaries are stripped: 66–69 MB instead of 107 MB per architecture.
+
 
 ## 0.5.0-alpha.1
 
@@ -20,6 +53,11 @@ publishes the matching section as the GitHub release body.
 - One release: the desktop app, the menu bar app nested inside it, the Linux tray and the phone share one version number and ship from one `v<version>` tag (#823).
 
 ### Mac
+- `infinitusctl push` takes a thread phase change from Infinitus desktop on stdin and pushes it through the Mac's channels — Notification Center, the phone, Slack/Telegram — under the Mac's own gating (#269).
+- `infinitusctl team-sessions <member>` lists the sessions a teammate lets you drive and `team-drive <member> <session> <action> [text]` sends into one, so a leader can troubleshoot a teammate from a terminal.
+- The Mac's push-to-start for the phone's working card carries an alert ("<account> is working — N of M sessions busy"), the way the revival start does, so the card appears instead of being accepted and ignored (#845).
+- Settings › Themes, Utilization, Stats, Machine, Activity, Profiles and the Animations debug pane are retired — the desktop app's Themes/Animations (#763), Utilization (#774), Stats/Machine/Activity pages (#659) and Profiles (#754) replace them over the pref catalog and the control verbs; Display and Push stay on the Mac (#654).
+- A Codex (or any non-Claude) account no longer reads dead because a Claude account with the same email hit its limit: usage is shared between engines for Claude accounts only, and 9Router pairs same-email connections within one provider (#899).
 - The Mac posts its pushes to a Slack webhook and/or a Telegram bot of its own (Settings › Push › Also post to, `infinitusctl push-slack` / `push-telegram --chat`, secrets on stdin and in the keychain), replacing the channels that left with cswap (#756).
 - `infinitusctl activities-token --forget` no longer waits on an open stdin pipe, so a withdrawal from the desktop app returns at once (#835).
 - `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads over the credential it hands the app at port publish (#822).
@@ -28,6 +66,25 @@ publishes the matching section as the GitHub release body.
 
 ### Linux tray
 - `infinitus-tray` drives swapd like the Mac (`swapd list/switch/rotate/hold`), and `serve`'s pushes post to a Slack webhook and/or Telegram bot from `INFINITUS_SLACK_WEBHOOK` / `INFINITUS_TELEGRAM_TOKEN` + `INFINITUS_TELEGRAM_CHAT` — the cswap adapter is gone (#756).
+
+### Desktop
+- The mouse's back and forward buttons walk history on the pages that show a back arrow, and Cmd+[ / Cmd+] step to the previous and next thread (#840).
+- On a started thread the runtime-mode control is its icon alone, with the label in the tooltip and the chevron on hover; a new thread keeps the label (#843).
+- Draw on a draft image before sending — pen, arrow, rectangle, colours, undo — and the marked copy replaces the attachment (#875).
+- A side question forks the latest completed turn into a small plan-mode thread in the right panel, on any thread with a completed turn, and "Bring to main" pastes the answer into the composer (#269).
+- Queued messages live on the server: ordered, editable, visible on every device, sent when the thread goes idle; a message sent while a turn runs joins the queue (#806).
+- Babysit a pull request until it merges, best-of-N across models in separate worktrees, a needs-attention section in the sidebar, restore files without losing the chat, and a cap on threads holding a worktree (#269).
+- A turn that loses the network stays open and reconnects with backoff, shown as "waiting for the network" instead of a failed turn (#832).
+- Updating with turns running refuses, waits or interrupts by your choice — "Install when they finish" is the default in the update pill (#829).
+- The sidebar's utility icons wrap instead of overflowing, and Enter confirms the confirm dialog (#826).
+
+### Phone
+- Settings › Infinitus › "Show a test card" starts a working Live Activity locally, to tell a render problem from a push problem; live cards end from the same row (#845).
+- A thread with a pull request shows "#N" in its header with the phase, Open pull request, View checks and Mark ready, on iOS and Android; an idle thread whose PR is ready reads "Ready for review" in the list (#269).
+- A pencil on a draft image opens iOS markup; the drawing replaces the attachment (#269).
+- Ask a side question from a thread's header; it opens as a sheet over the parent and "Bring to main" appends the answer to the draft (#881).
+- Queued messages show as a card under the composer with edit, send now and remove; a send during a running turn joins the queue (#806).
+- A thread reconnecting after a network loss shows an amber notice instead of an error (#832).
 
 ## 0.4.5-alpha.1
 

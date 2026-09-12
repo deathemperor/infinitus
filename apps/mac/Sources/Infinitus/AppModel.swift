@@ -570,10 +570,11 @@ final class AppModel: ObservableObject {
             self.switchFlashTick += 1
         }
     }
-    // Deliberately NOT persisted: if a hidden icon survived a relaunch there
-    // would be no UI left to unhide it from (the Settings window is only
-    // reachable through the popup). Hiding lasts until quit.
-    @Published var menuBarIconShown = true
+    // Persisted since #828 (`menu_bar_enabled`): the desktop app and
+    // `infinitusctl prefs set menu_bar_enabled true` can restore a hidden
+    // icon, so it no longer needs the popup to be reachable. Off, the app
+    // runs headless — the socket, the mirror and the pinned window stay.
+    @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -1125,6 +1126,7 @@ final class AppModel: ObservableObject {
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
+        menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -1324,6 +1326,7 @@ final class AppModel: ObservableObject {
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
         set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
+        set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
         set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)
@@ -1702,18 +1705,21 @@ final class AppModel: ObservableObject {
         let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"] ?? ""
         team.ownsScan = { [weak self] in fixture.isEmpty && self?.statsModel.enabled == true }
         team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
+        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
+        // The memo holds what the team needs of a scan; the table goes back (#499).
+        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
+        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
         team.load()
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
-        namedTunnel.onConnected = { [weak self] up in
-            guard let self else { return }
-            applyQuickTunnel()
-            if up, let url = namedTunnel.endpoint { publishRendezvous(url) }
-        }
+        // Up or down, the named tunnel decides whether the quick one runs;
+        // its hostname is never published to the rendezvous (`publicURL`).
+        namedTunnel.onConnected = { [weak self] _ in self?.applyQuickTunnel() }
         // The tunnels can only point at a bound port, which arrives later.
+        // Named first: it ends by applying the quick tunnel, which must see
+        // the named process already running to stay down (#697).
         mirrorServer.onReady = { [weak self] _ in
-            self?.applyQuickTunnel()
             self?.applyNamedTunnel()
         }
         applyMirrorLAN()
@@ -1904,30 +1910,6 @@ final class AppModel: ObservableObject {
                 T3ProjectFiles.answer(pid: pid, path: path,
                                       sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
             }))
-        // The phone's terminal (#507 step 3): the session's cwd is where the
-        // shell opens, and `TerminalHost` owns everything after that — the
-        // routes only map its result to a status. An unknown pid is a 404.
-        let terminalHost = terminalHost
-        mirrorServer.terminal.set(.init(
-            open: { [weak self] pid, request in
-                guard let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .first(where: { $0.pid == pid }) else { return nil }
-                let outcome = terminalHost.open(pid: pid, cwd: record.cwd, request: request)
-                if case .success(let opened) = outcome, opened.created {
-                    Task { @MainActor in
-                        self?.logEvent("other", icon: "apple.terminal",
-                                       "phone opened a terminal in \((record.cwd as NSString).lastPathComponent)")
-                    }
-                }
-                return outcome
-            },
-            attach: { pid, id, since, sink in
-                terminalHost.attach(pid: pid, id: id, since: since, sink: sink)
-            },
-            detach: { terminalHost.detach($0) },
-            write: { pid, id, request in terminalHost.write(pid: pid, id: id, request) },
-            resize: { pid, id, request in terminalHost.resize(pid: pid, id: id, request) },
-            close: { pid, id in terminalHost.close(pid: pid, id: id) }))
         // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in
@@ -1968,8 +1950,7 @@ final class AppModel: ObservableObject {
             self?.deliverSessionInput(pid: pid, request, from: "phone")
                 ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
         }
-        applyQuickTunnel()
-        applyNamedTunnel()
+        applyNamedTunnel()  // ends by applying the quick tunnel (#697)
         applyForkTunnel()
     }
 
@@ -2443,11 +2424,14 @@ final class AppModel: ObservableObject {
 
     /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
     /// fronts the listener, so it follows the LAN toggle too. While the
-    /// named hostname answers it stands down (#697: one public door is
-    /// enough) and comes back as the fallback the moment that drops.
+    /// named tunnel's cloudflared runs it stands down (#697: one public
+    /// door is enough — gated on the process, not on `connected`, so a
+    /// relaunch never spawns a quick tunnel just to kill it seconds later
+    /// when the named one registers) and comes back as the fallback the
+    /// moment that process exits (`NamedTunnel.ended`).
     private func applyQuickTunnel() {
-        if namedTunnel.connected {
-            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel is up") }
+        if namedTunnel.isRunning {
+            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel has the door") }
             quickTunnel.stop()
             return
         }
@@ -2514,9 +2498,12 @@ final class AppModel: ObservableObject {
         if let url = publicURL { publishRendezvous(url) }
     }
 
-    /// The one public address the rendezvous carries: the named hostname
-    /// while it answers, else the quick tunnel's (#697).
-    private var publicURL: String? { namedTunnel.endpoint ?? quickTunnel.url }
+    /// The address the rendezvous carries: the quick tunnel's only. The
+    /// named hostname is stable, so nothing needs a lookup for it, and
+    /// infinitus.run's worker and the phone's `parseLookup` accept
+    /// `*.trycloudflare.com` alone — offering it answered HTTP 400 on
+    /// every named connect (#697).
+    private var publicURL: String? { quickTunnel.url }
 
     /// PUTs the public tunnel URL under this token's rendezvous key
     /// (MirrorRendezvous). Best effort: the QR still carries the URL, this
@@ -3224,9 +3211,6 @@ final class AppModel: ObservableObject {
         quickTunnel.stop()
         namedTunnel.stop()
         forkTunnel.stop()
-        // So are the phone's terminals (#507): a login shell holding a pty
-        // must not outlive the app either.
-        terminalHost.closeAll()
         let swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
         let team = team
@@ -3247,11 +3231,6 @@ final class AppModel: ObservableObject {
             }
         }
     }
-
-    /// The phone's terminals (#507 step 3): one PTY per session pid, opened
-    /// on demand by the mirror's terminal routes. Costs nothing until one is
-    /// open — the host has no sources of its own.
-    let terminalHost = TerminalHost()
 
     // MARK: - Owned sessions (#151)
 

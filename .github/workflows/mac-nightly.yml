@@ -29,6 +29,9 @@ jobs:
       - name: Publish rolling prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+        # Edit the release in place, never delete and recreate it: the desktop
+        # updater takes the first entry of releases.atom, and an edited nightly
+        # stays below the newest versioned tag while a fresh one would not (#924).
         run: |
           git push --force origin HEAD:refs/tags/nightly
           if gh release view nightly >/dev/null 2>&1; then

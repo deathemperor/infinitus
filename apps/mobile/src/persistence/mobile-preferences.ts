@@ -54,6 +54,10 @@ export interface Preferences {
   readonly infinitusPushAlertsEnabled?: boolean;
   /** Infinitus (fork, #742): pin each new task as the server creates it. */
   readonly infinitusPinAtCreation?: boolean;
+  /** Infinitus (fork, #807): what a follow-up does while the thread's turn
+      runs — the desktop's `composerSendMode`. Queue (default) waits for the
+      turn; steer sends into it. A held thread waits either way. */
+  readonly infinitusComposerSendMode?: "queue" | "steer";
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -119,6 +123,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     infinitusAlarmsEnabled?: boolean;
     infinitusPushAlertsEnabled?: boolean;
     infinitusPinAtCreation?: boolean;
+    infinitusComposerSendMode?: "queue" | "steer";
   } = {};
 
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
@@ -209,6 +214,12 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.infinitusPinAtCreation === "boolean") {
     preferences.infinitusPinAtCreation = parsed.infinitusPinAtCreation;
+  }
+  if (
+    parsed.infinitusComposerSendMode === "queue" ||
+    parsed.infinitusComposerSendMode === "steer"
+  ) {
+    preferences.infinitusComposerSendMode = parsed.infinitusComposerSendMode;
   }
   return preferences;
 }

@@ -7,7 +7,7 @@ to the proxy instead of api.anthropic.com; the proxy picks a credential
 per request. Infinitus drives it purely over its Management API — it
 never reads the proxy's config or credential files.
 
-How it differs from cswap: cswap **swaps the credential under Claude
+How it differs from swapd: swapd **swaps the credential under Claude
 Code** (one account active at a time, switched when limited). The proxy
 **rotates behind its own endpoint** (Claude Code never sees which
 account served a request). Run one engine per account set — both on the
@@ -80,15 +80,15 @@ Or by hand:
    (`run.infinitus.cliproxy`), never into defaults or logs.
 5. Flip **Engine on**. The app restarts with the proxy fleet registered.
 
-If cswap is also on you get the layer-fight warning under the toggle.
-Turn cswap off unless the two engines hold different accounts.
+If swapd is also on you get the layer-fight warning under the toggle.
+Turn swapd off unless the two engines hold different accounts.
 
 ## 4. Add accounts
 
 Settings → **Accounts** tab → the "Claude — CLIProxyAPI" section →
-**Add account…**. The same chooser as cswap appears: a private system
+**Add account…**. The same chooser as swapd appears: a private system
 sign-in sheet, or a per-account private window (its cookie jar is keyed
-by email and shared with cswap's sign-ins, so a second engine holding
+by email and shared with swapd's sign-ins, so a second engine holding
 the same account doesn't ask you to log in twice). Your default browser
 is never used.
 
@@ -96,7 +96,7 @@ Sign in, approve, and the credential appears in the section within a
 few seconds (Infinitus polls the proxy's auth state; the proxy runs the
 OAuth callback on port 54545 itself). Repeat per account.
 
-Per account you get the same controls as cswap: usage gauges, **Switch**
+Per account you get the same controls as swapd: usage gauges, **Switch**
 (raises the credential to the top priority tier), **Hold** (proxy
 `disabled`), rename (proxy `note`), **Relogin**, and remove.
 
@@ -124,7 +124,7 @@ Settings → CLIProxyAPI → **Routing**:
 
 | Strategy | What it does | Prompt cache |
 |---|---|---|
-| `fill-first` (recommended) | Highest priority credential until it is rate-limited — cswap's consume-first. Switch works. | Fine: one account per conversation. |
+| `fill-first` (recommended) | Highest priority credential until it is rate-limited — consume-first. Switch works. | Fine: one account per conversation. |
 | `round-robin` (proxy default) | Every request goes to the next credential. | **Misses** unless session affinity is on. Switch is advisory. |
 | `weighted-round-robin` | Rotation proportional to each credential's `weight`. | Same as round-robin. |
 
@@ -146,7 +146,7 @@ you Switch; Switch only steers new sessions.
 
 Anthropic's usage endpoint rate-limits per **account**. Infinitus polls
 each proxy credential once per 5 minutes, dedupes credentials that
-share an email, reuses usage cswap already fetched for the same email,
+share an email, reuses usage another engine already fetched for the same email,
 and backs a credential off for 5 minutes on a 429. If a gauge reads
 "error" right after adding an account, wait a poll or two.
 

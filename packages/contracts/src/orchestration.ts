@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Struct from "effect/Struct";
+import { OrchestrationMessageContext } from "./composerContext.ts";
 import { ProviderOptionSelections } from "./model.ts";
 import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
 import {
@@ -346,6 +347,8 @@ export type ChatUnknownAttachment = typeof ChatUnknownAttachment.Type;
 
 const UploadChatImageAttachment = Schema.Struct({
   type: Schema.Literal("image"),
+  /** Client-side id, so context records can bind to the attachment before it has a server id. */
+  id: Schema.optional(ChatAttachmentId),
   name: TrimmedNonEmptyString.check(Schema.isMaxLength(255)),
   mimeType: TrimmedNonEmptyString.check(Schema.isMaxLength(100), Schema.isPattern(/^image\//i)),
   sizeBytes: NonNegativeInt.check(Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_IMAGE_BYTES)),
@@ -489,6 +492,7 @@ export const OrchestrationMessage = Schema.Struct({
   role: OrchestrationMessageRole,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
+  context: Schema.optional(OrchestrationMessageContext),
   turnId: Schema.NullOr(TurnId),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,
@@ -712,6 +716,8 @@ export const OrchestrationQueuedTurn = Schema.Struct({
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
   modelSelection: Schema.optional(ModelSelection),
+  /** The message's context records (upstream #11265), sent with it by the drain (#969). */
+  context: Schema.optional(OrchestrationMessageContext),
   orderKey: TrimmedNonEmptyString,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -738,6 +744,69 @@ export const ThreadBabysit = Schema.Struct({
   rounds: NonNegativeInt,
 });
 export type ThreadBabysit = typeof ThreadBabysit.Type;
+
+/**
+ * Fork (#834): what one completed turn cost, as the provider reported it.
+ * Tokens are the main agent's (subagents excluded, so they understate on a
+ * turn with `hasSubagents`); `costUsd` is the provider's own estimate for
+ * every model call of the turn. Estimates, never billing truth.
+ */
+export const ThreadTurnUsage = Schema.Struct({
+  turnId: TurnId,
+  /** The model the turn mostly ran on, when the provider named one. */
+  model: Schema.NullOr(TrimmedNonEmptyString),
+  /** Cache reads and writes included. */
+  inputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  cachedInputTokens: NonNegativeInt,
+  cacheCreationTokens: NonNegativeInt,
+  /** Part of `outputTokens`; null when the provider does not break it out. */
+  reasoningTokens: Schema.NullOr(NonNegativeInt),
+  /** False when the provider gave partial totals. */
+  complete: Schema.Boolean,
+  hasSubagents: Schema.Boolean,
+  /** The provider's estimate in USD, null when it gave none. */
+  costUsd: Schema.NullOr(Schema.Number),
+  completedAt: IsoDateTime,
+  /** Tool calls the runtime announced during the turn. Absent when this
+      server did not see the turn start (a restart mid-turn), never zero for
+      "not counted". */
+  toolCalls: Schema.optional(NonNegativeInt),
+  /** Wall time from the turn's start to its completion, reconnects
+      included; absent with `toolCalls`. */
+  durationMs: Schema.optional(NonNegativeInt),
+});
+export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
+
+/**
+ * Fork (#834): a thread's completed turns summed (`@t3tools/shared/threadUsage`
+ * folds them). `runtime` rollups come from the turns this server ran;
+ * `transcript` ones are estimated from the provider's transcript after the
+ * fact. Estimates, never billing truth — show them as such.
+ */
+export const ThreadUsageSource = Schema.Literals(["runtime", "transcript"]);
+export type ThreadUsageSource = typeof ThreadUsageSource.Type;
+
+export const ThreadUsageRollup = Schema.Struct({
+  source: ThreadUsageSource,
+  turns: NonNegativeInt,
+  inputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  cachedInputTokens: NonNegativeInt,
+  cacheCreationTokens: NonNegativeInt,
+  reasoningTokens: NonNegativeInt,
+  /** Turns whose tokens understate because subagents ran. */
+  subagentTurns: NonNegativeInt,
+  /** The sum of the turns that carried an estimate; null when none did. */
+  costUsd: Schema.NullOr(Schema.Number),
+  /** Distinct, first seen first. */
+  models: Schema.Array(TrimmedNonEmptyString),
+  lastTurnAt: IsoDateTime,
+  /** Summed over the turns that carried one; absent while none did. */
+  toolCalls: Schema.optional(NonNegativeInt),
+  durationMs: Schema.optional(NonNegativeInt),
+});
+export type ThreadUsageRollup = typeof ThreadUsageRollup.Type;
 
 export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
@@ -793,6 +862,9 @@ export const OrchestrationThread = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#834): the completed turns' usage summed; absent until a turn
+  // has been recorded (never zero for "not recorded").
+  usage: Schema.optional(ThreadUsageRollup),
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
@@ -873,6 +945,9 @@ export const OrchestrationThreadShell = Schema.Struct({
   // Fork (#269 A): set while the thread is babysat. Optional so payloads
   // from pre-babysit servers still decode.
   babysit: Schema.optional(Schema.NullOr(ThreadBabysit)),
+  // Fork (#834): the completed turns' usage summed; absent until a turn
+  // has been recorded (never zero for "not recorded").
+  usage: Schema.optional(ThreadUsageRollup),
   // Fork (#269 C): the thread this one is a side question of. Such threads
   // live in a drawer over their main thread, not in the lists.
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
@@ -1288,6 +1363,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
     role: Schema.Literal("user"),
     text: Schema.String,
     attachments: Schema.Array(ChatAttachment),
+    context: Schema.optional(OrchestrationMessageContext),
   }),
   modelSelection: Schema.optional(ModelSelection),
   titleSeed: Schema.optional(TrimmedNonEmptyString),
@@ -1312,6 +1388,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
     role: Schema.Literal("user"),
     text: Schema.String,
     attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+    context: Schema.optional(OrchestrationMessageContext),
   }),
   modelSelection: Schema.optional(ModelSelection),
   titleSeed: Schema.optional(TrimmedNonEmptyString),
@@ -1337,12 +1414,14 @@ const QueuedTurnMessage = Schema.Struct({
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(ChatAttachment),
+  context: Schema.optional(OrchestrationMessageContext),
 });
 const ClientQueuedTurnMessage = Schema.Struct({
   messageId: MessageId,
   role: Schema.Literal("user"),
   text: Schema.String,
   attachments: Schema.Array(Schema.Union([UploadChatAttachment, ChatAttachment])),
+  context: Schema.optional(OrchestrationMessageContext),
 });
 
 export const ThreadTurnQueueCommand = Schema.Struct({
@@ -1448,18 +1527,11 @@ const ThreadCheckpointRevertCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
-/**
- * Fork (#270 E1): rewind the chat to a checkpoint's turn count without
- * touching files. The later turns leave every projection the way a revert's
- * do (the event log keeps them); the workspace and the git checkpoint refs
- * stay as they are.
- */
-const ThreadChatRewindCommand = Schema.Struct({
-  type: Schema.Literal("thread.chat.rewind"),
-  commandId: CommandId,
-  threadId: ThreadId,
-  turnCount: NonNegativeInt,
-  createdAt: IsoDateTime,
+// A separate command makes older servers reject history-only rewinds rather than
+// ignoring an unfamiliar option and restoring files.
+const ThreadConversationRevertCommand = Schema.Struct({
+  ...ThreadCheckpointRevertCommand.fields,
+  type: Schema.Literal("thread.conversation.revert"),
 });
 
 const ThreadSessionStopCommand = Schema.Struct({
@@ -1506,7 +1578,7 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
-  ThreadChatRewindCommand,
+  ThreadConversationRevertCommand,
   ThreadSessionStopCommand,
 ]);
 export type DispatchableClientOrchestrationCommand =
@@ -1543,7 +1615,7 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadUserInputDismissCommand,
   ThreadCheckpointRevertCommand,
-  ThreadChatRewindCommand,
+  ThreadConversationRevertCommand,
   ThreadSessionStopCommand,
 ]);
 export type ClientOrchestrationCommand = typeof ClientOrchestrationCommand.Type;
@@ -1553,6 +1625,28 @@ const ThreadSessionSetCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   session: OrchestrationSession,
+  createdAt: IsoDateTime,
+});
+
+/** Fork (#834): the runtime ingestion records a completed turn's usage. */
+const ThreadTurnUsageRecordCommand = Schema.Struct({
+  type: Schema.Literal("thread.turn.usage.record"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  turnUsage: ThreadTurnUsage,
+  createdAt: IsoDateTime,
+});
+
+/**
+ * Fork (#834): the transcript backfill sets a thread's rollup once, for a
+ * thread whose turns ran before usage was recorded. Refused when the thread
+ * already has one.
+ */
+const ThreadUsageBackfillCommand = Schema.Struct({
+  type: Schema.Literal("thread.usage.backfill"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  usage: ThreadUsageRollup,
   createdAt: IsoDateTime,
 });
 
@@ -1666,6 +1760,8 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadPullRequestSyncCommand,
   ThreadPullRequestLinkSyncCommand,
   ThreadSessionSetCommand,
+  ThreadTurnUsageRecordCommand,
+  ThreadUsageBackfillCommand,
   ThreadMessageAssistantDeltaCommand,
   ThreadMessageAssistantCompleteCommand,
   ThreadHistoryImportCommand,
@@ -1716,10 +1812,11 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.approval-response-requested",
   "thread.user-input-response-requested",
   "thread.checkpoint-revert-requested",
-  "thread.chat-rewind-requested",
   "thread.reverted",
   "thread.session-stop-requested",
   "thread.session-set",
+  "thread.turn-usage-recorded",
+  "thread.usage-backfilled",
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
@@ -1939,6 +2036,7 @@ export const ThreadMessageSentPayload = Schema.Struct({
   role: OrchestrationMessageRole,
   text: Schema.String,
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
+  context: Schema.optional(OrchestrationMessageContext),
   turnId: Schema.NullOr(TurnId),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,
@@ -1984,6 +2082,7 @@ export const ThreadCheckpointRevertRequestedPayload = Schema.Struct({
   turnCount: NonNegativeInt,
   /** Fork (#269 E): files only, see `thread.checkpoint.revert`. */
   keepChat: Schema.optional(Schema.Boolean),
+  restoreFiles: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -2000,6 +2099,19 @@ export const ThreadSessionStopRequestedPayload = Schema.Struct({
 export const ThreadSessionSetPayload = Schema.Struct({
   threadId: ThreadId,
   session: OrchestrationSession,
+});
+
+/** Fork (#834): the turn's record and the thread's rollup folded with it. */
+export const ThreadTurnUsageRecordedPayload = Schema.Struct({
+  threadId: ThreadId,
+  turnUsage: ThreadTurnUsage,
+  usage: ThreadUsageRollup,
+});
+
+/** Fork (#834): the rollup estimated from the transcript; assigned, never summed. */
+export const ThreadUsageBackfilledPayload = Schema.Struct({
+  threadId: ThreadId,
+  usage: ThreadUsageRollup,
 });
 
 export const ThreadProposedPlanUpsertedPayload = Schema.Struct({
@@ -2211,11 +2323,6 @@ export const OrchestrationEvent = Schema.Union([
   }),
   Schema.Struct({
     ...EventBaseFields,
-    type: Schema.Literal("thread.chat-rewind-requested"),
-    payload: ThreadCheckpointRevertRequestedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
     type: Schema.Literal("thread.reverted"),
     payload: ThreadRevertedPayload,
   }),
@@ -2228,6 +2335,16 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.session-set"),
     payload: ThreadSessionSetPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.turn-usage-recorded"),
+    payload: ThreadTurnUsageRecordedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.usage-backfilled"),
+    payload: ThreadUsageBackfilledPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

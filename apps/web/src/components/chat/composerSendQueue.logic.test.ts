@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, QueueId, ThreadId, type OrchestrationQueuedTurn } from "@t3tools/contracts";
 import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
 
+import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import type { PromptStashEntry } from "../../promptStashStore";
 import {
   composerSendQueueKey,
@@ -11,6 +12,7 @@ import {
   queuedTurnEditableText,
   queuedTurnMoveKey,
   queuedTurnSnippet,
+  restoredQueuedTurnText,
 } from "./composerSendQueue.logic";
 
 function row(id: string, orderKey: string, text = id): OrchestrationQueuedTurn {
@@ -130,5 +132,30 @@ describe("legacy stash rows (#270 F → #806)", () => {
       },
     });
     expect(legacyQueuedEntryCommand({ ...entry, pendingImageCount: 1 })).toBeNull();
+  });
+});
+
+describe("restoredQueuedTurnText (#971)", () => {
+  const link = (kind: string, contextId: string, label = contextId) =>
+    formatInlineContextReference({ kind, contextId, label });
+
+  it("points a link at the id its record was re-minted under and leaves the rest alone", () => {
+    const text = `Look at ${link("terminal", "terminal_t1", "build.log")} and ${link("file", "file_f1", "a.ts")}.`;
+    const rewritten = new Map([["terminal_t1", "terminal_t2"]]);
+    expect(restoredQueuedTurnText(text, rewritten)).toBe(
+      `Look at ${link("terminal", "terminal_t2", "build.log")} and ${link("file", "file_f1", "a.ts")}.`,
+    );
+  });
+
+  it("brings an element link back as a preview annotation and strips the effort prefix", () => {
+    const text = `Ultrathink:\nFix ${link("element", "element_e1", "button")}`;
+    const rewritten = new Map([["element_e1", "preview-annotation_p1"]]);
+    expect(restoredQueuedTurnText(text, rewritten)).toBe(
+      `Fix ${link("preview-annotation", "preview-annotation_p1", "button")}`,
+    );
+  });
+
+  it("returns plain prose unchanged", () => {
+    expect(restoredQueuedTurnText("just words", new Map())).toBe("just words");
   });
 });

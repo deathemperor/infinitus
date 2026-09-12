@@ -55,7 +55,7 @@ secrets; never edit files under `~/.cli-proxy-api/*.json`.
    }
    ```
    Do this only if the user confirms they want Claude Code routed
-   through the proxy from now on; if cswap is their active engine, the
+   through the proxy from now on; if swapd is their active engine, the
    two fight over the same accounts — ask first.
 
 7. **Connect Infinitus** with its CLI (`Infinitus.app/Contents/MacOS/infinitusctl`;

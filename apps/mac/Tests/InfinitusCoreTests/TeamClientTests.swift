@@ -17,6 +17,12 @@ final class TeamClientTests: XCTestCase {
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         p.arguments = ["git", "init", "--bare", "-q", bare.path]
         try p.run(); p.waitUntilExit()
+        // As the hosted remotes do: transcript branches are fetched
+        // without their blobs (#414) only where the server allows the filter.
+        let c = Process()
+        c.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        c.arguments = ["git", "--git-dir", bare.path, "config", "uploadpack.allowFilter", "true"]
+        try c.run(); c.waitUntilExit()
         return "file://" + bare.path
     }
 
@@ -401,20 +407,49 @@ final class TeamClientTests: XCTestCase {
         let chunk = "t/\(ann.identity.kid)/transcripts/s1/2.jsonl"
         XCTAssertEqual(paths, ["m/\(ann.identity.kid)/now.json", chunk])
 
-        // The leader's routine fetch brings Ann's transcript branch by hint…
+        // The leader's routine fetch brings Ann's transcript branch by hint —
+        // the listing, not the chunk (#414): the session shows by its path
+        // and the bytes come when it is opened.
         _ = try leader.fetch()
         XCTAssertTrue(remoteBranches(in: lp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try leader.store.list(chunk).map(\.present), [false])
         XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
+        XCTAssertThrowsError(try leader.read(chunk))
+        // The session opens on what is here; the absent chunk is no error.
+        XCTAssertNoThrow(try TeamReader.load(client: leader).transcript(kid: ann.identity.kid, session: "s1", client: leader))
+        try leader.fetchTranscripts(from: ann.identity.kid, session: "s1")
         XCTAssertEqual(try leader.read(chunk).1, Data("new\n".utf8))
+        XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
         // …and Bo's does not: the hint names the leaders, so the bytes never move to him.
         _ = try bo.fetch()
         XCTAssertFalse(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
         XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
-        // On demand the branch arrives; the envelope still isn't his to read.
+        // On demand the branch arrives and its paths are listed (#414: a
+        // path, not an envelope); once the session is opened the chunk is
+        // here, isn't his to read, and the listing drops it.
         try bo.fetchTranscripts(from: ann.identity.kid)
         XCTAssertTrue(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try TeamReader.load(client: bo).members[ann.identity.kid]?.transcripts["s1"], [chunk])
+        try bo.fetchTranscripts(from: ann.identity.kid, session: "s1")
         XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        XCTAssertThrowsError(try bo.read(chunk))
+        XCTAssertNil(try TeamReader.load(client: bo).members[ann.identity.kid]?.transcripts["s1"])
         XCTAssertThrowsError(try bo.fetchTranscripts(from: "../x"))
+        // A member whose every chunk lives on t/ (nothing from before the
+        // split): the leader's routine fetch lists the session and counts
+        // transcripts among what Bo shares, with no chunk byte fetched.
+        let boNow = TeamDocs.Now(at: 1_032, sessions: [], fleets: [], blockers: [], crashesToday: 0,
+                                 sharesTo: [TeamKinds.transcripts: .leaders])
+        _ = try bo.publish([
+            .init(kind: TeamKinds.now, path: "now.json", plaintext: try CanonicalJSON.encode(boNow), audience: .team),
+            .init(kind: TeamKinds.transcripts, path: "transcripts/s2/1.jsonl", plaintext: Data("bo\n".utf8), audience: .leaders),
+        ], now: 1_032)
+        _ = try leader.fetch()
+        let boChunk = "t/\(bo.identity.kid)/transcripts/s2/1.jsonl"
+        XCTAssertEqual(try leader.store.list(boChunk).map(\.present), [false])
+        let boSeen = try TeamReader.load(client: leader).members[bo.identity.kid]
+        XCTAssertEqual(boSeen?.transcripts["s2"], [boChunk])
+        XCTAssertTrue(boSeen?.kinds.contains(TeamKinds.transcripts) ?? false)
 
         // Leaving clears m/ and t/ alike.
         try ann.leave(now: 1_040)

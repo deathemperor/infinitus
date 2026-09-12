@@ -9,6 +9,9 @@ import {
   type UploadChatImageAttachment,
 } from "@t3tools/contracts";
 import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
+import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+
+import { formatInlineContextReference } from "../../lib/composerContextReferences";
 
 import type { PromptStashEntry } from "../../promptStashStore";
 
@@ -36,6 +39,29 @@ const EFFORT_PREFIX = "Ultrathink:\n";
 /** The row's text as the user typed it: the effort prefix the send added comes off. */
 export function queuedTurnEditableText(text: string): string {
   return text.startsWith(EFFORT_PREFIX) ? text.slice(EFFORT_PREFIX.length) : text;
+}
+
+/**
+ * The row's text for the composer once its records were imported (#971): the
+ * effort prefix comes off and every context link whose record was re-minted
+ * under a fresh id points at that id (an `element` record comes back as a
+ * preview annotation, as on a stash restore); a link the import left alone
+ * stays byte for byte.
+ */
+export function restoredQueuedTurnText(
+  text: string,
+  rewrittenContextIds: ReadonlyMap<string, string>,
+): string {
+  return replaceComposerContextReferences(queuedTurnEditableText(text), (reference) => {
+    const contextId = rewrittenContextIds.get(reference.contextId);
+    return contextId
+      ? formatInlineContextReference({
+          ...reference,
+          contextId,
+          kind: reference.kind === "element" ? "preview-annotation" : reference.kind,
+        })
+      : reference.source;
+  });
 }
 
 /** One line of the row for the list; attachments alone read as "N attachments". */

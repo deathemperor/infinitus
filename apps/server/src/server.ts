@@ -76,6 +76,8 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
+import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
+import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
@@ -91,6 +93,7 @@ import { ProviderRuntimeIngestionLive } from "./orchestration/Layers/ProviderRun
 import { ProviderCommandReactorLive } from "./orchestration/Layers/ProviderCommandReactor.ts";
 import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.ts";
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
+import { ThreadUsageBackfillLive } from "./orchestration/Layers/ThreadUsageBackfill.ts";
 import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
 import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
 import * as ThreadPullRequestReactor from "./orchestration/ThreadPullRequestReactor.ts";
@@ -301,6 +304,9 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(CheckpointReactorLive),
   Layer.provideMerge(ThreadDeletionReactorLive),
   Layer.provideMerge(ThreadSettlementReactor.layer),
+  // Fork (#834): estimates a legacy thread's usage from its Claude transcript
+  // once; reads the usage service provided further down.
+  Layer.provideMerge(ThreadUsageBackfillLive),
   // Fork (#269 A): queues a fix round for a babysat thread's red pull
   // request through `thread.turn.queue`; reads the sync reactor below.
   Layer.provideMerge(InfinitusBabysitLive),
@@ -310,6 +316,10 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#574): the Slack bridge over Socket Mode.
+  Layer.provideMerge(
+    InfinitusSlackLive.pipe(Layer.provide(SlackClientLive), Layer.provide(FetchHttpClient.layer)),
+  ),
   // Fork (#806): sends queued messages when their thread is idle, not held
   // and not paused; needs both layers below.
   Layer.provideMerge(InfinitusTurnQueueLive),

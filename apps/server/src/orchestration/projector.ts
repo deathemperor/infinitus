@@ -56,6 +56,8 @@ import {
   ThreadUnsnoozedPayload,
   ThreadRevertedPayload,
   ThreadSessionSetPayload,
+  ThreadTurnUsageRecordedPayload,
+  ThreadUsageBackfilledPayload,
   ThreadTurnDiffCompletedPayload,
 } from "./Schemas.ts";
 
@@ -844,6 +846,7 @@ export function projectEvent(
             role: payload.role,
             text: payload.text,
             ...(payload.attachments !== undefined ? { attachments: payload.attachments } : {}),
+            ...(payload.context !== undefined ? { context: payload.context } : {}),
             turnId: payload.turnId,
             streaming: payload.streaming,
             createdAt: payload.createdAt,
@@ -870,6 +873,7 @@ export function projectEvent(
                     ...(message.attachments !== undefined
                       ? { attachments: message.attachments }
                       : {}),
+                    ...(message.context !== undefined ? { context: message.context } : {}),
                   }
                 : entry,
             )
@@ -884,6 +888,33 @@ export function projectEvent(
           }),
         };
       });
+
+    // Fork (#834): the decider folded the rollup; assign it.
+    case "thread.turn-usage-recorded":
+      return decodeForEvent(
+        ThreadTurnUsageRecordedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, { usage: payload.usage }),
+        })),
+      );
+
+    case "thread.usage-backfilled":
+      return decodeForEvent(
+        ThreadUsageBackfilledPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, { usage: payload.usage }),
+        })),
+      );
 
     case "thread.session-set":
       return Effect.gen(function* () {

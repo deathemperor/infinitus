@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import type { ThreadPullRequestLink } from "@t3tools/contracts";
 
 import {
+  babysitLabel,
   prChecksUrl,
   prHeaderLabel,
   prHeaderMenuItems,
@@ -115,6 +116,45 @@ describe("prHeaderMenuItems", () => {
     expect(
       actions({ pr: { state: "open", isDraft: true }, checksUrl: null, canRunActions: false }),
     ).toEqual(["open"]);
+  });
+
+  it("offers babysit on an open PR of an Infinitus server, and stop while it is on (#269 A)", () => {
+    const items = (input: Partial<Parameters<typeof prHeaderMenuItems>[0]>) =>
+      prHeaderMenuItems({
+        pr: { state: "open", isDraft: false },
+        checksUrl: null,
+        canRunActions: false,
+        ...input,
+      }).map((item) => [item.action, item.label]);
+    expect(items({ babysit: { state: null } })).toEqual([
+      ["open", "Open pull request"],
+      ["babysit-on", "Babysit"],
+    ]);
+    expect(items({ babysit: { state: { since: "2026-09-12T00:00:00.000Z", rounds: 3 } } })).toEqual(
+      [
+        ["open", "Open pull request"],
+        ["babysit-off", "Stop babysitting (3/10)"],
+      ],
+    );
+    // Already on: the stop stays even once the PR has merged, so it can be turned off.
+    expect(
+      items({
+        pr: { state: "merged" },
+        babysit: { state: { since: "2026-09-12T00:00:00.000Z", rounds: 10 } },
+      }).map(([action]) => action),
+    ).toEqual(["open", "babysit-off"]);
+    // Off and not open, or a server without Infinitus: no item.
+    expect(items({ pr: { state: "closed" }, babysit: { state: null } })).toEqual([
+      ["open", "Open pull request"],
+    ]);
+    expect(items({ babysit: null })).toEqual([["open", "Open pull request"]]);
+    expect(items({})).toEqual([["open", "Open pull request"]]);
+  });
+
+  it("labels a babysat thread by its rounds", () => {
+    expect(babysitLabel({ since: "2026-09-12T00:00:00.000Z", rounds: 2 })).toBe("Babysitting 2/10");
+    expect(babysitLabel(null)).toBeNull();
+    expect(babysitLabel(undefined)).toBeNull();
   });
 
   it("describes the checks item by the rollup", () => {
