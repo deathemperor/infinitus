@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - The desktop's updater offers the next alpha, beta or plain release again: it follows the version's own prerelease channel, so an installed 0.5.0-alpha.1 must be replaced by hand once and every release after that arrives on its own (#924).
 - Settings › Infinitus › Menu bar carries the "Show the icon in the menu bar" switch: off hides the Mac's icon across relaunches while Infinitus keeps running, and this page turns it back on (#828).
 - The thread-info popover counts the tool calls and the duration of the turns this server ran, per thread (#834).
+- A queued message the server could not send stays in the queue and says why in the timeline instead of silently waiting; one the provider failed to start is put back at the head of the queue, once, so it is never lost (#806).
 
 ### Phone
 - A best-of-N member thread carries the group card: every live sibling with its model and a status word, a tap opens it; keeping one stays on the desktop (#269).

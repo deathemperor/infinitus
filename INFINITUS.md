@@ -293,8 +293,13 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   never, see #832), one send per thread at a time; wakes on session-set,
   the queue events, unarchive, a failed start, a hold or pause letting the
   thread go, and once at boot after the hold and interrupt layers have
-  published their first lists (5 s cap). A send the decider rejects leaves
-  the row; a provider failure after the send has already consumed it.
+  published their first lists (5 s cap). A send the decider refuses stays
+  in the queue with an `error` activity `queue.send.failed` and is skipped
+  until edited, moved or removed (the queue blocks behind it; a row already
+  sent or removed only logs); a send the provider fails to start after the
+  row was consumed is put back once, at the head, as `<queueId>~retry` with
+  a fresh message id and an `info` activity `queue.requeued` — the drain's
+  own sends only, "Send now" stays a manual send.
 - Update idle gate (#829): a server update is gated on the server's own
   turn state, never on process heuristics. `packages/contracts/src/server.ts`
   — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`

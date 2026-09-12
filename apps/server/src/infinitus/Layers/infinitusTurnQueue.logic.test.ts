@@ -1,10 +1,17 @@
-import { MessageId, QueueId, ThreadId } from "@t3tools/contracts";
+import { MessageId, QUEUED_TURN_GONE, QueueId, ThreadId } from "@t3tools/contracts";
+import { orderKeyBetween } from "@t3tools/shared/orderKeys";
 import { describe, expect, it } from "vite-plus/test";
 
+import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";
 import {
+  isRetryQueueId,
   orderedQueuedTurns,
   queueDrainVerdict,
+  queueHeadOrderKey,
+  queueSendRefusal,
+  queuedTurnSignature,
   releasedThreads,
+  retryQueueId,
   type QueueDrainThread,
 } from "./infinitusTurnQueue.logic.ts";
 
@@ -93,6 +100,57 @@ describe("queueDrainVerdict (#806)", () => {
       reason: "empty",
     });
     expect(queueDrainVerdict(thread({ queuedTurns: undefined }), open).kind).toBe("wait");
+  });
+});
+
+describe("queueDrainVerdict: a refused row (#806)", () => {
+  it("skips a refused row by its signature until an edit, move or removal changes it", () => {
+    const failed = new Set([queuedTurnSignature(threadId, row("q1", "m"))]);
+    expect(queueDrainVerdict(thread(), { ...open, failed })).toEqual({
+      kind: "wait",
+      reason: "failed",
+    });
+    const edited = { ...row("q1", "m"), updatedAt: "2026-01-01T00:05:00.000Z" };
+    expect(queueDrainVerdict(thread({ queuedTurns: [edited] }), { ...open, failed })).toEqual({
+      kind: "send",
+      row: edited,
+    });
+    // The queue blocks behind the refused head row; the next row does not
+    // jump it.
+    expect(
+      queueDrainVerdict(thread({ queuedTurns: [row("q1", "m"), row("q2", "t")] }), {
+        ...open,
+        failed,
+      }),
+    ).toEqual({ kind: "wait", reason: "failed" });
+  });
+});
+
+describe("queueSendRefusal", () => {
+  it("is quiet for a row already sent or removed and names every other refusal", () => {
+    const invariant = (detail: string) =>
+      new OrchestrationCommandInvariantError({ commandType: "thread.turn.start", detail });
+    expect(queueSendRefusal(invariant(`Queued message 'q1' was ${QUEUED_TURN_GONE}.`))).toBeNull();
+    expect(queueSendRefusal(invariant("Thread 'thread-1' has no session."))).toBe(
+      "Thread 'thread-1' has no session.",
+    );
+    expect(queueSendRefusal(new Error("database is locked"))).toBe("database is locked");
+    expect(queueSendRefusal("boom")).toBe("boom");
+  });
+});
+
+describe("retry rows", () => {
+  it("marks a row put back after a provider failure, once", () => {
+    const retry = retryQueueId(QueueId.make("q1"));
+    expect(retry).toBe("q1~retry");
+    expect(isRetryQueueId(retry)).toBe(true);
+    expect(isRetryQueueId(QueueId.make("q1"))).toBe(false);
+  });
+
+  it("puts the retry ahead of every row", () => {
+    expect(queueHeadOrderKey([row("q2", "t"), row("q3", "k")])).toBe(orderKeyBetween(null, "k"));
+    expect(queueHeadOrderKey([])).toBe(orderKeyBetween(null, null));
+    expect(queueHeadOrderKey([row("corrupt", "A")])).toBeUndefined();
   });
 });
 
