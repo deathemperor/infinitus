@@ -755,6 +755,41 @@ export function applyThreadDetailEvent(
           },
         };
       }
+      if (ids !== undefined) {
+        // An indexed history is sorted, so the rows this row supersedes leave
+        // and it lands at its position by binary search. Re-sorting the whole
+        // history here cost ~25 ms per event on a phone, and a subagent's
+        // progress row is re-delivered under one id with a newer createdAt
+        // on every update, thousands of times in a long thread.
+        const activities: OrchestrationThreadActivity[] = [];
+        for (const entry of thread.activities) {
+          if (entry.id === activity.id) continue;
+          if (
+            supersedesContextWindow &&
+            entry.turnId === activity.turnId &&
+            isResolvableContextWindowActivity(entry)
+          ) {
+            ids.delete(entry.id);
+            continue;
+          }
+          activities.push(entry);
+        }
+        let low = 0;
+        let high = activities.length;
+        while (low < high) {
+          const mid = (low + high) >>> 1;
+          if (activityOrder(activities[mid]!, activity) <= 0) low = mid + 1;
+          else high = mid;
+        }
+        activities.splice(low, 0, activity);
+        activityIdIndex.delete(thread.activities);
+        ids.add(activity.id);
+        activityIdIndex.set(activities, ids);
+        return {
+          kind: "updated",
+          thread: { ...thread, activities, updatedAt: event.occurredAt },
+        };
+      }
       const activities = pipe(
         thread.activities,
         Arr.filter(

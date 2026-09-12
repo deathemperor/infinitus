@@ -1275,6 +1275,60 @@ describe("applyThreadDetailEvent", () => {
       }
     });
 
+    it("moves a re-delivered activity to its new position on an indexed history", () => {
+      // Subagent progress rows are re-delivered under one id with a newer
+      // createdAt on every update (thousands of times in a long thread):
+      // the old row leaves its place and the update lands at the tail.
+      const makeActivity = (id: string, createdAt: string, summary: string) => ({
+        id: EventId.make(id),
+        tone: "tool" as const,
+        kind: "task.progress",
+        summary,
+        payload: {},
+        turnId: TurnId.make("turn-1"),
+        createdAt,
+      });
+      const makeEvent = (sequence: number, activity: ReturnType<typeof makeActivity>) =>
+        ({
+          ...baseEventFields,
+          sequence,
+          occurredAt: "2026-04-01T11:01:00.000Z",
+          aggregateKind: "thread",
+          aggregateId: ThreadId.make("thread-1"),
+          type: "thread.activity-appended",
+          payload: { threadId: ThreadId.make("thread-1"), activity },
+        }) as const;
+      let thread: OrchestrationThread = { ...baseThread, activities: [] };
+      const apply = (sequence: number, activity: ReturnType<typeof makeActivity>) => {
+        const result = applyThreadDetailEvent(thread, makeEvent(sequence, activity));
+        expect(result.kind).toBe("updated");
+        if (result.kind === "updated") thread = result.thread;
+      };
+      apply(1, makeActivity("task-1", "2026-04-01T11:00:01.000Z", "progress 1"));
+      apply(2, makeActivity("tool-a", "2026-04-01T11:00:02.000Z", "tool a"));
+      apply(3, makeActivity("tool-b", "2026-04-01T11:00:03.000Z", "tool b"));
+      apply(4, makeActivity("task-1", "2026-04-01T11:00:04.000Z", "progress 2"));
+      // An update that lands between existing rows, and one that is out of order.
+      apply(5, makeActivity("task-1", "2026-04-01T11:00:02.500Z", "progress 3"));
+      apply(6, makeActivity("tool-early", "2026-04-01T11:00:00.500Z", "early tool"));
+      expect(thread.activities.map((activity) => [activity.id, activity.summary])).toEqual([
+        ["tool-early", "early tool"],
+        ["tool-a", "tool a"],
+        ["task-1", "progress 3"],
+        ["tool-b", "tool b"],
+      ]);
+      // The index survives: a later in-order re-delivery still dedupes.
+      apply(7, makeActivity("tool-b", "2026-04-01T11:00:03.000Z", "tool b again"));
+      apply(8, makeActivity("tool-c", "2026-04-01T11:00:05.000Z", "tool c"));
+      expect(thread.activities.map((activity) => activity.summary)).toEqual([
+        "early tool",
+        "tool a",
+        "progress 3",
+        "tool b again",
+        "tool c",
+      ]);
+    });
+
     it("replaces earlier resolvable context-window updates for the same turn", () => {
       const contextWindowActivity = (id: string, sequence: number, usedTokens: unknown) => ({
         id: EventId.make(id),
