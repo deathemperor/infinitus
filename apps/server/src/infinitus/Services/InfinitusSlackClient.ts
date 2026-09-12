@@ -1,13 +1,12 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 /**
  * Slack bridge (#574): the transport seam. The reactor (`Layers/InfinitusSlack.ts`)
  * reads inbound events and posts replies through this service only; the
- * Socket Mode client that fills it is its own PR. Text arrives plain
+ * Socket Mode client (`Layers/InfinitusSlackSocket.ts`) fills it. Text arrives plain
  * (the transport unwraps Slack's escaping and `<url|label>` links).
  */
 
@@ -59,9 +58,3 @@ export interface SlackClientShape {
 export class SlackClient extends Context.Service<SlackClient, SlackClientShape>()(
   "t3/infinitus/Services/InfinitusSlackClient/SlackClient",
 ) {}
-
-/** No transport yet: nothing arrives, and a post says so. */
-export const SlackClientInert = Layer.succeed(SlackClient)({
-  inbound: Stream.never,
-  post: () => Effect.fail(new SlackPostError({ reason: "no Slack transport" })),
-});

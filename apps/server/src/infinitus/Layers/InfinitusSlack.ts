@@ -34,6 +34,7 @@ import {
   type SlackInbound,
   type SlackPost,
 } from "../Services/InfinitusSlackClient.ts";
+import { OFFLINE_TEXT } from "./infinitusSlackSocket.logic.ts";
 import {
   activityLine,
   approvalMessage,
@@ -85,6 +86,8 @@ export const InfinitusSlackLive = Layer.effectDiscard(
     /** Per thread: what has been posted once (turn ids, PR states, request ids). */
     const posted = new Map<ThreadId, Set<string>>();
     const seenEnvelopes = new Set<string>();
+    /** Threads this process started or steered: told when it goes away. */
+    const liveThreads = new Set<ThreadId>();
 
     const oncePer = (threadId: ThreadId, key: string): boolean => {
       const set = posted.get(threadId) ?? new Set<string>();
@@ -245,6 +248,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
           interactionMode: "default",
           createdAt,
         });
+        liveThreads.add(threadId);
         yield* Effect.logInfo("infinitus.slack.started", {
           threadId,
           projectId: project.id,
@@ -270,6 +274,7 @@ export const InfinitusSlackLive = Layer.effectDiscard(
       Effect.gen(function* () {
         const command = replyCommand(event.text);
         if (command === null) return;
+        liveThreads.add(binding.threadId);
         const shell = Option.getOrUndefined(yield* shellOf(binding.threadId));
         if (shell === undefined || shell.archivedAt !== null) {
           return yield* postTo(binding, "That thread is gone.");
@@ -461,6 +466,19 @@ export const InfinitusSlackLive = Layer.effectDiscard(
       }).pipe(
         Effect.catchCause((cause) => Effect.logWarning("infinitus.slack.event-failed", { cause })),
       );
+
+    // A clean shutdown tells the threads this process was driving; a crash
+    // or a closed lid cannot (Socket Mode queues nothing), see the issue.
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach(
+        [...liveThreads],
+        (threadId) => {
+          const binding = byThread.get(threadId);
+          return binding === undefined ? Effect.void : postTo(binding, OFFLINE_TEXT);
+        },
+        { discard: true },
+      ),
+    );
 
     // Subscribe first so nothing published while the file loads is missed;
     // each handler waits for the load before it reads the maps.
