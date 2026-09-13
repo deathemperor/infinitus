@@ -550,15 +550,15 @@ export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
  * ISO 8601 strings because those decoders use `.iso8601`.
  */
 
-/** Which Live Activity a token drives: a `*-start` token lets the Mac start
-    the activity while the app is closed (iOS 17.2 push-to-start), a plain one
-    belongs to a running activity, `alert` is an ordinary notification token. */
+/** Which push a token takes: `alert` is an ordinary notification token;
+    `agent-activity-start` lets the Mac start the phone's lock-screen thread
+    card while the app is closed (iOS 17.2 push-to-start) and `agent-activity`
+    is a running card's own token (#1047). The Mac-driven session cards'
+    `working` / `revival` kinds retired with #1041. */
 export const InfinitusActivityPushKind = Schema.Literals([
-  "working-start",
-  "working",
-  "revival-start",
-  "revival",
   "alert",
+  "agent-activity-start",
+  "agent-activity",
 ]);
 export type InfinitusActivityPushKind = typeof InfinitusActivityPushKind.Type;
 

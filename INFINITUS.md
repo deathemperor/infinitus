@@ -926,8 +926,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Mac alerts / reset alarms
-  toggles, sending mode, the alerting Mac) after General.
+  `SettingsInfinitusSection` (Accounts row, Mac alerts / thread card (with
+  its test card, #1047) / reset alarms toggles, sending mode, the alerting
+  Mac) after General.
 - `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
   link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
   `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
@@ -939,13 +940,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
   token, so the Mac's pushes reach the phone as banners; it withdraws the
   kind with `activities-token --forget <deviceId>/<kind>` through
-  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702) and
-  `InfinitusNotificationPresenter` (the app's one foreground notification
-  handler: Infinitus notifications show as banners in-app, T3's keep the
-  no-handler default).
+  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702),
+  `InfinitusThreadCardBridge` (the lock-screen thread card's tokens, #1047:
+  the push-to-start token as `agent-activity-start` and each running
+  `AgentActivity` card's own token as `agent-activity`, re-read on every
+  foreground and after a local start; both withdrawn the same way when the
+  switch goes off) and `InfinitusNotificationPresenter` (the app's one
+  foreground notification handler: Infinitus notifications show as banners
+  in-app, T3's keep the no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
+  `infinitusThreadCardEnabled` (#1047, absent reads on) /
   `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
   `"queue" | "steer"`) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
@@ -1952,6 +1958,22 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
   device's clock format — the phone has no timestamp setting — null once
   the instant is past).
+- `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+
+  `liveActivityStarts.ts`, `testCard.logic.ts`) — the phone half of the
+  lock-screen thread card (#1047, part 2; the Mac's `push
+{kind: "thread.activity"}` is part 1, the server's fold part 3). The card
+  is upstream's `AgentActivity` Live Activity, untouched: the Mac pushes
+  its `{name, props}` envelope, so the phone only files tokens — the
+  push-to-start one and each running card's own — with the Mac it follows
+  (`pusherMac`) through `activities-token`, the alert kind's path, and
+  withdraws both kinds when Settings › Infinitus › "Thread card on the lock
+  screen" goes off (default on, iOS only). "Show a test card" starts the
+  card locally with a fabricated state (`TEST_CARD_STATE`, one row per
+  ranked phase), no APNs in the loop, so a blank card blames the widget and
+  a refusal (ActivityKit's message in an alert) blames the phone's settings;
+  with cards live the row ends them all. `packages/contracts/src/infinitus.ts`
+  `InfinitusActivityPushKind` is `alert | agent-activity-start |
+agent-activity` (the session cards' kinds retired with #1041).
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown

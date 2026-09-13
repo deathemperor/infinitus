@@ -7,10 +7,18 @@ import * as Schema from "effect/Schema";
 
 import type { InfinitusMac } from "../accounts/accountsRoute.logic";
 
-/** The token kind this app registers through the Mac's `activities-token`
-    verb: the plain notification token (`alert`, #702). The four Live Activity
-    kinds left with the Mac-driven cards (#1041). */
-export type LiveActivityTokenKind = "alert";
+/** The token kinds this app registers through the Mac's `activities-token`
+    verb: the plain notification token (`alert`, #702), and for the
+    lock-screen thread card (#1047) the push-to-start token
+    (`agent-activity-start`) plus each running card's own token
+    (`agent-activity`). The Mac-driven session cards' kinds left with #1041. */
+export type LiveActivityTokenKind = "alert" | "agent-activity-start" | "agent-activity";
+
+/** The two kinds the thread card bridge files and withdraws together. */
+export const AGENT_ACTIVITY_TOKEN_KINDS: ReadonlyArray<LiveActivityTokenKind> = [
+  "agent-activity-start",
+  "agent-activity",
+];
 
 /** Tokens are re-sent no more often than this unless they change. */
 export const TOKEN_RESEND_INTERVAL_MS = 60_000;

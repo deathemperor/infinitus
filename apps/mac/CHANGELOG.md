@@ -30,6 +30,9 @@ publishes the matching section as the GitHub release body.
 - Settings › Updates has a Nightly track — last night's build of everything from main — beside Release, and you can switch between the two either way (#1042).
 - Coding agents are found even when your shell takes too long to start: the desktop now also looks in the usual install folders (`~/.local/bin`, Homebrew, nvm, Volta, Bun) when its login-shell check times out or finds no `claude` (#1078).
 
+### Phone
+- Settings › Infinitus has "Thread card on the lock screen": a Live Activity of what your threads are doing, kept moving by the Mac over push with the app closed, plus a test card that needs no push (#1047).
+
 ## 0.5.0-alpha.7
 
 ### Mac
