@@ -126,7 +126,9 @@ final class SwapdMappingTests: XCTestCase {
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
         XCTAssertEqual(account.usageStatus, "ok")
-        XCTAssertEqual(account.stale, true)
+        // No `lastError`: the reading is old because the engine's own
+        // cadence spaced the polls, not because a fetch failed.
+        XCTAssertNil(account.stale, "cadence-stale is not a failed refresh")
         XCTAssertNil(SentinelNotes.note(for: account.usageStatus), "stale is not a sentinel")
         // Without this the row would be both noteless and dataless, and
         // `usage == nil` drops an account out of liveness and revival.
@@ -151,9 +153,47 @@ final class SwapdMappingTests: XCTestCase {
         """)
         let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
         XCTAssertEqual(account.usageStatus, "ok")
-        XCTAssertEqual(account.stale, true)
+        XCTAssertNil(account.stale, "cadence-stale is not a failed refresh")
         XCTAssertEqual(account.usage?.fiveHour?.pct, 41)
         XCTAssertEqual(account.usageAgeSeconds, 900)
+    }
+
+    /// swapd calls any reading older than 300 s `stale`, failed fetch or
+    /// not: an exhausted candidate is polled every 600 s on purpose
+    /// (`poll_policy.rs EXHAUSTED_INTERVAL_S`) and reads stale for the
+    /// second half of every cycle. Only `lastError` — set by a failed
+    /// fetch, cleared by the next good one — says the collector could
+    /// not refresh, so only that row wears the flag, with the reason.
+    func testStaleIsAFailedRefreshOnlyWhenTheEngineNamesTheError() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[
+          {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"","active":true,
+           "disabled":false,"preferred":false,"usageStatus":"stale","windows":[],
+           "lastError":"http-429","backoffUntil":"2026-09-09T01:10:00Z",
+           "lastGood":{"fetchedAt":"2026-09-09T00:00:00Z","ageSeconds":900,
+                       "windows":[{"kind":"5h","pct":41,"resetsAt":"2026-09-09T05:59:59Z"}]}}]}]}
+        """)
+        let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
+        XCTAssertEqual(account.stale, true)
+        XCTAssertEqual(account.staleReason, "http-429")
+        XCTAssertEqual(account.usage?.fiveHour?.pct, 41, "the last good numbers still show")
+        XCTAssertEqual(account.usageAgeSeconds, 900)
+    }
+
+    /// A fetch that failed after a still-fresh success (an active row is
+    /// polled every 180 s) leaves `lastError` on an `ok` row. The numbers
+    /// are current enough for the engine, so the row is not flagged.
+    func testAFreshRowWithALeftoverErrorIsNotStale() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[
+          {"slot":1,"email":"a@b.c","organizationName":"","organizationUuid":"","active":true,
+           "disabled":false,"preferred":false,"usageStatus":"ok",
+           "fetchedAt":"2026-09-09T00:57:00Z","ageSeconds":180,"lastError":"timeout",
+           "windows":[{"kind":"5h","pct":41,"resetsAt":"2026-09-09T05:59:59Z"}]}]}]}
+        """)
+        let account = SwapdMapping.fleets(from: list, now: now)[0].accounts[0]
+        XCTAssertNil(account.stale)
+        XCTAssertNil(account.staleReason)
     }
 
     /// A sentinel keeps `usage` nil even though the engine parked a

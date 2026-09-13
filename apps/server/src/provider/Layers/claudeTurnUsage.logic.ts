@@ -84,3 +84,63 @@ export function claudeTurnUsageDelta(
     ...(result?.modelUsage === undefined ? {} : { turnModels }),
   };
 }
+
+/**
+ * No prompt cache (#974): a proxy or endpoint that never serves a cache
+ * read makes every call re-send the whole context at full price and full
+ * latency, and nothing on screen says so. Counted per session from the
+ * assistant messages' `usage`: a call whose input is large and neither read
+ * nor wrote the cache is a miss, a call that read or wrote it is a hit and
+ * clears the run, a small call is neither. One warning per session, at
+ * `PROMPT_CACHE_MISS_RUN` misses in a row. A snapshot repeating a message
+ * id counts once.
+ */
+export const PROMPT_CACHE_MISS_RUN = 5;
+const PROMPT_CACHE_MIN_INPUT_TOKENS = 10_000;
+
+export interface PromptCacheWatch {
+  readonly misses: number;
+  readonly warned: boolean;
+  readonly lastMessageId: string | undefined;
+}
+
+export const INITIAL_PROMPT_CACHE_WATCH: PromptCacheWatch = {
+  misses: 0,
+  warned: false,
+  lastMessageId: undefined,
+};
+
+export interface PromptCacheVerdict {
+  readonly watch: PromptCacheWatch;
+  /** Set on the call that completes the run: what the warning carries. */
+  readonly warn: { readonly calls: number; readonly inputTokens: number } | undefined;
+}
+
+export function promptCacheVerdict(
+  watch: PromptCacheWatch,
+  messageId: string | undefined,
+  usage: unknown,
+): PromptCacheVerdict {
+  const none = { watch, warn: undefined };
+  if (messageId !== undefined && messageId === watch.lastMessageId) return none;
+  if (!usage || typeof usage !== "object") return none;
+  const record = usage as Record<string, unknown>;
+  const input = finiteNonNegative(record.input_tokens);
+  const hit =
+    (finiteNonNegative(record.cache_read_input_tokens) ?? 0) > 0 ||
+    (finiteNonNegative(record.cache_creation_input_tokens) ?? 0) > 0;
+  if (hit) return { watch: { ...watch, misses: 0, lastMessageId: messageId }, warn: undefined };
+  if (input === undefined || input < PROMPT_CACHE_MIN_INPUT_TOKENS) {
+    return { watch: { ...watch, lastMessageId: messageId }, warn: undefined };
+  }
+  const misses = watch.misses + 1;
+  const warn = misses === PROMPT_CACHE_MISS_RUN && !watch.warned;
+  return {
+    watch: { misses, warned: watch.warned || warn, lastMessageId: messageId },
+    warn: warn ? { calls: misses, inputTokens: input } : undefined,
+  };
+}
+
+export function promptCacheWarningText(calls: number): string {
+  return `No prompt cache: ${calls} calls in a row re-sent the whole context uncached. Each step is slower and costs full price; check the instance's proxy or endpoint.`;
+}

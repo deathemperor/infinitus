@@ -250,10 +250,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648), `InfinitusPushBridgeLive` after it (#269 G; provided its own
-  `InfinitusControlClientLive`, the one in `InfinitusLayerLive` being
-  private to that block — the visual pass, which runs the server from
-  source, is what catches a layer the tests only ever mock). `InfinitusSlackLive` (provided `SlackClientLive` over
+  (#648). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
@@ -482,7 +479,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `claudeTurnUsage.logic.ts`: the SDK's `total_cost_usd` / `modelUsage` are
   cumulative per query() session, so each result is differenced from the
   previous one (`lastResultTotals`, reset when the query reopens; a total
-  that went down means the session started over). Tokens come from the
+  that went down means the session started over). The same module's
+  `promptCacheVerdict` (#974) counts, per session, the assistant calls that
+  sent ≥ 10k input tokens with no cache read or write — a subagent's too —
+  and five in a row raise one `runtime.warning` ("No prompt cache: …"),
+  once per session; a call that read or wrote the cache clears the run. Tokens come from the
   per-turn `tokenUsage` every adapter normalizes, so Codex turns record too,
   with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
   dispatch, a `turn.completed` naming its turn dispatches the command
@@ -714,8 +715,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the new thread as on any open. A side question takes the detail's
   `latestTurn` once completed. The other drivers have no fork point.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
-  `ServerSettings` (default on) and `ServerSettingsPatch` (#648);
-  `infinitusPushBridge` (default on) the same way (#269 G); the
+  `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
   `PromptSnippet` schema with its caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on both
   (#270 G). `packages/shared/src/serverSettings.ts` —
@@ -1039,9 +1039,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the nine Infinitus
+- `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
   `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
+  Priority since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`,
@@ -1054,12 +1054,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   settings, `ThreadNotificationCoordinator`, the `Notification` API and two
   bundled sounds; ruling #1032, which retired the fork's #270 B banners over
   the Electron main process and the #270 H per-window completion sound).
-  The fork layers three things. In `ThreadNotificationCoordinator.tsx` (an
+  The fork layers a few things. In `ThreadNotificationCoordinator.tsx` (an
   upstream file, one registration point): `held` and `failed` threads
   notify like input does (the holds come from the environment's
   `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
   and the thread on screen stays quiet while the window has focus
-  (`quietForViewer`) — upstream posts and rings for it. The Dock badge
+  (`quietForViewer`) — upstream posts and rings for it. Next, #270 B's
+  queue rule: a turn that completes while the thread still has
+  `queuedTurns` neither posts nor rings
+  (`notificationKind`), since the #806 drain sends the next row the moment
+  the turn ends; the completion still counts as seen, so removing the queued
+  row afterwards rings nothing for it, and an approval or question rings
+  queued or not because the drain cannot pass it. The Dock badge
   (`desktopBadgeAttention`, on by default) counts the threads in approval
   or input through the `setBadgeCount` bridge method, the one IPC left
   (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`
@@ -1075,7 +1081,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   items, and the server's `thread.phase` push keeps `local: false` because
   the desktop's banner covers that screen.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all ten where no
+  Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -1084,9 +1090,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
   marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
   instead of the pairing form, so the browser does not spend a phone's token.
-- `apps/web/src/routes/settings.infinitus*.tsx` (ten new files in upstream's
+- `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
-  the catalog's `themes` / `animations` sections, #747 step 1, and Sessions
+  the catalog's `themes` / `animations` sections, #747 step 1, and Priority
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
   the Menu bar page keeps `display` + `about`; a section the build lacks
@@ -1170,7 +1176,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (mocked engine, projection, provider stream, settings, Slack client, an
   in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines, Profiles) and their pure logic, and the Devices
+  (preferences, Engines) and their pure logic, and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
@@ -1429,8 +1435,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the form; the CLI's own `error` is shown; the submitted value is never
   interpolated into any message. Closing the OAuth window never cancels;
   the page's Cancel sends `signin-cancel`.
-- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
-  — the five Settings › Infinitus routes, thin shells over the panes above.
+- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
+  — the four Settings › Infinitus routes, thin shells over the panes above.
+  Profiles (#165, the Mac's "named way to start a session") left with the
+  #1041 sessions sweep, its `profiles` contract with it; the fixture keeps
+  answering the verb until the Mac drops it.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
@@ -1650,34 +1659,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).
-  `Layers/InfinitusPushBridge.ts` (+ `infinitusPushBridge.logic.ts`) is the
-  push bridge (#269 G): the thread phases the relay's awareness ladder
-  already derives (`projectThreadAwareness`) go to the Mac's `push` verb
-  when a thread moves into one a person
-  acts on — waiting for approval, waiting for input, finished, failed — as
-  `{kind: "thread.phase", threadId, title, phase, local: false}` on the
-  request line's `secret` field (the manifest says `stdin: "payload"`),
-  through the control client directly; the Mac fans it out like its own
-  account events (the phone's alert token, Slack, Telegram), `local: false`
-  skipping its own Notification Center notice since the desktop's banner
-  (#1032) already covers that screen. Each
-  event's phase is recorded per thread before the socket call and the first
-  sighting of a thread pushes nothing, so a restart announces nothing and a
-  phase is pushed once; `starting` / `running` / `stale` never. The setting
-  is read before anything else, so a server with it off pays no projection
-  read per event. A snapshot that is unpolled or last saw the app down is
-  polled again for the manifest gate; an app without the verb or an
-  unreachable one drops the push, and so does an app whose `push` summary
-  does not name `local` (it would post a second banner beside the
-  desktop's). A thread the Slack bridge (#574) is armed for and reports in
-  a Slack thread of its own (`InfinitusSlackBindings.isBound`, the service
-  `InfinitusSlackLive` returns) gets `slack: false` too, only on an app
-  whose `push` summary names `slack` in lowercase (#1028; the older summary
-  said "Slack/Telegram"), so the Mac's own Slack webhook does not post a
-  second copy — Telegram and the phone still get it. Only thread ids and
-  phases reach the log. On by default,
-  off by the `infinitusPushBridge` server setting (the second row of the
-  same card).
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
   Mac whose socket is still quiet 3 s after the server starts it runs `open
 -g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
@@ -1938,12 +1919,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
   Infinitus control socket the visual pass runs against in CI: a Node net
   server speaking the one-line protocol that answers `manifest`, `status`,
-  `fleets`, `sessions`, `forecast`, `prefs`, `profiles`, `stats`, `events`,
-  `aws-logins`, `client-activity`, `lock-status` and `team-status` with canned
-  data. The manifest and the pref catalog are `infinitusctl` captures (every
-  value reset to its default); the accounts (`ada-fixture`…), the session,
-  the team ("Lighthouse"), the profiles (`nightly-review`) and the stats are
-  made up. Every write and every unknown verb is refused with `ok: false`;
+  `fleets`, `forecast`, `prefs`, `profiles`, `stats`, `events`, `aws-logins`,
+  `client-activity` and `lock-status` with canned data. The manifest and
+  the pref catalog are `infinitusctl` captures (every value reset to its
+  default); the accounts (`ada-fixture`…), the profiles (`nightly-review`)
+  and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
@@ -1956,17 +1936,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
-
-- `packages/contracts/src/agentSessions.ts`,
-  `apps/server/src/project/AgentSessionScanner.ts`,
-  `apps/server/src/project/AgentSessionImporter.ts` — fork extension of
-  upstream's session import (#648): `AgentSessionImportInput.providerSessionIds`
-  (optional) filters the scanner to those transcript names before any budget
-  is spent (filtered-out files are neither imported nor counted as skipped),
-  and `AgentSessionImportResult.threads` (present only with a filter) lists
-  `{providerSessionId, threadId}` for each requested session that now has a
-  thread, imported now or earlier. Without the field the RPC behaves exactly
-  as upstream.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default

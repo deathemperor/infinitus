@@ -18,7 +18,6 @@ import {
   createLucideIcon,
   GaugeIcon,
   GitBranchIcon,
-  IdCardIcon,
   InfinityIcon,
   KeyboardIcon,
   Link2Icon,
@@ -104,7 +103,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/infinitus/notifications": BellIcon,
   "/settings/infinitus/devices": SmartphoneIcon,
   "/settings/infinitus/engines": CpuIcon,
-  "/settings/infinitus/profiles": IdCardIcon,
   "/settings/archived": ArchiveIcon,
 };
 
@@ -118,7 +116,6 @@ const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath
   "/settings/infinitus/notifications",
   "/settings/infinitus/devices",
   "/settings/infinitus/engines",
-  "/settings/infinitus/profiles",
 ]);
 
 const SETTINGS_NAV_ITEMS: ReadonlyArray<{

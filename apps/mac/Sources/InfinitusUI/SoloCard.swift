@@ -30,11 +30,10 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                     Text(plan).font(PopupFont.caption).foregroundStyle(.secondary)
                         .instantTip("Subscription: \(account.plan ?? "?")")
                 }
-                if let age = cells.staleAge {
-                    Text("· \(age)").font(PopupFont.caption).foregroundStyle(.orange)
+                if let stale = cells.staleAge {
+                    Text("· \(stale.label)").font(PopupFont.caption).foregroundStyle(.orange)
                         .fixedSize()
-                        .instantTip("Usage from \(age) — swapd could not "
-                                    + "refresh this account; it retries on its own")
+                        .instantTip(stale.tip)
                 }
                 Spacer(minLength: 12)
                 cells.cashCell
@@ -49,8 +48,8 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                 cells.readyCell
             } else {
                 // Dead rows keep their windows: the reset time is the
-                // whole point when there is no other account to use.
-                if cells.showAsDead { cells.deadCell }
+                // whole point when there is no other account to use. The
+                // blocking window's row IS the dead line.
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                     GridRow { cells.windowCell(account.usage?.fiveHour, session: true) }
                     GridRow { cells.windowCell(account.usage?.sevenDay, session: false) }

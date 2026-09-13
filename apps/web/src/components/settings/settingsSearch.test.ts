@@ -179,7 +179,6 @@ describe("searchSettings", () => {
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
-      "infinitus-profiles",
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });
@@ -222,7 +221,6 @@ describe("searchSettings", () => {
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
-      "infinitus-profiles",
     ]);
   });
 

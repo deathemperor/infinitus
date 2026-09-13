@@ -15,15 +15,13 @@ const ALWAYS_ON_SCREEN = [
   "Menu bar",
   "Themes",
   "Animations",
-  "Sessions",
+  "Priority",
   "Lock",
   "Team",
   "Notifications",
   "Devices",
   "Engines",
-  "Profiles",
   "Unlocking",
-  "Session profiles",
   "Engine status",
   "Pairing requests",
   "Utilization",
@@ -42,7 +40,6 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/notifications",
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
-      "/settings/infinitus/profiles",
       "/utilization",
       "/stats",
     ]);
@@ -92,7 +89,7 @@ describe("checkVisualPass", () => {
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[10]!, FORK_VISUAL_ROUTES[9]!],
+      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[9]!, FORK_VISUAL_ROUTES[8]!],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],
