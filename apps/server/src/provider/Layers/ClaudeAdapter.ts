@@ -589,7 +589,10 @@ function terminalResultError(
     case "turn_setup_failed":
       return "Claude could not start the turn.";
     case "blocking_limit":
-      return "Claude stopped: a usage limit blocked the request.";
+      // The CLI's prompt-too-long gate, not a usage limit: the prompt was
+      // already over the window when the turn was assembled, so autocompact
+      // never ran or did not free enough (its telemetry is `tengu_ptl_*`).
+      return "Claude stopped: the prompt exceeds the model's context window.";
     case "rapid_refill_breaker":
       return "Claude stopped: the context refilled too quickly after compaction.";
     case "prompt_too_long":
@@ -601,6 +604,17 @@ function terminalResultError(
     default:
       return undefined;
   }
+}
+
+/**
+ * Whether a turn's account was refusing it on a usage window when it ended —
+ * the same evidence `failureHint` is built from. Emitted structurally on
+ * `turn.completed` (#648) so a reader never has to match the error prose.
+ */
+function turnUsageLimited(turn: ClaudeTurnState | undefined): boolean {
+  return (
+    turn !== undefined && (turn.rejectedRateLimitTypes.size > 0 || turn.latestAssistantRateLimited)
+  );
 }
 
 function isInterruptedResult(result: SDKResultMessage): boolean {
@@ -2838,6 +2852,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           ? { turnModels: turnUsageDelta.turnModels }
           : {}),
         ...(errorMessage ? { errorMessage } : {}),
+        ...(turnUsageLimited(turnState) ? { usageLimited: true } : {}),
         tokenUsage: normalizeClaudeTurnTokenUsage(result, turnState.hasSubagents, status),
       },
       providerRefs: nativeProviderRefs(context),

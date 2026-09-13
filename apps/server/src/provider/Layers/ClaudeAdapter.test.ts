@@ -2322,6 +2322,20 @@ describe("ClaudeAdapterLive", () => {
       state: "failed",
       errorMessage: /prompt exceeds the model's context window/,
     },
+    // `blocking_limit` is the CLI's prompt-too-long gate — autocompact ran
+    // too early or freed too little — and reads like its sibling above, not
+    // like a usage limit.
+    {
+      name: "the context-window gate",
+      result: {
+        subtype: "success",
+        is_error: false,
+        terminal_reason: "blocking_limit",
+        errors: [],
+      },
+      state: "failed",
+      errorMessage: /prompt exceeds the model's context window/,
+    },
     {
       name: "a listed tool failure",
       result: {
@@ -2436,6 +2450,8 @@ describe("ClaudeAdapterLive", () => {
         payload.errorMessage,
         "Claude usage limit reached. Send the message again once the limit resets.",
       );
+      // Resume-on-limit (#648) reads this, never the wording above.
+      assert.equal(payload.usageLimited, true);
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
@@ -2898,6 +2914,14 @@ describe("ClaudeAdapterLive", () => {
         if (completed._tag === "Some" && completed.value.type === "turn.completed") {
           assert.equal(completed.value.payload.state, "failed", reason);
           assert.ok(completed.value.payload.errorMessage, `${reason} carries an error message`);
+          // No usage window rejected this turn, so nothing reads it as a
+          // limit stop — `blocking_limit` above all, which is the CLI's
+          // prompt-too-long gate and once said "a usage limit" outright.
+          assert.equal(
+            completed.value.payload.usageLimited,
+            undefined,
+            `${reason} is not a usage limit`,
+          );
         }
       }).pipe(
         Effect.provideService(Random.Random, makeDeterministicRandomService()),

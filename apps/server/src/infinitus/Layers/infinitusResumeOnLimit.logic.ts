@@ -62,15 +62,14 @@ export interface LimitStop {
   readonly proxy: string | null;
 }
 
-/** The adapter's own two wordings for a limit-ended turn — fixed strings in
-    this repo, not the CLI's; matched so the failed variant is caught too. */
-const LIMIT_FAILURE = /usage limit/i;
-
 /**
- * The limit stop one runtime event reports, or null. A parked turn arrives as
- * the adapter's `runtime.warning` carrying the SDK's `rate_limit_info` with
- * `status: "rejected"` (never matched on the message text); a failed one as a
- * `turn.completed` whose state is `failed` with the adapter's limit wording.
+ * The limit stop one runtime event reports, or null. Both arms read structured
+ * evidence, never the adapter's prose: a parked turn arrives as the adapter's
+ * `runtime.warning` carrying the SDK's `rate_limit_info` with
+ * `status: "rejected"`; a failed one as a `turn.completed` whose state is
+ * `failed` and whose payload carries `usageLimited`. Matching the error text
+ * instead read every wording with "usage limit" in it as a stop — including
+ * the CLI's context-window gate, whose message said so until it was reworded.
  */
 export function limitStopFromEvent(
   event: ProviderRuntimeEvent,
@@ -107,8 +106,7 @@ export function limitStopFromEvent(
   if (
     event.type === "turn.completed" &&
     event.payload.state === "failed" &&
-    event.payload.errorMessage !== undefined &&
-    LIMIT_FAILURE.test(event.payload.errorMessage)
+    event.payload.usageLimited === true
   ) {
     return { ...base, kind: "failed", resetsAt: null };
   }
