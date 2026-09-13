@@ -102,9 +102,12 @@ export const PREF_COPY: Readonly<
     label: "Transparency",
     description: "Higher is clearer, lower is frostier; one value for every state.",
   },
+  // The one surface left that draws it is the Infinitus iOS app's chat; the
+  // Mac's own chat window went with the sessions sweep (#1041), so the row no
+  // longer describes anything on this machine (#1068).
   chat_header: {
     label: "Chat header",
-    description: "What a session's chat wears above the transcript.",
+    description: "What the Infinitus iOS app's chat wears above the transcript.",
     choices: { compact: "Compact", strip: "Stat strip", hud: "Game HUD" },
   },
   // Themes.
