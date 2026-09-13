@@ -4397,7 +4397,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                   // is what the real query returns: rows completed at or after
                   // `since`. Two minutes in, and no `durationMs`, so each turn
                   // counts whole (#1127).
-                  const inside = new Date(Date.parse(since) + 2 * 60_000).toISOString();
+                  const inside = DateTime.formatIso(
+                    DateTime.addDuration(DateTime.makeUnsafe(since), Duration.minutes(2)),
+                  );
                   return [
                     {
                       threadId: ThreadId.make("thread-a"),
