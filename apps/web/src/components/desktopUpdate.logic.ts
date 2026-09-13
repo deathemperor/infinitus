@@ -196,3 +196,20 @@ export function getDesktopUpdateArmedDialog(count: number): {
 export function getDesktopUpdateArmedTooltip(count: number): string {
   return `Installs when ${runningThreadsPhrase(count)} finish${count === 1 ? "es" : ""}. Click to cancel.`;
 }
+
+/**
+ * What the armed "Install when they finish" wait does on a state change
+ * (#829, #1037). The wait outlives a poll that reads "checking" and a newer
+ * release that supersedes the downloaded one (the fork channel downloads it on
+ * its own); it is dropped only when nothing is left to install at all.
+ */
+export function resolveInstallWhenIdleStep(
+  state: DesktopUpdateState | null,
+  action: DesktopUpdateButtonAction,
+  runningLocalTurns: number | null,
+): "install" | "wait" | "disarm" {
+  if (!state || (state.downloadedVersion === null && state.availableVersion === null)) {
+    return "disarm";
+  }
+  return action === "install" && runningLocalTurns === 0 ? "install" : "wait";
+}

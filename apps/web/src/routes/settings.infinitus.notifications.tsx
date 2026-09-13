@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { DesktopNotificationSettings } from "../components/settings/DesktopNotificationSettings";
+import { DesktopBadgeSettings } from "../components/settings/DesktopBadgeSettings";
 import { InfinitusPrefsPanel } from "../components/settings/infinitus/InfinitusPrefsPanel";
 
 function SettingsInfinitusNotificationsRoute() {
@@ -8,7 +8,7 @@ function SettingsInfinitusNotificationsRoute() {
     <InfinitusPrefsPanel
       sectionSlugs={["push"]}
       title="Notifications"
-      lead={<DesktopNotificationSettings />}
+      lead={<DesktopBadgeSettings />}
     />
   );
 }

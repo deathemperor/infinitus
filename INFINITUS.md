@@ -877,8 +877,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Live Activity / Mac alerts /
-  reset alarms toggles, pusher Mac) after General.
+  `SettingsInfinitusSection` (Accounts row, Mac alerts / reset alarms
+  toggles, sending mode, the alerting Mac) after General.
 - `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
   link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
   `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
@@ -886,18 +886,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Mac's origin travels in the fragment the site never sees, `to` is taken as
   a bare http(s) origin only, and the sheet fills Host and code like a
   scanned QR (#746) — the same rewrite runs on the in-app scanner's payload
-  and on the route's `pairingUrl`. Mounts `InfinitusLiveActivityBridge` (Live
-  Activity token registration with the Mac), `InfinitusAlarmsBridge`
+  and on the route's `pairingUrl`. Mounts `InfinitusAlarmsBridge`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
-  token, so the Mac's pushes reach the phone as banners; both bridges
-  withdraw their kinds with `activities-token --forget <deviceId>/<kind>`
-  through `pushForget.ts` / `pushForget.logic.ts` when their switch goes off,
-  #702) and
+  token, so the Mac's pushes reach the phone as banners; it withdraws the
+  kind with `activities-token --forget <deviceId>/<kind>` through
+  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702) and
   `InfinitusNotificationPresenter` (the app's one foreground notification
   handler: Infinitus notifications show as banners in-app, T3's keep the
   no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
-  `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
+  `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
   `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
   `"queue" | "steer"`) keys (interface and sanitizer).
@@ -1005,8 +1003,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
-  (active account + fullest window of the Mac the list follows, plus its
-  waiting-session count) before the filter button, in the Android header; its
+  (active account + fullest window of the Mac the list follows) before the
+  filter button, in the Android header; its
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
@@ -1019,47 +1017,36 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
-- `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
-  `components/desktop/InfinitusCompletionSoundCoordinator.tsx`,
-  `components/settings/InfinitusCompletionSoundRow.tsx`,
-  `assets/infinitus-completion-chime.wav`) — the completion sound (#270 H):
-  a turn finishing on any thread while the window is hidden or unfocused
-  rings the picked sound (Chime, or the SnapShot Whoosh / Click), off by
-  default. The preference is per window in localStorage
-  (`infinitus:completion-sound:v1`), not a client setting: a sound belongs
-  to the machine that plays it. `turnsJustCompleted` rings only for threads
-  the window already knew (a bootstrap seeds, never rings). Registration
-  points: the coordinator mounted from `__root.tsx` beside
-  `SnapShotCoordinator`, the row from `SnapShotSettings.tsx` after the
-  capture sound, and the `completion-sound` search item in
-  `settingsSearch.ts`.
-- `apps/web/src/lib/desktopNotifications.logic.ts`,
-  `apps/web/src/components/desktop/DesktopNotificationCoordinator.tsx`,
-  `apps/web/src/components/settings/DesktopNotificationSettings.tsx`,
+- `apps/web/src/lib/infinitusNotifications.logic.ts`,
+  `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`,
+  `apps/web/src/components/desktop/NotificationModeMigration.tsx`,
+  `apps/web/src/components/settings/DesktopBadgeSettings.tsx`,
   `apps/desktop/src/electron/ElectronNotification.ts`,
-  `apps/desktop/src/ipc/methods/notifications.ts` — the desktop's OS
-  notifications and Dock badge (#270 B). The renderer decides: one banner
-  per thread this window already knew that moves into approval, input,
-  held or failed, or (off by default) reaches a completed turn it had not
-  seen completed — the completion sound's rule; the thread on screen while
-  the window is focused stays quiet. The badge counts the threads in
-  approval or input. The main process only shows (`Electron.Notification`,
-  a no-op where unsupported) and, on a click, reveals the window on the
-  thread over `NOTIFICATION_ACTIVATED_CHANNEL` (`DesktopWindow.
-dispatchNotificationActivated`). Fork-thread events only: the account
-  events (a limit, every account dead, revived) stay the native app's
-  Notification Center items. Six client-setting booleans
-  (`desktopNotifyOn*`, `desktopBadgeAttention`) in
-  `packages/contracts/src/settings.ts`; the `DesktopBridge` methods
-  `postNotification` / `setBadgeCount` / `onNotificationActivated` and the
-  `DesktopNotificationRequest` / `DesktopNotificationActivated` schemas in
-  `packages/contracts/src/ipc.ts`, all optional. Registration points: the
-  coordinator mounted from `__root.tsx` after the completion sound (primary
-  environment authenticated), the settings section as the notifications
-  pane's `lead`, the `desktop-notify-*` / `desktop-badge` search items, the
-  three channels in `apps/desktop/src/ipc/channels.ts`, the two handlers in
-  `DesktopIpcHandlers.ts`, `ElectronNotification.layer` in `main.ts`, and
-  the preload's `isNotificationActivated` guard.
+  `apps/desktop/src/ipc/methods/notifications.ts` — thread notifications
+  and sounds are upstream's (#11481: `notificationMode` on the client
+  settings, `ThreadNotificationCoordinator`, the `Notification` API and two
+  bundled sounds; ruling #1032, which retired the fork's #270 B banners over
+  the Electron main process and the #270 H per-window completion sound).
+  The fork layers three things. In `ThreadNotificationCoordinator.tsx` (an
+  upstream file, one registration point): `held` and `failed` threads
+  notify like input does (the holds come from the environment's
+  `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
+  and the thread on screen stays quiet while the window has focus
+  (`quietForViewer`) — upstream posts and rings for it. The Dock badge
+  (`desktopBadgeAttention`, on by default) counts the threads in approval
+  or input through the `setBadgeCount` bridge method, the one IPC left
+  (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`
+  and the `desktop-badge` search item. `NotificationModeMigration`, mounted
+  from `__root.tsx`, maps a client's old settings onto `notificationMode`
+  once (`legacyNotificationMode`: the four banner toggles — absent counts
+  as on, and only on a desktop shell — and the old
+  `infinitus:completion-sound:v1` switch), only while the mode still reads
+  `off`, then marks `infinitus:notification-mode:migrated:v1`; the four
+  toggles stay in `ClientSettingsSchema` as optional inputs and are never
+  written again. Fork-thread events only: the account events (a limit,
+  every account dead, revived) stay the native app's Notification Center
+  items, and the server's `thread.phase` push keeps `local: false` because
+  the desktop's banner covers that screen.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all ten where no
   connected server reaches an Infinitus app.
@@ -1431,8 +1418,8 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
   the `t3-code` MCP server id, the `t3code/<version>` UA token, upstream URLs,
   "T3 Connect").
-- `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels, the
-  Live Activity title, the auth device label and the `infinitus` variant's
+- `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
+  the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
   `production` variants keep their upstream names (they build the real T3 Code
   app side by side), the `t3code` URL scheme and bundle ids stay, and the
@@ -1638,15 +1625,15 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   Settings › Infinitus).
   `Layers/InfinitusPushBridge.ts` (+ `infinitusPushBridge.logic.ts`) is the
   push bridge (#269 G): the thread phases the relay's awareness ladder
-  already derives (`projectThreadAwareness`, what the phone's Live Activity
-  draws) go to the Mac's `push` verb when a thread moves into one a person
+  already derives (`projectThreadAwareness`) go to the Mac's `push` verb
+  when a thread moves into one a person
   acts on — waiting for approval, waiting for input, finished, failed — as
   `{kind: "thread.phase", threadId, title, phase, local: false}` on the
   request line's `secret` field (the manifest says `stdin: "payload"`),
   through the control client directly; the Mac fans it out like its own
   account events (the phone's alert token, Slack, Telegram), `local: false`
   skipping its own Notification Center notice since the desktop's banner
-  (#270 B) already covers that screen. Each
+  (#1032) already covers that screen. Each
   event's phase is recorded per thread before the socket call and the first
   sighting of a thread pushes nothing, so a restart announces nothing and a
   phase is pushed once; `starting` / `running` / `stale` never. The setting
@@ -1759,8 +1746,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `@t3tools/client-runtime/state/infinitusAccounts`). The per-Mac Sessions
   card it carried (rows from `@t3tools/client-runtime/state/infinitusSessions`,
   "Move to a thread" over `agentSessions.import`) was dropped on the #941
-  walk — the phone's surface is threads; only `sessions.logic.ts`'s
-  `attentionSessionCount` (the home chip's badge) remains.
+  walk, and the home chip's waiting-session badge (`sessions.logic.ts`)
+  with the #1041 sweep — the phone's surface is threads, and nothing on it
+  reads `@t3tools/client-runtime/state/infinitusSessions` any more.
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -1895,23 +1883,16 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
-- `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
-  `apps/mobile/src/widgets/InfinitusRevival.tsx`,
-  `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
-  Mac-driven Live Activity: layouts (content = native's activity states),
-  token registration, settings. `testCard.logic.ts` (#845) backs the
-  section's "Show a test card" row (iOS, under the Live Activity switch):
-  one press starts `InfinitusWorking` locally with a fabricated state, no
-  APNs in the loop, so a blank card blames the widget and a refusal
-  (ActivityKit's message in an alert) blames the phone's settings; with
-  working cards live the same row reads "End the working card(s)" and ends
-  them all — the Mac cannot end a card it never got an update token for.
-  A started test card bumps `liveActivityStarts.ts`'s atom, which
-  `InfinitusLiveActivityBridge` watches to re-scan the live cards and file
-  the new card's `working` update token with the Mac (the bridge otherwise
-  scans only at mount and on foreground); `pushRegistration.ts` logs a
-  refused `activities-token` (`[infinitus-push]`) since the bridges send
-  with `reportFailure: false`.
+- `apps/mobile/src/features/infinitus/liveActivity.logic.ts`,
+  `pushRegistration.ts`, `pushForget.ts` — the phone's `activities-token`
+  registration with the Mac, now for the `alert` kind alone: the Mac-driven
+  Live Activity (the `InfinitusWorking` / `InfinitusRevival` cards, their
+  bridge, the Settings switch and the #845 test card) went with the #1041
+  sweep — its content was the Mac's terminal-session states; a card drawn
+  from thread phases is the follow-up filed there. `pusherMac` still picks
+  the Mac the alerts come from (`infinitusLiveActivityMac`).
+  `pushRegistration.ts` logs a refused `activities-token`
+  (`[infinitus-push]`) since the bridge sends with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.

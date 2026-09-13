@@ -24,8 +24,8 @@ describe("tokenSender (#845)", () => {
       return { _tag: "Success" as const };
     });
     const send = tokenSender({ environmentId, run, isCancelled: () => false });
-    await send("working", "tok-1");
-    await send("working", "tok-1");
+    await send("alert", "tok-1");
+    await send("alert", "tok-1");
     expect(commands).toEqual(["activities-token"]);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -39,12 +39,12 @@ describe("tokenSender (#845)", () => {
       })
       .mockResolvedValueOnce({ _tag: "Success" as const });
     const send = tokenSender({ environmentId, run, isCancelled: () => false });
-    await send("working", "tok-1");
+    await send("alert", "tok-1");
     expect(warn).toHaveBeenCalledWith(
       "[infinitus-push] token registration failed",
-      expect.objectContaining({ kind: "working", error: "Error: forbidden" }),
+      expect.objectContaining({ kind: "alert", error: "Error: forbidden" }),
     );
-    await send("working", "tok-1");
+    await send("alert", "tok-1");
     expect(run).toHaveBeenCalledTimes(2);
   });
 });

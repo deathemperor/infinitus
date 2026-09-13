@@ -30,6 +30,7 @@ import {
   getDesktopUpdateInstallConfirmationMessage,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
+  resolveInstallWhenIdleStep,
   shouldShowArm64IntelBuildWarning,
   shouldToastDesktopUpdateActionResult,
 } from "../desktopUpdate.logic";
@@ -241,27 +242,16 @@ function SidebarUpdateControl() {
   }, []);
 
   // #829: "Install when they finish" — fire once the count reaches zero and
-  // the install action is back (the 4-minute poll reads as "checking" for a
-  // moment, with the downloaded build kept: that is no reason to disarm);
-  // drop the arming only when nothing is left to install.
+  // the install action is back. The wait survives the 4-minute poll reading
+  // "checking" and a newer release replacing the downloaded one (#1037);
+  // it is dropped only when nothing is left to install.
   useEffect(() => {
     if (!installWhenIdle) return;
-    if (!state?.downloadedVersion) {
-      setInstallWhenIdle(false);
-      return;
-    }
-    if (action === "install" && runningLocalTurns === 0) {
-      setInstallWhenIdle(false);
-      installNow();
-    }
-  }, [
-    action,
-    installNow,
-    installWhenIdle,
-    runningLocalTurns,
-    setInstallWhenIdle,
-    state?.downloadedVersion,
-  ]);
+    const step = resolveInstallWhenIdleStep(state, action, runningLocalTurns);
+    if (step === "wait") return;
+    setInstallWhenIdle(false);
+    if (step === "install") installNow();
+  }, [action, installNow, installWhenIdle, runningLocalTurns, setInstallWhenIdle, state]);
 
   const handleAction = useCallback(async () => {
     const bridge = window.desktopBridge;
