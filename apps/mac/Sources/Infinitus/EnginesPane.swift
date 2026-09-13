@@ -325,7 +325,6 @@ struct EngineToggleNotes: View {
 /// assumes the binary may be missing.
 struct SwapdEnginePane: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var reliability: ResumeReliabilityModel
 
     var body: some View {
         Form {
@@ -360,8 +359,6 @@ struct SwapdEnginePane: View {
                      + "reads or touches your real accounts; flipping this restarts the app.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
-            ResumeNudgesSection(service: model.resume)
-            ResumeReliabilitySection(model: reliability)
             Section {
                 LabeledContent("Binary") {
                     Text(model.swapd?.binaryPath ?? "not found")

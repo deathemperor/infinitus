@@ -21,8 +21,13 @@ on:
         description: "Publish the build on the rolling nightly release (main only)"
         type: boolean
         default: false
+# Read-only token by default (#1065): only the two jobs that touch the repo
+# hold `contents: write` — `publish` for the release, and `build` because a
+# reusable call is validated per nested job, skipped ones included, so the
+# callee's own tag-gated `publish` (write) must fit under the caller's grant;
+# the callee's build jobs still run with the `read` they declare.
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: infinitus-nightly
   cancel-in-progress: false
@@ -46,6 +51,8 @@ jobs:
   build:
     name: Build
     needs: version
+    permissions:
+      contents: write
     uses: ./.github/workflows/infinitus-release.yml
     with:
       version: ${{ needs.version.outputs.version }}
@@ -56,6 +63,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.publish == true)
     needs: [version, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:

@@ -1973,6 +1973,7 @@ function OpenCommandPaletteDialog(props: {
         "grouping",
         "checkout",
         "remove",
+        "infinitus.json",
         "t3.json",
       ],
       title: "Project settings",

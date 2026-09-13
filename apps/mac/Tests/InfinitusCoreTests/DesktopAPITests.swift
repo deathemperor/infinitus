@@ -80,6 +80,23 @@ final class DesktopAPITests: XCTestCase {
         }
     }
 
+    /// The descriptor's `platform` is an object, and every desktop verb reads
+    /// the descriptor first — decoding it as a string failed them all.
+    func testDescriptorDecodesThePlatformObject() throws {
+        let log = Log()
+        let body = """
+        {"environmentId":"env-1","label":"HyperNovae","platform":{"os":"darwin","arch":"arm64","machine":"laptop"},
+         "serverVersion":"0.5.0-alpha.7","capabilities":{"infinitus":true},"lanHttpBaseUrls":["http://192.168.2.19:3773"]}
+        """
+        let d = try api([(200, body)], log: log).descriptor()
+        XCTAssertEqual(d.environmentId, "env-1")
+        XCTAssertEqual(d.platform?.os, "darwin")
+        XCTAssertEqual(d.platform?.machine, "laptop")
+        XCTAssertEqual(d.serverVersion, "0.5.0-alpha.7")
+        XCTAssertEqual(log.calls[0].url, "http://127.0.0.1:3773/.well-known/t3/environment")
+        XCTAssertNil(try api([(200, "{\"environmentId\":\"env-1\",\"label\":\"No platform\"}")], log: Log()).descriptor().platform)
+    }
+
     func testHoldsAreEmptyOnADesktopWithoutTheRouteAndSessionAcceptedReadsTheAuthenticatedFlag() throws {
         let log = Log()
         let a = api([(404, "not found"), (200, "[{\"threadId\":\"t2\",\"since\":\"2026-09-12T00:00:00Z\",\"summary\":\"at limit\",\"kind\":\"held\"}]"),

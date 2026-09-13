@@ -406,7 +406,6 @@ extension FleetState: FleetModel {
     var reviveLead: TimeInterval { host.reviveLead }
     var burnStyle: String { host.burnStyle }
     var popupLayout: String { host.popupLayout }
-    var waitingResume: Int? { host.waitingResume }
     var fillScale: Double { host.fillScale }
     var isPlayground: Bool { host.isPlayground }
     var sessionsShown: Bool {

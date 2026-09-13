@@ -6,6 +6,7 @@ import {
 } from "@t3tools/contracts";
 import {
   InfinitusCommandFailed,
+  type InfinitusCommandInput,
   type InfinitusManifestCommand,
   type InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
@@ -23,10 +24,6 @@ import { describe, expect } from "vite-plus/test";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
-import {
-  InfinitusControlClient,
-  type InfinitusControlRequestInput,
-} from "../Services/InfinitusControlClient.ts";
 import { InfinitusSignInLapseLive } from "./InfinitusSignInLapse.ts";
 import { SIGN_IN_MARKER_KIND } from "./infinitusSignInLapse.logic.ts";
 
@@ -86,6 +83,16 @@ const manifest = (...names: ReadonlyArray<string>): InfinitusSnapshot => ({
   fleets: [],
   commands: names.map(command),
 });
+const withLogin = (phase: string, profile = "default"): InfinitusSnapshot => ({
+  ...manifest("aws-login", "gcloud-login"),
+  awsLogins: [
+    {
+      profile,
+      flow: "local",
+      state: { profile, flow: "local", phase, startedAt: 0 },
+    },
+  ],
+});
 const notPolled: InfinitusSnapshot = {
   available: false,
   unavailableReason: "not polled",
@@ -101,7 +108,7 @@ const makeHarness = (input: {
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
-    const requests = yield* Ref.make<ReadonlyArray<InfinitusControlRequestInput>>([]);
+    const requests = yield* Ref.make<ReadonlyArray<InfinitusCommandInput>>([]);
     const current = yield* Ref.make(input.snapshot ?? manifest("aws-login", "gcloud-login"));
     const layer = InfinitusSignInLapseLive.pipe(
       Layer.provide(
@@ -123,10 +130,7 @@ const makeHarness = (input: {
             refresh: Ref.set(current, input.polled ?? manifest("aws-login", "gcloud-login")),
             changes: () => Stream.empty,
             observed: Stream.empty,
-          }),
-          Layer.mock(InfinitusControlClient)({
-            socketPath: "/tmp/test.sock",
-            request: (request) =>
+            command: (request) =>
               Ref.update(requests, (list) => [...list, request]).pipe(
                 Effect.andThen(input.reply ?? Effect.succeed({ state: {} })),
               ),
@@ -161,7 +165,7 @@ const makeHarness = (input: {
         ),
       ),
       logins: Ref.get(requests).pipe(
-        Effect.map((list) => list.map((request) => [request.command, ...(request.args ?? [])])),
+        Effect.map((list) => list.map((request) => [request.command, ...request.args])),
       ),
     };
   });
@@ -196,7 +200,7 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
     }),
   );
 
-  effectIt.effect("once per thread per provider an hour; another thread is its own need", () =>
+  effectIt.effect("once per thread per profile an hour; another thread is its own need", () =>
     Effect.gen(function* () {
       const h = yield* makeHarness({});
       yield* h.emit(toolResult(one, SSO_EXPIRED));
@@ -218,12 +222,49 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
     }),
   );
 
+  effectIt.effect("a second profile lapsing in the same hour is its own need", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({});
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile papaya"));
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile banyan"));
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile papaya"));
+      expect((yield* h.rows).map((row) => row.summary)).toEqual([
+        "AWS sign-in needed on papaya",
+        "AWS sign-in needed on banyan",
+      ]);
+      expect(yield* h.logins).toEqual([
+        ["aws-login", "papaya"],
+        ["aws-login", "banyan"],
+      ]);
+    }),
+  );
+
   effectIt.effect("an app without the verb gets the row and no request", () =>
     Effect.gen(function* () {
       const h = yield* makeHarness({ snapshot: manifest("status") });
       yield* h.emit(toolResult(one, SSO_EXPIRED));
       expect((yield* h.rows).length).toBe(1);
       expect(yield* h.logins).toEqual([]);
+    }),
+  );
+
+  effectIt.effect("a login already waiting on a person is left alone", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({ snapshot: withLogin("waitingForBrowser") });
+      yield* h.emit(toolResult(one, SSO_EXPIRED));
+      expect((yield* h.rows).length).toBe(1);
+      expect(yield* h.logins).toEqual([]);
+    }),
+  );
+
+  effectIt.effect("a login that finished or failed does not block the next one", () =>
+    Effect.gen(function* () {
+      const done = yield* makeHarness({ snapshot: withLogin("done") });
+      yield* done.emit(toolResult(one, SSO_EXPIRED));
+      expect(yield* done.logins).toEqual([["aws-login", "default"]]);
+      const other = yield* makeHarness({ snapshot: withLogin("starting", "banyan") });
+      yield* other.emit(toolResult(one, SSO_EXPIRED));
+      expect(yield* other.logins).toEqual([["aws-login", "default"]]);
     }),
   );
 

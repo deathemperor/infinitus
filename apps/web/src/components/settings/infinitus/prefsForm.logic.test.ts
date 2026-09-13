@@ -155,6 +155,30 @@ describe("buildPrefSections controls", () => {
     expect(PREF_COPY.brand_new_knob).toBeUndefined();
   });
 
+  it("words the Mac's fork_ keys without the contributor's name for the fork (#823)", () => {
+    const devicesSection = { slug: "devices", name: "Devices" };
+    const rows =
+      buildPrefSections(
+        catalog(
+          [devicesSection],
+          [
+            pref({ key: "fork_tunnel_enabled", type: "bool", default: false, section: "devices" }),
+            pref({ key: "fork_server_port", type: "int", default: 3773, section: "devices" }),
+            pref({ key: "fork_tunnel_hostname", type: "string", default: "", section: "devices" }),
+          ],
+        ),
+      )[0]?.rows ?? [];
+
+    expect(rows.map((row) => row.label)).toEqual([
+      "Reach this server through a Cloudflare tunnel",
+      "Server port",
+      "Tunnel hostname",
+    ]);
+    for (const row of rows) {
+      expect(`${row.label} ${row.description ?? ""}`.toLowerCase()).not.toContain("fork");
+    }
+  });
+
   it("marks a row default only when the value equals the default, and flags restart effects", () => {
     const untouched = pref({ key: "compact_rows", type: "bool", default: false, value: false });
     const engine = pref({

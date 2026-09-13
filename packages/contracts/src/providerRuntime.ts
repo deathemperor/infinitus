@@ -408,6 +408,10 @@ const TurnCompletedPayload = Schema.Struct({
   turnCostUsd: Schema.optional(Schema.Number),
   turnModels: Schema.optional(Schema.Array(TrimmedNonEmptyStringSchema)),
   errorMessage: Schema.optional(TrimmedNonEmptyStringSchema),
+  // Fork (#648): the turn ended while its account's usage window was
+  // rejecting requests. Read instead of the error prose, which is the
+  // adapter's wording and says nothing structured about the cause.
+  usageLimited: Schema.optional(Schema.Boolean),
   tokenUsage: Schema.optional(TurnTokenUsage),
 });
 export type TurnCompletedPayload = typeof TurnCompletedPayload.Type;
