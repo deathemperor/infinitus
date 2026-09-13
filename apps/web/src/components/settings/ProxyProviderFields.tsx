@@ -5,6 +5,7 @@ import { useState } from "react";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -17,6 +18,14 @@ import {
 } from "./proxyProvider";
 
 const NOT_SET = "";
+
+/** Typed picker models, before a list is loaded: comma or newline separated. */
+function splitTypedModels(value: string): ReadonlyArray<string> {
+  return value
+    .split(/[\n,]/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
 
 interface ProxyProviderFieldsProps {
   readonly environmentId: EnvironmentId;
@@ -39,7 +48,7 @@ function proxyErrorDetail(cause: Cause.Cause<unknown>): string {
 /**
  * Fork: "Route through a proxy" for a Claude instance — 9Router, CLIProxyAPI or
  * any Anthropic-compatible endpoint. Loads the proxy's model list so the
- * ANTHROPIC_DEFAULT_*_MODEL slots and the picker model are chosen, not typed.
+ * ANTHROPIC_DEFAULT_*_MODEL slots and the picker models are chosen, not typed.
  */
 export function ProxyProviderFields({
   environmentId,
@@ -73,6 +82,21 @@ export function ProxyProviderFields({
       return;
     }
     setLoadError(proxyErrorDetail(result.cause));
+  };
+
+  const picked = new Set(draft.pickerModels);
+  const allPicked = models !== null && models.length > 0 && models.every((m) => picked.has(m));
+  /** Models the proxy did not list (typed before the list loaded) keep their place first. */
+  const unlisted = draft.pickerModels.filter((entry) => !(models ?? []).includes(entry));
+  const withPicked = (next: ReadonlySet<string>): ReadonlyArray<string> => [
+    ...unlisted.filter((entry) => next.has(entry)),
+    ...(models ?? []).filter((entry) => next.has(entry)),
+  ];
+  const togglePicked = (model: string, checked: boolean): ReadonlyArray<string> => {
+    const next = new Set(picked);
+    if (checked) next.add(model);
+    else next.delete(model);
+    return withPicked(next);
   };
 
   const modelField = (
@@ -206,15 +230,59 @@ export function ProxyProviderFields({
               ),
             )}
           </div>
-          {modelField(
-            "Also list in the model picker",
-            draft.pickerModel,
-            "e.g. kr/gpt-5.6-sol",
-            (next) => onChange({ ...draft, pickerModel: next }),
-          )}
+          <div className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-foreground">
+                Also list in the model picker
+              </span>
+              {models && models.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() =>
+                    onChange({
+                      ...draft,
+                      pickerModels: allPicked
+                        ? unlisted
+                        : withPicked(new Set([...draft.pickerModels, ...models])),
+                    })
+                  }
+                >
+                  {allPicked ? "Clear all" : "Select all"}
+                </Button>
+              ) : null}
+            </div>
+            {models && models.length > 0 ? (
+              <ul className="grid max-h-48 gap-0.5 overflow-y-auto rounded-md bg-background p-1 ring-1 ring-black/5 dark:ring-white/5">
+                {models.map((model) => (
+                  <li key={model}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/60">
+                      <Checkbox
+                        checked={picked.has(model)}
+                        onCheckedChange={(next) =>
+                          onChange({ ...draft, pickerModels: togglePicked(model, Boolean(next)) })
+                        }
+                      />
+                      <span className="truncate">{model}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Input
+                className="bg-background"
+                placeholder="e.g. kr/gpt-5.6-sol, kr/claude-opus-5"
+                value={draft.pickerModels.join(", ")}
+                onChange={(event) =>
+                  onChange({ ...draft, pickerModels: splitTypedModels(event.target.value) })
+                }
+              />
+            )}
+          </div>
           <span className="text-[11px] text-muted-foreground">
-            The slots map Claude's model names onto the proxy's. A picker model is added to this
-            instance's custom models so you can choose it directly.
+            The slots map Claude's model names onto the proxy's. Picked models are added to this
+            instance's custom models so you can choose them directly.
           </span>
           {error ? <span className="text-[11px] text-destructive">{error}</span> : null}
         </>

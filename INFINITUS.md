@@ -199,7 +199,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   Config step renders `ProxyProviderFields` ("Route through a proxy"); on save
   `applyProxyDraft` adds the ANTHROPIC_* environment variables (the key marked
   sensitive), a dedicated `homePath` (`~/.claude-proxy/<instanceId>` unless one
-  was typed) and the picker model as a custom model.
+  was typed) and every picked model as a custom model (the loaded list is
+  checkboxes with Select all, so the proxy's models populate the picker in one
+  click; models already on the instance, by slug or `{slug}`, are not doubled).
 - `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
   — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
