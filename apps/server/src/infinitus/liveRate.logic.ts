@@ -9,20 +9,24 @@
  * the window counts: a ten-minute turn finishing now would otherwise drop
  * all its tokens into a five-minute window and read twice the true rate.
  * A row without a duration — a turn this server did not see start — counts
- * whole at its completion.
+ * whole at its completion. A row whose provider reported no usage (Cursor
+ * and Grok report none) is not a turn that produced nothing: its zeros would
+ * read as an idle server, so it is left out of the window entirely.
  */
 
 /** The window the page's wording promises: "over the last 5 minutes". */
 export const LIVE_RATE_WINDOW_MS = 5 * 60_000;
 
 /** What the rate needs of a `ThreadTurnUsage` row. */
-export interface LiveRateTurn {
+interface LiveRateTurn {
   readonly outputTokens: number;
   readonly completedAt: string;
   readonly durationMs?: number | undefined;
+  /** #834: the provider reported nothing, so the zeros mean "not counted". */
+  readonly usageUnavailable?: true | undefined;
 }
 
-export interface LiveOutputRate {
+interface LiveOutputRate {
   readonly perMinute: number;
 }
 
@@ -39,6 +43,7 @@ export function liveOutputRate(
   let tokens = 0;
   let touched = false;
   for (const turn of turns) {
+    if (turn.usageUnavailable === true) continue;
     const end = Date.parse(turn.completedAt);
     if (Number.isNaN(end)) continue;
     const duration = turn.durationMs !== undefined && turn.durationMs > 0 ? turn.durationMs : 0;

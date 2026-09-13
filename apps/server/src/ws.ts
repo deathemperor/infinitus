@@ -3264,9 +3264,12 @@ const makeWsRpcLayer = (
           observeRpcEffect(
             WS_METHODS.infinitusLiveRate,
             Effect.gen(function* () {
-              const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+              const now = yield* DateTime.now;
+              const nowMs = DateTime.toEpochMillis(now);
               const rows = yield* projectionTurnUsageRepository.listCompletedSince({
-                since: new Date(nowMs - LIVE_RATE_WINDOW_MS).toISOString(),
+                since: DateTime.formatIso(
+                  DateTime.subtract(now, { milliseconds: LIVE_RATE_WINDOW_MS }),
+                ),
               });
               return {
                 liveRate: liveOutputRate(
@@ -3277,7 +3280,7 @@ const makeWsRpcLayer = (
             }).pipe(
               // A rate the database cannot answer is nothing to draw, not a
               // page-level failure: the line simply stays off.
-              Effect.catchAll((error) =>
+              Effect.catch((error) =>
                 Effect.logWarning("infinitus.liveRate.read-failed", error).pipe(
                   Effect.as({ liveRate: null }),
                 ),

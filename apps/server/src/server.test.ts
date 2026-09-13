@@ -130,6 +130,7 @@ import {
   OrchestrationThreadSettleBlockedError,
 } from "./orchestration/Errors.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
+import { ProjectionTurnUsageRepository } from "./persistence/ProjectionTurnUsage.ts";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor.ts";
 import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
 import { SqlitePersistenceMemory } from "./persistence/Layers/Sqlite.ts";
@@ -809,6 +810,11 @@ const buildAppUnderTest = (options?: {
           }),
           // No turn runs here; the update gate has its own tests (#829).
           Layer.mock(InfinitusRunningTurns)({ list: Effect.succeed([]) }),
+          // No turn usage is recorded here either, so the live rate (#1127)
+          // reads as no rate; the fold has its own tests.
+          Layer.mock(ProjectionTurnUsageRepository)({
+            listCompletedSince: () => Effect.succeed([]),
+          }),
           // Nothing is ever paused here either; the layer has its own tests (#743).
           Layer.mock(InfinitusSessionInterrupt)({
             resume: () => Effect.succeed({ released: false, reason: "nothing is paused" }),

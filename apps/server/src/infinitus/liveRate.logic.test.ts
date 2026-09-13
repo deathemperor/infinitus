@@ -1,10 +1,12 @@
+import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import { LIVE_RATE_WINDOW_MS, liveOutputRate } from "./liveRate.logic.ts";
 
-const NOW = Date.parse("2026-09-14T12:00:00.000Z");
-const at = (msBeforeNow: number) => new Date(NOW - msBeforeNow).toISOString();
 const MIN = 60_000;
+const NOW = DateTime.toEpochMillis(DateTime.makeUnsafe("2026-09-14T12:00:00.000Z"));
+const iso = (ms: number) => DateTime.formatIso(DateTime.makeUnsafe(ms));
+const at = (msBeforeNow: number) => iso(NOW - msBeforeNow);
 
 describe("liveOutputRate (#1127)", () => {
   it("is null when no turn ran in the window", () => {
@@ -56,6 +58,23 @@ describe("liveOutputRate (#1127)", () => {
     });
   });
 
+  it("leaves out a turn whose provider reported no usage", () => {
+    // Cursor and Grok report none (#834): the row's zeros mean "not counted",
+    // and a window holding only those must draw nothing, not a rate of zero.
+    expect(
+      liveOutputRate([{ outputTokens: 0, completedAt: at(MIN), usageUnavailable: true }], NOW),
+    ).toBeNull();
+    expect(
+      liveOutputRate(
+        [
+          { outputTokens: 0, completedAt: at(MIN), usageUnavailable: true },
+          { outputTokens: 2500, completedAt: at(2 * MIN) },
+        ],
+        NOW,
+      ),
+    ).toEqual({ perMinute: 500 });
+  });
+
   it("drops a row whose completion cannot be read", () => {
     expect(liveOutputRate([{ outputTokens: 900, completedAt: "not a date" }], NOW)).toBeNull();
   });
@@ -64,10 +83,7 @@ describe("liveOutputRate (#1127)", () => {
     // Clock skew between the recording server and this read must not make a
     // turn's tokens count for time that has not passed.
     expect(
-      liveOutputRate(
-        [{ outputTokens: 1000, completedAt: new Date(NOW + MIN).toISOString(), durationMs: MIN }],
-        NOW,
-      ),
+      liveOutputRate([{ outputTokens: 1000, completedAt: iso(NOW + MIN), durationMs: MIN }], NOW),
     ).toEqual({ perMinute: 0 });
   });
 

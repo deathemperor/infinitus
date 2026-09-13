@@ -52,7 +52,11 @@ export type ListThreadUsageBackfillCandidatesInput =
 
 /**
  * Fork (#1127): every turn recorded since an instant, whatever its thread —
- * what the live output rate is folded from.
+ * what the live output rate is folded from. `completed_at` is compared as
+ * text, which orders chronologically because every producer stamps it with
+ * `DateTime.formatIso` (UTC, `Z`, milliseconds); the fold re-checks each row
+ * against the window by parsed time, so a query that takes in too much is
+ * harmless.
  */
 export const ListProjectionTurnUsageSinceInput = Schema.Struct({
   /** ISO-8601, compared as the text the rows are stamped with. */
