@@ -50,7 +50,8 @@ export function ConnectionEnvironmentRow(props: {
   );
   const enabled = props.environment.isEnabled;
   const statusLabel = connectionStatusLabel(props.environment);
-  // Fork (#663): where this connect got through, or the host it also answers on.
+  // Fork (#663): where this connect got through, or the host it also answers
+  // on; nothing for a connection switched off, which reads "Off" instead.
   const roamingLine = roamingHostsLine(
     useEnvironmentPresentation(props.environment.environmentId).presentation?.entry ?? null,
   );
@@ -105,7 +106,7 @@ export function ConnectionEnvironmentRow(props: {
           <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {props.environment.displayUrl}
           </Text>
-          {roamingLine ? (
+          {enabled && roamingLine ? (
             <Text className="text-xs text-foreground-muted" numberOfLines={1}>
               {roamingLine}
             </Text>

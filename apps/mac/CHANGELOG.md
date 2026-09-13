@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Phone
+- A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).
 
 ## 0.5.0-alpha.6
 
