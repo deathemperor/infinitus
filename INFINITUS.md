@@ -1499,10 +1499,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   named). `apps/server/src/persistence/ProjectionTurnUsage.ts` —
   `listCompletedSince` reads the window's rows whole (minutes wide, so the row
   count is small); `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test)
-  is the fold — five minutes, and a `usageUnavailable` row skipped entirely,
-  since its zero tokens mean "not reported" and would read as a turn that
-  burned nothing. `ws.ts` pulls the repository and answers; a read that fails
-  is logged and answers no turns, which draws no line, rather than failing a
+  is the fold — five minutes, taking the window's end as `{nowMs}`; each turn's
+  tokens are spread over its `durationMs` and only the part of that span inside
+  the window counts, so a thirty-minute turn that finished a minute ago no
+  longer drops all of its output into five minutes and reads ~6× the true rate
+  (the clip came from the withdrawn #1148). A row with no `durationMs` — a turn
+  this server never saw start — counts whole at its completion, and a
+  `usageUnavailable` row is skipped entirely, since its zero tokens mean "not
+  reported" and would read as a turn that burned nothing. `ws.ts` pulls the
+  repository and answers; a read that fails is logged and answers
+  `EMPTY_LIVE_TOKEN_RATE` (no turns, so no line) rather than failing a
   cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
   Utilization page's own cadence, and `infinitusUtilization.ts`'s
   `liveRateText(u, server?)` — the line reads "Live: ≈ N output tokens/min …
