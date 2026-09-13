@@ -1008,9 +1008,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the nine Infinitus
+- `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
   `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
+  Priority since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`,
@@ -1044,7 +1044,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   items, and the server's `thread.phase` push keeps `local: false` because
   the desktop's banner covers that screen.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all ten where no
+  Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -1053,9 +1053,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
   marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
   instead of the pairing form, so the browser does not spend a phone's token.
-- `apps/web/src/routes/settings.infinitus*.tsx` (ten new files in upstream's
+- `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
-  the catalog's `themes` / `animations` sections, #747 step 1, and Sessions
+  the catalog's `themes` / `animations` sections, #747 step 1, and Priority
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
   the Menu bar page keeps `display` + `about`; a section the build lacks
@@ -1139,7 +1139,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (mocked engine, projection, provider stream, settings, Slack client, an
   in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines, Profiles) and their pure logic, and the Devices
+  (preferences, Engines) and their pure logic, and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
@@ -1398,8 +1398,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the form; the CLI's own `error` is shown; the submitted value is never
   interpolated into any message. Closing the OAuth window never cancels;
   the page's Cancel sends `signin-cancel`.
-- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines,profiles}.tsx`
-  — the five Settings › Infinitus routes, thin shells over the panes above.
+- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
+  — the four Settings › Infinitus routes, thin shells over the panes above.
+  Profiles (#165, the Mac's "named way to start a session") left with the
+  #1041 sessions sweep, its `profiles` contract with it; the fixture keeps
+  answering the verb until the Mac drops it.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
