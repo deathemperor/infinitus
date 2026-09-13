@@ -363,6 +363,8 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   /** Fork (#270 B): the Dock badge counting the threads waiting on the user. */
   desktopBadgeAttention: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /** Fork (#1075): the desktop holds off sleep while a local thread's turn runs. */
+  desktopKeepAwake: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   /**
    * Fork (#1032): the #270 B banner toggles, read once by the desktop's
    * `NotificationModeMigration` to seed `notificationMode`; never set again.
@@ -1531,6 +1533,7 @@ export const ClientSettingsPatch = Schema.Struct({
   browserLinkTarget: Schema.optionalKey(BrowserLinkTarget),
   browserAutoShowFloatingPreview: Schema.optionalKey(Schema.Boolean),
   desktopBadgeAttention: Schema.optionalKey(Schema.Boolean),
+  desktopKeepAwake: Schema.optionalKey(Schema.Boolean),
   browserProfiles: Schema.optionalKey(Schema.Array(BrowserProfile)),
   browserDefaultProfileId: Schema.optionalKey(BrowserProfileId),
   confirmQuit: Schema.optionalKey(QuitConfirmationMode),

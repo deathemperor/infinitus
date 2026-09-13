@@ -1705,6 +1705,23 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
   (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
   developer's Mac (the tests mock `spawn`).
+- `apps/desktop/src/infinitus/InfinitusKeepAwake.ts` — sleep held off while a
+  turn runs (#1075), the desktop's replacement for the Mac app's retired
+  `keep_awake` (#1041 d5). The renderer decides from the thread shells it
+  already holds (`apps/web/src/lib/desktopKeepAwake.logic.ts`
+  `keepAwakeWanted`: the `desktopKeepAwake` client setting on, default on,
+  and any thread on the primary environment with its session `starting` or
+  `running`; remote environments never count) and sends the verdict over the
+  optional bridge method `setKeepAwake`; the shell holds one
+  `powerSaveBlocker('prevent-app-suspension')` while asked, idempotent, and
+  releases it when its scope closes with the app. Registration points:
+  `DesktopKeepAwakeCoordinator` mounted from `__root.tsx` after the badge
+  coordinator (it sends once on mount, so a reload cannot leave the blocker
+  held), `DesktopKeepAwakeSettings` after the quit row of Settings › General
+  with its dirty label and reset entry, the `desktop-keep-awake` search item,
+  `SET_KEEP_AWAKE_CHANNEL`, `setKeepAwake` in `ipc/methods/infinitus.ts`, the
+  handler and preload lines, the layer in `InfinitusDesktop.layer`. No socket
+  traffic, no Mac involvement.
 - `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
   `<scheme>://thread/<environmentId>/<threadId>` and
   `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
