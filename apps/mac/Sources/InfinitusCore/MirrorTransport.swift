@@ -17,80 +17,6 @@ public enum MirrorTransport {
     /// Unauthenticated: what this Mac supports, read before pairing (#223
     /// phase 4; T3 `/.well-known/t3/environment`).
     public static let wellKnownPath = "/.well-known/infinitus"
-    /// The per-session feed route (#17 layer 1): `GET /sessions/<pid>/tail`.
-    public static func sessionTailPath(pid: Int32) -> String { "/sessions/\(pid)/tail" }
-    /// The `pid` out of a request path, when it matches
-    /// `/sessions/<pid>/tail` exactly — `nil` for anything else,
-    /// including a non-numeric pid.
-    public static func sessionTailPid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "tail" else { return nil }
-        return Int32(parts[1])
-    }
-    /// A user prompt's image as a thumbnail: `GET /sessions/<pid>/images/<id>`,
-    /// the id from a feed item's `images` (phone thumbnails, 2026-09-04).
-    public static func sessionImagePath(pid: Int32, id: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.:"))
-        return "/sessions/\(pid)/images/" + (id.addingPercentEncoding(withAllowedCharacters: allowed) ?? id)
-    }
-    /// The `pid` and image id out of a request path, when it matches
-    /// `/sessions/<pid>/images/<id>` exactly.
-    public static func sessionImageRef(_ path: String) -> (pid: Int32, id: String)? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 4, parts[0] == "sessions", parts[2] == "images",
-              let pid = Int32(parts[1]), let id = String(parts[3]).removingPercentEncoding, !id.isEmpty
-        else { return nil }
-        return (pid, id)
-    }
-    /// The per-session input route (#17 layer 2): `POST /sessions/<pid>/input`.
-    public static func sessionInputPath(pid: Int32) -> String { "/sessions/\(pid)/input" }
-    /// The `pid` out of a request path, when it matches
-    /// `/sessions/<pid>/input` exactly.
-    public static func sessionInputPid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "input" else { return nil }
-        return Int32(parts[1])
-    }
-    /// `POST /sessions/<pid>/attention` (#223 phase 3): settle / snooze / pin.
-    public static func sessionAttentionPath(pid: Int32) -> String { "/sessions/\(pid)/attention" }
-    public static func sessionAttentionPid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "attention" else { return nil }
-        return Int32(parts[1])
-    }
-    /// `GET /sessions/<pid>/timeline` (#223 phase 4): sequence-resumable timeline.
-    public static func sessionTimelinePath(pid: Int32) -> String { "/sessions/\(pid)/timeline" }
-    public static func sessionTimelinePid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "timeline" else { return nil }
-        return Int32(parts[1])
-    }
-    /// `GET /sessions/<pid>/commands` (#223, the phone's `/` popover): the
-    /// slash commands and skills `SlashCommands.discover` finds for that
-    /// session's cwd, as `[SlashCommand]` JSON.
-    public static func sessionCommandsPath(pid: Int32) -> String { "/sessions/\(pid)/commands" }
-    public static func sessionCommandsPid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "commands" else { return nil }
-        return Int32(parts[1])
-    }
-    /// `GET /sessions/<pid>/files` and `GET /sessions/<pid>/file?path=<rel>`
-    /// (#223, the phone's file browser): the flat workspace listing and one
-    /// file — its text, or an image's raw bytes — `T3ProjectFiles` builds the
-    /// paths and the bodies.
-    public static func sessionFilesPid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "files" else { return nil }
-        return Int32(parts[1])
-    }
-    public static func sessionFilePid(_ path: String) -> Int32? {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard parts.count == 3, parts[0] == "sessions", parts[2] == "file" else { return nil }
-        return Int32(parts[1])
-    }
-    public static let timelineAfterQueryName = "afterSequence"
-    public static let timelineEpochQueryName = "epoch"
-    /// Query parameter carrying the item limit for the tail route.
     /// `POST /activities/token` — the phone's alert push token
     /// (an `ActivityPushRegistration` body; 204 when stored).
     public static let activityTokenPath = "/activities/token"
@@ -99,16 +25,6 @@ public enum MirrorTransport {
     /// `POST /app/update` (#121): the phone's trigger for this Mac's
     /// own update, empty body.
     public static let appUpdatePath = "/app/update"
-    public static let tailLimitQueryName = "n"
-    /// Long-poll: `?since=<feed.stamp>&wait=<seconds>` holds the reply until
-    /// the transcript's stamp differs from `since`, or `wait` elapses
-    /// (capped at `tailWaitMax`) — then answers with the current feed.
-    public static let tailSinceQueryName = "since"
-    public static let tailWaitQueryName = "wait"
-    /// `?rows=1`: the reply also carries `rows`, the presented timeline
-    /// with every fold open and the hidden rows flagged (the browser page).
-    public static let tailRowsQueryName = "rows"
-    public static let tailWaitMax: TimeInterval = 25
     /// Query parameter carrying the pairing token when a header can't
     /// (a QR-pasted URL opened in a browser, `curl "…?t=TOKEN"`).
     public static let tokenQueryName = "t"
@@ -116,13 +32,9 @@ public enum MirrorTransport {
     /// `host:port` override has something to guess when mDNS is blocked.
     /// The server falls back to a kernel-assigned port if it's taken.
     public static let defaultPort: UInt16 = 47824
-    /// Default body cap for every route except `POST /sessions/*/input`
-    /// (`/snapshot` and `/tail` never carry a body worth more than this).
+    /// Default body cap for every route (`/snapshot` never carries a body
+    /// worth more than this).
     public static let defaultBodyCap = 16 * 1024
-    /// `POST /sessions/<pid>/input` carries up to 4 attachments — a
-    /// 20 MiB video and three 5 MiB images at most (#381) — base64-inflated,
-    /// plus the JSON envelope (2026-09-03 "add features to allow attachments").
-    public static let sessionInputBodyCap = 48 * 1024 * 1024
 
     // MARK: - Server side
 
@@ -206,12 +118,9 @@ public enum MirrorTransport {
 
     /// The body cap a route should use, decided from the request line
     /// alone — the head parses (and so the route is known) well before a
-    /// large body has fully arrived. Every route but `POST
-    /// /sessions/*/input` keeps the small default.
+    /// large body has fully arrived. Every route keeps the small default.
     public static func bodyCap(method: String, path: String) -> Int {
-        guard method == "POST" else { return defaultBodyCap }
-        if sessionInputPid(path) != nil { return sessionInputBodyCap }
-        return defaultBodyCap
+        defaultBodyCap
     }
 
     /// A whole request, body included: `nil` while the head or (when
@@ -283,22 +192,8 @@ public enum MirrorTransport {
         response(status: 200, reason: "OK", contentType: "application/json", body: body)
     }
 
-    /// 409 with a JSON body — a command the session's state refuses
-    /// (`SessionAttention.Outcome.refused`).
-    public static func conflictResponse(_ body: Data) -> Data {
-        response(status: 409, reason: "Conflict", contentType: "application/json", body: body)
-    }
-
-    /// An image body (`/sessions/<pid>/images/<id>`); a thumbnail never
-    /// changes for its id, so the phone may keep it.
-    public static func imageResponse(_ body: Data, contentType: String) -> Data {
-        response(status: 200, reason: "OK", contentType: contentType, body: body,
-                 extraHeaders: ["Cache-Control": "private, max-age=86400"])
-    }
-
-    /// A refused route with a reason the phone can show: `{"error": "…"}`
-    /// under the status the route decided (#223's file browser answers 400,
-    /// 404, 415 and 500 this way).
+    /// A refused route with a reason the caller can show: `{"error": "…"}`
+    /// under the status the route decided.
     public static func errorResponse(status: Int, message: String) -> Data {
         let reason: String
         switch status {
@@ -308,56 +203,10 @@ public enum MirrorTransport {
         case 415: reason = "Unsupported Media Type"
         default: reason = "Internal Server Error"
         }
-        let body = (try? JSONEncoder().encode(T3ProjectFiles.Failure(error: message)))
+        struct ErrorBody: Codable { let error: String }
+        let body = (try? JSONEncoder().encode(ErrorBody(error: message)))
             ?? Data(#"{"error":"failed"}"#.utf8)
         return response(status: status, reason: reason, contentType: "application/json", body: body)
-    }
-
-    /// `GET /sessions/<pid>/files`'s result → response, shared by the Mac's
-    /// dispatch and the Linux tray's: `nil` (no such pid) is a 404,
-    /// `.failure` is the Core error's own status, `.success` the listing.
-    public static func filesListResponse(_ result: Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>?) -> Data {
-        switch result {
-        case .success(let listing)?:
-            return (try? JSONEncoder().encode(listing)).map(jsonResponse)
-                ?? errorResponse(status: 500, message: "cannot encode the listing")
-        case .failure(let error)?:
-            return errorResponse(status: error.status, message: error.message)
-        case nil:
-            return errorResponse(status: 404, message: "no such session")
-        }
-    }
-
-    /// `GET /sessions/<pid>/file`'s result → response, same shape as
-    /// `filesListResponse`.
-    public static func fileReadResponse(_ result: Result<T3ProjectFiles.FileRead, T3ProjectFiles.ReadError>?) -> Data {
-        switch result {
-        case .success(let file)?:
-            return (try? JSONEncoder().encode(file)).map(jsonResponse)
-                ?? errorResponse(status: 500, message: "cannot encode the file")
-        case .failure(let error)?:
-            return errorResponse(status: error.status, message: error.message)
-        case nil:
-            return errorResponse(status: 404, message: "no such session")
-        }
-    }
-
-    /// `GET /sessions/<pid>/file`'s answer → response. A text read is the JSON
-    /// envelope above; an image is its raw bytes under its own `Content-Type`,
-    /// no envelope (#223's image contract) and no `Cache-Control` — a workspace
-    /// file changes under the same path.
-    public static func fileAnswerResponse(
-        _ result: Result<T3ProjectFiles.FileAnswer, T3ProjectFiles.ReadError>?) -> Data {
-        switch result {
-        case .success(.text(let file))?:
-            return fileReadResponse(.success(file))
-        case .success(.image(let image))?:
-            return response(status: 200, reason: "OK", contentType: image.mime, body: image.bytes)
-        case .failure(let error)?:
-            return errorResponse(status: error.status, message: error.message)
-        case nil:
-            return errorResponse(status: 404, message: "no such session")
-        }
     }
 
     public static func notFoundResponse() -> Data {

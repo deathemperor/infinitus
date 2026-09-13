@@ -103,13 +103,6 @@ struct SyncPane: View {
                                     addressRow(primary)
                                 }
                                 Button("Copy Pair Link") { copy(app.pairURL) }
-                                if let primary = app.pairRoutes.first {
-                                    // #151: Linux/Windows open this in a browser.
-                                    Button("Copy Browser Link") {
-                                        copy(MirrorWebClient.url(endpoint: primary.endpoint, token: app.mirrorPairToken))
-                                    }
-                                    .help("The sessions and chat page for a machine without the Infinitus app; the pairing token is in the link.")
-                                }
                             }
                             Spacer(minLength: 0)
                         }
@@ -126,11 +119,12 @@ struct SyncPane: View {
             } header: {
                 Text("Pairing")
             } footer: {
-                Text("The phone scans the code once and keeps every address in it, trying "
+                let footer: String = "The phone scans the code once and keeps every address in it, trying "
                      + "them in order \u{2014} so a tunnel address that changes on restart "
                      + "falls through to Wi-Fi or Tailscale. Every request must carry the "
                      + "pairing token; the snapshot it answers with carries account names, "
-                     + "emails and usage estimates, never tokens or push secrets.")
+                     + "emails and usage estimates, never tokens or push secrets."
+                Text(footer)
                     .font(.caption2).foregroundStyle(.secondary)
             }
             Section {
@@ -425,8 +419,7 @@ struct SyncPane: View {
                        + "snapshot; nothing leaves the machine otherwise.",
                  done: serving),
             Step(id: 2, title: "Put Infinitus on the phone",
-                 detail: "The iOS companion is in the repo under ios/ (build "
-                       + "it in Xcode until it reaches TestFlight).",
+                 detail: "Install the Infinitus phone app on the phone.",
                  done: server.lastServed != nil),
             Step(id: 3, title: "Pick how the phone reaches this Mac",
                  detail: remote
@@ -507,15 +500,7 @@ struct SyncPane: View {
         out += ["", "## Do the unticked steps, in order",
                 "1. Serving: a toggle in the Infinitus menu bar app (Settings → Devices → "
                 + "\"Serve the fleet to my phone\"). No shell equivalent — ask the user to flip it.",
-                "2. Phone app: the iOS companion lives in ios/ of the repo. From a clone:",
-                "   cd ios && xcodegen generate",
-                "   xcrun devicectl list devices            # find the phone's UDID",
-                "   xcodebuild -project InfinitusMobile.xcodeproj -scheme InfinitusMobile "
-                + "-configuration Debug -destination 'id=<UDID>' -derivedDataPath build "
-                + "-allowProvisioningUpdates DEVELOPMENT_TEAM=<team id> CODE_SIGN_STYLE=Automatic build",
-                "   xcrun devicectl device install app --device <UDID> "
-                + "build/Build/Products/Debug-iphoneos/InfinitusMobile.app",
-                "   (a free personal team works; the user trusts the profile once on the phone)",
+                "2. Phone app: the Infinitus phone app, installed by the user on their phone.",
                 "3. A route. Same Wi-Fi needs nothing. From anywhere, either:",
                 "   - Tailscale: `brew install --cask tailscale-app` (the pkg asks for an admin "
                 + "password — the user types it), open Tailscale, sign in; on the phone install "
@@ -642,7 +627,7 @@ private func crashWhen(_ report: CrashReport) -> String {
 
 /// Crashes of the phone app (MetricKit, over the mirror) and of this
 /// Mac app (its own diagnostic reports): built-in, nothing leaves the
-/// machine. Each can go into a session's chat for triage.
+/// machine.
 private struct CrashReportsSection: View {
     @ObservedObject var app: AppModel
     @Binding var confirmDelete: CrashReport?
@@ -662,16 +647,6 @@ private struct CrashReportsSection: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    let sessions = app.liveSessions?.sessions ?? []
-                    Menu("Send to Session") {
-                        if sessions.isEmpty { Text("No live sessions") }
-                        ForEach(sessions, id: \.pid) { s in
-                            Button("\(app.sessionProgress.byPid[s.pid]?.name ?? URL(fileURLWithPath: s.cwd).lastPathComponent) · \(s.status)") {
-                                app.sendCrash(report, toPid: s.pid)
-                            }
-                        }
-                    }
-                    .fixedSize()
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(report.transcript, forType: .string)

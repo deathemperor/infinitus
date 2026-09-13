@@ -241,24 +241,17 @@ final class ControlServer {
             return ControlReply(ok: true, result: try .of(["quitting": true]))
 
         case "sessions":
-            // #612: the id, the account alias, the start and the pending
-            // sign-in needs ride along for the fork's sessions list.
+            // #612: the id, the account alias and the start ride along
+            // for the fork's sessions list.
             let account = model.activeAccountName
             let iso = Self.iso
             return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
-                // The merged list (#402): a headless child's need off its
-                // stream, and a need a finished login already met is gone.
-                let needs = model.awsLogins.filter { $0.pid == row.pid }
-                    .map { $0.providerOrAws.rawValue + "-login:" + $0.profile }
-                return .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
-                                "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
-                                "kind": .string(row.kind),
-                                "profile": model.sessionBirths[row.pid]?.profile.map { .string($0) } ?? .null,
-                                "permissionMode": model.sessionBirths[row.pid]?.effectiveMode.map { .string($0) } ?? .null,
-                                "sessionId": .string(row.sessionId),
-                                "account": account.map { .string($0) } ?? .null,
-                                "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null,
-                                "needs": .array(needs.map { .string($0) })])
+                .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
+                        "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
+                        "kind": .string(row.kind),
+                        "sessionId": .string(row.sessionId),
+                        "account": account.map { .string($0) } ?? .null,
+                        "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null])
             }))
 
 
@@ -388,11 +381,10 @@ final class ControlServer {
             // "application-default" for the library credentials.
             let provider: AwsLogin.Provider = r.command == "gcloud-login" ? .gcloud : .aws
             guard let profile = r.args.first, !profile.isEmpty else {
-                throw Fail("usage: \(r.command) <\(provider == .aws ? "profile" : "account|application-default")> [--pid n] [--local] [--remote] [--status]")
+                throw Fail("usage: \(r.command) <\(provider == .aws ? "profile" : "account|application-default")> [--local] [--remote] [--status]")
             }
-            let pid = r.options["pid"].flatMap(Int.init)
             // --status: the phone's flag-less poll — report, start nothing.
-            let reply = await model.startAwsLogin(provider: provider, profile: profile, pid: pid, local: r.options["local"] == "true",
+            let reply = await model.startAwsLogin(provider: provider, profile: profile, pid: nil, local: r.options["local"] == "true",
                                                   remote: r.options["status"] == "true" ? nil : r.options["remote"] == "true")
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "could not start") }
             return ControlReply(ok: true, result: try .of(["state": state]))

@@ -449,9 +449,6 @@ jobs:
         if: needs.mac_changes.outputs.changed != 'false'
       - run: swift build
         if: needs.mac_changes.outputs.changed != 'false'
-      - name: generated files are current
-        run: tools/t3ref/check-generated.sh
-        if: needs.mac_changes.outputs.changed != 'false'
       - run: swift test --parallel
         if: needs.mac_changes.outputs.changed != 'false'
   # End-to-end + performance gate (#18): the debug app against the demo

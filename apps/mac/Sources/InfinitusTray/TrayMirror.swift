@@ -14,11 +14,10 @@ enum TrayMirror {
     static var url: URL { stateDir.appendingPathComponent("mirror-snapshot.json") }
     static var stampURL: URL { stateDir.appendingPathComponent("mirror-snapshot.lastwrite") }
 
-    static func export(raw: Data, sessions: [SessionPanelRow], enginePath: String,
+    static func export(raw: Data, enginePath: String,
                         prefs: FleetPrefs,
                         serviceStatus: ServiceStatusSummary? = nil,
                         engine: EngineBadge? = nil,
-                        progressByPid: [Int: SessionProgress]? = nil,
                         now: Date = Date()) {
         // The demo engine's fabricated fleet must not reach the mobile
         // companion (same gate TrayHistory uses).
@@ -31,7 +30,6 @@ enum TrayMirror {
             capturedAt: now,
             machineName: ProcessInfo.processInfo.hostName,
             listJSON: raw,
-            sessions: sessions,
             prefs: prefs,
             // No `cswap usage --json` cash cache on Linux today (#9
             // phase D1a) — TrayHistory only tracks headroom, not spend.
@@ -40,8 +38,7 @@ enum TrayMirror {
             // TrayServiceStatus/EngineProbe) — the tray has no supervisor
             // of its own, just a snapshot of what's true right now.
             serviceStatus: serviceStatus,
-            engine: engine,
-            progressByPid: progressByPid)
+            engine: engine)
         guard (try? MirrorWriter.write(snapshot, to: url)) != nil else { return }
         try? String(now.timeIntervalSince1970).write(to: stampURL, atomically: true, encoding: .utf8)
     }

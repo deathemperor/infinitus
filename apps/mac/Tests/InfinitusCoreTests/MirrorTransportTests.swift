@@ -115,125 +115,11 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertEqual(lan?.urlText, "http://192.168.1.20:47824")
     }
 
-    // MARK: - Session feed route (#17 layer 1)
-
-    func testSessionTailPathRoundTrips() {
-        XCTAssertEqual(MirrorTransport.sessionTailPath(pid: 123), "/sessions/123/tail")
-        XCTAssertEqual(MirrorTransport.sessionTailPid("/sessions/123/tail"), 123)
-        let ref = MirrorTransport.sessionImageRef(MirrorTransport.sessionImagePath(pid: 7, id: "t:ab-1:1"))
-        XCTAssertEqual(ref?.pid, 7)
-        XCTAssertEqual(ref?.id, "t:ab-1:1")
-        XCTAssertEqual(MirrorTransport.sessionImageRef("/sessions/7/images/a:x%20y.png")?.id, "a:x y.png")
-        XCTAssertNil(MirrorTransport.sessionImageRef("/sessions/7/images"))
-        XCTAssertNil(MirrorTransport.sessionImageRef("/sessions/7/images/"))
-    }
-
-    func testSessionTailPidRejectsNonNumericOrWrongShape() {
-        XCTAssertNil(MirrorTransport.sessionTailPid("/sessions/x/tail"))
-        XCTAssertNil(MirrorTransport.sessionTailPid("/sessions/123"))
-        XCTAssertNil(MirrorTransport.sessionTailPid("/sessions/123/tail/extra"))
-        XCTAssertNil(MirrorTransport.sessionTailPid("/snapshot"))
-    }
-
-    // MARK: - Session input route (#17 layer 2)
-
-    func testSessionInputPathRoundTrips() {
-        XCTAssertEqual(MirrorTransport.sessionInputPath(pid: 123), "/sessions/123/input")
-        XCTAssertEqual(MirrorTransport.sessionInputPid("/sessions/123/input"), 123)
-        XCTAssertNil(MirrorTransport.sessionInputPid("/sessions/123/tail"))
-        XCTAssertNil(MirrorTransport.sessionInputPid("/sessions/x/input"))
-    }
-
-    func testSessionAttentionPathRoundTrips() {
-        XCTAssertEqual(MirrorTransport.sessionAttentionPath(pid: 123), "/sessions/123/attention")
-        XCTAssertEqual(MirrorTransport.sessionAttentionPid("/sessions/123/attention"), 123)
-        XCTAssertNil(MirrorTransport.sessionAttentionPid("/sessions/123/input"))
-        XCTAssertNil(MirrorTransport.sessionAttentionPid("/sessions/x/attention"))
-    }
-
-    func testSessionCommandsPathRoundTrips() {
-        XCTAssertEqual(MirrorTransport.sessionCommandsPath(pid: 5), "/sessions/5/commands")
-        XCTAssertEqual(MirrorTransport.sessionCommandsPid("/sessions/5/commands"), 5)
-        XCTAssertNil(MirrorTransport.sessionCommandsPid("/sessions/5/timeline"))
-        XCTAssertNil(MirrorTransport.sessionCommandsPid("/sessions/x/commands"))
-        let wire = try? JSONEncoder().encode([SlashCommand(name: "review", description: "Review a PR", source: .projectCommand)])
-        let back = wire.flatMap { try? JSONDecoder().decode([SlashCommand].self, from: $0) }
-        XCTAssertEqual(back, [SlashCommand(name: "review", description: "Review a PR", source: .projectCommand)])
-    }
-
-    func testSessionTimelinePathRoundTrips() {
-        XCTAssertEqual(MirrorTransport.sessionTimelinePath(pid: 5), "/sessions/5/timeline")
-        XCTAssertEqual(MirrorTransport.sessionTimelinePid("/sessions/5/timeline"), 5)
-        XCTAssertNil(MirrorTransport.sessionTimelinePid("/sessions/5/tail"))
-        XCTAssertEqual(MirrorTransport.timelineAfterQueryName, "afterSequence")
-        XCTAssertEqual(MirrorTransport.timelineEpochQueryName, "epoch")
-    }
-
-    func testConflictResponseIs409JSON() {
-        let body = Data(#"{"error":"waiting"}"#.utf8)
-        XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.conflictResponse(body)),
-                       MirrorTransport.HTTPResponse(status: 409, body: body))
-    }
-
     func testJsonAndBadRequestResponses() {
         let body = Data(#"{"outcome":"delivered"}"#.utf8)
         let ok = MirrorTransport.parseResponse(MirrorTransport.jsonResponse(body))
         XCTAssertEqual(ok, MirrorTransport.HTTPResponse(status: 200, body: body))
         XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.badRequestResponse())?.status, 400)
-    }
-
-    // MARK: - Files route responses (#486: the Mac's dispatch and the Linux tray's share these)
-
-    func testFilesListResponseMapsSuccessFailureAndNilPid() {
-        let listing = T3ProjectFiles.Listing(cwd: "/repo", entries: [], truncated: false)
-        let ok = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(.success(listing)))
-        XCTAssertEqual(ok?.status, 200)
-        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.Listing.self, from: ok?.body ?? Data()), listing)
-        let failed = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(.failure(.rootGone)))
-        XCTAssertEqual(failed?.status, 404)
-        let missing = MirrorTransport.parseResponse(MirrorTransport.filesListResponse(nil))
-        XCTAssertEqual(missing?.status, 404)
-    }
-
-    func testFileReadResponseMapsSuccessFailureAndNilPid() {
-        let file = T3ProjectFiles.FileRead(path: "a.swift", contents: "x", byteLength: 1, truncated: false, mime: "text/x-swift")
-        let ok = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.success(file)))
-        XCTAssertEqual(ok?.status, 200)
-        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.FileRead.self, from: ok?.body ?? Data()), file)
-        let failed = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.failure(.binary)))
-        XCTAssertEqual(failed?.status, 415)
-        let missing = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(nil))
-        XCTAssertEqual(missing?.status, 404)
-    }
-
-    /// #223's image contract: raw bytes under the image's own type, no JSON
-    /// envelope, and 413 for one over the cap.
-    func testFileAnswerResponseSendsImageBytesRawAndKeepsTextAsJSON() {
-        let bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF])
-        let image = T3ProjectFiles.ImageRead(path: "logo.png", bytes: bytes, mime: "image/png")
-        let raw = MirrorTransport.fileAnswerResponse(.success(.image(image)))
-        XCTAssertEqual(MirrorTransport.parseResponse(raw)?.status, 200)
-        XCTAssertEqual(MirrorTransport.parseResponse(raw)?.body, bytes)
-        XCTAssertTrue(String(decoding: raw, as: UTF8.self).contains("Content-Type: image/png\r\n"),
-                      String(decoding: raw.prefix(120), as: UTF8.self))
-        // A workspace file changes under its path, so nothing may be cached.
-        XCTAssertFalse(String(decoding: raw.prefix(200), as: UTF8.self).contains("Cache-Control"))
-        // Text is the envelope the phone already parses — the same builder,
-        // so the same status, type and decoded body (Linux's JSONEncoder
-        // orders keys differently per encode, so not the same bytes).
-        let file = T3ProjectFiles.FileRead(path: "a.swift", contents: "x", byteLength: 1,
-                                           truncated: false, mime: "text/x-swift")
-        let text = MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(.success(.text(file))))
-        let plain = MirrorTransport.parseResponse(MirrorTransport.fileReadResponse(.success(file)))
-        XCTAssertEqual(text?.status, plain?.status)
-        XCTAssertEqual(text?.status, 200)
-        XCTAssertEqual(try? JSONDecoder().decode(T3ProjectFiles.FileRead.self, from: text?.body ?? Data()), file)
-        XCTAssertTrue(String(decoding: MirrorTransport.fileAnswerResponse(.success(.text(file))).prefix(80), as: UTF8.self)
-                        .contains("Content-Type: application/json\r\n"))
-        let big = MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(.failure(.tooLarge)))
-        XCTAssertEqual(big?.status, 413)
-        XCTAssertEqual(String(decoding: big?.body ?? Data(), as: UTF8.self), #"{"error":"file too large"}"#)
-        XCTAssertEqual(MirrorTransport.parseResponse(MirrorTransport.fileAnswerResponse(nil))?.status, 404)
     }
 
     // MARK: - Request body parsing (#17 layer 2)
@@ -265,32 +151,10 @@ final class MirrorTransportTests: XCTestCase {
         XCTAssertEqual(request?.body, Data(String(repeating: "x", count: 10).utf8))
     }
 
-    /// `POST /sessions/*/input` gets the big cap (attachments); every
-    /// other route stays at the small default (2026-09-03 attachments).
-    func testBodyCapIsBigOnlyForSessionInput() {
-        XCTAssertEqual(MirrorTransport.bodyCap(method: "POST", path: "/sessions/7/input"),
-                       MirrorTransport.sessionInputBodyCap)
+    func testBodyCapIsAlwaysTheDefault() {
+        XCTAssertEqual(MirrorTransport.bodyCap(method: "POST", path: "/prefs"),
+                       MirrorTransport.defaultBodyCap)
         XCTAssertEqual(MirrorTransport.bodyCap(method: "GET", path: MirrorTransport.snapshotPath),
                        MirrorTransport.defaultBodyCap)
-        XCTAssertEqual(MirrorTransport.bodyCap(method: "GET", path: "/sessions/7/tail"),
-                       MirrorTransport.defaultBodyCap)
-        // Wrong verb on the input path doesn't get the big cap either.
-        XCTAssertEqual(MirrorTransport.bodyCap(method: "GET", path: "/sessions/7/input"),
-                       MirrorTransport.defaultBodyCap)
-    }
-
-    /// A body bigger than the small default but within the session-input
-    /// cap is honoured when the route says so.
-    func testParseRequestWithBodyHonoursTheSessionInputCap() {
-        let payload = String(repeating: "x", count: 20_000)
-        let head = "POST /sessions/1/input HTTP/1.1\r\nContent-Length: \(payload.count)\r\n\r\n"
-        let whole = Data((head + payload).utf8)
-        // The default cap truncates well short of the real body.
-        XCTAssertEqual(MirrorTransport.parseRequestWithBody(whole)?.body.count,
-                       MirrorTransport.defaultBodyCap)
-        // The session-input cap is large enough for the whole thing.
-        let request = MirrorTransport.parseRequestWithBody(
-            whole, bodyCap: MirrorTransport.sessionInputBodyCap)
-        XCTAssertEqual(request?.body, Data(payload.utf8))
     }
 }

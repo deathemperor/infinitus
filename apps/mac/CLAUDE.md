@@ -207,7 +207,7 @@ before that the `native` branch). Split out of
   `INFINITUS_MIRROR_SNAPSHOT=<state-dir>/mirror-snapshot.json`, or
   MirrorExporter overwrites the real app's mirror snapshot (#474), and
   `INFINITUS_APP_SUPPORT=<state-dir>/app-support`, or every other file
-  it writes (stats caches, births, events…) lands in
+  it writes (stats caches, events…) lands in
   the real Application Support/Infinitus (#506; the stats clobber cost
   each relaunch a year's re-read, #346).
 

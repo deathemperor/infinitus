@@ -24,11 +24,6 @@ actor MirrorExporter {
             ?? AppSupport.root().appendingPathComponent("mirror-snapshot.json")
     }()
 
-    /// The ⚡ gauge's scale: the highest tokens/minute seen lately.
-    private var tokenPeak = 0
-    /// The six panel rows' transcripts, read incrementally (#346).
-    private var tails: [String: SessionTail] = [:]
-    private var tailProgress: [String: SessionProgress] = [:]
     /// Folders sessions have run in, newest first (#91's repository
     /// picker); kept across launches.
     private var recentCwds: [String] = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
@@ -38,38 +33,23 @@ actor MirrorExporter {
                 serviceStatus: ServiceStatusSummary, engine: EngineBadge,
                 fleets: [EngineFleet] = [], forecast: UsageForecast? = nil,
                 plan: WindowPlanner.Plan? = nil, awsLogins: [AwsLogin.Item] = [],
-                progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
+                stats: Stats.Bundle? = nil,
                 pushesAlerts: Bool = false, app: AppInfo? = nil,
                 // A closure, not a value: T3's project list scans past
                 // sessions and shells out to git per cwd (T3 clone A, #337) —
-                // real work the throttle below must skip, the same
-                // reason `facts` below is a closure too.
+                // real work the throttle below must skip.
                 projects: @Sendable () -> [ProjectSummary] = { [] },
-                births: [Int: SessionBirth] = [:],
-                facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
-                sequence: SequenceLog? = nil, now: Bool = false) {
+                now: Bool = false) {
         // `now`: news the phone is waiting on (an AWS-login need that just
         // surfaced) skips the 30 s throttle.
         guard now || Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
-        let plainRecords = ClaudeSessions.list(claudeDir: claudeDir)
-        // Same selection as InfinitusTray.swift's panel rows: busy/waiting
-        // first, busy before waiting, capped at 6.
-        let allRecords = plainRecords
+        let allRecords = ClaudeSessions.list(claudeDir: claudeDir)
         let sessionRecords = allRecords
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
         let now = Date()
-        // One transcript read per record feeds both the panel row and the
-        // sessions card's per-pid progress (#9 phase D2) — the card's own
-        // rows come from listJSON's liveSessions, so a session outside
-        // this busy/waiting six simply keeps its single line.
-        // `progress` is the app's own scan of EVERY listed session (name,
-        // AWS need, token rate) — without it an idle session reached the
-        // phone nameless (user 2026-09-03 "idle sessions doesn't have
-        // names shown on ios"); the six below overwrite it with a fresh read.
-        var progressByPid = progress
         var recent = recentCwds
         for record in sessionRecords.reversed() where !record.cwd.isEmpty {
             recent.removeAll { $0 == record.cwd }
@@ -80,29 +60,9 @@ actor MirrorExporter {
             recentCwds = recent
             AppDefaults.standard.set(recent, forKey: "recent_cwds")
         }
-        let shown = Array(sessionRecords.prefix(6))
-        let sessions = shown.map { record -> SessionPanelRow in
-            let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
-            var tail = tails[record.sessionId] ?? SessionTail(url: url)
-            let progress: SessionProgress
-            if !tail.advance(), let previous = tailProgress[record.sessionId] {
-                progress = previous
-            } else {
-                progress = tail.progress(name: record.name, now: now)
-            }
-            tails[record.sessionId] = tail
-            tailProgress[record.sessionId] = progress
-            progressByPid[Int(record.pid)] = progress
-            return SessionPanelRow.make(record: record, progress: progress, now: now)
-        }
-        let shownIds = Set(shown.map(\.sessionId))
-        tails = tails.filter { shownIds.contains($0.key) }
-        tailProgress = tailProgress.filter { shownIds.contains($0.key) }
         // Cash column (#9 phase D1a) was `cswap usage`'s cache; the field
         // stays on the wire, empty, until a native estimate (#756).
         let usageJSON: Data? = nil
-        let perMinute = TokenRate.perMinute(progressByPid, now: now)
-        tokenPeak = TokenRate.nextPeak(tokenPeak, seeing: perMinute)
         // The engine's rows know pids only; the session records know the
         // ids (#391), so a phone can act on a session by id as well as pid.
         let sessionIds = Dictionary(allRecords.map { (Int($0.pid), $0.sessionId) }, uniquingKeysWith: { a, _ in a })
@@ -111,23 +71,17 @@ actor MirrorExporter {
             capturedAt: now,
             machineName: MachineName.current(),
             listJSON: listJSON,
-            sessions: sessions,
             prefs: prefs,
             usageJSON: usageJSON,
             serviceStatus: serviceStatus,
             engine: engine,
-            progressByPid: progressByPid,
             fleets: fleets.isEmpty ? nil : fleets,
-            tokenRate: TokenRate(perMinute: perMinute, peakPerMinute: tokenPeak),
+            tokenRate: nil,
             forecast: forecast, plan: plan,
             awsLogins: awsLogins.isEmpty ? nil : awsLogins, stats: stats,
             recentCwds: recentCwds.isEmpty ? nil : recentCwds,
             pushesAlerts: pushesAlerts, app: app,
-            projects: { let p = projects(); return p.isEmpty ? nil : p }(),
-            births: births.isEmpty ? nil
-                : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })),
-            factsByPid: facts(plainRecords),
-            epoch: sequence?.epoch, sequence: sequence?.current)
+            projects: { let p = projects(); return p.isEmpty ? nil : p }())
         // Encoded once here rather than inside MirrorWriter so the LAN
         // server hands out the same bytes the file holds.
         let encoder = JSONEncoder()

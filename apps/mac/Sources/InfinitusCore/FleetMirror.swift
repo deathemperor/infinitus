@@ -12,7 +12,6 @@ public struct MirrorSnapshot: Codable, Sendable {
     public let capturedAt: Date
     public let machineName: String
     public let listJSON: Data
-    public let sessions: [SessionPanelRow]
     /// Display prefs (#9 phase C1: "Follow Mac") — optional so snapshots
     /// captured before this field existed still decode.
     public let prefs: FleetPrefs?
@@ -25,24 +24,14 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// snapshot simply decodes them as nil and the chips drop out.
     public let serviceStatus: ServiceStatusSummary?
     public let engine: EngineBadge?
-    /// Per-pid transcript progress for the sessions card, keyed by the
-    /// session record's pid (`SessionDetail.pid` in `listJSON`).
-    public let progressByPid: [Int: SessionProgress]?
-    /// T3's shell-row facts per pid (#223 phase 3) — the app's own read
-    /// of each session, next to `progressByPid`; `SessionDetail` is the
-    /// engine's and can't carry it. Additive optional.
-    public let factsByPid: [Int: SessionFacts]?
-    /// The `SequenceLog`'s launch epoch and last sequence at capture (#223
-    /// phase 4): a phone that sees a new epoch re-syncs every timeline.
-    /// Additive optionals.
-    public let epoch: String?
-    public let sequence: Int?
     /// Every engine's last fleet (#8 multi-engine), in popup order —
     /// `listJSON` stays the primary cswap fleet for older phones; a
     /// phone that knows this field stacks one section per fleet.
     public let fleets: [EngineFleet]?
     /// Output tokens per minute across every live session, with the
-    /// host's recent peak for the gauge scale.
+    /// host's recent peak for the gauge scale. The live scan that fed
+    /// this is gone (#1041 d5); always nil now, kept so the type stays
+    /// on the wire for an older phone that still decodes it.
     public let tokenRate: TokenRate?
     /// Run-rate projection for the primary fleet (2026-09-03) and the #7
     /// battle plan — both additive optionals; older phones ignore them.
@@ -71,16 +60,12 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// T3's project list (spec §2.1) — one row per cwd the Mac has seen,
     /// for both clients' sidebar/Home grouping. Additive optional.
     public let projects: [ProjectSummary]?
-    /// How Infinitus started each live session, by pid (#163/#165):
-    /// profile, permission mode, resumed-from. Additive optional.
-    public let births: [Int: SessionBirth]?
 
     public init(capturedAt: Date, machineName: String, listJSON: Data,
-                sessions: [SessionPanelRow], prefs: FleetPrefs? = nil,
+                prefs: FleetPrefs? = nil,
                 usageJSON: Data? = nil,
                 serviceStatus: ServiceStatusSummary? = nil,
                 engine: EngineBadge? = nil,
-                progressByPid: [Int: SessionProgress]? = nil,
                 fleets: [EngineFleet]? = nil,
                 tokenRate: TokenRate? = nil,
                 forecast: UsageForecast? = nil,
@@ -89,19 +74,14 @@ public struct MirrorSnapshot: Codable, Sendable {
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
                 app: AppInfo? = nil,
-                projects: [ProjectSummary]? = nil,
-                births: [Int: SessionBirth]? = nil,
-                factsByPid: [Int: SessionFacts]? = nil,
-                epoch: String? = nil, sequence: Int? = nil) {
+                projects: [ProjectSummary]? = nil) {
         self.capturedAt = capturedAt
         self.machineName = machineName
         self.listJSON = listJSON
-        self.sessions = sessions
         self.prefs = prefs
         self.usageJSON = usageJSON
         self.serviceStatus = serviceStatus
         self.engine = engine
-        self.progressByPid = progressByPid
         self.fleets = fleets
         self.tokenRate = tokenRate
         self.forecast = forecast
@@ -112,10 +92,6 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.pushesAlerts = pushesAlerts
         self.app = app
         self.projects = projects
-        self.births = births
-        self.factsByPid = factsByPid
-        self.epoch = epoch
-        self.sequence = sequence
     }
 }
 

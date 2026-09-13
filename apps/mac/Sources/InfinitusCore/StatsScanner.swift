@@ -9,6 +9,13 @@ public enum StatsScanner {
         case human, phone, agent, nudge, compaction, toolResult, machinery
     }
 
+    /// The name and preface a peer-socket message from this app carried
+    /// (PeerSocket.swift's wire format, #1041 d5 — the socket itself is
+    /// gone, but a transcript scan still needs to recognize its shape to
+    /// classify who wrote a line).
+    public static let peerSenderName = "Infinitus app"
+    public static let peerPhonePreface = "[Infinitus] The user sent this from their phone. Answer it here in this session, as you would a message typed at the keyboard — the phone reads your reply from this transcript. The sender is the Infinitus app, not a Claude session: it has no inbox, so do not reply with SendMessage.\n\n"
+
     /// Carry-over between appended chunks of one transcript.
     public struct ScanState: Codable, Equatable, Sendable {
         public var lastMessageID: String?
@@ -140,7 +147,7 @@ public enum StatsScanner {
             let fromApp: Bool = {
                 guard let r = raw.range(of: "from-name=\""), let q = raw[r.upperBound...].firstIndex(of: "\"") else { return false }
                 let name = raw[r.upperBound..<q]
-                return name == "Infinitus" || name == PeerSocket.senderName
+                return name == "Infinitus" || name == peerSenderName
             }()
             return peerKind(fromApp: fromApp, body: wrappedBody(raw))
         }
@@ -172,7 +179,7 @@ public enum StatsScanner {
     /// The socket preface's first 48 characters — enough to tell a phone
     /// message from the app's own "[Infinitus] …" nudge text without
     /// retyping the whole preface.
-    private static let phoneMarker = String(PeerSocket.phonePreface.prefix(48))
+    private static let phoneMarker = String(peerPhonePreface.prefix(48))
 
     private static func peerKind(fromApp: Bool, body: String) -> UserKind {
         guard fromApp else { return .agent }

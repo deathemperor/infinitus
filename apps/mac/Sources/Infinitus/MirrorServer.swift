@@ -49,50 +49,8 @@ final class MirrorTokenBox: @unchecked Sendable {
     }
 }
 
-/// The `/sessions/<pid>/tail` handler (#17 layer 1), boxed the same way
-/// as payload/token: AppModel sets it from the main actor, the
-/// connection handlers call it from the network queue. The closure does
-/// its own file read (`ClaudeSessions.list` + `SessionFeedReader.read`)
-/// on that queue — off the main actor, same as every other route here.
-final class MirrorSessionFeedBox: @unchecked Sendable {
-    /// `rows`: also serve the presented timeline rows (`?rows=1`, the
-    /// browser page — it folds client-side).
-    typealias Provider = @Sendable (_ pid: Int32, _ limit: Int, _ since: String?, _ wait: TimeInterval, _ rows: Bool) -> Data?
-    private let lock = NSLock()
-    private var provider: Provider?
-
-    func set(_ new: @escaping Provider) {
-        lock.lock(); provider = new; lock.unlock()
-    }
-
-    /// May block for up to `wait` seconds (the long-poll) — call it off
-    /// the network queue when `wait > 0`.
-    func call(_ pid: Int32, _ limit: Int, since: String? = nil, wait: TimeInterval = 0, rows: Bool = false) -> Data? {
-        lock.lock(); let current = provider; lock.unlock()
-        return current?(pid, limit, since, wait, rows)
-    }
-}
-
 /// The `POST /activities/token` handler (alert pushes): the phone's
 /// APNs token, handed to AppModel's pusher on the main actor.
-/// The `/sessions/<pid>/images/<id>` handler (phone thumbnails): the
-/// image bytes and content type, nil for 404. Reads a transcript tail
-/// and scales an image, so the route runs it off the network queue.
-final class MirrorSessionImageBox: @unchecked Sendable {
-    typealias Provider = @Sendable (_ pid: Int32, _ id: String) -> (data: Data, contentType: String)?
-    private let lock = NSLock()
-    private var provider: Provider?
-
-    func set(_ new: @escaping Provider) {
-        lock.lock(); provider = new; lock.unlock()
-    }
-
-    func call(_ pid: Int32, _ id: String) -> (data: Data, contentType: String)? {
-        lock.lock(); let current = provider; lock.unlock()
-        return current?(pid, id)
-    }
-}
-
 final class MirrorActivityTokenBox: @unchecked Sendable {
     private let lock = NSLock()
     private var sink: (@Sendable (ActivityPushRegistration) -> Void)?
@@ -184,11 +142,6 @@ final class MirrorCrashBox: @unchecked Sendable {
     }
 }
 
-/// The `POST /sessions/<pid>/input` handler (#17 layer 2), boxed the
-/// same way as `sessionFeed`: AppModel sets it once from the main actor,
-/// the connection handlers call it from the network queue. `nil` means
-/// "no such pid" (404); the closure itself does the PTY/socket delivery
-/// and its own logging.
 /// AWS sign-in from the phone (AwsLogin.swift): start / code handlers.
 final class MirrorAwsLoginBox: @unchecked Sendable {
     private let lock = NSLock()
@@ -225,71 +178,6 @@ final class MirrorAwsLoginBox: @unchecked Sendable {
     }
 }
 
-/// The `POST /sessions/<pid>/attention` handler (#223 phase 3), boxed
-/// like `sessionInput`: AppModel sets it once, the network queue calls
-/// it. `nil` means "no such pid" (404); the closure resolves the record,
-/// the cached timeline and the attention store itself.
-final class MirrorAttentionBox: @unchecked Sendable {
-    typealias Provider = @Sendable (_ pid: Int32, _ request: SessionAttention.Request) -> SessionAttention.Outcome?
-    private let lock = NSLock()
-    private var provider: Provider?
-    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
-    func call(_ pid: Int32, _ request: SessionAttention.Request) -> SessionAttention.Outcome? {
-        lock.lock(); let current = provider; lock.unlock()
-        return current?(pid, request)
-    }
-}
-
-/// The `GET /sessions/<pid>/timeline` handler (#223 phase 4), boxed like
-/// `sessionFeed`; may block for the long-poll — call it off the queue.
-final class MirrorTimelineBox: @unchecked Sendable {
-    typealias Provider = @Sendable (_ pid: Int32, _ afterSequence: Int?, _ epoch: String?, _ wait: TimeInterval) -> Data?
-    private let lock = NSLock()
-    private var provider: Provider?
-    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
-    func call(_ pid: Int32, _ afterSequence: Int?, _ epoch: String?, _ wait: TimeInterval) -> Data? {
-        lock.lock(); let current = provider; lock.unlock()
-        return current?(pid, afterSequence, epoch, wait)
-    }
-}
-
-/// The `GET /sessions/<pid>/commands` handler (#223, the phone's `/`
-/// popover), boxed like `timeline`; reads `.claude/` trees, so call it
-/// off the queue. `nil` = no such pid (404).
-final class MirrorCommandsBox: @unchecked Sendable {
-    typealias Provider = @Sendable (_ pid: Int32) -> Data?
-    private let lock = NSLock()
-    private var provider: Provider?
-    func set(_ new: @escaping Provider) { lock.lock(); provider = new; lock.unlock() }
-    func call(_ pid: Int32) -> Data? {
-        lock.lock(); let current = provider; lock.unlock()
-        return current?(pid)
-    }
-}
-
-/// The phone's file browser (#223): `GET /sessions/<pid>/files` and
-/// `GET /sessions/<pid>/file?path=<rel>`. Boxed with a `Handlers` struct like
-/// `checkpoints` because there are two of them; `nil` = no such pid (404),
-/// and every refusal past that is the Core error's own status. Both spawn
-/// `git` or walk a tree, so the routes call them off the serving queue.
-final class MirrorFilesBox: @unchecked Sendable {
-    struct Handlers: Sendable {
-        let list: @Sendable (Int32) -> Result<T3ProjectFiles.Listing, T3ProjectFiles.ListError>?
-        let read: @Sendable (Int32, String) -> Result<T3ProjectFiles.FileAnswer, T3ProjectFiles.ReadError>?
-    }
-    private let lock = NSLock()
-    private var handlers: Handlers?
-
-    func set(_ new: Handlers) {
-        lock.lock(); handlers = new; lock.unlock()
-    }
-
-    var current: Handlers? {
-        lock.lock(); defer { lock.unlock() }
-        return handlers
-    }
-}
-
 /// `GET /.well-known/infinitus` (#223 phase 4): the descriptor, no token.
 final class MirrorDescriptorBox: @unchecked Sendable {
     private let lock = NSLock()
@@ -298,44 +186,6 @@ final class MirrorDescriptorBox: @unchecked Sendable {
     func call() -> MirrorDescriptor? {
         lock.lock(); let current = provider; lock.unlock()
         return current?()
-    }
-}
-
-/// Where `POST /sessions/<pid>/input` deliveries run, one at a time.
-private let mirrorInputQueue = DispatchQueue(label: "run.infinitus.mirror-input", qos: .userInitiated)
-
-final class MirrorSessionInputBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var provider: (@Sendable (Int32, SessionInput.Request) -> SessionInput.Reply?)?
-    /// #168: a request the phone's outbox sends twice (it died between
-    /// send and reply, or the reply was lost) is answered once; the
-    /// repeat gets back the SAME reply the first send got — recording a
-    /// synthetic "delivered" instead would turn a lost noSurface/
-    /// noChannel reply into a false "Delivered" on the repeat.
-    private var dedup = InputDedup()
-
-    func set(_ new: @escaping @Sendable (Int32, SessionInput.Request) -> SessionInput.Reply?) {
-        lock.lock(); provider = new; lock.unlock()
-    }
-
-    func call(_ pid: Int32, _ request: SessionInput.Request) -> SessionInput.Reply? {
-        lock.lock()
-        if let requestId = request.requestId, let replayed = dedup.replay(pid: pid, requestId: requestId) {
-            lock.unlock()
-            return replayed
-        }
-        let current = provider
-        lock.unlock()
-        // The provider runs on the serial `mirrorInputQueue` (this is the
-        // only caller), so two identical requests never race the
-        // remember-after-the-fact below.
-        let reply = current?(pid, request)
-        if let requestId = request.requestId, let reply {
-            lock.lock()
-            dedup.remember(pid: pid, requestId: requestId, reply: reply)
-            lock.unlock()
-        }
-        return reply
     }
 }
 
@@ -368,29 +218,12 @@ final class MirrorServer: ObservableObject {
     let payload = MirrorPayloadBox()
     /// Read by the connection handlers; written by AppModel on regenerate.
     let token = MirrorTokenBox()
-    /// Answers `/sessions/<pid>/tail`; set by AppModel once at start.
-    let sessionFeed = MirrorSessionFeedBox()
     /// Answers `POST /activities/token`; set by AppModel once at start.
     let activityTokens = MirrorActivityTokenBox()
-    /// Answers `POST /sessions/<pid>/input` (#17 layer 2); set by AppModel
-    /// once at start.
-    let sessionInput = MirrorSessionInputBox()
-    /// Answers `POST /sessions/<pid>/attention` (#223 phase 3); set by AppModel once at start.
-    let attention = MirrorAttentionBox()
-    /// Answers `GET /sessions/<pid>/timeline` (#223 phase 4); set by AppModel once at start.
-    let timeline = MirrorTimelineBox()
-    /// Answers `GET /sessions/<pid>/commands` (#223); set by AppModel once at start.
-    let commands = MirrorCommandsBox()
-    /// Answers the file-browser routes (#223); set by AppModel once at start.
-    let files = MirrorFilesBox()
     /// Answers `GET /.well-known/infinitus`; set by AppModel once at start.
     let descriptor = MirrorDescriptorBox()
-    /// Command receipts for input / start / attention (#223 phase 4).
-    let receipts = Receipts()
     /// Client-activity leases (#223 phase 5): who is looking at what.
     let leases = LeaseTable()
-    /// Answers `/sessions/<pid>/images/<id>`; set by AppModel once at start.
-    let sessionImage = MirrorSessionImageBox()
     let awsLogin = MirrorAwsLoginBox()
     /// Answers `POST /crashes`; set by AppModel once at start.
     let crashes = MirrorCrashBox()
@@ -455,19 +288,11 @@ final class MirrorServer: ObservableObject {
         listener.service = NWListener.Service(name: name, type: MirrorTransport.bonjourType)
         let payload = self.payload
         let token = self.token
-        let sessionFeed = self.sessionFeed
         let prefs = self.prefs
         let appUpdate = self.appUpdate
         let accountAction = self.accountAction
-        let sessionInput = self.sessionInput
-        let attention = self.attention
-        let timeline = self.timeline
-        let commands = self.commands
-        let files = self.files
         let descriptor = self.descriptor
-        let receipts = self.receipts
         let leases = self.leases
-        let sessionImage = self.sessionImage
         let activityTokens = self.activityTokens
         let awsLogin = self.awsLogin
         let crashes = self.crashes
@@ -481,8 +306,8 @@ final class MirrorServer: ObservableObject {
             }
         }
         listener.newConnectionHandler = { [queue] connection in
-            Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
-                       sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, prefs: prefs,
+            Self.serve(connection, payload: payload, token: token, descriptor: descriptor, leases: leases,
+                       activityTokens: activityTokens, crashes: crashes, prefs: prefs,
                        appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
@@ -525,24 +350,15 @@ final class MirrorServer: ObservableObject {
     private nonisolated static func serve(_ connection: NWConnection,
                                           payload: MirrorPayloadBox,
                                           token: MirrorTokenBox,
-                                          sessionFeed: MirrorSessionFeedBox,
-                                          sessionInput: MirrorSessionInputBox,
-                                          attention: MirrorAttentionBox,
-                                          timeline: MirrorTimelineBox,
-                                          commands: MirrorCommandsBox,
-                                          files: MirrorFilesBox,
                                           descriptor: MirrorDescriptorBox,
-                                          receipts: Receipts,
                                           leases: LeaseTable,
-                                            sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, prefs: MirrorPrefsBox,
                                           appUpdate: MirrorAppUpdateBox,
                                           awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
                                           queue: DispatchQueue,
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
-        receive(connection, buffer: Data(), payload: payload, token: token,
-               sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+        receive(connection, buffer: Data(), payload: payload, token: token, descriptor: descriptor, leases: leases,
                activityTokens: activityTokens, crashes: crashes, prefs: prefs,
                appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, onServed: onServed)
     }
@@ -551,16 +367,8 @@ final class MirrorServer: ObservableObject {
                                             buffer: Data,
                                             payload: MirrorPayloadBox,
                                             token: MirrorTokenBox,
-                                            sessionFeed: MirrorSessionFeedBox,
-                                            sessionInput: MirrorSessionInputBox,
-                                          attention: MirrorAttentionBox,
-                                          timeline: MirrorTimelineBox,
-                                          commands: MirrorCommandsBox,
-                                          files: MirrorFilesBox,
-                                          descriptor: MirrorDescriptorBox,
-                                          receipts: Receipts,
-                                          leases: LeaseTable,
-                                            sessionImage: MirrorSessionImageBox,
+                                            descriptor: MirrorDescriptorBox,
+                                            leases: LeaseTable,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, prefs: MirrorPrefsBox,
                                             appUpdate: MirrorAppUpdateBox,
                                             awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
@@ -610,82 +418,11 @@ final class MirrorServer: ObservableObject {
                         .map(MirrorTransport.jsonResponse) ?? MirrorTransport.unavailableResponse()
                 } else if !MirrorTransport.isAuthorized(request, token: token.current) {
                     response = MirrorTransport.unauthorizedResponse()
-                } else if request.method == "GET", request.path == MirrorWebClient.path {
-                    // The browser client (#151): Linux/Windows have no app.
-                    response = MirrorWebClient.response()
                 } else if request.method == "GET",
                           request.path == MirrorTransport.snapshotPath {
                     response = payload.latest.map(MirrorTransport.snapshotResponse)
                         ?? MirrorTransport.unavailableResponse()
                     onServed(request)
-                } else if request.method == "GET",
-                          let pid = MirrorTransport.sessionTailPid(request.path) {
-                    let limit = request.query(MirrorTransport.tailLimitQueryName).flatMap(Int.init) ?? 30
-                    let since = request.query(MirrorTransport.tailSinceQueryName)
-                    let wait = request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0
-                    let rows = request.query(MirrorTransport.tailRowsQueryName) == "1"
-                    // Off this queue either way: a long-poll sleeps until
-                    // the transcript moves, and even the plain form reads
-                    // a 256 KiB tail — every connection shares this queue,
-                    // so nothing that takes time may run on it.
-                    DispatchQueue.global(qos: .utility).async {
-                        let data = sessionFeed.call(pid, limit, since: since, wait: wait, rows: rows)
-                        let response = data.map(MirrorTransport.snapshotResponse)
-                            ?? MirrorTransport.notFoundResponse()
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "GET",
-                          let pid = MirrorTransport.sessionTimelinePid(request.path) {
-                    let after = request.query(MirrorTransport.timelineAfterQueryName).flatMap(Int.init)
-                    let epoch = request.query(MirrorTransport.timelineEpochQueryName)
-                    let wait = request.query(MirrorTransport.tailWaitQueryName).flatMap(Double.init) ?? 0
-                    // A long-poll and a possible transcript parse: off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let response = timeline.call(pid, after, epoch, wait).map(MirrorTransport.jsonResponse)
-                            ?? MirrorTransport.notFoundResponse()
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "GET",
-                          let pid = MirrorTransport.sessionCommandsPid(request.path) {
-                    // Discovery walks .claude/ trees on disk: off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let response = commands.call(pid).map(MirrorTransport.jsonResponse)
-                            ?? MirrorTransport.notFoundResponse()
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "GET",
-                          let pid = MirrorTransport.sessionFilesPid(request.path) {
-                    // `git ls-files` or a tree walk over the whole cwd: off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let response = MirrorTransport.filesListResponse(files.current?.list(pid))
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "GET",
-                          let pid = MirrorTransport.sessionFilePid(request.path) {
-                    // A missing `path` is refused like any other path outside
-                    // the workspace — the Core read decides, not the route.
-                    let path = request.query(T3ProjectFiles.pathQueryName) ?? ""
-                    // Up to 256 KiB of text, or 8 MB of image, read off disk:
-                    // off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let response = MirrorTransport.fileAnswerResponse(files.current?.read(pid, path))
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
                 } else if request.method == "POST", request.path == PrefCatalog.path {
                     guard let write = try? JSONDecoder().decode(PrefCatalog.Write.self, from: request.body) else {
                         connection.send(content: MirrorTransport.badRequestResponse(),
@@ -719,79 +456,6 @@ final class MirrorServer: ObservableObject {
                     onServed(request)
                     connection.send(content: response,
                                     completion: .contentProcessed { _ in connection.cancel() })
-                    return
-                } else if request.method == "GET",
-                          let ref = MirrorTransport.sessionImageRef(request.path) {
-                    // A transcript tail read and an image decode: off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let response = sessionImage.call(ref.pid, ref.id)
-                            .map { MirrorTransport.imageResponse($0.data, contentType: $0.contentType) }
-                            ?? MirrorTransport.notFoundResponse()
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "POST",
-                          let pid = MirrorTransport.sessionInputPid(request.path) {
-                    guard let decoded = try? JSONDecoder().decode(SessionInput.Request.self, from: request.body)
-                    else {
-                        connection.send(content: MirrorTransport.badRequestResponse(),
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                        return
-                    }
-                    // Delivery spawns `ps` and sleeps through the terminal's
-                    // settle waits (a second each) — on this queue that
-                    // stalled the phone's own long-poll and the snapshot
-                    // behind every send (user 2026-09-04 "sending and
-                    // receiving are not responsive"). Its own SERIAL queue,
-                    // not the global pool: two sends in a row must land
-                    // one after the other, never interleave keystrokes.
-                    mirrorInputQueue.async {
-                        // A stop tombstones this pid's receipts first: the
-                        // interrupted input must not come back on a retry.
-                        if decoded.kind == .key, decoded.text == "esc" { receipts.tombstone(pid: pid) }
-                        let response = receipts.serve(commandId: decoded.commandId,
-                                                      target: request.path + "#" + decoded.kind.rawValue, pid: pid) {
-                            sessionInput.call(pid, decoded)
-                                .flatMap { try? JSONEncoder().encode($0) }
-                                .map(MirrorTransport.jsonResponse)
-                        }
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                } else if request.method == "POST",
-                          let pid = MirrorTransport.sessionAttentionPid(request.path) {
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    guard let decoded = try? decoder.decode(SessionAttention.Request.self, from: request.body) else {
-                        connection.send(content: MirrorTransport.badRequestResponse(),
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                        return
-                    }
-                    // Resolves the record and may parse a transcript tail: off this queue.
-                    DispatchQueue.global(qos: .utility).async {
-                        let encoder = JSONEncoder()
-                        encoder.dateEncodingStrategy = .iso8601
-                        let response = receipts.serve(commandId: decoded.commandId, target: request.path, pid: pid) {
-                            switch attention.call(pid, decoded) {
-                            case .applied(let facts)?:
-                                return (try? encoder.encode(facts)).map(MirrorTransport.jsonResponse)
-                                    ?? MirrorTransport.unavailableResponse()
-                            case .refused(let reason)?:
-                                return MirrorTransport.conflictResponse(Data(#"{"error":"\#(reason)"}"#.utf8))
-                            case .badRequest?:
-                                return MirrorTransport.badRequestResponse()
-                            case nil:
-                                return nil
-                            }
-                        }
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
                     return
                 } else if request.method == "POST", request.path == ClientActivity.path {
                     guard let decoded = try? JSONDecoder().decode(ClientActivity.Report.self, from: request.body) else {
@@ -895,8 +559,7 @@ final class MirrorServer: ObservableObject {
                 connection.cancel()
                 return
             }
-            receive(connection, buffer: buffer, payload: payload, token: token,
-                   sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
+            receive(connection, buffer: buffer, payload: payload, token: token, descriptor: descriptor, leases: leases,
                    activityTokens: activityTokens, crashes: crashes, prefs: prefs,
                    appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, onServed: onServed)
         }

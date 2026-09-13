@@ -2,32 +2,6 @@ import XCTest
 @testable import InfinitusCore
 
 final class AwsLoginTests: XCTestCase {
-    func testDetectsTheProfileFromTheBrokerAndCliSignatures() {
-        XCTAssertEqual(AwsLogin.profile(in: """
-            [aws-cred-broker] could not refresh credentials for 'papaya-login'.
-              aws said: aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.
-              Fix: aws login --profile papaya-login
-            """), "papaya-login")
-        XCTAssertEqual(AwsLogin.profile(in: "aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'."), "default")
-        XCTAssertEqual(AwsLogin.profile(in: "Error when retrieving token from sso: Token has expired and refresh failed\nRun: aws sso login --profile papaya-dev"), "papaya-dev")
-        XCTAssertNil(AwsLogin.profile(in: "aws login --profile x is documented here"), "no failure, no need")
-        XCTAssertNil(AwsLogin.profile(in: "all good"))
-        XCTAssertEqual(AwsLogin.profile(in: "aws: [ERROR]: The pending authorization to retrieve an SSO token has expired. The login flow to retrieve an SSO token must be restarted."), "default")
-        XCTAssertEqual(AwsLogin.profile(in: "aws: [ERROR]: An error occurred (ExpiredToken) when calling the GetCallerIdentity operation: The security token included in the request is expired"), "default")
-        // The broker's refresh lock is held for >30 s only while the holder
-        // sits in the interactive login (2026-09-05, peon-wave-16: nothing
-        // shown while `aws login` waited for the browser).
-        XCTAssertEqual(AwsLogin.profile(in: "aws: [ERROR]: Error when retrieving credentials from custom-process: [aws-cred-broker] timed out after 30.0s waiting for the refresh lock held by pid 39243. Inspect that process; do not delete /Users/x/.config/banyan/aws-broker/global.lock while it is running.\ntunnel-DOWN"), "default")
-        // Quoted, not suffered: a grep hit / Read line / source fixture.
-        XCTAssertNil(AwsLogin.profile(in: "99:    let failed = \"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\""))
-        XCTAssertNil(AwsLogin.profile(in: "    [aws-cred-broker] ...\n      Fix: aws login --profile papaya-login"))
-        // `… 2>&1 | tail -1` keeps only the broker's own two-space "Fix:"
-        // line — that indentation is the broker's, not a quote's
-        // (2026-09-05 11:02, banyan: nothing shown on the phone).
-        XCTAssertEqual(AwsLogin.profile(in: "=== A sts\n  Fix: aws login --profile papaya-login\n=== B refs\ndocs/x.md:33:- rows"), "papaya-login")
-        XCTAssertNil(AwsLogin.profile(in: "357:            f\"  Fix: aws login --profile {anchor}\""), "the broker's source, read")
-    }
-
     func testFlowFollowsTheProfileKindInTheConfig() {
         let config = """
         [default]
@@ -160,87 +134,7 @@ final class AwsLoginTests: XCTestCase {
     }
 }
 
-final class AwsLoginProgressTests: XCTestCase {
-    func testSessionProgressReadsTheLapsedProfileOffTheNewestToolResults() {
-        let failed = #"{"type":"user","timestamp":"2026-09-03T08:00:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"[aws-cred-broker] could not refresh credentials for 'papaya-login'.\n  aws said: aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile papaya-login"}]}}"#
-        let fine = #"{"type":"user","timestamp":"2026-09-03T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"ok"}]}]}}"#
-        XCTAssertEqual(SessionProgress.parse(lines: [failed, fine]).awsLoginProfile, "papaya-login")
-        XCTAssertEqual(SessionProgress.parse(lines: [failed, fine]).awsLoginFailedAt, UsageHistory.parseISO("2026-09-03T08:00:00.000Z"))
-        XCTAssertNil(SessionProgress.parse(lines: [fine]).awsLoginProfile)
-        // The CLI's own error names no profile — the failed command does.
-        let use = #"{"type":"assistant","timestamp":"2026-09-03T08:00:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t9","name":"Bash","input":{"command":"AWS_PROFILE=papaya-dev aws sts get-caller-identity"}}]}}"#
-        let raw = #"{"type":"user","timestamp":"2026-09-03T08:00:01.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t9","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'."}]}}"#
-        XCTAssertEqual(SessionProgress.parse(lines: [use, raw]).awsLoginProfile, "papaya-dev")
-        XCTAssertEqual(AwsLogin.profile(inCommand: "aws s3 ls --profile=banyan"), "banyan")
-        XCTAssertNil(AwsLogin.profile(inCommand: "aws s3 ls"))
-        // Scrolls out of the scan window once the session moves on.
-        let later = Array(repeating: fine, count: SessionProgress.awsLoginScanEntries * 2)
-        XCTAssertNil(SessionProgress.parse(lines: [failed] + later).awsLoginProfile)
-        // Thinking / text turns between calls don't count.
-        let thought = #"{"type":"assistant","timestamp":"2026-09-03T08:02:00.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"ok"}]}}"#
-        XCTAssertEqual(SessionProgress.parse(lines: [failed] + Array(repeating: thought, count: 30)).awsLoginProfile, "papaya-login")
-        // Attachments / hook summaries / turn stats don't eat the window.
-        let padding = Array(repeating: #"{"type":"attachment","attachment":{"type":"hook_success"}}"#, count: 20)
-            + [#"{"type":"system","subtype":"turn_duration","durationMs":1}"#]
-        XCTAssertEqual(SessionProgress.parse(lines: [failed] + padding).awsLoginProfile, "papaya-login")
-    }
-}
-
-/// #149: the aws command that failed ran in a sub-agent, so the parent's
-/// own tail never carries the signature — the need is read off the
-/// sub-agent transcript and attributed to the parent.
 final class AwsLoginSubagentTests: XCTestCase {
-    var dir: URL!
-    let failed = #"{"type":"user","timestamp":"2026-09-03T08:00:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile papaya-login"}]}}"#
-    let failedLater = #"{"type":"user","timestamp":"2026-09-03T08:05:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile banyan"}]}}"#
-    let fine = #"{"type":"user","timestamp":"2026-09-03T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"ok"}]}]}}"#
-
-    override func setUpWithError() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("infinitus-aws-sub-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    }
-    override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
-
-    private func write(_ lines: [String], agent: String? = nil, mtime: Date? = nil) throws {
-        let transcript = Transcript.path(cwd: "/p", sessionId: "s1", claudeDir: dir)
-        var url = transcript
-        if let agent {
-            let subagents = transcript.deletingPathExtension().appendingPathComponent("subagents")
-            try FileManager.default.createDirectory(at: subagents, withIntermediateDirectories: true)
-            url = subagents.appendingPathComponent("agent-\(agent).jsonl")
-        } else {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        }
-        try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
-        if let mtime { try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: url.path) }
-    }
-
-    func testASubagentsLapsedSignInIsAttributedToTheParent() throws {
-        try write([fine])
-        try write([failed], agent: "a")
-        let progress = SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir)
-        XCTAssertEqual(progress.awsLoginProfile, "papaya-login")
-        XCTAssertEqual(progress.awsLoginFailedAt, UsageHistory.parseISO("2026-09-03T08:00:00.000Z"))
-    }
-
-    func testTheNewestSubagentFailureWinsAndTheParentsOwnTailWinsOverAll() throws {
-        try write([fine])
-        try write([failed], agent: "a")
-        try write([failedLater], agent: "b")
-        XCTAssertEqual(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile, "banyan")
-        let ownFailure = #"{"type":"user","timestamp":"2026-09-03T08:09:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t9","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile parent-prof"}]}}"#
-        try write([ownFailure])
-        XCTAssertEqual(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile, "parent-prof")
-    }
-
-    func testAStaleAgentTranscriptAndAMovedOnAgentAreIgnored() throws {
-        try write([fine])
-        try write([failed], agent: "old", mtime: Date().addingTimeInterval(-2 * 60 * 60))
-        XCTAssertNil(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile)
-        try write([failed] + Array(repeating: fine, count: SessionProgress.awsLoginScanEntries * 2), agent: "busy")
-        XCTAssertNil(SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir).awsLoginProfile)
-    }
-
     func testOrphanLoginWrappersAreTheLaunchdChildrenRunningThisInstancesAws() {
         let ps = """
             81429     1 /usr/bin/script -q /dev/null /opt/homebrew/bin/aws login --remote --profile papaya-login
@@ -253,46 +147,5 @@ final class AwsLoginSubagentTests: XCTestCase {
         XCTAssertEqual(AwsLogin.orphanLogins(ps: ps, aws: "/opt/homebrew/bin/aws"), [81429])
         XCTAssertEqual(AwsLogin.orphanLogins(ps: ps, aws: "/tmp/e2e/aws"), [9002])
         XCTAssertEqual(AwsLogin.orphanLogins(ps: "", aws: "/opt/homebrew/bin/aws"), [])
-    }
-
-    func testSessionLoginsAreTheWaitingLoginsUnderThatSessionForThatProfileWithTheirSubtree() {
-        let ps = """
-              1     0 /sbin/launchd
-            500     1 claude
-            501   500 zsh -c aws login --profile papaya --region ap-southeast-1
-            502   501 /opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python /opt/homebrew/bin/aws login --profile papaya --region ap-southeast-1
-            503   500 /bin/sh /tmp/e2e/aws login --profile papaya
-            504   503 nc -l 127.0.0.1 41726
-            505   500 /opt/homebrew/bin/aws login --profile other
-            506   500 /opt/homebrew/bin/aws login
-            600     1 claude
-            601   600 /opt/homebrew/bin/aws login --profile papaya
-            700   500 /opt/homebrew/bin/aws sts get-caller-identity --profile papaya
-            """
-        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 500, profile: "papaya"), [501, 502, 503, 504])
-        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 500, profile: "default"), [506])
-        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 600, profile: "papaya"), [601])
-        XCTAssertEqual(AwsLogin.sessionLogins(ps: ps, sessionPid: 700, profile: "papaya"), [])
-    }
-
-    func testListeningPortsComeFromLsofFieldOutput() {
-        let lsof = """
-            p46681
-            f3
-            n127.0.0.1:41726
-            p42654
-            f5
-            n*:55466
-            f6
-            n[::1]:55467
-            """
-        XCTAssertEqual(AwsLogin.listeningPorts(lsof: lsof), [46681: [41726], 42654: [55466, 55467]])
-    }
-
-    func testContinueMessageSaysWhenTheSessionsOwnLoginWasStopped() {
-        XCTAssertFalse(AwsLogin.continueMessage(profile: "p", fromPhone: true).contains("stopped"))
-        let released = AwsLogin.continueMessage(profile: "p", fromPhone: true, released: true)
-        XCTAssertTrue(released.contains("was stopped because the sign-in had already completed"))
-        XCTAssertTrue(released.hasSuffix("do not run `aws login` again."))
     }
 }
