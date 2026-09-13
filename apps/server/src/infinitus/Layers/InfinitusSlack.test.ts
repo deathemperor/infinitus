@@ -240,7 +240,9 @@ describe("InfinitusSlack (#574)", () => {
         });
         const posts = yield* harness.posts;
         expect(posts).toHaveLength(1);
-        expect(posts[0]!.text).toMatch(/^Started in Limitless on infinitus\/[0-9a-f]{8} \(build\)\.$/);
+        expect(posts[0]!.text).toMatch(
+          /^Started in Limitless on infinitus\/[0-9a-f]{8} \(build\)\.$/,
+        );
       }),
   );
 
