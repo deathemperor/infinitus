@@ -26,6 +26,7 @@ IDLE_BUDGET_PCT="${IDLE_BUDGET_PCT:-8}"   # measured 0.3-0.5% on every theme/bur
 RSS_BUDGET_MB="${RSS_BUDGET_MB:-240}"
 GROWTH_BUDGET_KB_MIN="${GROWTH_BUDGET_KB_MIN:-768}"   # idle heap growth; ~80 KB/min after the fix, 2.1 MB/min before
 WINDOW_S="${WINDOW_S:-30}"   # long enough for the growth rate to mean something
+LOGIN_RELEASE_S="${LOGIN_RELEASE_S:-30}"   # grace for the released aws login to exit; a loaded Mac takes longer than the app does (#1133)
 
 BIN="$(swift build --show-bin-path)"
 APP="$BIN/Infinitus"
@@ -108,6 +109,23 @@ except Exception: bad=True     # a JSON null is a legitimate reply
 if bad or not ($1):
     open('$LOG.reply','w').write(raw[:800]); sys.exit(1)
 " && rm -f "$LOG.reply"
+}
+# idle_cpu_ok <label> <measured pct> <window seconds> — the idle-CPU gate
+# (#1133). A window over budget is measured again and passes if the SECOND
+# one is under it: one window on a loaded shared runner is not a stable
+# estimate (CI read 8.3 % against a budget of 8, on a diff that adds no
+# timer), while a real regression idles tens of points over and misses
+# both. Never a blind retry of the whole job, which would hide one.
+idle_cpu_ok() {
+    if python3 -c "import sys; sys.exit(0 if $2 <= $IDLE_BUDGET_PCT else 1)"; then return 0; fi
+    echo "$1 ${2}% over budget ${IDLE_BUDGET_PCT}% — taking a second window"
+    IDLE_A="$("$CTL" perf | json "d['cpuSeconds']")"
+    sleep "$3"
+    IDLE_B="$("$CTL" perf | json "d['cpuSeconds']")"
+    IDLE_PCT="$(python3 -c "print(round(($IDLE_B-$IDLE_A)/$3*100,1))")"
+    echo "$1 (second window): ${IDLE_PCT}%"
+    python3 -c "import sys; sys.exit(0 if $IDLE_PCT <= $IDLE_BUDGET_PCT else 1)" \
+        || fail "$1 ${2}% then ${IDLE_PCT}% over budget ${IDLE_BUDGET_PCT}%"
 }
 acct() { echo "[a for a in d['fleet']['accounts'] if a['number']==$1][0]"; }
 popout_visible() { "$CTL" windows | expect "any(w['visible'] and w['content']=='GlassContainerView' for w in d)"; }
@@ -423,7 +441,7 @@ sleep 15
 SB="$("$CTL" perf | json "d['cpuSeconds']")"
 SPCT="$(python3 -c "print(round(($SB-$SA)/15*100,1))")"
 echo "idle CPU with Settings open: ${SPCT}%"
-python3 -c "import sys; sys.exit(0 if $SPCT <= $IDLE_BUDGET_PCT else 1)" || fail "Settings idle CPU ${SPCT}% over budget ${IDLE_BUDGET_PCT}%"
+idle_cpu_ok "Settings idle CPU" "$SPCT" 15
 "$CTL" hide settings | expect "d['hidden']=='settings'" || fail "hide settings"
 sleep 1
 settings_visible && fail "Settings still visible after hide"
@@ -469,6 +487,10 @@ echo "prefs: ok"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+# #1047: the desktop's thread card on the push verb — a null state ends
+# it (no phone registered: a no-op that still answers), a stray shape is refused.
+printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True" || fail "push thread.activity end"
+printf '{"kind":"thread.activity","state":{"title":"x"}}' | "$CTL" push 2>&1 | grep -q "thread.activity" || fail "push thread.activity refuses a stray state"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
 # #835: --forget has no body, so a stdin pipe nobody closes must not hold it
 # (a fifo opened read-write never reaches EOF).
@@ -507,7 +529,7 @@ sleep 12
 RB="$("$CTL" perf | json "d['cpuSeconds']")"
 RPCT="$(python3 -c "print(round(($RB-$RA)/12*100,1))")"
 echo "all-dead CPU with the reviver band: ${RPCT}%"
-python3 -c "import sys; sys.exit(0 if $RPCT <= $IDLE_BUDGET_PCT else 1)" || fail "all-dead CPU ${RPCT}% over budget ${IDLE_BUDGET_PCT}%"
+idle_cpu_ok "all-dead CPU" "$RPCT" 12
 "$INFINITUS_SWAPD_CLI" simulate off >/dev/null
 "$CTL" refresh | expect "d[0].get('nextCandidate') is not None" || fail "fleet didn't recover after simulate off"
 echo "scenarios: ok (all-dead and back)"
@@ -576,9 +598,13 @@ while aws_login_item; do
 done
 echo "aws: code flow signed in, need cleared"
 # The session's own stuck login (#275) is released once the phone sign-in lands.
+# The app signals it at once, but the process itself exits when the machine
+# gets round to it: 10 s was short enough that a concurrent `swift build`
+# failed this (#1133), so the grace period is LOGIN_RELEASE_S and CI can
+# widen it. A login the app never released is still here at the end of it.
 i=0
 while pgrep -f "aws login --profile e2e-login" >/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|aws-own-login-listener' | grep -v grep | head -4 | tr '\n' ';'))"
+    i=$((i + 1)); [ "$i" -lt "$LOGIN_RELEASE_S" ] || fail "the session's own aws login was not released within ${LOGIN_RELEASE_S}s (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|aws-own-login-listener' | grep -v grep | head -4 | tr '\n' ';'))"
     sleep 1
 done
 echo "aws: the session's own stuck login released"
@@ -711,7 +737,7 @@ RSS="$("$CTL" perf | json "int(d['rssBytes']/1048576)")"
 PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
 GROWTH="$(python3 -c "print(int(($HEAP_B-$HEAP_A)*60/$WINDOW_S))")"
 echo "idle CPU with pop-out open (rpg + ember): ${PCT}%  rss: ${RSS} MB  heap growth: ${GROWTH} KB/min  (budgets ${IDLE_BUDGET_PCT}% / ${RSS_BUDGET_MB} MB / ${GROWTH_BUDGET_KB_MIN} KB/min)"
-python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
+idle_cpu_ok "idle CPU" "$PCT" "$WINDOW_S"
 [ "$RSS" -le "$RSS_BUDGET_MB" ] || fail "RSS ${RSS} MB over budget ${RSS_BUDGET_MB} MB"
 [ "$GROWTH" -le "$GROWTH_BUDGET_KB_MIN" ] || fail "idle heap growth ${GROWTH} KB/min over budget ${GROWTH_BUDGET_KB_MIN} KB/min"
 
@@ -727,7 +753,7 @@ sleep "$WINDOW_S"
 B="$("$CTL" perf | json "d['cpuSeconds']")"
 PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
 echo "idle CPU with no lease (pop-out closed, no phone): ${PCT}%  (budget ${IDLE_BUDGET_PCT}%)"
-python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail "idle CPU with no lease ${PCT}% over budget ${IDLE_BUDGET_PCT}%"
+idle_cpu_ok "idle CPU with no lease" "$PCT" "$WINDOW_S"
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,

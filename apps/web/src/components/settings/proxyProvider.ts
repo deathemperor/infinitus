@@ -8,8 +8,8 @@ import type { ProviderInstanceEnvironmentVariable } from "@t3tools/contracts";
  * subscription login in ~/.claude is left alone.
  */
 export const PROXY_PRESETS = [
-  { id: "9router", label: "9Router", baseUrl: "http://127.0.0.1:20128/v1" },
-  { id: "cliproxyapi", label: "CLIProxyAPI", baseUrl: "http://127.0.0.1:8317/v1" },
+  { id: "9router", label: "9Router", baseUrl: "http://127.0.0.1:20128" },
+  { id: "cliproxyapi", label: "CLIProxyAPI", baseUrl: "http://127.0.0.1:8317" },
   { id: "custom", label: "Custom", baseUrl: "" },
 ] as const;
 export type ProxyPresetId = (typeof PROXY_PRESETS)[number]["id"];
@@ -47,13 +47,23 @@ export function withProxyPreset(draft: ProxyDraft, preset: ProxyPresetId): Proxy
   return { ...draft, preset, baseUrl: preset === "custom" ? draft.baseUrl : baseUrl };
 }
 
+/**
+ * The value `ANTHROPIC_BASE_URL` takes. The Anthropic SDK appends `/v1/messages`
+ * to it, so a base URL that already ends in `/v1` would reach `/v1/v1/messages`
+ * — 404 on CLIProxyAPI, and a path 9Router only happens to tolerate. Strip it,
+ * whether it came from a preset or was typed.
+ */
+export function proxyAnthropicBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, "").replace(/\/v1$/, "");
+}
+
 export function validateProxyDraft(draft: ProxyDraft): string | null {
   if (!draft.enabled) return null;
   let url: URL;
   try {
     url = new URL(draft.baseUrl.trim());
   } catch {
-    return "Enter the proxy's base URL, e.g. http://127.0.0.1:20128/v1.";
+    return "Enter the proxy's base URL, e.g. http://127.0.0.1:20128.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return "The proxy base URL must start with http:// or https://.";
@@ -91,7 +101,7 @@ export function applyProxyDraft(
 } {
   if (!draft.enabled) return { config: { ...config }, environment: undefined };
   const environment: ProviderInstanceEnvironmentVariable[] = [
-    { name: "ANTHROPIC_BASE_URL", value: draft.baseUrl.trim(), sensitive: false },
+    { name: "ANTHROPIC_BASE_URL", value: proxyAnthropicBaseUrl(draft.baseUrl), sensitive: false },
     { name: "ANTHROPIC_AUTH_TOKEN", value: draft.apiKey.trim(), sensitive: true },
   ];
   for (const slot of PROXY_MODEL_SLOTS) {

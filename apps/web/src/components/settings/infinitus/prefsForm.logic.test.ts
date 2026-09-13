@@ -179,6 +179,60 @@ describe("buildPrefSections controls", () => {
     }
   });
 
+  it("words the Animations keys and their choice codes", () => {
+    const animationsSection = { slug: "animations", name: "Animations" };
+    const rows =
+      buildPrefSections(
+        catalog(
+          [animationsSection],
+          [
+            pref({
+              key: "intro_style",
+              type: "string",
+              default: "top",
+              section: "animations",
+              choices: ["top", "bottom", "fade", "rows"],
+            }),
+            pref({
+              key: "intro_title",
+              type: "string",
+              default: "zoom",
+              section: "animations",
+              choices: ["zoom", "slam", "spin", "off"],
+            }),
+            pref({
+              key: "intro_speed",
+              type: "double",
+              default: 1,
+              section: "animations",
+              min: 0.4,
+              max: 2,
+            }),
+            pref({
+              key: "burn_style",
+              type: "string",
+              default: "ember",
+              section: "animations",
+              choices: ["off", "ember", "flame", "limit"],
+            }),
+          ],
+        ),
+      )[0]?.rows ?? [];
+
+    expect(rows.map((row) => row.label)).toEqual([
+      "Popup entrance",
+      "Title flourish",
+      "Animation speed",
+      "Pace fire",
+    ]);
+    // No row falls back to its humanised key, and no select shows a raw code.
+    for (const row of rows) {
+      expect(row.label).not.toMatch(/^(Intro|Burn) /);
+      if (row.control.kind !== "select") continue;
+      for (const option of row.control.options) expect(option.label).not.toBe(option.value);
+    }
+  });
+
   it("marks a row default only when the value equals the default, and flags restart effects", () => {
     const untouched = pref({ key: "compact_rows", type: "bool", default: false, value: false });
     const engine = pref({

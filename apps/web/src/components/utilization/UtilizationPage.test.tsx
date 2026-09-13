@@ -276,6 +276,8 @@ describe("UtilizationPage", () => {
     expect(markup).toContain("6.3k");
     expect(markup).toContain("520.0k");
     expect(markup).toContain("31.00");
+    // Turns are grouped like every other count in the fork, never "1200".
+    expect(markup).toContain(">1,200<");
     expect(markup).toContain("Tokens counted but not priced: mystery-1");
     expect(markup).toContain("24 hours");
   });

@@ -2,6 +2,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  AGENT_ACTIVITY_TOKEN_KINDS,
   pusherMac,
   registrationBody,
   registrationCommand,
@@ -75,4 +76,23 @@ describe("shouldSendToken", () => {
     expect(shouldSendToken(sent, "alert", "a", 1_001)).toBe(false);
     expect(shouldSendToken(sent, "alert", "a", 1_000 + TOKEN_RESEND_INTERVAL_MS)).toBe(true);
   });
+});
+
+describe("AGENT_ACTIVITY_TOKEN_KINDS", () => {
+  it("names the push-to-start and the running card's kinds, never the alert one (#1047)", () => {
+    expect(AGENT_ACTIVITY_TOKEN_KINDS).toEqual(["agent-activity-start", "agent-activity"]);
+    expect(registrationBody({ ...bodyInput(), kind: "agent-activity-start" }).layout).toBe("expo");
+  });
+
+  function bodyInput() {
+    return {
+      kind: "alert" as const,
+      token: "t",
+      deviceId: "d",
+      deviceName: "n",
+      environmentId: EnvironmentId.make("mac-1"),
+      sandbox: true,
+      now: new Date(0),
+    };
+  }
 });

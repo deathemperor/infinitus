@@ -288,6 +288,11 @@ export function compactTokens(value: number): string {
   return value.toFixed(0);
 }
 
+/** A turn count as the rest of the fork writes counts: "1,620", never "1620". */
+export function formatCount(value: number): string {
+  return Math.round(value).toLocaleString("en-US");
+}
+
 /**
  * The live line under the table (#1127): this server's own output rate over
  * its rolling window, folded from the per-turn usage it records. Null when no

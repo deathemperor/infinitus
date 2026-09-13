@@ -24,6 +24,10 @@ final class AppModel: ObservableObject {
     var primary: FleetState? { registry.primary }
     /// Per-engine last error (the primary's also lands in lastError).
     @Published var engineErrors: [String: String] = [:]
+    /// When each engine last answered `snapshot()`. The age a failing
+    /// engine's retained rows report falls back to this when the engine
+    /// stamped no `usageFetchedAt` of its own (`FleetState.markStale`).
+    private var engineLastGood: [String: Date] = [:]
     /// Per-engine honesty note for the fleet header (proxy: routing
     /// strategy that ignores priority tiers).
     @Published var fleetCaveats: [String: String] = [:]
@@ -489,7 +493,6 @@ final class AppModel: ObservableObject {
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Hold a power assertion while any session is mid-turn (KeepAwake).
     /// Display-only row order (PopupSort): the engine's slots, headroom
     /// with active + next pinned (todo 2026-09-01), or the engine's own
     /// candidate ranking (#542). Engine slots never move — nothing is
@@ -504,20 +507,6 @@ final class AppModel: ObservableObject {
             return sort
         }
         return PopupSort(legacyHeadroom: defaults.object(forKey: "sort_headroom") as? Bool ?? true)
-    }
-    @Published var keepAwake: Bool {
-        didSet {
-            defaults.set(keepAwake, forKey: "keep_awake")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
-    }
-    /// With `keepAwake`: the screen stays on too, the way a caffeine app
-    /// keeps it (#455). Off, only system sleep is held.
-    @Published var keepAwakeDisplay: Bool {
-        didSet {
-            defaults.set(keepAwakeDisplay, forKey: "keep_awake_display")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
     }
     // Away-push triggers beyond switches (PushTriggers has the rules).
     @Published var pushAllDead: Bool { didSet { defaults.set(pushAllDead, forKey: "push_all_dead") } }
@@ -789,7 +778,6 @@ final class AppModel: ObservableObject {
         Notifier.post(title: "Infinitus", body: body)
         liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
-    private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.
     private lazy var pushTriggers = PushTriggers(memory: persistedPushMemory)
@@ -898,8 +886,6 @@ final class AppModel: ObservableObject {
         swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
-        keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
-        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
         popupSort = Self.popupSort(defaults)
         mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
         mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
@@ -1022,7 +1008,7 @@ final class AppModel: ObservableObject {
     /// engine toggles go through their own setters, whose `didSet`
     /// relaunches the app, with the `engine` command's guards; every
     /// other key is stored and re-read by `reloadPrefs`, so its `didSet`
-    /// side effects (the LAN listener, keep-awake, the title) run as
+    /// side effects (the LAN listener, the title) run as
     /// they do from the panes. Returns the updated pref and whether the
     /// app is relaunching behind the reply.
     func setPref(key: String, value: JSONValue) throws -> (pref: PrefCatalog.Pref, restarting: Bool) {
@@ -1097,8 +1083,6 @@ final class AppModel: ObservableObject {
         set(\.popupLayout, defaults.string(forKey: "popup_layout") ?? "wide")
         set(\.popupTextSize, defaults.string(forKey: "popup_text_size") ?? "default")
         set(\.glassFocused, defaults.object(forKey: "glass_focused") as? Double ?? 0.7)
-        set(\.keepAwake, defaults.object(forKey: "keep_awake") as? Bool ?? false)
-        set(\.keepAwakeDisplay, defaults.object(forKey: "keep_awake_display") as? Bool ?? true)
         set(\.popupSort, Self.popupSort(defaults))
         set(\.pushAllDead, defaults.object(forKey: "push_all_dead") as? Bool ?? true)
         set(\.pushLastAlive, defaults.object(forKey: "push_last_alive") as? Bool ?? true)
@@ -2327,11 +2311,20 @@ final class AppModel: ObservableObject {
                     NSLog("Infinitus engine %@: %@", r.id, message)
                     engineErrors[r.id] = message
                 }
+                // Keeping the rows is right — they are still the best
+                // numbers the app has — but they must stop reading as
+                // current: every countdown on them is recomputed live
+                // off stored reset times, so an hour-old reading looked
+                // exactly like a fresh one. Age them instead.
+                for state in registry.fleets where state.engineID == r.id {
+                    state.markStale(reason: message, lastGood: engineLastGood[r.id], now: Date())
+                }
                 continue
             }
             // Only publish a change: every @Published set re-runs each
             // observer's body, once per refresh, even for an identical value (#18).
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
+            engineLastGood[r.id] = Date()
             for reported in fleets {
                 let state = registry.state(for: reported)
                 let fleet = withLocalSessions(reported, primary: state === primary)
@@ -2549,10 +2542,6 @@ final class AppModel: ObservableObject {
                 .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(current)"
             notify("switched to account \(current) (\(name))")
         }
-        if !isPlayground {
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay,
-                         busyCount: list.liveSessions?.busy ?? 0)
-        }
         controlServer.heal()
         // Same display-feed vantage as the switch diff above: these
         // triggers fire even while the supervised engine is parked.
@@ -2640,9 +2629,9 @@ final class AppModel: ObservableObject {
 
     /// The primary fleet's live sessions are the app's own scan when the
     /// engine reports none (#756: cswap's list carried them, swapd's does
-    /// not) — the keep-awake busy count, the token-rate/AWS-login scan,
-    /// the mirror's sessions block and the session→account attribution
-    /// all read this block off the primary fleet. Never in the playground
+    /// not) — the token-rate/AWS-login scan, the mirror's sessions block
+    /// and the session→account attribution all read this block off the
+    /// primary fleet. Never in the playground
     /// (demo data only).
     func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
         guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
@@ -2665,11 +2654,20 @@ final class AppModel: ObservableObject {
 /// every requirement is an existing member; only the relogin action is
 /// mac-only, so it lands here rather than in the protocol's no-op.
 extension AppModel: FleetModel {
+    // A click while a flow already runs brings ITS windows back rather
+    // than doing nothing (user 2026-09-13: "pressing again show nothing"
+    // — the sign-in was alive the whole time, buried under the pinned
+    // pop-out). `start` keeps its own guard; this is the way back in.
     func startRelogin(_ account: Account) {
+        guard !TokenFlow.shared.running, !addingFirstAccount else {
+            TokenFlow.shared.reopenAuth(); return
+        }
         TokenFlow.shared.start(model: self, relogin: account)
     }
     func addAccount() {
-        guard !TokenFlow.shared.running, !addingFirstAccount else { return }
+        guard !TokenFlow.shared.running, !addingFirstAccount else {
+            TokenFlow.shared.reopenAuth(); return
+        }
         TokenFlow.shared.start(model: self)
     }
     var canAddAccount: Bool { currentLoginEngine != nil }

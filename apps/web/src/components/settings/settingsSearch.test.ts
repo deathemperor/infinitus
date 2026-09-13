@@ -248,6 +248,31 @@ describe("searchSettings", () => {
     );
   });
 
+  it("sends the retired pushes and Live Activity nowhere (#1041)", () => {
+    const available = filterAvailableSettingsSearchItems({
+      hasCloudPublicConfig: false,
+      hasEnvironment: false,
+      hasProviderSettingsEnvironment: false,
+      canManageLocalBackend: false,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasInfinitusEnvironment: true,
+    });
+
+    // The Mac's session tracker took `push_waiting` and `push_aws_login` with
+    // it, and the Live Activity cards went with the sessions too. A result for
+    // any of the three lands on a page that no longer draws that row.
+    const ids = (query: string) => searchSettings(query, available).map((item) => item.id);
+    expect(ids("waiting")).not.toContain("infinitus-push");
+    expect(ids("aws sign-in")).not.toContain("infinitus-push");
+    expect(ids("live activity")).not.toContain("infinitus-devices");
+
+    // What each page does still hold is still findable.
+    expect(ids("account exhausted")).toContain("infinitus-push");
+    expect(ids("revive countdown")).toContain("infinitus-push");
+    expect(ids("mirror tunnel")).toContain("infinitus-devices");
+  });
+
   it("lights up the deepest Infinitus nav item only", () => {
     expect(isSettingsSectionActive("/settings/infinitus", "/settings/infinitus")).toBe(true);
     expect(isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus")).toBe(

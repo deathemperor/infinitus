@@ -15,6 +15,16 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
         /// A plain notification token (issue #3): every alert the Mac
         /// posts locally also reaches the phone, no Slack in between.
         case alert = "alert"
+        /// The phone's push-to-start token (iOS 17.2+) for the thread
+        /// card (#1047): the Mac can START the `AgentActivity` activity
+        /// with the app closed; iOS then hands the app the activity's
+        /// own token, registered as `agent-activity`.
+        case agentActivityStart = "agent-activity-start"
+        /// One live thread card's update token.
+        case agentActivity = "agent-activity"
+
+        /// Sent on the `liveactivity` push type and topic, not `alert`.
+        public var isLiveActivity: Bool { self != .alert }
     }
     public let kind: Kind
     /// Hex APNs token.
@@ -63,6 +73,20 @@ public struct ActivityPushRegistration: Codable, Sendable, Equatable {
 
 public enum LiveActivityPush {
     public static let bundleID = "run.infinitus.mobile"
+    public static let topic = bundleID + ".push-type.liveactivity"
+    /// The expo-widgets layout the phone registers for the thread card
+    /// (#1047): upstream's `AgentActivity`, one attributes type for
+    /// every expo activity, the state as a JSON STRING under `props` —
+    /// the envelope T3's relay sends, so the widget needs no change.
+    public static let agentActivityName = "AgentActivity"
+    public static let expoAttributesType = "LiveActivityAttributes"
+    /// Updates flow on thread events only, so a healthy card can be
+    /// silent for minutes; iOS dims it after this without one.
+    public static let staleAfter: TimeInterval = 10 * 60
+    /// How long an ended card with a final state stays on the screen,
+    /// and how fast one ended without a state goes.
+    public static let dismissAfter: TimeInterval = 5 * 60
+    public static let contentlessDismissAfter: TimeInterval = 15
 
     /// APNs answers that mean the token will never work again, so the
     /// registration is dropped instead of retried every push: 410
@@ -85,6 +109,49 @@ public enum LiveActivityPush {
     /// A plain alert (push-type `alert`, topic = the app's bundle id).
     public static func alertPayload(title: String, body: String) -> Data {
         data(["aps": ["alert": ["title": title, "body": body], "sound": "default"]])
+    }
+
+    /// The expo-widgets content state: the layout's name and the props
+    /// as one JSON string.
+    static func contentState(_ state: AgentActivityState) -> [String: Any] {
+        ["name": agentActivityName, "props": state.props]
+    }
+
+    /// `event: start` on a push-to-start token: attributes stay empty,
+    /// `input-push-token` asks iOS to hand the app the new activity's
+    /// token, and the alert wakes the screen with the card's headline.
+    public static func agentActivityStartPayload(_ state: AgentActivityState, now: Date = Date()) -> Data {
+        let timestamp = Int(now.timeIntervalSince1970)
+        return data(["aps": [
+            "timestamp": timestamp, "event": "start",
+            "attributes-type": expoAttributesType, "attributes": [String: Any](),
+            "input-push-token": 1,
+            "alert": ["title": state.title, "body": state.subtitle],
+            "content-state": contentState(state),
+            "stale-date": timestamp + Int(staleAfter),
+        ]])
+    }
+
+    /// `event: update` — new content for the running card.
+    public static func agentActivityUpdatePayload(_ state: AgentActivityState, now: Date = Date()) -> Data {
+        let timestamp = Int(now.timeIntervalSince1970)
+        return data(["aps": [
+            "timestamp": timestamp, "event": "update",
+            "content-state": contentState(state),
+            "stale-date": timestamp + Int(staleAfter),
+        ]])
+    }
+
+    /// `event: end` — with the last state it lingers a while; without
+    /// one it goes at once rather than freeze whatever it last showed.
+    public static func agentActivityEndPayload(_ state: AgentActivityState?, now: Date = Date()) -> Data {
+        let timestamp = Int(now.timeIntervalSince1970)
+        var aps: [String: Any] = [
+            "timestamp": timestamp, "event": "end",
+            "dismissal-date": timestamp + Int(state == nil ? contentlessDismissAfter : dismissAfter),
+        ]
+        if let state { aps["content-state"] = contentState(state) }
+        return data(["aps": aps])
     }
 
     private static func data(_ object: [String: Any]) -> Data {

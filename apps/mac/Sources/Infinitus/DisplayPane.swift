@@ -194,11 +194,6 @@ struct DisplayPane: View {
             if let note = login.note {
                 Text(note).font(.caption).foregroundStyle(.orange)
             }
-            Toggle("Keep the Mac awake while sessions are working",
-                   isOn: $model.keepAwake)
-            Toggle("Keep the screen on too",
-                   isOn: $model.keepAwakeDisplay)
-                .disabled(!model.keepAwake)
         } header: {
             Text("Refresh and startup")
         } footer: {
@@ -206,11 +201,7 @@ struct DisplayPane: View {
                  + "usage numbers; a longer one is lighter on the machine "
                  + "and slower to notice a switch. "
                  + "The login item points at where the app is right now — "
-                 + "move it and turn this off and on again. Keeping the Mac "
-                 + "awake holds a power assertion while any session is "
-                 + "mid-turn, like a caffeine app; with the screen on too "
-                 + "the display stays lit as well, otherwise it may sleep "
-                 + "while the machine won't.")
+                 + "move it and turn this off and on again.")
         }
         .settingsAnchor("Display/Startup")
     }
@@ -325,12 +316,6 @@ extension DisplayPane {
             entry(startup, "Refresh interval", ["poll", "interval", "refresh", "seconds"],
                   anchor: startupAnchor),
             entry(startup, "Start at login", ["login item", "startup", "launch", "boot"],
-                  anchor: startupAnchor),
-            entry(startup, "Keep the Mac awake while sessions are working",
-                  ["keep awake", "awake", "caffeinate", "sleep", "power"],
-                  anchor: startupAnchor),
-            entry(startup, "Keep the screen on too",
-                  ["screen", "display", "awake", "caffeine", "sleep"],
                   anchor: startupAnchor),
         ]
     }()

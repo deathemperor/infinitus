@@ -42,13 +42,23 @@ export const ALWAYS_ABSENT: ReadonlyArray<string> = [
 export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   { route: "/settings/infinitus", label: "Menu bar", marker: "Show the account name" },
   { route: "/settings/infinitus/themes", label: "Themes", marker: "Off — plain numbers" },
-  { route: "/settings/infinitus/animations", label: "Animations", marker: "Intro style" },
+  {
+    route: "/settings/infinitus/animations",
+    label: "Animations",
+    // A select's value, not its label: a label renders whether or not the
+    // choice names arrived, so the value is the part that proves they did.
+    marker: "[Popup entrance: Slide down from the top]",
+    shows: ["[Title flourish: Zoom in]", "[Pace fire: Ember]"],
+    // Each one is a key of this page humanised for want of web copy, the same
+    // failure `Fork ` guards above.
+    absent: ["Intro style", "Intro title", "Intro speed", "Burn style"],
+  },
   { route: "/settings/infinitus/sessions", label: "Priority", marker: "Session priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
   {
     route: "/settings/infinitus/notifications",
     label: "Notifications",
-    marker: "All sessions finish working",
+    marker: "All accounts are exhausted",
   },
   {
     route: "/settings/infinitus/devices",
@@ -90,9 +100,14 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     absent: ["Nothing logged yet.", "Only polls so far"],
   },
   {
+    // The Run rate row pins its own figures: the page's counts are the one
+    // place in the fork a raw number reached the screen ungrouped, so the
+    // week's turn count is asserted the way it reads, "1,620" (#1110's
+    // lesson, applied to the column a label alone would not have caught).
     route: "/utilization",
     label: "Utilization",
     marker: "ada-fixture",
+    shows: ["Last week 13.8M 58.20 1,620"],
     absent: ["No projection yet"],
   },
   {
@@ -118,6 +133,13 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Minutes lost, all out 77",
       "Ignites 7",
       "Resumes 21",
+      // The Cost group's four ratio tiles, which the web left out until it was
+      // diffed against the Mac's own catalogue. Each divides two figures, so a
+      // tile that stopped reading one of them reads "—" rather than a number.
+      "Per commit $2.04",
+      "Per PR $9.20",
+      "Tokens / line 141.2",
+      "Mean hours to merge 4.5",
     ],
   },
 ];

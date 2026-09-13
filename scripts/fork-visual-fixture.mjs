@@ -10,8 +10,8 @@
  *
  * The manifest and the preference catalog in `fork-visual-fixture.data.json`
  * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; accounts, the profiles, the forecast and
- * the stats are made up. Secrets: none — every write verb
+ * pref value reset to its default; the accounts, the forecast and the stats
+ * are made up. Secrets: none — every write verb
  * and every unknown verb is refused with `ok: false`, and only verb names are
  * logged. No dependencies; node ≥ 22.
  */
@@ -133,20 +133,6 @@ const forecast = () => ({
   },
 });
 
-const profiles = () => ({
-  profiles: [
-    {
-      name: "nightly-review",
-      cwd: "~/code/app",
-      engine: "claude",
-      permissionMode: "acceptEdits",
-      model: "opus",
-      allowTools: ["Edit", "Bash git"],
-    },
-    { name: "docs-sweep", engine: "codex", prompt: "Read the docs folder and list what is stale." },
-  ],
-});
-
 const tally = (n, usd) => ({
   n,
   s: n * 90,
@@ -204,6 +190,10 @@ const statsDay = (scale) => ({
   reverts: 1 * scale,
   prsOpened: 3 * scale,
   prsMerged: 2 * scale,
+  // The two the "Mean hours to merge" tile divides: 9 h per merged PR, one
+  // timing per merge, so the tile reads 4.5 whatever the period.
+  mergeHoursTotal: 9 * scale,
+  mergeCount: 2 * scale,
   // The compact form the Mac sends once the repo set is dropped, which the
   // Repos tile only reads when `repos` is absent or empty.
   repoTally: 3,
@@ -435,8 +425,6 @@ function answer(request, socketPath) {
     case "prefs":
       // One verb for reads and writes; the fixture holds no state to write.
       return args[0] === "set" ? undefined : data.prefs;
-    case "profiles":
-      return profiles();
     case "stats":
       return stats(typeof options.period === "string" ? options.period : "week");
     case "utilization":

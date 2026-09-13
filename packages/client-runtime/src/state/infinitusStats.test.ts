@@ -38,6 +38,11 @@ const summary = (overrides: Partial<StatsSummary> = {}): StatsSummary =>
       sessionSeconds: 4 * 1800,
       sessionBuckets: [1, 2, 1, 0],
       repoTally: 2,
+      prsMerged: 4,
+      linesAdded: 800,
+      linesRemoved: 200,
+      mergeHoursTotal: 10,
+      mergeCount: 4,
       activities: {
         code: { n: 5, s: 600, in: 10, out: 20, usd: 3 },
         review: { n: 1, s: 60, in: 1, out: 2, usd: 1 },
@@ -126,6 +131,22 @@ describe("statsTileGroups", () => {
     expect(find("Processed tokens").value).toBe("11,500");
     expect(find("Uncached input").value).toBe("1,500");
     expect(find("Keyboard").delta).toBe("new");
+  });
+
+  it("derives the cost group's four ratio tiles the way the pane did", () => {
+    expect(find("Per commit").value).toBe("$10.29");
+    expect(find("Per PR").value).toBe("$30.86");
+    expect(find("Tokens / line").value).toBe("2.0");
+    expect(find("Mean hours to merge").value).toBe("2.5");
+  });
+
+  it("shows an em dash where the denominator is zero", () => {
+    const empty = statsTileGroups(summary({ total: {} }));
+    const value = (id: string) => empty.flatMap((g) => g.tiles).find((t) => t.id === id)?.value;
+    expect(value("Per commit")).toBe("—");
+    expect(value("Per PR")).toBe("—");
+    expect(value("Tokens / line")).toBe("—");
+    expect(value("Mean hours to merge")).toBe("—");
   });
 });
 
