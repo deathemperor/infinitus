@@ -616,9 +616,12 @@ function WasteRowLine({
       <span className="w-24 shrink-0 text-right text-foreground">
         {Math.round(row.wastePct)}% unused
       </span>
-      {stale ? (
-        <span className="shrink-0 text-muted-foreground">Last seen hours before</span>
-      ) : null}
+      {/* Reserved on every row, stale or not: the caveat is a flex sibling of
+          the bar's track, so a slot only some rows carry would leave their
+          bars shorter than the rest and the percentages incomparable. */}
+      <span className="w-40 shrink-0 text-muted-foreground">
+        {stale ? "Last seen hours before" : null}
+      </span>
     </li>
   );
 }

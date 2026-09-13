@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
+- A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
 - The desktop's thread card can be shown on the phone's lock screen: the Mac starts it, redraws it as threads move and ends it when the desktop says so (#1047).
 
 
