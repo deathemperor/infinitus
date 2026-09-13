@@ -11,6 +11,7 @@ import {
   compactTokens,
   decodeUtilization,
   fiveHourSummary,
+  formatCount,
   historyLines,
   historyRange,
   liveRateText,
@@ -654,7 +655,7 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
                   <td className="py-1 text-left text-foreground">{row.label}</td>
                   <td className="py-1 text-right">{compactTokens(row.tokens)}</td>
                   <td className="py-1 text-right">{row.usd.toFixed(2)}</td>
-                  <td className="py-1 text-right">{row.messages}</td>
+                  <td className="py-1 text-right">{formatCount(row.messages)}</td>
                 </tr>
               ))}
             </tbody>

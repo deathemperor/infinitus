@@ -4,6 +4,7 @@ import {
   compactTokens,
   decodeUtilization,
   fiveHourSummary,
+  formatCount,
   historyLines,
   historyRange,
   liveRateText,
@@ -222,6 +223,12 @@ describe("run rate", () => {
       "950",
       "6.3k",
       "2.4M",
+    ]);
+    // A turn count is grouped, not compacted: a week of turns reads "1,620".
+    expect([formatCount(12), formatCount(1620), formatCount(1_200_000)]).toEqual([
+      "12",
+      "1,620",
+      "1,200,000",
     ]);
     expect(liveRateText(decodeUtilization(reply)!)).toBe(
       "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",

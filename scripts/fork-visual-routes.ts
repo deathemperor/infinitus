@@ -90,9 +90,14 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     absent: ["Nothing logged yet.", "Only polls so far"],
   },
   {
+    // The Run rate row pins its own figures: the page's counts are the one
+    // place in the fork a raw number reached the screen ungrouped, so the
+    // week's turn count is asserted the way it reads, "1,620" (#1110's
+    // lesson, applied to the column a label alone would not have caught).
     route: "/utilization",
     label: "Utilization",
     marker: "ada-fixture",
+    shows: ["Last week 13.8M 58.20 1,620"],
     absent: ["No projection yet"],
   },
   {
