@@ -17,8 +17,7 @@ enum Nesting {
     /// keeps the menu bar and the control socket; this one leaves. Dev
     /// instances (their own INFINITUS_CONTROL_SOCKET, or an unbundled
     /// binary) never take part. A twin on its way out — the desktop's
-    /// `quit` answers before the process exits, and a team quit can hold
-    /// it up to TeamModel.quitBound — is waited out first.
+    /// `quit` answers before the process exits — is waited out first.
     static func yieldsToRunningTwin() -> Bool {
         guard ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] == nil,
               Bundle.main.bundleURL.pathExtension == "app",

@@ -17,8 +17,7 @@ final class LockModel: ObservableObject {
     /// The last prompt's failure, shown under the Unlock button; cleared
     /// on the next attempt. A cancel leaves it nil.
     @Published private(set) var lastError: String?
-    /// Set by StatusItemHolder: opens the Settings window (the "button to
-    /// the setting" a disabled team action offers, plan 5).
+    /// Set by StatusItemHolder: opens the Settings window.
     var showSettings: (() -> Void)?
     private let defaults: UserDefaults
     private var observers: [NSObjectProtocol] = []
@@ -99,24 +98,9 @@ final class LockModel: ObservableObject {
         }
     }
 
-    /// Allowed while in a team (the pane warns first); the app never
-    /// leaves a team by itself.
     func turnOff() {
         mutate { $0.setEnabled(false) }
         defaults.set(false, forKey: LockSetting.enabledKey)
-    }
-
-    // MARK: teams
-
-    /// Names of the teams this Mac is in — for the off-while-in-a-team
-    /// warning. Reads the config files only (never TeamClient.open, which
-    /// spawns git); called on the toggle, not per render.
-    func teamNames() -> [String] {
-        let paths = TeamPaths.standard()
-        return paths.teamIDs().compactMap { id in
-            (try? Data(contentsOf: paths.configFile(id)))
-                .flatMap { try? CanonicalJSON.decode(TeamConfig.self, from: $0) }?.name
-        }
     }
 
     /// Opens Settings on the Lock pane. The pane's `onReceive` subscribes

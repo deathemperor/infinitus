@@ -26,9 +26,9 @@ enum SettingsSearchCatalog {
         case "Display": return DisplayPane.searchEntries
         case LockModel.paneTitle: return LockPane.searchEntries
         case "About": return AboutPane.searchEntries
-        // Accounts, Push, Profiles, Devices, Team and the engine panes
-        // carry their title and keywords only, until they publish their
-        // own searchEntries.
+        // Accounts, Push, Profiles, Devices and the engine panes carry
+        // their title and keywords only, until they publish their own
+        // searchEntries.
         default: return []
         }
     }

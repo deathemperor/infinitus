@@ -63,7 +63,7 @@ public actor OwnedSessions {
         init(pid: Int32, cwd: String, stdin: FileHandle) {
             self.pid = pid; self.cwd = cwd; self.stdin = stdin
             // A write to a child that already exited must fail, not raise
-            // SIGPIPE at the app (TeamGit.feed's idiom).
+            // SIGPIPE at the app.
             #if canImport(Darwin)
             _ = fcntl(stdin.fileDescriptor, F_SETNOSIGPIPE, 1)
             #elseif canImport(Glibc)
