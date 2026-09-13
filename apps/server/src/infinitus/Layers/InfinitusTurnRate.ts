@@ -35,8 +35,10 @@ export const InfinitusTurnRateLive = Layer.effect(
         const sum = yield* turnUsage.sumSince({ since });
         return { ...empty, ...sum };
       }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning("infinitus.turnRate.read-failed", cause).pipe(Effect.as(empty)),
+        // The projection's own failures only: a defect or an interrupt is not
+        // an empty window and has no business being reported as one.
+        Effect.catch((error) =>
+          Effect.logWarning("infinitus.turnRate.read-failed", error).pipe(Effect.as(empty)),
         ),
       ),
     });
