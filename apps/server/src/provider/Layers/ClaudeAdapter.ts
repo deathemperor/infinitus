@@ -441,11 +441,22 @@ interface ClaudeSessionContext {
   /** Fork (#270 E2): one anchor per completed turn, oldest first. */
   anchors: Array<ClaudeTurnAnchor>;
   /**
-   * Fork fallback: set while the first start's fork at `resumeSessionAt`
-   * can still be refused; `latest` says the session's end may stand in for
-   * the anchor once (`claudeForkFallback.logic.ts`).
+   * Fork fallback: set while the first start's fork at `resumeSessionAt` can
+   * still be refused; `latest` says the session's end may stand in for the
+   * anchor once (`claudeForkFallback.logic.ts`). The CLI refuses the anchor
+   * while reading its options, so this can settle before the thread's first
+   * send ever runs: `reopening` while the anchorless query is being opened,
+   * `spent` once it is, `missing` when the fork point is gone for good.
+   * `settled` completes on the last two, so a send that arrives meanwhile
+   * waits instead of talking to the query the CLI already dropped.
    */
-  forkAnchor: { readonly latest: boolean; state: "pending" | "reopening" | "spent" } | undefined;
+  forkAnchor:
+    | {
+        readonly latest: boolean;
+        state: "pending" | "reopening" | "spent" | "missing";
+        readonly settled: Deferred.Deferred<void>;
+      }
+    | undefined;
   /** Fork (#834): the last result's cumulative totals, differenced per turn. */
   lastResultTotals: ClaudeResultTotals | undefined;
   /** No prompt cache (#974): the run of large uncached calls, per session. */
@@ -3510,13 +3521,16 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     const { status, errorMessage } = resultOutcome(message, failureHint);
 
     const forkAnchor = context.forkAnchor;
+    // The CLI refuses an anchor it cannot resolve while reading its options,
+    // so this result can arrive before the thread's first send — no turn yet.
     if (
       status === "failed" &&
-      turn &&
       forkAnchor?.state === "pending" &&
       isForkAnchorMissingResult(message)
     ) {
       if (!forkAnchor.latest) {
+        forkAnchor.state = "missing";
+        yield* Deferred.succeed(forkAnchor.settled, undefined);
         yield* emitRuntimeError(context, FORK_POINT_MISSING_MESSAGE);
         yield* completeTurn(context, status, FORK_POINT_MISSING_MESSAGE, message);
         return;
@@ -3526,19 +3540,21 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       forkAnchor.state = "reopening";
       yield* Effect.logInfo("Claude fork point not found; forking at the session's end.", {
         threadId: context.session.threadId,
-        turnId: turn.turnId,
+        ...(turn ? { turnId: turn.turnId } : {}),
       });
       yield* emitRuntimeWarning(context, FORK_AT_END_MESSAGE);
       context.runFork(
         reopenForForkAtEnd(context).pipe(
           Effect.catch((error) =>
             Effect.gen(function* () {
-              if (context.stopped || context.turnState === undefined) return;
+              if (context.stopped) return;
               yield* emitRuntimeError(context, error.detail);
               yield* completeTurn(context, "failed", error.detail);
               yield* stopSessionInternal(context, { emitExitEvent: true });
             }),
           ),
+          // A send waiting on the refused query must never wait forever.
+          Effect.ensuring(Deferred.succeed(forkAnchor.settled, undefined)),
           Effect.catchCause((cause) =>
             Cause.hasInterruptsOnly(cause)
               ? Effect.void
@@ -3682,7 +3698,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
 
     switch (message.subtype) {
-      case "init":
+      case "init": {
+        // Fork fallback: the CLI got as far as a session, so it took the
+        // fork point. Nothing is waiting on the anchor any more.
+        const forkAnchor = context.forkAnchor;
+        if (forkAnchor?.state === "pending") {
+          forkAnchor.state = "spent";
+          yield* Deferred.succeed(forkAnchor.settled, undefined);
+        }
         yield* offerRuntimeEvent({
           ...base,
           type: "session.configured",
@@ -3691,6 +3714,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           },
         });
         return;
+      }
       case "status":
         yield* offerRuntimeEvent({
           ...base,
@@ -4436,14 +4460,16 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
   /**
    * Fork fallback: the refused query is closed and the fork reopened without
    * its anchor, the turn's own message sent again (unless the CLI never read
-   * it, in which case it is still queued).
+   * it, in which case it is still queued). With no turn — the CLI refused
+   * the anchor before the thread's first send — the fresh queue is simply
+   * empty and the send that follows fills it.
    */
   const reopenForForkAtEnd = Effect.fn("reopenForForkAtEnd")(function* (
     context: ClaudeSessionContext,
   ) {
     const turn = context.turnState;
     const forkAnchor = context.forkAnchor;
-    if (context.stopped || turn === undefined || forkAnchor?.state !== "reopening") {
+    if (context.stopped || forkAnchor?.state !== "reopening") {
       return;
     }
     const oldStreamFiber = context.streamFiber;
@@ -4464,7 +4490,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     const promptQueue = yield* Queue.unbounded<PromptQueueItem>();
     yield* Queue.offerAll(
       promptQueue,
-      carried.length > 0 || turn.lastUserMessage === undefined
+      carried.length > 0 || turn?.lastUserMessage === undefined
         ? carried
         : [{ type: "message" as const, message: turn.lastUserMessage }],
     );
@@ -4657,6 +4683,60 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       sessions.delete(context.session.threadId);
     }
   });
+
+  /**
+   * Fork fallback: the CLI refuses an anchor it cannot resolve while reading
+   * its options — before it ever asks for a prompt — so the refusal
+   * routinely beats the thread's first send, and that send would otherwise
+   * talk to a query that is already gone. Once the refusal is in, a send
+   * waits for the fallback's query and its fresh prompt queue; a fork point
+   * that is gone for good fails the send with the reason instead. A fork
+   * point still undecided is not waited on: the CLI takes the overwhelming
+   * majority of them, and the send is what makes it read anything.
+   */
+  const awaitForkPoint = Effect.fn("awaitForkPoint")(function* (context: ClaudeSessionContext) {
+    const forkAnchor = context.forkAnchor;
+    if (forkAnchor === undefined || forkAnchor.state === "pending") return;
+    if (forkAnchor.state === "reopening") {
+      yield* Deferred.await(forkAnchor.settled);
+    }
+    if (forkAnchor.state === "missing") {
+      return yield* new ProviderAdapterRequestError({
+        provider: PROVIDER,
+        method: "turn/start",
+        detail: FORK_POINT_MISSING_MESSAGE,
+      });
+    }
+    if (context.stopped) {
+      return yield* new ProviderAdapterSessionClosedError({
+        provider: PROVIDER,
+        threadId: context.session.threadId,
+      });
+    }
+  });
+
+  /**
+   * A query call a send makes (model, permission mode). The refusal can land
+   * between the send's own check and this call, leaving it to reject against
+   * the dropped query; the fallback's query then gets the same call.
+   */
+  const onSessionQuery = <A>(
+    context: ClaudeSessionContext,
+    method: string,
+    run: (query: ClaudeQueryRuntime) => Promise<A>,
+  ): Effect.Effect<A, ProviderAdapterError> => {
+    const attempt = Effect.tryPromise({
+      try: () => run(context.query),
+      catch: (cause) => toRequestError(context.session.threadId, method, cause),
+    });
+    return attempt.pipe(
+      Effect.catch((error) =>
+        context.forkAnchor === undefined || context.forkAnchor.state === "spent"
+          ? Effect.fail(error)
+          : awaitForkPoint(context).pipe(Effect.flatMap(() => attempt)),
+      ),
+    );
+  };
 
   const requireSession = (
     threadId: ThreadId,
@@ -5405,7 +5485,11 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         anchors: resumeState?.fork ? [] : [...(resumeState?.anchors ?? [])],
         forkAnchor:
           resumeState?.fork && existingResumeSessionId && resumeState.resumeSessionAt
-            ? { latest: resumeState.resumeSessionAtLatest === true, state: "pending" }
+            ? {
+                latest: resumeState.resumeSessionAtLatest === true,
+                state: "pending",
+                settled: yield* Deferred.make<void>(),
+              }
             : undefined,
         lastResultTotals: undefined,
         promptCache: INITIAL_PROMPT_CACHE_WATCH,
@@ -5469,6 +5553,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
   const sendTurn: ClaudeAdapterShape["sendTurn"] = Effect.fn("sendTurn")(function* (input) {
     const context = yield* requireSession(input.threadId);
+    // A fork whose anchor the CLI already refused has no usable query until
+    // the fallback's is open; everything below would talk to the dropped one.
+    yield* awaitForkPoint(context);
     const modelCatalog = yield* modelCatalogEffect;
     const selectedModel =
       input.modelSelection !== undefined && input.modelSelection.instanceId === boundInstanceId
@@ -5495,10 +5582,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     if (modelSelection?.model) {
       const apiModelId = resolveClaudeCatalogApiModelId(modelCatalog, modelSelection);
       if (context.currentApiModelId !== apiModelId) {
-        yield* Effect.tryPromise({
-          try: () => context.query.setModel(apiModelId),
-          catch: (cause) => toRequestError(input.threadId, "turn/setModel", cause),
-        });
+        yield* onSessionQuery(context, "turn/setModel", (query) => query.setModel(apiModelId));
         context.currentApiModelId = apiModelId;
       }
       context.session = {
@@ -5520,15 +5604,13 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     // "default" restores the session's original permission mode.
     // When interactionMode is absent we leave the current mode unchanged.
     if (input.interactionMode === "plan") {
-      yield* Effect.tryPromise({
-        try: () => context.query.setPermissionMode("plan"),
-        catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
-      });
+      yield* onSessionQuery(context, "turn/setPermissionMode", (query) =>
+        query.setPermissionMode("plan"),
+      );
     } else if (input.interactionMode === "default") {
-      yield* Effect.tryPromise({
-        try: () => context.query.setPermissionMode(context.basePermissionMode ?? "default"),
-        catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
-      });
+      yield* onSessionQuery(context, "turn/setPermissionMode", (query) =>
+        query.setPermissionMode(context.basePermissionMode ?? "default"),
+      );
     }
 
     const turnId = steeringTurnState?.turnId ?? TurnId.make(yield* randomUUIDv4);

@@ -8215,6 +8215,89 @@ describe("fork fallback (side questions)", () => {
     },
   );
 
+  it.effect("forks at the session's end when the CLI refuses before the first send", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+        resumeCursor: {
+          threadId: THREAD_ID,
+          resume: SOURCE_SESSION,
+          resumeSessionAt: "assistant-9",
+          resumeSessionAtLatest: true,
+          fork: true,
+        },
+      });
+      // The CLI refuses the fork point while reading its options: it never
+      // asked for a prompt, so this lands before the side question is sent.
+      anchorRefused(harness.query);
+      yield* settle;
+      assert.equal(harness.queries.length, 2);
+
+      // A side question asks in plan mode; the mode and the prompt must land
+      // on the fallback's query, not on the one the CLI already dropped.
+      yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "which browser tool the agent use to test?",
+        attachments: [],
+        interactionMode: "plan",
+      });
+      yield* settle;
+
+      const second = harness.queries[1]!;
+      assert.deepEqual(second.setPermissionModeCalls, ["plan"]);
+      assert.equal(
+        yield* Effect.promise(() => readFirstPromptText(harness.getLastCreateQueryInput())),
+        "which browser tool the agent use to test?",
+      );
+      const repair = runtimeEvents.find((event) => event.type === "runtime.warning");
+      assert.equal(
+        repair?.type === "runtime.warning" && repair.payload.message,
+        FORK_AT_END_MESSAGE,
+      );
+      assert.equal(
+        runtimeEvents.some((event) => event.type === "runtime.error"),
+        false,
+      );
+
+      init(second, "7c9e6679-7425-40de-944b-e07fc1f90ae7");
+      second.emit({
+        type: "assistant",
+        session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        uuid: "assistant-answer",
+        parent_tool_use_id: null,
+        message: { id: "message-answer", content: [{ type: "text", text: "An answer." }] },
+      } as unknown as SDKMessage);
+      second.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        uuid: "result-answer",
+      } as unknown as SDKMessage);
+      while (!runtimeEvents.some((event) => event.type === "turn.completed")) {
+        yield* Effect.yieldNow;
+      }
+      runtimeEventsFiber.interruptUnsafe();
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type === "turn.completed" && completed.payload.state, "completed");
+      assert.equal(harness.queries.length, 2);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("fails an earlier turn's anchor plainly instead of forking elsewhere", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
