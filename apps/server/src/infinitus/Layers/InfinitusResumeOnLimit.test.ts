@@ -6,6 +6,8 @@ import {
   type OrchestrationCommand,
   type OrchestrationThreadShell,
   ProviderDriverKind,
+  ProviderInstanceId,
+  type ProviderInstanceConfigMap,
   type ProviderRuntimeEvent,
   ThreadId,
   TurnId,
@@ -117,7 +119,24 @@ const shell = {
   id: threadId,
   archivedAt: null,
   interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+  modelSelection: { instanceId: ProviderInstanceId.make("claudeAgent"), model: "opus" },
 } as unknown as OrchestrationThreadShell;
+
+/** A thread on an instance that routes through a proxy (#1088). */
+const proxiedShell = {
+  ...shell,
+  modelSelection: { instanceId: ProviderInstanceId.make("claudeAgent_router"), model: "cc/opus" },
+} as unknown as OrchestrationThreadShell;
+const providerInstances: ProviderInstanceConfigMap = {
+  [ProviderInstanceId.make("claudeAgent")]: { driver: claude },
+  [ProviderInstanceId.make("claudeAgent_router")]: {
+    driver: claude,
+    displayName: "Router",
+    environment: [
+      { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:20128", sensitive: false },
+    ],
+  },
+};
 
 const session = {
   threadId,
@@ -148,7 +167,10 @@ interface Harness {
 }
 
 /** Fork (#616): the gate a resume passes through; passthrough by default. */
-const makeHarnessWith = (gate?: TurnStartGateShape) =>
+const makeHarnessWith = (
+  gate?: TurnStartGateShape,
+  threadShell: OrchestrationThreadShell = shell,
+) =>
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
     const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
@@ -185,7 +207,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
               ),
           }),
           Layer.mock(ProjectionSnapshotQuery)({
-            getThreadShellById: () => Effect.succeed(Option.some(shell)),
+            getThreadShellById: () => Effect.succeed(Option.some(threadShell)),
             getThreadRuntimeContext: () =>
               Effect.succeed(
                 Option.some({ id: threadId, projectId: shell.projectId, title: "Thread", session }),
@@ -195,6 +217,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
             getSettings: Ref.get(enabled).pipe(
               Effect.map((value) => ({
                 ...DEFAULT_SERVER_SETTINGS,
+                providerInstances,
                 infinitusResumeOnLimit: value,
               })),
             ),
@@ -481,5 +504,39 @@ describe("InfinitusResumeOnLimitLive", () => {
         expect(afterResume[3]).toEqual([]);
       }),
     ),
+  );
+  effectIt.effect(
+    "a proxied instance's limit names the instance, polls nothing and never resumes (#1088)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarnessWith(undefined, proxiedShell);
+          yield* TestClock.adjust(Duration.seconds(100));
+          yield* h.emit(
+            runtimeEvent("turn.completed", {
+              state: "failed",
+              errorMessage: "Claude stopped: a usage limit blocked the request.",
+            }),
+          );
+          const dispatched = yield* settle(h.dispatched, (list) => list.length === 1);
+          const limited = dispatched[0]!;
+          if (limited.type !== "thread.activity.append") throw new Error("limited row expected");
+          expect(limited.activity.summary).toBe("Limit hit on the proxy instance Router");
+          expect(limited.activity.payload).toMatchObject({ accounts: [], proxy: "Router" });
+          const stopped = yield* Stream.runHead(h.stopped);
+          expect(Option.getOrUndefined(stopped)?.map((entry) => entry.summary)).toEqual([
+            "Limit hit on the proxy instance Router",
+          ]);
+          // Nothing on this Mac can lift a proxy's limit: no snapshot watch, no resume.
+          yield* Effect.yieldNow;
+          expect(yield* h.watchers).toBe(0);
+          yield* h.setCurrent(swapped(at(150)));
+          yield* h.poll(swapped(at(150)));
+          yield* Effect.yieldNow;
+          expect(yield* h.turns).toEqual([]);
+          expect(yield* h.interrupts).toEqual([]);
+          expect((yield* h.dispatched).length).toBe(1);
+        }),
+      ),
   );
 });

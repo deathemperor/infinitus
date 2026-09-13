@@ -1,4 +1,10 @@
-import type { ProviderRuntimeEvent, ThreadId, TurnId } from "@t3tools/contracts";
+import type {
+  ModelSelection,
+  ProviderInstanceConfigMap,
+  ProviderRuntimeEvent,
+  ThreadId,
+  TurnId,
+} from "@t3tools/contracts";
 import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 
 /**
@@ -16,6 +22,9 @@ const CLAUDE_DRIVER = "claudeAgent";
 const CLAUDE_PROVIDER = "claude";
 /** The engine's word for an account that can take work. */
 const ACCOUNT_OK = "ok";
+/** The variable a proxied instance carries (`applyProxyDraft`, #1088): its
+    requests never spend a swapd account, so its limit is the proxy's own. */
+const PROXY_BASE_URL_VARIABLE = "ANTHROPIC_BASE_URL";
 
 /** Two resumes of one thread are never closer than this; a flapping "ok"
     cannot chain them. Native's ResumeGate spaces its nudges the same way. */
@@ -47,6 +56,10 @@ export interface LimitStop {
   /** When the window that rejected the turn resets (epoch ms), from the SDK's
       `rate_limit_info`; null for a failed turn, whose error names no reset. */
   readonly resetsAt: number | null;
+  /** The proxied instance the thread runs on (#1088), else null: its limit
+      belongs to the proxy's upstream, so no swapd account is named and no
+      rotation resumes it. */
+  readonly proxy: string | null;
 }
 
 /** The adapter's own two wordings for a limit-ended turn — fixed strings in
@@ -70,6 +83,7 @@ export function limitStopFromEvent(
     turnId: event.turnId ?? null,
     stoppedAt: now,
     activeAtStop: activeClaudeAccounts(snapshot),
+    proxy: null,
   };
   if (event.type === "runtime.warning") {
     const detail = event.payload.detail;
@@ -99,6 +113,28 @@ export function limitStopFromEvent(
     return { ...base, kind: "failed", resetsAt: null };
   }
   return null;
+}
+
+/**
+ * The proxied instance's label when the thread's instance routes through one
+ * (`ANTHROPIC_BASE_URL` on its environment), else null. The display name,
+ * falling back to the instance id.
+ */
+export function proxyInstanceLabel(
+  instances: ProviderInstanceConfigMap,
+  selection: Pick<ModelSelection, "instanceId">,
+): string | null {
+  const instance = instances[selection.instanceId];
+  if (instance === undefined) return null;
+  const proxied = (instance.environment ?? []).some(
+    (variable) => variable.name === PROXY_BASE_URL_VARIABLE && variable.value.trim() !== "",
+  );
+  return proxied ? (instance.displayName ?? selection.instanceId) : null;
+}
+
+/** The stop as a proxied instance's: no account named, never resumed. */
+export function proxyStop(stop: LimitStop, proxy: string): LimitStop {
+  return { ...stop, proxy, activeAtStop: new Map() };
 }
 
 /**
@@ -156,6 +192,8 @@ export interface ResumeTarget {
  * weaker test, a different account than the one at the stop.
  */
 export function resumeTarget(stop: LimitStop, snapshot: InfinitusSnapshot): ResumeTarget | null {
+  // A proxy's limit: no account on this Mac can lift it (#1088).
+  if (stop.proxy !== null) return null;
   for (const fleet of claudeFleets(snapshot)) {
     const active = fleet.accounts.find((account) => account.active);
     if (active === undefined || active.usageStatus !== ACCOUNT_OK) continue;
@@ -172,6 +210,7 @@ export function resumeTarget(stop: LimitStop, snapshot: InfinitusSnapshot): Resu
 /** The limited row's line: the account whose limit stopped the turn, when
     the snapshot named one. */
 export function limitMarkerSummary(stop: LimitStop): string {
+  if (stop.proxy !== null) return `Limit hit on the proxy instance ${stop.proxy}`;
   const accounts = [...new Set(stop.activeAtStop.values())];
   return accounts.length === 0 ? "Limit hit" : `Limit hit on ${accounts.join(", ")}`;
 }

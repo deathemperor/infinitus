@@ -1,6 +1,8 @@
 import {
   EventId,
   ProviderDriverKind,
+  ProviderInstanceId,
+  type ProviderInstanceConfigMap,
   type ProviderRuntimeEvent,
   ThreadId,
   TurnId,
@@ -11,7 +13,10 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   activeClaudeAccounts,
   eventCancelsStop,
+  limitMarkerSummary,
   limitStopFromEvent,
+  proxyInstanceLabel,
+  proxyStop,
   resumeMarkerSummary,
   resumeTarget,
   type LimitStop,
@@ -69,6 +74,7 @@ const stopAt = (snapshot: InfinitusSnapshot, kind: LimitStop["kind"] = "parked")
   stoppedAt: NOW,
   activeAtStop: activeClaudeAccounts(snapshot),
   resetsAt: null,
+  proxy: null,
 });
 
 describe("limitStopFromEvent", () => {
@@ -83,6 +89,7 @@ describe("limitStopFromEvent", () => {
       activeAtStop: new Map([["swapd/claude", "one@example.com"]]),
       // The SDK's epoch seconds, kept as milliseconds.
       resetsAt: 1_757_600_000_000,
+      proxy: null,
     });
     // A reset the SDK left out, or one that is not a number, is none.
     expect(
@@ -270,5 +277,63 @@ describe("resumeTarget", () => {
     );
     expect(target?.account).toBe("work");
     expect(resumeMarkerSummary(target!)).toBe("Turn resumed on work");
+  });
+});
+
+describe("proxied instances (#1088)", () => {
+  const instances: ProviderInstanceConfigMap = {
+    [ProviderInstanceId.make("claudeAgent")]: { driver: ProviderDriverKind.make("claudeAgent") },
+    [ProviderInstanceId.make("claudeAgent_router")]: {
+      driver: ProviderDriverKind.make("claudeAgent"),
+      displayName: "Router",
+      environment: [
+        { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:20128", sensitive: false },
+        { name: "ANTHROPIC_AUTH_TOKEN", value: "", sensitive: true, valueRedacted: true },
+      ],
+    },
+    [ProviderInstanceId.make("claudeAgent_blank")]: {
+      driver: ProviderDriverKind.make("claudeAgent"),
+      environment: [{ name: "ANTHROPIC_BASE_URL", value: " ", sensitive: false }],
+    },
+  };
+
+  it("names the instance whose environment routes through a proxy, else nothing", () => {
+    expect(
+      proxyInstanceLabel(instances, { instanceId: ProviderInstanceId.make("claudeAgent") }),
+    ).toBeNull();
+    expect(
+      proxyInstanceLabel(instances, { instanceId: ProviderInstanceId.make("gone") }),
+    ).toBeNull();
+    expect(
+      proxyInstanceLabel(instances, { instanceId: ProviderInstanceId.make("claudeAgent_blank") }),
+    ).toBeNull();
+    expect(
+      proxyInstanceLabel(instances, { instanceId: ProviderInstanceId.make("claudeAgent_router") }),
+    ).toBe("Router");
+    const unnamed = {
+      ...instances,
+      [ProviderInstanceId.make("claudeAgent_router")]: {
+        driver: ProviderDriverKind.make("claudeAgent"),
+        environment: [{ name: "ANTHROPIC_BASE_URL", value: "http://p", sensitive: false }],
+      },
+    };
+    expect(
+      proxyInstanceLabel(unnamed, { instanceId: ProviderInstanceId.make("claudeAgent_router") }),
+    ).toBe("claudeAgent_router");
+  });
+
+  it("a proxied stop names no account and no rotation resumes it", () => {
+    const snapshot = snapshotWith([account(1, "one@example.com", { active: true })]);
+    const plain = stopAt(snapshot, "failed");
+    expect(limitMarkerSummary(plain)).toBe("Limit hit on one@example.com");
+    const proxied = proxyStop(plain, "Router");
+    expect(proxied.activeAtStop.size).toBe(0);
+    expect(limitMarkerSummary(proxied)).toBe("Limit hit on the proxy instance Router");
+    const after = "2026-09-11T10:01:00Z";
+    const live = snapshotWith([
+      account(2, "two@example.com", { active: true, usageFetchedAt: after }),
+    ]);
+    expect(resumeTarget(plain, live)).not.toBeNull();
+    expect(resumeTarget(proxied, live)).toBeNull();
   });
 });

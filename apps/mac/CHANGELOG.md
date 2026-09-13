@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- A thread that runs through a proxy instance no longer blames a swapd account when the proxy's limit stops it, and is no longer re-sent into that limit on every account switch (#1088).
 - Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
 
 ### Mac

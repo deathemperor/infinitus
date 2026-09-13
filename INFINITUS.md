@@ -1679,7 +1679,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   and the banner add "resets <time>" in the user's timestamp format while
   the instant is still ahead (`infinitusHoldBanner.logic.ts` `limitedLine`
   / `resetLabelFor`, `sidebar/HeldTooltipText.tsx`). A failed stop names no
-  reset. Once per stop, 2-min cooldown per thread,
+  reset. A thread on an instance whose environment carries
+  `ANTHROPIC_BASE_URL` (a proxy, #1088) spends no swapd account: its stop
+  reads "Limit hit on the proxy instance <display name>", names no account,
+  starts no snapshot watch and is never resumed — the banner stays until the
+  user sends again. Once per stop, 2-min cooldown per thread,
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).
