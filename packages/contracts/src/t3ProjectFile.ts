@@ -5,11 +5,23 @@ import { ThreadEnvMode } from "./environment.ts";
 import { ProjectScriptIcon } from "./orchestration.ts";
 import { PRODUCT_NAME } from "./productName.ts";
 
-/** File name of the checked-in T3 project file, resolved at the workspace root. */
-export const T3_PROJECT_FILE_NAME = "t3.json";
+/** File name of the checked-in project file, resolved at the workspace root. */
+export const T3_PROJECT_FILE_NAME = "infinitus.json";
+
+/** Upstream's name for the same file, still read when the preferred one is absent. */
+export const LEGACY_T3_PROJECT_FILE_NAME = "t3.json";
+
+/**
+ * The names a workspace root is searched for, in order. The first one that
+ * exists decides; a second file is never merged into the first.
+ */
+export const T3_PROJECT_FILE_NAMES = [
+  T3_PROJECT_FILE_NAME,
+  LEGACY_T3_PROJECT_FILE_NAME,
+] as const;
 
 /** Public URL of the published JSON Schema for {@link T3ProjectFile}. */
-export const T3_PROJECT_FILE_SCHEMA_URL = "https://t3.codes/schema/t3.json";
+export const T3_PROJECT_FILE_SCHEMA_URL = "https://infinitus.run/schema/infinitus.json";
 
 const T3_PROJECT_FILE_PATH_MAX_LENGTH = 512;
 const T3_PROJECT_FILE_MAX_SCRIPTS = 50;
@@ -87,7 +99,7 @@ export const T3ProjectFile = Schema.Struct({
       .check(Schema.isMaxLength(T3_PROJECT_FILE_MAX_SCRIPTS)),
   ),
 }).annotate({
-  title: "T3 project file",
-  description: `Checked-in project configuration for ${PRODUCT_NAME} (t3.json at the repository root). See https://t3.codes for documentation.`,
+  title: `${PRODUCT_NAME} project file`,
+  description: `Checked-in project configuration for ${PRODUCT_NAME} (${T3_PROJECT_FILE_NAME} at the repository root).`,
 });
 export type T3ProjectFile = typeof T3ProjectFile.Type;

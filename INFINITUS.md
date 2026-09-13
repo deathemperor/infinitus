@@ -220,7 +220,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 J; test `projectScripts.test.ts`). Surfaced by the hint under the
   Command field in `apps/web/src/components/projectScriptEditor.tsx` and the
   `command` description in `packages/contracts/src/t3ProjectFile.ts` (the
-  published `t3.json` schema); the two exact-env assertions in
+  published project file schema); the two exact-env assertions in
   `apps/server/src/project/ProjectSetupScriptRunner.test.ts` became
   `expect.objectContaining`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Jump to next waiting
@@ -1135,6 +1135,41 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
 - `README.md` — the fork notice at the top.
+- **The project file is `infinitus.json`** (#823 layer 1: the upstream name
+  never reaches a screen, and this one is on screen every time the scripts
+  menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
+  is the pivot: `T3_PROJECT_FILE_NAME` is `infinitus.json`,
+  `LEGACY_T3_PROJECT_FILE_NAME` keeps upstream's `t3.json`, and
+  `T3_PROJECT_FILE_NAMES` is the order every read site walks — the first name
+  that answers decides, and a file that answered decides even when it fails to
+  decode, so a checkout carrying both never silently falls back to the older
+  one. No merge, no conversion: an unconverted repository is read from its
+  `t3.json` as before. The four read sites:
+  `apps/server/src/project/T3ProjectFileLoader.ts` (the loop, + its test's
+  fallback and preferred-wins cases), `apps/web/src/hooks/useT3ProjectFileScripts.ts`
+  (both names queried, `loading` until both settle so the status cannot flap),
+  `apps/web/src/lib/t3ProjectFileDefaults.ts` and
+  `apps/mobile/src/features/threads/new-task-flow-provider.tsx` (both queries
+  gated on the same boolean, so the hook count is stable). The copy follows:
+  "From infinitus.json" / "Import from infinitus.json"
+  (`ProjectScriptsControl.tsx`, `ProjectActionsSettings.tsx`, whose invalid-file
+  card names both), the Workspace rows in `ProjectDefaultsSettings.tsx`, the
+  `settingsSearch.ts` and `CommandPalette.tsx` search terms (both names) and
+  `docs/user/project-settings.md`.
+  `T3_PROJECT_FILE_SCHEMA_URL` is `https://infinitus.run/schema/infinitus.json`
+  — upstream's `apps/marketing/src/pages/schema/t3.json.ts` is left untouched
+  and now publishes a document whose `$id` names ours, which is harmless: it is
+  upstream's site, not ours. We serve the schema from `apps/mac/site`, which has
+  no build step, so `scripts/build-project-file-schema.ts` writes
+  `apps/mac/site/public/schema/infinitus.json` from
+  `buildT3ProjectFileJsonSchema()` and `--check` (with the test beside it)
+  fails when the checked-in asset drifts from the contract. Regenerate after any
+  change to the project file schema, and **the URL only resolves after a hand
+  `npx wrangler deploy` from `apps/mac/site`**.
+  The repository's own `infinitus.json` carries `iconPath`
+  `assets/infinitus/infinitus-web-apple-touch-180.png`, so the project row for
+  this checkout draws the Infinitus mark instead of upstream's T3 blueprint
+  icon; `ProjectFaviconResolver` reads it ahead of the well-known favicon paths.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch. The sync workflow
