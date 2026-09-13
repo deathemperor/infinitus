@@ -176,7 +176,7 @@ export type DesktopUpdateStatus =
 
 export type DesktopRuntimeArch = "arm64" | "x64" | "other";
 export type DesktopTheme = "light" | "dark" | "system";
-export type DesktopUpdateChannel = "latest" | "nightly" | "infinitus";
+export type DesktopUpdateChannel = "latest" | "nightly" | "infinitus" | "infinitus-nightly";
 export type DesktopAppStageLabel = "Alpha" | "Dev" | "Nightly";
 
 export const DesktopUpdateStatusSchema = Schema.Literals([
@@ -191,7 +191,12 @@ export const DesktopUpdateStatusSchema = Schema.Literals([
 ]);
 export const DesktopRuntimeArchSchema = Schema.Literals(["arm64", "x64", "other"]);
 export const DesktopThemeSchema = Schema.Literals(["light", "dark", "system"]);
-export const DesktopUpdateChannelSchema = Schema.Literals(["latest", "nightly", "infinitus"]);
+export const DesktopUpdateChannelSchema = Schema.Literals([
+  "latest",
+  "nightly",
+  "infinitus",
+  "infinitus-nightly",
+]);
 export const DesktopAppStageLabelSchema = Schema.Literals(["Alpha", "Dev", "Nightly"]);
 
 export interface DesktopAppBranding {
@@ -1344,6 +1349,12 @@ export interface DesktopBridge {
    * user. Optional: a shell without it hides the switch.
    */
   setBadgeCount?: (count: number) => Promise<void>;
+  /**
+   * Fork (#1075): hold off sleep while a local thread's turn runs; the
+   * renderer sends the verdict, the shell holds one power-save blocker.
+   * Optional: a shell without it hides the switch.
+   */
+  setKeepAwake?: (active: boolean) => Promise<void>;
   openInfinitusSignIn?: (input: InfinitusSignInWindowInput) => Promise<void>;
   closeInfinitusSignIn?: (flowId: string) => Promise<void>;
   submitInfinitusSignInCode?: (

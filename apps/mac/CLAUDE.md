@@ -18,10 +18,6 @@ before that the `native` branch). Split out of
   Never read engine internals (`~/.claude-swap-backup/*`). Reading
   Claude Code's own files is fine: `~/.claude/settings.json`,
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.
-- **The resume-nudge mechanism lives HERE, not in the engine** (user
-  2026-08-30; upstream never merged PR #250's copy). InfinitusCore
-  ClaudeSessions/Transcript/PeerSocket/PtyHosts/PtyNudge/SessionResume
-  + ResumeService. Never rebuild it engine-side.
 - **Bundle id is `run.infinitus`**, the phone's `run.infinitus.mobile`
   (+`.widgets`, `.share`), every derived service id under the same
   prefix (user-approved explicit ask, 2026-09-05, with the paid Apple
@@ -69,7 +65,7 @@ before that the `native` branch). Split out of
   appends it; each clone/worktree owner runs `git config core.hooksPath
   tools/githooks` once (shared across worktrees of one clone). Subagent
   briefs still say it explicitly.
-- Secrets (webhook URLs, bot tokens) travel over stdin, never argv; shown
+- Secrets (tokens, sign-in codes) travel over stdin, never argv; shown
   masked only. Usage-cost figures are estimates, never billing truth.
 - **Release notes: one feature, one line** (user 2026-09-04). A CHANGELOG
   bullet is a single short sentence — no multi-sentence paragraphs, no
@@ -139,7 +135,7 @@ before that the `native` branch). Split out of
   account = base URL). Unsigned debug binaries trip an ACL prompt on
   every rebuild — reads skip UI, and the dev loop codesigns the debug
   binary with the Apple Development identity so the grant sticks.
-- A dev instance never pushes Live Activities from the shipped app's
+- A dev instance never pushes alerts from the shipped app's
   APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
   only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
   the pusher stays unconfigured — silently (no last-result line, no

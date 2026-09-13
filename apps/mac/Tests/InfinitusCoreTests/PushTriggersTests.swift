@@ -101,8 +101,6 @@ final class PushTriggersTests: XCTestCase {
         XCTAssertEqual(t.tick(accounts: dead, flags: all), [])
         _ = t.tick(accounts: mixed, flags: all)
         XCTAssertEqual(t.tick(accounts: dead, flags: all).count, 1)
-        XCTAssertTrue(PushTriggers.isAllDeadMessage("all 2 accounts exhausted — nothing left to switch to"))
-        XCTAssertFalse(PushTriggers.isAllDeadMessage("a1 is back"))
     }
 
     func testAllDeadAtLaunchIsSeededSilently() {

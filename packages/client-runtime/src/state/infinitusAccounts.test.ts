@@ -602,8 +602,6 @@ describe("sign-in rows", () => {
         toolLabel: "AWS",
         profile: "dev",
         failedAt: "2026-09-10T08:00:00Z",
-        sessions: ["api · feature/login"],
-        pid: 101,
         deviceCode: true,
         phase: "idle",
         url: null,
@@ -616,8 +614,6 @@ describe("sign-in rows", () => {
         toolLabel: "gcloud",
         profile: "me@example.com",
         failedAt: "2026-09-10T08:00:00Z",
-        sessions: ["api · feature/login"],
-        pid: 202,
         deviceCode: false,
         phase: "idle",
         url: null,
@@ -628,25 +624,18 @@ describe("sign-in rows", () => {
     expect(rows).toEqual(expected);
   });
 
-  it("folds every session waiting on one profile into its row, latest lapse first", () => {
+  it("folds every lapse of one profile into its row, latest first", () => {
     const rows = buildSignInRows(
       snapshot({
-        sessions: [{ pid: 303, name: "web", cwd: "/w", kind: "claude" }],
         awsLogins: [
-          login({ pid: 101, failedAt: "2026-09-10T08:00:00Z" }),
-          login({ pid: 303, sessionLabel: null, failedAt: "2026-09-10T09:30:00Z" }),
-          login({ pid: 404, sessionLabel: null, failedAt: null }),
-          login({ pid: 101, failedAt: "2026-09-10T08:00:00Z" }),
+          login({ failedAt: "2026-09-10T08:00:00Z" }),
+          login({ failedAt: "2026-09-10T09:30:00Z" }),
+          login({ failedAt: null }),
         ],
       }),
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      key: "aws:dev",
-      failedAt: "2026-09-10T09:30:00Z",
-      pid: 303,
-      sessions: ["api · feature/login", "web", "pid 404"],
-    });
+    expect(rows[0]).toMatchObject({ key: "aws:dev", failedAt: "2026-09-10T09:30:00Z" });
   });
 
   it("carries the running login's phase, page and code", () => {
@@ -678,29 +667,23 @@ describe("sign-in rows", () => {
   });
 
   it("starts a device-code profile flag-less and every other flow on the Mac's browser", () => {
-    const [aws, gcloud, relay] = buildSignInRows(
+    const [aws, gcloud] = buildSignInRows(
       snapshot({
         awsLogins: [
           login(),
           login({ profile: "me@example.com", provider: "gcloud", flow: "relay", pid: null }),
-          login({ profile: "legacy", flow: "relay", pid: 505 }),
         ],
       }),
     );
     expect(signInCommandArgs(aws!)).toEqual({
       command: "aws-login",
       args: ["dev"],
-      options: { pid: "101" },
+      options: {},
     });
     expect(signInCommandArgs(gcloud!)).toEqual({
       command: "gcloud-login",
       args: ["me@example.com"],
       options: { local: "true" },
-    });
-    expect(signInCommandArgs(relay!)).toEqual({
-      command: "aws-login",
-      args: ["legacy"],
-      options: { local: "true", pid: "505" },
     });
   });
 });

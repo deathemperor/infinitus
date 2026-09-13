@@ -31,14 +31,7 @@ final class AppModel: ObservableObject {
 
     var accounts: [Account] { primary?.accounts ?? [] }
     var activeNumber: Int? { primary?.activeNumber }
-    /// When the current active account became active — ResumeGate holds
-    /// post-switch nudges until it has held for a while (#136).
-    private var activeSince: Date?
     var nextCandidate: Int? { primary?.nextCandidate }
-    /// Limit-stopped sessions waiting to resume; non-nil only while
-    /// every account is at a limit (rides the all-limited banner).
-    @Published var waitingResume: Int?
-    private var waitingScanAt: Date = .distantPast
     var nextRecovery: NextRecovery? { primary?.nextRecovery }
     var liveSessions: LiveSessions? { primary?.liveSessions }
     /// Session-list popover (brain chip click) — popup-wide state so the
@@ -131,8 +124,6 @@ final class AppModel: ObservableObject {
         let event = StatsEvent(at: Date(), kind: kind, icon: icon, text: text)
         Task.detached(priority: .utility) { [eventStore] in await eventStore.append(event) }
     }
-    /// App-side resume nudges + /rc re-arm (ResumeService.swift).
-    let resume = ResumeService()
     /// Sessions popover's mini progress rows (SessionProgressModel.swift).
     let sessionProgress = SessionProgressModel()
     /// What Infinitus started each live session as (#163/#165), by pid;
@@ -149,8 +140,6 @@ final class AppModel: ObservableObject {
         sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
         try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
     }
-    /// "Allow for this session" rules from the phone (#79), per session id.
-    let toolApprovals = ToolApprovals()
 
     /// The phone's star/pause verbs (`POST /accounts/action`), with the
     /// popup's own semantics: the same capability guards the control
@@ -190,26 +179,6 @@ final class AppModel: ObservableObject {
         return AccountAction.Reply(outcome: "done")
     }
 
-    /// Moves a running session's permission mode (#163 phase 2): the
-    /// plugin's PreToolUse hook answers from it. The start mode is a
-    /// floor — Claude Code itself already lets those tools through, so
-    /// narrowing from here would only pretend.
-    func setSessionMode(_ text: String, pid: Int, record: ClaudeSessionRecord) -> SessionInput.Reply {
-        let mode = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let choice = SessionModes.hookModes.first(where: { $0.mode == mode }) else {
-            return SessionInput.Reply(outcome: "rejected", detail: "mode must be one of \(SessionModes.hookModes.map(\.mode).joined(separator: ", "))")
-        }
-        let birth = sessionBirths[pid] ?? SessionBirth()
-        let target: String? = choice.mode == "supervised" ? nil : choice.mode
-        if SessionModes.modeRank(target) < SessionModes.modeRank(birth.permissionMode) {
-            let started = birth.modeLabelForStart ?? "supervised"
-            return SessionInput.Reply(outcome: "rejected", detail: "the session started as \(started); a start mode cannot be narrowed from here")
-        }
-        toolApprovals.setMode(target, sessionId: record.sessionId)
-        recordBirth(pid: pid, birth.moved(to: target))
-        logEvent("hook", icon: "checkmark.shield", "session \(pid) moved to \(choice.label)")
-        return SessionInput.Reply(outcome: "delivered", channel: "mac", detail: choice.label)
-    }
     @Published var lastError: String?
     /// #7 layer 2: the reset battle plan for the current sprint, recomputed
     /// every snapshot; nil when there is nothing to plan. Manual mode: the
@@ -298,7 +267,6 @@ final class AppModel: ObservableObject {
     private let launchExecutableDate = AppModel.executableDate()
     private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
-    private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
     // Display prefs, persisted to UserDefaults under the same names and
@@ -567,10 +535,6 @@ final class AppModel: ObservableObject {
     @Published var priorityLowPct: Int { didSet { defaults.set(priorityLowPct, forKey: "priority_low_pct"); rejudgeHeadroom() } }
     @Published var priorityAbundantPct: Int { didSet { defaults.set(priorityAbundantPct, forKey: "priority_abundant_pct"); rejudgeHeadroom() } }
     private func rejudgeHeadroom() { for fleet in fleets { fleet.judgeHeadroom() } }
-    /// Settings › Sync "Phone lock screen": how often the working Live
-    /// Activity's tok/min is pushed on its own (user 2026-09-08 "update the
-    /// tok/min every 5s, make it configurable"); 0 = only with other changes.
-    @Published var liveActivityRateSeconds: Int { didSet { defaults.set(liveActivityRateSeconds, forKey: "live_activity_rate_seconds") } }
     /// Settings › Sync "This Mac's name" (#99); empty follows the computer name.
     @Published var machineNameOverride: String {
         didSet {
@@ -582,9 +546,6 @@ final class AppModel: ObservableObject {
         }
     }
     var machineName: String { MachineName.current(defaults: defaults) }
-    /// Per-turn workspace checkpoints (#167): a hidden git ref per prompt,
-    /// recorded when the plugin's UserPromptSubmit hook fires.
-    @Published var checkpointsEnabled: Bool { didSet { defaults.set(checkpointsEnabled, forKey: "checkpoints_enabled") } }
     /// The status item in the theme's color with the theme's icon (#90),
     /// and its effects (switch/death/revival flash, the burn breath).
     @Published var menuBarThemed: Bool { didSet { defaults.set(menuBarThemed, forKey: "menubar_themed") } }
@@ -731,10 +692,6 @@ final class AppModel: ObservableObject {
     static let statsSurface = "stats"
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
-    /// `Stop`/`SessionEnd` hints ahead of Claude Code's own record (#79);
-    /// off the main actor — `sessionRows` reads it
-    /// from wherever the control socket calls in.
-    let sessionStatusHints = OSAllocatedUnfairLock(initialState: SessionStatusHints())
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
@@ -757,7 +714,7 @@ final class AppModel: ObservableObject {
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
     func push(_ msg: String) {
-        notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+        notify(msg)
     }
 
     struct SessionRow {
@@ -776,8 +733,7 @@ final class AppModel: ObservableObject {
     /// The live sessions as the control socket lists them (#79): the
     /// record plus the name the popup shows.
     func sessionRows() -> [SessionRow] {
-        let hinted = sessionStatusHints.withLock { $0.apply(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())) }
-        return hinted.map { record in
+        return ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { record in
             let pid = Int(record.pid)
             let progress = sessionProgress.byPid[pid]
             let shown = SessionNaming.displayName(name: progress?.name ?? record.name,
@@ -824,86 +780,14 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// A Claude Code hook event from the plugin (#79): a prompt is pushed
-    /// the moment it appears — the poll would take up to a minute — and
-    /// the fleet refreshes right after, so a turn's end shows up as fast
-    /// as its prompts. Returns the session's pid when the record is known.
-    func handleHookEvent(_ event: HookEvent) -> Int? {
-        let record = event.sessionId.flatMap { id in
-            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.sessionId == id }
-        }
-        let pid = record.map { Int($0.pid) }
-        // #777: nested in the desktop, the fork's own threads (SDK-entered,
-        // #648) are its to announce; terminal sessions stay the helper's.
-        let forkDriven = Nesting.isNested && (record?.resumedElsewhere ?? false)
-        if event.name == "UserPromptSubmit", checkpointsEnabled, !isPlayground,
-           let sessionId = event.sessionId, let cwd = event.cwd {
-            recordCheckpoint(sessionId: sessionId, cwd: cwd, subject: event.prompt ?? "")
-        }
-        if let sessionId = event.sessionId, let hint = event.statusHint() {
-            sessionStatusHints.withLock { $0.note(sessionId: sessionId, hint) }
-        }
-        if event.name == "StopFailure", !isPlayground {
-            logEvent("hook", icon: "bolt.horizontal", event.logLine)
-        }
-        if event.needsHuman, !isPlayground, !forkDriven {
-            logEvent("hook", icon: "bolt.horizontal", event.logLine)
-        }
-        // One refresh per burst, at most every 30 s: the record's status
-        // flips a beat after the hook fires, Stop + Notification often
-        // land together, and the "sessions done" trigger counts quiet
-        // polls — hook polls a second apart would fire it mid-typing.
-        if hookRefresh == nil {
-            let wait = max(1, Self.hookRefreshSpacing - Date().timeIntervalSince(lastHookRefresh))
-            hookRefresh = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(wait))
-                guard let self else { return }
-                lastHookRefresh = Date()
-                await refreshSnapshot()
-                hookRefresh = nil
-            }
-        }
-        return pid
-    }
-    private var hookRefresh: Task<Void, Never>?
-    private var lastHookRefresh = Date.distantPast
     /// The pass a freshly surfaced AWS-login need starts (rebuildAwsLogins).
     private var awsNeedRefresh: Task<Void, Never>?
     /// That pass writes the mirror snapshot past the exporter's throttle.
     private var mirrorExportDue = false
 
-    /// The snapshot runs git in the session's repository, off the main
-    /// thread; the first checkpoint of a session is logged, the rest are
-    /// quiet (one per prompt would drown the Activity pane). A failure
-    /// is logged once per session too.
-    private var checkpointed: Set<String> = []
-    private func recordCheckpoint(sessionId: String, cwd: String, subject: String) {
-        let first = !checkpointed.contains(sessionId)
-        checkpointed.insert(sessionId)
-        let repo = (cwd as NSString).lastPathComponent
-        Task.detached(priority: .utility) { [weak self] in
-            do {
-                guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
-                if first {
-                    await MainActor.run { self?.logEvent("other", icon: "clock.arrow.2.circlepath",
-                                                         "checkpointing \(repo) — \(made.subject)") }
-                }
-            } catch {
-                if first {
-                    await MainActor.run { self?.logEvent("other", icon: "exclamationmark.triangle",
-                                                         "checkpoint of \(repo) failed: \(error)") }
-                }
-            }
-        }
-    }
-    static let hookRefreshSpacing: TimeInterval = 30
-
-    /// `phoneUnlessRevival`: a phone showing the all-dead countdown activity
-    /// (or about to get its start alert) already has this news — the Mac
-    /// banner still posts.
-    func notify(_ body: String, phoneUnlessRevival: Bool = false) {
+    func notify(_ body: String) {
         Notifier.post(title: "Infinitus", body: body)
-        liveActivityPusher.pushAlert(title: "Infinitus", body: body, unlessRevival: phoneUnlessRevival)
+        liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
     private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
@@ -1036,9 +920,7 @@ final class AppModel: ObservableObject {
         priorityMode = Self.priorityMode(defaults)
         priorityLowPct = defaults.object(forKey: "priority_low_pct") as? Int ?? 80
         priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
-        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
-        checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
@@ -1225,9 +1107,7 @@ final class AppModel: ObservableObject {
         set(\.priorityMode, Self.priorityMode(defaults))
         set(\.priorityLowPct, defaults.object(forKey: "priority_low_pct") as? Int ?? 80)
         set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
-        set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
-        set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
@@ -1448,12 +1328,6 @@ final class AppModel: ObservableObject {
         if !isPlayground, !mockMode {
             Task.detached(priority: .utility) { [eventStore] in await eventStore.prune() }
         }
-        resume.log = { [weak self] icon, text in
-            self?.logEvent("nudge", icon: icon, text)
-        }
-        resume.push = { [weak self] text in
-            self?.push(text)
-        }
         mirrorServer.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
@@ -1479,15 +1353,6 @@ final class AppModel: ObservableObject {
             guard let self else { return AccountAction.Reply(outcome: "failed", detail: "app gone") }
             return await self.performAccountAction(request)
         }
-        // A session's hook mode (#163 phase 2) is remembered in its birth
-        // across a relaunch, but the hook answers from ToolApprovals'
-        // memory — reseed it, or the chip would promise a mode the hook
-        // no longer grants.
-        let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-        for (pid, birth) in sessionBirths {
-            guard let record = live.first(where: { Int($0.pid) == pid }), birth.sessionId == record.sessionId else { continue }
-            if let mode = birth.hookMode { toolApprovals.setMode(mode, sessionId: record.sessionId) }
-        }
         // UserDefaults is thread-safe; the closure only reads it.
         nonisolated(unsafe) let prefDefaults = defaults
         mirrorServer.prefs.set { try PrefCatalog.reply(from: prefDefaults) }
@@ -1505,35 +1370,6 @@ final class AppModel: ObservableObject {
             done.wait()
             return try outcome.get()
         }
-        // The phone's checkpoint routes (#167 phase 2) act on the live
-        // session's record — the same lookup `infinitusctl checkpoints`
-        // makes; an unknown pid is a 404.
-        let session: @Sendable (Int32) -> ClaudeSessionRecord? = { pid in
-            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.pid == pid }
-        }
-        mirrorServer.checkpoints.set(.init(
-            list: { pid in
-                guard let record = session(pid) else { return nil }
-                let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
-                return Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list)
-            },
-            diff: { pid, n, m in
-                guard let record = session(pid) else { return nil }
-                return try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: m)
-            },
-            restore: { [weak self] pid, n in
-                guard let record = session(pid) else { return nil }
-                do {
-                    let (restored, backup) = try Checkpoints.restore(cwd: record.cwd, sessionId: record.sessionId, n: n)
-                    Task { @MainActor in
-                        self?.logEvent("other", icon: "clock.arrow.2.circlepath",
-                                       "phone restored \((record.cwd as NSString).lastPathComponent) to checkpoint \(restored.subject)")
-                    }
-                    return Checkpoints.RestoreReply(outcome: "restored", backup: backup?.n)
-                } catch {
-                    return Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)")
-                }
-            }))
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
@@ -1575,21 +1411,6 @@ final class AppModel: ObservableObject {
                 // the next tick without restarting the task.
                 let seconds = await MainActor.run { self?.refreshInterval ?? 60 }
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
-            }
-        }
-        // The tok/min line of the phone's working card, on its own beat: the
-        // token rate is fresh within a second of a transcript write, the
-        // fleet refresh above is a minute apart.
-        rateTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let seconds = await MainActor.run { () -> Int in
-                    guard let self else { return 0 }
-                    if self.liveActivityRateSeconds > 0 {
-                        self.liveActivityPusher.pushRate(self.sessionProgress.tokenRate)
-                    }
-                    return self.liveActivityRateSeconds
-                }
-                try? await Task.sleep(for: .seconds(max(seconds, 1)))
             }
         }
     }
@@ -1789,25 +1610,6 @@ final class AppModel: ObservableObject {
                 Task { @MainActor in self.logMirrorInput("⚠️", "\(source) input not delivered: unknown session") }
                 return SessionInput.Reply(outcome: "rejected", detail: "session ended")
             }
-            // A mode change never reaches the terminal: it is the Mac's
-            // own state, decided on the main actor (the births live
-            // there). This queue never blocks main, so a hop is safe.
-            if request.kind == .mode {
-                return DispatchQueue.main.sync {
-                    MainActor.assumeIsolated {
-                        self.setSessionMode(request.text, pid: Int(pid), record: record)
-                            ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
-                    }
-                }
-            }
-            // "Allow for this session": remember the rule for the plugin's
-            // PreToolUse hook; the request itself goes down as `.approve`,
-            // and Core's arm answers it — an owned session gets the wire's
-            // allow-for-session, a terminal a Yes keypress (#430).
-            if request.kind == .approve, let rule = ToolApproval.decode(request.text) {
-                self.toolApprovals.add(rule, sessionId: record.sessionId)
-                Task { @MainActor in self.logMirrorInput("🛡️", "\(source) allows \(rule.label) for the rest of session \(pid)") }
-            }
             let reply = SessionInput.deliver(request: request, record: record,
                                              hosts: PtyHosts.available(), claudeDir: claudeDir)
             let label = URL(fileURLWithPath: record.cwd).lastPathComponent
@@ -1964,17 +1766,17 @@ final class AppModel: ObservableObject {
         await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }
 
-    /// The login landed: tell the session that needed it to carry on —
-    /// the phone's own message path, so it works wherever replies do.
+    /// The login landed: clear whatever of the session's own logins were
+    /// waiting on it and log the sign-in — the terminal is no longer
+    /// nudged to continue (#1041).
     private func awsLoginLanded(_ state: AwsLogin.State) {
         let provider = state.providerOrAws
         logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) signed in")
-        let fromPhone = state.flow != .local
         // Every session that needed this profile, not only the one the
         // login was started for (two sessions, one sign-in, 2026-09-04).
         var pids = Set(sessionProgress.byPid.filter { $0.value.loginProfile(provider) == state.profile }.map(\.key))
         if let pid = state.pid { pids.insert(pid) }
-        for pid in pids { nudgeAfterAwsLogin(pid: pid, provider: provider, profile: state.profile, fromPhone: fromPhone) }
+        for pid in pids { releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: state.profile) }
         // A login often signs other profiles in underneath — a broker
         // profile over its anchor `aws login` profile, an SSO session
         // several profiles share, gcloud's active account under a named
@@ -1987,14 +1789,12 @@ final class AppModel: ObservableObject {
                 await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: state.profile)
                 self.logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) also signed \(profile) in")
                 for (pid, progress) in self.sessionProgress.byPid where progress.loginProfile(provider) == profile {
-                    self.nudgeAfterAwsLogin(pid: pid, provider: provider, profile: profile, fromPhone: fromPhone)
+                    self.releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: profile)
                 }
             }
         }
     }
 
-    /// Tells a session that needed the login to carry on — the phone's
-    /// own message path, so it works wherever replies do.
     // MARK: crash reports (built-in, no third party — user 2026-09-04)
 
     /// Stores a report, logs it, and — for the phone's — says so.
@@ -2063,22 +1863,15 @@ final class AppModel: ObservableObject {
         return reply
     }
 
-    private func nudgeAfterAwsLogin(pid: Int, provider: AwsLogin.Provider = .aws, profile: String, fromPhone: Bool) {
+    private func releaseAwsLoginAfterSignIn(pid: Int, provider: AwsLogin.Provider = .aws, profile: String) {
+        guard provider == .aws else { return }
         Task.detached(priority: .utility) { [weak self] in
-            // The session's own stuck `aws login` first (#275), so the
-            // nudge drains now instead of after its tool timeout. gcloud's
+            // The session's own stuck `aws login` (#275) — gcloud's
             // paste-back login has no callback to poke.
-            let released = provider == .aws ? await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid) : 0
-            let text = provider.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
-            let request = SessionInput.Request(kind: .message, text: text)
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else { return }
-            let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
+            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
+            guard released > 0 else { return }
             await MainActor.run { [weak self] in
-                if released > 0 { self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released") }
-                self?.logMirrorInput(reply.outcome == "delivered" ? "📲" : "⚠️",
-                                     "session \(pid) nudged after \(provider.cliName) login: \(reply.outcome)")
+                self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released")
             }
         }
     }
@@ -2364,9 +2157,9 @@ final class AppModel: ObservableObject {
             // re-probe (~10 min while dead): the latched PushTriggers message
             // owns that notification. session-resumed, remote-control-rearmed
             // and account-unquarantined used to post banners with no latch
-            // and no Settings › Notify toggle; resumes are this app's own
-            // ResumeService now, the /rc re-arm is housekeeping, and the
-            // revival diff already carries the account-back news.
+            // and no Settings › Notify toggle; both are swapd's own
+            // housekeeping now (#1041), and the revival diff already
+            // carries the account-back news.
             default:
                 break
             }
@@ -2682,13 +2475,6 @@ final class AppModel: ObservableObject {
             let plan = battlePlan
             let awsLogins = awsLogins
             let progress = sessionProgress.byPid
-            if let primaryFleet = primary.lastFleet {
-                liveActivityPusher.tick(fleet: primaryFleet,
-                                        machine: machineName,
-                                        themes: availableThemes, macTheme: rowTheme,
-                                        report: primary.report,
-                                        tokenRate: sessionProgress.tokenRate)
-            }
             statsModel.refreshIfStale()
             let stats = statsModel.bundle
             // This Mac's own version, mirrored for the phone's Settings
@@ -2732,29 +2518,6 @@ final class AppModel: ObservableObject {
                                             sequence: sequenceLog, now: mirrorNow)
             }
         }
-        // All-limited: count the limit-stopped sessions waiting to be
-        // resumed (todo 2026-09-01), reusing the resume mechanism's
-        // own detection — Claude Code's files, never engine internals.
-        // Throttled: the transcript tails re-read at most every 20s.
-        if list.nextCandidate == nil,
-           RecoveryMath.corrected(engine: list.nextRecovery, accounts: list.accounts,
-                                  activeNumber: list.activeAccountNumber) != nil {
-            if Date().timeIntervalSince(waitingScanAt) > 20 {
-                waitingScanAt = Date()
-                Task.detached(priority: .utility) { [weak self] in
-                    let dir = ClaudeSessions.configHome()
-                    let stopped = Transcript.findStopped(
-                        sessions: ClaudeSessions.list(claudeDir: dir),
-                        claudeDir: dir)
-                    let count = stopped.count
-                    await MainActor.run { [weak self] in
-                        self?.waitingResume = count
-                    }
-                }
-            }
-        } else {
-            waitingResume = nil
-        }
         // Death/revive ticks fired inside FleetState.apply.
         // Launch greeting: once the first snapshot renders, the
         // active row plays its sweep alongside the bars' fill-up
@@ -2791,21 +2554,6 @@ final class AppModel: ObservableObject {
                          busyCount: list.liveSessions?.busy ?? 0)
         }
         controlServer.heal()
-        // Same display-feed vantage: a switch (manual or parked-engine)
-        // re-arms /rc; an active account that can work resumes stopped
-        // sessions. Detached, single-flight — never awaited here.
-        if !isPlayground {
-            let active = list.accounts.first { $0.number == list.activeAccountNumber }
-            if previous != list.activeAccountNumber { activeSince = Date() }
-            resume.tick(switched: previous != nil && previous != list.activeAccountNumber,
-                        activeAlive: active.map { !AccountVitals.isDead($0.usage) } ?? false,
-                        activeNumber: list.activeAccountNumber,
-                        activeFetchedAt: active?.usageFetchedAt
-                            .flatMap(UsageHistory.parseISO),
-                        activeName: active.map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) },
-                        activePct: active.flatMap { PushTriggers.worstPlanPct($0.usage) }.map { Int($0) },
-                        activeSince: activeSince)
-        }
         // Same display-feed vantage as the switch diff above: these
         // triggers fire even while the supervised engine is parked.
         let health = list.accounts

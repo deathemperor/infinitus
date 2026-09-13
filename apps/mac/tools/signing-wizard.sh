@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Infinitus signing wizard — Developer ID + notarization for the Mac app,
-# the paid team for the phone app, the APNs key for Live Activity push.
+# the paid team for the phone app, the APNs key for the phone's alert push.
 # Walks the human through the portal steps and runs the local checks
 # (docs/RELEASING.md). Re-runnable; values persist outside the repo.
 #
@@ -345,8 +345,8 @@ else
 fi
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
-stage "Push — APNs key for Live Activity updates (#70)"
-say "The Mac pushes Live Activity updates with an APNs auth key. This is a"
+stage "Push — APNs key for the phone's alerts (#70)"
+say "The Mac pushes its alerts to the phone with an APNs auth key. This is a"
 warn "DIFFERENT .p8 from stage 2's App Store Connect key — don't reuse that one."
 open_url "https://developer.apple.com/account/resources/authkeys/add"
 step "Key name 'infinitus apns' → tick 'Apple Push Notifications service (APNs)' → Continue → Register."
@@ -355,7 +355,7 @@ ask APNS_KEY_ID "APNs Key ID (10 characters, blank to skip):"
 if [[ -n "$APNS_KEY_ID" ]]; then
   write_env APNS_KEY_ID "$APNS_KEY_ID"
   step "Open the .p8 in a text editor and copy its whole contents to the clipboard."
-  step "Infinitus (menu bar) → Settings → Devices → 'Phone lock screen' → Team ID '$TEAM_ID', Key ID '$APNS_KEY_ID' → 'Paste .p8 from clipboard'."
+  step "Infinitus (menu bar) → Settings → Devices → 'Phone alerts' → Team ID '$TEAM_ID', Key ID '$APNS_KEY_ID' → 'Paste .p8 from clipboard'."
   note "The key lives in the Mac keychain only (run.infinitus.apns); shown masked."
   pause "Press Enter once the row says 'key in the keychain'"
   security find-generic-password -s run.infinitus.apns -a "$APNS_KEY_ID" >/dev/null 2>&1 \

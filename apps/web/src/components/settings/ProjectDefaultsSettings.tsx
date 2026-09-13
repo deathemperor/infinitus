@@ -79,7 +79,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
   const unavailable = connectedEnvironments.length === 0;
 
-  // A checkout's t3.json wins over the environment default when the project
+  // A checkout's project file wins over the environment default when the project
   // has no override of its own; show which one "inherit" resolves to.
   const checkout = scope.kind === "checkout" ? scope.checkout : null;
   // The query is disabled without a checkout, so any id satisfies the hook.
@@ -92,7 +92,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
     workspaceSource === "project"
       ? null
       : repositoryEnvMode
-        ? `${resolveEnvModeLabel(repositoryEnvMode)} (t3.json)`
+        ? `${resolveEnvModeLabel(repositoryEnvMode)} (infinitus.json)`
         : null;
 
   function modelDisabledReason(instanceId: ProviderInstanceId, model: string): string | null {
@@ -292,8 +292,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             title="Workspace"
             description={
               isProjectScope
-                ? "Where new threads in this project start. A t3.json preference applies when the project has no override."
-                : "Where new threads start, unless overridden by the project or t3.json."
+                ? "Where new threads in this project start. An infinitus.json preference applies when the project has no override."
+                : "Where new threads start, unless overridden by the project or infinitus.json."
             }
             status={
               inheritedEnvModeLabel ? `Repository default: ${inheritedEnvModeLabel}` : undefined

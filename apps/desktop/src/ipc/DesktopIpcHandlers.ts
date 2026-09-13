@@ -72,6 +72,7 @@ import {
   openInfinitusSignIn,
   setInfinitusCaptureGestureEnabled,
   setInfinitusQuitWithApp,
+  setKeepAwake,
   submitInfinitusSignInCode,
 } from "./methods/infinitus.ts";
 import { setBadgeCount } from "./methods/notifications.ts";
@@ -135,6 +136,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(submitInfinitusSignInCode);
   yield* ipc.handle(consumeInfinitusDeepLink);
   yield* ipc.handle(setBadgeCount);
+  yield* ipc.handle(setKeepAwake);
 
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(pickProjectFavicon);

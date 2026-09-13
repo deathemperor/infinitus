@@ -72,7 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
-    @StateObject private var reliabilityModel: ResumeReliabilityModel
     @StateObject private var appRelease: AppReleaseModel
     @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -106,15 +105,13 @@ struct InfinitusApp: App {
         _brew = StateObject(wrappedValue: brew)
         model.brewUpdater = brew
         brew.relaunch = { model.relaunchApp() }
-        let reliabilityModel = ResumeReliabilityModel()
-        _reliabilityModel = StateObject(wrappedValue: reliabilityModel)
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
             appDelegate?.statusHolder = StatusItemHolder(
                 model: model,
                 settingsTabs: {
                     settingsTabs(
-                        model: model, reliabilityModel: reliabilityModel,
+                        model: model,
                         appRelease: release, brew: brew)
                 })
         }
@@ -142,7 +139,7 @@ struct InfinitusApp: App {
         // macOS 15+, and SceneBuilder takes no #available branch.)
         Settings {
             SettingsRoot(tabs: settingsTabs(
-                model: model, reliabilityModel: reliabilityModel,
+                model: model,
                 appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
@@ -164,7 +161,7 @@ struct InfinitusApp: App {
 /// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
-    model: AppModel, reliabilityModel: ResumeReliabilityModel,
+    model: AppModel,
     appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
@@ -212,7 +209,7 @@ struct InfinitusApp: App {
                     // auto-switch daemon runs is the tab's own business.
                     provider: ProviderBadge(live: model.swapdRegistered
                                             && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model, reliability: reliabilityModel))),
+                    view: AnyView(SwapdEnginePane(model: model))),
         SettingsTab(title: "CLIProxyAPI", symbol: "network",
                     keywords: ["proxy", "cliproxy", "router", "management",
                                "key", "engine", "provider", "claude"],

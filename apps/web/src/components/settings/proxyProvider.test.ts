@@ -13,7 +13,7 @@ const filled: ProxyDraft = {
   enabled: true,
   apiKey: " sk-9r ",
   slots: { fable: "kr/gpt-5.6-sol", opus: "kr/claude-opus-5", sonnet: "", haiku: "" },
-  pickerModel: "kr/gpt-5.6-sol",
+  pickerModels: ["kr/gpt-5.6-sol", "kr/claude-opus-5"],
 };
 
 describe("proxyProvider", () => {
@@ -41,14 +41,25 @@ describe("proxyProvider", () => {
     ).toBe("~/.claude2");
   });
 
-  it("lists the picker model after any custom models already typed", () => {
+  it("lists the picker models after any custom models already typed", () => {
     expect(applyProxyDraft(filled, "id", { customModels: ["a"] }).config.customModels).toEqual([
       "a",
       "kr/gpt-5.6-sol",
+      "kr/claude-opus-5",
     ]);
-    expect(applyProxyDraft({ ...filled, pickerModel: "" }, "id", {}).config).not.toHaveProperty(
+    expect(applyProxyDraft({ ...filled, pickerModels: [] }, "id", {}).config).not.toHaveProperty(
       "customModels",
     );
+  });
+
+  it("skips picker models the instance already lists, as a slug or an object", () => {
+    const config = applyProxyDraft(filled, "id", {
+      customModels: ["kr/gpt-5.6-sol", { slug: "kr/claude-opus-5", name: "Opus" }],
+    }).config;
+    expect(config.customModels).toEqual([
+      "kr/gpt-5.6-sol",
+      { slug: "kr/claude-opus-5", name: "Opus" },
+    ]);
   });
 
   it("validates only when enabled: URL scheme, then key", () => {

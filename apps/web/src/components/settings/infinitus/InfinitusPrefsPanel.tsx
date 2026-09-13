@@ -75,6 +75,8 @@ export function useInfinitusEnvironment(targetEnvironment?: EnvironmentPresentat
 
 const EMPTY_ORIGINS: ReadonlyArray<string> = [];
 
+const NO_GROUPING: Intl.NumberFormatOptions = { useGrouping: false };
+
 /** Everything the panes say when there is nothing to edit yet. */
 export function InfinitusPanelNotice({ message }: { readonly message: string }) {
   return (
@@ -136,6 +138,8 @@ function PrefControlField({
           step={control.integer ? 1 : 0.1}
           {...(control.min === undefined ? {} : { min: control.min })}
           {...(control.max === undefined ? {} : { max: control.max })}
+          // A port or an interval reads as a raw number; grouping would show "3,773".
+          format={NO_GROUPING}
           size="sm"
           className="w-28"
           onValueCommitted={(value) => {
@@ -194,7 +198,8 @@ export function RestartConfirmDialog({
           <AlertDialogTitle>Relaunch Infinitus?</AlertDialogTitle>
           <AlertDialogDescription>
             “{pending.label}” only takes hold at the next launch, so Infinitus quits and comes
-            straight back. Sessions it runs keep going; this page reconnects on its own.
+            straight back. Threads keep running — they live on this server; this page reconnects on
+            its own.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

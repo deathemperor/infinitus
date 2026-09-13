@@ -168,6 +168,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   closeInfinitusSignIn: (flowId) =>
     ipcRenderer.invoke(IpcChannels.CLOSE_INFINITUS_SIGN_IN_CHANNEL, flowId),
   setBadgeCount: (count) => ipcRenderer.invoke(IpcChannels.SET_BADGE_COUNT_CHANNEL, count),
+  setKeepAwake: (active) => ipcRenderer.invoke(IpcChannels.SET_KEEP_AWAKE_CHANNEL, active),
   submitInfinitusSignInCode: (input) =>
     ipcRenderer.invoke(IpcChannels.SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL, input),
   consumePendingDeepLink: () =>

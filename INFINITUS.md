@@ -39,7 +39,10 @@ makes wrong, in its own PR.
   `DesktopAppIdentity.test.ts` and `DesktopPreReadyPlatform.test.ts` (plain
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
   (upstream-channel tests start on a nightly feed via the harness `settings`
-  option) are re-flipped to `infinitus` after each merge, never the rule.
+  option; the harness's `resourcesPath` option and the feed-swap test are
+  the fork's, #1042; `DesktopShellEnvironment.test.ts`'s harness takes an
+  `existingPaths` fake filesystem for the known-CLI-dirs fallback, #1078)
+  are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
   (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
@@ -51,8 +54,9 @@ makes wrong, in its own PR.
   native Infinitus (menu bar, engines, team, tunnels, mirror API, control
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
   (read it when working there), its own CHANGELOG/VERSION, path-filtered
-  CI jobs (`mac-*` in ci.yml) and its own workflows (`mac-nightly.yml`,
-  `mac-linux-sanitize.yml`; releases are `infinitus-release.yml`, below).
+  CI jobs (`mac-*` in ci.yml) and its own workflow
+  (`mac-linux-sanitize.yml`; releases are `infinitus-release.yml` and the
+  nightly `infinitus-nightly.yml`, below).
   It came in as a subtree
   (`git subtree add`) from the frozen `native` branch, history included
   (the merge's second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
@@ -72,12 +76,16 @@ makes wrong, in its own PR.
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
   `nightly` tag: `latest` becomes the one-app release with the first plain
-  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build — one
-  release created once and only edited in place (tag re-pointed, asset
-  clobbered, title edited), never deleted and recreated: the desktop
-  updater takes the first entry of `releases.atom`, an edited `nightly`
-  keeps its place below the newest versioned tag, a recreated one would
-  not (#924). Desktop
+  version; `nightly` is `infinitus-nightly.yml`'s rolling build of the
+  whole product (#1042): the same build jobs, called (`workflow_call`)
+  every night at 17:17 UTC with `<VERSION>-infinitus-nightly.<yyyymmdd>.<run>`
+  written over `VERSION` in the job, published by the caller — one release
+  created once and only edited in place (tag re-pointed, assets clobbered,
+  older nights' versioned assets removed, title edited), never deleted and
+  recreated: the desktop updater takes the first entry of `releases.atom`,
+  an edited `nightly` keeps its place below the newest versioned tag, a
+  recreated one would not (#924). A dispatch of the nightly workflow is a
+  dry run unless its `publish` input is set from `main`. Desktop
   updates follow electron-updater's own GitHub rule (#924): the client's
   channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
   `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
@@ -92,7 +100,18 @@ makes wrong, in its own PR.
   fail its polls (no manifest) were it the feed's first entry, which is why
   the `nightly` release must keep its place below the newest versioned tag
   (its rule is with `nightly` above). The `infinitus` track name lives only
-  in the desktop's settings and UI. On the track an available update downloads itself
+  in the desktop's settings and UI. The `infinitus-nightly` track (#1042;
+  Settings › Updates, "Nightly" beside "Release", a switch that goes both
+  ways) cannot use that rule — the GitHub provider takes only semver-tagged
+  releases, and a per-night `v…` tag would be the site's "latest"
+  (`apps/mac/site`'s worker) — so `DesktopUpdates.applyFeedProvider` puts
+  electron-updater on the generic provider at `releases/download/nightly`
+  with channel `infinitus-nightly` (the manifest `infinitus-nightly-mac.yml`,
+  `resolveDesktopPublishChannel`), downgrades on, and back on
+  app-update.yml's provider when the track is left; a nightly build on the
+  release track follows its line's id with downgrades on, since semver ranks
+  `alpha.7` below `alpha.6-infinitus-nightly.…`. On both fork tracks an
+  available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over. History:
   before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
@@ -109,10 +128,15 @@ makes wrong, in its own PR.
   version, and cannot go down).
   `apps/desktop/package.json`'s version is upstream's and never edited. The
   `infinitus` track is internal and follows from the version, not a flag:
-  every version that is not an upstream nightly (`-nightly.<date>.<run>`)
-  defaults to and brands as `infinitus` (`resolveDesktopUpdateChannel`,
+  every version that is not an upstream nightly (first prerelease id
+  `nightly`) brands as `infinitus`; one carrying the nightly suffix
+  `-infinitus-nightly.<date>.<run>` (#1042; the line's id stays first,
+  `0.5.0-alpha.7-infinitus-nightly.20260913.42`) defaults to the
+  `infinitus-nightly` track with the same brand and a plain title, every
+  other one to `infinitus` (`resolveDesktopUpdateChannel`,
   `resolveDefaultDesktopUpdateChannel`,
-  `resolveWebAssetBrandForPackageVersion`). Upstream's `latest` track is
+  `resolveWebAssetBrandForPackageVersion`; all read the first prerelease
+  id, never the `-nightly.` substring the suffix carries too). Upstream's `latest` track is
   never a default here; a persisted `latest` resolves to `infinitus`. The
   feed a build follows is a separate thing, above.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
@@ -175,7 +199,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   Config step renders `ProxyProviderFields` ("Route through a proxy"); on save
   `applyProxyDraft` adds the ANTHROPIC_* environment variables (the key marked
   sensitive), a dedicated `homePath` (`~/.claude-proxy/<instanceId>` unless one
-  was typed) and the picker model as a custom model.
+  was typed) and every picked model as a custom model (the loaded list is
+  checkboxes with Select all, so the proxy's models populate the picker in one
+  click; models already on the instance, by slug or `{slug}`, are not doubled).
 - `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
   — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
@@ -194,7 +220,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 J; test `projectScripts.test.ts`). Surfaced by the hint under the
   Command field in `apps/web/src/components/projectScriptEditor.tsx` and the
   `command` description in `packages/contracts/src/t3ProjectFile.ts` (the
-  published `t3.json` schema); the two exact-env assertions in
+  published project file schema); the two exact-env assertions in
   `apps/server/src/project/ProjectSetupScriptRunner.test.ts` became
   `expect.objectContaining`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Jump to next waiting
@@ -227,7 +253,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648). `InfinitusSlackLive` (provided `SlackClientLive` over
+  (#648). `InfinitusSignInLapseLive` beside it, with its own control
+  client (#1076), merged with `InfinitusAgentActivityLive` (#1047). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
@@ -747,8 +774,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a turn
   runs" row. Client-runtime: `operations/commands.ts` + `state/threadCommands.ts`
   — `queueTurn` / `updateQueuedTurn` / `removeQueuedTurn` / `moveQueuedTurn`.
-- `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
-  methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
+- `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
+  `DesktopUpdateChannel` / `DesktopUpdateChannelSchema` (#1042); the fork's
+  optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
   `submitInfinitusSignInCode` (#677), and `setInfinitusCaptureGestureEnabled`
   / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
@@ -765,6 +793,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `apps/desktop/src/app/DesktopPreReadyPlatform.ts` — `deepLinkIntake.attach`
   at the end of the pre-ready setup, and `DesktopEarlyElectronStartup.ts`
   exports `isDevelopmentEnvironment` for its scheme (#270 D).
+- `apps/desktop/src/shell/DesktopShellEnvironment.ts` — one block in
+  `installPosixEnvironment` (#1078): on darwin the merged PATH takes
+  `knownPosixCliPath` between the login-shell (or launchctl) PATH and the
+  process's own, so a `.zshrc` slower than the 5 s probe timeout, or a probe
+  PATH with no `claude`, still reaches the usual install dirs.
 - `apps/web/src/routes/__root.tsx` — `DeepLinkCoordinator` mounted beside
   `DesktopAppActivationCoordinator` (#270 D).
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
@@ -811,6 +844,13 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
   `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
   and cannot import the constant).
+- `packages/shared/src/git.ts` — `WORKTREE_BRANCH_PREFIX` is `infinitus`
+  (#823: a branch name is on screen), `LEGACY_WORKTREE_BRANCH_PREFIX` keeps
+  upstream's `t3code` so temporary branches minted before the rename are
+  still recognised (`isTemporaryWorktreeBranch`) and regenerated
+  (`ProviderCommandReactor.buildGeneratedWorktreeBranchName` strips both);
+  `GitManager.ts` / `BitbucketApi.ts` build fork-PR checkout branches from the
+  constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
@@ -820,7 +860,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   installed app's real `T3 Code (Alpha)`/`(Dev)` directory names and the KDE
   component name; `resolveDesktopAppBranding` titles every packaged build
   plain `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)` and
-  `(Nightly)` for a dev run and an upstream nightly (#823 layer 3).
+  `(Nightly)` for a dev run and an upstream nightly (#823 layer 3); a fork
+  nightly's stage label is `Nightly`, its title plain (#1042).
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
   (it never does), so an installed `T3 Code (Alpha)` is left alone.
@@ -843,8 +884,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   entry `Name=` follows `PRODUCT_NAME` the same way (#601).
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
-  and `resolveWebAssetBrandForPackageVersion` mapping every non-nightly
-  version to it (#823 layer 3).
+  and `resolveWebAssetBrandForPackageVersion` mapping every version but an
+  upstream nightly (first prerelease id `nightly`) to it (#823 layer 3, #1042).
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
   TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
@@ -853,8 +894,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   "Infinitus (Dev)" too (packaged builds get theirs from
   `scripts/build-desktop-artifact.ts`).
 - `apps/web/src/components/settings/SettingsPanels.tsx` (+ `.logic.ts`) —
-  `resolveDesktopUpdateTrackRow`: an `infinitus` build shows its own track
-  read-only instead of "Stable" with a one-way switch to upstream's releases.
+  `resolveDesktopUpdateTrackRow`: a fork build's select offers Release
+  (`infinitus`) and Nightly (`infinitus-nightly`, #1042) instead of upstream's
+  Stable / Nightly, which would hand it the real T3 Code with no way back;
+  the row's `options` drive the select.
 - Upstream tests carrying the renderer origin or the userData directory
   (`DesktopAppIdentity`, `DesktopClerk`, `ElectronProtocol`, `DesktopWindow`,
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`, `server.test.ts`,
@@ -1073,7 +1116,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
-  the Menu bar page keeps `display` + `about`; a section the build lacks
+  the Menu bar page keeps `display` + `about`; the Priority page reads the
+  catalog's `priority` section and, on a build before the Mac's session
+  sweep (#1041), `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
@@ -1091,6 +1136,41 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
 - `README.md` — the fork notice at the top.
+- **The project file is `infinitus.json`** (#823 layer 1: the upstream name
+  never reaches a screen, and this one is on screen every time the scripts
+  menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
+  is the pivot: `T3_PROJECT_FILE_NAME` is `infinitus.json`,
+  `LEGACY_T3_PROJECT_FILE_NAME` keeps upstream's `t3.json`, and
+  `T3_PROJECT_FILE_NAMES` is the order every read site walks — the first name
+  that answers decides, and a file that answered decides even when it fails to
+  decode, so a checkout carrying both never silently falls back to the older
+  one. No merge, no conversion: an unconverted repository is read from its
+  `t3.json` as before. The four read sites:
+  `apps/server/src/project/T3ProjectFileLoader.ts` (the loop, + its test's
+  fallback and preferred-wins cases), `apps/web/src/hooks/useT3ProjectFileScripts.ts`
+  (both names queried, `loading` until both settle so the status cannot flap),
+  `apps/web/src/lib/t3ProjectFileDefaults.ts` and
+  `apps/mobile/src/features/threads/new-task-flow-provider.tsx` (both queries
+  gated on the same boolean, so the hook count is stable). The copy follows:
+  "From infinitus.json" / "Import from infinitus.json"
+  (`ProjectScriptsControl.tsx`, `ProjectActionsSettings.tsx`, whose invalid-file
+  card names both), the Workspace rows in `ProjectDefaultsSettings.tsx`, the
+  `settingsSearch.ts` and `CommandPalette.tsx` search terms (both names) and
+  `docs/user/project-settings.md`.
+  `T3_PROJECT_FILE_SCHEMA_URL` is `https://infinitus.run/schema/infinitus.json`
+  — upstream's `apps/marketing/src/pages/schema/t3.json.ts` is left untouched
+  and now publishes a document whose `$id` names ours, which is harmless: it is
+  upstream's site, not ours. We serve the schema from `apps/mac/site`, which has
+  no build step, so `scripts/build-project-file-schema.ts` writes
+  `apps/mac/site/public/schema/infinitus.json` from
+  `buildT3ProjectFileJsonSchema()` and `--check` (with the test beside it)
+  fails when the checked-in asset drifts from the contract. Regenerate after any
+  change to the project file schema, and **the URL only resolves after a hand
+  `npx wrangler deploy` from `apps/mac/site`**.
+  The repository's own `infinitus.json` carries `iconPath`
+  `assets/infinitus/infinitus-web-apple-touch-180.png`, so the project row for
+  this checkout draws the Infinitus mark instead of upstream's T3 blueprint
+  icon; `ProjectFaviconResolver` reads it ahead of the well-known favicon paths.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch. The sync workflow
@@ -1213,12 +1293,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
   `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
   › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off [--yes]|now|relock <arg>` / `unlock` (native
-  #788), each answering `{enabled, locked, relock}`. The switch turns the
-  lock on (the Mac's own prompt runs there; the row says "Confirm on the
-  Mac" while it waits) or off; a `lock off` refused inside a team ("this Mac
-  is in …; lock off --yes …") becomes a Keep on / Turn off confirm whose
-  Turn off sends `--yes`. Re-lock is a select over the four native labels
+  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
+  each answering `{enabled, locked, relock}`. The switch turns the lock on
+  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
+  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
+  Re-lock is a select over the four native labels
   (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
@@ -1352,17 +1431,30 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   decodes the lines leniently (the contract leaves them opaque; an odd line
   or window is dropped alone). History (every account's percentage of one
   window — 5h, 7d, a model — over 24 hours / 7 / 30 days, one SVG line per
-  account) and Run rate (tokens, API-equivalent $ and turns over the last
+  account), Five-hour windows (the windows the Mac reconstructs off its own
+  history, newest first: each one's PEAK percentage — a window starts on the
+  first request after the last expired, so its headroom idles rather than
+  leaking, and the percentage it ended on says nothing — plus the poll count
+  behind it, the still-ticking one, the range's replay sentence: switches,
+  the ones onto a cold 5h clock, minutes stalled at the limit), Weekly waste
+  (the headroom that expired at each 7d or per-model rollover, with a caveat
+  on a row the Mac stopped watching hours before the reset; 5h windows are
+  left out, since they recycle ~34× a week) and Run rate (tokens,
+  API-equivalent $ and turns over the last
   hour / day / week, unpriced models, the live output rate) read the Mac's
   `utilization --days n` through `infinitusEnvironment.utilization`, a
   query atom re-read every 5 min while the page is mounted and dropped a
   minute after it leaves; `InfinitusUtilization` in
-  `packages/contracts/src/infinitus.ts` pins the samples and the rates and
-  leaves the waste generations, five-hour windows, replay and dry-run plan
-  opaque (not drawn yet); the fold is
+  `packages/contracts/src/infinitus.ts` pins the samples, the rates and the
+  three telemetry row shapes, and leaves the dry-run plan opaque (its Swift
+  `Action` is an enum with payloads whose Codable form the fork would have to
+  guess at, and it proposes steps only the Mac can run); each telemetry row
+  decodes on its own like `buildForecast`'s lines, so a Mac build that words
+  one differently drops that row, not the section. The fold is
   `packages/client-runtime/src/state/infinitusUtilization.ts`. A build
-  without the verb keeps the forecast and says what is missing. Sidebar
-  "Utilization" beside Activity.
+  without the verb keeps the forecast and says what is missing; one whose
+  reply carries no telemetry keeps the chart and the run rate, and the two
+  sections are simply absent. Sidebar "Utilization" beside Activity.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:
@@ -1384,7 +1476,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
-  nothing lapsed); row/section/sign-in models come from
+  nothing lapsed; one row per tool and profile, no session names and no
+  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):
   a server whose config arrived with `false` or without the field
@@ -1633,7 +1727,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   and the banner add "resets <time>" in the user's timestamp format while
   the instant is still ahead (`infinitusHoldBanner.logic.ts` `limitedLine`
   / `resetLabelFor`, `sidebar/HeldTooltipText.tsx`). A failed stop names no
-  reset. Once per stop, 2-min cooldown per thread,
+  reset. A thread on an instance whose environment carries
+  `ANTHROPIC_BASE_URL` (a proxy, #1088) spends no swapd account: its stop
+  reads "Limit hit on the proxy instance <display name>", names no account,
+  starts no snapshot watch and is never resumed — the banner stays until the
+  user sends again. Once per stop, 2-min cooldown per thread,
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
   Settings › Infinitus).
@@ -1665,6 +1763,61 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   path. A standalone helper is left alone whatever its version; one that
   reports no `bundlePath` only has its skew logged
   (`infinitus.companion.skew-unarmed`).
+- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+
+  `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins for
+  the threads this server runs (#1076), the fork's counterpart to the Mac's
+  transcript scan (retired with the terminal-session features, #1041). Every
+  tool result the Claude driver relays (`item.updated`, the raw `tool_result`
+  block under `payload.data.result`) is read for the CLIs' expired-credentials
+  signatures — the Mac's marker and line-start tables (`AwsLogin.swift`,
+  `GcloudLogin.swift`) ported verbatim: a marker anywhere plus one opening a
+  line at column 0, so the same words quoted from a file or a grep hit never
+  match; only the last 16 KiB is scanned. The profile is the error's own
+  `--profile` when it prints one, else the Bash command's `--profile` /
+  `AWS_PROFILE` (`--account` / `CLOUDSDK_CORE_ACCOUNT` for gcloud), else
+  `default`; gcloud's Application Default Credentials are the
+  `application-default` account. A hit leaves one `infinitus.signin.needed`
+  work-log row ("AWS sign-in needed on <profile>") and, on an app whose
+  manifest lists the verb, starts the Mac's `aws-login <profile>` /
+  `gcloud-login <account>` flow through `InfinitusService.command` (no `--pid`:
+  a thread has no session pid; the Mac runs its default flow, and that path's
+  post-write poll re-reads `aws-logins`, so the login reaches the Sign-ins
+  lists at once instead of at the next cycle) — unless that same reply
+  already shows a login for the credential in flight (`hasLoginInFlight`: any
+  `state.phase` short of `done`/`failed`), which is a browser tab waiting on
+  a person and must not be taken over. Once per thread per profile
+  per hour (a thread reaching two expired AWS profiles in one hour needs both
+  logins); one sequential worker off the event stream, so the turn is never
+  waited on; an unreachable Mac or a refused verb is logged and the row
+  stays. The result text and the command reach no log, span or payload —
+  only the thread id, the provider and the profile.
+- `apps/server/src/infinitus/Layers/InfinitusAgentActivity.ts` (+
+  `infinitusAgentActivity.logic.ts`, tests) — the phone's lock-screen thread
+  card, the server half (#1047 part 3; the Mac half is `ThreadActivityPush`
+  in `apps/mac`, the phone's the `AgentActivity` widget). The server folds
+  every live thread's `projectThreadAwareness` (what the T3 Connect relay is
+  fed per thread; side questions skipped) into upstream's aggregate card as
+  the relay's `makeAggregateState` does — ported, since the server cannot
+  import `infra/relay`: the active rows by priority (approval and input,
+  failed, working), then the threads finished within 15 min, five rows at
+  most, "Agent work in progress" / "completed" / "failed"; the title is
+  `PRODUCT_NAME`, and a starting or running row carries its turn's
+  `startedAt`, which the Mac forwards untouched — and hands it to the Mac's
+  `push` verb on stdin (the request line's `secret` field: `{kind, state}`
+  with the kind `thread.activity`, `state: null` ending the card; the reply
+  is `{pushed, card}`). Cadence is `AgentAwarenessRelay`'s: a thread event the relay
+  would publish schedules one fold 5 s later, the fold reads the whole shell
+  snapshot and sends only when the card's identity (everything but the
+  timestamps, at both levels) changed since the last push the Mac took (an
+  unavailable Mac leaves the slot empty, so the next event tries again);
+  each push showing a finished row arms one wake for the moment it ages
+  out, since no thread event says so; a clean shutdown sends `null`
+  best-effort when a card was up. Gated on the manifest's `push` taking a
+  payload whose summary names `thread.activity` (older builds refuse the
+  kind and stay quiet); withheld exactly where the port publish is. Counts
+  and phases reach the log; titles never. Staleness (a phone that stops
+  hearing) is the Mac pusher's, not the server's: an identical card is
+  never re-sent.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
@@ -1702,6 +1855,32 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
   (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
   developer's Mac (the tests mock `spawn`).
+- `apps/desktop/src/infinitus/InfinitusKeepAwake.ts` — sleep held off while a
+  turn runs (#1075), the desktop's replacement for the Mac app's retired
+  `keep_awake` (#1041 d5). The renderer decides from the thread shells it
+  already holds (`apps/web/src/lib/desktopKeepAwake.logic.ts`
+  `keepAwakeWanted`: the `desktopKeepAwake` client setting on, default on,
+  and any thread on the primary environment with its session `starting` or
+  `running`; remote environments never count) and sends the verdict over the
+  optional bridge method `setKeepAwake`; the shell holds one
+  `powerSaveBlocker('prevent-app-suspension')` while asked, idempotent, and
+  releases it when its scope closes with the app. Registration points:
+  `DesktopKeepAwakeCoordinator` mounted from `__root.tsx` after the badge
+  coordinator (it sends once on mount, so a reload cannot leave the blocker
+  held), `DesktopKeepAwakeSettings` closing the Behavior section of Settings › General
+  with its dirty label and reset entry, the `desktop-keep-awake` search item,
+  `SET_KEEP_AWAKE_CHANNEL`, `setKeepAwake` in `ipc/methods/infinitus.ts`, the
+  handler and preload lines, the layer in `InfinitusDesktop.layer`. No socket
+  traffic, no Mac involvement.
+- `apps/desktop/src/shell/InfinitusPosixCliDirs.ts` (+ test) — the POSIX
+  sibling of upstream's `knownWindowsCliDirs` (#1078): `~/.claude/local`,
+  `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
+  `~/.nvm/versions/node/*/bin` newest first, `~/.volta/bin`, `~/.bun/bin`,
+  existing ones only, joined to PATH after the login-shell probe's own
+  entries and only when that probe answered nothing or a PATH without
+  `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
+  `listDirectory`); one info line names the dirs added and the one holding
+  `claude`. darwin only; a probe that answers in time still wins.
 - `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
   `<scheme>://thread/<environmentId>/<threadId>` and
   `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
@@ -1923,6 +2102,14 @@ pair` (token masked, server log never uploaded), screenshots every route in
 < /dev/null &` — and probe with `curl --max-time`, or the step holds the job
   to its timeout.
 
+- `.github/workflows/infinitus-nightly.yml` — the nightly (#1042, "One
+  release" above): a `version` job dates the root `VERSION`, `build` is
+  `infinitus-release.yml` through `workflow_call` with that version
+  (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
+  `publish` — `main` only, on the schedule or a dispatch with `publish` —
+  force-moves the `nightly` tag, clobbers the assets (`Infinitus-nightly.zip`
+  is a copy of the standalone zip for the cask and the menu bar app's
+  About pane), removes older nights' versioned assets and edits the title.
 - `.github/workflows/infinitus-release.yml` — the one release (see
   "One release" above). Its `desktop` job nests the menu bar app as a login
   item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`

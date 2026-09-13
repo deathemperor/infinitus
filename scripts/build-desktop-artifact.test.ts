@@ -56,6 +56,7 @@ import {
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
+  resolveDesktopPublishChannel,
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
@@ -273,6 +274,44 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "infinitus");
     assert.equal(resolveDesktopUpdateChannel("0.0.40-alpha.2"), "infinitus");
   });
+
+  // The four shapes a version takes (#1042): plain, the line's prerelease,
+  // this repo's nightly, an upstream nightly. Only the first prerelease id
+  // decides — the repo's nightly carries `-nightly.` too.
+  it.each([
+    ["0.5.0", "infinitus", null, "infinitus", "Infinitus"],
+    ["0.5.0-alpha.7", "infinitus", "alpha", "infinitus", "Infinitus"],
+    [
+      "0.5.0-alpha.7-infinitus-nightly.20260913.42",
+      "infinitus-nightly",
+      "infinitus-nightly",
+      "infinitus",
+      "Infinitus",
+    ],
+    ["0.0.41-nightly.20260913.1", "nightly", "nightly", "nightly", "Infinitus (Nightly)"],
+  ] as const)(
+    "%s: track %s, publish channel %s, %s artwork, titled %s",
+    (version, track, publishChannel, brand, productName) => {
+      assert.equal(resolveDesktopUpdateChannel(version), track);
+      assert.equal(resolveDesktopPublishChannel(version), publishChannel);
+      assert.equal(resolveDesktopWebAssetBrand(version), brand);
+      assert.equal(resolveDesktopProductName(version), productName);
+      assert.deepStrictEqual(
+        resolveDesktopBuildIconAssets(version),
+        brand === "nightly"
+          ? {
+              macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
+              linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
+              windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
+            }
+          : {
+              macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
+              linuxIconPng: BRAND_ASSET_PATHS.infinitusLinuxIconPng,
+              windowsIconIco: BRAND_ASSET_PATHS.infinitusWindowsIconIco,
+            },
+      );
+    },
+  );
 
   it("switches desktop packaging product names to nightly for nightly builds", () => {
     assert.equal(resolveDesktopProductName("0.0.17"), "Infinitus");

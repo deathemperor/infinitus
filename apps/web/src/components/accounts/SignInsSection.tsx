@@ -2,12 +2,12 @@ import type { SignInRowModel } from "@t3tools/client-runtime/state/infinitusAcco
 
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
-import { signInButtonLabel, signInStatus, waitingSessionsLabel } from "./signIns.logic";
+import { signInButtonLabel, signInStatus } from "./signIns.logic";
 
 /**
- * The AWS profiles and gcloud accounts whose credentials lapsed under a
- * session, each with a way to sign in again from here. Rendered only when
- * there is at least one; the page leaves it out otherwise.
+ * The AWS profiles and gcloud accounts whose credentials lapsed, each with a
+ * way to sign in again from here. Rendered only when there is at least one;
+ * the page leaves it out otherwise.
  */
 export function SignInsSection({
   rows,
@@ -24,12 +24,11 @@ export function SignInsSection({
     <section className="flex flex-col gap-1">
       <h2 className="font-medium text-foreground text-sm">Sign-ins</h2>
       <p className="text-muted-foreground text-xs">
-        Sessions stuck on expired credentials. Signing in runs on the Infinitus host.
+        Expired AWS and gcloud credentials. Signing in runs on the Mac.
       </p>
       <div className="flex flex-col">
         {rows.map((row) => {
           const label = signInButtonLabel(row);
-          const sessions = waitingSessionsLabel(row.sessions);
           const pending = pendingKey === row.key;
           return (
             <div key={row.key} className="flex flex-col gap-1 border-b py-2 last:border-b-0">
@@ -64,9 +63,6 @@ export function SignInsSection({
                   {row.url}
                 </a>
               ) : null}
-              {sessions === "" ? null : (
-                <p className="truncate text-muted-foreground text-xs">{sessions}</p>
-              )}
               {failure?.key === row.key ? (
                 <p className="text-destructive text-xs">{failure.message}</p>
               ) : null}

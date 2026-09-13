@@ -3,8 +3,7 @@
  * control socket's `lock-status` / `lock` / `unlock`. The prompts run on the
  * Mac — turning the lock on and unlocking wait for the answer there — so the
  * pane says so while a call is in flight. The app's own error text is shown
- * verbatim; a `lock off` refused inside a team becomes a confirm that sends
- * `--yes`.
+ * verbatim.
  *
  * @module InfinitusLockPanel
  */
@@ -21,7 +20,6 @@ import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsP
 import {
   lockCommandInput,
   lockCommandsSupported,
-  lockOffRefusalTeams,
   parseLockStatus,
   RELOCK_CHOICES,
   relockChoiceFor,
@@ -37,8 +35,6 @@ export function InfinitusLockPanel() {
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const [status, setStatus] = useState<LockStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** The teams a refused `lock off` named; the confirm row shows while set. */
-  const [offWarning, setOffWarning] = useState<ReadonlyArray<string> | null>(null);
   /** The action waiting on the Mac, for the button labels. */
   const [busy, setBusy] = useState<LockAction["type"] | null>(null);
 
@@ -53,14 +49,7 @@ export function InfinitusLockPanel() {
       const result = await runCommand({ environmentId, input: lockCommandInput(action) });
       setBusy(null);
       if (result._tag === "Failure") {
-        const message = infinitusCommandFailure(result.cause).message;
-        const teams = action.type === "off" && !action.force ? lockOffRefusalTeams(message) : null;
-        if (teams !== null) {
-          setOffWarning(teams);
-          setError(null);
-          return;
-        }
-        setError(message);
+        setError(infinitusCommandFailure(result.cause).message);
         return;
       }
       const parsed = parseLockStatus(result.value.result);
@@ -69,7 +58,6 @@ export function InfinitusLockPanel() {
         return;
       }
       setError(null);
-      setOffWarning(null);
       setStatus(parsed);
     },
     [environmentId, runCommand],
@@ -113,7 +101,7 @@ export function InfinitusLockPanel() {
           description={
             busy === "on"
               ? "Confirm on the Mac — its unlock prompt is open."
-              : "The Mac's pop-out and settings window show a locked state until you unlock there; biometrics fall back to the login password. Teams need this on."
+              : "The Mac's pop-out and settings window show a locked state until you unlock there; biometrics fall back to the login password."
           }
           control={
             <Switch
@@ -121,37 +109,11 @@ export function InfinitusLockPanel() {
               disabled={disabled}
               aria-label="Unlock with Touch ID or password"
               onCheckedChange={(checked) =>
-                void run(checked === true ? { type: "on" } : { type: "off", force: false })
+                void run(checked === true ? { type: "on" } : { type: "off" })
               }
             />
           }
         />
-        {offWarning === null ? null : (
-          <SettingsRow
-            title="Turn off biometric unlock?"
-            description={`You're in ${offWarning.join(", ")}. Team data stays on this Mac and re-locks only behind the identity prompt on each launch; you stay in the team.`}
-            control={
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy !== null}
-                  onClick={() => setOffWarning(null)}
-                >
-                  Keep on
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={busy !== null}
-                  onClick={() => void run({ type: "off", force: true })}
-                >
-                  Turn off
-                </Button>
-              </>
-            }
-          />
-        )}
         <SettingsRow
           title="Re-lock"
           description="A timed re-lock settles on your next interaction or when the Mac wakes; nothing ticks while it is idle."

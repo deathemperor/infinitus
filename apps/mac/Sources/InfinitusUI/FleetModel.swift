@@ -29,9 +29,6 @@ public protocol FleetModel: ObservableObject {
     /// How far ahead of an account's reset its countdown goes live
     /// (Settings › Notifications; the phone follows the Mac).
     var reviveLead: TimeInterval { get }
-    /// Limit-stopped sessions the resume nudge is holding — the all-dead
-    /// banner's suffix.
-    var waitingResume: Int? { get }
     /// Set by a row click; the host puts up its own confirmation.
     var pendingSwitch: Int? { get set }
     var switchFlashTick: Int { get }
@@ -153,9 +150,6 @@ public extension FleetModel {
     var canAddAccount: Bool { false }
     func setPreferred(_ number: Int, _ on: Bool) {}
     func setRotation(_ number: Int, enabled: Bool) {}
-    /// A host with no resume nudge (the phone) simply has no count —
-    /// the banner then drops its suffix.
-    var waitingResume: Int? { nil }
 }
 
 /// The cash column's source — the estimated-spend report the mac app

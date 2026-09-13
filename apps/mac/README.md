@@ -42,9 +42,9 @@ or flip the track in-app under About → Update channel):
 brew install --cask deathemperor/tap/infinitus@nightly
 ```
 
-Releases are Developer ID signed and notarized since 0.4.3, so they
-open like any other app. Nightly builds are ad-hoc signed: install
-those with `--no-quarantine` (or right-click → Open once).
+Releases are Developer ID signed and notarized since 0.4.3, and nightly
+builds are too since #1042 (they come out of the release workflow's own
+jobs), so both open like any other app.
 
 ### GitHub releases
 
@@ -111,7 +111,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
 - **Sessions & status chips** — the live Claude Code session count with its busy/idle split, engine status, auto-mode.
-- **Resume nudges** (opt-in) — sessions a limit stopped get a "continue" typed into their terminal or sent over the peer socket once an account works again; sub-agent limits get the same nudge once an account with headroom is active.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
@@ -121,7 +120,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
 - **Session chat from the phone** — each transcript as a chat with markdown, tool chips and sub-agent cards; reply, attach photos and files, answer prompts.
-- **Allow for this session** — the phone's permission card can allow a tool for the rest of the session; with the plugin, that prompt never comes back.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
 - **Three engines** — swapd, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs. swapd is multi-provider: one fleet per provider it holds (Claude, Gemini CLI…), and igniting an account refreshes it at once.
@@ -131,20 +129,17 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
-- **A Claude Code plugin** — `infinitusctl plugin install`: hooks that reach the phone the moment a session needs you, an MCP server (`fleet_status`, `list_sessions`, `session_message`), `/infinitus:status` and `/infinitus:handoff`.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back, with the sessions waiting to resume.
 - **Share → Infinitus from any app** — images, files, a link or text into a session on any paired Mac with a note; your sessions sit in the share sheet's suggestions.
 - **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
-- **Live Activities that keep moving** — with an APNs key the lock-screen countdown and working card update with the app closed; one pair per paired Mac; the icon follows the theme.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
-- **Checkpoints** — every prompt checkpoints the repository as a hidden git ref (with the plugin); list them, diff one against now or restore it from `infinitusctl checkpoints`, the Mac or the phone.
 - **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
 - **A browser page for machines without the app** — sessions list, chat with a session, at the "Copy Browser Link" address in Settings › Devices.
 - **Chat with a session** — from the desktop app (the sidebar's Sessions group, "Move to a thread") or the phone: the live transcript, a composer, its prompts answered.
@@ -159,9 +154,9 @@ Everything stays on your machine (the phone talks straight to your Mac
 over routes you enable; the only thing that ever touches infinitus.run
 is a quick tunnel's URL, keyed by a hash of the pairing token — never
 the token, never usage). The app talks to the engine through
-`swapd … --json` subprocesses and never reads its files (resume nudges
-read Claude Code's own session records and transcripts, nothing of the
-engine's); usage-cost
+`swapd … --json` subprocesses and never reads its files (sessions and
+transcripts read Claude Code's own records, nothing of the engine's);
+usage-cost
 figures are estimates, never billing truth; push-notification secrets
 travel over stdin and render masked.
 

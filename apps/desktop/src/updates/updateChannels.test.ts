@@ -18,11 +18,25 @@ describe("resolveDefaultDesktopUpdateChannel", () => {
     expect(resolveDefaultDesktopUpdateChannel("0.0.40-nightly.20260910.7")).toBe("nightly");
   });
 
+  // The four shapes a version takes (#1042): a plain one, the line's
+  // prerelease, this repo's nightly, an upstream nightly. Only the first
+  // prerelease id decides — the repo's nightly carries `-nightly.` too.
+  it.each([
+    ["0.5.0", "infinitus"],
+    ["0.5.0-alpha.7", "infinitus"],
+    ["0.5.0-alpha.7-infinitus-nightly.20260913.42", "infinitus-nightly"],
+    ["0.5.0-infinitus-nightly.20260913.42", "infinitus-nightly"],
+    ["0.0.41-nightly.20260913.1", "nightly"],
+  ] as const)("defaults %s to the %s track", (version, channel) => {
+    expect(resolveDefaultDesktopUpdateChannel(version)).toBe(channel);
+  });
+
   it("calls everything but an upstream nightly an Infinitus build", () => {
     expect(isInfinitusDesktopVersion("0.5.0-alpha.1")).toBe(true);
     expect(isInfinitusDesktopVersion("0.0.40-infinitus.20260910.7")).toBe(true);
     expect(isInfinitusDesktopVersion("0.0.40-alpha.2")).toBe(true);
     expect(isInfinitusDesktopVersion("0.0.40-nightly.20260910.7")).toBe(false);
+    expect(isInfinitusDesktopVersion("0.5.0-alpha.7-infinitus-nightly.20260913.42")).toBe(true);
   });
 });
 
@@ -75,6 +89,33 @@ describe("resolveElectronUpdaterFeed", () => {
       channel: "latest",
       allowPrerelease: false,
       allowDowngrade: false,
+    });
+  });
+
+  it("reads the rolling nightly release on the infinitus-nightly track (#1042)", () => {
+    // The generic provider at releases/download/nightly: the manifest is
+    // `infinitus-nightly-mac.yml` whatever the version, downgrades on.
+    expect(
+      resolveElectronUpdaterFeed(
+        "0.5.0-alpha.7-infinitus-nightly.20260913.42",
+        "infinitus-nightly",
+      ),
+    ).toEqual({ channel: "infinitus-nightly", allowPrerelease: true, allowDowngrade: true });
+    expect(resolveElectronUpdaterFeed("0.5.0-alpha.7", "infinitus-nightly")).toEqual({
+      channel: "infinitus-nightly",
+      allowPrerelease: true,
+      allowDowngrade: true,
+    });
+  });
+
+  it("lets a nightly build go back to its line's release, which semver ranks lower", () => {
+    expect(
+      resolveElectronUpdaterFeed("0.5.0-alpha.7-infinitus-nightly.20260913.42", "infinitus"),
+    ).toEqual({ channel: "alpha", allowPrerelease: true, allowDowngrade: true });
+    expect(resolveElectronUpdaterFeed("0.5.0-infinitus-nightly.20260913.42", "infinitus")).toEqual({
+      channel: "latest",
+      allowPrerelease: false,
+      allowDowngrade: true,
     });
   });
 

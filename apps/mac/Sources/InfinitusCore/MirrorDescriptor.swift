@@ -24,16 +24,14 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         public var sequence: Bool?
         public var attention: Bool?
         public var leases: Bool?
-        public var checkpoints: Bool?
         public var images: Bool?
         public var files: Bool?
         /// `GET /prefs` (#558): the preference catalog with values.
         public var prefs: Bool?
         public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
-                    checkpoints: Bool? = nil, images: Bool? = nil, files: Bool? = nil,
+                    images: Bool? = nil, files: Bool? = nil,
                     prefs: Bool? = nil) {
             self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
-            self.checkpoints = checkpoints
             self.images = images; self.files = files
             self.prefs = prefs
         }
@@ -60,7 +58,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         #endif
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
                                 capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
-                                                           checkpoints: true, images: true, files: true,
+                                                           images: true, files: true,
                                                            prefs: true))
     }
 
@@ -68,11 +66,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     /// everything `.current()` claims for the Mac, minus what the tray
     /// doesn't answer yet — `files`, `timeline` and `sequence` are true
     /// (slice 1 gave the tray Files; slice 2 the timeline/sequence route).
-    /// `checkpoints` is true since slice 3: the tray listens on a control
-    /// socket, so the plugin's `UserPromptSubmit` hook writes a Linux
-    /// session's checkpoints through `Checkpoints.snapshot` the way the
-    /// Mac's hook path does, and the ladder the tray already served has
-    /// something in it. `attention` and `images` are true since slice 4:
+    /// `attention` and `images` are true since slice 4:
     /// the tray answers both routes through the same Core deciders.
     /// Explicit `false` for the rest, not the nil the
     /// struct also accepts as "unknown", so a phone comparing builds sees a
@@ -80,7 +74,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
                          capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: false,
-                                                    checkpoints: true, images: true, files: true,
+                                                    images: true, files: true,
                                                     prefs: false))
     }
 }

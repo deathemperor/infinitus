@@ -12,6 +12,16 @@ publishes the matching section as the GitHub release body.
 - Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
 - Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
 - Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
+- A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
+- `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
+
+
+## 0.5.0-alpha.8
+
+### Mac
+- The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
+- "Allow for this session" and the session permission mode switch are gone with the plugin.
+- Per-prompt repository checkpoints are gone (the list, diffs and restore on the Mac, the phone and `infinitusctl checkpoints`); thread checkpoints live in Infinitus desktop.
 - The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
 - The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
 - A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
@@ -20,13 +30,23 @@ publishes the matching section as the GitHub release body.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
+- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
+- A thread whose AWS or gcloud command fails on expired credentials gets a "sign-in needed" line in its work log and the Mac starts that sign-in, which shows under Sign-ins.
+- Infinitus desktop keeps the computer awake while a thread on it has a turn running; Settings › General › Keep awake turns that off (#1075).
+- Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
 - The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
 - A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
+- Settings › Updates has a Nightly track — last night's build of everything from main — beside Release, and you can switch between the two either way (#1042).
+- Coding agents are found even when your shell takes too long to start: the desktop now also looks in the usual install folders (`~/.local/bin`, Homebrew, nvm, Volta, Bun) when its login-shell check times out or finds no `claude` (#1078).
 
 ## 0.5.0-alpha.7
 
 ### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+- The lock-screen Live Activity cards (the working card and the revival countdown) are gone; the phone's alert banners stay, and the revival time still arrives as one.
+- Resume nudges are gone: a terminal session a usage limit stopped is no longer typed a "continue" once an account works again (threads resume on their own in Infinitus desktop).
+- The Mac no longer nudges a terminal session after an AWS or gcloud sign-in from the phone; the sign-in itself is unchanged.
 
 ### Desktop
 - A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).

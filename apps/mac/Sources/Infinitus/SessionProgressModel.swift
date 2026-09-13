@@ -3,13 +3,13 @@ import InfinitusCore
 import InfinitusUI
 
 /// Feeds the sessions popover's mini progress rows (issue #13 step 2).
-/// Reads Claude Code's own session records + transcript tails — same
-/// engine-isolation rule as ResumeService (never touches the engine).
+/// Reads Claude Code's own session records + transcript tails — the same
+/// engine-isolation rule as everything else here (never touches the engine).
 @MainActor
 final class SessionProgressModel: SessionProgressSource {
     @Published private(set) var byPid: [Int: SessionProgress] = [:]
     /// Fleet-wide output tokens per minute with a slowly decaying peak
-    /// (the footer's ⚡ gauge and the phone's Live Activity).
+    /// (the footer's ⚡ gauge).
     @Published private(set) var tokenRate: TokenRate?
     /// The exporter's facts for leased sessions (#223 phase 3) — the
     /// sessions card reads the attention dot and word off them. Published

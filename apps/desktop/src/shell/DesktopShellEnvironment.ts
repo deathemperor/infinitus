@@ -9,6 +9,7 @@ import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import { knownPosixCliPath } from "./InfinitusPosixCliDirs.ts";
 
 type EnvironmentPatch = Record<string, string>;
 
@@ -441,8 +442,19 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
       config.platform === "darwin" && !shellEnvironment.PATH
         ? yield* readLaunchctlPath
         : Option.none<string>();
+    const shellPath = trimNonEmpty(shellEnvironment.PATH).pipe(Option.orElse(() => launchctlPath));
+    // Fork (#1078): known CLI dirs after the shell's own PATH when that PATH is
+    // missing (a slow .zshrc past the probe timeout) or has no `claude`.
+    const knownCliPath =
+      config.platform === "darwin"
+        ? yield* knownPosixCliPath({
+            homeDirectory: Option.getOrUndefined(trimNonEmpty(config.env.HOME)),
+            shellPath,
+          })
+        : Option.none<string>();
     const mergedPath = mergePaths(config.platform, [
-      trimNonEmpty(shellEnvironment.PATH).pipe(Option.orElse(() => launchctlPath)),
+      shellPath,
+      knownCliPath,
       readEnvPath(config.env),
     ]);
 

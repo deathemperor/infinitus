@@ -66,10 +66,6 @@ public struct PushTriggers: Sendable {
     }
 
     static let allDeadTail = "nothing left to switch to"
-    /// The all-dead message, for callers that route it differently.
-    public static func isAllDeadMessage(_ message: String) -> Bool {
-        message.hasSuffix(allDeadTail)
-    }
 
     public static func worstPlanPct(_ usage: Usage?) -> Double? {
         guard let usage else { return nil }

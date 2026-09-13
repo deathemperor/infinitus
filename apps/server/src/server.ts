@@ -81,6 +81,8 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
+import { InfinitusAgentActivityLive } from "./infinitus/Layers/InfinitusAgentActivity.ts";
+import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
 import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
 import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
 import { InfinitusForkAnchorGate } from "./infinitus/Layers/InfinitusForkAnchorGate.ts";
@@ -322,6 +324,18 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
+  // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
+  // work-log row and starts the Mac's login; and (#1047) the phone's
+  // lock-screen thread card, folded from the shell snapshot and handed to the
+  // Mac's `push` verb. The activity layer gets its own control client, since
+  // InfinitusLayerLive's is private.
+  Layer.provideMerge(
+    Layer.mergeAll(InfinitusSignInLapseLive, InfinitusAgentActivityLive).pipe(
+      Layer.provide(
+        InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
+      ),
+    ),
+  ),
   // Fork (#574): the Slack bridge over Socket Mode.
   Layer.provideMerge(
     InfinitusSlackLive.pipe(Layer.provide(SlackClientLive), Layer.provide(FetchHttpClient.layer)),

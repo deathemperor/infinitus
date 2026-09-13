@@ -168,18 +168,12 @@ struct DisplayPane: View {
 
     @ViewBuilder private var sessionsSection: some View {
         Section {
-            Toggle("Checkpoint the repository at every prompt",
-                   isOn: $model.checkpointsEnabled)
             // The phone's picker with its live previews (#151): one row
             // per style, drawn in the current theme.
             ChatHeaderPicker(selection: $model.chatHeader, theme: model.rowTheme)
         } header: {
             Text("Sessions")
         } footer: {
-            Text("Checkpointing records the working tree as a hidden git "
-                 + "ref at every prompt, so a session can be compared or "
-                 + "put back later; ignored files stay out and git status "
-                 + "is untouched.")
         }
         .settingsAnchor("Display/Sessions")
     }
@@ -327,7 +321,6 @@ extension DisplayPane {
             entry(popup, "Compact rows", ["compact", "one line", "dense"]),
             entry(popup, "Hide the action buttons", ["actions", "buttons", "footer", "chips"]),
             entry(popup, "Sort rows by headroom", ["order", "sort", "headroom", "next"]),
-            entry(sessions, "Checkpoint the repository at every prompt", ["checkpoint", "git", "restore", "diff", "undo"]),
             entry(sessions, "Chat header", ["hud", "compact", "strip", "chat", "header", "unit frame"]),
             entry(startup, "Refresh interval", ["poll", "interval", "refresh", "seconds"],
                   anchor: startupAnchor),

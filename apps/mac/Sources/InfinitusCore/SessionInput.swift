@@ -216,10 +216,8 @@ extension SessionInput {
         return nil
     }
 
-    /// Delivers one phone-sent input: a message to the session's peer
-    /// socket (its terminal when there is none), a key into its terminal
-    /// — the send side of layer 1's read-only feed. `hosts`/`claudeDir` come from the same `PtyHosts.available()`
-    /// / `ClaudeSessions.configHome()` call `ResumeService` makes.
+    /// Delivers one phone-sent input over the session's peer socket — the
+    /// send side of layer 1's read-only feed.
     /// `owned` (#151) is asked first with the request as it would be
     /// delivered — messages already framed, attachments on disk — and a
     /// non-nil reply ends it there: a session the app owns takes input on
@@ -244,9 +242,6 @@ extension SessionInput {
         owned: ((Request, ClaudeSessionRecord) -> Reply?)? = nil,
         sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
     ) -> Reply {
-        let tty = ttyOfPid(record.pid)
-        let ancestors = ancestorsOf(record.pid)
-
         switch request.kind {
         case .mode:
             // The app's own state (#163 phase 2); nothing to type.
@@ -288,17 +283,6 @@ extension SessionInput {
                 return Reply(outcome: "rejected", detail: "unsupported key")
             }
             if let reply = owned?(request, record) { return reply }
-            for host in hosts {
-                switch PtyNudge.press(host: host, pid: record.pid, key: request.text,
-                                      tty: tty, ancestors: ancestors, name: record.name, sleep: sleep) {
-                case .delivered, .typedUnverified:
-                    return Reply(outcome: "delivered", channel: "pty")
-                case .running:
-                    return Reply(outcome: "running")
-                case .capturedInput, .noSurface:
-                    continue
-                }
-            }
             return Reply(outcome: "noSurface")
 
         case .message:
@@ -337,11 +321,10 @@ extension SessionInput {
                     deliveredText += videoHint
                 }
             }
-            // Claude Code's own inbox first — a message, line breaks kept,
-            // rather than keystrokes (user 2026-09-03). The terminal is
-            // the fallback for a record without a socket or a dead one.
-            // The Mac's own texts (Continue) carry their "[Infinitus]"
-            // marker already; a phone message gets the preface.
+            // Claude Code's own inbox, a message with line breaks kept
+            // (user 2026-09-03). The Mac's own texts (Continue) carry
+            // their "[Infinitus]" marker already; a phone message gets
+            // the preface.
             let framed = deliveredText.hasPrefix("[Infinitus]")
                 ? deliveredText : PeerSocket.phonePreface + deliveredText
             if let reply = owned?(Request(kind: .message, text: framed, requestId: request.requestId,
@@ -351,29 +334,8 @@ extension SessionInput {
             if !record.messagingSocketPath.isEmpty, socketSend(record, framed) {
                 return Reply(outcome: "delivered", channel: "socket")
             }
-            var sawRunning = false
-            var sawCaptured = false
-            // A terminal submits on every newline: one typed line.
-            let typed = deliveredText.split(separator: "\n", omittingEmptySubsequences: true)
-                .joined(separator: " ")
-            for host in hosts {
-                switch PtyNudge.nudge(host: host, pid: record.pid, text: typed,
-                                      tty: tty, ancestors: ancestors, name: record.name, sleep: sleep) {
-                case .delivered, .typedUnverified:
-                    return Reply(outcome: "delivered", channel: "pty")
-                case .running:
-                    sawRunning = true
-                case .capturedInput:
-                    sawCaptured = true
-                case .noSurface:
-                    continue
-                }
-            }
-            if sawRunning { return Reply(outcome: "running") }
-            if sawCaptured { return Reply(outcome: "captured") }
-            // No surface anywhere and no socket to try either — there is
-            // simply no way into this session, distinct from "there's a
-            // terminal but it wouldn't take input".
+            // No socket to try — there is simply no way into this
+            // session, distinct from "there's a socket but it refused".
             if record.messagingSocketPath.isEmpty { return Reply(outcome: "noChannel") }
             return Reply(outcome: "noSurface")
         }

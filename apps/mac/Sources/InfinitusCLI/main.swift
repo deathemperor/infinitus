@@ -15,14 +15,6 @@ let programName: String = {
     return name.isEmpty ? "infinitusctl" : name
 }()
 
-// `plugin` drives `claude plugin …` (PluginCommand.swift); no app needed.
-if args.first == "plugin" {
-    exit(PluginCommand.run(Array(args.dropFirst())))
-}
-// `mcp` serves the plugin's MCP tools over stdio (MCPCommand.swift).
-if args.first == "mcp" {
-    exit(MCPCommand.run())
-}
 // `environments`/`projects`/`threads`/`thread`/`desktop` talk to Infinitus
 // desktop's server with the credential the app keeps (DesktopCommand.swift).
 if let code = runDesktopVerbs(args) {
@@ -38,8 +30,6 @@ func usage() -> String {
         if !c.options.isEmpty { out += "  [\(c.options.joined(separator: ", "))]" }
         out += "\n"
     }
-    out += "  plugin install|uninstall|status   the Claude Code plugin: hooks that push prompts to the phone the moment they appear\n"
-    out += "  mcp                    the plugin's MCP server over stdio (fleet_status, list_sessions, session_message)\n"
     out += "  environments | projects | threads | thread show|send|new|interrupt|release|rename|title | desktop status|credential\n"
     out += "                         Infinitus desktop's projects and threads (`\(programName) thread --help`)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. swapd/claude, cliproxy/claude).\n"
@@ -83,7 +73,7 @@ while i < args.count {
 // read (`activities-token --forget` hung a run for 90 min, 2026-09-11).
 let stdinPiped = isatty(0) == 0
 var secret: String?
-if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "push", "send", "approve", "desktop-credential"].contains(command) {
+if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "push", "desktop-credential"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }

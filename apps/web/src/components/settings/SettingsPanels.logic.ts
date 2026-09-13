@@ -347,13 +347,26 @@ export interface DesktopUpdateTrackRow {
   readonly description: string;
   /** False keeps the track read-only: there is no track to switch to. */
   readonly switchable: boolean;
+  /** The tracks the select offers, the current one among them. */
+  readonly options: readonly { readonly value: DesktopUpdateChannel; readonly label: string }[];
 }
+
+const UPSTREAM_TRACK_OPTIONS = [
+  { value: "latest", label: "Stable" },
+  { value: "nightly", label: "Nightly" },
+] as const satisfies DesktopUpdateTrackRow["options"];
+
+const INFINITUS_TRACK_OPTIONS = [
+  { value: "infinitus", label: "Release" },
+  { value: "infinitus-nightly", label: "Nightly" },
+] as const satisfies DesktopUpdateTrackRow["options"];
 
 /**
  * The Update-track row of an installed desktop build. A fork build follows the
- * `infinitus` channel, whose releases only this repository publishes; upstream's
- * Stable and Nightly tracks would hand it the real T3 Code on the next update,
- * with no way back. So the fork shows its own track and offers no switch.
+ * `infinitus` channel, whose releases only this repository publishes, or its
+ * nightly (#1042: last night's build of main, every day); upstream's Stable
+ * and Nightly tracks would hand it the real T3 Code on the next update, with
+ * no way back, so the fork's select offers only its own two.
  */
 export function resolveDesktopUpdateTrackRow(
   channel: DesktopUpdateChannel | null,
@@ -366,18 +379,21 @@ export function resolveDesktopUpdateTrackRow(
       label: "Checking…",
       description: "Use stable releases or nightly builds. Switch back anytime.",
       switchable: false,
+      options: [],
     };
   }
-  if (channel === "infinitus") {
+  if (channel === "infinitus" || channel === "infinitus-nightly") {
     return {
-      label: PRODUCT_NAME,
-      description: `${PRODUCT_NAME} builds update from their own releases.`,
-      switchable: false,
+      label: channel === "infinitus" ? "Release" : "Nightly",
+      description: `Release follows ${PRODUCT_NAME} releases; Nightly is last night's build of main. Switch back anytime.`,
+      switchable: true,
+      options: INFINITUS_TRACK_OPTIONS,
     };
   }
   return {
     label: channel === "nightly" ? "Nightly" : "Stable",
     description: "Use stable releases or nightly builds. Switch back anytime.",
     switchable: true,
+    options: UPSTREAM_TRACK_OPTIONS,
   };
 }
