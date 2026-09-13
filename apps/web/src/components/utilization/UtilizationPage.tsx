@@ -10,13 +10,19 @@ import {
 import {
   compactTokens,
   decodeUtilization,
+  fiveHourSummary,
   historyLines,
   historyRange,
   liveRateText,
+  replayText,
   RUN_RATE_NOTE,
   runRateRows,
   utilizationWindows,
+  wasteRows,
+  WASTE_GAP_SECONDS,
+  type FiveHourWindowRow,
   type HistoryLine,
+  type WasteRow,
 } from "@t3tools/client-runtime/state/infinitusUtilization";
 import type { InfinitusUtilization } from "@t3tools/contracts/infinitus";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
@@ -32,7 +38,7 @@ import { usePrimaryEnvironmentId } from "../../state/environments";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
 import { primaryServerConfigAtom } from "../../state/server";
-import { formatUpcomingTimestamp } from "../../timestampFormat";
+import { formatDayAwareTimestamp, formatUpcomingTimestamp } from "../../timestampFormat";
 import { AccountsUnavailable } from "../accounts/AccountsUnavailable";
 import { ForecastStrip } from "../accounts/ForecastStrip";
 import { Button } from "../ui/button";
@@ -196,6 +202,8 @@ export function UtilizationPage() {
         ) : (
           <>
             <HistorySection utilization={utilization} labels={labels} />
+            <FiveHourSection utilization={utilization} labels={labels} />
+            <WasteSection utilization={utilization} labels={labels} />
             <RunRateSection utilization={utilization} />
           </>
         )}
@@ -461,6 +469,155 @@ function HistoryChart({
         <span>{axisLabel(range.to, days)}</span>
       </div>
     </div>
+  );
+}
+
+const isoFromSeconds = (seconds: number) => new Date(seconds * 1000).toISOString();
+
+/** The Mac's reconstructed 5h windows: a window starts on the first request
+    after the previous one expired, so what it was used for is its PEAK, not
+    the percentage it ended on — headroom idles rather than leaking. */
+function FiveHourSection({
+  utilization,
+  labels,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly labels: Readonly<Record<string, string>>;
+}) {
+  const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
+  const range = useMemo(
+    () => historyRange(utilization, Math.floor(Date.now() / 1000)),
+    [utilization],
+  );
+  const summary = useMemo(
+    () => fiveHourSummary(utilization, range, labels),
+    [labels, range, utilization],
+  );
+  const replay = replayText(utilization);
+  if (summary === null) {
+    return null;
+  }
+  return (
+    <section className="flex flex-col gap-3" data-testid="utilization-five-hour">
+      <h2 className="font-medium text-foreground text-sm">Five-hour windows</h2>
+      <p className="text-muted-foreground text-xs tabular-nums">
+        {summary.count} {summary.count === 1 ? "window" : "windows"} · mean peak{" "}
+        {Math.round(summary.meanPeakPct)}%
+        {summary.unused > 0 ? ` · ${summary.unused} never used past 5%` : ""}
+      </p>
+      <ul className="flex flex-col gap-1.5">
+        {summary.windows.map((window) => (
+          <FiveHourRow key={window.key} window={window} timestampFormat={timestampFormat} />
+        ))}
+      </ul>
+      {replay !== null ? <p className="text-muted-foreground text-xs">{replay}</p> : null}
+      <p className="text-muted-foreground text-xs">
+        A window starts on the first request after the last one expired, so the peak is what it was
+        used for — the rest idled rather than leaking.
+      </p>
+    </section>
+  );
+}
+
+function FiveHourRow({
+  window,
+  timestampFormat,
+}: {
+  readonly window: FiveHourWindowRow;
+  readonly timestampFormat: TimestampFormat;
+}) {
+  return (
+    <li className="flex items-center gap-3 text-xs tabular-nums">
+      <span className="w-28 shrink-0 truncate text-foreground">{window.label}</span>
+      <span className="w-32 shrink-0 text-muted-foreground">
+        {formatDayAwareTimestamp(isoFromSeconds(window.start), timestampFormat)}
+      </span>
+      <span className="h-1.5 min-w-0 flex-1 rounded-full bg-muted">
+        <span
+          aria-hidden
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${Math.max(1, window.peakPct)}%` }}
+        />
+      </span>
+      <span className="w-10 shrink-0 text-right text-foreground">
+        {Math.round(window.peakPct)}%
+      </span>
+      <span className="w-24 shrink-0 text-right">
+        {window.closed ? (
+          <span className="text-muted-foreground">
+            {window.samples} {window.samples === 1 ? "poll" : "polls"}
+          </span>
+        ) : (
+          <span className="text-orange-500">Still ticking</span>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/** The weekly rollovers: what expired unused at each 7d — or per-model —
+    reset. A 5h window recycles ~34× a week, so its leftovers are idle time
+    rather than lost quota and never count here. */
+function WasteSection({
+  utilization,
+  labels,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly labels: Readonly<Record<string, string>>;
+}) {
+  const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
+  const waste = useMemo(() => wasteRows(utilization, labels), [labels, utilization]);
+  if (waste.length === 0) {
+    return null;
+  }
+  return (
+    <section className="flex flex-col gap-3" data-testid="utilization-waste">
+      <h2 className="font-medium text-foreground text-sm">Weekly waste</h2>
+      <ul className="flex flex-col gap-1.5">
+        {waste.map((row) => (
+          <WasteRowLine key={row.key} row={row} timestampFormat={timestampFormat} />
+        ))}
+      </ul>
+      <p className="text-muted-foreground text-xs">
+        The headroom that expired at each weekly reset, as the Mac last saw the window. Five-hour
+        windows are left out: they recycle all week, so their leftovers are idle time, not lost
+        quota.
+      </p>
+    </section>
+  );
+}
+
+function WasteRowLine({
+  row,
+  timestampFormat,
+}: {
+  readonly row: WasteRow;
+  readonly timestampFormat: TimestampFormat;
+}) {
+  // A long gap between the last poll and the reset means the final percentage
+  // is a floor: the app was not watching for the window's tail.
+  const stale = row.observationGap !== null && row.observationGap >= WASTE_GAP_SECONDS;
+  return (
+    <li className="flex items-center gap-3 text-xs tabular-nums">
+      <span className="w-28 shrink-0 truncate text-foreground">{row.label}</span>
+      <span className="w-12 shrink-0 text-muted-foreground">{row.window}</span>
+      <span className="w-32 shrink-0 text-muted-foreground">
+        {formatDayAwareTimestamp(isoFromSeconds(row.resetAt), timestampFormat)}
+      </span>
+      <span className="h-1.5 min-w-0 flex-1 rounded-full bg-muted">
+        <span
+          aria-hidden
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${Math.max(1, row.finalPct)}%` }}
+        />
+      </span>
+      <span className="w-24 shrink-0 text-right text-foreground">
+        {Math.round(row.wastePct)}% unused
+      </span>
+      {stale ? (
+        <span className="shrink-0 text-muted-foreground">Last seen hours before</span>
+      ) : null}
+    </li>
   );
 }
 

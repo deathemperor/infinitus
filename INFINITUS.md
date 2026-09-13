@@ -1396,17 +1396,30 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   decodes the lines leniently (the contract leaves them opaque; an odd line
   or window is dropped alone). History (every account's percentage of one
   window — 5h, 7d, a model — over 24 hours / 7 / 30 days, one SVG line per
-  account) and Run rate (tokens, API-equivalent $ and turns over the last
+  account), Five-hour windows (the windows the Mac reconstructs off its own
+  history, newest first: each one's PEAK percentage — a window starts on the
+  first request after the last expired, so its headroom idles rather than
+  leaking, and the percentage it ended on says nothing — plus the poll count
+  behind it, the still-ticking one, the range's replay sentence: switches,
+  the ones onto a cold 5h clock, minutes stalled at the limit), Weekly waste
+  (the headroom that expired at each 7d or per-model rollover, with a caveat
+  on a row the Mac stopped watching hours before the reset; 5h windows are
+  left out, since they recycle ~34× a week) and Run rate (tokens,
+  API-equivalent $ and turns over the last
   hour / day / week, unpriced models, the live output rate) read the Mac's
   `utilization --days n` through `infinitusEnvironment.utilization`, a
   query atom re-read every 5 min while the page is mounted and dropped a
   minute after it leaves; `InfinitusUtilization` in
-  `packages/contracts/src/infinitus.ts` pins the samples and the rates and
-  leaves the waste generations, five-hour windows, replay and dry-run plan
-  opaque (not drawn yet); the fold is
+  `packages/contracts/src/infinitus.ts` pins the samples, the rates and the
+  three telemetry row shapes, and leaves the dry-run plan opaque (its Swift
+  `Action` is an enum with payloads whose Codable form the fork would have to
+  guess at, and it proposes steps only the Mac can run); each telemetry row
+  decodes on its own like `buildForecast`'s lines, so a Mac build that words
+  one differently drops that row, not the section. The fold is
   `packages/client-runtime/src/state/infinitusUtilization.ts`. A build
-  without the verb keeps the forecast and says what is missing. Sidebar
-  "Utilization" beside Activity.
+  without the verb keeps the forecast and says what is missing; one whose
+  reply carries no telemetry keeps the chart and the run rate, and the two
+  sections are simply absent. Sidebar "Utilization" beside Activity.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:

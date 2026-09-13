@@ -222,18 +222,62 @@ const utilization = (days) => {
       });
     }
   }
+  // The window telemetry beside the chart: the Mac reconstructs these off
+  // its full history, so they are their own rows rather than a fold of the
+  // samples above. Three closed 5h windows per account plus one still
+  // ticking for the active one, and the last two weekly rollovers.
+  const fiveHourWindows = [];
+  for (const account of ACCOUNTS) {
+    for (let back = 1; back <= 3; back += 1) {
+      const resetsAt = now - back * 21_600 - account.number * 900;
+      fiveHourWindows.push({
+        email: account.email,
+        number: account.number,
+        start: resetsAt - 18_000,
+        resetsAt,
+        peakPct: Math.max(2, account.five + back * 7 - account.number * 3),
+        samples: 40 - back * 6,
+        closed: true,
+      });
+    }
+  }
+  fiveHourWindows.push({
+    email: ACCOUNTS[0].email,
+    number: ACCOUNTS[0].number,
+    start: now - 7200,
+    resetsAt: now + 10_800,
+    peakPct: ACCOUNTS[0].five,
+    samples: 12,
+    closed: false,
+  });
+  const generations = ACCOUNTS.flatMap((account, index) => [
+    {
+      email: account.email,
+      window: "7d",
+      resetAt: now - 86_400 * (2 + index),
+      finalPct: Math.max(5, account.seven - 4),
+      observationGap: index === 1 ? 9 * 3600 : 1200,
+    },
+    {
+      email: account.email,
+      window: "7d",
+      resetAt: now - 86_400 * (9 + index),
+      finalPct: Math.max(5, account.seven - 18),
+      observationGap: 600,
+    },
+  ]);
   return {
     days,
     bucketSeconds: bucket,
     samples,
-    generations: [],
-    fiveHourWindows: [],
+    generations,
+    fiveHourWindows,
     replay: {
       from: now - days * 86_400,
       to: now,
       switches: 2,
-      coldSwitches: 0,
-      stalledSeconds: 0,
+      coldSwitches: 1,
+      stalledSeconds: 780,
       sawActiveFlag: true,
     },
     windows: ["5h", "7d"],
