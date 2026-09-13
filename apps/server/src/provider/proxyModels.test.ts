@@ -27,11 +27,11 @@ const attempt = (
   );
 
 describe("fetchProxyModels", () => {
-  it.effect("lists the ids at <baseUrl>/models with the key as a bearer", () =>
+  it.effect("lists the ids at <baseUrl>/v1/models with the key as a bearer", () =>
     Effect.gen(function* () {
       const seen: Seen[] = [];
       const result = yield* attempt(
-        { baseUrl: "http://127.0.0.1:20128/v1/", apiKey: "sk-test" },
+        { baseUrl: "http://127.0.0.1:20128/", apiKey: "sk-test" },
         () => Response.json({ data: [{ id: "kr/auto" }, { id: "kr/claude-opus-5" }] }),
         seen,
       );
@@ -41,6 +41,18 @@ describe("fetchProxyModels", () => {
       expect(seen[0]?.url).toBe("http://127.0.0.1:20128/v1/models");
       expect(seen[0]?.headers.authorization).toBe("Bearer sk-test");
       expect(seen[0]?.headers["x-api-key"]).toBe("sk-test");
+    }),
+  );
+
+  it.effect("does not double the version segment of a base URL typed with /v1", () =>
+    Effect.gen(function* () {
+      const seen: Seen[] = [];
+      yield* attempt(
+        { baseUrl: "http://127.0.0.1:8317/v1", apiKey: "k" },
+        () => Response.json({ data: [] }),
+        seen,
+      );
+      expect(seen[0]?.url).toBe("http://127.0.0.1:8317/v1/models");
     }),
   );
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   applyProxyDraft,
   EMPTY_PROXY_DRAFT,
+  proxyAnthropicBaseUrl,
   validateProxyDraft,
   withProxyPreset,
   type ProxyDraft,
@@ -25,7 +26,7 @@ describe("proxyProvider", () => {
   it("writes the proxy env vars, marks only the key sensitive, and skips empty slots", () => {
     const { environment } = applyProxyDraft(filled, "claudeAgent_9router", {});
     expect(environment).toEqual([
-      { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:20128/v1", sensitive: false },
+      { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:20128", sensitive: false },
       { name: "ANTHROPIC_AUTH_TOKEN", value: "sk-9r", sensitive: true },
       { name: "ANTHROPIC_DEFAULT_FABLE_MODEL", value: "kr/gpt-5.6-sol", sensitive: false },
       { name: "ANTHROPIC_DEFAULT_OPUS_MODEL", value: "kr/claude-opus-5", sensitive: false },
@@ -72,7 +73,22 @@ describe("proxyProvider", () => {
 
   it("swaps the URL with the preset but keeps a typed one under Custom", () => {
     const cli = withProxyPreset(filled, "cliproxyapi");
-    expect(cli.baseUrl).toBe("http://127.0.0.1:8317/v1");
-    expect(withProxyPreset(cli, "custom").baseUrl).toBe("http://127.0.0.1:8317/v1");
+    expect(cli.baseUrl).toBe("http://127.0.0.1:8317");
+    expect(withProxyPreset(cli, "custom").baseUrl).toBe("http://127.0.0.1:8317");
+  });
+
+  it("drops a typed /v1 from the base URL, which the SDK appends itself", () => {
+    const typed = { ...filled, preset: "custom", baseUrl: " https://proxy.example/v1/ " } as const;
+    const { environment } = applyProxyDraft(typed, "id", {});
+    expect(environment?.[0]).toEqual({
+      name: "ANTHROPIC_BASE_URL",
+      value: "https://proxy.example",
+      sensitive: false,
+    });
+    expect(proxyAnthropicBaseUrl("http://127.0.0.1:8317/")).toBe("http://127.0.0.1:8317");
+    // Only the version segment goes; a proxy mounted under a path keeps it.
+    expect(proxyAnthropicBaseUrl("https://proxy.example/anthropic")).toBe(
+      "https://proxy.example/anthropic",
+    );
   });
 });

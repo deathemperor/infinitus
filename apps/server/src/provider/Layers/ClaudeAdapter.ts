@@ -130,6 +130,7 @@ import {
   resolveClaudeModelSlug,
   scopeClaudeModelCatalog,
 } from "../ClaudeModelCatalog.ts";
+import { isProxiedClaudeEnvironment } from "../claudeProxyInstance.ts";
 import {
   ProviderAdapterProcessError,
   ProviderAdapterRequestError,
@@ -2145,6 +2146,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     claudeSettings.binaryPath,
     claudeEnvironment,
   );
+  /** A proxied instance (#1088) asks for the plain slug: see `claudeProxyInstance`. */
+  const apiModelIdOptions = { modelSuffixes: !isProxiedClaudeEnvironment(claudeEnvironment) };
   const nativeEventLogger =
     options?.nativeEventLogger ??
     (options?.nativeEventLogPath !== undefined
@@ -5225,7 +5228,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       const caps = getClaudeCatalogModelCapabilities(modelCatalog, modelSelection?.model);
       const descriptors = getProviderOptionDescriptors({ caps });
       const apiModelId = modelSelection
-        ? resolveClaudeCatalogApiModelId(modelCatalog, modelSelection)
+        ? resolveClaudeCatalogApiModelId(modelCatalog, modelSelection, apiModelIdOptions)
         : undefined;
       const initialContextWindow = selectedClaudeContextWindow(modelCatalog, modelSelection);
       const rawEffort = getModelSelectionStringOptionValue(modelSelection, "effort");
@@ -5595,7 +5598,11 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
 
     if (modelSelection?.model) {
-      const apiModelId = resolveClaudeCatalogApiModelId(modelCatalog, modelSelection);
+      const apiModelId = resolveClaudeCatalogApiModelId(
+        modelCatalog,
+        modelSelection,
+        apiModelIdOptions,
+      );
       if (context.currentApiModelId !== apiModelId) {
         yield* onSessionQuery(context, "turn/setModel", (query) => query.setModel(apiModelId));
         context.currentApiModelId = apiModelId;
