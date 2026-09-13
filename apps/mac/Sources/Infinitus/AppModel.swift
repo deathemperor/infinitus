@@ -31,14 +31,7 @@ final class AppModel: ObservableObject {
 
     var accounts: [Account] { primary?.accounts ?? [] }
     var activeNumber: Int? { primary?.activeNumber }
-    /// When the current active account became active — ResumeGate holds
-    /// post-switch nudges until it has held for a while (#136).
-    private var activeSince: Date?
     var nextCandidate: Int? { primary?.nextCandidate }
-    /// Limit-stopped sessions waiting to resume; non-nil only while
-    /// every account is at a limit (rides the all-limited banner).
-    @Published var waitingResume: Int?
-    private var waitingScanAt: Date = .distantPast
     var nextRecovery: NextRecovery? { primary?.nextRecovery }
     var liveSessions: LiveSessions? { primary?.liveSessions }
     /// Session-list popover (brain chip click) — popup-wide state so the
@@ -131,8 +124,6 @@ final class AppModel: ObservableObject {
         let event = StatsEvent(at: Date(), kind: kind, icon: icon, text: text)
         Task.detached(priority: .utility) { [eventStore] in await eventStore.append(event) }
     }
-    /// App-side resume nudges + /rc re-arm (ResumeService.swift).
-    let resume = ResumeService()
     /// Sessions popover's mini progress rows (SessionProgressModel.swift).
     let sessionProgress = SessionProgressModel()
     let sessionProfiles = SessionProfilesModel()
@@ -277,7 +268,6 @@ final class AppModel: ObservableObject {
     private let launchExecutableDate = AppModel.executableDate()
     private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
-    private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
     // Display prefs, persisted to UserDefaults under the same names and
@@ -557,10 +547,6 @@ final class AppModel: ObservableObject {
     @Published var priorityLowPct: Int { didSet { defaults.set(priorityLowPct, forKey: "priority_low_pct"); rejudgeHeadroom() } }
     @Published var priorityAbundantPct: Int { didSet { defaults.set(priorityAbundantPct, forKey: "priority_abundant_pct"); rejudgeHeadroom() } }
     private func rejudgeHeadroom() { for fleet in fleets { fleet.judgeHeadroom() } }
-    /// Settings › Sync "Phone lock screen": how often the working Live
-    /// Activity's tok/min is pushed on its own (user 2026-09-08 "update the
-    /// tok/min every 5s, make it configurable"); 0 = only with other changes.
-    @Published var liveActivityRateSeconds: Int { didSet { defaults.set(liveActivityRateSeconds, forKey: "live_activity_rate_seconds") } }
     /// Settings › Sync "This Mac's name" (#99); empty follows the computer name.
     @Published var machineNameOverride: String {
         didSet {
@@ -747,7 +733,7 @@ final class AppModel: ObservableObject {
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
     func push(_ msg: String) {
-        notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+        notify(msg)
     }
 
     struct SessionRow {
@@ -818,12 +804,9 @@ final class AppModel: ObservableObject {
     /// That pass writes the mirror snapshot past the exporter's throttle.
     private var mirrorExportDue = false
 
-    /// `phoneUnlessRevival`: a phone showing the all-dead countdown activity
-    /// (or about to get its start alert) already has this news — the Mac
-    /// banner still posts.
-    func notify(_ body: String, phoneUnlessRevival: Bool = false) {
+    func notify(_ body: String) {
         Notifier.post(title: "Infinitus", body: body)
-        liveActivityPusher.pushAlert(title: "Infinitus", body: body, unlessRevival: phoneUnlessRevival)
+        liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
     private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
@@ -964,7 +947,6 @@ final class AppModel: ObservableObject {
         priorityMode = Self.priorityMode(defaults)
         priorityLowPct = defaults.object(forKey: "priority_low_pct") as? Int ?? 80
         priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
-        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
@@ -1161,7 +1143,6 @@ final class AppModel: ObservableObject {
         set(\.priorityMode, Self.priorityMode(defaults))
         set(\.priorityLowPct, defaults.object(forKey: "priority_low_pct") as? Int ?? 80)
         set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
-        set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
@@ -1390,12 +1371,6 @@ final class AppModel: ObservableObject {
                 await MainActor.run { self?.logEvent("other", icon: "terminal", "swept \(swept.count) orphaned headless sessions") }
             }
         }
-        resume.log = { [weak self] icon, text in
-            self?.logEvent("nudge", icon: icon, text)
-        }
-        resume.push = { [weak self] text in
-            self?.push(text)
-        }
         mirrorServer.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
@@ -1505,21 +1480,6 @@ final class AppModel: ObservableObject {
                 // the next tick without restarting the task.
                 let seconds = await MainActor.run { self?.refreshInterval ?? 60 }
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
-            }
-        }
-        // The tok/min line of the phone's working card, on its own beat: the
-        // token rate is fresh within a second of a transcript write, the
-        // fleet refresh above is a minute apart.
-        rateTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let seconds = await MainActor.run { () -> Int in
-                    guard let self else { return 0 }
-                    if self.liveActivityRateSeconds > 0 {
-                        self.liveActivityPusher.pushRate(self.sessionProgress.tokenRate)
-                    }
-                    return self.liveActivityRateSeconds
-                }
-                try? await Task.sleep(for: .seconds(max(seconds, 1)))
             }
         }
     }
@@ -1907,17 +1867,17 @@ final class AppModel: ObservableObject {
         await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }
 
-    /// The login landed: tell the session that needed it to carry on —
-    /// the phone's own message path, so it works wherever replies do.
+    /// The login landed: clear whatever of the session's own logins were
+    /// waiting on it and log the sign-in — the terminal is no longer
+    /// nudged to continue (#1041).
     private func awsLoginLanded(_ state: AwsLogin.State) {
         let provider = state.providerOrAws
         logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) signed in")
-        let fromPhone = state.flow != .local
         // Every session that needed this profile, not only the one the
         // login was started for (two sessions, one sign-in, 2026-09-04).
         var pids = Set(sessionProgress.byPid.filter { $0.value.loginProfile(provider) == state.profile }.map(\.key))
         if let pid = state.pid { pids.insert(pid) }
-        for pid in pids { nudgeAfterAwsLogin(pid: pid, provider: provider, profile: state.profile, fromPhone: fromPhone) }
+        for pid in pids { releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: state.profile) }
         // A login often signs other profiles in underneath — a broker
         // profile over its anchor `aws login` profile, an SSO session
         // several profiles share, gcloud's active account under a named
@@ -1930,14 +1890,12 @@ final class AppModel: ObservableObject {
                 await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: state.profile)
                 self.logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) also signed \(profile) in")
                 for (pid, progress) in self.sessionProgress.byPid where progress.loginProfile(provider) == profile {
-                    self.nudgeAfterAwsLogin(pid: pid, provider: provider, profile: profile, fromPhone: fromPhone)
+                    self.releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: profile)
                 }
             }
         }
     }
 
-    /// Tells a session that needed the login to carry on — the phone's
-    /// own message path, so it works wherever replies do.
     // MARK: crash reports (built-in, no third party — user 2026-09-04)
 
     /// Stores a report, logs it, and — for the phone's — says so.
@@ -2006,22 +1964,15 @@ final class AppModel: ObservableObject {
         return reply
     }
 
-    private func nudgeAfterAwsLogin(pid: Int, provider: AwsLogin.Provider = .aws, profile: String, fromPhone: Bool) {
+    private func releaseAwsLoginAfterSignIn(pid: Int, provider: AwsLogin.Provider = .aws, profile: String) {
+        guard provider == .aws else { return }
         Task.detached(priority: .utility) { [weak self] in
-            // The session's own stuck `aws login` first (#275), so the
-            // nudge drains now instead of after its tool timeout. gcloud's
+            // The session's own stuck `aws login` (#275) — gcloud's
             // paste-back login has no callback to poke.
-            let released = provider == .aws ? await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid) : 0
-            let text = provider.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
-            let request = SessionInput.Request(kind: .message, text: text)
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else { return }
-            let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
+            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
+            guard released > 0 else { return }
             await MainActor.run { [weak self] in
-                if released > 0 { self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released") }
-                self?.logMirrorInput(reply.outcome == "delivered" ? "📲" : "⚠️",
-                                     "session \(pid) nudged after \(provider.cliName) login: \(reply.outcome)")
+                self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released")
             }
         }
     }
@@ -2307,9 +2258,9 @@ final class AppModel: ObservableObject {
             // re-probe (~10 min while dead): the latched PushTriggers message
             // owns that notification. session-resumed, remote-control-rearmed
             // and account-unquarantined used to post banners with no latch
-            // and no Settings › Notify toggle; resumes are this app's own
-            // ResumeService now, the /rc re-arm is housekeeping, and the
-            // revival diff already carries the account-back news.
+            // and no Settings › Notify toggle; both are swapd's own
+            // housekeeping now (#1041), and the revival diff already
+            // carries the account-back news.
             default:
                 break
             }
@@ -2625,13 +2576,6 @@ final class AppModel: ObservableObject {
             let plan = battlePlan
             let awsLogins = awsLogins
             let progress = sessionProgress.byPid
-            if let primaryFleet = primary.lastFleet {
-                liveActivityPusher.tick(fleet: primaryFleet,
-                                        machine: machineName,
-                                        themes: availableThemes, macTheme: rowTheme,
-                                        report: primary.report,
-                                        tokenRate: sessionProgress.tokenRate)
-            }
             statsModel.refreshIfStale()
             let stats = statsModel.bundle
             // This Mac's own version, mirrored for the phone's Settings
@@ -2678,29 +2622,6 @@ final class AppModel: ObservableObject {
                                             overlay: self.overlayingOwnedStatus)
             }
         }
-        // All-limited: count the limit-stopped sessions waiting to be
-        // resumed (todo 2026-09-01), reusing the resume mechanism's
-        // own detection — Claude Code's files, never engine internals.
-        // Throttled: the transcript tails re-read at most every 20s.
-        if list.nextCandidate == nil,
-           RecoveryMath.corrected(engine: list.nextRecovery, accounts: list.accounts,
-                                  activeNumber: list.activeAccountNumber) != nil {
-            if Date().timeIntervalSince(waitingScanAt) > 20 {
-                waitingScanAt = Date()
-                Task.detached(priority: .utility) { [weak self] in
-                    let dir = ClaudeSessions.configHome()
-                    let stopped = Transcript.findStopped(
-                        sessions: ClaudeSessions.list(claudeDir: dir),
-                        claudeDir: dir)
-                    let count = stopped.count
-                    await MainActor.run { [weak self] in
-                        self?.waitingResume = count
-                    }
-                }
-            }
-        } else {
-            waitingResume = nil
-        }
         // Death/revive ticks fired inside FleetState.apply.
         // Launch greeting: once the first snapshot renders, the
         // active row plays its sweep alongside the bars' fill-up
@@ -2737,21 +2658,6 @@ final class AppModel: ObservableObject {
                          busyCount: list.liveSessions?.busy ?? 0)
         }
         controlServer.heal()
-        // Same display-feed vantage: a switch (manual or parked-engine)
-        // re-arms /rc; an active account that can work resumes stopped
-        // sessions. Detached, single-flight — never awaited here.
-        if !isPlayground {
-            let active = list.accounts.first { $0.number == list.activeAccountNumber }
-            if previous != list.activeAccountNumber { activeSince = Date() }
-            resume.tick(switched: previous != nil && previous != list.activeAccountNumber,
-                        activeAlive: active.map { !AccountVitals.isDead($0.usage) } ?? false,
-                        activeNumber: list.activeAccountNumber,
-                        activeFetchedAt: active?.usageFetchedAt
-                            .flatMap(UsageHistory.parseISO),
-                        activeName: active.map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) },
-                        activePct: active.flatMap { PushTriggers.worstPlanPct($0.usage) }.map { Int($0) },
-                        activeSince: activeSince)
-        }
         // Same display-feed vantage as the switch diff above: these
         // triggers fire even while the supervised engine is parked.
         let health = list.accounts

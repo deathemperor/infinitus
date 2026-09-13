@@ -111,7 +111,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
 - **Sessions & status chips** — the live Claude Code session count with its busy/idle split, engine status, auto-mode.
-- **Resume nudges** (opt-in) — sessions a limit stopped get a "continue" typed into their terminal or sent over the peer socket once an account works again; sub-agent limits get the same nudge once an account with headroom is active.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
@@ -138,7 +137,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back, with the sessions waiting to resume.
 - **Share → Infinitus from any app** — images, files, a link or text into a session on any paired Mac with a note; your sessions sit in the share sheet's suggestions.
 - **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
-- **Live Activities that keep moving** — with an APNs key the lock-screen countdown and working card update with the app closed; one pair per paired Mac; the icon follows the theme.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
@@ -164,9 +162,9 @@ Everything stays on your machine (the phone talks straight to your Mac
 over routes you enable; the only thing that ever touches infinitus.run
 is a quick tunnel's URL, keyed by a hash of the pairing token — never
 the token, never usage). The app talks to the engine through
-`swapd … --json` subprocesses and never reads its files (resume nudges
-read Claude Code's own session records and transcripts, nothing of the
-engine's); usage-cost
+`swapd … --json` subprocesses and never reads its files (sessions and
+transcripts read Claude Code's own records, nothing of the engine's);
+usage-cost
 figures are estimates, never billing truth; push-notification secrets
 travel over stdin and render masked.
 

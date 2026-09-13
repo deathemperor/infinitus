@@ -236,7 +236,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                 } else if isReviver {
                     // The reviver's row (#227) carries the full countdown in
                     // the theme's flash colour — the same digits as the
-                    // floating panel and the Live Activity.
+                    // floating panel.
                     Text(RecoveryCountdown.label(until: date, now: ctx.date))
                         .font(PopupFont.caption).bold().monospacedDigit()
                         .foregroundStyle(ThemeColor.flash(theme))

@@ -15,8 +15,12 @@ export interface ForkVisualRoute {
   readonly route: string;
   /** The page's name in the report. */
   readonly label: string;
-  /** Text only the populated page shows. */
+  /** Text only the populated page shows. A field's value counts, written the
+      way the harness captures one: `[<accessible name>: <what the user reads>]`. */
   readonly marker: string;
+  /** Further text the populated page must show, for a page whose render is
+      worth proving in more than one place; each is checked like `marker`. */
+  readonly shows?: ReadonlyArray<string>;
   /** Empty-state copy this page must not show, on top of `ALWAYS_ABSENT`. */
   readonly absent?: ReadonlyArray<string>;
 }
@@ -27,6 +31,9 @@ export const ALWAYS_ABSENT: ReadonlyArray<string> = [
   "not answering",
   // #823: the product is Infinitus on every screen; the upstream name never shows.
   "T3 Code",
+  // #823 too: a Mac pref key starting `fork_` humanises to "Fork …" when the
+  // web has no copy for it, which puts the contributor's word on screen.
+  "Fork ",
   "Still connecting",
   "This Infinitus build has no",
   "could not be read",
@@ -43,15 +50,76 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     label: "Notifications",
     marker: "All accounts are exhausted",
   },
-  { route: "/settings/infinitus/devices", label: "Devices", marker: "Serve the fleet to my phone" },
+  {
+    route: "/settings/infinitus/devices",
+    label: "Devices",
+    // A switch's state, which the fixture sets on where its two neighbours are
+    // off. A label renders whether or not its control took the pref, so the
+    // value is the only part of this page that proves one arrived — and a
+    // switch state is the same string whatever the number formatting.
+    marker: "[Publish the current URL to infinitus.run: on]",
+    // The port the fixture sets, unformatted. #1110 shipped a port that read
+    // "3,773" — the label and the description were on screen, so nothing here
+    // saw it. It is a number field's value, so this is the check that would.
+    shows: ["[Server port: 3773]"],
+  },
   { route: "/settings/infinitus/engines", label: "Engines", marker: "swapd engine on" },
+  {
+    route: "/accounts",
+    label: "Accounts",
+    marker: "claude (swapd)",
+    absent: ["no engine reports accounts"],
+  },
+  {
+    // The fixture's log carries one row of every kind the Mac logs, so every
+    // chip is on screen. Each phrase here is a chip followed by the start of
+    // its own row's text — the capture joins a row's spans with a space — so
+    // a kind that lost its chip fails here, on the exact row, instead of
+    // reaching a screen unlabelled (#1111).
+    route: "/activity",
+    label: "Activity",
+    marker: "all out all exhausted",
+    shows: [
+      "limit grace-fixture hit a limit",
+      "revival grace-fixture is back",
+      "ignite ignited linus-fixture",
+      "desktop desktop credential stored",
+      "pairing phone pairing token",
+      "switch Switched to ada-fixture",
+    ],
+    absent: ["Nothing logged yet.", "Only polls so far"],
+  },
   {
     route: "/utilization",
     label: "Utilization",
     marker: "ada-fixture",
     absent: ["No projection yet"],
   },
-  { route: "/stats", label: "Stats", marker: "Session lengths" },
+  {
+    route: "/stats",
+    label: "Stats",
+    marker: "Session lengths",
+    // The tiles whose figure the fixture used to leave out, so each read zero
+    // and a tile that stopped reading its field looked the same as one that
+    // worked (#1115). Each phrase is a tile's name and the figure beside it —
+    // the capture joins a tile's spans with a space.
+    shows: [
+      "Reverts 7",
+      "Repos 3",
+      "Nudges 21",
+      "Sub-agents 28",
+      "Longest unattended 34 tool calls",
+      "Questions 49",
+      "Denied tools 7",
+      "Tool errors 35",
+      "API retries 14",
+      "Accounts hit a limit 14",
+      "Revivals 14",
+      "Minutes lost, all out 77",
+      "Ignites 7",
+      "Resumes 21",
+    ],
+  },
 ];
 
 /** The file stem `fork-visual-pass.mjs` gives a route: `/settings/infinitus`
@@ -64,7 +132,9 @@ export function captureName(route: string): string {
 export function routeFailures(route: ForkVisualRoute, text: string | null): ReadonlyArray<string> {
   if (text === null) return ["no text capture"];
   const failures: string[] = [];
-  if (!text.includes(route.marker)) failures.push(`missing "${route.marker}"`);
+  for (const phrase of [route.marker, ...(route.shows ?? [])]) {
+    if (!text.includes(phrase)) failures.push(`missing "${phrase}"`);
+  }
   for (const phrase of [...ALWAYS_ABSENT, ...(route.absent ?? [])]) {
     if (text.includes(phrase)) failures.push(`shows "${phrase}"`);
   }

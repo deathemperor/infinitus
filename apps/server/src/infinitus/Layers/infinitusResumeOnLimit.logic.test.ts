@@ -128,13 +128,14 @@ describe("limitStopFromEvent", () => {
     ).toBeNull();
   });
 
-  it("reads a failed turn off the adapter's usage-limit wording", () => {
+  it("reads a failed turn off the adapter's structured limit flag", () => {
     const failed = {
       ...base,
       type: "turn.completed" as const,
       payload: {
         state: "failed" as const,
-        errorMessage: "Claude stopped: a usage limit blocked the request.",
+        usageLimited: true,
+        errorMessage: "Claude gave up after repeated API errors.",
       },
     };
     expect(limitStopFromEvent(failed, NOW, snapshot)).toMatchObject({
@@ -153,6 +154,25 @@ describe("limitStopFromEvent", () => {
     ).toBeNull();
     expect(
       limitStopFromEvent({ ...failed, payload: { state: "completed" } }, NOW, snapshot),
+    ).toBeNull();
+  });
+
+  // The CLI's context-window gate (`blocking_limit`) is not a usage limit, and
+  // its wording used to say one. Nothing but the flag records a stop now.
+  it("ignores a failed turn whose error merely reads like a limit", () => {
+    expect(
+      limitStopFromEvent(
+        {
+          ...base,
+          type: "turn.completed" as const,
+          payload: {
+            state: "failed" as const,
+            errorMessage: "Claude stopped: a usage limit blocked the request.",
+          },
+        },
+        NOW,
+        snapshot,
+      ),
     ).toBeNull();
   });
 

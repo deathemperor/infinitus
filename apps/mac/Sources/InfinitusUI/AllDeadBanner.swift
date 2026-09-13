@@ -2,8 +2,7 @@ import SwiftUI
 import InfinitusCore
 
 /// All-limited banner (todo 2026-09-01): names the first account
-/// to recover with a live one-second countdown, and counts the
-/// limit-stopped sessions waiting to be resumed. Rides the error
+/// to recover with a live one-second countdown. Rides the error
 /// slot so every layout carries it without four insert sites — and
 /// the #7 battle plan line rides along with it for the same reason.
 public struct AllDeadBanner<M: FleetModel>: View {
@@ -31,18 +30,12 @@ public struct AllDeadBanner<M: FleetModel>: View {
                     .foregroundStyle(.orange)
                  + Text(" All accounts limited — \(name) recovers in ")
                  + Text(RecoveryCountdown.label(until: date, now: ctx.date))
-                    .bold().monospacedDigit().foregroundStyle(.orange)
-                 + Text(waitingResumeSuffix))
+                    .bold().monospacedDigit().foregroundStyle(.orange))
                     .font(PopupFont.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
             }
         }
-    }
-
-    private var waitingResumeSuffix: String {
-        guard let waiting = model.waitingResume else { return "" }
-        return " · \(waiting) session\(waiting == 1 ? "" : "s") waiting to resume"
     }
 }

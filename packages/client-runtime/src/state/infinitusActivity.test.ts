@@ -1,6 +1,42 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { activityRows, decodeEventRows, isPollRow } from "./infinitusActivity.ts";
+import {
+  ACTIVITY_KIND_LABELS,
+  activityRows,
+  decodeEventRows,
+  isPollRow,
+} from "./infinitusActivity.ts";
+
+describe("ACTIVITY_KIND_LABELS", () => {
+  /** Every kind the Mac writes to `events.jsonl` today: the six literals
+      `AppModel.logEvent` is called with, plus the three `AppModel.eventKind`
+      folds the engine's own events into. `other` is the deliberate no-chip
+      default. Kept in step by hand with `apps/mac/Sources/Infinitus/AppModel.swift`. */
+  const MAC_KINDS = [
+    "death",
+    "desktop",
+    "ignite",
+    "pairing",
+    "revival",
+    "switch",
+    "limit",
+    "resume",
+  ];
+
+  it("chips every kind the Mac logs", () => {
+    for (const kind of MAC_KINDS) {
+      expect(ACTIVITY_KIND_LABELS[kind], kind).toBeDefined();
+    }
+  });
+
+  it("keeps `other` unchipped and tells the two limit kinds apart", () => {
+    expect(ACTIVITY_KIND_LABELS["other"]).toBeUndefined();
+    // One account out vs the whole fleet out: Stats counts them as separate
+    // tiles, so the chips must not both read "limit".
+    expect(ACTIVITY_KIND_LABELS["death"]).toBe("limit");
+    expect(ACTIVITY_KIND_LABELS["limit"]).toBe("all out");
+  });
+});
 
 describe("decodeEventRows", () => {
   it("reads the verb's array and rejects anything else", () => {

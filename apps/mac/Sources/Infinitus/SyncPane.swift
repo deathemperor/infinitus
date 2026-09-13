@@ -193,13 +193,13 @@ struct SyncPane: View {
             Section {
                 liveActivityRows
             } header: {
-                Text("Phone lock screen")
+                Text("Phone alerts")
             } footer: {
-                Text("The phone's Live Activities (working sessions, revival countdown) "
-                     + "update while the app is open. To keep them live with the app "
-                     + "closed, this Mac pushes through Apple (APNs) with a key from "
-                     + "your developer account: Certificates, Identifiers & Profiles \u{2192} "
-                     + "Keys \u{2192} + \u{2192} Apple Push Notifications service, download the .p8.")
+                Text("The Mac's own notifications reach the phone while the app is "
+                     + "open. To keep reaching it with the app closed, this Mac pushes "
+                     + "through Apple (APNs) with a key from your developer account: "
+                     + "Certificates, Identifiers & Profiles \u{2192} Keys \u{2192} + \u{2192} "
+                     + "Apple Push Notifications service, download the .p8.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             Section {
@@ -260,10 +260,10 @@ struct SyncPane: View {
             Button("Forget", role: .destructive) { pusher.storeKey(pem: "") }
             Button("Keep Key", role: .cancel) { }
         } message: {
-            Text("The key leaves the keychain and lock-screen activities stop updating "
-                 + "with the app closed. Apple hands out each key file once, so without "
-                 + "your own copy you'll need a new key to set push up again. Pairing "
-                 + "and everything else here are untouched.")
+            Text("The key leaves the keychain and the phone stops getting this Mac's "
+                 + "alerts with the app closed. Apple hands out each key file once, so "
+                 + "without your own copy you'll need a new key to set push up again. "
+                 + "Pairing and everything else here are untouched.")
         }
         .confirmationDialog("Forget the tunnel token?", isPresented: $confirmForgetToken) {
             Button("Forget", role: .destructive) { app.saveNamedTunnelToken("") }
@@ -289,8 +289,8 @@ struct SyncPane: View {
     /// The restart-proof remote route: a Cloudflare tunnel the user owns.
     /// Cloudflare holds the hostname → localhost:port mapping; this Mac
     /// holds only the tunnel token, in the keychain.
-    /// Live Activity pushes (APNs): the .p8 key that lets this Mac keep
-    /// the phone's lock-screen activities moving with the app closed.
+    /// Alert pushes (APNs): the .p8 key that lets this Mac reach the
+    /// phone with its own notifications while the app is closed.
     @ViewBuilder private var liveActivityRows: some View {
         TextField("Team ID", text: $pusher.teamID, prompt: Text("ABCDE12345"))
         TextField("Key ID", text: $pusher.keyID, prompt: Text("the key's 10-character id"))
@@ -318,11 +318,6 @@ struct SyncPane: View {
         }
         if let result = pusher.lastResult {
             Text(result).font(.caption).foregroundStyle(.secondary)
-        }
-        Stepper(value: $app.liveActivityRateSeconds, in: 0...60, step: 5) {
-            Text(app.liveActivityRateSeconds == 0
-                 ? "tok/min: pushed with other changes only"
-                 : "tok/min: pushed every \(app.liveActivityRateSeconds) s")
         }
     }
 

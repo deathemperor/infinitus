@@ -327,8 +327,8 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
   // work-log row and starts the Mac's login; and (#1047) the phone's
   // lock-screen thread card, folded from the shell snapshot and handed to the
-  // Mac's `push` verb. Their own control client, since InfinitusLayerLive's
-  // is private.
+  // Mac's `push` verb. The activity layer gets its own control client, since
+  // InfinitusLayerLive's is private.
   Layer.provideMerge(
     Layer.mergeAll(InfinitusSignInLapseLive, InfinitusAgentActivityLive).pipe(
       Layer.provide(

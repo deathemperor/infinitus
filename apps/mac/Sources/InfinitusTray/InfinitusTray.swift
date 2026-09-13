@@ -79,7 +79,6 @@ struct PanelEngine: Encodable {
 struct PanelRecovery: Encodable {
     let number: Int
     let at: String
-    let waiting: Int
 }
 
 /// A phone on the mirror (#9 parity with the Mac's device list).
@@ -352,26 +351,14 @@ struct InfinitusTray {
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
         let selectedSessions = Array(sessionRecords.prefix(6))
-        var progressCache = SessionProgressCache.load()
         var progressByPid: [Int: SessionProgress] = [:]
         let sessions = selectedSessions.map { record -> SessionPanelRow in
-            let stamp = SessionProgressCache.stamp(sessionId: record.sessionId,
-                                                   cwd: record.cwd, claudeDir: claudeDir)
-            let progress: SessionProgress
-            if let entry = progressCache[record.sessionId],
-               entry.size == stamp.size, entry.mtime == stamp.mtime {
-                progress = entry.progress
-            } else {
-                progress = SessionProgress.read(sessionId: record.sessionId,
+            let progress = SessionProgress.read(sessionId: record.sessionId,
                                                 cwd: record.cwd, claudeDir: claudeDir,
                                                 name: record.name)
-                progressCache[record.sessionId] = .init(size: stamp.size, mtime: stamp.mtime,
-                                                        progress: progress)
-            }
             progressByPid[Int(record.pid)] = progress
             return SessionPanelRow.make(record: record, progress: progress, now: now)
         }
-        SessionProgressCache.save(progressCache)
         return (sessions, progressByPid)
     }
 
@@ -478,17 +465,11 @@ struct InfinitusTray {
                     note: note, deadLine: deadLine, critical: critical,
                     windows: windows)
             }
-            // All-limited: the engine names the first account to recover;
-            // the waiting count reuses the resume mechanism's own
-            // stopped-session detection (Claude Code's files only —
-            // never engine internals).
+            // All-limited: the engine names the first account to recover.
             let claudeDir = ClaudeSessions.configHome()
             var panelRecovery: PanelRecovery?
             if list.nextCandidate == nil, let rec = recovery {
-                let stopped = Transcript.findStopped(
-                    sessions: ClaudeSessions.list(claudeDir: claudeDir), claudeDir: claudeDir)
-                panelRecovery = PanelRecovery(number: rec.number, at: rec.at,
-                                              waiting: stopped.count)
+                panelRecovery = PanelRecovery(number: rec.number, at: rec.at)
             }
             // Session progress rows (issue #13 step 4): busy/waiting
             // first (same ordering as the macOS wall's session board),

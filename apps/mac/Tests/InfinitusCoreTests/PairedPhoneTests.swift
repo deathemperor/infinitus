@@ -44,8 +44,6 @@ final class PairedPhoneTests: XCTestCase {
     }
 
     func testPushSummaryNamesWhatThePhoneHolds() {
-        XCTAssertEqual(PairedPhones.pushSummary([.working, .workingStart, .revivalStart, .alert]), "lock-screen cards + alerts")
-        XCTAssertEqual(PairedPhones.pushSummary([.revivalStart]), "lock-screen cards")
         XCTAssertEqual(PairedPhones.pushSummary([.alert]), "alerts")
         XCTAssertEqual(PairedPhones.pushSummary([]), "no push tokens")
     }
