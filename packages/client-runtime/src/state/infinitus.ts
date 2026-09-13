@@ -31,6 +31,12 @@ const INFINITUS_STATS_IDLE_TTL_MS = 60_000;
 const INFINITUS_UTILIZATION_STALE_MS = 60_000;
 const INFINITUS_UTILIZATION_REFRESH_MS = 300_000;
 const INFINITUS_UTILIZATION_IDLE_TTL_MS = 60_000;
+/** The Utilization page's live rate (#1127): the server's own turn usage over
+    the last five minutes, so a re-read a minute apart keeps the line moving
+    while the page is open. */
+const INFINITUS_RUN_RATE_STALE_MS = 30_000;
+const INFINITUS_RUN_RATE_REFRESH_MS = 60_000;
+const INFINITUS_RUN_RATE_IDLE_TTL_MS = 60_000;
 /** The Activity page's read (#659): `events --limit 100` once on mount; the
     snapshot subscription's deltas carry everything after. No re-read. */
 const INFINITUS_EVENTS_STALE_MS = 60_000;
@@ -123,6 +129,16 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
       refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
       idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
+    }),
+    /** The server's own run rate (#1127): no Infinitus app in the path, so it
+        is read on its own cadence — a five-minute window is only worth
+        drawing if it is re-read inside one. */
+    runRate: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:run-rate",
+      tag: WS_METHODS.infinitusRunRate,
+      staleTimeMs: INFINITUS_RUN_RATE_STALE_MS,
+      refreshIntervalMs: INFINITUS_RUN_RATE_REFRESH_MS,
+      idleTtlMs: INFINITUS_RUN_RATE_IDLE_TTL_MS,
     }),
     // Approve-on-Mac pairing (#710): the server's pending requests, resent
     // whole on every change (metadata and the match code only — never the

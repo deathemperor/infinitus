@@ -18,6 +18,7 @@ import {
   replayText,
   RUN_RATE_NOTE,
   runRateRows,
+  serverRunRateText,
   utilizationWindows,
   wasteRows,
   WASTE_GAP_SECONDS,
@@ -25,7 +26,7 @@ import {
   type HistoryLine,
   type WasteRow,
 } from "@t3tools/client-runtime/state/infinitusUtilization";
-import type { InfinitusUtilization } from "@t3tools/contracts/infinitus";
+import type { InfinitusRunRate, InfinitusUtilization } from "@t3tools/contracts/infinitus";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
@@ -107,6 +108,12 @@ export function UtilizationPage() {
   const utilization = useMemo(
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
+  );
+  // Fork (#1127): this server's own turns, on their own minute-by-minute
+  // cadence — the Mac's transcript-tail live rate went with its session
+  // tracker, and this one needs no verb at all.
+  const runRateQuery = useEnvironmentQuery(
+    ready ? infinitusEnvironment.runRate({ environmentId, input: {} }) : null,
   );
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
@@ -205,7 +212,7 @@ export function UtilizationPage() {
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
-            <RunRateSection utilization={utilization} />
+            <RunRateSection utilization={utilization} runRate={runRateQuery.data} />
           </>
         )}
       </div>
@@ -627,9 +634,17 @@ function WasteRowLine({
   );
 }
 
-function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
+function RunRateSection({
+  utilization,
+  runRate,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly runRate: InfinitusRunRate | null;
+}) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization);
+  // This server's own turns first (#1127); the Mac's transcript line is the
+  // fallback for a build whose session tracker still measured one.
+  const live = serverRunRateText(runRate) ?? liveRateText(utilization);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">

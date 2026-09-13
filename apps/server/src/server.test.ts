@@ -118,6 +118,7 @@ import { CaptureStore } from "./captures/CaptureStore.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
+import { InfinitusRunRate } from "./infinitus/Services/InfinitusRunRate.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
@@ -809,6 +810,15 @@ const buildAppUnderTest = (options?: {
           }),
           // No turn runs here; the update gate has its own tests (#829).
           Layer.mock(InfinitusRunningTurns)({ list: Effect.succeed([]) }),
+          // No turn finishes here either; the window has its own tests (#1127).
+          Layer.mock(InfinitusRunRate)({
+            read: Effect.succeed({
+              windowMinutes: 5,
+              turns: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+            }),
+          }),
           // Nothing is ever paused here either; the layer has its own tests (#743).
           Layer.mock(InfinitusSessionInterrupt)({
             resume: () => Effect.succeed({ released: false, reason: "nothing is paused" }),

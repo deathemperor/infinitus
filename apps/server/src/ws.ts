@@ -93,6 +93,7 @@ import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
+import { InfinitusRunRate } from "./infinitus/Services/InfinitusRunRate.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
@@ -562,6 +563,7 @@ const makeWsRpcLayer = (
       const infinitus = yield* InfinitusService;
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusSessionHold = yield* InfinitusSessionHold;
+      const infinitusRunRate = yield* InfinitusRunRate;
       const infinitusLimitStops = yield* InfinitusLimitStops;
       const infinitusSessionInterrupt = yield* InfinitusSessionInterrupt;
       const infinitusSecret = yield* InfinitusSecret;
@@ -3190,6 +3192,12 @@ const makeWsRpcLayer = (
           ),
         [WS_METHODS.infinitusLaunch]: (_input) =>
           observeRpcEffect(WS_METHODS.infinitusLaunch, infinitusCompanion.launch, {
+            "rpc.aggregate": "infinitus",
+          }),
+        [WS_METHODS.infinitusRunRate]: (_input) =>
+          // Fork (#1127): this server's own turns, summed over the window —
+          // no Infinitus app in the path.
+          observeRpcEffect(WS_METHODS.infinitusRunRate, infinitusRunRate.read, {
             "rpc.aggregate": "infinitus",
           }),
         [WS_METHODS.subscribeInfinitusHolds]: (_input) =>

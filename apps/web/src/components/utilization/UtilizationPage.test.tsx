@@ -1,4 +1,4 @@
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusRunRate, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
+  runRate: null as InfinitusRunRate | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     utilization: () => ({ label: "utilization-atom" }),
+    runRate: () => ({ label: "run-rate-atom" }),
   },
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -31,7 +33,9 @@ vi.mock("../../state/query", () => ({
         ? null
         : atom.label === "utilization-atom"
           ? testState.utilization
-          : testState.snapshot;
+          : atom.label === "run-rate-atom"
+            ? testState.runRate
+            : testState.snapshot;
     return {
       data,
       error: null,
@@ -244,6 +248,8 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
+    // No turn of this server's in the window unless a case says so (#1127).
+    testState.runRate = null;
     testState.capability = true;
     testState.refresh.mockReset();
   });
@@ -267,6 +273,19 @@ describe("UtilizationPage", () => {
     expect(markup).toContain("Tokens counted but not priced: mystery-1");
     expect(markup).toContain("Live: 1.5k output tokens/min");
     expect(markup).toContain("24 hours");
+  });
+
+  it("prefers this server's own live rate over the Mac's transcript one (#1127)", () => {
+    testState.runRate = { windowMinutes: 5, turns: 3, outputTokens: 6_000, totalTokens: 40_000 };
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain(
+      "Live: 1.2k output tokens/min over the last 5 minutes, from 3 turns this server finished.",
+    );
+    expect(markup).not.toContain("Live: 1.5k output tokens/min");
+
+    // A window with no finished turn falls back to whatever the Mac measured.
+    testState.runRate = { windowMinutes: 5, turns: 0, outputTokens: 0, totalTokens: 0 };
+    expect(renderToStaticMarkup(<UtilizationPage />)).toContain("Live: 1.5k output tokens/min");
   });
 
   it("draws the five-hour windows, the replay and the weekly waste beside the chart", () => {

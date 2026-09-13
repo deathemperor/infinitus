@@ -1,4 +1,5 @@
 import {
+  type InfinitusRunRate,
   InfinitusUtilization,
   InfinitusUtilizationFiveHourWindow,
   InfinitusUtilizationGeneration,
@@ -301,6 +302,21 @@ export function liveRateText(u: InfinitusUtilization): string | null {
       ? `, peak ${compactTokens(live.peakPerMinute)}`
       : "";
   return `Live: ${compactTokens(live.perMinute)} output tokens/min over the last 5 minutes${peak}.`;
+}
+
+/**
+ * The same line from this server's own turns (#1127), for the Utilization
+ * page to draw where the Mac's transcript tail used to: the window's output
+ * tokens over its minutes, and how many turns that is. Null when no turn
+ * finished inside the window — a rate of zero would read as "nothing is
+ * running" when it means "nothing finished yet".
+ */
+export function serverRunRateText(rate: InfinitusRunRate | null | undefined): string | null {
+  if (rate === undefined || rate === null) return null;
+  if (rate.turns === 0 || rate.windowMinutes <= 0) return null;
+  const perMinute = rate.outputTokens / rate.windowMinutes;
+  const turns = rate.turns === 1 ? "1 turn" : `${formatCount(rate.turns)} turns`;
+  return `Live: ${compactTokens(perMinute)} output tokens/min over the last ${rate.windowMinutes} minutes, from ${turns} this server finished.`;
 }
 
 export const RUN_RATE_NOTE =

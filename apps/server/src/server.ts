@@ -88,6 +88,7 @@ import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
 import { InfinitusForkAnchorGate } from "./infinitus/Layers/InfinitusForkAnchorGate.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
+import { InfinitusRunRateLive } from "./infinitus/Layers/InfinitusRunRate.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
 import { InfinitusBabysitLive } from "./infinitus/Layers/InfinitusBabysit.ts";
 import { InfinitusTurnQueueLive } from "./infinitus/Layers/InfinitusTurnQueue.ts";
@@ -352,8 +353,10 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#616): the TurnStartGate every provider turn start passes — holds a
   // background thread's start while its fleet's headroom reads low.
   Layer.provideMerge(InfinitusSessionHoldLayers),
-  // Fork (#829): the running turns an update must not cut off.
-  Layer.provideMerge(InfinitusRunningTurnsLive),
+  // Fork (#829): the running turns an update must not cut off, and (#1127)
+  // the tokens the turns this server finishes move, rolling. Neither reads
+  // the other; they share a merge because `pipe` takes only so many steps.
+  Layer.provideMerge(Layer.mergeAll(InfinitusRunningTurnsLive, InfinitusRunRateLive)),
 );
 
 const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(

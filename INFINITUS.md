@@ -435,6 +435,31 @@ user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
   gated at the renderer (the IPC install) and at the server (the commit of
   a remote desktop update); a plain quit never installs (`DesktopUpdates.ts`
   sets `autoInstallOnAppQuit` false), so those two are the only paths.
+- Live run rate (#1127): the Mac's transcript-tail rate (`utilization`'s
+  `liveRate`) retired with its session tracker, so the server publishes its
+  own from the turn usage it already records.
+  `packages/contracts/src/infinitus.ts` — `InfinitusRunRate` (`windowMinutes`,
+  `turns`, `outputTokens`, `totalTokens`: sums, the reader divides);
+  `rpc.ts` — `infinitus.runRate` in `WS_METHODS`, its `Rpc.make` and the
+  group (`AuthOrchestrationReadScope` in `RpcAuthorization.ts`: the server's
+  own numbers, read like the snapshot); `ws.ts` — the handler; `server.ts` —
+  `InfinitusRunRateLive` merged with `InfinitusRunningTurnsLive` in
+  `ReactorLayerLive` (one `Layer.mergeAll`: that pipe chain is at its arity
+  cap), `server.test.ts` a `Layer.mock` of it. Fork-only:
+  `apps/server/src/infinitus/Layers/InfinitusRunRate.ts` (+
+  `infinitusRunRate.logic.ts`, tests) — watches `thread.turn-usage-recorded`
+  on `streamDomainEvents` and keeps the window's samples in memory, pruned on
+  every record and read: a restart starts the window over (a live rate is
+  about the last five minutes, so nothing worth a migration), a turn whose
+  provider reported no usage (`usageUnavailable`) contributes nothing, and an
+  empty window is `turns: 0`, never a rate of zero. Web:
+  `packages/client-runtime/src/state/infinitus.ts` — the `runRate` query atom,
+  re-read every minute while a page holds it;
+  `state/infinitusUtilization.ts` — `serverRunRateText` (null with no turn in
+  the window); `apps/web/src/components/utilization/UtilizationPage.tsx` draws
+  it in the Run rate section ahead of `liveRateText`, which stays for a build
+  that still measures one. One number for the server: not split per fleet by
+  #779's attribution, and the phone does not read it yet.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts`
   — `ThreadBabysit` (`since`, `rounds`), `BABYSIT_MAX_ROUNDS` (10), `babysit?`
   on `OrchestrationThread` and `OrchestrationThreadShell` (optional, so

@@ -10,6 +10,7 @@ import {
   liveRateText,
   replayText,
   runRateRows,
+  serverRunRateText,
   utilizationWindows,
   wasteRows,
 } from "./infinitusUtilization.ts";
@@ -237,5 +238,24 @@ describe("run rate", () => {
       "Live: 0 output tokens/min over the last 5 minutes.",
     );
     expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+  });
+
+  it("words this server's own run rate, and draws none without a turn (#1127)", () => {
+    expect(
+      serverRunRateText({ windowMinutes: 5, turns: 3, outputTokens: 6_000, totalTokens: 40_000 }),
+    ).toBe(
+      "Live: 1.2k output tokens/min over the last 5 minutes, from 3 turns this server finished.",
+    );
+    expect(
+      serverRunRateText({ windowMinutes: 5, turns: 1, outputTokens: 500, totalTokens: 2_000 }),
+    ).toBe(
+      "Live: 100 output tokens/min over the last 5 minutes, from 1 turn this server finished.",
+    );
+    // No turn finished in the window: nothing to say, rather than "0/min",
+    // which reads as "nothing is running".
+    expect(
+      serverRunRateText({ windowMinutes: 5, turns: 0, outputTokens: 0, totalTokens: 0 }),
+    ).toBeNull();
+    expect(serverRunRateText(null)).toBeNull();
   });
 });

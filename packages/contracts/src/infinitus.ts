@@ -1,7 +1,12 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { ForwardCompatibleOptional, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  ForwardCompatibleOptional,
+  NonNegativeInt,
+  ThreadId,
+  TrimmedNonEmptyString,
+} from "./baseSchemas.ts";
 
 /**
  * Wire contracts for the Infinitus control socket: one JSON line per request,
@@ -513,6 +518,25 @@ export const InfinitusHeldThread = Schema.Struct({
   resetsAt: Schema.optionalKey(Schema.String),
 });
 export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
+
+/**
+ * Fork (#1127): what this server's own turns burned over the last few
+ * minutes, the thread-side replacement for the Mac's transcript-tail live
+ * rate (`utilization`'s `liveRate`, which retired with the terminal session
+ * tracker). Sums rather than a rate, so the reader divides by the window it
+ * is told: `turns` is the turns that completed inside it and reported usage,
+ * a turn whose provider reported none counts for nothing. Held in memory, so
+ * a restart starts the window over — and no turn in the window is a `turns`
+ * of 0, which the client draws as nothing rather than as a rate of zero.
+ */
+export const InfinitusRunRate = Schema.Struct({
+  windowMinutes: Schema.Number,
+  turns: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  /** Input, output and both cache counts — everything the turns moved. */
+  totalTokens: NonNegativeInt,
+});
+export type InfinitusRunRate = typeof InfinitusRunRate.Type;
 
 export const InfinitusReleaseThreadInput = Schema.Struct({ threadId: ThreadId });
 export type InfinitusReleaseThreadInput = typeof InfinitusReleaseThreadInput.Type;
