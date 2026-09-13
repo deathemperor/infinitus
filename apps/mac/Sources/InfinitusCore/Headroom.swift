@@ -3,17 +3,27 @@ import Foundation
 /// One fleet's verdict on whether background sessions may spend (#616,
 /// ruling A: native decides, the fork obeys). Published on `fleets` /
 /// `refresh` while `priority_mode` is on; absent when the mode is off or
-/// the active account has never carried usage. Pct-only in v1: the
-/// active account's fullest window binds, `low` at or above
-/// `priority_low_pct`, `abundant` again at or below
-/// `priority_abundant_pct`, and inside the band the previous verdict
-/// holds. The interrupt mode (#743) says `critical` wherever the hold
-/// mode says `low` — same line, same hysteresis — so the mode travels
-/// inside the verdict: the fork holds starts on `low`, holds starts and
-/// interrupts running background turns on `critical`, and never reads
-/// the pref.
+/// the active account has never carried usage. The active account's
+/// fullest window binds, `low` at or above `priority_low_pct`, `abundant`
+/// again at or below `priority_abundant_pct`, inside the band the previous
+/// verdict holds, and independently a window the forecast projects to
+/// fill before its own reset holds too, even below the line (#616
+/// remainder 1). The interrupt mode (#743) says `critical` wherever the
+/// hold mode says `low` — same line, same hysteresis — so the mode
+/// travels inside the verdict: the fork holds starts on `low`, holds
+/// starts and interrupts running background turns on `critical`, and
+/// never reads the pref.
 public struct Headroom: Codable, Sendable, Equatable {
     public enum State: String, Codable, Sendable { case abundant, low, critical }
+    /// The active account's earliest window projected to fill before its
+    /// reset, as `UsageForecast.AccountLine` names it. Never reaches the
+    /// wire — a caller-computed input to `verdict`, not part of the
+    /// published verdict.
+    public struct Fill: Sendable, Equatable {
+        public let window: String
+        public let at: Double
+        public init(window: String, at: Double) { self.window = window; self.at = at }
+    }
     public let state: State
     /// The binding window as the engine names it: "5h", "7d", or a
     /// scoped window's display name.
@@ -33,9 +43,16 @@ public struct Headroom: Codable, Sendable, Equatable {
     /// `interrupt` picks the holding state: `.critical` in the interrupt
     /// mode, `.low` otherwise; a previous verdict held under the other
     /// mode re-reads as this mode's holding state inside the band.
+    /// `fill`, when given, is the active account's earliest window on
+    /// pace to hit its limit before it resets — checked right after the
+    /// pct threshold, so a fleet already at/above `lowPct` keeps that
+    /// reason, and a fleet whose pace drops back (`fill` goes nil) while
+    /// the pct still sits in the band keeps the held verdict via the
+    /// ordinary hysteresis.
     public static func verdict(previous: Headroom?, usage: Usage?,
                                lowPct: Double, abundantPct: Double,
-                               interrupt: Bool = false) -> Headroom? {
+                               interrupt: Bool = false, fill: Fill? = nil,
+                               now: Double = Date().timeIntervalSince1970) -> Headroom? {
         guard let usage else { return previous }
         let holding: State = interrupt ? .critical : .low
         var windows: [(String, Double)] = []
@@ -47,6 +64,13 @@ public struct Headroom: Codable, Sendable, Equatable {
         if pct >= lowPct {
             return Headroom(state: holding, window: window, pct: pct,
                             reason: "\(shown), \(interrupt ? "interrupting" : "holding") from \(Int(lowPct))%")
+        }
+        if let fill {
+            let fillPct = windows.first { $0.0 == fill.window }?.1 ?? pct
+            let minutes = Int(max(0, (fill.at - now) / 60).rounded())
+            let verb = interrupt ? "interrupting" : "holding"
+            return Headroom(state: holding, window: fill.window, pct: fillPct,
+                            reason: "\(fill.window) at \(Int(fillPct.rounded()))%, fills in \(minutes) min before its reset — \(verb)")
         }
         if pct <= abundantPct || previous == nil {
             return Headroom(state: .abundant, window: window, pct: pct,

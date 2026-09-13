@@ -83,6 +83,84 @@ final class HeadroomTests: XCTestCase {
         XCTAssertEqual(Headroom.verdict(previous: nil, usage: u, lowPct: 60, abundantPct: 90)?.state, .low)
     }
 
+    func testFillBeforeResetHoldsBelowTheLine() throws {
+        // #616 remainder 1: 55% is below `low`, but the pace projects the
+        // window full in 20 minutes, before its reset — hold anyway.
+        let u = try usage(#"{"fiveHour": {"pct": 55}}"#)
+        let now = 1_000_000.0
+        let fill = Headroom.Fill(window: "5h", at: now + 20 * 60)
+        let v = Headroom.verdict(previous: nil, usage: u, lowPct: low, abundantPct: abundant,
+                                  fill: fill, now: now)
+        XCTAssertEqual(v?.state, .low)
+        XCTAssertEqual(v?.window, "5h")
+        XCTAssertEqual(v?.pct, 55)
+        XCTAssertTrue(v?.reason.contains("fills in 20 min") == true, v?.reason ?? "")
+    }
+
+    func testFillNamesItsOwnWindow() throws {
+        // The fullest window (7d at 70%) is not the one on pace to fill —
+        // the verdict reports the fill's own window and pct, not the
+        // fullest one's.
+        let u = try usage(#"{"fiveHour": {"pct": 40}, "sevenDay": {"pct": 70}}"#)
+        let now = 1_000_000.0
+        let fill = Headroom.Fill(window: "5h", at: now + 15 * 60)
+        let v = Headroom.verdict(previous: nil, usage: u, lowPct: low, abundantPct: abundant,
+                                  fill: fill, now: now)
+        XCTAssertEqual(v?.state, .low)
+        XCTAssertEqual(v?.window, "5h")
+        XCTAssertEqual(v?.pct, 40)
+    }
+
+    func testPctRuleWinsOverFill() throws {
+        // Already at/above `lowPct`: the pct reason wins even though a
+        // fill was also passed.
+        let u = try usage(#"{"fiveHour": {"pct": 90}}"#)
+        let now = 1_000_000.0
+        let fill = Headroom.Fill(window: "5h", at: now + 5 * 60)
+        let v = Headroom.verdict(previous: nil, usage: u, lowPct: low, abundantPct: abundant,
+                                  fill: fill, now: now)
+        XCTAssertEqual(v?.state, .low)
+        XCTAssertEqual(v?.reason, "5h at 90%, holding from 80%")
+    }
+
+    func testInterruptModeFillSaysCritical() throws {
+        let u = try usage(#"{"fiveHour": {"pct": 55}}"#)
+        let now = 1_000_000.0
+        let fill = Headroom.Fill(window: "5h", at: now + 10 * 60)
+        let v = Headroom.verdict(previous: nil, usage: u, lowPct: low, abundantPct: abundant,
+                                  interrupt: true, fill: fill, now: now)
+        XCTAssertEqual(v?.state, .critical)
+        XCTAssertTrue(v?.reason.contains("interrupting") == true, v?.reason ?? "")
+    }
+
+    func testFillGoneKeepsTheHeldVerdictInsideTheBand() throws {
+        // The held verdict came from a fill; once the pace drops back
+        // (fill nil) and pct sits in the band, the ordinary hysteresis
+        // keeps it held until `abundantPct` — same as any other hold.
+        let held = Headroom(state: .low, window: "5h", pct: 55,
+                             reason: "5h at 55%, fills in 20 min before its reset — holding")
+        let band = try usage(#"{"fiveHour": {"pct": 65}}"#)
+        let v = Headroom.verdict(previous: held, usage: band, lowPct: low, abundantPct: abundant, fill: nil)
+        XCTAssertEqual(v?.state, .low, "65% is inside the band: still low")
+        let cool = try usage(#"{"fiveHour": {"pct": 45}}"#)
+        let v2 = Headroom.verdict(previous: v, usage: cool, lowPct: low, abundantPct: abundant, fill: nil)
+        XCTAssertEqual(v2?.state, .abundant, "at the release threshold")
+    }
+
+    func testNoFillIsExactlyV1() throws {
+        // fill: nil (the default) must reproduce the pre-existing
+        // behaviour exactly — one abundant case, one low case.
+        let abundantUsage = try usage(#"{"fiveHour": {"pct": 65}, "sevenDay": {"pct": 20}}"#)
+        XCTAssertEqual(
+            Headroom.verdict(previous: nil, usage: abundantUsage, lowPct: low, abundantPct: abundant, fill: nil)?.state,
+            .abundant)
+        let lowUsage = try usage(#"{"fiveHour": {"pct": 12}, "sevenDay": {"pct": 41}, "scoped": [{"pct": 84, "name": "Fable"}]}"#)
+        let v = Headroom.verdict(previous: nil, usage: lowUsage, lowPct: low, abundantPct: abundant, fill: nil)
+        XCTAssertEqual(v?.state, .low)
+        XCTAssertEqual(v?.window, "Fable")
+        XCTAssertEqual(v?.pct, 84)
+    }
+
     func testWireShape() throws {
         let v = Headroom(state: .low, window: "7d", pct: 84, reason: "7d at 84%, holding from 80%")
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(v)) as? [String: Any]

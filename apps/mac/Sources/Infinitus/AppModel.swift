@@ -1073,6 +1073,11 @@ final class AppModel: ObservableObject {
         // anchor that is a new sample or a new rate, not every poll.
         if next.accounts != forecast?.accounts || next.allDeadAt != forecast?.allDeadAt {
             forecast = next
+            // The forecast lands after `apply` already judged this
+            // poll's headroom (#616 remainder 1) — re-judge now that a
+            // fresh projection exists. Idempotent: judge only publishes
+            // on change.
+            primary?.judgeHeadroom()
         }
         let relay = LiveForecastRelay.shared
         relay.forecast = forecast

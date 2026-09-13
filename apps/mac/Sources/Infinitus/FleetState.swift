@@ -111,10 +111,19 @@ final class FleetState: ObservableObject, Identifiable {
         var next: Headroom?
         if host.priorityMode != "off", let fleet = lastFleet {
             let active = fleet.accounts.first { $0.active }
+            // The forecast is fleet-wide but only means anything for the
+            // primary's own account, and only while it still names the
+            // account this snapshot has active — a forecast built before
+            // a swap must not hold the new account (#616 remainder 1).
+            var fill: Headroom.Fill?
+            if host.primary === self, let line = host.forecast?.active, line.email == active?.email {
+                fill = line.bindsAt.map { Headroom.Fill(window: line.bindsWindow ?? "?", at: $0) }
+            }
             next = Headroom.verdict(previous: swapped ? nil : headroom, usage: active?.usage,
                                     lowPct: Double(host.priorityLowPct),
                                     abundantPct: Double(host.priorityAbundantPct),
-                                    interrupt: host.priorityMode == "interrupt")
+                                    interrupt: host.priorityMode == "interrupt", fill: fill,
+                                    now: host.forecast?.computedAt ?? Date().timeIntervalSince1970)
         }
         if headroom != next { headroom = next }
     }
