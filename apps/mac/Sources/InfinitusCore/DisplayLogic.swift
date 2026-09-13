@@ -180,6 +180,14 @@ public extension Account {
         guard stale == true else { return nil }
         return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
     }
+
+    /// The sentence behind that caption, one for every surface: the age,
+    /// and the engine's error kind when it named one.
+    var staleTip: String? {
+        guard let age = staleAgeLabel else { return nil }
+        let why = staleReason.map { " (\($0))" } ?? ""
+        return "Usage from \(age) — swapd could not refresh this account\(why); it retries on its own"
+    }
 }
 
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
