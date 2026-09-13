@@ -1929,17 +1929,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
 
-- `packages/contracts/src/agentSessions.ts`,
-  `apps/server/src/project/AgentSessionScanner.ts`,
-  `apps/server/src/project/AgentSessionImporter.ts` — fork extension of
-  upstream's session import (#648): `AgentSessionImportInput.providerSessionIds`
-  (optional) filters the scanner to those transcript names before any budget
-  is spent (filtered-out files are neither imported nor counted as skipped),
-  and `AgentSessionImportResult.threads` (present only with a filter) lists
-  `{providerSessionId, threadId}` for each requested session that now has a
-  thread, imported now or earlier. Without the field the RPC behaves exactly
-  as upstream.
-
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
   branch).
