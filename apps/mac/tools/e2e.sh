@@ -484,6 +484,10 @@ echo "prefs: ok"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+# #1047: the desktop's thread card on the push verb — a null state ends
+# it (no phone registered: a no-op that still answers), a stray shape is refused.
+printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True" || fail "push thread.activity end"
+printf '{"kind":"thread.activity","state":{"title":"x"}}' | "$CTL" push 2>&1 | grep -q "thread.activity" || fail "push thread.activity refuses a stray state"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
 # #835: --forget has no body, so a stdin pipe nobody closes must not hold it
 # (a fifo opened read-write never reaches EOF).

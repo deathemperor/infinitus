@@ -10,6 +10,7 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
 - The lock-screen Live Activity cards (the working card and the revival countdown) are gone; the phone's alert banners stay, and the revival time still arrives as one.
+- The `push` verb takes the desktop's thread card too (`{kind: "thread.activity", state}`), sent to the phone's lock screen as the AgentActivity Live Activity — start, redraw or end — on `agent-activity` / `agent-activity-start` push tokens (#1047).
 
 ### Desktop
 - A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).

@@ -29,6 +29,9 @@ final class LiveActivityPusher: ObservableObject {
 
     private var jwt: (token: String, mintedAt: Date)?
     private var inFlight: Set<String> = []
+    /// The thread card each phone last got (#1047), by device id: a
+    /// repeat of the same state is not sent again.
+    private var lastAgentActivity: [String: AgentActivityState] = [:]
 
     init() {
         let defaults = AppDefaults.standard
@@ -144,6 +147,40 @@ final class LiveActivityPusher: ObservableObject {
         }
     }
 
+    /// The desktop's thread card (#1047): every phone with a live
+    /// `agent-activity` token gets the state as an update, a phone with
+    /// only a push-to-start token gets it as a start; nil ends the card
+    /// and drops the update token (the next start brings a new one).
+    /// The push-to-start token stays: it is good for the next card.
+    func pushAgentActivity(_ state: AgentActivityState?) {
+        guard configured else { return }
+        let devices = Set(registrations.values.filter { $0.kind.isLiveActivity }.map(\.deviceId))
+        for device in devices {
+            let live = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivity.rawValue]
+            let start = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivityStart.rawValue]
+            guard let state else {
+                if let live {
+                    send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
+                         to: live, what: "end thread card")
+                    registrations[live.slot] = nil
+                    persist()
+                }
+                lastAgentActivity[device] = nil
+                continue
+            }
+            if lastAgentActivity[device] == state { continue }
+            if let live {
+                send(LiveActivityPush.agentActivityUpdatePayload(state), to: live, what: "update thread card",
+                     priority: "5")
+            } else if let start {
+                send(LiveActivityPush.agentActivityStartPayload(state), to: start, what: "start thread card")
+            } else {
+                continue
+            }
+            lastAgentActivity[device] = state
+        }
+    }
+
     // MARK: APNs
 
     private func bearer() -> String? {
@@ -158,7 +195,7 @@ final class LiveActivityPusher: ObservableObject {
     /// `retried`: this is the one resend on the other APNs gateway after
     /// a BadDeviceToken — a second refusal writes the token off.
     private func send(_ payload: Data, to registration: ActivityPushRegistration, what: String,
-                      retried: Bool = false) {
+                      priority: String = "10", retried: Bool = false) {
         let slot = registration.slot
         // Alerts are each their own message (two in one refresh must both land).
         let key = "\(slot)#\(UUID().uuidString)"
@@ -170,9 +207,11 @@ final class LiveActivityPusher: ObservableObject {
         request.httpMethod = "POST"
         request.httpBody = payload
         request.setValue("bearer \(bearer)", forHTTPHeaderField: "authorization")
-        request.setValue(LiveActivityPush.bundleID, forHTTPHeaderField: "apns-topic")
-        request.setValue("alert", forHTTPHeaderField: "apns-push-type")
-        request.setValue("10", forHTTPHeaderField: "apns-priority")
+        let liveActivity = registration.kind.isLiveActivity
+        request.setValue(liveActivity ? LiveActivityPush.topic : LiveActivityPush.bundleID,
+                         forHTTPHeaderField: "apns-topic")
+        request.setValue(liveActivity ? "liveactivity" : "alert", forHTTPHeaderField: "apns-push-type")
+        request.setValue(priority, forHTTPHeaderField: "apns-priority")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         let device = registration.deviceName
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -192,7 +231,8 @@ final class LiveActivityPusher: ObservableObject {
                         self.log?("ℹ️", "Alert push: \(device)'s token is a \(registration.environment) one, not the \(registration.onOtherGateway().environment) it declared — switched gateway")
                     }
                 } else if !retried, code == 400, body.contains("BadDeviceToken") {
-                    self.send(payload, to: registration.onOtherGateway(), what: what, retried: true)
+                    self.send(payload, to: registration.onOtherGateway(), what: what, priority: priority,
+                              retried: true)
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code) \(body)"
                     self.lastResult = "\(what) → \(device) failed: \(why)"
