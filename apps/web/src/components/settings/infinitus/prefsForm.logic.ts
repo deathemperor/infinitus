@@ -107,9 +107,6 @@ export const PREF_COPY: Readonly<
     description: "What a session's chat wears above the transcript.",
     choices: { compact: "Compact", strip: "Stat strip", hud: "Game HUD" },
   },
-  // Display › Sessions and startup.
-  keep_awake: { label: "Keep the Mac awake while sessions are working" },
-  keep_awake_display: { label: "Keep the screen on too" },
   // Themes.
   gamification_style: {
     label: "Theme",

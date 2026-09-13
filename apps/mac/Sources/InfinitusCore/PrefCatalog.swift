@@ -102,9 +102,6 @@ public enum PrefCatalog {
         Entry("footer_actions_hidden", .bool, .bool(false), display),
         Entry("glass_focused", .double, .number(0.7), display),
         Entry("chat_header", .string, .string("compact"), display, choices: strings(["compact", "strip", "hud"])),
-        // Display: sessions.
-        Entry("keep_awake", .bool, .bool(false), display),
-        Entry("keep_awake_display", .bool, .bool(true), display),
         // Themes: any theme id, built-in or custom.
         Entry("gamification_style", .string, .string("off"), themes),
 

@@ -766,22 +766,6 @@
         "value": "compact"
       },
       {
-        "default": false,
-        "effect": "live",
-        "key": "keep_awake",
-        "section": "display",
-        "type": "bool",
-        "value": false
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "keep_awake_display",
-        "section": "display",
-        "type": "bool",
-        "value": true
-      },
-      {
         "choices": [
           {
             "id": "off",

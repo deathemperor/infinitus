@@ -493,7 +493,6 @@ final class AppModel: ObservableObject {
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Hold a power assertion while any session is mid-turn (KeepAwake).
     /// Display-only row order (PopupSort): the engine's slots, headroom
     /// with active + next pinned (todo 2026-09-01), or the engine's own
     /// candidate ranking (#542). Engine slots never move — nothing is
@@ -508,20 +507,6 @@ final class AppModel: ObservableObject {
             return sort
         }
         return PopupSort(legacyHeadroom: defaults.object(forKey: "sort_headroom") as? Bool ?? true)
-    }
-    @Published var keepAwake: Bool {
-        didSet {
-            defaults.set(keepAwake, forKey: "keep_awake")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
-    }
-    /// With `keepAwake`: the screen stays on too, the way a caffeine app
-    /// keeps it (#455). Off, only system sleep is held.
-    @Published var keepAwakeDisplay: Bool {
-        didSet {
-            defaults.set(keepAwakeDisplay, forKey: "keep_awake_display")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
     }
     // Away-push triggers beyond switches (PushTriggers has the rules).
     @Published var pushAllDead: Bool { didSet { defaults.set(pushAllDead, forKey: "push_all_dead") } }
@@ -793,7 +778,6 @@ final class AppModel: ObservableObject {
         Notifier.post(title: "Infinitus", body: body)
         liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
-    private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.
     private lazy var pushTriggers = PushTriggers(memory: persistedPushMemory)
@@ -902,8 +886,6 @@ final class AppModel: ObservableObject {
         swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
-        keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
-        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
         popupSort = Self.popupSort(defaults)
         mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
         mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
@@ -1026,7 +1008,7 @@ final class AppModel: ObservableObject {
     /// engine toggles go through their own setters, whose `didSet`
     /// relaunches the app, with the `engine` command's guards; every
     /// other key is stored and re-read by `reloadPrefs`, so its `didSet`
-    /// side effects (the LAN listener, keep-awake, the title) run as
+    /// side effects (the LAN listener, the title) run as
     /// they do from the panes. Returns the updated pref and whether the
     /// app is relaunching behind the reply.
     func setPref(key: String, value: JSONValue) throws -> (pref: PrefCatalog.Pref, restarting: Bool) {
@@ -1101,8 +1083,6 @@ final class AppModel: ObservableObject {
         set(\.popupLayout, defaults.string(forKey: "popup_layout") ?? "wide")
         set(\.popupTextSize, defaults.string(forKey: "popup_text_size") ?? "default")
         set(\.glassFocused, defaults.object(forKey: "glass_focused") as? Double ?? 0.7)
-        set(\.keepAwake, defaults.object(forKey: "keep_awake") as? Bool ?? false)
-        set(\.keepAwakeDisplay, defaults.object(forKey: "keep_awake_display") as? Bool ?? true)
         set(\.popupSort, Self.popupSort(defaults))
         set(\.pushAllDead, defaults.object(forKey: "push_all_dead") as? Bool ?? true)
         set(\.pushLastAlive, defaults.object(forKey: "push_last_alive") as? Bool ?? true)
@@ -2562,10 +2542,6 @@ final class AppModel: ObservableObject {
                 .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(current)"
             notify("switched to account \(current) (\(name))")
         }
-        if !isPlayground {
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay,
-                         busyCount: list.liveSessions?.busy ?? 0)
-        }
         controlServer.heal()
         // Same display-feed vantage as the switch diff above: these
         // triggers fire even while the supervised engine is parked.
@@ -2653,9 +2629,9 @@ final class AppModel: ObservableObject {
 
     /// The primary fleet's live sessions are the app's own scan when the
     /// engine reports none (#756: cswap's list carried them, swapd's does
-    /// not) — the keep-awake busy count, the token-rate/AWS-login scan,
-    /// the mirror's sessions block and the session→account attribution
-    /// all read this block off the primary fleet. Never in the playground
+    /// not) — the token-rate/AWS-login scan, the mirror's sessions block
+    /// and the session→account attribution all read this block off the
+    /// primary fleet. Never in the playground
     /// (demo data only).
     func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
         guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
