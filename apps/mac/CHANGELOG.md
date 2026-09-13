@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 
 ### Phone
