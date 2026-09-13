@@ -1,5 +1,5 @@
 import type { AuthEnvironmentScope } from "@t3tools/contracts";
-import { InfinitusManifest } from "@t3tools/contracts/infinitus";
+import { InfinitusManifest, InfinitusPrefs } from "@t3tools/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
 import * as NodeOS from "node:os";
@@ -8,6 +8,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/unstable/http";
 
@@ -41,6 +42,35 @@ export const DESKTOP_CREDENTIAL_TTL = Duration.days(90);
 
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 type Manifest = typeof InfinitusManifest.Type;
+
+const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
+
+/** How often a publishing server re-checks that the app still names its port
+    (#1137). Slow on purpose: the read is one socket request, and the repair it
+    guards is a minute of dark `infinitusctl` verbs, not a live user action. */
+const HEARTBEAT_INTERVAL = Duration.seconds(60);
+
+/**
+ * The port the app's catalog names for `fork_server_port`, or undefined when
+ * it names none we can compare. A value that is not ours is the signal that
+ * another server published over us and, if it has since died, left the tunnel
+ * pointing at a closed port (#1137).
+ *
+ * Two cases deliberately answer undefined, because a false positive here
+ * republishes every minute and each publish rotates the `infinitusctl`
+ * credential: a catalog without the pref at all (an app that has no such
+ * setting), and a value that is not a port number (an app reporting something
+ * we cannot compare). Neither is a port we can claim is stale.
+ */
+export const publishedPort = (prefs: typeof InfinitusPrefs.Type): number | undefined => {
+  const pref = prefs.prefs.find((entry) => entry.key === PORT_PREF);
+  if (pref === undefined) return undefined;
+  if (typeof pref.value === "number") return pref.value;
+  if (typeof pref.value === "string" && /^\d+$/.test(pref.value.trim())) {
+    return Number(pref.value.trim());
+  }
+  return undefined;
+};
 
 const takesDesktopCredential = (manifest: Manifest) =>
   manifest.commands.some(
@@ -144,9 +174,39 @@ export const publishServerPort = Effect.fn("Infinitus.publishServerPort")(functi
 });
 
 /**
+ * One heartbeat check (#1137): reads the app's own catalog and republishes
+ * only when the port it names is not ours. A read, not a blind write —
+ * republishing on a timer would re-mint the `infinitusctl` credential every
+ * minute, so a CLI holding a token would lose it mid-command. Never fails:
+ * an app that is away, or a reply that will not decode, is next minute's
+ * problem.
+ */
+const republishIfPortDrifted = Effect.fn("Infinitus.republishIfPortDrifted")(
+  function* (port: number) {
+    const client = yield* InfinitusControlClient;
+    const prefs = yield* client
+      .request({ command: PREFS_COMMAND })
+      .pipe(Effect.flatMap(decodePrefs));
+    const published = publishedPort(prefs);
+    if (published === undefined || published === port) return;
+    // `published` is the one fact that identifies whoever took the pref: log
+    // it, so a fight between two live publishers reads as the same foreign
+    // port coming back every minute instead of a silent flip-flop.
+    yield* Effect.logInfo("infinitus.server-port.drifted", { port, published });
+    yield* publishServerPort(port);
+  },
+  Effect.catch((error) =>
+    Effect.logDebug("infinitus.server-port.heartbeat-skipped", { error: error._tag }),
+  ),
+);
+
+/**
  * The startup publish, then one more each time the app comes back — as seen
- * by whichever client is polling, since this never polls itself. A server that
- * outlives an Infinitus relaunch lands its port the moment somebody looks.
+ * by whichever client is polling, since this never polls itself — and, from
+ * #1137, a slow heartbeat of its own. The edge alone was not enough: a server
+ * nobody is watching polls nothing, so when another server published over its
+ * port and died, the tunnel fronted a closed port until someone relaunched the
+ * app. The heartbeat is the one thing here that does not need a watcher.
  */
 export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublished")(function* (
   port: number,
@@ -155,7 +215,13 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
   if (client.socketPath === null) return;
   const infinitus = yield* InfinitusService;
   const heard = yield* publishServerPort(port);
-  yield* infinitus.observed.pipe(
+  // The came-back edge and the heartbeat are two independent callers of a
+  // publish that is read-modify-write on the credential (revoke all, issue,
+  // hand over). Interleaved, the app can end up holding a token the other
+  // call already revoked, and the heartbeat — seeing the port match — would
+  // never repair it. One permit keeps them in line.
+  const publishing = yield* Semaphore.make(1);
+  const onReturn = infinitus.observed.pipe(
     // Only the edge: an app the startup publish reached is not "back" on the
     // first snapshot that shows it.
     Stream.mapAccum(
@@ -163,8 +229,14 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
       (wasAvailable, snapshot) =>
         [snapshot.available, !wasAvailable && snapshot.available ? [port] : []] as const,
     ),
-    Stream.runForEach((returnedPort) => publishServerPort(returnedPort)),
+    Stream.runForEach((returnedPort) => publishing.withPermits(1)(publishServerPort(returnedPort))),
   );
+  const heartbeat = Effect.forever(
+    Effect.sleep(HEARTBEAT_INTERVAL).pipe(
+      Effect.andThen(publishing.withPermits(1)(republishIfPortDrifted(port))),
+    ),
+  );
+  yield* Effect.all([onReturn, heartbeat], { concurrency: "unbounded", discard: true });
 });
 
 /**

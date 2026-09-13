@@ -1079,6 +1079,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   filter button, in the Android header; its
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
+- `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's
+  elapsed timer (#1047 follow-up), the fork's one edit to the widget:
+  `AgentActivityRowProps` gains an optional `startedAt` (the turn's, which the
+  server sends on a starting or running row and the Mac forwards untouched)
+  and `renderCompactRow` draws a `Text` with `timerInterval` +
+  `countsDown={false}` for such a row, so SwiftUI counts it up on the phone
+  between pushes. Both bounds are derived from `startedAt` — the widget reads
+  no clock — and the upper one caps the display a day in. It lives here rather
+  than in a fork file because the widget body carries the `"widget"` directive
+  and is serialized into the widget extension's bundle: it can reference only
+  imported view and modifier factories, never a module-scope helper of ours.
+  Keep the edit to those two places so every upstream sync meets a small one.
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
   `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
@@ -1674,7 +1686,24 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   publish, revocable there (the next CLI request gets 401 until the next
   publish). A refused write revokes the new session again. Withheld exactly
   where the port is (dev runner, isolated socket, worktree `.t3`); the token
-  reaches no log or span. Two HTTP routes for a CLI with no WebSocket, both
+  reaches no log or span. The publish repeats on a 60 s heartbeat (#1137):
+  the keeper reads the app's own catalog and republishes port and credential
+  only when `fork_server_port` names a port that is not ours, so a server
+  that published over this one and died is corrected within a minute instead
+  of leaving the tunnel on a closed port until someone relaunches the app. A
+  read and not a blind write, because every publish re-mints the
+  `infinitusctl` session and doing that on a timer would rotate the CLI's
+  token every minute; an absent pref and a value that is not a port both read
+  as no drift for the same reason. The heartbeat is the only part here that
+  needs no watcher — `observed` starts no poll, so the app-came-back edge
+  never fires on a server nobody is looking at, which is how the stale
+  publish survived. The edge and the heartbeat share one permit: a publish
+  revokes, issues and hands over, so interleaved they could leave the app
+  holding a token the other call revoked and a matching port the heartbeat
+  would never repair. The drift line names the foreign port, so two live
+  publishers fighting over the pref read as the same port coming back every
+  minute. Residual: a stale publisher that used the same port
+  leaves a credential this server cannot tell from its own. Two HTTP routes for a CLI with no WebSocket, both
   behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
   list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
   from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
@@ -2063,14 +2092,16 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `liveActivityStarts.ts`, `testCard.logic.ts`) — the phone half of the
   lock-screen thread card (#1047, part 2; the Mac's `push
 {kind: "thread.activity"}` is part 1, the server's fold part 3). The card
-  is upstream's `AgentActivity` Live Activity, untouched: the Mac pushes
+  is upstream's `AgentActivity` Live Activity, edited only for the elapsed
+  timer (the registration point above): the Mac pushes
   its `{name, props}` envelope, so the phone only files tokens — the
   push-to-start one and each running card's own — with the Mac it follows
   (`pusherMac`) through `activities-token`, the alert kind's path, and
   withdraws both kinds when Settings › Infinitus › "Thread card on the lock
   screen" goes off (default on, iOS only). "Show a test card" starts the
   card locally with a fabricated state (`TEST_CARD_STATE`, one row per
-  ranked phase), no APNs in the loop, so a blank card blames the widget and
+  ranked phase, the working one dated against the press so its timer ticks —
+  `testCardState`), no APNs in the loop, so a blank card blames the widget and
   a refusal (ActivityKit's message in an alert) blames the phone's settings;
   with cards live the row ends them all. `packages/contracts/src/infinitus.ts`
   `InfinitusActivityPushKind` is `alert | agent-activity-start |
