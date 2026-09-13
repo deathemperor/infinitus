@@ -1,9 +1,27 @@
 import type { DesktopUpdateChannel } from "@t3tools/contracts";
 
-const NIGHTLY_VERSION_PATTERN = /-nightly\.\d{8}\.\d+$/;
+/** The version's first prerelease id (`alpha` for `0.5.0-alpha.1`), or
+    undefined for a plain version. electron-updater and electron-builder key
+    the GitHub feed on it (#924), so every rule here reads it and never a
+    substring: `0.5.0-alpha.6-infinitus-nightly.20260913.42` is an `alpha`. */
+const PRERELEASE_ID_PATTERN = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/;
 
+function resolvePrereleaseId(version: string): string | undefined {
+  return PRERELEASE_ID_PATTERN.exec(version)?.[1];
+}
+
+/** An upstream nightly: `x.y.z-nightly.<date>.<run>`. */
 export function isNightlyDesktopVersion(version: string): boolean {
-  return NIGHTLY_VERSION_PATTERN.test(version);
+  return resolvePrereleaseId(version) === "nightly";
+}
+
+const INFINITUS_NIGHTLY_SUFFIX_PATTERN = /-infinitus-nightly\.\d{8}\.\d+$/;
+
+/** This repo's nightly (#1042): `<VERSION>-infinitus-nightly.<date>.<run>`,
+    main built every night onto the rolling `nightly` release. The line's own
+    id stays first, so the release track's feed can be read off it. */
+export function isInfinitusNightlyDesktopVersion(version: string): boolean {
+  return INFINITUS_NIGHTLY_SUFFIX_PATTERN.test(version);
 }
 
 /**
@@ -18,7 +36,8 @@ export function isInfinitusDesktopVersion(version: string): boolean {
 }
 
 export function resolveDefaultDesktopUpdateChannel(appVersion: string): DesktopUpdateChannel {
-  return isNightlyDesktopVersion(appVersion) ? "nightly" : "infinitus";
+  if (isNightlyDesktopVersion(appVersion)) return "nightly";
+  return isInfinitusNightlyDesktopVersion(appVersion) ? "infinitus-nightly" : "infinitus";
 }
 
 /**
@@ -42,7 +61,12 @@ export function resolveEffectiveDesktopUpdateChannel(
     (`<id>-mac.yml`, `latest-mac.yml` for a plain version). So on the
     `infinitus` track the channel is the version's own prerelease id, never
     the track's name: `0.5.0-alpha.1` follows `alpha`, a plain `0.5.0` reads
-    `releases/latest`. Downgrades stay off there (versions only go up).
+    `releases/latest`. Downgrades stay off there (versions only go up) — except
+    for a nightly build switching back: its line's newest release compares
+    lower in semver. The `infinitus-nightly` track reads the rolling `nightly`
+    release through the generic provider (`DesktopUpdates` sets the URL;
+    #1042): one manifest name whatever the version, and downgrades on, since
+    a VERSION bump lands the same night's build below the one running.
     Upstream's channels keep upstream's settings. */
 export interface ElectronUpdaterFeed {
   readonly channel: string;
@@ -50,18 +74,22 @@ export interface ElectronUpdaterFeed {
   readonly allowDowngrade: boolean;
 }
 
-const PRERELEASE_ID_PATTERN = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/;
-
 export function resolveElectronUpdaterFeed(
   appVersion: string,
   channel: DesktopUpdateChannel,
 ): ElectronUpdaterFeed {
+  if (channel === "infinitus-nightly") {
+    return { channel, allowPrerelease: true, allowDowngrade: true };
+  }
   if (channel !== "infinitus") {
     const prerelease = channel === "nightly";
     return { channel, allowPrerelease: prerelease, allowDowngrade: prerelease };
   }
-  const prereleaseId = PRERELEASE_ID_PATTERN.exec(appVersion)?.[1];
+  const nightlyBuild = isInfinitusNightlyDesktopVersion(appVersion);
+  const prereleaseId = resolvePrereleaseId(
+    nightlyBuild ? appVersion.replace(INFINITUS_NIGHTLY_SUFFIX_PATTERN, "") : appVersion,
+  );
   return prereleaseId === undefined
-    ? { channel: "latest", allowPrerelease: false, allowDowngrade: false }
-    : { channel: prereleaseId, allowPrerelease: true, allowDowngrade: false };
+    ? { channel: "latest", allowPrerelease: false, allowDowngrade: nightlyBuild }
+    : { channel: prereleaseId, allowPrerelease: true, allowDowngrade: nightlyBuild };
 }

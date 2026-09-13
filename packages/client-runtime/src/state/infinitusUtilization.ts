@@ -1,5 +1,8 @@
 import {
   InfinitusUtilization,
+  InfinitusUtilizationFiveHourWindow,
+  InfinitusUtilizationGeneration,
+  InfinitusUtilizationReplay,
   type InfinitusUtilizationSample,
   type InfinitusUtilizationTotals,
   type InfinitusUtilizationWindow,
@@ -10,8 +13,9 @@ import * as Schema from "effect/Schema";
  * The Utilization page's history read model (#747): the `utilization --days
  * n` reply decoded defensively and folded into the lines the retired native
  * pane charted — every account's percentage of one window over the range —
- * and its run-rate table. Estimates the Mac read off its own history and
- * transcripts, never billing truth.
+ * its run-rate table, and the window telemetry the Mac reconstructs beside
+ * them (weekly waste, the five-hour windows, the range's replay). Estimates
+ * the Mac read off its own history and transcripts, never billing truth.
  */
 
 const decode = Schema.decodeUnknownOption(InfinitusUtilization);
@@ -107,6 +111,140 @@ export function historyRange(
   const newest = u.samples.reduce((max, sample) => Math.max(max, sample.t), 0);
   const to = newest > 0 ? Math.max(newest, nowSeconds) : nowSeconds;
   return { from: to - u.days * 86_400, to };
+}
+
+/* The window telemetry beside the chart: the Mac reconstructs it off its FULL
+   history (a reset may predate the asked range) and ships it with every
+   `utilization` reply. Each row decodes on its own, so one the Mac words
+   differently drops alone. */
+
+const decodeGeneration = Schema.decodeUnknownOption(InfinitusUtilizationGeneration);
+const decodeFiveHour = Schema.decodeUnknownOption(InfinitusUtilizationFiveHourWindow);
+const decodeReplay = Schema.decodeUnknownOption(InfinitusUtilizationReplay);
+
+function rows<A>(
+  values: ReadonlyArray<unknown> | null | undefined,
+  decodeRow: (value: unknown) => { readonly _tag: "None" } | { readonly _tag: "Some"; value: A },
+): ReadonlyArray<A> {
+  if (values === undefined || values === null) return [];
+  const out: A[] = [];
+  for (const value of values) {
+    const decoded = decodeRow(value);
+    if (decoded._tag === "Some") out.push(decoded.value);
+  }
+  return out;
+}
+
+export interface WasteRow {
+  /** `email|window|resetAt`, unique across the reply. */
+  readonly key: string;
+  readonly label: string;
+  readonly window: string;
+  /** Epoch seconds of the rollover. */
+  readonly resetAt: number;
+  readonly finalPct: number;
+  /** The headroom that expired with the window. */
+  readonly wastePct: number;
+  /** Seconds between the last observation and the reset; null when the Mac
+      sent none. Hours of it mean `finalPct` undercounts the real use. */
+  readonly observationGap: number | null;
+}
+
+/** A gap this long before a reset means the app was not watching for most of
+    the window's tail, so its final percentage is a floor, not a reading. */
+export const WASTE_GAP_SECONDS = 6 * 3600;
+
+/** The weekly resets the Mac recorded, newest first, capped. These are the 7d
+    and per-model windows only: a 5h window recycles ~34× a week, where unused
+    headroom is idle time rather than lost quota. */
+export function wasteRows(
+  u: InfinitusUtilization,
+  labels: Readonly<Record<string, string>> = {},
+  limit = 6,
+): ReadonlyArray<WasteRow> {
+  return rows(u.generations, decodeGeneration)
+    .map((generation) => ({
+      key: `${generation.email}|${generation.window}|${generation.resetAt}`,
+      label: labels[generation.email] ?? generation.email,
+      window: generation.window,
+      resetAt: generation.resetAt,
+      finalPct: generation.finalPct,
+      wastePct: Math.max(0, Math.min(100, 100 - generation.finalPct)),
+      observationGap: generation.observationGap ?? null,
+    }))
+    .sort((a, b) => b.resetAt - a.resetAt)
+    .slice(0, limit);
+}
+
+export interface FiveHourWindowRow {
+  /** `email|resetsAt`, native's own identity: two accounts share a reset. */
+  readonly key: string;
+  readonly label: string;
+  /** Epoch seconds; derived by the Mac as `resetsAt - 5h`. */
+  readonly start: number;
+  readonly resetsAt: number;
+  /** The highest percentage observed inside the window — what it was used
+      for, since headroom idles rather than leaking. */
+  readonly peakPct: number;
+  readonly samples: number;
+  readonly closed: boolean;
+}
+
+export interface FiveHourSummary {
+  readonly windows: ReadonlyArray<FiveHourWindowRow>;
+  readonly count: number;
+  readonly meanPeakPct: number;
+  /** Closed windows whose peak never rose above 5 % — opened or ignited, then
+      left (native's `WindowTelemetry.summary`). */
+  readonly unused: number;
+}
+
+/** The five-hour windows the Mac reconstructed, kept to those that started
+    inside the asked range, newest first. Null when the reply carries none —
+    a build before the telemetry, or a history too short to close a window. */
+export function fiveHourSummary(
+  u: InfinitusUtilization,
+  range: { readonly from: number; readonly to: number },
+  labels: Readonly<Record<string, string>> = {},
+): FiveHourSummary | null {
+  const windows = rows(u.fiveHourWindows, decodeFiveHour)
+    .filter((window) => window.start >= range.from)
+    .map((window) => ({
+      key: `${window.email}|${window.resetsAt}`,
+      label: labels[window.email] ?? window.email,
+      start: window.start,
+      resetsAt: window.resetsAt,
+      peakPct: Math.max(0, Math.min(100, window.peakPct)),
+      samples: window.samples,
+      closed: window.closed,
+    }))
+    .sort((a, b) => b.start - a.start);
+  if (windows.length === 0) return null;
+  return {
+    windows,
+    count: windows.length,
+    meanPeakPct: windows.reduce((sum, window) => sum + window.peakPct, 0) / windows.length,
+    unused: windows.filter((window) => window.closed && window.peakPct < 5).length,
+  };
+}
+
+/** One sentence on what the fleet did over the range: how often it switched
+    account, how many of those landed on an account with no window ticking
+    (which a warm-up request could have started ahead of time), and how long
+    the active account sat at its 5h limit. Null when the reply carries no
+    replay, or when the history is older than the `active` flag, where no
+    switch can be seen at all. */
+export function replayText(u: InfinitusUtilization): string | null {
+  const decoded = decodeReplay(u.replay);
+  if (decoded._tag === "None") return null;
+  const replay = decoded.value;
+  if (replay.sawActiveFlag === false) return null;
+  const switches = `${replay.switches} account ${replay.switches === 1 ? "switch" : "switches"}`;
+  const cold = replay.coldSwitches > 0 ? `, ${replay.coldSwitches} onto a cold 5h clock` : "";
+  const minutes = Math.round(replay.stalledSeconds / 60);
+  const stalled =
+    minutes > 0 ? `, ${minutes} min stalled at the 5h limit` : ", nothing stalled at the 5h limit";
+  return `Over this range: ${switches}${cold}${stalled}.`;
 }
 
 const total = (t: InfinitusUtilizationTotals): number =>

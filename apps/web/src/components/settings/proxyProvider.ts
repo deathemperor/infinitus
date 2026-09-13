@@ -28,8 +28,8 @@ export interface ProxyDraft {
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly slots: Readonly<Record<ProxyModelSlotKey, string>>;
-  /** A router model to list in this instance's model picker (e.g. `kr/gpt-5.6-sol`). */
-  readonly pickerModel: string;
+  /** Router models to list in this instance's model picker (e.g. `kr/gpt-5.6-sol`). */
+  readonly pickerModels: ReadonlyArray<string>;
 }
 
 export const EMPTY_PROXY_DRAFT: ProxyDraft = {
@@ -38,7 +38,7 @@ export const EMPTY_PROXY_DRAFT: ProxyDraft = {
   baseUrl: PROXY_PRESETS[0].baseUrl,
   apiKey: "",
   slots: { fable: "", opus: "", sonnet: "", haiku: "" },
-  pickerModel: "",
+  pickerModels: [],
 };
 
 /** Picking a preset also resets the URL to its default; Custom keeps what is typed. */
@@ -66,9 +66,19 @@ function defaultProxyHomePath(instanceId: string): string {
   return `~/.claude-proxy/${instanceId}`;
 }
 
+/** The slug of a `customModels` entry, which is a bare string or `{slug}`. */
+function customModelSlug(entry: unknown): string | null {
+  if (typeof entry === "string") return entry.trim() || null;
+  if (entry !== null && typeof entry === "object" && "slug" in entry) {
+    const slug = (entry as { slug?: unknown }).slug;
+    return typeof slug === "string" ? slug.trim() || null : null;
+  }
+  return null;
+}
+
 /**
  * Fold the draft into the instance being created: env vars for the proxy,
- * a dedicated CLAUDE_CONFIG_DIR unless one was typed, and the picker model
+ * a dedicated CLAUDE_CONFIG_DIR unless one was typed, and the picker models
  * appended to `customModels`. A disabled draft leaves everything untouched.
  */
 export function applyProxyDraft(
@@ -90,12 +100,21 @@ export function applyProxyDraft(
   }
   const typedHome = typeof config.homePath === "string" ? config.homePath.trim() : "";
   const existingModels = Array.isArray(config.customModels) ? config.customModels : [];
-  const pickerModel = draft.pickerModel.trim();
+  const taken = new Set(
+    existingModels.map((entry) => customModelSlug(entry)).filter((slug) => slug !== null),
+  );
+  const added: string[] = [];
+  for (const model of draft.pickerModels) {
+    const slug = model.trim();
+    if (slug.length === 0 || taken.has(slug)) continue;
+    taken.add(slug);
+    added.push(slug);
+  }
   return {
     config: {
       ...config,
       homePath: typedHome.length > 0 ? typedHome : defaultProxyHomePath(instanceId),
-      ...(pickerModel.length > 0 ? { customModels: [...existingModels, pickerModel] } : {}),
+      ...(added.length > 0 ? { customModels: [...existingModels, ...added] } : {}),
     },
     environment,
   };

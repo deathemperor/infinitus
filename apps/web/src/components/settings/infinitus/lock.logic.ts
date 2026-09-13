@@ -56,7 +56,7 @@ export function relockChoiceFor(native: string): RelockChoice | null {
 export type LockAction =
   | { readonly type: "status" }
   | { readonly type: "on" }
-  | { readonly type: "off"; readonly force: boolean }
+  | { readonly type: "off" }
   | { readonly type: "now" }
   | { readonly type: "relock"; readonly arg: RelockChoice["arg"] }
   | { readonly type: "unlock" };
@@ -69,7 +69,7 @@ export function lockCommandInput(action: LockAction): InfinitusCommandInput {
     case "on":
       return { command: "lock", args: ["on"], options: {} };
     case "off":
-      return { command: "lock", args: ["off"], options: action.force ? { yes: "true" } : {} };
+      return { command: "lock", args: ["off"], options: {} };
     case "now":
       return { command: "lock", args: ["now"], options: {} };
     case "relock":
@@ -77,18 +77,4 @@ export function lockCommandInput(action: LockAction): InfinitusCommandInput {
     case "unlock":
       return { command: "unlock", args: [], options: {} };
   }
-}
-
-/**
- * `lock off` inside a team is refused until it is asked with `--yes`; the
- * refusal names the teams ("this Mac is in Alpha, Beta; lock off --yes turns
- * the lock off anyway"). Those names, or null for any other error.
- */
-export function lockOffRefusalTeams(error: string): ReadonlyArray<string> | null {
-  const match = /^this Mac is in (.+); lock off --yes turns the lock off anyway$/.exec(error);
-  if (match === null) return null;
-  return match[1]!
-    .split(",")
-    .map((name) => name.trim())
-    .filter((name) => name.length > 0);
 }

@@ -201,8 +201,14 @@ public struct Account: Codable, Sendable {
     /// swapd's verdict that this reading is an older good fetch its
     /// collector could not refresh (#965); `usageStatus` stays `ok` so
     /// every reader still renders the numbers. nil on engines that have
-    /// no such state.
+    /// no such state, and nil for a reading that is merely old: the
+    /// engine polls an exhausted candidate every ten minutes on purpose
+    /// and calls anything past five minutes stale, so only a row whose
+    /// last fetch actually failed (`staleReason`) wears this.
     public let stale: Bool?
+    /// The engine's classified kind of that failed fetch (`http-429`,
+    /// `timeout`, `locked`, …), swapd's `lastError`; nil unless `stale`.
+    public let staleReason: String?
 
     /// Memberwise, for engines that build accounts directly instead of
     /// decoding `cswap list --json` (multi-engine seam, #8).
@@ -214,7 +220,8 @@ public struct Account: Codable, Sendable {
                 plan: String? = nil, disabled: Bool? = nil, preferred: Bool? = nil,
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
-                lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil) {
+                lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil,
+                staleReason: String? = nil) {
         self.number = number
         self.email = email
         self.organizationName = organizationName
@@ -235,6 +242,7 @@ public struct Account: Codable, Sendable {
         self.lastGoodFetchedAt = lastGoodFetchedAt
         self.lastGoodAgeSeconds = lastGoodAgeSeconds
         self.stale = stale
+        self.staleReason = staleReason
     }
 
     /// The same account with `preferred` stamped — cswap learns it from
@@ -246,7 +254,7 @@ public struct Account: Codable, Sendable {
                 alias: alias, icon: icon, plan: plan, disabled: disabled, preferred: preferred,
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
-                lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale)
+                lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale, staleReason: staleReason)
     }
 }
 

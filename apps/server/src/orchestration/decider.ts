@@ -141,15 +141,19 @@ function babysitPatch(
   command: {
     readonly babysit?: boolean | undefined;
     readonly babysitRounds?: number | undefined;
+    readonly babysitStopped?: true | undefined;
   },
   occurredAt: string,
 ): { readonly babysit?: ThreadBabysit | null } {
   if (command.babysit === false) return thread.babysit == null ? {} : { babysit: null };
   const current = thread.babysit ?? null;
-  if (command.babysit === true && current === null) {
+  // A record stopped at the cap counts as off: turning on starts fresh.
+  if (command.babysit === true && (current === null || current.stoppedAt !== undefined)) {
     return { babysit: { since: occurredAt, rounds: command.babysitRounds ?? 0 } };
   }
-  if (command.babysitRounds !== undefined && current !== null) {
+  if (current === null || current.stoppedAt !== undefined) return {};
+  if (command.babysitStopped === true) return { babysit: { ...current, stoppedAt: occurredAt } };
+  if (command.babysitRounds !== undefined) {
     return { babysit: { ...current, rounds: command.babysitRounds } };
   }
   return {};

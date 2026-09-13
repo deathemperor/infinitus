@@ -1,0 +1,103 @@
+# The whole product from main, every night (#1042): infinitus-release.yml's
+# build jobs — both Swift bundles, the desktop DMG with the menu bar app
+# nested, the Linux tray — called with a dated version
+# (`<VERSION>-infinitus-nightly.<yyyymmdd>.<run>`; the line's own prerelease
+# id stays first, so a nightly build can go back to its line's releases),
+# published on the rolling `nightly` prerelease. That release is created
+# once and only edited in place — tag re-pointed, assets clobbered, older
+# nights' versioned assets removed, title edited — never deleted and
+# recreated (#924). The desktop reads it through electron-updater's generic
+# provider at releases/download/nightly (manifest infinitus-nightly-mac.yml);
+# the menu bar app and the `infinitus@nightly` cask take Infinitus-nightly.zip
+# as before. A dispatch on any branch is a dry run; `publish` only runs from
+# main, on the schedule or when the dispatch says so.
+name: Infinitus nightly
+on:
+  schedule:
+    - cron: "17 17 * * *" # 17:17 UTC, off the hour like #1034 (00:17 GMT+7)
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the build on the rolling nightly release (main only)"
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: infinitus-nightly
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Nightly version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        run: |
+          set -euo pipefail
+          line="$(head -1 VERSION | tr -cd '0-9A-Za-z.-')"
+          version="${line}-infinitus-nightly.$(date -u +%Y%m%d).${{ github.run_number }}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Nightly $version from $(git rev-parse --short HEAD)." >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build
+    needs: version
+    uses: ./.github/workflows/infinitus-release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
+  publish:
+    name: Publish nightly
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.publish == true)
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect nightly assets
+        run: |
+          set -euo pipefail
+          mkdir nightly-assets
+          cp artifacts/mac-bundles/*.zip nightly-assets/
+          cp artifacts/desktop-mac-arm64/* nightly-assets/
+          cp artifacts/linux-x86_64/infinitus-tray-linux-x86_64 \
+             artifacts/linux-aarch64/infinitus-tray-linux-aarch64 \
+             artifacts/linux-x86_64/infinitus-omarchy.tar.gz nightly-assets/
+          # The cask's and the menu bar app's rolling name.
+          cp "nightly-assets/Infinitus-${VERSION}.zip" nightly-assets/Infinitus-nightly.zip
+          for want in "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
+                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" \
+                      infinitus-nightly-mac.yml Infinitus-nightly.zip; do
+            [[ -f "nightly-assets/$want" ]] || { echo "Missing nightly asset $want" >&2; ls -1 nightly-assets >&2; exit 1; }
+          done
+          ls -l nightly-assets
+      - name: Publish rolling prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="Nightly $(date -u +%Y-%m-%d) ($(git rev-parse --short HEAD))"
+          git push --force origin HEAD:refs/tags/nightly
+          notes="Rolling build of main: the desktop app (Nightly track under Settings › Updates), the menu bar app (brew reinstall infinitus@nightly) and the Linux tray."
+          if gh release view nightly >/dev/null 2>&1; then
+            # Tonight's assets land first, so a client holding last night's
+            # manifest still finds its files until they are replaced; then the
+            # previous versioned assets go.
+            gh release upload nightly nightly-assets/* --clobber
+            gh release view nightly --json assets --jq '.assets[].name' \
+              | { grep -- '-infinitus-nightly\.' || true; } \
+              | { grep -v -F -- "$VERSION" || true; } \
+              | while read -r name; do gh release delete-asset nightly "$name" --yes; done
+            gh release edit nightly --title "$title" --notes "$notes" --prerelease
+          else
+            gh release create nightly nightly-assets/* --title "$title" --notes "$notes" --prerelease
+          fi

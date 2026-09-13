@@ -29,7 +29,7 @@ public enum SettingsCatalog {
         Entry(id: "themes",     title: "Themes",
               keywords: ["theme", "skin", "gallery", "community", "rpg", "row", "gamification"], engine: false),
         Entry(id: "push",       title: "Push",
-              keywords: ["slack", "telegram", "webhook", "notification"], engine: false),
+              keywords: ["notification"], engine: false),
         Entry(id: "usage",      title: "Usage",
               keywords: ["spend", "cost", "tokens", "estimate"], engine: false),
         Entry(id: "utilization", title: "Utilization",

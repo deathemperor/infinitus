@@ -4,6 +4,7 @@ import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
@@ -243,6 +244,55 @@ describe("DesktopUpdates", () => {
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
+
+  it.effect(
+    "reads the rolling nightly release on the nightly track and app-update.yml's feed back on the release track (#1042)",
+    () => {
+      // The GitHub provider takes only semver-tagged releases, so the nightly
+      // track is the generic provider at releases/download/nightly; leaving
+      // it puts the updater back on the file's provider, following the
+      // build's own line with downgrades on (semver ranks the line's newest
+      // release below a nightly of it).
+      const resourcesPath = `/tmp/t3-desktop-updates-feed-${process.pid}`;
+      const harness = makeHarness({
+        appVersion: "0.5.0-alpha.7-infinitus-nightly.20260913.42",
+        resourcesPath,
+        env: { T3CODE_DESKTOP_MOCK_UPDATES: "false" },
+        settings: { updateChannel: "infinitus-nightly", updateChannelConfiguredByUser: true },
+      });
+
+      return Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          yield* fs.makeDirectory(resourcesPath, { recursive: true });
+          yield* fs.writeFileString(
+            `${resourcesPath}/app-update.yml`,
+            "provider: github\nowner: deathemperor\nrepo: infinitus\n",
+          );
+          const updates = yield* DesktopUpdates.DesktopUpdates;
+          yield* updates.configure;
+          assert.equal((yield* updates.getState).status, "idle");
+          assert.deepEqual(harness.feedUrls(), [
+            {
+              provider: "generic",
+              url: "https://github.com/deathemperor/infinitus/releases/download/nightly",
+            },
+          ]);
+          assert.equal(harness.channels().at(-1), "infinitus-nightly");
+          assert.isTrue(harness.allowDowngrade());
+
+          yield* updates.setChannel("infinitus");
+          assert.deepEqual(harness.feedUrls().at(-1), {
+            provider: "github",
+            owner: "deathemperor",
+            repo: "infinitus",
+          });
+          assert.equal(harness.channels().at(-1), "alpha");
+          assert.isTrue(harness.allowDowngrade());
+        }),
+      ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+    },
+  );
 
   it.effect("keeps the download behind a click on upstream channels", () => {
     const harness = makeHarness(UPSTREAM_CHANNEL);

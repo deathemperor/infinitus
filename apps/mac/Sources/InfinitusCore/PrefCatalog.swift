@@ -106,7 +106,6 @@ public enum PrefCatalog {
         Entry("session_auto_names", .bool, .bool(true), display),
         Entry("session_host", .string, .string("auto"), display,
               choices: strings(["auto", "cmux", "terminal", "owned"])),
-        Entry("checkpoints_enabled", .bool, .bool(true), display),
         Entry("keep_awake", .bool, .bool(false), display),
         Entry("keep_awake_display", .bool, .bool(true), display),
         // Themes: any theme id, built-in or custom.

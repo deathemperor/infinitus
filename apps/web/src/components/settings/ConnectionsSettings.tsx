@@ -68,6 +68,7 @@ import {
 import { searchableSetting } from "./settingsSearch";
 import { EnvironmentIconPicker } from "./EnvironmentIconPicker";
 import { LoadBalancingSettings } from "./LoadBalancingSettings";
+import { GitHubRoutingSettings } from "./GitHubRoutingSettings";
 import { Input } from "../ui/input";
 import { CommandShortcut } from "../ui/command";
 import {
@@ -3715,6 +3716,7 @@ export function ConnectionsSettings() {
           savedEnvironments={savedEnvironments}
         />
       </SettingsSection>
+      <GitHubRoutingSettings environments={environments} />
       <LoadBalancingSettings environments={loadBalancingEnvironments} />
     </SettingsPageContainer>
   );

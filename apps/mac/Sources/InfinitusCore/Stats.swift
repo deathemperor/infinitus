@@ -443,9 +443,9 @@ public enum Stats {
 
         /// Set on a `JSONEncoder`'s `userInfo` to write the lean form
         /// below. Only the transcript cache asks for it: the CLI's
-        /// `stats` JSON, the phone's snapshot and the team's docs keep
-        /// every key (scripts and older readers expect them; the e2e's
-        /// stats verb checks for `commits`, 2026-09-10).
+        /// `stats` JSON and the phone's snapshot keep every key (scripts
+        /// and older readers expect them; the e2e's stats verb checks
+        /// for `commits`, 2026-09-10).
         public static let leanEncoding = CodingUserInfoKey(rawValue: "run.infinitus.stats.lean")!
 
         /// Hand-written too (#499). Lean (`leanEncoding`): a field at its

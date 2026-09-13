@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import { BABYSIT_MAX_ROUNDS, type EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
 
 import type { SidebarThreadSummary } from "../../types";
@@ -9,9 +9,11 @@ import { resolveSidebarThreadStatus } from "../Sidebar.logic";
  * environment, for the section above the sidebar's list. Blocked means the
  * thread waits for something only the user can give: an approval, an
  * answer, headroom (a held start, #741), or an account swap (a usage limit,
- * #270 I). A failed or unread thread is not blocked and stays where it is.
+ * #270 I), or a next step after babysit stopped at its round cap (#269 A:
+ * the pull request still needs work, and only the user can say what). A
+ * failed or unread thread is not blocked and stays where it is.
  */
-export type NeedsAttentionStatus = "approval" | "input" | "held" | "limited";
+export type NeedsAttentionStatus = "approval" | "input" | "held" | "limited" | "stopped";
 
 export interface NeedsAttentionEntry {
   readonly thread: SidebarThreadSummary;
@@ -27,7 +29,17 @@ const STATUS_ORDER: Record<NeedsAttentionStatus, number> = {
   input: 1,
   held: 2,
   limited: 3,
+  stopped: 4,
 };
+
+/** A babysit stopped at the cap that the user has not answered with a message yet. */
+function babysitStoppedAt(thread: SidebarThreadSummary): string | null {
+  const stoppedAt = thread.babysit?.stoppedAt;
+  if (stoppedAt === undefined) return null;
+  return thread.latestUserMessageAt !== null && thread.latestUserMessageAt > stoppedAt
+    ? null
+    : stoppedAt;
+}
 
 /**
  * The blocked threads in the order the user should take them: approvals,
@@ -50,6 +62,15 @@ export function collectNeedsAttention(
       limited: holdKind === "limited",
     });
     if (status !== "approval" && status !== "input" && status !== "held" && status !== "limited") {
+      const stoppedAt = babysitStoppedAt(thread);
+      if (stoppedAt !== null) {
+        entries.push({
+          thread,
+          status: "stopped",
+          since: stoppedAt,
+          summary: `Babysit stopped after ${BABYSIT_MAX_ROUNDS} rounds; the pull request still needs work`,
+        });
+      }
       continue;
     }
     entries.push({

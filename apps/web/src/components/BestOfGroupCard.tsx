@@ -11,12 +11,14 @@ import { useCallback, useMemo, useState } from "react";
 import { useThreadActions } from "../hooks/useThreadActions";
 import { cn } from "../lib/utils";
 import { readThreadShell, useProject, useThreadShells } from "../state/entities";
+import { useEnvironmentQuery } from "../state/query";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
 import { buildThreadRouteParams } from "../threadRoutes";
 import {
   BEST_OF_STATUS_LABEL,
+  bestOfMemberChanges,
   bestOfMemberStats,
   bestOfMemberStatus,
   bestOfSiblings,
@@ -202,6 +204,7 @@ export function BestOfGroupCard({
               {stats ? (
                 <span className="text-muted-foreground shrink-0 tabular-nums">{stats}</span>
               ) : null}
+              <MemberChanges environmentId={environmentId} cwd={sibling.worktreePath} />
               <span
                 className={cn(
                   "text-muted-foreground shrink-0",
@@ -218,4 +221,25 @@ export function BestOfGroupCard({
       {error ? <p className="text-destructive mt-1 text-xs">{error}</p> : null}
     </div>
   );
+}
+
+/**
+ * The member's working-tree changes (#269 B), from the same status stream
+ * the sidebar row for that worktree already holds — one subscription per
+ * cwd, shared through the atom family, so the card adds no socket traffic.
+ */
+function MemberChanges({
+  environmentId,
+  cwd,
+}: {
+  environmentId: EnvironmentId;
+  cwd: string | null;
+}) {
+  const status = useEnvironmentQuery(
+    cwd === null ? null : vcsEnvironment.status({ environmentId, input: { cwd } }),
+  );
+  const changes = bestOfMemberChanges(status.data);
+  return changes ? (
+    <span className="text-muted-foreground shrink-0 tabular-nums">{changes}</span>
+  ) : null;
 }

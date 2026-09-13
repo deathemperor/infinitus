@@ -34,18 +34,14 @@ final class SessionProfilesTests: XCTestCase {
         XCTAssertEqual(SessionProfiles.removing("SHIP", from: list).map(\.name), ["review"])
     }
 
-    func testAllowListParsesCleansAndBecomesRules() {
+    func testAllowListParsesAndCleans() {
         XCTAssertEqual(SessionProfiles.parseAllowList(" Edit, Bash  git ,, Edit,Write"), ["Edit", "Bash git", "Write"])
         XCTAssertNil(SessionProfiles.parseAllowList(" , "))
         let p = SessionProfile(name: "R", allowTools: ["Edit", "Bash git", "   "])
         let saved = SessionProfiles.upsert(p, into: [])[0]
         XCTAssertEqual(saved.allowTools, ["Edit", "Bash git"])
-        XCTAssertEqual(saved.allowRules, [.init(tool: "Edit"), .init(tool: "Bash", prefix: "git")])
         XCTAssertEqual(saved.summary, "allows 2 tools")
         XCTAssertEqual(SessionProfile(name: "R", allowTools: ["Edit"]).summary, "allows Edit")
-        XCTAssertEqual(ToolApproval.Rule.parse("Bash git")?.text, "Bash git")
-        XCTAssertEqual(ToolApproval.Rule.parse("Edit anything")?.prefix, nil)
-        XCTAssertNil(ToolApproval.Rule.parse(""))
     }
 
     func testSummaryNamesWhatIsSet() {

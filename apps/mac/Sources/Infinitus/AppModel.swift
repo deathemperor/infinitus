@@ -31,14 +31,7 @@ final class AppModel: ObservableObject {
 
     var accounts: [Account] { primary?.accounts ?? [] }
     var activeNumber: Int? { primary?.activeNumber }
-    /// When the current active account became active — ResumeGate holds
-    /// post-switch nudges until it has held for a while (#136).
-    private var activeSince: Date?
     var nextCandidate: Int? { primary?.nextCandidate }
-    /// Limit-stopped sessions waiting to resume; non-nil only while
-    /// every account is at a limit (rides the all-limited banner).
-    @Published var waitingResume: Int?
-    private var waitingScanAt: Date = .distantPast
     var nextRecovery: NextRecovery? { primary?.nextRecovery }
     var liveSessions: LiveSessions? { primary?.liveSessions }
     /// Session-list popover (brain chip click) — popup-wide state so the
@@ -114,73 +107,6 @@ final class AppModel: ObservableObject {
     @Published var eventLog: [EventEntry] = []
     let eventStore = EventStore()
     private let launchedAt = Date()
-    /// Team session control (#220): the audit feed and who is driving
-    /// which session (by session id) until when — read at render time,
-    /// no timer.
-    let teamControlFeed = TeamControlFeed()
-    struct Driven { let name: String; let project: String; let until: Date }
-    @Published var drivenBy: [String: Driven] = [:]
-    /// One "your commands are failing" notification per driver per hour.
-    private var controlRefusalNotified: [String: Date] = [:]
-    static let drivenByWindow: TimeInterval = 60
-    static let executedOutcomes: Set<String> = ["delivered", "running", "captured"]
-    static let notifiedRefusals: Set<String> = ["expired", "replayed", "notLive", "rateLimited", "badRequest"]
-
-    func recordTeamControl(_ audit: TeamControl.Audit, driverName: String?) {
-        let driver = driverName ?? String(audit.driver.prefix(8))
-        let project = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-            .first { $0.sessionId == audit.session }.map { URL(fileURLWithPath: $0.cwd).lastPathComponent } ?? audit.session
-        let line = TeamControlFeed.Line(driver: driver, session: project, action: audit.action, outcome: audit.outcome, detail: audit.detail)
-        teamControlFeed.append(line)
-        logEvent("team-control", icon: "person.2", line.text)
-        if Self.executedOutcomes.contains(audit.outcome) {
-            drivenBy[audit.session] = Driven(name: driver, project: project, until: Date().addingTimeInterval(Self.drivenByWindow))
-        }
-        if driverName != nil, Self.notifiedRefusals.contains(audit.outcome),
-           controlRefusalNotified[audit.driver].map({ Date().timeIntervalSince($0) > 3600 }) ?? true {
-            controlRefusalNotified[audit.driver] = Date()
-            notify("\(driver)'s commands are failing: \(audit.outcome)")
-        }
-        if audit.outcome == TeamControl.Outcome.pending {
-            notify("\(driver) asks to \(audit.action) \(project) — allow or deny in Settings › Team, or `infinitusctl team-pending`")
-        }
-        refreshTeamPending()
-    }
-
-    /// Mirrors the box's in-memory waits into the feed's screen-safe rows
-    /// (#220 Phase 2 §7.1). Called on every audit: `pending`, `done`,
-    /// `refused`, `denied`, `expired` and `revoked` all change the list.
-    func refreshTeamPending() {
-        let entries = mirrorServer.teamControl.pending()
-        guard !entries.isEmpty else { teamControlFeed.setPending([]); return }
-        let sessions = entries.contains { $0.command.session != TeamControl.machineSession }
-            ? ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()) : []
-        let rows = entries.map { entry -> TeamControlFeed.Pending in
-            let driver = team.snapshot?.members.first { $0.kid == entry.driver }?.name ?? String(entry.driver.prefix(8))
-            let project: String
-            if entry.command.session == TeamControl.machineSession {
-                project = "this Mac"
-            } else if let session = sessions.first(where: { $0.sessionId == entry.command.session }) {
-                project = URL(fileURLWithPath: session.cwd).lastPathComponent
-            } else {
-                project = entry.command.session
-            }
-            return TeamControlFeed.Pending(id: entry.command.id, driver: driver, project: project,
-                                           action: entry.command.action, expires: Date(timeIntervalSince1970: TimeInterval(entry.expires)))
-        }
-        teamControlFeed.setPending(rows)
-    }
-
-    /// Where a teammate reaches this Mac right now (#220 §5.1), for now.json.
-    var controlEndpoints: TeamControl.Endpoints {
-        var e = TeamControl.Endpoints()
-        if let port = mirrorServer.port, let lan = MirrorPairing.lanAddress(in: LocalAddresses.ipv4()) { e.lan = "\(lan):\(port)" }
-        if namedTunnel.connected { e.hostname = namedTunnel.hostname }
-        if quickTunnel.url != nil, let kid = team.kid, let id = team.paths.teamIDs().sorted().first {
-            e.rendezvous = TeamControl.rendezvousKey(team: id, kid: kid)
-        }
-        return e
-    }
     lazy var statsModel = StatsModel(eventStore: eventStore)
 
     /// Every event goes through here: the Activity pane's tail and the
@@ -198,8 +124,6 @@ final class AppModel: ObservableObject {
         let event = StatsEvent(at: Date(), kind: kind, icon: icon, text: text)
         Task.detached(priority: .utility) { [eventStore] in await eventStore.append(event) }
     }
-    /// App-side resume nudges + /rc re-arm (ResumeService.swift).
-    let resume = ResumeService()
     /// Sessions popover's mini progress rows (SessionProgressModel.swift).
     let sessionProgress = SessionProgressModel()
     let sessionProfiles = SessionProfilesModel()
@@ -215,27 +139,7 @@ final class AppModel: ObservableObject {
         // reused pid after a reboot can never inherit a grant.
         let id = live.first { Int($0.pid) == pid }?.sessionId
         sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
-        // The profile's allow-list (#165) becomes the session's hook rules.
-        if let id { seedAllowList(birth, sessionId: id) }
         try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
-    }
-    /// "Allow for this session" rules from the phone (#79), per session id.
-    let toolApprovals = ToolApprovals()
-    /// Permission asks routed to the desktop and the web (#79 item 3).
-    let permissionAsks = PermissionAsks()
-
-    private func profileAllowRules(_ birth: SessionBirth) -> [ToolApproval.Rule] {
-        guard let name = birth.profile else { return [] }
-        return sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }?.allowRules ?? []
-    }
-
-    /// A session born from a profile runs its allow-list without asking:
-    /// the same rules the phone's "Allow for this session" adds.
-    private func seedAllowList(_ birth: SessionBirth, sessionId: String) {
-        let rules = profileAllowRules(birth)
-        guard !rules.isEmpty, let name = birth.profile else { return }
-        for rule in rules { toolApprovals.add(rule, sessionId: sessionId) }
-        logEvent("hook", icon: "checkmark.shield", "profile \(name) allows \(rules.map(\.label).joined(separator: ", ")) in session \(sessionId.prefix(8))")
     }
 
     /// The phone's star/pause verbs (`POST /accounts/action`), with the
@@ -276,26 +180,6 @@ final class AppModel: ObservableObject {
         return AccountAction.Reply(outcome: "done")
     }
 
-    /// Moves a running session's permission mode (#163 phase 2): the
-    /// plugin's PreToolUse hook answers from it. The start mode is a
-    /// floor — Claude Code itself already lets those tools through, so
-    /// narrowing from here would only pretend.
-    func setSessionMode(_ text: String, pid: Int, record: ClaudeSessionRecord) -> SessionInput.Reply {
-        let mode = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let choice = SessionStart.hookModes.first(where: { $0.mode == mode }) else {
-            return SessionInput.Reply(outcome: "rejected", detail: "mode must be one of \(SessionStart.hookModes.map(\.mode).joined(separator: ", "))")
-        }
-        let birth = sessionBirths[pid] ?? SessionBirth()
-        let target: String? = choice.mode == "supervised" ? nil : choice.mode
-        if SessionStart.modeRank(target) < SessionStart.modeRank(birth.permissionMode) {
-            let started = birth.modeLabelForStart ?? "supervised"
-            return SessionInput.Reply(outcome: "rejected", detail: "the session started as \(started); a start mode cannot be narrowed from here")
-        }
-        toolApprovals.setMode(target, sessionId: record.sessionId)
-        recordBirth(pid: pid, birth.moved(to: target))
-        logEvent("hook", icon: "checkmark.shield", "session \(pid) moved to \(choice.label)")
-        return SessionInput.Reply(outcome: "delivered", channel: "mac", detail: choice.label)
-    }
     @Published var lastError: String?
     /// #7 layer 2: the reset battle plan for the current sprint, recomputed
     /// every snapshot; nil when there is nothing to plan. Manual mode: the
@@ -677,9 +561,6 @@ final class AppModel: ObservableObject {
     /// Where a session started from the phone opens (#91): "auto" (cmux
     /// when installed, else Terminal), "cmux", "terminal".
     @Published var sessionHost: String { didSet { defaults.set(sessionHost, forKey: "session_host") } }
-    /// Per-turn workspace checkpoints (#167): a hidden git ref per prompt,
-    /// recorded when the plugin's UserPromptSubmit hook fires.
-    @Published var checkpointsEnabled: Bool { didSet { defaults.set(checkpointsEnabled, forKey: "checkpoints_enabled") } }
     /// The status item in the theme's color with the theme's icon (#90),
     /// and its effects (switch/death/revival flash, the burn breath).
     @Published var menuBarThemed: Bool { didSet { defaults.set(menuBarThemed, forKey: "menubar_themed") } }
@@ -830,22 +711,10 @@ final class AppModel: ObservableObject {
     /// main actor so `PastSessions.list/find` can read it from the mirror
     /// box or a popover's detached task without hopping here first.
     let hiddenSessions = OSAllocatedUnfairLock(initialState: PastSessions.Hidden.load(root: AppSupport.root()).ids)
-    /// `Stop`/`SessionEnd` hints ahead of Claude Code's own record (#79);
-    /// off the main actor like `hiddenSessions` — `ownedRoster` reads it
-    /// from wherever the control socket calls in.
-    let sessionStatusHints = OSAllocatedUnfairLock(initialState: SessionStatusHints())
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
     private(set) lazy var lock = LockModel(defaults: defaults)
-    /// Settings › Team (spec §9). Secrets in the keychain, or files when
-    /// INFINITUS_TEAM_DIR redirects the team dir (e2e, a second instance).
-    private(set) lazy var team: TeamModel = {
-        let paths = TeamPaths.standard()
-        let model = TeamModel(paths: paths, makeSecrets: TeamSecretsFactory.make(paths: paths), defaults: defaults)
-        model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
-        return model
-    }()
     /// The desktop's CLI credential (#822): stored by `desktop-credential`, read by `desktop-token`.
     private(set) lazy var desktopCredential: DesktopCredential = {
         let credential = DesktopCredential(defaults: defaults)
@@ -863,26 +732,9 @@ final class AppModel: ObservableObject {
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
-    /// `local: false` skips the Mac's own Notification Center notice and
-    /// still reaches the phone and the away channels (#1020: the desktop
-    /// shows its own banner for its threads, and two banners per phase
-    /// change kept the bridge off). `slack: false` skips the Slack
-    /// webhook alone (#574: a Slack-started thread reports in its own
-    /// Slack thread already).
-    func push(_ msg: String, local: Bool = true, slack: Bool = true) {
-        if local {
-            notify(msg)
-        } else {
-            liveActivityPusher.pushAlert(title: "Infinitus", body: msg)
-        }
-        awayPush.send(msg, slack: slack)
+    func push(_ msg: String) {
+        notify(msg)
     }
-    /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
-    lazy var awayPush: AwayPush = {
-        let push = AwayPush(defaults: defaults)
-        push.log = { [weak self] icon, text in self?.logEvent("other", icon: icon, text) }
-        return push
-    }()
 
     struct SessionRow {
         let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
@@ -947,81 +799,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// A Claude Code hook event from the plugin (#79): a prompt is pushed
-    /// the moment it appears — the poll would take up to a minute — and
-    /// the fleet refreshes right after, so a turn's end shows up as fast
-    /// as its prompts. Returns the session's pid when the record is known.
-    func handleHookEvent(_ event: HookEvent) -> Int? {
-        let record = event.sessionId.flatMap { id in
-            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.sessionId == id }
-        }
-        let pid = record.map { Int($0.pid) }
-        // #777: nested in the desktop, the fork's own threads (SDK-entered,
-        // #648) are its to announce; terminal sessions stay the helper's.
-        let forkDriven = Nesting.isNested && (record?.resumedElsewhere ?? false)
-        if event.name == "UserPromptSubmit", checkpointsEnabled, !isPlayground,
-           let sessionId = event.sessionId, let cwd = event.cwd {
-            recordCheckpoint(sessionId: sessionId, cwd: cwd, subject: event.prompt ?? "")
-        }
-        if let sessionId = event.sessionId, let hint = event.statusHint() {
-            sessionStatusHints.withLock { $0.note(sessionId: sessionId, hint) }
-        }
-        if event.name == "StopFailure", !isPlayground {
-            logEvent("hook", icon: "bolt.horizontal", event.logLine)
-        }
-        if let line = event.pushLine, !isPlayground, !forkDriven {
-            logEvent("hook", icon: "bolt.horizontal", event.logLine)
-            if let pid { pushTriggers.announceWaiting(pid: pid) }
-            if pushWaiting { push(line) }
-        }
-        // One refresh per burst, at most every 30 s: the record's status
-        // flips a beat after the hook fires, Stop + Notification often
-        // land together, and the "sessions done" trigger counts quiet
-        // polls — hook polls a second apart would fire it mid-typing.
-        if hookRefresh == nil {
-            let wait = max(1, Self.hookRefreshSpacing - Date().timeIntervalSince(lastHookRefresh))
-            hookRefresh = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(wait))
-                guard let self else { return }
-                lastHookRefresh = Date()
-                await refreshSnapshot()
-                hookRefresh = nil
-            }
-        }
-        return pid
-    }
-    private var hookRefresh: Task<Void, Never>?
-    private var lastHookRefresh = Date.distantPast
     /// The pass a freshly surfaced AWS-login need starts (rebuildAwsLogins).
     private var awsNeedRefresh: Task<Void, Never>?
     /// That pass writes the mirror snapshot past the exporter's throttle.
     private var mirrorExportDue = false
-
-    /// The snapshot runs git in the session's repository, off the main
-    /// thread; the first checkpoint of a session is logged, the rest are
-    /// quiet (one per prompt would drown the Activity pane). A failure
-    /// is logged once per session too.
-    private var checkpointed: Set<String> = []
-    private func recordCheckpoint(sessionId: String, cwd: String, subject: String) {
-        let first = !checkpointed.contains(sessionId)
-        checkpointed.insert(sessionId)
-        let repo = (cwd as NSString).lastPathComponent
-        Task.detached(priority: .utility) { [weak self] in
-            do {
-                guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
-                if first {
-                    await MainActor.run { self?.logEvent("other", icon: "clock.arrow.2.circlepath",
-                                                         "checkpointing \(repo) — \(made.subject)") }
-                }
-            } catch {
-                if first {
-                    await MainActor.run { self?.logEvent("other", icon: "exclamationmark.triangle",
-                                                         "checkpoint of \(repo) failed: \(error)") }
-                }
-            }
-        }
-    }
-    static let hookRefreshSpacing: TimeInterval = 30
 
     func notify(_ body: String) {
         Notifier.post(title: "Infinitus", body: body)
@@ -1168,7 +949,6 @@ final class AppModel: ObservableObject {
         priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
-        checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
@@ -1232,7 +1012,6 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = mirrorServer.leases
-        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
         if !isPlayground, !mockMode {
             let namer = SessionNamer(appSupport: AppSupport.root())
             namer.enabled = sessionAutoNames
@@ -1366,7 +1145,6 @@ final class AppModel: ObservableObject {
         set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
-        set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
@@ -1593,67 +1371,9 @@ final class AppModel: ObservableObject {
                 await MainActor.run { self?.logEvent("other", icon: "terminal", "swept \(swept.count) orphaned headless sessions") }
             }
         }
-        resume.log = { [weak self] icon, text in
-            self?.logEvent("nudge", icon: icon, text)
-        }
-        resume.push = { [weak self] text in
-            self?.push(text)
-        }
         mirrorServer.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
-        mirrorServer.teamControl.onAudit = { [weak self] audit, name in
-            Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
-        }
-        teamControlFeed.decide = { [weak self] id, allow in
-            self?.mirrorServer.teamControl.decide(id, allow: allow) { _ in }
-        }
-        // Both re-apply the listener first: joining, leaving or flipping
-        // Discoverable decides whether the team keeps it up (#356).
-        team.onLoaded = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamControl() }
-        team.onActed = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamStanding(force: true) }
-        // #220 §5.4: a leader's hostname for this Mac — token to the keychain,
-        // the named tunnel on. The LAN listener is the user's switch, not ours.
-        team.onHostname = { [weak self] hostname, from in
-            guard let self else { return }
-            let host = NamedTunnel.normalizeHostname(hostname.hostname)
-            guard !host.isEmpty else { return }
-            // A re-give mints a fresh token for the same host: the running
-            // cloudflared holds the old one, so it restarts below.
-            if namedTunnel.isRunning, namedTunnel.hostname == host { namedTunnel.stop() }
-            NamedTunnel.setToken(hostname.token, for: host)
-            mirrorNamedTunnelHost = host
-            mirrorNamedTunnelEnabled = true
-            let who = team.snapshot?.members.first { $0.kid == from }?.name ?? String(from.prefix(8))
-            let hint = mirrorLANEnabled ? "" : " — turn on the LAN listener to run it"
-            logEvent("team", icon: "network", "\(who) gave this Mac the hostname \(host)\(hint)")
-        }
-        // Team session control (#220): the phone's delivery path, origin
-        // "team". Wired here, not in applyMirrorLAN — the store lane runs
-        // with the LAN listener off.
-        mirrorServer.teamControl.setDeliver { [weak self] pid, request, origin in
-            self?.deliverSessionInput(pid: pid, request, from: origin)
-                ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
-        }
-        // #220 Phase 2: a granted non-drive action is the Mac's own control
-        // verb, run through ControlServer.run on the main actor. The team-control
-        // queue waits here (never main): main is free while the verb runs, so
-        // team-allow — a verb itself, suspended at its await — cannot deadlock it.
-        mirrorServer.teamControl.setRunVerb { [weak self] verb in
-            guard let self else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
-            let done = DispatchSemaphore(value: 0)
-            let slot = OSAllocatedUnfairLock<ControlReply?>(initialState: nil)
-            Task { @MainActor in
-                let reply = await self.controlServer.run(ControlRequest(command: verb.command, args: verb.args, options: verb.options, secret: nil))
-                slot.withLock { $0 = reply }
-                done.signal()
-            }
-            guard done.wait(timeout: .now() + 30) == .success, let reply = slot.withLock({ $0 }) else {
-                return SessionInput.Reply(outcome: TeamControl.Outcome.refused, detail: "still running after 30 s")
-            }
-            return TeamControl.verbReply(verb, ok: reply.ok, error: reply.error)
-        }
-        team.onFetched = { [mirrorServer] client in mirrorServer.teamControl.storePass(client) }
         quickTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
@@ -1697,16 +1417,6 @@ final class AppModel: ObservableObject {
             }
             return reply
         }
-        // A session's hook mode (#163 phase 2) is remembered in its birth
-        // across a relaunch, but the hook answers from ToolApprovals'
-        // memory — reseed it, or the chip would promise a mode the hook
-        // no longer grants.
-        let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-        for (pid, birth) in sessionBirths {
-            guard let record = live.first(where: { Int($0.pid) == pid }), birth.sessionId == record.sessionId else { continue }
-            if let mode = birth.hookMode { toolApprovals.setMode(mode, sessionId: record.sessionId) }
-            for rule in profileAllowRules(birth) { toolApprovals.add(rule, sessionId: record.sessionId) }
-        }
         // UserDefaults is thread-safe; the closure only reads it.
         nonisolated(unsafe) let prefDefaults = defaults
         mirrorServer.prefs.set { try PrefCatalog.reply(from: prefDefaults) }
@@ -1729,51 +1439,6 @@ final class AppModel: ObservableObject {
                                                            limit: limit, search: search,
                                                            hidden: hiddenSessions.withLock { $0 }))
         }
-        // The phone's checkpoint routes (#167 phase 2) act on the live
-        // session's record — the same lookup `infinitusctl checkpoints`
-        // makes; an unknown pid is a 404.
-        let session: @Sendable (Int32) -> ClaudeSessionRecord? = { pid in
-            ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first { $0.pid == pid }
-        }
-        mirrorServer.checkpoints.set(.init(
-            list: { pid in
-                guard let record = session(pid) else { return nil }
-                let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
-                return Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list)
-            },
-            diff: { pid, n, m in
-                guard let record = session(pid) else { return nil }
-                return try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: m)
-            },
-            restore: { [weak self] pid, n in
-                guard let record = session(pid) else { return nil }
-                do {
-                    let (restored, backup) = try Checkpoints.restore(cwd: record.cwd, sessionId: record.sessionId, n: n)
-                    Task { @MainActor in
-                        self?.logEvent("other", icon: "clock.arrow.2.circlepath",
-                                       "phone restored \((record.cwd as NSString).lastPathComponent) to checkpoint \(restored.subject)")
-                    }
-                    return Checkpoints.RestoreReply(outcome: "restored", backup: backup?.n)
-                } catch {
-                    return Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)")
-                }
-            }))
-        // The phone's Team tab (spec §9 step 8) — every call lands on the
-        // main actor, where TeamModel lives.
-        mirrorServer.teamMirror.set { [weak self] request in
-            guard let team = await MainActor.run(body: { self?.team }) else { return nil }
-            return await TeamMirrorHandler.reply(request, team: team)
-        }
-        team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
-        // The fixture instance (e2e) publishes what the publisher scans itself.
-        let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"] ?? ""
-        team.ownsScan = { [weak self] in fixture.isEmpty && self?.statsModel.enabled == true }
-        team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
-        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
-        // The memo holds what the team needs of a scan; the table goes back (#499).
-        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
-        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        team.load()
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
@@ -1841,24 +1506,10 @@ final class AppModel: ObservableObject {
     /// Starts or stops the phone companion's LAN listener (#9). Never in
     /// the playground: it seeds from the real defaults and would
     /// advertise a second service with the same machine name.
-    /// The team hooks' cheap form (#356): re-run the full apply only when
-    /// the listener's up/down answer changed — `applyMirrorLAN` rewires
-    /// every handler and drops the thumbnail cache, too much for every load.
-    private func reapplyMirrorLANForTeam() {
-        let wanted = mirrorLANEnabled || team.discoverable || team.inTeam
-        if wanted != mirrorServer.isListening { applyMirrorLAN() }
-    }
-
     private func applyMirrorLAN() {
         let allowed = exposureAllowed
-        // Team Nearby rides the same listener (#356): a discoverable Mac
-        // or a team member keeps it up with the phone switch off, and the
-        // phone routes then drop their connections. The tunnels stay the
-        // phone's alone.
-        let teamWantsLAN = team.discoverable || team.inTeam
-        team.nearbyAvailable = allowed
         mirrorServer.phoneEnabled = mirrorLANEnabled
-        guard allowed, mirrorLANEnabled || teamWantsLAN else {
+        guard allowed, mirrorLANEnabled else {
             mirrorServer.stop()
             quickTunnel.stop()
             namedTunnel.stop()
@@ -2039,25 +1690,6 @@ final class AppModel: ObservableObject {
                 Task { @MainActor in self.logMirrorInput("⚠️", "\(source) input not delivered: unknown session") }
                 return SessionInput.Reply(outcome: "rejected", detail: "session ended")
             }
-            // A mode change never reaches the terminal: it is the Mac's
-            // own state, decided on the main actor (the births live
-            // there). This queue never blocks main, so a hop is safe.
-            if request.kind == .mode {
-                return DispatchQueue.main.sync {
-                    MainActor.assumeIsolated {
-                        self.setSessionMode(request.text, pid: Int(pid), record: record)
-                            ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
-                    }
-                }
-            }
-            // "Allow for this session": remember the rule for the plugin's
-            // PreToolUse hook; the request itself goes down as `.approve`,
-            // and Core's arm answers it — an owned session gets the wire's
-            // allow-for-session, a terminal a Yes keypress (#430).
-            if request.kind == .approve, let rule = ToolApproval.decode(request.text) {
-                self.toolApprovals.add(rule, sessionId: record.sessionId)
-                Task { @MainActor in self.logMirrorInput("🛡️", "\(source) allows \(rule.label) for the rest of session \(pid)") }
-            }
             let reply = SessionInput.deliver(request: request, record: record,
                                              hosts: PtyHosts.available(), claudeDir: claudeDir,
                                              owned: self.ownedBox.existing.map { owned in
@@ -2235,17 +1867,17 @@ final class AppModel: ObservableObject {
         await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }
 
-    /// The login landed: tell the session that needed it to carry on —
-    /// the phone's own message path, so it works wherever replies do.
+    /// The login landed: clear whatever of the session's own logins were
+    /// waiting on it and log the sign-in — the terminal is no longer
+    /// nudged to continue (#1041).
     private func awsLoginLanded(_ state: AwsLogin.State) {
         let provider = state.providerOrAws
         logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) signed in")
-        let fromPhone = state.flow != .local
         // Every session that needed this profile, not only the one the
         // login was started for (two sessions, one sign-in, 2026-09-04).
         var pids = Set(sessionProgress.byPid.filter { $0.value.loginProfile(provider) == state.profile }.map(\.key))
         if let pid = state.pid { pids.insert(pid) }
-        for pid in pids { nudgeAfterAwsLogin(pid: pid, provider: provider, profile: state.profile, fromPhone: fromPhone) }
+        for pid in pids { releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: state.profile) }
         // A login often signs other profiles in underneath — a broker
         // profile over its anchor `aws login` profile, an SSO session
         // several profiles share, gcloud's active account under a named
@@ -2258,14 +1890,12 @@ final class AppModel: ObservableObject {
                 await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: state.profile)
                 self.logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) also signed \(profile) in")
                 for (pid, progress) in self.sessionProgress.byPid where progress.loginProfile(provider) == profile {
-                    self.nudgeAfterAwsLogin(pid: pid, provider: provider, profile: profile, fromPhone: fromPhone)
+                    self.releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: profile)
                 }
             }
         }
     }
 
-    /// Tells a session that needed the login to carry on — the phone's
-    /// own message path, so it works wherever replies do.
     // MARK: crash reports (built-in, no third party — user 2026-09-04)
 
     /// Stores a report, logs it, and — for the phone's — says so.
@@ -2280,48 +1910,6 @@ final class AppModel: ObservableObject {
     func removeCrash(_ id: String) {
         crashStore.remove(id)
         crashReports = crashStore.list()
-    }
-
-    /// What this Mac publishes to its team (spec §7): Claude Code's own
-    /// files, this Mac's live sessions and crash reports, each engine's
-    /// active account with its window percentages, and the blockers
-    /// the pop-out shows (lapsed AWS logins, an all-limited fleet).
-    /// INFINITUS_TEAM_PROJECTS swaps the projects dir for a fixture
-    /// (the e2e gate) and skips the Codex scan.
-    func teamSources() -> TeamPublisher.Sources {
-        let claudeDir = ClaudeSessions.configHome()
-        var s = TeamPublisher.Sources(projectsDir: claudeDir.appendingPathComponent("projects"), home: NSHomeDirectory())
-        s.codexDir = StatsScanner.defaultCodexDir()
-        if let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"], !fixture.isEmpty {
-            s.projectsDir = URL(fileURLWithPath: fixture)
-            s.codexDir = nil
-        }
-        s.liveSessions = ClaudeSessions.list(claudeDir: claudeDir)
-        s.crashes = crashStore.list()
-        s.endpoints = controlEndpoints
-        if let id = team.paths.teamIDs().sorted().first {
-            let hints = TeamGrants.load(teamDir: team.paths.teamDir(id)).hints
-            s.grantsTo = hints.isEmpty ? nil : hints
-        }
-        let lastFleets = fleets.compactMap(\.lastFleet)
-        s.fleets = lastFleets.map { fleet in
-            let active = fleet.accounts.first { $0.number == fleet.activeNumber }
-            var windows: [TeamDocs.Window] = []
-            if let w = active?.usage?.fiveHour { windows.append(TeamDocs.Window(label: "5h", pct: Int(w.pct.rounded()))) }
-            if let w = active?.usage?.sevenDay { windows.append(TeamDocs.Window(label: "7d", pct: Int(w.pct.rounded()))) }
-            return TeamDocs.Fleet(engine: fleet.engineID, account: active.map { $0.alias ?? $0.email }, windows: windows)
-        }
-        // Every account, for the member fleet view (#221); this Mac's one
-        // token rate rides the primary fleet.
-        let perMinute = sessionProgress.tokenRate?.perMinute ?? 0
-        let rate: Double? = perMinute > 0 ? Double(perMinute) : nil
-        s.fleetRows = lastFleets.enumerated().map { i, fleet in
-            TeamDocs.FleetDoc.row(fleet, tokensPerMinute: i == 0 ? rate : nil)
-        }
-        s.blockers = awsLogins.map { "\($0.providerOrAws.loginLabel): \($0.profile)" }
-            + lastFleets.filter { !$0.accounts.isEmpty && $0.activeNumber == nil && $0.nextCandidate == nil }
-                .map { "\($0.engineID): every account limited" }
-        return s
     }
 
     /// This Mac's own crashes: `~/Library/Logs/DiagnosticReports/
@@ -2376,22 +1964,15 @@ final class AppModel: ObservableObject {
         return reply
     }
 
-    private func nudgeAfterAwsLogin(pid: Int, provider: AwsLogin.Provider = .aws, profile: String, fromPhone: Bool) {
+    private func releaseAwsLoginAfterSignIn(pid: Int, provider: AwsLogin.Provider = .aws, profile: String) {
+        guard provider == .aws else { return }
         Task.detached(priority: .utility) { [weak self] in
-            // The session's own stuck `aws login` first (#275), so the
-            // nudge drains now instead of after its tool timeout. gcloud's
+            // The session's own stuck `aws login` (#275) — gcloud's
             // paste-back login has no callback to poke.
-            let released = provider == .aws ? await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid) : 0
-            let text = provider.continueMessage(profile: profile, fromPhone: fromPhone, released: released > 0)
-            let request = SessionInput.Request(kind: .message, text: text)
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else { return }
-            let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
+            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
+            guard released > 0 else { return }
             await MainActor.run { [weak self] in
-                if released > 0 { self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released") }
-                self?.logMirrorInput(reply.outcome == "delivered" ? "📲" : "⚠️",
-                                     "session \(pid) nudged after \(provider.cliName) login: \(reply.outcome)")
+                self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released")
             }
         }
     }
@@ -2560,10 +2141,6 @@ final class AppModel: ObservableObject {
     func publishRendezvous(_ url: String) {
         guard mirrorRendezvousEnabled else { return }
         if let target = MirrorRendezvous.url(token: mirrorPairToken) { publish(url, at: target, label: "tunnel address") }
-        // #220: teammates derive this key from the roster alone.
-        if let key = controlEndpoints.rendezvous, let target = MirrorRendezvous.url(key: key) {
-            publish(url, at: target, label: "team control address")
-        }
     }
 
     private func publish(_ url: String, at target: URL, label: String) {
@@ -2681,9 +2258,9 @@ final class AppModel: ObservableObject {
             // re-probe (~10 min while dead): the latched PushTriggers message
             // owns that notification. session-resumed, remote-control-rearmed
             // and account-unquarantined used to post banners with no latch
-            // and no Settings › Notify toggle; resumes are this app's own
-            // ResumeService now, the /rc re-arm is housekeeping, and the
-            // revival diff already carries the account-back news.
+            // and no Settings › Notify toggle; both are swapd's own
+            // housekeeping now (#1041), and the revival diff already
+            // carries the account-back news.
             default:
                 break
             }
@@ -2801,7 +2378,6 @@ final class AppModel: ObservableObject {
         let bundle = Bundle.main.bundleURL.path
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
-        let team = team
         Task {
             await oldSwapd?.stop()
             let p = Process()
@@ -2809,10 +2385,8 @@ final class AppModel: ObservableObject {
             // Unbundled dev runs are a bare executable — `open` on its
             // directory would just raise Finder.
             let exe = Bundle.main.executablePath ?? ""
-            // applicationShouldTerminate can hold quit up to
-            // TeamModel.quitBound (20s) for a team's now.json delete, so a
-            // fixed sleep can no longer be trusted to outlast this
-            // process — wait for the pid to actually exit instead.
+            // A fixed sleep can't be trusted to outlast this process —
+            // wait for the pid to actually exit instead.
             let pid = ProcessInfo.processInfo.processIdentifier
             let wait = "while /bin/kill -0 \(pid) 2>/dev/null; do sleep 0.1; done; "
             let cmd = bundle.hasSuffix(".app")
@@ -2820,16 +2394,7 @@ final class AppModel: ObservableObject {
                 : wait + "exec \"\(exe)\""
             p.arguments = ["-c", cmd]
             try? p.run()
-            // Same as shutdown() (#656): the team's now.json delete runs
-            // here, so applicationShouldTerminate answers .terminateNow.
-            // From inside a Task, .terminateLater parks the main thread in
-            // AppKit's nested event loop and the reply never runs — the
-            // bundle sat wedged in this very call for 30 minutes on
-            // 2026-09-11 (sampled), its control socket accepting and never
-            // answering, the reopen shell waiting on a pid that never left.
-            await team.quit()
             await MainActor.run {
-                AppDelegate.teamQuitDone = true
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -3012,9 +2577,7 @@ final class AppModel: ObservableObject {
             let awsLogins = awsLogins
             let progress = sessionProgress.byPid
             statsModel.refreshIfStale()
-            team.refreshIfStale() // inside the !mockMode guard above: the automatic loop is real-instance-only; a mock instance still answers team-* control commands directly
             let stats = statsModel.bundle
-            let teamSnapshot = team.snapshot
             // This Mac's own version, mirrored for the phone's Settings
             // (#121) — same keys ControlServer.status reads.
             let info = Bundle.main.infoDictionary ?? [:]
@@ -3039,7 +2602,7 @@ final class AppModel: ObservableObject {
                                             awsLogins: awsLogins, progress: progress,
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
-                                            app: appInfo, team: teamSnapshot,
+                                            app: appInfo,
                                             profiles: sessionProfilesList,
                                             projects: { self.projectSummaries(profiles: sessionProfilesList) },
                                             births: self.sessionBirths,
@@ -3058,29 +2621,6 @@ final class AppModel: ObservableObject {
                                             sequence: sequenceLog, now: mirrorNow,
                                             overlay: self.overlayingOwnedStatus)
             }
-        }
-        // All-limited: count the limit-stopped sessions waiting to be
-        // resumed (todo 2026-09-01), reusing the resume mechanism's
-        // own detection — Claude Code's files, never engine internals.
-        // Throttled: the transcript tails re-read at most every 20s.
-        if list.nextCandidate == nil,
-           RecoveryMath.corrected(engine: list.nextRecovery, accounts: list.accounts,
-                                  activeNumber: list.activeAccountNumber) != nil {
-            if Date().timeIntervalSince(waitingScanAt) > 20 {
-                waitingScanAt = Date()
-                Task.detached(priority: .utility) { [weak self] in
-                    let dir = ClaudeSessions.configHome()
-                    let stopped = Transcript.findStopped(
-                        sessions: ClaudeSessions.list(claudeDir: dir),
-                        claudeDir: dir)
-                    let count = stopped.count
-                    await MainActor.run { [weak self] in
-                        self?.waitingResume = count
-                    }
-                }
-            }
-        } else {
-            waitingResume = nil
         }
         // Death/revive ticks fired inside FleetState.apply.
         // Launch greeting: once the first snapshot renders, the
@@ -3118,21 +2658,6 @@ final class AppModel: ObservableObject {
                          busyCount: list.liveSessions?.busy ?? 0)
         }
         controlServer.heal()
-        // Same display-feed vantage: a switch (manual or parked-engine)
-        // re-arms /rc; an active account that can work resumes stopped
-        // sessions. Detached, single-flight — never awaited here.
-        if !isPlayground {
-            let active = list.accounts.first { $0.number == list.activeAccountNumber }
-            if previous != list.activeAccountNumber { activeSince = Date() }
-            resume.tick(switched: previous != nil && previous != list.activeAccountNumber,
-                        activeAlive: active.map { !AccountVitals.isDead($0.usage) } ?? false,
-                        activeNumber: list.activeAccountNumber,
-                        activeFetchedAt: active?.usageFetchedAt
-                            .flatMap(UsageHistory.parseISO),
-                        activeName: active.map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) },
-                        activePct: active.flatMap { PushTriggers.worstPlanPct($0.usage) }.map { Int($0) },
-                        activeSince: activeSince)
-        }
         // Same display-feed vantage as the switch diff above: these
         // triggers fire even while the supervised engine is parked.
         let health = list.accounts
@@ -3250,20 +2775,12 @@ final class AppModel: ObservableObject {
         forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
-        let team = team
         Task {
             await swapdSupervisor?.stop()
             // Owned Claude sessions are this process's children (#151):
             // they don't outlive the app either (the #274 lesson).
             await owned?.stopAll()
-            // The team's now.json delete here, not in applicationShouldTerminate:
-            // from inside a Task, `.terminateLater` parks the main thread in
-            // AppKit's nested event loop and the reply never runs (#654: the
-            // e2e's quit sat there past 30s; sampled 2026-09-11). Bounded by
-            // TeamModel.quitBound.
-            await team.quit()
             await MainActor.run {
-                AppDelegate.teamQuitDone = true
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -3288,13 +2805,11 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The roster with the hook hints applied (#79) and an owned child's
-    /// status filled in from its actor (the CLI leaves an sdk-cli record's
-    /// status empty) — the overlay stays last: an owned child's actor is
-    /// the truth for its own pid.
+    /// The roster with an owned child's status filled in from its actor
+    /// (the CLI leaves an sdk-cli record's status empty) — the overlay
+    /// stays last: an owned child's actor is the truth for its own pid.
     nonisolated func ownedRoster(claudeDir: URL) -> [ClaudeSessionRecord] {
-        let hinted = sessionStatusHints.withLock { $0.apply(ClaudeSessions.list(claudeDir: claudeDir)) }
-        return overlayingOwnedStatus(hinted)
+        overlayingOwnedStatus(ClaudeSessions.list(claudeDir: claudeDir))
     }
 
     nonisolated func overlayingOwnedStatus(_ records: [ClaudeSessionRecord]) -> [ClaudeSessionRecord] {

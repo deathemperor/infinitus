@@ -47,18 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         AppDelegate.terminating = true
         Lifecycle.log.notice("quit requested by pid \(Lifecycle.quitSenderPID.map(String.init) ?? "self", privacy: .public)")
-        // Spec §7: `now.json` goes on quit, on EVERY quit — Cmd-Q, logout,
-        // the relaunch path — not only AppModel.shutdown(). Bounded
-        // (TeamModel.quitBound) so a dead remote never holds the quit.
-        guard let team = model?.team, team.inTeam, !AppDelegate.teamQuitDone else { return .terminateNow }
-        AppDelegate.teamQuitDone = true
-        Task { @MainActor in
-            await team.quit()
-            sender.reply(toApplicationShouldTerminate: true)
-        }
-        return .terminateLater
+        return .terminateNow
     }
-    static var teamQuitDone = false
 
     /// `open Infinitus.app` on an already-running instance lands here: show
     /// the pinned window. This is the guaranteed way into the UI when the
@@ -77,20 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return false
     }
-
-    /// `infinitus://join/…` from a QR, a message or the phone (spec §6.2).
-    func application(_ application: NSApplication, open urls: [URL]) {
-        guard let model else { return }
-        for url in urls {
-            if model.team.open(url: url) { break }
-        }
-    }
 }
 
 @main
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
-    @StateObject private var reliabilityModel: ResumeReliabilityModel
     @StateObject private var appRelease: AppReleaseModel
     @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -124,15 +105,13 @@ struct InfinitusApp: App {
         _brew = StateObject(wrappedValue: brew)
         model.brewUpdater = brew
         brew.relaunch = { model.relaunchApp() }
-        let reliabilityModel = ResumeReliabilityModel()
-        _reliabilityModel = StateObject(wrappedValue: reliabilityModel)
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
             appDelegate?.statusHolder = StatusItemHolder(
                 model: model,
                 settingsTabs: {
                     settingsTabs(
-                        model: model, reliabilityModel: reliabilityModel,
+                        model: model,
                         appRelease: release, brew: brew)
                 })
         }
@@ -160,7 +139,7 @@ struct InfinitusApp: App {
         // macOS 15+, and SceneBuilder takes no #available branch.)
         Settings {
             SettingsRoot(tabs: settingsTabs(
-                model: model, reliabilityModel: reliabilityModel,
+                model: model,
                 appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
@@ -182,7 +161,7 @@ struct InfinitusApp: App {
 /// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
-    model: AppModel, reliabilityModel: ResumeReliabilityModel,
+    model: AppModel,
     appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
@@ -211,11 +190,8 @@ struct InfinitusApp: App {
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
         SettingsTab(title: LockModel.paneTitle, symbol: "lock.fill", tint: .gray,
                     keywords: ["biometric", "touch id", "face id", "password",
-                               "unlock", "privacy", "team"],
+                               "unlock", "privacy"],
                     view: AnyView(LockPane(lock: model.lock))),
-        SettingsTab(title: TeamModel.paneTitle, symbol: "person.3", tint: .teal,
-                    keywords: ["team", "invite", "code", "join", "members", "leader", "share", "publish", "exclude", "control", "grant", "drive"],
-                    view: AnyView(TeamPane(team: model.team, feed: model.teamControlFeed))),
     ]
     + [
         SettingsTab(title: "About", symbol: "info.circle", tint: .indigo,
@@ -233,7 +209,7 @@ struct InfinitusApp: App {
                     // auto-switch daemon runs is the tab's own business.
                     provider: ProviderBadge(live: model.swapdRegistered
                                             && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model, reliability: reliabilityModel))),
+                    view: AnyView(SwapdEnginePane(model: model))),
         SettingsTab(title: "CLIProxyAPI", symbol: "network",
                     keywords: ["proxy", "cliproxy", "router", "management",
                                "key", "engine", "provider", "claude"],

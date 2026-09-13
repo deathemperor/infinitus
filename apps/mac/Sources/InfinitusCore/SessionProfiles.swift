@@ -20,8 +20,8 @@ public struct SessionProfile: Codable, Sendable, Equatable, Identifiable {
     /// The first prompt the session opens with.
     public var prompt: String?
     /// Tools allowed without asking for a session born from this profile
-    /// (#165), in `ToolApproval.Rule.text` form ("Edit", "Bash git"); the
-    /// plugin's PreToolUse hook answers from them. Claude only.
+    /// (#165): "Edit", "Bash git" — the tool, then for Bash the command's
+    /// first word. Claude only.
     public var allowTools: [String]?
 
     public init(name: String, cwd: String? = nil, engine: String? = nil, permissionMode: String? = nil,
@@ -36,9 +36,6 @@ public struct SessionProfile: Codable, Sendable, Equatable, Identifiable {
         self.prompt = prompt
         self.allowTools = allowTools
     }
-
-    /// The allow-list as rules, malformed entries dropped.
-    public var allowRules: [ToolApproval.Rule] { (allowTools ?? []).compactMap(ToolApproval.Rule.parse) }
 
     /// The fields set, as one caption: "codex · acceptEdits · opus".
     public var summary: String {

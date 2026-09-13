@@ -22,7 +22,11 @@ import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { isInfinitusDesktopVersion, isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import {
+  isInfinitusDesktopVersion,
+  isInfinitusNightlyDesktopVersion,
+  isNightlyDesktopVersion,
+} from "../updates/updateChannels.ts";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -107,7 +111,10 @@ function resolveDesktopAppStageLabel(input: {
     return "Dev";
   }
 
-  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Alpha";
+  return isNightlyDesktopVersion(input.appVersion) ||
+    isInfinitusNightlyDesktopVersion(input.appVersion)
+    ? "Nightly"
+    : "Alpha";
 }
 
 export function resolveDesktopAppBranding(input: {

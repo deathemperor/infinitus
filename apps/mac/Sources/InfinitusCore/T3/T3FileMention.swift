@@ -13,7 +13,8 @@ import Foundation
 /// (`apps/mobile/src/features/files/fileTree.ts:130-143`).
 ///
 /// Foundation only, so the phone builds it too — the `git` subprocess is
-/// guarded exactly as `Checkpoints.run` guards its own (Checkpoints.swift:234).
+/// guarded the way a child process must be: killed after a deadline, its
+/// pipe drained before the wait.
 public enum T3FileMention: Sendable {
     /// The menu's row cap (`rank`'s default), as the composer offers it.
     public static let limit = 12
@@ -41,8 +42,8 @@ public enum T3FileMention: Sendable {
     /// filenames otherwise. nil = no repo here (or no git), so the walk answers.
     static func gitListed(cwd: String, limit: Int = maxListed) -> [String]? {
         #if os(Windows) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-        // No child processes here (Checkpoints.swift:234 makes the same call);
-        // the walk covers every platform.
+        // No child processes here (another guarded `git` call makes the
+        // same one); the walk covers every platform.
         return nil
         #else
         var isDirectory: ObjCBool = false
@@ -64,7 +65,7 @@ public enum T3FileMention: Sendable {
         let killer = DispatchWorkItem { if process.isRunning { process.terminate() } }
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5, execute: killer)
         // Drain before waiting: a big checkout fills the pipe's buffer and the
-        // child blocks on write otherwise (the lesson in Checkpoints.run).
+        // child blocks on write otherwise.
         let data = out.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         killer.cancel()

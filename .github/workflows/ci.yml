@@ -422,8 +422,8 @@ jobs:
   # the old single job's 20 minutes (2026-09-07). Both halves run test
   # classes in parallel. `mac-test` is the one check the ruleset requires;
   # it just needs both halves green.
-  mac-test-core:
-    name: mac-test-core
+  mac-test:
+    name: mac-test
     needs: mac_changes
     runs-on: macos-26
     timeout-minutes: 45
@@ -449,42 +449,8 @@ jobs:
       - name: generated files are current
         run: tools/t3ref/check-generated.sh
         if: needs.mac_changes.outputs.changed != 'false'
-      - run: swift test --parallel --skip Team
+      - run: swift test --parallel
         if: needs.mac_changes.outputs.changed != 'false'
-  mac-test-team:
-    name: mac-test-team
-    needs: mac_changes
-    runs-on: macos-26
-    timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: apps/mac
-    steps:
-      - uses: actions/checkout@v6
-        if: needs.mac_changes.outputs.changed != 'false'
-      - uses: actions/cache@v4
-        with:
-          path: apps/mac/.build
-          # Per-commit key: actions/cache never overwrites an existing key,
-          # so a key on the manifest hash alone froze .build at its first
-          # save and every later run rebuilt from that (2026-09-03).
-          key: spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-${{ github.sha }}
-          restore-keys: |
-            spm-mac-${{ runner.os }}-${{ hashFiles('apps/mac/Package.resolved', 'apps/mac/Package.swift') }}-
-            spm-mac-${{ runner.os }}-
-        if: needs.mac_changes.outputs.changed != 'false'
-      - run: swift build
-        if: needs.mac_changes.outputs.changed != 'false'
-      - run: swift test --parallel --filter Team
-        if: needs.mac_changes.outputs.changed != 'false'
-  mac-test:
-    name: mac-test
-    runs-on: ubuntu-24.04
-    needs: [mac-test-core, mac-test-team]
-    if: always()
-    steps:
-      - run: |
-          test "${{ needs.mac-test-core.result }}" = success && test "${{ needs.mac-test-team.result }}" = success
   # End-to-end + performance gate (#18): the debug app against the demo
   # engine, driven through infinitusctl; fails on a broken command, a
   # missing pop-out, or idle CPU / RSS over budget (apps/mac/tools/e2e.sh).

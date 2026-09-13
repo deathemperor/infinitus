@@ -113,6 +113,26 @@ final class StaleAgeTests: XCTestCase {
         let staleNoAge = Account(number: 1, email: "a@b.c", stale: true)
         XCTAssertNil(staleNoAge.staleAgeLabel)
     }
+
+    /// The one sentence every surface hangs on the age: it names the
+    /// engine's error kind when there is one, so a throttled account
+    /// (`http-429`) and a dead network read differently.
+    func testStaleTipCarriesTheReason() {
+        let throttled = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380,
+                                stale: true, staleReason: "http-429")
+        XCTAssertEqual(throttled.staleTip,
+                       "Usage from 6 min ago — swapd could not refresh this account (http-429); "
+                       + "it retries on its own")
+
+        let unexplained = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380, stale: true)
+        XCTAssertEqual(unexplained.staleTip,
+                       "Usage from 6 min ago — swapd could not refresh this account; "
+                       + "it retries on its own")
+
+        XCTAssertNil(Account(number: 1, email: "a@b.c", usageAgeSeconds: 380).staleTip)
+        XCTAssertNil(Account(number: 1, email: "a@b.c", stale: true, staleReason: "timeout").staleTip,
+                     "no age, no sentence — same rule as the label")
+    }
 }
 
 /// A dead row draws its dead line in the blocking window's own place

@@ -476,7 +476,7 @@ export const OrchestrationProject = Schema.Struct({
   repositoryIdentity: Schema.optional(Schema.NullOr(RepositoryIdentity)),
   defaultModelSelection: Schema.NullOr(ModelSelection),
   // Per-project override for where new threads start. Null/absent means
-  // "no override": clients fall back to t3.json, then the global setting.
+  // "no override": clients fall back to the project file, then the global setting.
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   // Opt-in because background sync performs network I/O and may move the checkout.
   // Optional on the wire so cached snapshots from older servers still decode.
@@ -749,6 +749,9 @@ export const ThreadBabysit = Schema.Struct({
   since: IsoDateTime,
   /** Automatic rounds queued so far. */
   rounds: NonNegativeInt,
+  /** Set when the layer stopped at the round cap: the record stays so the
+      sidebar can say so (#269 A), but nothing runs until turned on again. */
+  stoppedAt: Schema.optional(IsoDateTime),
 });
 export type ThreadBabysit = typeof ThreadBabysit.Type;
 
@@ -1302,6 +1305,9 @@ const ThreadMetaUpdateCommand = Schema.Struct({
   babysit: Schema.optional(Schema.Boolean),
   /** Fork (#269 A): the babysit layer's round count; ignored while off. */
   babysitRounds: Schema.optional(NonNegativeInt),
+  /** Fork (#269 A): the layer stopped at the round cap; the record keeps its
+      rounds and gains `stoppedAt`. Ignored while off or already stopped. */
+  babysitStopped: Schema.optional(Schema.Literal(true)),
 }).check(
   Schema.makeFilter(
     (input) =>

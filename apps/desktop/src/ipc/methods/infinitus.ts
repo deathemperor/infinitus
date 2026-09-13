@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 import { InfinitusCaptureGestureService } from "../../captures/InfinitusCaptureGesture.ts";
 import { InfinitusDeepLinksService } from "../../infinitus/InfinitusDeepLinks.ts";
 import { InfinitusDesktopPrefsService } from "../../infinitus/InfinitusDesktopPrefs.ts";
+import { InfinitusKeepAwakeService } from "../../infinitus/InfinitusKeepAwake.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
 import * as IpcChannels from "../channels.ts";
 import { makeIpcMethod } from "../DesktopIpc.ts";
@@ -82,5 +83,15 @@ export const consumeInfinitusDeepLink = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.consumeDeepLink")(function* () {
     const deepLinks = yield* InfinitusDeepLinksService;
     return yield* deepLinks.consume;
+  }),
+});
+
+export const setKeepAwake = makeIpcMethod({
+  channel: IpcChannels.SET_KEEP_AWAKE_CHANNEL,
+  payload: Schema.Boolean,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.infinitus.setKeepAwake")(function* (active) {
+    const keepAwake = yield* InfinitusKeepAwakeService;
+    yield* keepAwake.set(active);
   }),
 });
