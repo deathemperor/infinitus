@@ -50,7 +50,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == "/.well-known/t3/environment":
-            return self.reply(200, {"environmentId": "env-demo", "label": "Demo desktop", "platform": "darwin",
+            return self.reply(200, {"environmentId": "env-demo", "label": "Demo desktop",
+                                    "platform": {"os": "darwin", "arch": "arm64", "machine": "laptop"},
                                     "serverVersion": "0.0.0-demo", "capabilities": []})
         if path == "/api/auth/session":   # answers everyone, like the desktop's
             ok = self.headers.get("Authorization") == "Bearer " + TOKEN

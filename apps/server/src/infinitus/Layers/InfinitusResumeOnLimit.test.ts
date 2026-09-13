@@ -6,6 +6,8 @@ import {
   type OrchestrationCommand,
   type OrchestrationThreadShell,
   ProviderDriverKind,
+  ProviderInstanceId,
+  type ProviderInstanceConfigMap,
   type ProviderRuntimeEvent,
   ThreadId,
   TurnId,
@@ -92,13 +94,14 @@ const runtimeEvent = (
   type: ProviderRuntimeEvent["type"],
   payload: unknown,
   turn: TurnId = turnId,
+  thread: ThreadId = threadId,
 ): ProviderRuntimeEvent =>
   ({
     type,
     eventId: EventId.make(`evt-${(eventCount += 1)}`),
     provider: claude,
     createdAt: "2026-09-11T10:00:00Z",
-    threadId,
+    threadId: thread,
     turnId: turn,
     payload,
   }) as ProviderRuntimeEvent;
@@ -117,7 +120,25 @@ const shell = {
   id: threadId,
   archivedAt: null,
   interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+  modelSelection: { instanceId: ProviderInstanceId.make("claudeAgent"), model: "opus" },
 } as unknown as OrchestrationThreadShell;
+
+/** A thread on an instance that routes through a proxy (#1088). */
+const proxiedThreadId = ThreadId.make("thread-proxied");
+const proxiedShell = {
+  ...shell,
+  modelSelection: { instanceId: ProviderInstanceId.make("claudeAgent_router"), model: "cc/opus" },
+} as unknown as OrchestrationThreadShell;
+const providerInstances: ProviderInstanceConfigMap = {
+  [ProviderInstanceId.make("claudeAgent")]: { driver: claude },
+  [ProviderInstanceId.make("claudeAgent_router")]: {
+    driver: claude,
+    displayName: "Router",
+    environment: [
+      { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:20128", sensitive: false },
+    ],
+  },
+};
 
 const session = {
   threadId,
@@ -148,7 +169,10 @@ interface Harness {
 }
 
 /** Fork (#616): the gate a resume passes through; passthrough by default. */
-const makeHarnessWith = (gate?: TurnStartGateShape) =>
+const makeHarnessWith = (
+  gate?: TurnStartGateShape,
+  threadShell: OrchestrationThreadShell = shell,
+) =>
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
     const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
@@ -185,7 +209,9 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
               ),
           }),
           Layer.mock(ProjectionSnapshotQuery)({
-            getThreadShellById: () => Effect.succeed(Option.some(shell)),
+            // The harness's thread, or the second, proxied one (#1088).
+            getThreadShellById: (id) =>
+              Effect.succeed(Option.some(id === threadId ? threadShell : { ...proxiedShell, id })),
             getThreadRuntimeContext: () =>
               Effect.succeed(
                 Option.some({ id: threadId, projectId: shell.projectId, title: "Thread", session }),
@@ -195,6 +221,7 @@ const makeHarnessWith = (gate?: TurnStartGateShape) =>
             getSettings: Ref.get(enabled).pipe(
               Effect.map((value) => ({
                 ...DEFAULT_SERVER_SETTINGS,
+                providerInstances,
                 infinitusResumeOnLimit: value,
               })),
             ),
@@ -368,13 +395,38 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.emit(
           runtimeEvent("turn.completed", {
             state: "failed",
-            errorMessage: "Claude stopped: a usage limit blocked the request.",
+            usageLimited: true,
+            errorMessage:
+              "Claude usage limit reached. Send the message again once the limit resets.",
           }),
         );
         yield* settle(h.watchers, (n) => n === 1);
         yield* h.poll(swapped(at(150)));
         yield* settle(h.turns, (list) => list.length === 1);
         expect(yield* h.interrupts).toEqual([]);
+      }),
+    ),
+  );
+
+  // A context-window failure is not a usage limit: nothing is recorded, so the
+  // thread never reads "Limit hit" and no resume is armed for it.
+  effectIt.effect("a turn that failed on the context window records no stop", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(
+          runtimeEvent("turn.completed", {
+            state: "failed",
+            errorMessage: "Claude stopped: the prompt exceeds the model's context window.",
+          }),
+        );
+        yield* Effect.yieldNow;
+        expect(yield* h.watchers).toBe(0);
+        yield* h.poll(swapped(at(150)));
+        yield* Effect.yieldNow;
+        expect(yield* h.turns).toEqual([]);
+        expect(yield* h.dispatched).toEqual([]);
       }),
     ),
   );
@@ -481,5 +533,80 @@ describe("InfinitusResumeOnLimitLive", () => {
         expect(afterResume[3]).toEqual([]);
       }),
     ),
+  );
+  effectIt.effect(
+    "a proxied instance's limit names the instance, polls nothing and never resumes (#1088)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarnessWith(undefined, proxiedShell);
+          yield* TestClock.adjust(Duration.seconds(100));
+          yield* h.emit(
+            runtimeEvent("turn.completed", {
+              state: "failed",
+              usageLimited: true,
+              errorMessage:
+                "Claude usage limit reached. Send the message again once the limit resets.",
+            }),
+          );
+          const dispatched = yield* settle(h.dispatched, (list) => list.length === 1);
+          const limited = dispatched[0]!;
+          if (limited.type !== "thread.activity.append") throw new Error("limited row expected");
+          expect(limited.activity.summary).toBe("Limit hit on the proxy instance Router");
+          expect(limited.activity.payload).toMatchObject({ accounts: [], proxy: "Router" });
+          const stopped = yield* Stream.runHead(h.stopped);
+          expect(Option.getOrUndefined(stopped)?.map((entry) => entry.summary)).toEqual([
+            "Limit hit on the proxy instance Router",
+          ]);
+          // Nothing on this Mac can lift a proxy's limit: no snapshot watch, no resume.
+          yield* Effect.yieldNow;
+          expect(yield* h.watchers).toBe(0);
+          yield* h.setCurrent(swapped(at(150)));
+          yield* h.poll(swapped(at(150)));
+          yield* Effect.yieldNow;
+          expect(yield* h.turns).toEqual([]);
+          expect(yield* h.interrupts).toEqual([]);
+          expect((yield* h.dispatched).length).toBe(1);
+        }),
+      ),
+  );
+
+  effectIt.effect(
+    "a lingering proxy stop keeps no poll alive once a swapd stop resumed (#1088)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarness;
+          yield* TestClock.adjust(Duration.seconds(100));
+          yield* h.emit(
+            runtimeEvent(
+              "turn.completed",
+              {
+                state: "failed",
+                usageLimited: true,
+                errorMessage:
+                  "Claude usage limit reached. Send the message again once the limit resets.",
+              },
+              TurnId.make("turn-proxied"),
+              proxiedThreadId,
+            ),
+          );
+          yield* settle(h.dispatched, (list) => list.length === 1);
+          expect(yield* h.watchers).toBe(0);
+          yield* h.emit(parkedWarning());
+          yield* settle(h.watchers, (n) => n === 1);
+
+          yield* h.poll(swapped(at(150)));
+          const turns = yield* settle(h.turns, (list) => list.length === 1);
+          expect(turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+          // The swapd stop is gone; the proxy's stays listed and nothing polls for it.
+          yield* settle(h.watchers, (n) => n === 0);
+          expect(yield* h.watchers).toBe(0);
+          const stopped = yield* Stream.runHead(h.stopped);
+          expect(Option.getOrUndefined(stopped)?.map((entry) => entry.threadId)).toEqual([
+            proxiedThreadId,
+          ]);
+        }),
+      ),
   );
 });

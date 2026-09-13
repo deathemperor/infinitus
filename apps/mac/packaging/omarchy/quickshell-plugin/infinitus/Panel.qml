@@ -42,8 +42,8 @@ Panel {
   }
 
   // All-limited state: the payload names the first account to recover
-  // (raw ISO instant) and the limit-stopped sessions waiting to resume;
-  // the countdown ticks HERE (a subprocess per second is a non-starter).
+  // (raw ISO instant); the countdown ticks HERE (a subprocess per
+  // second is a non-starter).
   readonly property var recovery: fleet && fleet.nextRecovery ? fleet.nextRecovery : null
   property double nowTick: Date.now()
 
@@ -68,11 +68,7 @@ Panel {
     var name = "#" + recovery.number
     for (var i = 0; i < accounts.length; i++)
       if (accounts[i].number === recovery.number) { name = accounts[i].name; break }
-    var line = "All accounts limited — " + name + " recovers in " + countdown(recovery.at)
-    if (recovery.waiting > 0)
-      line += " · " + recovery.waiting
-            + (recovery.waiting === 1 ? " session" : " sessions") + " waiting to resume"
-    return line
+    return "All accounts limited — " + name + " recovers in " + countdown(recovery.at)
   }
 
   // Guarded so the widget renders before the bar is injected.
@@ -294,8 +290,8 @@ Panel {
               font.pixelSize: Style.font.caption
             }
 
-            // All-limited banner: first reviver + live countdown +
-            // sessions waiting to resume (matches the macOS popup).
+            // All-limited banner: first reviver + live countdown
+            // (matches the macOS popup).
             Text {
               textFormat: Text.PlainText
               visible: root.recovery !== null

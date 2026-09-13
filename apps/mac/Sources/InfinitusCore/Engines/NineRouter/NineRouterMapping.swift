@@ -30,12 +30,35 @@ public struct NineRouterConnection: Decodable, Sendable {
     public let lastError: LastError?
     public let updatedAt: String?
 
+    /// 9Router 0.5.x writes this as a plain string (`"[400]: {…}"`, with the
+    /// code repeated in a sibling `errorCode`); older builds wrote an object.
+    /// Both decode — a type mismatch here used to fail the WHOLE list, so one
+    /// account with an error froze the whole fleet on its last good rows (#1095).
     public struct LastError: Decodable, Sendable {
         public let status: Int?
         public let message: String?
         public init(status: Int?, message: String?) {
             self.status = status
             self.message = message
+        }
+
+        private enum CodingKeys: String, CodingKey { case status, message }
+
+        public init(from decoder: Decoder) throws {
+            if let text = try? decoder.singleValueContainer().decode(String.self) {
+                status = LastError.leadingStatus(text)
+                message = text
+            } else {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                status = try c.decodeIfPresent(Int.self, forKey: .status)
+                message = try c.decodeIfPresent(String.self, forKey: .message)
+            }
+        }
+
+        /// `"[400]: …"` → 400.
+        static func leadingStatus(_ text: String) -> Int? {
+            guard text.hasPrefix("["), let close = text.firstIndex(of: "]") else { return nil }
+            return Int(text[text.index(after: text.startIndex)..<close])
         }
     }
 
@@ -58,6 +81,31 @@ public struct NineRouterConnection: Decodable, Sendable {
 
 public struct NineRouterConnectionList: Decodable, Sendable {
     public let connections: [NineRouterConnection]
+
+    public init(connections: [NineRouterConnection]) { self.connections = connections }
+
+    /// A row the app cannot read is dropped, never the list: one connection
+    /// whose fields took a shape a newer 9Router writes must not freeze the
+    /// popup (#1095).
+    public init(from decoder: Decoder) throws {
+        enum CodingKeys: String, CodingKey { case connections }
+        var array = try decoder.container(keyedBy: CodingKeys.self)
+            .nestedUnkeyedContainer(forKey: .connections)
+        var rows: [NineRouterConnection] = []
+        while !array.isAtEnd {
+            // A failed element decode leaves the cursor put, so step over it
+            // with a shape that always succeeds.
+            let before = array.currentIndex
+            if let row = try? array.decode(NineRouterConnection.self) {
+                rows.append(row)
+            }
+            if array.currentIndex == before { _ = try? array.decode(Skip.self) }
+        }
+        connections = rows
+    }
+
+    /// Consumes one element whatever its shape.
+    private struct Skip: Decodable { init(from decoder: Decoder) throws {} }
 }
 
 /// `GET /api/usage/{id}` for any connection.

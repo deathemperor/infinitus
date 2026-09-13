@@ -107,6 +107,44 @@ const utilizationReply = {
     ],
     windows: ["5h", "7d"],
     emails: ["alpha@example.com", "beta@example.com"],
+    generations: [
+      {
+        email: "alpha@example.com",
+        window: "7d",
+        resetAt: now - 86_400,
+        finalPct: 64,
+        observationGap: 9 * 3600,
+      },
+      { email: "beta@example.com", window: "Fable", resetAt: now - 2 * 86_400, finalPct: 91 },
+    ],
+    fiveHourWindows: [
+      {
+        email: "alpha@example.com",
+        number: 1,
+        start: now - 21_600,
+        resetsAt: now - 3600,
+        peakPct: 74,
+        samples: 32,
+        closed: true,
+      },
+      {
+        email: "beta@example.com",
+        number: 2,
+        start: now - 7200,
+        resetsAt: now + 10_800,
+        peakPct: 18,
+        samples: 9,
+        closed: false,
+      },
+    ],
+    replay: {
+      from: now - 7 * 86_400,
+      to: now,
+      switches: 4,
+      coldSwitches: 1,
+      stalledSeconds: 1800,
+      sawActiveFlag: true,
+    },
     rates: {
       computedAt: now,
       lastHour: {
@@ -229,6 +267,33 @@ describe("UtilizationPage", () => {
     expect(markup).toContain("24 hours");
   });
 
+  it("draws the five-hour windows, the replay and the weekly waste beside the chart", () => {
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    expect(markup).toContain("Five-hour windows");
+    expect(markup).toContain("2 windows");
+    expect(markup).toContain("mean peak 46%");
+    expect(markup).toContain("Still ticking");
+    expect(markup).toContain("32 polls");
+    expect(markup).toContain(
+      "Over this range: 4 account switches, 1 onto a cold 5h clock, 30 min stalled at the 5h limit.",
+    );
+
+    expect(markup).toContain("Weekly waste");
+    expect(markup).toContain("36% unused");
+    expect(markup).toContain("9% unused");
+    expect(markup).toContain("Last seen hours before");
+  });
+
+  it("leaves out the window telemetry a build sends none of", () => {
+    const { generations: _g, fiveHourWindows: _w, replay: _r, ...bare } = utilizationReply.result;
+    testState.utilization = { result: bare };
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain("History");
+    expect(markup).not.toContain("Five-hour windows");
+    expect(markup).not.toContain("Weekly waste");
+  });
+
   it("waits for the scan, and says what a build without the verb is missing", () => {
     testState.utilization = { result: { days: 7, samples: [] } };
     let markup = renderToStaticMarkup(<UtilizationPage />);
@@ -276,6 +341,19 @@ describe("UtilizationPage", () => {
 
     testState.capability = undefined;
     expect(renderToStaticMarkup(<UtilizationPage />)).toContain("no Infinitus adapter");
+  });
+
+  it("tells the two ends of a 24-hour chart apart", () => {
+    testState.utilization = { result: { ...utilizationReply.result, days: 1 } };
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    const to = new Date(Math.max(now - 3600, Math.floor(Date.now() / 1000)) * 1000);
+    const from = new Date(to.getTime() - 86_400_000);
+    const label = (date: Date) =>
+      date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    expect(label(from)).not.toBe(label(to));
+    expect(markup).toContain(label(from));
+    expect(markup).toContain(label(to));
   });
 
   it("shows the offline state from the snapshot", () => {

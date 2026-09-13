@@ -18,17 +18,34 @@ export interface ActivityRow {
   readonly text: string;
 }
 
-/** The durable log's vocabulary, as short chips; `other` shows none. */
+/**
+ * The durable log's vocabulary, as short chips; `other` shows none.
+ *
+ * The Mac's own list is `AppModel.logEvent`'s doc comment plus the engine
+ * kinds `AppModel.eventKind` folds in. Two of them are near-twins and are
+ * worded here the way Stats words its tiles, so a row says which it is:
+ * `death` is one account hitting its limit ("Accounts hit a limit"),
+ * `limit` is the fleet with nothing left ("Minutes lost, all out").
+ *
+ * `events.jsonl` keeps months of history, so kinds whose subsystem the Mac
+ * has since deleted — `team` / `team-control` (#1061), `hook` (#1064),
+ * `nudge` (#1079) — keep their chips: those rows are still in the log the
+ * page reads, and dropping the label would only strip them of their label,
+ * not of the row.
+ */
 export const ACTIVITY_KIND_LABELS: Readonly<Record<string, string>> = {
   switch: "switch",
-  limit: "limit",
+  death: "limit",
+  limit: "all out",
   revival: "revival",
+  ignite: "ignite",
   resume: "resume",
+  pairing: "pairing",
+  desktop: "desktop",
   nudge: "nudge",
   team: "team",
   "team-control": "team",
   hook: "hook",
-  pairing: "pairing",
 };
 
 /** The engine poller's two lines a minute — `poll` and `no switch — <reason>`

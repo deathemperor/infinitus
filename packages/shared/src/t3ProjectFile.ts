@@ -6,7 +6,7 @@ import { T3ProjectFile, T3_PROJECT_FILE_SCHEMA_URL } from "@t3tools/contracts";
 import { fromLenientJson } from "./schemaJson.ts";
 
 /**
- * Codec between the raw `t3.json` file contents (lenient JSONC string) and the
+ * Codec between the raw project file contents (lenient JSONC string) and the
  * decoded {@link T3ProjectFile}.
  */
 export const T3ProjectFileFromJson = fromLenientJson(T3ProjectFile);
@@ -14,7 +14,7 @@ export const T3ProjectFileFromJson = fromLenientJson(T3ProjectFile);
 const decodeT3ProjectFile = Schema.decodeExit(T3ProjectFileFromJson);
 
 /**
- * Decode raw `t3.json` contents, treating invalid or malformed files as
+ * Decode raw project file contents, treating invalid or malformed files as
  * absent. Clients use this to read optional defaults (scripts, thread env
  * mode) without surfacing decode errors to the user.
  */
@@ -24,10 +24,12 @@ export function parseT3ProjectFile(contents: string): T3ProjectFile | null {
 }
 
 /**
- * Build the publishable JSON Schema document for `t3.json` (draft 2020-12).
+ * Build the publishable JSON Schema document for the project file
+ * (draft 2020-12).
  *
- * Served from the marketing site at {@link T3_PROJECT_FILE_SCHEMA_URL} so
- * editors get LSP support via a `$schema` reference.
+ * Served at {@link T3_PROJECT_FILE_SCHEMA_URL} so editors get LSP support via
+ * a `$schema` reference; `scripts/build-project-file-schema.ts` writes it into
+ * the site's assets.
  */
 export function buildT3ProjectFileJsonSchema(): Record<string, unknown> {
   const document = Schema.toJsonSchemaDocument(T3ProjectFile);

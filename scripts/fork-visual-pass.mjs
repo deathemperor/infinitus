@@ -157,23 +157,102 @@ await send("Emulation.setDeviceMetricsOverride", {
   mobile: false,
 });
 
-const pageText = async () =>
-  ((await evaluate("document.body.innerText")) ?? "").replace(/\s+/g, " ");
+/**
+ * What the page shows, fields included. `innerText` leaves out every form
+ * control's value, so a port rendered as "3,773", a stale hostname or an empty
+ * required field reached no check and the route still passed — yet the values
+ * are what these pages exist to show. Each field contributes `[label: value]`
+ * where it sits, so a marker or a forbidden phrase can name one.
+ *
+ * Only fields carrying a real accessible name are taken: base-ui puts a hidden
+ * twin behind every switch and number field, and those have none, so this
+ * skips them and reads the named widget the user actually sees — one entry per
+ * control, keyed by a name a route table can be written against rather than a
+ * generated id. Password values never travel.
+ */
+const FIELD_VALUES = `(() => {
+  const nameOf = (el) => {
+    const aria = el.getAttribute("aria-label");
+    if (aria && aria.trim()) return aria.trim();
+    const labelledBy = el.getAttribute("aria-labelledby");
+    if (labelledBy) {
+      const text = labelledBy
+        .split(/\\s+/)
+        .map((id) => document.getElementById(id)?.innerText ?? "")
+        .join(" ")
+        .trim();
+      if (text) return text;
+    }
+    const label = el.labels?.[0]?.innerText?.trim();
+    return label || "";
+  };
+  // base-ui's switch is a span with no aria-checked: its state is the
+  // data-checked / data-unchecked attribute its styles key off.
+  const checkedOf = (el) => {
+    const aria = el.getAttribute("aria-checked");
+    if (aria !== null) return aria === "true" ? "on" : aria === "false" ? "off" : aria;
+    if (el.hasAttribute("data-checked")) return "on";
+    if (el.hasAttribute("data-unchecked")) return "off";
+    return el.checked ? "on" : "off";
+  };
+  const valueOf = (el) => {
+    const role = el.getAttribute("role");
+    if (role === "switch" || role === "checkbox" || el.type === "checkbox" || el.type === "radio") {
+      return checkedOf(el);
+    }
+    if (el.tagName === "SELECT") return el.selectedOptions?.[0]?.text?.trim() ?? el.value;
+    if (el.type === "password") return el.value ? "(set)" : "(empty)";
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return el.value;
+    return el.innerText?.trim() ?? "";
+  };
+  const fields = document.querySelectorAll(
+    "input, select, textarea, [role=switch], [role=checkbox], [role=combobox]",
+  );
+  for (const el of fields) {
+    if (el.type === "hidden") continue;
+    const name = nameOf(el);
+    // No accessible name: a base-ui hidden twin, or a control no check can
+    // name anyway. The visible widget beside it carries the same state.
+    if (!name) continue;
+    const marker = document.createElement("span");
+    marker.dataset.forkVisualField = "1";
+    marker.textContent = " [" + name + ": " + valueOf(el) + "] ";
+    el.insertAdjacentElement("afterend", marker);
+  }
+  const text = document.body.innerText;
+  for (const marker of document.querySelectorAll("[data-fork-visual-field]")) marker.remove();
+  return text;
+})()`;
 
-/** Until the app tree is mounted; reloads on the stalled connection gate. */
-const waitForApp = async (label) => {
+const pageText = async () => ((await evaluate(FIELD_VALUES)) ?? "").replace(/\s+/g, " ");
+
+/**
+ * Until the app tree is mounted on `expectPath`; reloads on the stalled
+ * connection gate. The path is half the wait on purpose: the page still on
+ * screen shows the same `APP_MOUNTED` markers the next one will, so mount
+ * alone is satisfied by a navigation that has not committed yet — and a run
+ * slow enough for that to repeat drifts whole routes behind, writing each
+ * capture under an earlier route's name. Pass no path for a navigation that
+ * lands somewhere of its own (pairing redirects to the app root).
+ */
+const waitForApp = async (label, expectPath) => {
   const deadline = Date.now() + options.mountTimeoutMs;
+  let path = null;
   while (Date.now() < deadline) {
     const text = await pageText();
+    path = await evaluate("location.pathname");
     if (text.includes(STALLED_GATE)) {
       await evaluate("location.reload()");
       await sleep(4000);
       continue;
     }
-    if (APP_MOUNTED.some((marker) => text.includes(marker))) return text;
+    const onRoute = expectPath === undefined || path === expectPath;
+    if (onRoute && APP_MOUNTED.some((marker) => text.includes(marker))) return text;
     await sleep(1500);
   }
-  console.warn(`${label}: app not mounted after ${options.mountTimeoutMs} ms (boot shell?)`);
+  console.warn(
+    `${label}: not mounted at ${expectPath ?? "any path"} after ${options.mountTimeoutMs} ms (on ${path}; boot shell?)`,
+  );
   return await pageText();
 };
 
@@ -216,13 +295,21 @@ for (let i = 0; i < 10 && WIZARD_HEADING.test(await pageText()); i++) {
 }
 console.log("after wizard:", (await pageText()).slice(0, 160));
 
+let mismatched = 0;
 for (const route of options.routes) {
   await send("Page.navigate", { url: `${options.baseUrl}${route}` });
-  await waitForApp(route);
+  await waitForApp(route, route);
   await sleep(options.settleMs);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   const name = route.replace(/^\//, "").replace(/\//g, "-") || "home";
   const text = await pageText();
+  // Settling can outlive a redirect, so the shot is proved against the path it
+  // was actually taken on, not the one the wait ended at.
+  const shotPath = await evaluate("location.pathname");
+  if (shotPath !== route) {
+    mismatched++;
+    console.error(`${route}: captured ${shotPath} instead — text-${name}.txt is not this route`);
+  }
   NodeFS.writeFileSync(
     NodePath.join(options.out, `shot-${name}.png`),
     Buffer.from(shot.result.data, "base64"),
@@ -233,4 +320,6 @@ for (const route of options.routes) {
 
 ws.close();
 await shutdown();
-process.exit(0);
+// A capture written under the wrong route's name would let the check pass on a
+// page it never opened, so the run fails rather than leaving that for the eye.
+process.exit(mismatched === 0 ? 0 : 1);

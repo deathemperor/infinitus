@@ -5,6 +5,7 @@ import {
   applyGitStatusStreamEvent,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
+  LEGACY_WORKTREE_BRANCH_PREFIX,
   normalizeGitRemoteUrl,
   parseGitHubRepositoryNameWithOwnerFromRemoteUrl,
   parseOriginUrlFromGitConfig,
@@ -154,6 +155,21 @@ describe("isTemporaryWorktreeBranch", () => {
     expect(buildTemporaryWorktreeBranchName(() => "f4ae4e0e-f971-4d48-b4f2-9cf0aa54ab12")).toBe(
       `${WORKTREE_BRANCH_PREFIX}/f4ae4e0e`,
     );
+  });
+
+  it("still recognises upstream's t3code/ temporary branches from before the rename", () => {
+    expect(isTemporaryWorktreeBranch(`${LEGACY_WORKTREE_BRANCH_PREFIX}/deadbeef`)).toBe(true);
+    expect(
+      isTemporaryWorktreeBranch(
+        `${LEGACY_WORKTREE_BRANCH_PREFIX}/f4ae4e0e-f971-4d48-b4f2-9cf0aa54ab12`,
+      ),
+    ).toBe(true);
+    expect(isTemporaryWorktreeBranch("other/deadbeef")).toBe(false);
+  });
+
+  it("mints infinitus/ branches", () => {
+    expect(WORKTREE_BRANCH_PREFIX).toBe("infinitus");
+    expect(buildTemporaryWorktreeBranchName(() => "deadbeef")).toBe("infinitus/deadbeef");
   });
 
   it("matches legacy UUID-shaped temporary worktree refs from older mobile builds", () => {
