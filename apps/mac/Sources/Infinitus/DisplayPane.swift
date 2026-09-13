@@ -20,7 +20,6 @@ struct DisplayPane: View {
         Form {
             menuBarSection
             popupSection
-            sessionsSection
             startupSection
         }
         .formStyle(.grouped)
@@ -162,20 +161,6 @@ struct DisplayPane: View {
                  + "when.")
         }
         .settingsAnchor("Display/Popup")
-    }
-
-    // MARK: sessions
-
-    @ViewBuilder private var sessionsSection: some View {
-        Section {
-            // The phone's picker with its live previews (#151): one row
-            // per style, drawn in the current theme.
-            ChatHeaderPicker(selection: $model.chatHeader, theme: model.rowTheme)
-        } header: {
-            Text("Sessions")
-        } footer: {
-        }
-        .settingsAnchor("Display/Sessions")
     }
 
     // MARK: startup

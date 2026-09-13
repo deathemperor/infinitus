@@ -101,7 +101,6 @@ public enum PrefCatalog {
         Entry("compact_rows", .bool, .bool(false), display),
         Entry("footer_actions_hidden", .bool, .bool(false), display),
         Entry("glass_focused", .double, .number(0.7), display),
-        Entry("chat_header", .string, .string("compact"), display, choices: strings(["compact", "strip", "hud"])),
         // Themes: any theme id, built-in or custom.
         Entry("gamification_style", .string, .string("off"), themes),
 

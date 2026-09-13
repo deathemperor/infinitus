@@ -567,15 +567,6 @@
         "value": 0.7
       },
       {
-        "choices": ["compact", "strip", "hud"],
-        "default": "compact",
-        "effect": "live",
-        "key": "chat_header",
-        "section": "display",
-        "type": "string",
-        "value": "compact"
-      },
-      {
         "choices": [
           {
             "id": "off",

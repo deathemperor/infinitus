@@ -1511,7 +1511,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `EMPTY_LIVE_TOKEN_RATE` (no turns, so no line) rather than failing a
   cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
   Utilization page's own cadence, and `infinitusUtilization.ts`'s
-  `liveRateText(u, server?)` — the line reads "Live: ≈ N output tokens/min …
+  `liveRateText` — the line reads "Live: ≈ N output tokens/min …
   across N turns on this server" (the #834 "≈" rule: a five-minute
   extrapolation is an estimate; the Mac's own line is left as it is, being
   transitional). The server's rate wins whenever it has turns
@@ -1800,8 +1800,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   ids (comma-separated, parsed by `parseAllowedUserIds`); `slackStatusLine`
   says what is still missing before the bridge is live.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
-  resume-on-limit for the threads this server runs (#648), the fork's
-  counterpart to native's terminal nudge: the Claude adapter's parked-turn
+  resume-on-limit for the threads this server runs (#648), and since the
+  sessions sweep (#1041) the only one left — the Mac's terminal nudge went
+  with the sessions it typed into: the Claude adapter's parked-turn
   warning (`rate_limit_info.status: "rejected"`) or a limit-failed
   `turn.completed` records a stop; while any thread is stopped the layer
   subscribes to the snapshot and waits for an active Claude account that
@@ -2198,12 +2199,14 @@ agent-activity` (the session cards' kinds retired with #1041).
   match the catalog exactly.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
-  shows (a pref row label, the fixture's team or profile name, "Re-lock",
+  shows (a pref row's label or its value, "Thread priority", "Re-lock",
   "Session lengths"…) and the empty-state phrases that must not appear
   (`ALWAYS_ABSENT`: "not answering", "T3 Code" (#823: the upstream name never
-  reaches a screen), "Still connecting", "This Infinitus build has no", "could
-  not be read"; per route "No projection yet", "Reading the team"…). The test pins the route list, checks no marker is a substring of a
-  nav label or card title (those print on a dead page too), and mirrors the
+  reaches a screen), "Fork " (a Mac pref key with no web copy humanises to
+  "Fork …"), "Still connecting", "This Infinitus build has no", "could
+  not be read"; per route "No projection yet", "no engine reports
+  accounts"…). The test pins the route list, checks no marker is a substring
+  of a nav label or card title (those print on a dead page too), and mirrors the
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
