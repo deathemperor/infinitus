@@ -251,7 +251,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
-  (#648). `InfinitusSlackLive` (provided `SlackClientLive` over
+  (#648). `InfinitusSignInLapseLive` beside it, with its own control
+  client (#1076). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
@@ -1701,6 +1702,29 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   path. A standalone helper is left alone whatever its version; one that
   reports no `bundlePath` only has its skew logged
   (`infinitus.companion.skew-unarmed`).
+- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+
+  `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins for
+  the threads this server runs (#1076), the fork's counterpart to the Mac's
+  transcript scan (retired with the terminal-session features, #1041). Every
+  tool result the Claude driver relays (`item.updated`, the raw `tool_result`
+  block under `payload.data.result`) is read for the CLIs' expired-credentials
+  signatures — the Mac's marker and line-start tables (`AwsLogin.swift`,
+  `GcloudLogin.swift`) ported verbatim: a marker anywhere plus one opening a
+  line at column 0, so the same words quoted from a file or a grep hit never
+  match; only the last 16 KiB is scanned. The profile is the error's own
+  `--profile` when it prints one, else the Bash command's `--profile` /
+  `AWS_PROFILE` (`--account` / `CLOUDSDK_CORE_ACCOUNT` for gcloud), else
+  `default`; gcloud's Application Default Credentials are the
+  `application-default` account. A hit leaves one `infinitus.signin.needed`
+  work-log row ("AWS sign-in needed on <profile>") and, on an app whose
+  manifest lists the verb, starts the Mac's `aws-login <profile>` /
+  `gcloud-login <account>` flow over the control client (no `--pid`: a thread
+  has no session pid; the Mac runs its default flow and the login shows in
+  the Sign-ins lists like one started by hand). Once per thread per provider
+  per hour; one sequential worker off the event stream, so the turn is never
+  waited on; an unreachable Mac or a refused verb is logged and the row
+  stays. The result text and the command reach no log, span or payload —
+  only the thread id, the provider and the profile.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is

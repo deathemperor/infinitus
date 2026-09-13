@@ -1,0 +1,165 @@
+import {
+  CommandId,
+  EventId,
+  type ProviderRuntimeEvent,
+  type ThreadId,
+  type TurnId,
+} from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
+import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+
+import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
+import { ProviderService } from "../../provider/Services/ProviderService.ts";
+import { forkParked } from "../../serverActivation.ts";
+import { InfinitusService } from "../Services/Infinitus.ts";
+import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
+import {
+  manifestHasVerb,
+  SIGN_IN_DEBOUNCE_MS,
+  SIGN_IN_MARKER_KIND,
+  signInLapseFromEvent,
+  signInMarkerSummary,
+  signInVerb,
+  type SignInLapse,
+} from "./infinitusSignInLapse.logic.ts";
+
+/** Debounce entries kept; far more threads than a server runs, bounded so
+    the map cannot grow for the process lifetime. */
+const SEEN_LIMIT = 500;
+
+/**
+ * Lapsed AWS / gcloud sign-ins for the threads this server runs (#1076),
+ * the fork's counterpart to the Mac's transcript scan (retired with the
+ * terminal-session features, #1041). Every tool result the Claude driver
+ * relays (`item.updated` with the raw `tool_result` block) is read for the
+ * CLIs' expired-credentials signatures; a hit leaves one
+ * `infinitus.signin.needed` work-log row on the thread ("AWS sign-in needed
+ * on <profile>") and, on an app whose manifest lists the verb, starts the
+ * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow over the
+ * control client — the login then shows in the Sign-ins lists (`aws-logins`)
+ * like one started by hand. Once per thread per provider per hour: a
+ * session that keeps retrying the same call is one need. Everything runs
+ * on one sequential worker off the event stream, so the turn is never
+ * waited on; an unreachable Mac or a refused verb is logged and the row
+ * stays. The result text and the command reach no log, span or payload —
+ * only the thread id, the provider and the profile.
+ */
+export const InfinitusSignInLapseLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const providerService = yield* ProviderService;
+    const orchestrationEngine = yield* OrchestrationEngineService;
+    const infinitus = yield* InfinitusService;
+    const control = yield* InfinitusControlClient;
+    const crypto = yield* Crypto.Crypto;
+    const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
+    const eventId = crypto.randomUUIDv4.pipe(Effect.map(EventId.make));
+    /** `<threadId>\n<provider>` → when the last row was left, epoch ms. */
+    const seen = new Map<string, number>();
+
+    // The snapshot answers the last poll and nobody polls a headless server:
+    // an unpolled placeholder, or an app last seen down, is polled again so
+    // the manifest gate can open.
+    const manifestHas = (verb: string) =>
+      Effect.gen(function* () {
+        let snapshot = yield* infinitus.snapshot;
+        if (!snapshot.available) {
+          yield* infinitus.refresh;
+          snapshot = yield* infinitus.snapshot;
+        }
+        return snapshot.available && manifestHasVerb(snapshot.commands, verb);
+      });
+
+    const mark = (threadId: ThreadId, turnId: TurnId | null, lapse: SignInLapse) =>
+      Effect.gen(function* () {
+        const createdAt = DateTime.formatIso(yield* DateTime.now);
+        yield* orchestrationEngine.dispatch({
+          type: "thread.activity.append",
+          commandId: yield* commandId,
+          threadId,
+          activity: {
+            id: yield* eventId,
+            tone: "info",
+            kind: SIGN_IN_MARKER_KIND,
+            summary: signInMarkerSummary(lapse),
+            payload: { provider: lapse.provider, profile: lapse.profile, turnId },
+            turnId,
+            createdAt,
+          },
+          createdAt,
+        });
+      });
+
+    const login = (threadId: ThreadId, lapse: SignInLapse) => {
+      const verb = signInVerb(lapse.provider);
+      const context = { threadId, provider: lapse.provider };
+      return Effect.gen(function* () {
+        if (!(yield* manifestHas(verb))) {
+          yield* Effect.logDebug("infinitus.signin-lapse.no-verb", context);
+          return;
+        }
+        yield* control.request({ command: verb, args: [lapse.profile] }).pipe(
+          Effect.asVoid,
+          Effect.tap(() => Effect.logInfo("infinitus.signin-lapse.login-started", context)),
+          Effect.catchTags({
+            InfinitusUnavailable: () =>
+              Effect.logDebug("infinitus.signin-lapse.unavailable", context),
+            InfinitusProtocolError: (error) =>
+              Effect.logWarning("infinitus.signin-lapse.refused", {
+                ...context,
+                detail: error.detail,
+              }),
+            InfinitusCommandFailed: (error) =>
+              Effect.logWarning("infinitus.signin-lapse.refused", {
+                ...context,
+                error: error.error,
+              }),
+          }),
+        );
+      });
+    };
+
+    const onEvent = (event: ProviderRuntimeEvent) =>
+      Effect.gen(function* () {
+        const lapse = signInLapseFromEvent(event);
+        if (lapse === null) return;
+        const threadId = event.threadId;
+        const key = `${threadId}\n${lapse.provider}`;
+        const now = DateTime.toEpochMillis(yield* DateTime.now);
+        const last = seen.get(key);
+        if (last !== undefined && now - last < SIGN_IN_DEBOUNCE_MS) return;
+        seen.delete(key);
+        if (seen.size >= SEEN_LIMIT) {
+          const oldest = seen.keys().next().value;
+          if (oldest !== undefined) seen.delete(oldest);
+        }
+        seen.set(key, now);
+        yield* mark(threadId, event.turnId ?? null, lapse);
+        yield* login(threadId, lapse);
+      });
+
+    const worker = yield* makeDrainableWorker((event: ProviderRuntimeEvent) =>
+      onEvent(event).pipe(
+        // One bad event must not end the worker for every later one.
+        Effect.catchCause((cause) =>
+          Effect.logWarning("infinitus.signin-lapse.event-failed", {
+            threadId: event.threadId,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      ),
+    );
+
+    yield* forkParked(
+      providerService.streamEvents.pipe(
+        // Only the relayed tool results; the content stream stays out.
+        Stream.filter((event) => event.type === "item.updated"),
+        Stream.runForEach((event) => worker.enqueue(event)),
+      ),
+    );
+  }),
+);

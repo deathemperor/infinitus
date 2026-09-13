@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- A thread whose AWS or gcloud command fails on expired credentials gets a "sign-in needed" line in its work log and the Mac starts that sign-in, which shows under Sign-ins.
 - Infinitus desktop keeps the computer awake while a thread on it has a turn running; Settings › General › Keep awake turns that off (#1075).
 - Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
 - The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
