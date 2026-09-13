@@ -1023,12 +1023,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   settings, `ThreadNotificationCoordinator`, the `Notification` API and two
   bundled sounds; ruling #1032, which retired the fork's #270 B banners over
   the Electron main process and the #270 H per-window completion sound).
-  The fork layers three things. In `ThreadNotificationCoordinator.tsx` (an
+  The fork layers a few things. In `ThreadNotificationCoordinator.tsx` (an
   upstream file, one registration point): `held` and `failed` threads
   notify like input does (the holds come from the environment's
   `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
   and the thread on screen stays quiet while the window has focus
-  (`quietForViewer`) — upstream posts and rings for it. The Dock badge
+  (`quietForViewer`) — upstream posts and rings for it. Next, #270 B's
+  queue rule: a turn that completes while the thread still has
+  `queuedTurns` neither posts nor rings
+  (`notificationKind`), since the #806 drain sends the next row the moment
+  the turn ends; the completion still counts as seen, so removing the queued
+  row afterwards rings nothing for it, and an approval or question rings
+  queued or not because the drain cannot pass it. The Dock badge
   (`desktopBadgeAttention`, on by default) counts the threads in approval
   or input through the `setBadgeCount` bridge method, the one IPC left
   (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`

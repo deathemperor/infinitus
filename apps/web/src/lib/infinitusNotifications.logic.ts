@@ -5,8 +5,9 @@ import type { SidebarThreadStatus } from "../components/Sidebar.logic";
 /**
  * The fork's half of thread notifications (#1032, on upstream #11481): the
  * two states upstream has no title for, the quiet rule for the thread on
- * screen, the Dock badge's count (#270 B), and the one-time mapping of the
- * old #270 B toggles and #270 H sound onto upstream's `notificationMode`.
+ * screen, the Dock badge's count and the queue rule (#270 B), and the
+ * one-time mapping of the old #270 B toggles and #270 H sound onto
+ * upstream's `notificationMode`.
  */
 const ATTENTION_TITLES: Partial<Record<SidebarThreadStatus, string>> = {
   approval: "Approval needed",
@@ -27,6 +28,37 @@ export function quietForViewer(
   doc: { readonly visibilityState: DocumentVisibilityState; readonly hasFocus: () => boolean },
 ): boolean {
   return viewedKey === key && doc.visibilityState === "visible" && doc.hasFocus();
+}
+
+/** What a thread's notification record looks like between two renders. */
+export interface ThreadNotificationRecord {
+  /** The waiting turn and state, null while nothing waits on the user. */
+  readonly input: string | null;
+  /** The latest completion seen, as epoch ms. */
+  readonly completion: number | null;
+}
+
+/**
+ * What to ring for a thread whose record changed. A new wait on the user
+ * always rings: the queue cannot drain past an approval or a question. A
+ * later completion rings only while nothing is queued (#270 B): the drain
+ * sends the next row the moment the turn ends, so the thread is not done.
+ * The completion still counts as seen, so a queued row the user removes
+ * afterwards rings nothing for it.
+ */
+export function notificationKind(
+  prior: ThreadNotificationRecord,
+  next: ThreadNotificationRecord,
+  queuedCount: number,
+): "input" | "completion" | null {
+  if (next.input !== null && next.input !== prior.input) return "input";
+  if (
+    queuedCount === 0 &&
+    next.completion !== null &&
+    (prior.completion === null || next.completion > prior.completion)
+  )
+    return "completion";
+  return null;
 }
 
 /** The threads waiting on the user: an approval to give or a question to answer. */
