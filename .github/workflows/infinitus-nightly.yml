@@ -13,8 +13,6 @@
 # main, on the schedule or when the dispatch says so.
 name: Infinitus nightly
 on:
-  push:
-    branches: [nightly-track] # TEMPORARY (#1058): the caller's own pre-merge dry run; removed before merge
   schedule:
     - cron: "17 17 * * *" # 17:17 UTC, off the hour like #1034 (00:17 GMT+7)
   workflow_dispatch:
