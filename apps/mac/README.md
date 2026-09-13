@@ -141,7 +141,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back, with the sessions waiting to resume.
 - **Share → Infinitus from any app** — images, files, a link or text into a session on any paired Mac with a note; your sessions sit in the share sheet's suggestions.
 - **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
-- **Live Activities that keep moving** — with an APNs key the lock-screen countdown and working card update with the app closed; one pair per paired Mac; the icon follows the theme.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.

@@ -128,7 +128,6 @@ public enum PrefCatalog {
         Entry("mirror_lan_enabled", .bool, .bool(false), devices),
         Entry("mirror_tunnel_enabled", .bool, .bool(false), devices),
         Entry("mirror_rendezvous_enabled", .bool, .bool(true), devices),
-        Entry("live_activity_rate_seconds", .int, .number(5), devices),
         // Devices: the tunnel fronting the T3 Code fork server's port (#572).
         Entry("fork_tunnel_enabled", .bool, .bool(false), devices),
         Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),

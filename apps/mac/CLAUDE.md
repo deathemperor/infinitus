@@ -139,7 +139,7 @@ before that the `native` branch). Split out of
   account = base URL). Unsigned debug binaries trip an ACL prompt on
   every rebuild — reads skip UI, and the dev loop codesigns the debug
   binary with the Apple Development identity so the grant sticks.
-- A dev instance never pushes Live Activities from the shipped app's
+- A dev instance never pushes alerts from the shipped app's
   APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
   only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
   the pusher stays unconfigured — silently (no last-result line, no

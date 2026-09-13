@@ -346,7 +346,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "The preference catalog with current values: key, type, default, section (slug + name), live/restart effect, choices; `get` narrows it to the named keys.",
                        replyShape: "{sections:[{slug,name}], prefs:[{key,type,default,value,section,effect,choices?,min?,max?}]}"),
         ControlCommand(name: "activities-token", options: ["--body <json>", "--forget <deviceId>/<kind>"], effect: .write,
-                       summary: "Register a phone's push token — the body `POST /activities/token` takes: {kind, token, deviceId, deviceName, environment, themeID?, macId?}. Without --body the CLI reads the JSON from stdin. `--forget <deviceId>/<kind>` withdraws that one registration instead (the phone's alerts switched off); forgotten is false when none was held.",
+                       summary: "Register a phone's alert push token — the body `POST /activities/token` takes: {kind: \"alert\", token, deviceId, deviceName, environment, themeID?, macId?}. Without --body the CLI reads the JSON from stdin. `--forget <deviceId>/<kind>` withdraws that one registration instead (the phone's alerts switched off); forgotten is false when none was held.",
                        replyShape: "{slot} | with --forget {slot, forgotten}"),
         ControlCommand(name: "client-activity", options: ["--body <json>"], effect: .write,
                        summary: "A client's visibility report — the body `POST /client-activity` takes: {clientId, visible, focused, recentlyInteracted, scopes:[{type:sessions|session|fleets|stats, pid?}], ttlMs}. Leases the scopes it watches.",

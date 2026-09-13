@@ -384,7 +384,6 @@ final class AppModel: ObservableObject {
     private let launchExecutableDate = AppModel.executableDate()
     private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
-    private var rateTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
     // Display prefs, persisted to UserDefaults under the same names and
@@ -664,10 +663,6 @@ final class AppModel: ObservableObject {
     @Published var priorityLowPct: Int { didSet { defaults.set(priorityLowPct, forKey: "priority_low_pct"); rejudgeHeadroom() } }
     @Published var priorityAbundantPct: Int { didSet { defaults.set(priorityAbundantPct, forKey: "priority_abundant_pct"); rejudgeHeadroom() } }
     private func rejudgeHeadroom() { for fleet in fleets { fleet.judgeHeadroom() } }
-    /// Settings › Sync "Phone lock screen": how often the working Live
-    /// Activity's tok/min is pushed on its own (user 2026-09-08 "update the
-    /// tok/min every 5s, make it configurable"); 0 = only with other changes.
-    @Published var liveActivityRateSeconds: Int { didSet { defaults.set(liveActivityRateSeconds, forKey: "live_activity_rate_seconds") } }
     /// Settings › Sync "This Mac's name" (#99); empty follows the computer name.
     @Published var machineNameOverride: String {
         didSet {
@@ -876,10 +871,9 @@ final class AppModel: ObservableObject {
     /// Slack thread already).
     func push(_ msg: String, local: Bool = true, slack: Bool = true) {
         if local {
-            notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
+            notify(msg)
         } else {
-            liveActivityPusher.pushAlert(title: "Infinitus", body: msg,
-                                         unlessRevival: PushTriggers.isAllDeadMessage(msg))
+            liveActivityPusher.pushAlert(title: "Infinitus", body: msg)
         }
         awayPush.send(msg, slack: slack)
     }
@@ -1029,12 +1023,9 @@ final class AppModel: ObservableObject {
     }
     static let hookRefreshSpacing: TimeInterval = 30
 
-    /// `phoneUnlessRevival`: a phone showing the all-dead countdown activity
-    /// (or about to get its start alert) already has this news — the Mac
-    /// banner still posts.
-    func notify(_ body: String, phoneUnlessRevival: Bool = false) {
+    func notify(_ body: String) {
         Notifier.post(title: "Infinitus", body: body)
-        liveActivityPusher.pushAlert(title: "Infinitus", body: body, unlessRevival: phoneUnlessRevival)
+        liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
     private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
@@ -1175,7 +1166,6 @@ final class AppModel: ObservableObject {
         priorityMode = Self.priorityMode(defaults)
         priorityLowPct = defaults.object(forKey: "priority_low_pct") as? Int ?? 80
         priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
-        liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
@@ -1374,7 +1364,6 @@ final class AppModel: ObservableObject {
         set(\.priorityMode, Self.priorityMode(defaults))
         set(\.priorityLowPct, defaults.object(forKey: "priority_low_pct") as? Int ?? 80)
         set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
-        set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
         set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
@@ -1826,21 +1815,6 @@ final class AppModel: ObservableObject {
                 // the next tick without restarting the task.
                 let seconds = await MainActor.run { self?.refreshInterval ?? 60 }
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
-            }
-        }
-        // The tok/min line of the phone's working card, on its own beat: the
-        // token rate is fresh within a second of a transcript write, the
-        // fleet refresh above is a minute apart.
-        rateTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let seconds = await MainActor.run { () -> Int in
-                    guard let self else { return 0 }
-                    if self.liveActivityRateSeconds > 0 {
-                        self.liveActivityPusher.pushRate(self.sessionProgress.tokenRate)
-                    }
-                    return self.liveActivityRateSeconds
-                }
-                try? await Task.sleep(for: .seconds(max(seconds, 1)))
             }
         }
     }
@@ -3037,13 +3011,6 @@ final class AppModel: ObservableObject {
             let plan = battlePlan
             let awsLogins = awsLogins
             let progress = sessionProgress.byPid
-            if let primaryFleet = primary.lastFleet {
-                liveActivityPusher.tick(fleet: primaryFleet,
-                                        machine: machineName,
-                                        themes: availableThemes, macTheme: rowTheme,
-                                        report: primary.report,
-                                        tokenRate: sessionProgress.tokenRate)
-            }
             statsModel.refreshIfStale()
             team.refreshIfStale() // inside the !mockMode guard above: the automatic loop is real-instance-only; a mock instance still answers team-* control commands directly
             let stats = statsModel.bundle

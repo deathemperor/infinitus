@@ -74,8 +74,8 @@ final class MirrorSessionFeedBox: @unchecked Sendable {
     }
 }
 
-/// The `POST /activities/token` handler (Live Activity pushes): the
-/// phone's APNs tokens, handed to AppModel's pusher on the main actor.
+/// The `POST /activities/token` handler (alert pushes): the phone's
+/// APNs token, handed to AppModel's pusher on the main actor.
 /// The `/sessions/<pid>/images/<id>` handler (phone thumbnails): the
 /// image bytes and content type, nil for 404. Reads a transcript tail
 /// and scales an image, so the route runs it off the network queue.

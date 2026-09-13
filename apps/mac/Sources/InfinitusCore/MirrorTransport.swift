@@ -117,7 +117,7 @@ public enum MirrorTransport {
     public static let timelineAfterQueryName = "afterSequence"
     public static let timelineEpochQueryName = "epoch"
     /// Query parameter carrying the item limit for the tail route.
-    /// `POST /activities/token` — the phone's Live Activity push tokens
+    /// `POST /activities/token` — the phone's alert push token
     /// (an `ActivityPushRegistration` body; 204 when stored).
     public static let activityTokenPath = "/activities/token"
     /// `POST /crashes`: the phone's MetricKit crash/hang reports.

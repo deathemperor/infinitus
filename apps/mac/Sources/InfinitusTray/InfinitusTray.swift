@@ -352,26 +352,14 @@ struct InfinitusTray {
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
         let selectedSessions = Array(sessionRecords.prefix(6))
-        var progressCache = SessionProgressCache.load()
         var progressByPid: [Int: SessionProgress] = [:]
         let sessions = selectedSessions.map { record -> SessionPanelRow in
-            let stamp = SessionProgressCache.stamp(sessionId: record.sessionId,
-                                                   cwd: record.cwd, claudeDir: claudeDir)
-            let progress: SessionProgress
-            if let entry = progressCache[record.sessionId],
-               entry.size == stamp.size, entry.mtime == stamp.mtime {
-                progress = entry.progress
-            } else {
-                progress = SessionProgress.read(sessionId: record.sessionId,
+            let progress = SessionProgress.read(sessionId: record.sessionId,
                                                 cwd: record.cwd, claudeDir: claudeDir,
                                                 name: record.name)
-                progressCache[record.sessionId] = .init(size: stamp.size, mtime: stamp.mtime,
-                                                        progress: progress)
-            }
             progressByPid[Int(record.pid)] = progress
             return SessionPanelRow.make(record: record, progress: progress, now: now)
         }
-        SessionProgressCache.save(progressCache)
         return (sessions, progressByPid)
     }
 
