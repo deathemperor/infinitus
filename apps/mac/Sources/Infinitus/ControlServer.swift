@@ -720,6 +720,13 @@ final class ControlServer {
             do {
                 if args.first == "set" {
                     guard args.count == 3 else { throw Fail("usage: prefs set <key> <value>") }
+                    // #1137: a fork-server port the app cannot reach is not
+                    // followed — the tunnel and the CLI credential would both
+                    // point at a closed port until the app was relaunched.
+                    if args[1] == "fork_server_port", let port = Int(args[2]),
+                       await !model.acceptsForkServerPublish(port: port) {
+                        throw Fail(ForkServerProbe.refusalReply(port: port))
+                    }
                     let (pref, restarting) = try model.setPref(key: args[1], value: PrefCatalog.parseValue(args[2]))
                     return ControlReply(ok: true, result: try .of(pref), restarting: restarting)
                 }
@@ -814,6 +821,16 @@ final class ControlServer {
                 throw Fail("usage: desktop-credential --origin <http://127.0.0.1:port> [--expiresAt <iso>]  (the token on stdin; empty stdin forgets it)")
             }
             let expiresAt = r.options["expiresAt"].flatMap { $0 == "true" ? nil : $0 }
+            // #1137: the origin carries the same port the publish just set, so
+            // after an accepted `prefs set` this probes nothing. After a
+            // refused one it refuses too, rather than leaving the CLI pointed
+            // at a port the tunnel was kept away from. Forgetting (empty
+            // stdin) is never refused — it takes no target anywhere.
+            if !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let port = URL(string: origin)?.port,
+               await !model.acceptsForkServerPublish(port: port) {
+                throw Fail(ForkServerProbe.refusalReply(port: port))
+            }
             if let why = model.desktopCredential.store(origin: origin, expiresAt: expiresAt, token: token) { throw Fail(why) }
             return ControlReply(ok: true, result: .object([
                 "origin": model.desktopCredential.origin.map(JSONValue.string) ?? .null,
