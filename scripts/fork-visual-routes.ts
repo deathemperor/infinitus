@@ -39,12 +39,6 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   { route: "/settings/infinitus/sessions", label: "Sessions", marker: "Session priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
   {
-    route: "/settings/infinitus/team",
-    label: "Team",
-    marker: "Lighthouse",
-    absent: ["Reading the team", "This Mac is not in a team"],
-  },
-  {
     route: "/settings/infinitus/notifications",
     label: "Notifications",
     marker: "All sessions finish working",

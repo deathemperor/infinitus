@@ -23,7 +23,6 @@ export type SettingsPath =
   | "/settings/infinitus/animations"
   | "/settings/infinitus/sessions"
   | "/settings/infinitus/lock"
-  | "/settings/infinitus/team"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
@@ -99,7 +98,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/infinitus/animations": "Animations",
   "/settings/infinitus/sessions": "Sessions",
   "/settings/infinitus/lock": "Lock",
-  "/settings/infinitus/team": "Team",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
@@ -835,14 +833,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
   },
   {
-    id: "infinitus-team",
-    title: "Infinitus team",
-    to: "/settings/infinitus/team",
-    targetId: "infinitus-team",
-    infinitusOnly: true,
-    searchTerms: ["team join code invite roster members requests leader fetch publish"],
-  },
-  {
     id: "infinitus-push",
     title: "Infinitus notifications",
     to: "/settings/infinitus/notifications",
@@ -906,7 +896,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/infinitus/animations": null,
   "/settings/infinitus/sessions": null,
   "/settings/infinitus/lock": null,
-  "/settings/infinitus/team": null,
   "/settings/infinitus/notifications": null,
   "/settings/infinitus/devices": null,
   "/settings/infinitus/engines": null,

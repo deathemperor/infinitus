@@ -1014,9 +1014,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the ten Infinitus
+- `apps/web/src/components/settings/settingsSearch.ts` — the nine Infinitus
   `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Sessions since #743, Lock and Team since #747 step 3), the `infinitusOnly` search flag with the
+  Sessions since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
@@ -1076,8 +1076,8 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
   the Menu bar page keeps `display` + `about`; a section the build lacks
-  renders "no … settings yet"; Lock is `InfinitusLockPanel` and Team
-  `InfinitusTeamPanel`, #747 step 3) and
+  renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
+  and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
@@ -1085,7 +1085,7 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   added; the upstream sync re-generates it.
 - `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
   item and its `infinitus` capability gate, the footer's
-  `SidebarInfinitusSessions` group and `SidebarAccountsPill`, and `/accounts`
+  `SidebarAccountsPill`, and `/accounts`
   in the `currentFooterPage` selector (so the Back button appears on the page).
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
@@ -1205,14 +1205,11 @@ dispatchNotificationActivated`). Fork-thread events only: the account
 - `apps/web/src/hooks/useInfinitusEventToasts.ts`,
   `apps/web/src/hooks/infinitusEventToasts.logic.ts`,
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events
-  (an account switch, every account exhausted, a session waiting for an
-  answer) as the app's toasts; nothing from the first snapshot, deduped by
-  the server's event id. Every toast has one Open action
-  (`toastAction`): the waiting session's own window (`show session <pid>`,
-  #612) while the manifest's `show` takes a session, otherwise a page of
-  this app — /accounts for a limit or a switch, /activity for a waiting
-  session; `show` is never sent without a session since the pop-out and
-  session windows retired (#670). Mounted once from `apps/web/src/routes/__root.tsx`
+  (an account switch, every account exhausted) as the app's toasts; nothing
+  from the first snapshot, deduped by the server's event id. Every toast has
+  one Open action to /accounts; nothing is sent to the Infinitus socket
+  (the waiting-session toast left with the sessions sweep, #1041). Mounted
+  once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that line and `CaptureGestureCoordinator`'s are the
   fork's only edits there).
 - `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
@@ -1228,33 +1225,6 @@ dispatchNotificationActivated`). Fork-thread events only: the account
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
   carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
-- `apps/web/src/components/settings/infinitus/InfinitusTeamPanel.tsx` (+
-  `team.logic.ts`, route `settings.infinitus.team.tsx`) — Settings › Infinitus
-  › Team (#747 step 3): `team-status` over `infinitus.command` (null = no
-  team) drawn as the team row (name, role, masked remote, last fetch /
-  publish, Fetch now → `team-fetch`, Publish now → `team-publish` then a
-  read), the Members roster, and for a leader the Requests with Approve /
-  Decline (`team-approve` / `team-decline <kid>`). With no team, Join: this
-  Mac's roster name as the manifest's `<your name>` positional (so the
-  `infinitus.secret` args key is literally `"your name"`), the team code or
-  invite link on `secret` — a `type="password"` `autoComplete="off"` field
-  held in memory only, cleared on submit and gone with the page; the Mac's
-  error verbatim and the code never interpolated. The server's four secret
-  refusals get a plain sentence each (`infinitusSecretFailure`). Create a
-  team (no team only): team name, your name and the empty private repo's URL
-  as the manifest's `name` / `--remote` / `--as` (args keys `name`, `remote`,
-  `as`); a write token, when the remote needs one, rides `secret` over
-  `infinitus.secret`, and with the token field empty the same verb goes over
-  `infinitus.command` (an ssh remote, a credential-less one) — no empty
-  secret is ever sent. Hostnames (leaders only): the Cloudflare zone and
-  label member hostnames are minted under as `--zone` / `--label` (args keys
-  `zone`, `label`) with the API token on `secret`, answered `{zone, label,
-configured}` and drawn as the configured row with Forget token, which is
-  `team-hostname --clear` over `infinitus.command` (no stdin) and answers
-  `{zone: null, label: null, configured: false}`; the Mac has no read for the
-  ledger, so the form shows until a save answers. Gated on `team-status`;
-  Join also on `team-join`, Create on `team-create`, Hostnames on
-  `team-hostname`, each with `stdin: "secret"`.
 - `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
   the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
   shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
@@ -1317,12 +1287,9 @@ configured}` and drawn as the configured row with Forget token, which is
   project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
-  unknown project toasts. `join` (`infinitus://join/<code>`, the native
-  app's team join link, the whole link text being the code) offers the
-  code to `pendingTeamJoin.ts` (in memory only, taken once) and opens
-  Settings › Infinitus › Team, whose Join field picks it up
-  (`InfinitusTeamPanel.tsx`); the request leaves only on the user's tap,
-  over `infinitus.secret`. Only the link's kind is ever logged.
+  unknown project toasts.
+  Only the link's kind is ever logged; the native app's `join` / `pair`
+  links are not claimed (Team left with #1041).
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
@@ -1981,34 +1948,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
-
-- `apps/web/src/components/sidebar/SidebarInfinitusSessions.tsx` (+
-  `sidebarInfinitusSessions.logic.ts`) — the footer's collapsible Sessions
-  group: the Claude Code sessions the Mac tracks, the ones needing a person
-  first. Per row, behind manifest checks: `show session <pid>` on click,
-  `nudge <pid>` and the `session-mode` radio in its menu (#612). Its row model
-  is `packages/client-runtime/src/state/infinitusSessions.ts` (exported as
-  `@t3tools/client-runtime/state/infinitusSessions`; account, age from
-  `startedAt`, `needs` chips) so mobile draws the same rows. "Move to a
-  thread" in the row menu (rows with a session id) and "Move idle" beside the
-  header (#648) turn a tracked terminal session into a T3 thread: the cwd
-  becomes a project when it is not one (`projectEnvironment.create` +
-  `waitForProject`), `agentSessionsImport` runs with the row's id in
-  `providerSessionIds`, the thread opens and the row shows a link plus "close
-  the terminal session". Nothing is sent to the Infinitus socket; the
-  terminal session is never killed or typed into. The pure parts
-  (`canMoveSession`, `idleMoveableRows` — idle only, never busy, waiting,
-  shell or unknown — `sessionMoveBatches` per cwd, `movedThreadId`) live in
-  the row-model module. "Answer prompts here" in the row menu (#79 item 3;
-  `session-remote <pid> on|off`, the row's `remote`) routes the session's
-  permission prompts to the sidebar: `usePermissionAsks.ts` reads
-  `permission-pending` every 5 s on its own timer while any row is remote
-  (the Mac's 60 s window outpaces the snapshot's 30 s idle cadence) and
-  `permissionAsks.logic.ts` matches each ask to its row (pid, else session
-  id) and words the card — the tool and the Mac's bounded rendering of the
-  input, never a log — with Allow / Deny over `permission-decide`; no answer
-  in 60 s leaves the terminal's own prompt to run. Behind the manifest
-  listing the three verbs.
 
 - `packages/contracts/src/agentSessions.ts`,
   `apps/server/src/project/AgentSessionScanner.ts`,

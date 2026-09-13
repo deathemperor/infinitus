@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
 import * as DateTime from "effect/DateTime";
@@ -6,7 +6,6 @@ import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const environmentId = EnvironmentId.make("test-environment");
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
@@ -68,8 +67,6 @@ const event = (id: string, icon: string, text: string) => ({
 const switched = (id: string) =>
   event(id, "arrow.triangle.2.circlepath", "switched one@example.com → two@example.com");
 const exhausted = (id: string) => event(id, "battery.0percent", "all exhausted");
-const waiting = (id: string) =>
-  event(id, "hand.raised", "headless session 4243 is waiting for an answer");
 
 const snapshotWith = (events: ReadonlyArray<ReturnType<typeof event>>): InfinitusSnapshot => ({
   available: true,
@@ -177,24 +174,6 @@ describe("InfinitusEventToasts", () => {
     renderer.unmount();
   });
 
-  it("offers Open on a waiting session, which goes to /activity when the host's show takes no session (#670)", async () => {
-    testState.snapshot = snapshotWith([]);
-    const renderer = await mount();
-    await deliver(renderer, snapshotWith([waiting("w1")]));
-    expect(testState.addToast).toHaveBeenCalledTimes(1);
-    const toast = testState.addToast.mock.calls[0]![0] as {
-      type: string;
-      actionProps: { children: string; onClick: () => void };
-    };
-    expect(toast.type).toBe("warning");
-    expect(toast.actionProps.children).toBe("Open");
-
-    toast.actionProps.onClick();
-    expect(testState.navigate).toHaveBeenCalledWith({ to: "/activity" });
-    expect(testState.command).not.toHaveBeenCalled();
-    renderer.unmount();
-  });
-
   it("Open on account news goes to /accounts, never to the host", async () => {
     testState.snapshot = snapshotWith([]);
     const renderer = await mount();
@@ -205,31 +184,6 @@ describe("InfinitusEventToasts", () => {
     toast.actionProps.onClick();
     expect(testState.navigate).toHaveBeenCalledWith({ to: "/accounts" });
     expect(testState.command).not.toHaveBeenCalled();
-    renderer.unmount();
-  });
-
-  it("Open shows the waiting session's own window when the host's show takes a session (#612)", async () => {
-    const showSession = {
-      name: "show",
-      args: [
-        "popout|settings|wall|workspace [sidebar|thread|composer|draft|switcher]|session <pid|name>",
-      ],
-      options: [],
-      effect: "write" as const,
-      summary: "",
-      replyShape: "{shown}",
-    };
-    testState.snapshot = { ...snapshotWith([]), commands: [showSession] };
-    const renderer = await mount();
-    await deliver(renderer, { ...snapshotWith([waiting("w1")]), commands: [showSession] });
-    const toast = testState.addToast.mock.calls[0]![0] as {
-      actionProps: { onClick: () => void };
-    };
-    toast.actionProps.onClick();
-    expect(testState.command).toHaveBeenCalledWith({
-      environmentId,
-      input: { command: "show", args: ["session", "4243"], options: {} },
-    });
     renderer.unmount();
   });
 

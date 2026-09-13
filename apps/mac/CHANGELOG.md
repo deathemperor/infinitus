@@ -7,6 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+- Desktop: terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
+
 ### Phone
 - A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).
 
