@@ -196,7 +196,7 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
     }),
   );
 
-  effectIt.effect("once per thread per provider an hour; another thread is its own need", () =>
+  effectIt.effect("once per thread per profile an hour; another thread is its own need", () =>
     Effect.gen(function* () {
       const h = yield* makeHarness({});
       yield* h.emit(toolResult(one, SSO_EXPIRED));
@@ -215,6 +215,23 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
       yield* h.emit(toolResult(one, SSO_EXPIRED));
       expect((yield* h.rows).length).toBe(4);
       expect((yield* h.logins).length).toBe(4);
+    }),
+  );
+
+  effectIt.effect("a second profile lapsing in the same hour is its own need", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({});
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile papaya"));
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile banyan"));
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile papaya"));
+      expect((yield* h.rows).map((row) => row.summary)).toEqual([
+        "AWS sign-in needed on papaya",
+        "AWS sign-in needed on banyan",
+      ]);
+      expect(yield* h.logins).toEqual([
+        ["aws-login", "papaya"],
+        ["aws-login", "banyan"],
+      ]);
     }),
   );
 

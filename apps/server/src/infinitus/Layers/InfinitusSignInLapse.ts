@@ -42,8 +42,9 @@ const SEEN_LIMIT = 500;
  * on <profile>") and, on an app whose manifest lists the verb, starts the
  * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow over the
  * control client — the login then shows in the Sign-ins lists (`aws-logins`)
- * like one started by hand. Once per thread per provider per hour: a
- * session that keeps retrying the same call is one need. Everything runs
+ * like one started by hand. Once per thread per profile per hour: a
+ * session that keeps retrying the same call is one need, while a second
+ * profile that lapses in the same hour is its own. Everything runs
  * on one sequential worker off the event stream, so the turn is never
  * waited on; an unreachable Mac or a refused verb is logged and the row
  * stays. The result text and the command reach no log, span or payload —
@@ -58,7 +59,10 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
     const crypto = yield* Crypto.Crypto;
     const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
     const eventId = crypto.randomUUIDv4.pipe(Effect.map(EventId.make));
-    /** `<threadId>\n<provider>` → when the last row was left, epoch ms. */
+    /** `<threadId>\n<provider>\n<profile>` → when the last row was left,
+        epoch ms. Keyed by profile, not by provider: one thread reaching two
+        expired AWS profiles needs both logins, and a debounce over the
+        provider would report only the first. */
     const seen = new Map<string, number>();
 
     // The snapshot answers the last poll and nobody polls a headless server:
@@ -128,7 +132,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
         const lapse = signInLapseFromEvent(event);
         if (lapse === null) return;
         const threadId = event.threadId;
-        const key = `${threadId}\n${lapse.provider}`;
+        const key = `${threadId}\n${lapse.provider}\n${lapse.profile}`;
         const now = DateTime.toEpochMillis(yield* DateTime.now);
         const last = seen.get(key);
         if (last !== undefined && now - last < SIGN_IN_DEBOUNCE_MS) return;

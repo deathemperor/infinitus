@@ -22,7 +22,7 @@ export interface SignInLapse {
 /** The work-log row a hit leaves on the thread. */
 export const SIGN_IN_MARKER_KIND = "infinitus.signin.needed";
 
-/** One row and one login per thread per provider inside this window. */
+/** One row and one login per thread per profile inside this window. */
 export const SIGN_IN_DEBOUNCE_MS = 60 * 60 * 1000;
 
 /** Only the tail is scanned: the CLIs print the failure last, and a tool
