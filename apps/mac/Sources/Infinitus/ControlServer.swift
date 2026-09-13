@@ -853,6 +853,19 @@ final class ControlServer {
             if let e = model.engineErrors[CLIProxyEngine.engineID] { out["error"] = .string(e) }
             return ControlReply(ok: true, result: .object(out))
 
+        case "9router":
+            // The proxy's read verb for the other engine. Its error was
+            // reachable only from the Mac's own Settings pane, so a
+            // 9Router that had stopped refreshing could not be diagnosed
+            // from the CLI, the phone or the desktop app at all.
+            var out: [String: JSONValue] = [
+                "baseURL": .string(model.nineRouterBaseURL),
+                "passwordPresent": .bool(model.nineRouterPasswordPresent),
+                "enabled": .bool(model.nineRouterEnabled),
+            ]
+            if let e = model.engineErrors[NineRouterEngine.engineID] { out["error"] = .string(e) }
+            return ControlReply(ok: true, result: .object(out))
+
         case "proxy-key":
             let url = r.options["url"] ?? model.cliproxyBaseURL
             model.saveCLIProxy(baseURL: url, key: r.secret ?? "")
