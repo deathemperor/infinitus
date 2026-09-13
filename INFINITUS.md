@@ -1671,7 +1671,24 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   publish, revocable there (the next CLI request gets 401 until the next
   publish). A refused write revokes the new session again. Withheld exactly
   where the port is (dev runner, isolated socket, worktree `.t3`); the token
-  reaches no log or span. Two HTTP routes for a CLI with no WebSocket, both
+  reaches no log or span. The publish repeats on a 60 s heartbeat (#1137):
+  the keeper reads the app's own catalog and republishes port and credential
+  only when `fork_server_port` names a port that is not ours, so a server
+  that published over this one and died is corrected within a minute instead
+  of leaving the tunnel on a closed port until someone relaunches the app. A
+  read and not a blind write, because every publish re-mints the
+  `infinitusctl` session and doing that on a timer would rotate the CLI's
+  token every minute; an absent pref and a value that is not a port both read
+  as no drift for the same reason. The heartbeat is the only part here that
+  needs no watcher — `observed` starts no poll, so the app-came-back edge
+  never fires on a server nobody is looking at, which is how the stale
+  publish survived. The edge and the heartbeat share one permit: a publish
+  revokes, issues and hands over, so interleaved they could leave the app
+  holding a token the other call revoked and a matching port the heartbeat
+  would never repair. The drift line names the foreign port, so two live
+  publishers fighting over the pref read as the same port coming back every
+  minute. Residual: a stale publisher that used the same port
+  leaves a credential this server cannot tell from its own. Two HTTP routes for a CLI with no WebSocket, both
   behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
   list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
   from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
