@@ -7,6 +7,10 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
+- The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
+
 ### Desktop
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).

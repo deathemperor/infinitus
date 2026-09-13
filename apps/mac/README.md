@@ -68,8 +68,7 @@ one-click rotate — as a Waybar module or Quickshell plugin for
 [Omarchy](https://omarchy.org) and any Waybar desktop
 (see [`packaging/omarchy/`](packaging/omarchy/README.md)).
 The engine is the same `swapd` the Mac app drives (`swapd add`,
-`swapd auto`, `swapd list --json`); `serve`'s pushes post to the same
-Slack webhook / Telegram bot channels, from the env:
+`swapd auto`, `swapd list --json`):
 
 ```sh
 cargo install --git https://github.com/deathemperor/swapd swapd
@@ -116,7 +115,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
-- **Push notifications** — switch and limit events to Slack, Discord, Telegram or a webhook; secrets over stdin, shown masked.
+- **Push notifications** — switch and limit events in Notification Center and on the phone.
 - **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
 - **Sessions by name** — `/rename` names label the rows on the Mac and the phone, with branch, model, kind and output size.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.

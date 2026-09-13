@@ -629,25 +629,10 @@ struct InfinitusTray {
         for msg in pushes { await deliverPush(msg) }
     }
 
-    /// One push, every way this box can deliver it: the away channels
-    /// the Mac posts to as well (#756 — a Slack webhook and/or a
-    /// Telegram bot, from the env, the tray's config channel) and the
-    /// desktop's notify-send. A refused post is one stderr line; the
-    /// next tick's message is not held back by it.
+    /// One push, every way this box can deliver it: the desktop's
+    /// notify-send.
     static func deliverPush(_ msg: String) async {
         logPhoneInput("🔔 \(msg)")
-        for (channel, request) in AwayPushWire.requests(text: msg, env: ProcessInfo.processInfo.environment) {
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if !(200..<300).contains(code) { logPhoneInput("push via \(channel): HTTP \(code)") }
-            } catch {
-                // The code, not the description: a transport error's text
-                // may quote the URL, and Telegram's carries the token.
-                let code = (error as? URLError).map { "URLError \($0.code.rawValue)" } ?? "no reply"
-                logPhoneInput("push via \(channel): \(code)")
-            }
-        }
         if let notifySend = which("notify-send") {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: notifySend)

@@ -866,14 +866,11 @@ final class AppModel: ObservableObject {
     /// Every app notification: Notification Center here, and the same
     /// text to any phone that registered an alert token (issue #3).
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
-    /// phone (#756: the engine's own away-push channels went with cswap;
-    /// swapd's `notify` only reports).
+    /// phone.
     /// `local: false` skips the Mac's own Notification Center notice and
-    /// still reaches the phone and the away channels (#1020: the desktop
+    /// still reaches the phone (#1020: the desktop
     /// shows its own banner for its threads, and two banners per phase
-    /// change kept the bridge off). `slack: false` skips the Slack
-    /// webhook alone (#574: a Slack-started thread reports in its own
-    /// Slack thread already).
+    /// change kept the bridge off).
     func push(_ msg: String, local: Bool = true, slack: Bool = true) {
         if local {
             notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
@@ -881,14 +878,7 @@ final class AppModel: ObservableObject {
             liveActivityPusher.pushAlert(title: "Infinitus", body: msg,
                                          unlessRevival: PushTriggers.isAllDeadMessage(msg))
         }
-        awayPush.send(msg, slack: slack)
     }
-    /// The Mac's own Slack/Telegram channels (#756); wired to the log in init.
-    lazy var awayPush: AwayPush = {
-        let push = AwayPush(defaults: defaults)
-        push.log = { [weak self] icon, text in self?.logEvent("other", icon: icon, text) }
-        return push
-    }()
 
     struct SessionRow {
         let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
