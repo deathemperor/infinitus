@@ -10,6 +10,9 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
+### Desktop
+- A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
+
 ## 0.5.0-alpha.7
 
 ### Mac
@@ -23,7 +26,6 @@ publishes the matching section as the GitHub release body.
 - Settings › Infinitus › Profiles is gone with the terminal sessions it started; the Sessions page is now "Priority", at the same place (#1041).
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - The Best-of card shows each member's turns, tool calls and wall time beside its status, off the thread's own counters (#269).
-- A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 - `infinitusctl thread show` and `thread send --wait` read a thread again instead of failing with "unreadable reply" (#1048).
 
