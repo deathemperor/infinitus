@@ -443,12 +443,11 @@ function AboutVersionSection() {
                   <SelectValue>{updateTrackRow.label}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem hideIndicator value="latest">
-                    Stable
-                  </SelectItem>
-                  <SelectItem hideIndicator value="nightly">
-                    Nightly
-                  </SelectItem>
+                  {updateTrackRow.options.map((option) => (
+                    <SelectItem key={option.value} hideIndicator value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectPopup>
               </Select>
             ) : (

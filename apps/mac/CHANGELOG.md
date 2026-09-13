@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 - `infinitusctl thread show` and `thread send --wait` read a thread again instead of failing with "unreadable reply" (#1048).
+- Settings › Updates has a Nightly track — last night's build of everything from main — beside Release, and you can switch between the two either way (#1042).
 
 ### Phone
 - A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).

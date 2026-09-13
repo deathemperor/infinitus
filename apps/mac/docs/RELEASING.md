@@ -15,7 +15,9 @@ prerelease while the version has a `-alpha.N`/`-beta.N`/`-rc.N` tag) and
 the tap cask bump. The tag must match `VERSION` and the CHANGELOG must
 have the section, or the run fails before publishing. A
 `workflow_dispatch` is the dry run: artifacts, nothing published.
-Nightly (`mac-nightly.yml`) still builds the Mac app from `main` daily.
+Nightly (`infinitus-nightly.yml`) calls the same build jobs from `main`
+daily with a dated version and publishes the rolling `nightly` prerelease
+itself; a dispatch with `publish` unset is its dry run.
 The two Mac assets: `Infinitus-<v>.zip` (the standalone app, what the cask
 installs) and `Infinitus-Menu-Bar-<v>.zip` (the same build as `Infinitus
 Menu Bar.app`, no `infinitus://` URL type — what the desktop nests).

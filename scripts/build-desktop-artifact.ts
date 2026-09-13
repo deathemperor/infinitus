@@ -58,10 +58,12 @@ const DESKTOP_APP_ID = "run.infinitus.desktop";
 const DESKTOP_PRODUCT_NAME = "Infinitus";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
-// The fork publishes its desktop builds on their own updater channel so a
+// The fork publishes its desktop builds on their own updater channels so a
 // release never lands on `latest` (the native Infinitus app polls that) and
-// never on `nightly` (upstream's channel).
-type DesktopUpdateChannel = "latest" | "nightly" | "infinitus";
+// never on `nightly` (upstream's channel); `infinitus-nightly` is its own
+// rolling nightly (#1042), which wears the `infinitus` artwork.
+type DesktopUpdateChannel = "latest" | "nightly" | "infinitus" | "infinitus-nightly";
+type DesktopArtworkChannel = Exclude<DesktopUpdateChannel, "infinitus-nightly">;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
@@ -2489,7 +2491,7 @@ function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: bo
 
 export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(function* (
   stageResourcesDir: string,
-  channel: DesktopUpdateChannel,
+  channel: DesktopArtworkChannel,
   verbose: boolean,
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -2653,12 +2655,17 @@ export function resolveDesktopRuntimeDependencies(
   return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
 }
 
+const INFINITUS_NIGHTLY_SUFFIX_PATTERN = /-infinitus-nightly\.\d{8}\.\d+$/;
+
 /** The prerelease id of a version (`alpha` for `0.5.0-alpha.1`, `nightly` for
     an upstream nightly), or `null` for a plain one. electron-updater's GitHub
     provider names the manifest after it and offers a release only to
     clients whose channel equals it (#924), so the publish channel is this,
-    never a track name. */
+    never a track name. The repo's own nightly (#1042) is the exception: it
+    is read through the generic provider off the rolling `nightly` release,
+    so its manifest is `infinitus-nightly-mac.yml` whatever the version. */
 export function resolveDesktopPublishChannel(version: string): string | null {
+  if (INFINITUS_NIGHTLY_SUFFIX_PATTERN.test(version)) return "infinitus-nightly";
   return /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(version)?.[1] ?? null;
 }
 
@@ -2691,14 +2698,23 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
 
 /**
  * One product, one version (#823): every build of this repo is on the
- * `infinitus` track (its artwork and DMG background) and only an upstream
- * nightly keeps its own. `latest` is upstream's stable track; nothing built
- * here lands there. The same rule decides the desktop's default at runtime
- * (`apps/desktop/src/updates/updateChannels.ts`). The feed a build publishes
- * to is `resolveDesktopPublishChannel`, from the version alone.
+ * `infinitus` track (its artwork and DMG background) — its own nightly on
+ * `infinitus-nightly` (#1042), same artwork — and only an upstream nightly
+ * (first prerelease id `nightly`) keeps its own. `latest` is upstream's
+ * stable track; nothing built here lands there. The same rule decides the
+ * desktop's default at runtime (`apps/desktop/src/updates/updateChannels.ts`).
+ * The feed a build publishes to is `resolveDesktopPublishChannel`, from the
+ * version alone.
  */
 export function resolveDesktopUpdateChannel(version: string): DesktopUpdateChannel {
-  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "infinitus";
+  if (/^\d+\.\d+\.\d+-nightly\./.test(version)) return "nightly";
+  return INFINITUS_NIGHTLY_SUFFIX_PATTERN.test(version) ? "infinitus-nightly" : "infinitus";
+}
+
+/** The artwork a build wears: both fork tracks share the Infinitus set. */
+function resolveDesktopArtworkChannel(version: string): DesktopArtworkChannel {
+  const channel = resolveDesktopUpdateChannel(version);
+  return channel === "infinitus-nightly" ? "infinitus" : channel;
 }
 
 function isDesktopPreviewVersion(version: string): boolean {
@@ -2706,13 +2722,13 @@ function isDesktopPreviewVersion(version: string): boolean {
 }
 
 export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
-  const channel = resolveDesktopUpdateChannel(version);
+  const channel = resolveDesktopArtworkChannel(version);
   if (channel === "infinitus") return "infinitus";
   return resolveWebAssetBrandForChannel(channel === "nightly" ? "nightly" : "latest");
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
-  const channel = resolveDesktopUpdateChannel(version);
+  const channel = resolveDesktopArtworkChannel(version);
   if (channel === "infinitus") {
     return {
       macIconPng: BRAND_ASSET_PATHS.infinitusMacIconPng,
@@ -2811,7 +2827,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       ...(platform === "win" && wslRuntimeBundled ? WSL_RUNTIME_EXTRA_RESOURCES : []),
     ],
   };
-  const updateChannel = resolveDesktopUpdateChannel(version);
+  const artworkChannel = resolveDesktopArtworkChannel(version);
   if (!isDesktopPreviewVersion(version)) {
     const publishConfig = yield* resolveGitHubPublishConfig(version);
     if (publishConfig) {
@@ -2864,7 +2880,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       // DMG window backgrounds by volume name, so reusing a generic name can
       // make a newly built background look unchanged during testing.
       title: `${resolveDesktopProductName(version)} ${version} Installer`,
-      background: `dmg/dmg-background-${updateChannel}.png`,
+      background: `dmg/dmg-background-${artworkChannel}.png`,
       window: {
         width: 640,
         // The DMG backend derives bounds from the image, including Finder's
@@ -3782,7 +3798,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   if (options.platform === "mac" && options.target === "dmg") {
     yield* stageDesktopDmgBackground(
       stageResourcesDir,
-      resolveDesktopUpdateChannel(appVersion),
+      resolveDesktopArtworkChannel(appVersion),
       options.verbose,
     );
   }

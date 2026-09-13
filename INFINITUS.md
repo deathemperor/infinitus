@@ -51,8 +51,9 @@ makes wrong, in its own PR.
   native Infinitus (menu bar, engines, team, tunnels, mirror API, control
   socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
   (read it when working there), its own CHANGELOG/VERSION, path-filtered
-  CI jobs (`mac-*` in ci.yml) and its own workflows (`mac-nightly.yml`,
-  `mac-linux-sanitize.yml`; releases are `infinitus-release.yml`, below).
+  CI jobs (`mac-*` in ci.yml) and its own workflow
+  (`mac-linux-sanitize.yml`; releases are `infinitus-release.yml` and the
+  nightly `infinitus-nightly.yml`, below).
   It came in as a subtree
   (`git subtree add`) from the frozen `native` branch, history included
   (the merge's second parent). Its dev loop is unchanged: `cd apps/mac && ./make-app.sh`,
@@ -72,12 +73,16 @@ makes wrong, in its own PR.
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
   `nightly` tag: `latest` becomes the one-app release with the first plain
-  version; `nightly` stays `mac-nightly.yml`'s rolling Mac build — one
-  release created once and only edited in place (tag re-pointed, asset
-  clobbered, title edited), never deleted and recreated: the desktop
-  updater takes the first entry of `releases.atom`, an edited `nightly`
-  keeps its place below the newest versioned tag, a recreated one would
-  not (#924). Desktop
+  version; `nightly` is `infinitus-nightly.yml`'s rolling build of the
+  whole product (#1042): the same build jobs, called (`workflow_call`)
+  every night at 17:17 UTC with `<VERSION>-infinitus-nightly.<yyyymmdd>.<run>`
+  written over `VERSION` in the job, published by the caller — one release
+  created once and only edited in place (tag re-pointed, assets clobbered,
+  older nights' versioned assets removed, title edited), never deleted and
+  recreated: the desktop updater takes the first entry of `releases.atom`,
+  an edited `nightly` keeps its place below the newest versioned tag, a
+  recreated one would not (#924). A dispatch of the nightly workflow is a
+  dry run unless its `publish` input is set from `main`. Desktop
   updates follow electron-updater's own GitHub rule (#924): the client's
   channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
   `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
@@ -92,7 +97,18 @@ makes wrong, in its own PR.
   fail its polls (no manifest) were it the feed's first entry, which is why
   the `nightly` release must keep its place below the newest versioned tag
   (its rule is with `nightly` above). The `infinitus` track name lives only
-  in the desktop's settings and UI. On the track an available update downloads itself
+  in the desktop's settings and UI. The `infinitus-nightly` track (#1042;
+  Settings › Updates, "Nightly" beside "Release", a switch that goes both
+  ways) cannot use that rule — the GitHub provider takes only semver-tagged
+  releases, and a per-night `v…` tag would be the site's "latest"
+  (`apps/mac/site`'s worker) — so `DesktopUpdates.applyFeedProvider` puts
+  electron-updater on the generic provider at `releases/download/nightly`
+  with channel `infinitus-nightly` (the manifest `infinitus-nightly-mac.yml`,
+  `resolveDesktopPublishChannel`), downgrades on, and back on
+  app-update.yml's provider when the track is left; a nightly build on the
+  release track follows its line's id with downgrades on, since semver ranks
+  `alpha.7` below `alpha.6-infinitus-nightly.…`. On both fork tracks an
+  available update downloads itself
   (`DesktopUpdates.autoDownloadOnForkChannel`); upstream keeps the download
   behind a click, and a click that raced a relaunch started over. History:
   before the fold, desktops shipped as `v<version>-infinitus.<date>.<run>`
@@ -109,10 +125,15 @@ makes wrong, in its own PR.
   version, and cannot go down).
   `apps/desktop/package.json`'s version is upstream's and never edited. The
   `infinitus` track is internal and follows from the version, not a flag:
-  every version that is not an upstream nightly (`-nightly.<date>.<run>`)
-  defaults to and brands as `infinitus` (`resolveDesktopUpdateChannel`,
+  every version that is not an upstream nightly (first prerelease id
+  `nightly`) brands as `infinitus`; one carrying the nightly suffix
+  `-infinitus-nightly.<date>.<run>` (#1042; the line's id stays first,
+  `0.5.0-alpha.7-infinitus-nightly.20260913.42`) defaults to the
+  `infinitus-nightly` track with the same brand and a plain title, every
+  other one to `infinitus` (`resolveDesktopUpdateChannel`,
   `resolveDefaultDesktopUpdateChannel`,
-  `resolveWebAssetBrandForPackageVersion`). Upstream's `latest` track is
+  `resolveWebAssetBrandForPackageVersion`; all read the first prerelease
+  id, never the `-nightly.` substring the suffix carries too). Upstream's `latest` track is
   never a default here; a persisted `latest` resolves to `infinitus`. The
   feed a build follows is a separate thing, above.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
@@ -741,8 +762,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a turn
   runs" row. Client-runtime: `operations/commands.ts` + `state/threadCommands.ts`
   — `queueTurn` / `updateQueuedTurn` / `removeQueuedTurn` / `moveQueuedTurn`.
-- `packages/contracts/src/ipc.ts` — the fork's optional `DesktopBridge`
-  methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
+- `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
+  `DesktopUpdateChannel` / `DesktopUpdateChannelSchema` (#1042); the fork's
+  optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
   `submitInfinitusSignInCode` (#677), and `setInfinitusCaptureGestureEnabled`
   / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
@@ -814,7 +836,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   installed app's real `T3 Code (Alpha)`/`(Dev)` directory names and the KDE
   component name; `resolveDesktopAppBranding` titles every packaged build
   plain `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)` and
-  `(Nightly)` for a dev run and an upstream nightly (#823 layer 3).
+  `(Nightly)` for a dev run and an upstream nightly (#823 layer 3); a fork
+  nightly's stage label is `Nightly`, its title plain (#1042).
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
   (it never does), so an installed `T3 Code (Alpha)` is left alone.
@@ -837,8 +860,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   entry `Name=` follows `PRODUCT_NAME` the same way (#601).
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
-  and `resolveWebAssetBrandForPackageVersion` mapping every non-nightly
-  version to it (#823 layer 3).
+  and `resolveWebAssetBrandForPackageVersion` mapping every version but an
+  upstream nightly (first prerelease id `nightly`) to it (#823 layer 3, #1042).
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
   TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
@@ -847,8 +870,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   "Infinitus (Dev)" too (packaged builds get theirs from
   `scripts/build-desktop-artifact.ts`).
 - `apps/web/src/components/settings/SettingsPanels.tsx` (+ `.logic.ts`) —
-  `resolveDesktopUpdateTrackRow`: an `infinitus` build shows its own track
-  read-only instead of "Stable" with a one-way switch to upstream's releases.
+  `resolveDesktopUpdateTrackRow`: a fork build's select offers Release
+  (`infinitus`) and Nightly (`infinitus-nightly`, #1042) instead of upstream's
+  Stable / Nightly, which would hand it the real T3 Code with no way back;
+  the row's `options` drive the select.
 - Upstream tests carrying the renderer origin or the userData directory
   (`DesktopAppIdentity`, `DesktopClerk`, `ElectronProtocol`, `DesktopWindow`,
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`, `server.test.ts`,
@@ -1961,6 +1986,14 @@ pair` (token masked, server log never uploaded), screenshots every route in
 < /dev/null &` — and probe with `curl --max-time`, or the step holds the job
   to its timeout.
 
+- `.github/workflows/infinitus-nightly.yml` — the nightly (#1042, "One
+  release" above): a `version` job dates the root `VERSION`, `build` is
+  `infinitus-release.yml` through `workflow_call` with that version
+  (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
+  `publish` — `main` only, on the schedule or a dispatch with `publish` —
+  force-moves the `nightly` tag, clobbers the assets (`Infinitus-nightly.zip`
+  is a copy of the standalone zip for the cask and the menu bar app's
+  About pane), removes older nights' versioned assets and edits the title.
 - `.github/workflows/infinitus-release.yml` — the one release (see
   "One release" above). Its `desktop` job nests the menu bar app as a login
   item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`

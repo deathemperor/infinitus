@@ -3,8 +3,10 @@
 # desktop DMG from the same sha, builds the Linux tray, and publishes all of
 # it as one GitHub release. The version is the root VERSION file; the tag
 # must match it. Upstream's release.yml (npm, AUR, web, marketing) stays
-# disabled and untouched, hence this file's name. The rolling `nightly`
-# prerelease is mac-nightly.yml's.
+# disabled and untouched, hence this file's name. infinitus-nightly.yml
+# calls the same build jobs every night with a dated version and publishes
+# the rolling `nightly` prerelease itself (#1042); `publish` here runs on a
+# tag only.
 name: Infinitus release
 on:
   push:
@@ -12,6 +14,13 @@ on:
   # Dispatch is the dry run: every job builds and uploads its artifacts,
   # nothing is published.
   workflow_dispatch:
+  # infinitus-nightly.yml: the build jobs with its version in place of
+  # VERSION's; the caller's ref is not a tag, so `publish` stays skipped.
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
 permissions:
   contents: write
 
@@ -42,8 +51,15 @@ jobs:
       - name: Resolve release version
         id: version
         working-directory: .
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          # A nightly's dated version replaces VERSION here, so make-app.sh
+          # stamps it and the desktop job's helper check sees the same string.
+          if [[ -n "${INPUT_VERSION:-}" ]]; then
+            printf '%s\n' "$INPUT_VERSION" > VERSION
+          fi
           version="$(head -1 VERSION | tr -cd '0-9A-Za-z.-')"
           case "$GITHUB_REF" in
             refs/tags/*)
@@ -381,8 +397,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-publish
-          channel="${VERSION#*-}"
-          [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
+          # resolveDesktopPublishChannel's rule: the first prerelease id, or
+          # `infinitus-nightly` for the nightly track's build (#1042).
+          if [[ "$VERSION" == *-infinitus-nightly.* ]]; then
+            channel=infinitus-nightly
+          else
+            channel="${VERSION#*-}"
+            [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
+          fi
           manifest="${channel}-mac.yml"
 
           shopt -s nullglob
@@ -431,14 +453,20 @@ jobs:
         working-directory: apps/mac
     steps:
       - uses: actions/checkout@v6
-      # A tag build reports its number (#486); a dispatch dry run stays "dev".
-      - run: |
+      # A tag build and a nightly report their number (#486); a dispatch dry
+      # run stays "dev".
+      - env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          V=""
           case "$GITHUB_REF" in
-            refs/tags/*)
-                V="$(head -1 ../../VERSION | tr -cd '0-9A-Za-z.-')"
-                sed -i "s/static let string = \"dev\"/static let string = \"$V\"/" Sources/InfinitusTray/BuiltVersion.swift
-                grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift;;
+            refs/tags/*) V="$(head -1 ../../VERSION | tr -cd '0-9A-Za-z.-')";;
           esac
+          [[ -n "${INPUT_VERSION:-}" ]] && V="$(printf '%s' "$INPUT_VERSION" | tr -cd '0-9A-Za-z.-')"
+          if [[ -n "$V" ]]; then
+            sed -i "s/static let string = \"dev\"/static let string = \"$V\"/" Sources/InfinitusTray/BuiltVersion.swift
+            grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift
+          fi
       - run: swift build -c release -Xswiftc -static-stdlib
       - run: swift test
       - name: Stage artifacts

@@ -284,11 +284,17 @@ describe("getChangedBrowserSettingLabels", () => {
 });
 
 describe("resolveDesktopUpdateTrackRow", () => {
-  it("shows an Infinitus build its own track, with no switch away from it", () => {
+  it("offers an Infinitus build its Release and Nightly tracks, and never upstream's (#1042)", () => {
     const row = resolveDesktopUpdateTrackRow("infinitus");
 
-    expect(row.label).toBe("Infinitus");
-    expect(row.switchable).toBe(false);
+    expect(row.label).toBe("Release");
+    expect(row.switchable).toBe(true);
+    expect(row.options.map((option) => option.value)).toEqual(["infinitus", "infinitus-nightly"]);
+    expect(resolveDesktopUpdateTrackRow("infinitus-nightly")).toMatchObject({
+      label: "Nightly",
+      switchable: true,
+      options: row.options,
+    });
   });
 
   it("offers no switch before the desktop bridge reports a track", () => {
@@ -307,5 +313,9 @@ describe("resolveDesktopUpdateTrackRow", () => {
       label: "Nightly",
       switchable: true,
     });
+    expect(resolveDesktopUpdateTrackRow("latest").options.map((option) => option.value)).toEqual([
+      "latest",
+      "nightly",
+    ]);
   });
 });

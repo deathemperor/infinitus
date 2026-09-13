@@ -301,6 +301,9 @@ export const make = Effect.gen(function* () {
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
 
   const appUpdateYmlConfigRef = yield* Ref.make<Option.Option<AppUpdateYmlConfig>>(Option.none());
+  // Which provider electron-updater is on: app-update.yml's (GitHub) or the
+  // nightly track's generic one (#1042). Starts on the file's, as the library does.
+  const feedProviderRef = yield* Ref.make<"app-update.yml" | "nightly">("app-update.yml");
   const activeUpdateActionRef = yield* Ref.make<Option.Option<UpdateAction>>(Option.none());
   const finishedUpdateActions = yield* PubSub.unbounded<UpdateAction>();
   const updaterConfiguredRef = yield* Ref.make(false);
@@ -390,10 +393,42 @@ export const make = Effect.gen(function* () {
       ),
     );
 
+  // The nightly track reads the rolling `nightly` release through the generic
+  // provider (#1042): the GitHub provider only ever takes a semver-tagged
+  // release, and a night's tag would make the site call it the latest
+  // release. The release track goes back to app-update.yml's provider. The
+  // mock feed of a dev run is left alone.
+  const applyFeedProvider = Effect.fn("desktop.updates.applyFeedProvider")(function* (
+    channel: DesktopUpdateChannel,
+  ) {
+    const wanted = channel === "infinitus-nightly" ? "nightly" : "app-update.yml";
+    if (config.mockUpdates || (yield* Ref.get(feedProviderRef)) === wanted) return;
+    const appUpdateYmlConfig = yield* Ref.get(appUpdateYmlConfigRef);
+    if (Option.isNone(appUpdateYmlConfig)) return;
+    const { owner, repo } = appUpdateYmlConfig.value;
+    if (wanted === "nightly") {
+      if (!owner || !repo) {
+        yield* logUpdaterInfo("app-update.yml names no repository; nightly feed not set");
+        return;
+      }
+      yield* electronUpdater.setFeedURL({
+        provider: "generic",
+        url: `https://github.com/${owner}/${repo}/releases/download/nightly`,
+      } as ElectronUpdater.ElectronUpdaterFeedUrl);
+    } else {
+      yield* electronUpdater.setFeedURL(
+        appUpdateYmlConfig.value as ElectronUpdater.ElectronUpdaterFeedUrl,
+      );
+    }
+    yield* Ref.set(feedProviderRef, wanted);
+    yield* logUpdaterInfo("using update feed", { feed: wanted });
+  });
+
   const applyAutoUpdaterChannel = Effect.fn("desktop.updates.applyAutoUpdaterChannel")(function* (
     channel: DesktopUpdateChannel,
   ) {
     yield* Effect.annotateCurrentSpan({ channel });
+    yield* applyFeedProvider(channel);
     // The feed electron-updater follows for this track (#924). Its channel
     // setter turns allowDowngrade on, so the downgrade flag is set after it.
     const feed = resolveElectronUpdaterFeed(environment.appVersion, channel);
@@ -717,15 +752,20 @@ export const make = Effect.gen(function* () {
     );
   }).pipe(Effect.withSpan("desktop.updates.startPollers"));
 
-  // Fork channel (INFINITUS.md): an available update downloads itself, so the
-  // user only relaunches. Upstream keeps the download behind a click; a click
-  // that races the next relaunch starts the download over. The download
-  // action is refused while the check that found the update still holds the
-  // action slot, so wait it out in short steps.
+  // Fork channels (INFINITUS.md), the nightly track too: an available update
+  // downloads itself, so the user only relaunches. Upstream keeps the
+  // download behind a click; a click that races the next relaunch starts the
+  // download over. The download action is refused while the check that found
+  // the update still holds the action slot, so wait it out in short steps.
   const autoDownloadOnForkChannel = Effect.gen(function* () {
     for (let attempt = 0; attempt < 20; attempt++) {
       const state = yield* Ref.get(updateStateRef);
-      if (state.channel !== "infinitus" || state.status !== "available") return;
+      if (
+        (state.channel !== "infinitus" && state.channel !== "infinitus-nightly") ||
+        state.status !== "available"
+      ) {
+        return;
+      }
       const result = yield* downloadAvailableUpdate;
       if (result.accepted) {
         yield* logUpdaterInfo("update downloaded without a click (fork channel)", {

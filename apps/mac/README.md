@@ -42,9 +42,9 @@ or flip the track in-app under About → Update channel):
 brew install --cask deathemperor/tap/infinitus@nightly
 ```
 
-Releases are Developer ID signed and notarized since 0.4.3, so they
-open like any other app. Nightly builds are ad-hoc signed: install
-those with `--no-quarantine` (or right-click → Open once).
+Releases are Developer ID signed and notarized since 0.4.3, and nightly
+builds are too since #1042 (they come out of the release workflow's own
+jobs), so both open like any other app.
 
 ### GitHub releases
 
