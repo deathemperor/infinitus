@@ -143,6 +143,17 @@ makes wrong, in its own PR.
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
   `Co-Authored-By: Claude Code <noreply@anthropic.com>`.
+- **Worktrees share one clone's `refs/remotes/origin`.** Several sessions
+  work in worktrees of the same clone, so `git fetch && git merge origin/main`
+  can merge a tip another session fetched moments earlier and land a branch
+  that silently misses commits already on main (#1092 missed #1091 this way,
+  with a clean-looking stat). After every merge of main and before arming
+  auto-merge: `git fetch origin main && git merge-base --is-ancestor
+  origin/main HEAD || echo STALE`. A PR whose checks are green but whose
+  mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
+  `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
+  (auto-merge drops on reopen; arm it again). Never push empty commits for
+  either.
 - **Never install anything on the developer's Mac** (toolchains, brew,
   Xcode components, Docker). `vp i` inside the worktree is fine.
 - Secrets travel over stdin, never argv; shown masked only.
