@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
 - Settings › Infinitus › Profiles is gone with the terminal sessions it started; the Sessions page is now "Priority", at the same place (#1041).

@@ -456,7 +456,11 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `claudeTurnUsage.logic.ts`: the SDK's `total_cost_usd` / `modelUsage` are
   cumulative per query() session, so each result is differenced from the
   previous one (`lastResultTotals`, reset when the query reopens; a total
-  that went down means the session started over). Tokens come from the
+  that went down means the session started over). The same module's
+  `promptCacheVerdict` (#974) counts, per session, the assistant calls that
+  sent ≥ 10k input tokens with no cache read or write — a subagent's too —
+  and five in a row raise one `runtime.warning` ("No prompt cache: …"),
+  once per session; a call that read or wrote the cache clears the run. Tokens come from the
   per-turn `tokenUsage` every adapter normalizes, so Codex turns record too,
   with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
   dispatch, a `turn.completed` naming its turn dispatches the command
