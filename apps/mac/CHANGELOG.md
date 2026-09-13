@@ -10,6 +10,7 @@ publishes the matching section as the GitHub release body.
 ### Mac
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
+- Rows an engine could not refresh say how old their numbers are instead of reading as current, on every engine rather than swapd alone.
 
 
 ## 0.5.0-alpha.8
@@ -23,7 +24,7 @@ publishes the matching section as the GitHub release body.
 - A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
 - A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
 - The Team features are gone (shared fleets, member roster, join codes, nearby discovery, team control): Infinitus is about threads now.
-- An account row is flagged stale whenever its own engine's last fetch failed, with how old the numbers are on the row and the error in the tooltip.
+- An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
 - A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
