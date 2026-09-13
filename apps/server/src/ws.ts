@@ -149,7 +149,11 @@ import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts
 import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
 import { importRecentAgentThreads } from "./project/AgentSessionImporter.ts";
 import { forkThreadAtTurn } from "./infinitus/ThreadFork.ts";
-import { foldLiveTokenRate, liveTokenRateSince } from "./infinitus/liveTokenRate.logic.ts";
+import {
+  EMPTY_LIVE_TOKEN_RATE,
+  foldLiveTokenRate,
+  liveTokenRateSince,
+} from "./infinitus/liveTokenRate.logic.ts";
 import { ProjectionTurnUsageRepository } from "./persistence/ProjectionTurnUsage.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
@@ -3265,14 +3269,17 @@ const makeWsRpcLayer = (
               const rows = yield* projectionTurnUsage.listCompletedSince({
                 since: liveTokenRateSince(now),
               });
-              return foldLiveTokenRate(rows.map((row) => row.turnUsage));
+              return foldLiveTokenRate(
+                rows.map((row) => row.turnUsage),
+                { nowMs: DateTime.toEpochMillis(now) },
+              );
             }).pipe(
               // A cosmetic figure: rather than fail the call, a read that
               // cannot answer reports no turns, which draws no line — the
               // same as a window in which nothing ran.
               Effect.catchCause((cause) =>
                 Effect.logWarning("infinitus.liveTokenRate: turn usage read failed", cause).pipe(
-                  Effect.as(foldLiveTokenRate([])),
+                  Effect.as(EMPTY_LIVE_TOKEN_RATE),
                 ),
               ),
             ),

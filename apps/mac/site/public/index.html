@@ -274,7 +274,8 @@
         "15 themes with their own intro, death and revival effects",
         "Usage history and utilization estimates",
         "Priority mode: a headroom verdict per fleet so clients pause background work before a window binds",
-        "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
+        "Phone app for iPhone and Android over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
+        "Thread checkpoints and forks, Best of N across models, and a server-side message queue in Infinitus desktop",
         "Thread chat from the phone: streamed replies, approvals and questions answered, photo and file attachments",
         "infinitusctl control CLI for the Mac app and Infinitus desktop's threads, and an onboarding brief for coding agents",
         "Linux tray daemon with an Omarchy Quickshell panel plugin"
@@ -298,7 +299,7 @@
         { "@type": "Question", "name": "Does Infinitus work with Claude Code?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus drives account switching through the swapd CLI and reads Claude Code's own local files for usage. It never modifies Claude Code itself." } },
         { "@type": "Question", "name": "Which platforms does Infinitus support?",
-          "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. An iOS companion app is in progress." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. The phone app for iPhone and Android builds from the repository; it is not on the stores yet." } },
         { "@type": "Question", "name": "Is Infinitus free?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
         { "@type": "Question", "name": "How do I install Infinitus?",
@@ -428,32 +429,44 @@
         <p>Single account? A card with big gauges and the reset time in
         the menu bar — no fleet vocabulary until you add a second.</p></div>
     </div>
+    <h3 class="group">Threads</h3>
+    <div class="grid">
+      <div class="card"><h3><span class="dot">●</span>Checkpoints and forks</h3>
+        <p>Every turn checkpoints the repository. From any turn in the
+        transcript: restore its files, rewind the chat, both at once, or
+        fork the thread from there into a new one.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Best of N</h3>
+        <p>One prompt to two, three or four models at once, each in its own
+        worktree. A card on every member lists the others — status, turns,
+        files changed — and Keep this one clears the rest away.</p></div>
+      <div class="card"><h3><span class="dot">●</span>A queue, not an interrupt</h3>
+        <p>A message typed while a turn runs waits for it instead of
+        steering into it, and goes the moment the thread is idle. Edit it,
+        reorder it, send it now — or switch the composer back to steering.</p></div>
+    </div>
     <h3 class="group">Phone</h3>
     <div class="grid">
       <div class="card"><h3><span class="dot">●</span>Mobile companion</h3>
-        <p>Your fleet on the iPhone — over Wi-Fi, Tailscale, your own
-        Cloudflare hostname or a free quick tunnel. One QR, every route;
-        the Mac lists which devices are connected and how.</p></div>
+        <p>Your fleet on the phone, iPhone or Android — over Wi-Fi,
+        Tailscale, your own Cloudflare hostname or a free quick tunnel.
+        One QR, every route; the Mac lists which devices are connected
+        and how.</p></div>
       <div class="card"><h3><span class="dot">●</span>Thread chat</h3>
         <p>Every thread as a chat on the phone: markdown replies streamed
         live, tool runs in one chip, sub-agent cards. Answer approvals and
         questions, reply, attach photos from the camera or files.</p></div>
       <div class="card"><h3><span class="dot">●</span>Live Activities</h3>
-        <p>A lock-screen card of what your threads are doing, started by
-        the Mac and kept moving over push with the app closed. Turn it on
-        in Settings › Infinitus.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Game HUD chat header</h3>
-        <p>A ringed portrait with the level on its rim, a name plate,
-        HP/MP-style bars and a buff square per model — or a compact
-        header, or a stat strip. Every style previews live in your theme.</p></div>
+        <p>On the iPhone, a lock-screen card of what your threads are
+        doing, started by the Mac and kept moving over push with the app
+        closed. Turn it on in Settings › Infinitus.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Usage widgets</h3>
+        <p>A home-screen and lock-screen widget for the five-hour and
+        weekly quota of the environments the phone is connected to — the
+        tightest one when the lock screen has room for a single line.</p></div>
       <div class="card"><h3><span class="dot">●</span>Crash reports, on-device</h3>
-        <p>The phone app and the Mac app record their own crashes into
-        Settings. Nothing leaves your machine.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Widgets in your theme</h3>
-        <p>Home-screen and lock-screen widgets draw the active account's
-        windows as your theme names and colors them, and the revival
-        countdown when every account is limited — and one for whichever
-        paired Mac you pick.</p></div>
+        <p>The Mac lists its own crashes and hangs in Settings › Sync, and
+        the phone app keeps its own startup-crash log in Settings. Nothing
+        leaves your machine.</p></div>
       <div class="card"><h3><span class="dot">●</span>AWS and gcloud login from the phone</h3>
         <p>A thread whose <code>aws</code> or <code>gcloud</code> command
         hit expired credentials shows up on your phone; sign in there
@@ -462,12 +475,13 @@
         <p>The phone opens on what's waiting for you: the threads that
         need an approval, an answer or a look.</p></div>
       <div class="card"><h3><span class="dot">●</span>Star &amp; pause from the phone</h3>
-        <p>Swipe or long-press an account to star it or pause its
-        rotation; on the Mac, right-click the name in the popup, and a
-        paused row shows a play button to resume.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Dictate in any language</h3>
-        <p>Vietnamese in, English out — translated on the phone, or sent
-        as spoken with a note asking for an English reply.</p></div>
+        <p>An account's menu on the phone stars it — picked first — or
+        holds it out of rotation; on the Mac, right-click the name in the
+        popup, and a held row shows a play button to release it.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Dictate a prompt</h3>
+        <p>Hold the mic in the composer and talk. On the iPhone the words
+        are turned into text on the device itself, and the transcript lands
+        where you were typing.</p></div>
     </div>
     <h3 class="group">Themes &amp; history</h3>
     <div class="grid">
@@ -620,8 +634,8 @@
       <dt>Which platforms?</dt>
       <dd>macOS 14+ on Apple silicon (Homebrew cask), and Linux — a static
         <code>infinitus-tray</code> for x86_64 and aarch64 with a Quickshell
-        panel plugin for Omarchy / Arch (also on the AUR). The iPhone companion
-        builds from source today — no App Store build yet.</dd>
+        panel plugin for Omarchy / Arch (also on the AUR). The phone app for
+        iPhone and Android builds from source today — no store build yet.</dd>
       <dt>Is it free?</dt>
       <dd>Free and open source, MIT licensed. Source is on
         <a href="https://github.com/deathemperor/infinitus">GitHub</a>.</dd>

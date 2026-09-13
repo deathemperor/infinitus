@@ -4370,7 +4370,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     () =>
       Effect.gen(function* () {
         const asked: Array<string> = [];
-        const turnUsage = (turnId: string, outputTokens: number): ThreadTurnUsage => ({
+        const turnUsage = (
+          turnId: string,
+          outputTokens: number,
+          completedAt: string,
+        ): ThreadTurnUsage => ({
           turnId: TurnId.make(turnId),
           model: "claude-opus-5",
           inputTokens: 2_000,
@@ -4381,7 +4385,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           complete: true,
           hasSubagents: false,
           costUsd: null,
-          completedAt: "2026-09-12T00:57:00.000Z",
+          completedAt,
         });
         yield* buildAppUnderTest({
           layers: {
@@ -4389,9 +4393,22 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               listCompletedSince: ({ since }) =>
                 Effect.sync(() => {
                   asked.push(since);
+                  // Stamped from the window the handler asked for, because that
+                  // is what the real query returns: rows completed at or after
+                  // `since`. Two minutes in, and no `durationMs`, so each turn
+                  // counts whole (#1127).
+                  const inside = DateTime.formatIso(
+                    DateTime.addDuration(DateTime.makeUnsafe(since), Duration.minutes(2)),
+                  );
                   return [
-                    { threadId: ThreadId.make("thread-a"), turnUsage: turnUsage("turn-1", 1_000) },
-                    { threadId: ThreadId.make("thread-b"), turnUsage: turnUsage("turn-2", 500) },
+                    {
+                      threadId: ThreadId.make("thread-a"),
+                      turnUsage: turnUsage("turn-1", 1_000, inside),
+                    },
+                    {
+                      threadId: ThreadId.make("thread-b"),
+                      turnUsage: turnUsage("turn-2", 500, inside),
+                    },
                   ];
                 }),
             },

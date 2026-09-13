@@ -1,6 +1,6 @@
 # Engines, fleets, and accounts
 
-An **engine** manages provider logins, reads their usage, and handles account switching. Infinitus shows what the engine reports and lets you control it. Session tracking works independently, so seeing sessions does not mean an account engine is configured.
+An **engine** manages provider logins, reads their usage, and handles account switching. Infinitus shows what the engine reports and lets you control it.
 
 A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them.
 

@@ -435,12 +435,22 @@ engineLayer("the live token rate's window read (#1127)", (it) => {
         rows.map((row) => row.turnUsage.turnId),
         ["turn-edge", "turn-in", "turn-other"],
       );
-      assert.deepStrictEqual(foldLiveTokenRate(rows.map((row) => row.turnUsage)), {
-        windowMinutes: 5,
-        turns: 3,
-        outputPerMinute: 60,
-        totalPerMinute: 660,
-      });
+      // None of these rows carries a `durationMs`, so each counts whole at its
+      // completion and the window's end only decides what is in range.
+      assert.deepStrictEqual(
+        foldLiveTokenRate(
+          rows.map((row) => row.turnUsage),
+          {
+            nowMs: Date.parse("2026-09-12T01:00:00.000Z"),
+          },
+        ),
+        {
+          windowMinutes: 5,
+          turns: 3,
+          outputPerMinute: 60,
+          totalPerMinute: 660,
+        },
+      );
     }),
   );
 });
