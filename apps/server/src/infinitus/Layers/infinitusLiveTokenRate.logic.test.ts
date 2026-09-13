@@ -78,9 +78,7 @@ describe("liveTokenRate (#1127)", () => {
 
   it("drops a turn stamped in the future rather than counting it at an unknown instant", () => {
     const future = isoAt(nowMs + 60_000);
-    expect(
-      liveTokenRate({ nowMs, rows: [row("thread-a", "turn-1", future, 5000)] }),
-    ).toBeNull();
+    expect(liveTokenRate({ nowMs, rows: [row("thread-a", "turn-1", future, 5000)] })).toBeNull();
   });
 
   it("splits by the account the swap log names, busiest first, and skips unattributed turns", () => {
