@@ -1,5 +1,6 @@
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -20,11 +21,20 @@ import { liveTokenRate, LIVE_RATE_WINDOW_MINUTES } from "./infinitusLiveTokenRat
  * accounts. A failed read is a null rate and a warning, never an error to the
  * page: a missing number is the same shape as a quiet window.
  */
+const ACCOUNTS_TTL = Duration.minutes(5);
+
 export const InfinitusLiveTokenRateLive = Layer.effect(
   InfinitusLiveTokenRate,
   Effect.gen(function* () {
     const repository = yield* ProjectionTurnUsageRepository;
     const attribution = yield* Effect.serviceOption(UsageAttribution);
+    // The swap log is one socket round trip for the whole log, and the page
+    // asks every half minute; a switch that lands mid-TTL only leaves that
+    // turn attributed to the account before it, in a number already an
+    // estimate.
+    const resolveAccounts = Option.isSome(attribution)
+      ? yield* Effect.cachedWithTTL(attribution.value.resolve, ACCOUNTS_TTL)
+      : Effect.succeed(null);
     return InfinitusLiveTokenRate.of({
       read: Effect.gen(function* () {
         const nowMs = yield* Clock.currentTimeMillis;
@@ -32,7 +42,7 @@ export const InfinitusLiveTokenRateLive = Layer.effect(
           DateTime.makeUnsafe(nowMs - LIVE_RATE_WINDOW_MINUTES * 60_000),
         );
         const rows = yield* repository.listCompletedSince({ since });
-        const accounts = Option.isSome(attribution) ? yield* attribution.value.resolve : null;
+        const accounts = yield* resolveAccounts;
         return liveTokenRate({ rows, nowMs, accounts });
       }).pipe(
         Effect.catchCause((cause) =>
