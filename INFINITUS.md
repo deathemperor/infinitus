@@ -811,6 +811,13 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
   `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
   and cannot import the constant).
+- `packages/shared/src/git.ts` — `WORKTREE_BRANCH_PREFIX` is `infinitus`
+  (#823: a branch name is on screen), `LEGACY_WORKTREE_BRANCH_PREFIX` keeps
+  upstream's `t3code` so temporary branches minted before the rename are
+  still recognised (`isTemporaryWorktreeBranch`) and regenerated
+  (`ProviderCommandReactor.buildGeneratedWorktreeBranchName` strips both);
+  `GitManager.ts` / `BitbucketApi.ts` build fork-PR checkout branches from the
+  constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from

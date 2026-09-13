@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
+
 ### Mac
 - A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
 - A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
