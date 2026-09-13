@@ -1,11 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { useEffect, useRef } from "react";
 
 import { getClientSettings, useClientSettings } from "../hooks/useSettings";
-import { useEnvironments } from "../state/environments";
+import { attentionNotificationTitle, quietForViewer } from "../lib/infinitusNotifications.logic";
+import { useEnvironment, useEnvironments } from "../state/environments";
+import { infinitusEnvironment } from "../state/infinitus";
+import { useEnvironmentQuery } from "../state/query";
 import { environmentShell } from "../state/shell";
 import {
   hasDesktopNotifications,
@@ -14,6 +17,7 @@ import {
   unlockNotificationAudio,
 } from "../threadNotifications";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
+import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
 
 export function ThreadNotificationCoordinator() {
   const { environments } = useEnvironments();
@@ -43,6 +47,23 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
   const shell = useAtomValue(environmentShell.stateValueAtom(environmentId));
   const mode = useClientSettings((settings) => settings.notificationMode);
   const navigate = useNavigate();
+  // Fork (#1032): held and failed threads notify too (the holds come from the
+  // server's stream), and the thread on screen stays quiet while the window
+  // has focus.
+  const supported =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities.infinitus === true;
+  const holds = useEnvironmentQuery(
+    supported ? infinitusEnvironment.holds({ environmentId, input: {} }) : null,
+  ).data;
+  const viewedEnvironmentId = useParams({
+    strict: false,
+    select: (params) => params.environmentId,
+  });
+  const viewedThreadId = useParams({ strict: false, select: (params) => params.threadId });
+  const viewedKey =
+    viewedEnvironmentId === undefined || viewedThreadId === undefined
+      ? null
+      : `${viewedEnvironmentId}:${viewedThreadId}`;
   const previous = useRef(new Map<ThreadId, { input: string | null; completion: number | null }>());
 
   useEffect(() => {
@@ -52,12 +73,14 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
     }
     const next = new Map<ThreadId, { input: string | null; completion: number | null }>();
     for (const thread of shell.snapshot.value.threads) {
-      const status = resolveSidebarThreadStatus(thread);
+      const held = heldEntryFor(holds, thread.id);
+      const status = resolveSidebarThreadStatus(thread, {
+        held: held?.kind === "held",
+        limited: held?.kind === "limited",
+      });
       const prior = previous.current.get(thread.id);
-      const input =
-        status === "input" || status === "approval"
-          ? `${thread.latestTurn?.turnId ?? ""}:${status}`
-          : null;
+      const attention = attentionNotificationTitle(status);
+      const input = attention === null ? null : `${thread.latestTurn?.turnId ?? ""}:${status}`;
       const completedAt = Date.parse(thread.latestTurn?.completedAt ?? "");
       const completion =
         status === "ready" &&
@@ -74,6 +97,7 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
             ? "completion"
             : null;
       if (!kind) continue;
+      if (quietForViewer(viewedKey, `${environmentId}:${thread.id}`, document)) continue;
       if (hasNotificationSound(mode)) {
         void playNotificationSound(kind, () =>
           hasNotificationSound(getClientSettings().notificationMode),
@@ -87,11 +111,7 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
         continue;
       try {
         const notification = new Notification(
-          kind === "completion"
-            ? "Thread completed"
-            : status === "approval"
-              ? "Approval needed"
-              : "Input needed",
+          kind === "completion" ? "Thread completed" : (attention ?? "Input needed"),
           { body: thread.title, tag: `${environmentId}:${thread.id}`, silent: true },
         );
         notification.addEventListener("click", () => {
@@ -107,7 +127,7 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
       }
     }
     previous.current = next;
-  }, [environmentId, mode, navigate, shell]);
+  }, [environmentId, holds, mode, navigate, shell, viewedKey]);
 
   return null;
 }

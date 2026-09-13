@@ -1,0 +1,68 @@
+import type { ClientSettings } from "@t3tools/contracts";
+
+import type { SidebarThreadStatus } from "../components/Sidebar.logic";
+
+/**
+ * The fork's half of thread notifications (#1032, on upstream #11481): the
+ * two states upstream has no title for, the quiet rule for the thread on
+ * screen, the Dock badge's count (#270 B), and the one-time mapping of the
+ * old #270 B toggles and #270 H sound onto upstream's `notificationMode`.
+ */
+const ATTENTION_TITLES: Partial<Record<SidebarThreadStatus, string>> = {
+  approval: "Approval needed",
+  input: "Input needed",
+  held: "Held for headroom",
+  failed: "Session failed",
+};
+
+/** The banner title for a state that waits on the user, else null. */
+export function attentionNotificationTitle(status: SidebarThreadStatus): string | null {
+  return ATTENTION_TITLES[status] ?? null;
+}
+
+/** The thread on screen needs no banner or bell while the window has focus. */
+export function quietForViewer(
+  viewedKey: string | null,
+  key: string,
+  doc: { readonly visibilityState: DocumentVisibilityState; readonly hasFocus: () => boolean },
+): boolean {
+  return viewedKey === key && doc.visibilityState === "visible" && doc.hasFocus();
+}
+
+/** The threads waiting on the user: an approval to give or a question to answer. */
+export function attentionCount(
+  threads: ReadonlyArray<{ readonly status: SidebarThreadStatus }>,
+): number {
+  let count = 0;
+  for (const thread of threads) {
+    if (thread.status === "approval" || thread.status === "input") count += 1;
+  }
+  return count;
+}
+
+type LegacyBannerFlags = Pick<
+  ClientSettings,
+  | "desktopNotifyOnApproval"
+  | "desktopNotifyOnInput"
+  | "desktopNotifyOnHeld"
+  | "desktopNotifyOnFailure"
+>;
+
+/**
+ * What `notificationMode` the old settings amount to. Banners were on by
+ * default (an absent flag counts as on) and desktop-only (`null` flags: no
+ * desktop shell, so no banners); the sound was this window's own switch.
+ */
+export function legacyNotificationMode(
+  flags: Partial<LegacyBannerFlags> | null,
+  soundEnabled: boolean,
+): ClientSettings["notificationMode"] {
+  const banners =
+    flags !== null &&
+    (flags.desktopNotifyOnApproval !== false ||
+      flags.desktopNotifyOnInput !== false ||
+      flags.desktopNotifyOnHeld !== false ||
+      flags.desktopNotifyOnFailure !== false);
+  if (banners) return soundEnabled ? "notifications-and-sound" : "notifications";
+  return soundEnabled ? "sound" : "off";
+}

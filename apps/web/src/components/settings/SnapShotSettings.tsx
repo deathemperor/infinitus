@@ -48,7 +48,6 @@ import { selectTriggerVariants } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { SnapShotSetupDialog } from "./SnapShotSetupDialog";
-import { InfinitusCompletionSoundRow } from "./InfinitusCompletionSoundRow";
 import { useSnapShotShortcutRecorder } from "./useSnapShotShortcutRecorder";
 import {
   captureSetupAccessReady,
@@ -565,7 +564,6 @@ export function SnapShotSettings() {
                   </Menu>
                 }
               />
-              <InfinitusCompletionSoundRow />
               <SettingsRow
                 {...searchableSetting("snap-shot-flash")}
                 description="Show a gentle cue on the captured window."

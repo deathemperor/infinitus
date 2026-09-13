@@ -1019,47 +1019,36 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Sessions since #743, Lock and Team since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
-- `apps/web/src/lib/infinitusCompletionSound.ts` (+ `.logic.ts`,
-  `components/desktop/InfinitusCompletionSoundCoordinator.tsx`,
-  `components/settings/InfinitusCompletionSoundRow.tsx`,
-  `assets/infinitus-completion-chime.wav`) — the completion sound (#270 H):
-  a turn finishing on any thread while the window is hidden or unfocused
-  rings the picked sound (Chime, or the SnapShot Whoosh / Click), off by
-  default. The preference is per window in localStorage
-  (`infinitus:completion-sound:v1`), not a client setting: a sound belongs
-  to the machine that plays it. `turnsJustCompleted` rings only for threads
-  the window already knew (a bootstrap seeds, never rings). Registration
-  points: the coordinator mounted from `__root.tsx` beside
-  `SnapShotCoordinator`, the row from `SnapShotSettings.tsx` after the
-  capture sound, and the `completion-sound` search item in
-  `settingsSearch.ts`.
-- `apps/web/src/lib/desktopNotifications.logic.ts`,
-  `apps/web/src/components/desktop/DesktopNotificationCoordinator.tsx`,
-  `apps/web/src/components/settings/DesktopNotificationSettings.tsx`,
+- `apps/web/src/lib/infinitusNotifications.logic.ts`,
+  `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`,
+  `apps/web/src/components/desktop/NotificationModeMigration.tsx`,
+  `apps/web/src/components/settings/DesktopBadgeSettings.tsx`,
   `apps/desktop/src/electron/ElectronNotification.ts`,
-  `apps/desktop/src/ipc/methods/notifications.ts` — the desktop's OS
-  notifications and Dock badge (#270 B). The renderer decides: one banner
-  per thread this window already knew that moves into approval, input,
-  held or failed, or (off by default) reaches a completed turn it had not
-  seen completed — the completion sound's rule; the thread on screen while
-  the window is focused stays quiet. The badge counts the threads in
-  approval or input. The main process only shows (`Electron.Notification`,
-  a no-op where unsupported) and, on a click, reveals the window on the
-  thread over `NOTIFICATION_ACTIVATED_CHANNEL` (`DesktopWindow.
-dispatchNotificationActivated`). Fork-thread events only: the account
-  events (a limit, every account dead, revived) stay the native app's
-  Notification Center items. Six client-setting booleans
-  (`desktopNotifyOn*`, `desktopBadgeAttention`) in
-  `packages/contracts/src/settings.ts`; the `DesktopBridge` methods
-  `postNotification` / `setBadgeCount` / `onNotificationActivated` and the
-  `DesktopNotificationRequest` / `DesktopNotificationActivated` schemas in
-  `packages/contracts/src/ipc.ts`, all optional. Registration points: the
-  coordinator mounted from `__root.tsx` after the completion sound (primary
-  environment authenticated), the settings section as the notifications
-  pane's `lead`, the `desktop-notify-*` / `desktop-badge` search items, the
-  three channels in `apps/desktop/src/ipc/channels.ts`, the two handlers in
-  `DesktopIpcHandlers.ts`, `ElectronNotification.layer` in `main.ts`, and
-  the preload's `isNotificationActivated` guard.
+  `apps/desktop/src/ipc/methods/notifications.ts` — thread notifications
+  and sounds are upstream's (#11481: `notificationMode` on the client
+  settings, `ThreadNotificationCoordinator`, the `Notification` API and two
+  bundled sounds; ruling #1032, which retired the fork's #270 B banners over
+  the Electron main process and the #270 H per-window completion sound).
+  The fork layers three things. In `ThreadNotificationCoordinator.tsx` (an
+  upstream file, one registration point): `held` and `failed` threads
+  notify like input does (the holds come from the environment's
+  `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
+  and the thread on screen stays quiet while the window has focus
+  (`quietForViewer`) — upstream posts and rings for it. The Dock badge
+  (`desktopBadgeAttention`, on by default) counts the threads in approval
+  or input through the `setBadgeCount` bridge method, the one IPC left
+  (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`
+  and the `desktop-badge` search item. `NotificationModeMigration`, mounted
+  from `__root.tsx`, maps a client's old settings onto `notificationMode`
+  once (`legacyNotificationMode`: the four banner toggles — absent counts
+  as on, and only on a desktop shell — and the old
+  `infinitus:completion-sound:v1` switch), only while the mode still reads
+  `off`, then marks `infinitus:notification-mode:migrated:v1`; the four
+  toggles stay in `ClientSettingsSchema` as optional inputs and are never
+  written again. Fork-thread events only: the account events (a limit,
+  every account dead, revived) stay the native app's Notification Center
+  items, and the server's `thread.phase` push keeps `local: false` because
+  the desktop's banner covers that screen.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all ten where no
   connected server reaches an Infinitus app.
@@ -1679,7 +1668,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   through the control client directly; the Mac fans it out like its own
   account events (the phone's alert token, Slack, Telegram), `local: false`
   skipping its own Notification Center notice since the desktop's banner
-  (#270 B) already covers that screen. Each
+  (#1032) already covers that screen. Each
   event's phase is recorded per thread before the socket call and the first
   sighting of a thread pushes nothing, so a restart announces nothing and a
   phase is pushed once; `starting` / `running` / `stale` never. The setting
