@@ -83,6 +83,11 @@ describe("routeFailures", () => {
     ]);
     expect(routeFailures(lock, "Re-lock · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
   });
+
+  it("fails a row humanised from a fork_ pref key the web has no copy for", () => {
+    expect(routeFailures(lock, "Re-lock Fork tunnel enabled")).toEqual(['shows "Fork "']);
+    expect(routeFailures(lock, "Re-lock Tunnel hostname")).toEqual([]);
+  });
 });
 
 describe("checkVisualPass", () => {

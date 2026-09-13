@@ -27,6 +27,9 @@ export const ALWAYS_ABSENT: ReadonlyArray<string> = [
   "not answering",
   // #823: the product is Infinitus on every screen; the upstream name never shows.
   "T3 Code",
+  // #823 too: a Mac pref key starting `fork_` humanises to "Fork …" when the
+  // web has no copy for it, which puts the contributor's word on screen.
+  "Fork ",
   "Still connecting",
   "This Infinitus build has no",
   "could not be read",
