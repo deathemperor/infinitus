@@ -9,6 +9,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
+- `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 
 
 ## 0.5.0-alpha.8

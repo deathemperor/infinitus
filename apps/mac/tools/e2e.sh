@@ -673,7 +673,7 @@ printf '%s' "$DESK_TOKEN" | "$CTL" desktop-credential --origin "http://127.0.0.1
 "$CTL" desktop status | expect "d['reachable'] is True and d['version']=='0.0.0-demo'" || fail "desktop status reachable"
 "$CTL" desktop status | grep -q "$DESK_TOKEN" && fail "desktop status must never print the token"
 "$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is True and d['label'].startswith('…')" || fail "desktop credential accepted"
-"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT'" || fail "environments"
+"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT' and d[0]['platform']=='darwin'" || fail "environments"
 "$CTL" projects | expect "d[0]['id']=='p-demo' and d[0]['name']=='Demo project' and d[0]['env']=='env-demo'" || fail "projects"
 "$CTL" threads | expect "[t['id'] for t in d]==['t-running','t-idle'] and d[0]['status']=='running' and d[1]['status']=='held' and d[1]['hold']['summary']=='at limit until 09:00' and d[0]['project']=='Demo project'" || fail "threads"
 "$CTL" threads --status held | expect "len(d)==1 and d[0]['id']=='t-idle'" || fail "threads --status held"
