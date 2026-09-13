@@ -347,35 +347,6 @@ final class ControlServer {
             let existed = model.sessionProfiles.profiles.contains { SessionProfiles.same($0.name, name) }
             model.sessionProfiles.remove(name)
             return ControlReply(ok: true, result: .object(["removed": .bool(existed)]))
-        case "checkpoints", "checkpoint-diff", "checkpoint-restore":
-            guard let who = r.args.first, let pid = model.sessionPid(matching: who),
-                  let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { Int($0.pid) == pid })
-            else { throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`") }
-            let (sessionId, cwd) = (record.sessionId, record.cwd)
-            switch r.command {
-            case "checkpoints":
-                let (list, inGit) = try await Task.detached {
-                    (try Checkpoints.list(cwd: cwd, sessionId: sessionId), Checkpoints.toplevel(cwd: cwd) != nil)
-                }.value
-                return ControlReply(ok: true, result: try .of(["sessionId": .string(sessionId), "cwd": .string(cwd),
-                                                               "checkpoints": try .of(list),
-                                                               "enabled": .bool(model.checkpointsEnabled),
-                                                               "inGit": .bool(inGit)] as [String: JSONValue]))
-            case "checkpoint-diff":
-                guard r.args.count >= 2, let n = Int(r.args[1]) else { throw Fail("usage: checkpoint-diff <pid|name> <n> [m]") }
-                let m = r.args.count > 2 ? Int(r.args[2]) : nil
-                let diff = try await Task.detached { try Checkpoints.diff(cwd: cwd, sessionId: sessionId, from: n, to: m) }.value
-                return ControlReply(ok: true, result: try .of(diff))
-            default:
-                guard r.args.count >= 2, let n = Int(r.args[1]) else { throw Fail("usage: checkpoint-restore <pid|name> <n> --yes") }
-                guard r.options["yes"] != nil else { throw Fail("checkpoint-restore rewrites files in \(cwd); pass --yes") }
-                let (restored, backup) = try await Task.detached { try Checkpoints.restore(cwd: cwd, sessionId: sessionId, n: n) }.value
-                model.logEvent("other", icon: "clock.arrow.2.circlepath",
-                               "restored \((cwd as NSString).lastPathComponent) to checkpoint \(restored.subject)")
-                return ControlReply(ok: true, result: try .of(["restored": try .of(restored),
-                                                               "backup": try backup.map { try .of($0) } ?? .null] as [String: JSONValue]))
-            }
-
         case "past-sessions":
             let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
                                              limit: r.options["limit"].flatMap(Int.init) ?? 50,
@@ -433,25 +404,6 @@ final class ControlServer {
             return ControlReply(ok: reply.outcome == "delivered", result: try .of(reply),
                                 error: reply.outcome == "delivered" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
 
-        case "approve":
-            guard let payload = r.secret, let event = HookEvent.parse(payload), event.name == "PreToolUse",
-                  let sessionId = event.sessionId, let tool = event.toolName else {
-                throw Fail("approve: a PreToolUse hook payload is expected on stdin")
-            }
-            let reason = model.toolApprovals.reason(sessionId: sessionId, tool: tool, command: event.toolCommand)
-            if let reason { model.logEvent("hook", icon: "checkmark.shield", "allowed \(tool) from \(reason)") }
-            return ControlReply(ok: true, result: .object(["decision": .string(reason != nil ? "allow" : "ask")]))
-
-        case "session-mode":
-            guard r.args.count >= 2 else { throw Fail("usage: session-mode <pid|name> <\(SessionStart.hookModes.map(\.mode).joined(separator: "|"))>") }
-            guard let pid = model.sessionPid(matching: r.args[0]),
-                  let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { Int($0.pid) == pid })
-            else { throw Fail("no live session matches \(r.args[0]); see `infinitusctl sessions`") }
-            let reply = model.setSessionMode(r.args[1], pid: pid, record: record)
-            guard reply.outcome == "delivered" else { throw Fail(reply.detail ?? reply.outcome) }
-            return ControlReply(ok: true, result: .object(["mode": model.sessionBirths[pid]?.effectiveMode.map { .string($0) } ?? .null,
-                                                          "label": .string(reply.detail ?? "Supervised")]))
-
         case "session-stop":
             guard let pidText = r.args.first, let pid = Int32(pidText), pid > 1 else {
                 throw Fail("usage: session-stop <pid> --yes")
@@ -478,13 +430,6 @@ final class ControlServer {
                 "pid": .number(Double(pid)), "sessionId": .string(sessionId),
                 "esc": .string(esc.outcome), "grace": .number(Self.stopGrace),
             ]))
-
-        case "event":
-            guard let payload = r.secret, let event = HookEvent.parse(payload) else {
-                throw Fail("event: a Claude Code hook payload (JSON with hook_event_name) is expected on stdin")
-            }
-            let pid = model.handleHookEvent(event)
-            return ControlReply(ok: true, result: .object(["pid": pid.map { .number(Double($0)) } ?? .null]))
 
         case "permission":
             // #79 item 3: the plugin's PermissionRequest hook. A session

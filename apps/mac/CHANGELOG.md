@@ -7,6 +7,11 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
+- "Allow for this session" and the session permission mode switch are gone with the plugin.
+- Per-prompt repository checkpoints are gone (the list, diffs and restore on the Mac, the phone and `infinitusctl checkpoints`); thread checkpoints live in Infinitus desktop.
+
 ### Desktop
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.

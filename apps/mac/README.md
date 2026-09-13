@@ -122,7 +122,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
 - **Session chat from the phone** — each transcript as a chat with markdown, tool chips and sub-agent cards; reply, attach photos and files, answer prompts.
-- **Allow for this session** — the phone's permission card can allow a tool for the rest of the session; with the plugin, that prompt never comes back.
 - **Start a session from the phone** — a repository, the engine, a first prompt; the Mac opens cmux or Terminal and the chat follows. Siri too.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
@@ -134,7 +133,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **Sessions, named and narrated** — unnamed sessions get a Haiku title that follows the work; the phone opens on what's waiting, with Continue.
-- **A Claude Code plugin** — `infinitusctl plugin install`: hooks that reach the phone the moment a session needs you, an MCP server (`fleet_status`, `list_sessions`, `session_message`), `/infinitus:status` and `/infinitus:handoff`.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
 - **Capture the desktop into a session** — a region or window, a session, a note, delivered like a phone message.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
@@ -157,7 +155,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
 - **Start on any Mac** — the "+" sheet, Past sessions and Siri's Start a session pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.
 - **Profiles** — the desktop app's Infinitus › Profiles settings save named ways to start a session (folder, engine, permissions, model, system prompt, first prompt, tools allowed without asking); the phone, Siri and the Mac's Start a session take one.
-- **Checkpoints** — every prompt checkpoints the repository as a hidden git ref (with the plugin); list them, diff one against now or restore it from `infinitusctl checkpoints`, the Mac or the phone.
 - **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
 - **Fork a session** — Past sessions on the Mac and the phone, or `infinitusctl resume-session --fork`, continue a transcript under a new session id.
 - **Start a session from the Mac** — the sessions popover takes a profile chip, folder, engine, permissions and a first prompt.

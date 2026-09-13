@@ -33,7 +33,6 @@ struct MacSessionsPopover: View {
                     .font(PopupFont.caption2).foregroundStyle(.secondary)
             }
             Divider()
-            CheckpointsSection(model: model, live: live)
             Divider()
             StartSessionSection(model: model)
             Divider()

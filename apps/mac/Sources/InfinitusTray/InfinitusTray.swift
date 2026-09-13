@@ -689,44 +689,6 @@ struct InfinitusTray {
         }
     }
 
-    /// `GET /sessions/<pid>/checkpoints` — the ladder, exactly as the
-    /// Mac's `checkpoints.list` handler answers it (no `enabled`/`inGit`:
-    /// the tray has no Display toggle to report).
-    static func answerCheckpointsList(pid: Int32, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
-        let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
-        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
-        return try? encoder.encode(Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list))
-    }
-
-    /// `GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]`.
-    static func answerCheckpointDiff(pid: Int32, n: Int, to: Int?, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }),
-              let diff = try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: to)
-        else { return nil }
-        return try? JSONEncoder().encode(diff)
-    }
-
-    /// `POST /sessions/<pid>/checkpoints/<n>/restore` — the restore arm of
-    /// the Mac's checkpoints box (`AppModel`), byte for byte: the current
-    /// state is checkpointed first, so the restore is undoable, and the
-    /// reply names that backup. A restore that fails is still a reply
-    /// (`outcome: "failed"` with the git error), so only an unknown pid is
-    /// the `nil` the route turns into a 404 — the same mapping the Mac's
-    /// route makes. The tray serves this since #486 slice 3 writes the
-    /// checkpoints, so `capabilities.checkpoints` is a whole claim.
-    static func answerCheckpointRestore(pid: Int32, n: Int, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
-        do {
-            let (restored, backup) = try Checkpoints.restore(cwd: record.cwd, sessionId: record.sessionId, n: n)
-            logPhoneInput("🕐 phone restored \(URL(fileURLWithPath: record.cwd).lastPathComponent) "
-                + "to checkpoint \(restored.subject)")
-            return try? JSONEncoder().encode(Checkpoints.RestoreReply(outcome: "restored", backup: backup?.n))
-        } catch {
-            return try? JSONEncoder().encode(Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)"))
-        }
-    }
-
     /// `GET /sessions/<pid>/timeline?afterSequence=&epoch=&wait=` — the
     /// same sequence-resumable timeline the Mac serves (`TimelineCache` +
     /// `SequenceLog` + `TimelineSync`, all Core already); `serve` keeps
@@ -804,26 +766,6 @@ struct InfinitusTray {
     // out here (type-checked by a Mac build too), `serve` only binds the
     // socket and hands `ControlDispatch` these handlers.
 
-    /// Sessions whose first checkpoint has been logged — touched only from
-    /// the serial checkpoint queue `controlHandlers` hands work to.
-    nonisolated(unsafe) static var checkpointedSessions: Set<String> = []
-
-    /// The tray's `AppModel.recordCheckpoint`: one `Checkpoints.snapshot`
-    /// per prompt, the first one per session announced, an error swallowed
-    /// to a log line — a hook must never be told a checkpoint failed.
-    /// Runs on the checkpoint queue, never on the accept thread: git in a
-    /// big repository takes its time.
-    static func recordCheckpoint(cwd: String, sessionId: String, subject: String) {
-        let first = checkpointedSessions.insert(sessionId).inserted
-        let repo = URL(fileURLWithPath: cwd).lastPathComponent
-        do {
-            guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
-            if first { logPhoneInput("🕐 checkpointing \(repo) — \(made.subject)") }
-        } catch {
-            if first { logPhoneInput("⚠️ checkpoint of \(repo) failed: \(error)") }
-        }
-    }
-
     /// `infinitusctl status` against the tray: enough to prove whose
     /// socket answered and that it can see this box's sessions.
     static func controlStatus(appVersion: String = BuiltVersion.string) -> JSONValue {
@@ -833,26 +775,8 @@ struct InfinitusTray {
                         "sessions": .number(Double(sessions))])
     }
 
-    static func controlHandlers(queue: DispatchQueue, pushes box: PushBox,
-                                flags: PushTriggers.Flags) -> ControlDispatch.Handlers {
-        ControlDispatch.Handlers(
-            checkpoint: { cwd, sessionId, subject in
-                queue.async { recordCheckpoint(cwd: cwd, sessionId: sessionId, subject: subject) }
-            },
-            status: { controlStatus() },
-            sessionPid: { sessionId in
-                ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .first { $0.sessionId == sessionId }.map { Int($0.pid) }
-            },
-            hook: { event, pid in
-                // A Notification that needs a human goes out now, not on
-                // the next tick — which then skips the same pid
-                // (announceWaiting, the Mac's rule). Detached: the hook
-                // gets its reply first, Claude Code times hooks out.
-                guard let line = event.pushLine, flags.waiting else { return }
-                if let pid { box.with { $0.announceWaiting(pid: pid) } }
-                Task { await deliverPush(line) }
-            })
+    static func controlHandlers() -> ControlDispatch.Handlers {
+        ControlDispatch.Handlers(status: { controlStatus() })
     }
 
     /// `serve`'s push state, shared between its tick and the control
@@ -1034,31 +958,6 @@ struct InfinitusTray {
                                               cache: commandsCache)
                 return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
             }
-            // #486 slice 2: GET /sessions/<pid>/checkpoints — the ladder.
-            if request.method == "GET", let pid = MirrorTransport.sessionCheckpointsPid(request.path) {
-                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                let response = answerCheckpointsList(pid: pid, sessions: sessions)
-                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
-            }
-            // #486 slice 2: GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]
-            // and, since slice 3 writes checkpoints on Linux, POST
-            // …/restore — the same one path shape, the method telling them
-            // apart exactly as the Mac's route does. Both take a while
-            // (trees read, a worktree rewritten); one thread per connection
-            // here, so blocking is fine.
-            if let ref = MirrorTransport.sessionCheckpointRef(request.path),
-               request.method == (ref.action == .diff ? "GET" : "POST") {
-                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                let response: Data?
-                switch ref.action {
-                case .diff:
-                    let to = request.query(MirrorTransport.checkpointToQueryName).flatMap(Int.init)
-                    response = answerCheckpointDiff(pid: ref.pid, n: ref.n, to: to, sessions: sessions)
-                case .restore:
-                    response = answerCheckpointRestore(pid: ref.pid, n: ref.n, sessions: sessions)
-                }
-                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
-            }
             return MirrorTransport.notFoundResponse()
         }
         let bound: UInt16
@@ -1069,14 +968,12 @@ struct InfinitusTray {
         }
         print("infinitus-tray serve: listening on 0.0.0.0:\(bound), "
             + "pairing token \(MirrorPairing.mask(resolved))")
-        // #486 slice 3: the control socket beside the HTTP listener, so the
-        // plugin's hooks reach this box (`infinitusctl event`) and a Linux
-        // session's prompts record checkpoints. `event` and `status` only —
+        // #486 slice 3: the control socket beside the HTTP listener, so
+        // `infinitusctl status` reaches this box. `status` only —
         // `ControlDispatch` answers everything else with a considered no.
         // A bind that fails is logged, never fatal: the phone's mirror is
         // this process's job, the socket is the extra.
-        let checkpointQueue = DispatchQueue(label: "infinitus.tray.checkpoints")
-        let handlers = controlHandlers(queue: checkpointQueue, pushes: pushes, flags: pushFlags)
+        let handlers = controlHandlers()
         let controlPath = ControlProtocol.socketURL().path
         let control = PosixControlSocket(path: controlPath) {
             ControlDispatch.replyLine(to: $0, handlers: handlers)
