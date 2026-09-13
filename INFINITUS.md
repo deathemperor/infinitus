@@ -1073,7 +1073,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
-  the Menu bar page keeps `display` + `about`; a section the build lacks
+  the Menu bar page keeps `display` + `about`; the Priority page reads the
+  catalog's `priority` section and, on a build before the Mac's session
+  sweep (#1041), `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
@@ -1213,12 +1215,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
   `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
   › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off [--yes]|now|relock <arg>` / `unlock` (native
-  #788), each answering `{enabled, locked, relock}`. The switch turns the
-  lock on (the Mac's own prompt runs there; the row says "Confirm on the
-  Mac" while it waits) or off; a `lock off` refused inside a team ("this Mac
-  is in …; lock off --yes …") becomes a Keep on / Turn off confirm whose
-  Turn off sends `--yes`. Re-lock is a select over the four native labels
+  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
+  each answering `{enabled, locked, relock}`. The switch turns the lock on
+  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
+  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
+  Re-lock is a select over the four native labels
   (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
@@ -1384,7 +1385,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
-  nothing lapsed); row/section/sign-in models come from
+  nothing lapsed; one row per tool and profile, no session names and no
+  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):
   a server whose config arrived with `false` or without the field

@@ -730,7 +730,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus",
     targetId: "infinitus-display",
     infinitusOnly: true,
-    searchTerms: ["menu bar popup sessions startup about updates"],
+    searchTerms: ["menu bar popup startup about updates threads"],
   },
   {
     // Fork (#574): the Slack bridge sits on the Menu bar page under Threads.

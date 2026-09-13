@@ -194,7 +194,8 @@ export function RestartConfirmDialog({
           <AlertDialogTitle>Relaunch Infinitus?</AlertDialogTitle>
           <AlertDialogDescription>
             “{pending.label}” only takes hold at the next launch, so Infinitus quits and comes
-            straight back. Sessions it runs keep going; this page reconnects on its own.
+            straight back. Threads keep running — they live on this server; this page reconnects on
+            its own.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

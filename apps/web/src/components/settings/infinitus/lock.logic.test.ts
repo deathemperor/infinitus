@@ -3,7 +3,6 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   lockCommandInput,
   lockCommandsSupported,
-  lockOffRefusalTeams,
   parseLockStatus,
   RELOCK_CHOICES,
   relockChoiceFor,
@@ -50,15 +49,10 @@ describe("lock.logic (#747)", () => {
       args: ["on"],
       options: {},
     });
-    expect(lockCommandInput({ type: "off", force: false })).toEqual({
+    expect(lockCommandInput({ type: "off" })).toEqual({
       command: "lock",
       args: ["off"],
       options: {},
-    });
-    expect(lockCommandInput({ type: "off", force: true })).toEqual({
-      command: "lock",
-      args: ["off"],
-      options: { yes: "true" },
     });
     expect(lockCommandInput({ type: "relock", arg: "sleep" })).toEqual({
       command: "lock",
@@ -70,12 +64,5 @@ describe("lock.logic (#747)", () => {
       args: [],
       options: {},
     });
-  });
-
-  it("reads the team names out of a refused lock off", () => {
-    expect(
-      lockOffRefusalTeams("this Mac is in Alpha, Beta; lock off --yes turns the lock off anyway"),
-    ).toEqual(["Alpha", "Beta"]);
-    expect(lockOffRefusalTeams("the unlock prompt was cancelled")).toBeNull();
   });
 });

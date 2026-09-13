@@ -23,12 +23,6 @@ export function signInStatus(row: SignInRowModel): string {
   }
 }
 
-/** Which sessions are stuck on the row, or empty when the app named none. */
-export function waitingSessionsLabel(sessions: ReadonlyArray<string>): string {
-  if (sessions.length === 0) return "";
-  return `Waiting: ${sessions.join(", ")}`;
-}
-
 /** The button's text, or null while a login runs or after it finished. */
 export function signInButtonLabel(row: SignInRowModel): string | null {
   if (row.phase === "idle") return "Sign in";
