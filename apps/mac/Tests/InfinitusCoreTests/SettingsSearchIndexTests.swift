@@ -27,7 +27,7 @@ final class SettingsSearchIndexTests: XCTestCase {
         SettingsSearchEntry(pane: "Themes", label: "Themes",
                             keywords: ["skin", "gallery"]),
         SettingsSearchEntry(pane: "Push", label: "Push",
-                            keywords: ["slack", "telegram", "webhook"]),
+                            keywords: ["notification"]),
     ])
 
     func testFindsASettingByItsOwnLabel() {

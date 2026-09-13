@@ -128,9 +128,8 @@ final class BrewUpdater: ObservableObject {
     @Published var running = false
     @Published var status: String?
     /// The app wires this to AppModel.relaunchApp, which waits for this
-    /// pid to exit before `open` and quits the way the menu does: a bare
-    /// terminate(nil) from a Task parks a team member in
-    /// applicationShouldTerminate's nested loop (#654, the #673 lesson).
+    /// pid to exit before `open` and quits the way the menu does (#654,
+    /// the #673 lesson).
     var relaunch: () -> Void = { NSApplication.shared.terminate(nil) }
 
     static let brewPath: String? =

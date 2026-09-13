@@ -65,7 +65,7 @@ before that the `native` branch). Split out of
   appends it; each clone/worktree owner runs `git config core.hooksPath
   tools/githooks` once (shared across worktrees of one clone). Subagent
   briefs still say it explicitly.
-- Secrets (webhook URLs, bot tokens) travel over stdin, never argv; shown
+- Secrets (tokens, sign-in codes) travel over stdin, never argv; shown
   masked only. Usage-cost figures are estimates, never billing truth.
 - **Release notes: one feature, one line** (user 2026-09-04). A CHANGELOG
   bullet is a single short sentence — no multi-sentence paragraphs, no

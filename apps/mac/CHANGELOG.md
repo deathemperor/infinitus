@@ -8,6 +8,23 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
+- "Allow for this session" and the session permission mode switch are gone with the plugin.
+- Per-prompt repository checkpoints are gone (the list, diffs and restore on the Mac, the phone and `infinitusctl checkpoints`); thread checkpoints live in Infinitus desktop.
+- The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
+- The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
+- A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
+- A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
+- The Team features are gone (shared fleets, member roster, join codes, nearby discovery, team control): Infinitus is about threads now.
+- An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
+
+### Desktop
+- The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
+- A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
+
+## 0.5.0-alpha.7
+
+### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
 - Resume nudges are gone: a terminal session a usage limit stopped is no longer typed a "continue" once an account works again (threads resume on their own in Infinitus desktop).
 - The Mac no longer nudges a terminal session after an AWS or gcloud sign-in from the phone; the sign-in itself is unchanged.

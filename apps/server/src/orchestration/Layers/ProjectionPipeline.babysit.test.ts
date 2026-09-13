@@ -55,7 +55,10 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
       const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" };
       const shell = () =>
         snapshotQuery.getThreadShellById(threadId).pipe(Effect.map(Option.getOrThrow));
-      const update = (commandId: string, fields: { babysit?: boolean; babysitRounds?: number }) =>
+      const update = (
+        commandId: string,
+        fields: { babysit?: boolean; babysitRounds?: number; babysitStopped?: true },
+      ) =>
         engine.dispatch({
           type: "thread.meta.update",
           commandId: CommandId.make(commandId),
@@ -91,7 +94,7 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
       const on = (yield* shell()).babysit;
       assert.isNotNull(on);
       assert.strictEqual(on?.rounds, 0);
-      const since = on?.since;
+      const since = on?.since ?? "";
 
       yield* update("cmd-babysit-round", { babysitRounds: 3 });
       assert.deepStrictEqual((yield* shell()).babysit, { since, rounds: 3 });
@@ -103,6 +106,22 @@ engineLayer("babysit on the thread projection (#269 A)", (it) => {
         SELECT babysit_json AS babysit FROM projection_threads WHERE thread_id = ${threadId}
       `;
       assert.deepStrictEqual(yield* decodeBabysitJson(rows[0]?.babysit), { since, rounds: 3 });
+
+      // Stopped at the cap (#269 A): the record stays with `stoppedAt`, a
+      // round count no longer moves it, and on again starts a fresh one.
+      yield* update("cmd-babysit-stop", { babysitStopped: true });
+      const stopped = (yield* shell()).babysit;
+      assert.strictEqual(stopped?.since, since);
+      assert.strictEqual(stopped?.rounds, 3);
+      assert.isString(stopped?.stoppedAt);
+      yield* update("cmd-babysit-round-stopped", { babysitRounds: 4 });
+      assert.deepStrictEqual((yield* shell()).babysit, stopped);
+      yield* update("cmd-babysit-stop-again", { babysitStopped: true });
+      assert.deepStrictEqual((yield* shell()).babysit, stopped);
+      yield* update("cmd-babysit-on-fresh", { babysit: true });
+      const fresh = (yield* shell()).babysit;
+      assert.strictEqual(fresh?.rounds, 0);
+      assert.isUndefined(fresh?.stoppedAt);
 
       yield* update("cmd-babysit-off", { babysit: false });
       assert.isUndefined((yield* shell()).babysit);

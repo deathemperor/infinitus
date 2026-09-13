@@ -24,7 +24,7 @@ final class ControlProtocolTests: XCTestCase {
     func testNullResultIsAValueNotAnAbsence() throws {
         let v = ControlProtocol.schemaVersion
         let null = try ControlCodec.decode(ControlReply.self, from: Data("{\"schemaVersion\":\(v),\"ok\":true,\"result\":null}\n".utf8))
-        XCTAssertEqual(null.result, .null, "team-status with no team answers null; the CLI prints it")
+        XCTAssertEqual(null.result, .null, "a null result is a value; the CLI prints it")
         let absent = try ControlCodec.decode(ControlReply.self, from: Data("{\"schemaVersion\":\(v),\"ok\":true}\n".utf8))
         XCTAssertNil(absent.result)
         let back = try ControlCodec.decode(ControlReply.self, from: try ControlCodec.encode(ControlReply(ok: true, result: .null)))
@@ -53,8 +53,6 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("profile-set")?.args, ["<name>"])
         XCTAssertEqual(ControlCommand.named("profile-remove")?.effect, .write)
         XCTAssertTrue(ControlCommand.named("status")?.replyShape.contains("forkTunnel:{enabled, port, state, url?, hostname?}") ?? false)
-        XCTAssertEqual(ControlCommand.named("checkpoint-restore")?.effect, .destructive)
-        XCTAssertEqual(ControlCommand.named("checkpoint-diff")?.args, ["<pid|name>", "<n>", "[m]"])
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")
         XCTAssertEqual(ControlCommand.named("lock-status")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("signin-begin")?.effect, .human)
@@ -64,24 +62,14 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertTrue(ControlCommand.named("signin-code")?.summary.contains("stdin") ?? false)
         XCTAssertEqual(ControlCommand.named("signin-cancel")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("lock-status")?.args, [])
-        XCTAssertEqual(ControlCommand.named("team-status")?.effect, .read)
-        XCTAssertEqual(ControlCommand.named("team-create")?.args, ["<name>"])
-        XCTAssertEqual(ControlCommand.named("team-create")?.effect, .write)
-        XCTAssertEqual(ControlCommand.named("session-mode")?.effect, .write)
-        XCTAssertEqual(ControlCommand.named("team-approve")?.args, ["<kid>"])
-        XCTAssertEqual(ControlCommand.named("team-publish")?.effect, .write)
-        XCTAssertEqual(ControlCommand.named("team-code")?.effect, .write, "fetches the store and (--invite) writes the nonce book")
         XCTAssertEqual(ControlCommand.named("show")?.args, ["popout|settings"])
         XCTAssertEqual(ControlCommand.named("hide")?.args, ["popout|settings"])
         XCTAssertEqual(ControlCommand.named("prefs")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("prefs")?.args, ["[get <key>...]"])
         XCTAssertEqual(ControlCommand.named("prefs-set")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("prefs-set")?.args, ["<key>", "<value>"])
-        XCTAssertNotNil(ControlCommand.named("team-code")); XCTAssertNotNil(ControlCommand.named("team-fetch")); XCTAssertNotNil(ControlCommand.named("team-decline"))
-        XCTAssertEqual(ControlCommand.named("team-sessions")?.effect, .read)
-        XCTAssertEqual(ControlCommand.named("team-drive")?.args.first, "<kid|name>")
-        XCTAssertEqual(ControlCommand.named("team-drive")?.effect, .write)
         XCTAssertNil(ControlCommand.named("nope"))
+        XCTAssertNil(ControlCommand.named("team-status"), "the Team subsystem is gone")
     }
 
     func testManifestEncodesForAgents() throws {
@@ -137,9 +125,9 @@ final class ControlProtocolTests: XCTestCase {
     /// anywhere else; payload readers are marked apart from them.
     func testTheManifestDeclaresWhichVerbsTakeASecret() {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
-        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "team-create", "team-join", "team-hostname", "proxy-key", "9router-password", "push-slack", "push-telegram", "desktop-credential"])
+        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "proxy-key", "9router-password", "desktop-credential"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
-        XCTAssertEqual(Set(payload), ["approve", "event", "push", "permission"])
+        XCTAssertEqual(Set(payload), ["push"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
     }
 

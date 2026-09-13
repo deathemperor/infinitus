@@ -147,9 +147,12 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             : theme.planLabel(plan, compact: compactText)
     }
 
-    /// "6 min ago" beside the plan when swapd could not refresh this
-    /// account (#965); nil for every fresh row.
-    var staleAge: String? { account.staleAgeLabel }
+    /// "6 min ago" beside the plan, with its tooltip, when swapd could
+    /// not refresh this account (#965); nil for every other row.
+    var staleAge: (label: String, tip: String)? {
+        guard let label = account.staleAgeLabel, let tip = account.staleTip else { return nil }
+        return (label, tip)
+    }
 
     /// Themed account number ("P1", "S3"); the raw number stays in
     /// tooltips and identifies the row for switching.

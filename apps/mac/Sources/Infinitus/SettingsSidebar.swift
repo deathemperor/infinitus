@@ -29,7 +29,7 @@ enum SettingsGroup: String, CaseIterable, Identifiable {
     static func of(_ tab: SettingsTab) -> SettingsGroup {
         if tab.provider != nil { return .engines }
         switch tab.title {
-        case "Accounts", TeamModel.paneTitle: return .accounts
+        case "Accounts": return .accounts
         case "Usage", "Utilization", "Stats", "Machine", "Activity": return .dashboards
         case "About", "Animations": return .app
         default: return .general

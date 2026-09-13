@@ -43,12 +43,7 @@ export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
 export INFINITUS_SWAPD_CLI="$PWD/tools/demo-swapd"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
-# Spec §11 e2e: the app is a team leader on a bare repo in $SOCKDIR with
-# its own team dir (file secrets, no keychain), and publishes a fixture
-# projects dir instead of this Mac's real transcripts.
 export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
-export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"
-export INFINITUS_TEAM_PROJECTS="$SOCKDIR/fixture/projects"
 LOG="$(mktemp -t infinitus-e2e)"
 # This run's own defaults domain (#690): unbundled debug binaries used to
 # share one, so a peer's leftover fork_server_port could fail another
@@ -110,7 +105,7 @@ expect() {
 import json,sys
 raw=sys.stdin.read()
 try: d=json.loads(raw); bad=False
-except Exception: bad=True     # a JSON null is a legitimate reply (team-status before a team)
+except Exception: bad=True     # a JSON null is a legitimate reply
 if bad or not ($1):
     open('$LOG.reply','w').write(raw[:800]); sys.exit(1)
 " && rm -f "$LOG.reply"
@@ -412,10 +407,6 @@ echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 "$CTL" prefs set priority_mode off | expect "d['value']=='off'" || fail "prefs set priority_mode off (interrupt)"
 echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" aws-logins | expect "'logins' in d and isinstance(d['logins'], list)" || fail "aws-logins verb"
-# #756: the app's own away channels; a token with no chat is refused, empty stdin forgets.
-printf '123456:ABCdef' | "$CTL" push-telegram 2>&1 | grep -q "usage: push-telegram --chat" || fail "push-telegram must want a chat"
-printf 'http://hooks.example/x' | "$CTL" push-slack 2>&1 | grep -q "https URL" || fail "push-slack must want https"
-"$CTL" push-slack </dev/null | expect "d['slack'] is False and d['telegram'] is False" || fail "push-slack with empty stdin forgets"
 "$CTL" forecast | expect "'forecast' in d and (d['forecast'] is None or ('basis' in d['forecast'] and 'accounts' in d['forecast']))" || fail "forecast verb"
 "$CTL" utilization --days 7 | expect "d['days']==7 and d['bucketSeconds']==1800 and isinstance(d['samples'], list) and d['windows'][:2]==['5h','7d'] and 'switches' in d['replay']" || fail "utilization verb (#747)"
 "$CTL" utilization --days 400 >/dev/null 2>&1 && fail "utilization must refuse an out-of-range day count"
@@ -423,8 +414,8 @@ printf 'http://hooks.example/x' | "$CTL" push-slack 2>&1 | grep -q "https URL" |
 
 # --- windows: Settings open idles too ------------------------------------
 # The Settings-open case sat at 18% for a week (#346: transcript reads,
-# the past-sessions walk, the team publish and the machine sampler all
-# ran on behind it) while the pop-out gate read 0.5%; this is the gate
+# the past-sessions walk and the machine sampler all ran on behind it)
+# while the pop-out gate read 0.5%; this is the gate
 # that would have caught it. Settle first: the window builds its tabs on
 # the first open.
 settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
@@ -567,44 +558,6 @@ echo "aws: need surfaced after ${i}s"
 pgrep -f "aws login --profile e2e-login" >/dev/null || fail "the session's own aws login is not running before the sign-in (#1007)"
 # #612: the row carries the id, the start and the need the fork's list shows.
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
-# #79: the Stop hook hints idle at once; the record's next statusUpdatedAt
-# still wins.
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
- "statusUpdatedAt":1700000000000}
-EOF
-"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='busy'" || fail "session busy before the Stop hook (#79)"
-printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"Stop","stop_hook_active":false}' "$SESSION_CWD" \
-    | "$CTL" event >/dev/null || fail "event Stop"
-"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "Stop hint did not read idle ahead of the record (#79)"
-sleep 1
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
- "statusUpdatedAt":$(date +%s)000}
-EOF
-"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='busy'" || fail "a fresh record status did not override the Stop hint (#79)"
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
-EOF
-# #79: the StopFailure hook hints idle the same way and logs the error
-# kind only — never error_details or last_assistant_message.
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"busy",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000,
- "statusUpdatedAt":1700000000000}
-EOF
-printf '{"session_id":"e2e-aws","cwd":"%s","hook_event_name":"StopFailure","error":"rate_limit","error_details":"e2e","last_assistant_message":"e2e assistant text"}' "$SESSION_CWD" \
-    | "$CTL" event >/dev/null || fail "event StopFailure"
-"$CTL" sessions | expect "next(s['status'] for s in d if s['pid']==$SESSION_PID)=='idle'" || fail "StopFailure hint did not read idle (#79)"
-"$CTL" events --limit 50 | expect "any(e['text']=='StopFailure — $(basename "$SESSION_CWD") (rate_limit)' for e in d)" || fail "StopFailure log line missing (#79)"
-"$CTL" events --limit 50 | expect "not any('assistant text' in e['text'] for e in d)" || fail "StopFailure logged assistant text (#79)"
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
-EOF
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).
@@ -702,58 +655,6 @@ while aws_login_item; do
 done
 "$CTL" aws-login e2e-login --status | expect "'outside the app' in d['state']['message']" || fail "probe outcome not recorded"
 echo "aws: lapse met outside the app cleared by the probe"
-# --- team (spec §11) -------------------------------------------------------
-# The app creates a team on a bare repo; a second identity — the CLI
-# in-process, its own INFINITUS_TEAM_DIR — joins with a team code and
-# publishes a fixture transcript; the app approves and reads it back.
-"$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
-git init -q --bare "$SOCKDIR/team.git"
-# Transcript branches are fetched without their blobs (#414); a bare
-# repo honours the filter only when told to, as the hosted remotes do.
-git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
-"$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
-    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder']" || fail "team-create"
-CODE="$("$CTL" team-code --days 1 | json "d['code']")"
-case "$CODE" in infinitus://join/*) ;; *) fail "team-code shape" ;; esac
-NOW="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
-mkdir -p "$SOCKDIR/fixture/projects/-tmp-e2e"
-printf '%s\n%s\n' \
-    "{\"type\":\"user\",\"cwd\":\"/tmp/e2e\",\"timestamp\":\"$NOW\",\"origin\":{\"kind\":\"human\"},\"message\":{\"role\":\"user\",\"content\":\"hello team\"}}" \
-    "{\"type\":\"assistant\",\"timestamp\":\"$NOW\",\"message\":{\"id\":\"e2e-1\",\"model\":\"claude-opus-5\",\"usage\":{\"input_tokens\":10,\"output_tokens\":1},\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}}" \
-    > "$SOCKDIR/fixture/projects/-tmp-e2e/e2e1.jsonl"
-CLI_TEAM="$SOCKDIR/team-cli"
-printf '%s' "$CODE" | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team request - --name Bo >/dev/null || fail "cli team request"
-KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
-"$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
-"$CTL" team-approve "$KID" | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "team-approve"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
-# #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
-# the app's own view, and a subcommand the app has no verb for either refuses
-# to mint a second identity or says whose identity it is using.
-env -u INFINITUS_TEAM_DIR "$CTL" team status | expect "d['role']=='leader' and d['name']=='Papaya'" || fail "cli team status did not route to the app"
-env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Mac's team identity\|infinitusctl's own identity" || fail "cli team identity neither refused nor named its own identity beside the app's"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish --projects "$SOCKDIR/fixture/projects" \
-    | expect "d['transcriptChunks']>=1" || fail "cli team publish"
-# "Nobody" (spec §7): the appended line WOULD chunk — the point of the
-# assertion is that it does not while transcripts are off. Do not drop it.
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
-    | expect "d['byKind']['transcripts']=='off'" || fail "team share transcripts off"
-printf '%s\n' \
-    "{\"type\":\"assistant\",\"timestamp\":\"$NOW\",\"message\":{\"id\":\"e2e-2\",\"model\":\"claude-opus-5\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1},\"content\":[{\"type\":\"text\",\"text\":\"more\"}]}}" \
-    >> "$SOCKDIR/fixture/projects/-tmp-e2e/e2e1.jsonl"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish --projects "$SOCKDIR/fixture/projects" \
-    | expect "d['transcriptChunks']==0" || fail "transcripts off must publish no chunks"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts leaders \
-    | expect "d['byKind']['transcripts']=='leaders'" || fail "restore the transcripts audience"
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'stats' in m['kinds'] and 'transcripts' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
-"$CTL" team-publish | expect "'published' in d" || fail "team-publish"
-"$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
-echo "team: ok (leader Ann, member Bo $KID)"
-# #747: the secret-carrying team verbs refuse an empty stdin by name.
-"$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
-"$CTL" team-hostname --zone example.com --label infi </dev/null 2>&1 | grep -q "needs the Cloudflare API token" || fail "team-hostname must ask for the token on stdin"
-"$CTL" team-hostname --zone example.com 2>&1 | grep -q "usage: team-hostname" || fail "team-hostname must want a label"
-"$CTL" team-hostname --clear </dev/null | expect "d['configured'] is False and d['zone'] is None" || fail "team-hostname --clear"
 
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
 # credential comes on stdin like every secret and stays in this run's own
@@ -801,113 +702,6 @@ rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
 kill "$DESK_PID" 2>/dev/null || true
 echo "desktop verbs: ok"
 
-# --- permission asks (#79 item 3) --------------------------------------
-# The real hook script against the fake session: a session not opted in
-# is stepped aside from; opted in, the hook registers the ask, parks on
-# permission-wait, and prints the allow once the desktop decides. Before
-# the team round: its stop grant signals the fake session.
-PERM_HOOK="$(dirname "$0")/../plugins/infinitus/hooks/permission.sh"
-PERM_PAYLOAD='{"session_id":"e2e-aws","hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"/r","tool_input":{"command":"git push origin main"},"permission_suggestions":[]}'
-printf '%s' "$PERM_PAYLOAD" | "$CTL" permission | expect "d=={'remote': False}" || fail "permission steps aside for a session not opted in"
-[ -z "$(printf '%s' "$PERM_PAYLOAD" | INFINITUS_CTL="$CTL" sh "$PERM_HOOK")" ] || fail "the hook prints nothing for a session not opted in"
-"$CTL" session-remote e2e-aws on | expect "d['remote'] is True and d['pid']==$SESSION_PID" || fail "session-remote on"
-"$CTL" sessions | expect "[s['remote'] for s in d if s['sessionId']=='e2e-aws']==[True]" || fail "sessions carries remote"
-PERM_OUT="$SOCKDIR/perm-hook.out"
-printf '%s' "$PERM_PAYLOAD" | INFINITUS_CTL="$CTL" sh "$PERM_HOOK" >"$PERM_OUT" &
-PERM_HOOK_PID=$!
-i=0; until [ "$("$CTL" permission-pending | json "len(d)")" = 1 ]; do i=$((i + 1)); [ "$i" -lt 40 ] || fail "the ask never registered ($("$CTL" permission-pending 2>&1 | head -c 200))"; sleep 0.25; done
-"$CTL" permission-pending | expect "d[0]['tool']=='Bash' and d[0]['input']=='git push origin main' and d[0]['pid']==$SESSION_PID and d[0]['sessionId']=='e2e-aws'" || fail "permission-pending carries the ask"
-PERM_ID="$("$CTL" permission-pending | json "d[0]['id']")"
-kill -0 "$PERM_HOOK_PID" 2>/dev/null || fail "the hook did not park"
-"$CTL" permission-decide "$PERM_ID" allow | expect "d['decided'] is True and d['decision']=='allow'" || fail "permission-decide"
-wait "$PERM_HOOK_PID" || fail "the hook exited non-zero"
-grep -q '"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}' "$PERM_OUT" || fail "the hook printed no allow (got: $(head -c 200 "$PERM_OUT"))"
-"$CTL" permission-pending | expect "d==[]" || fail "the ask is gone once answered"
-"$CTL" permission-decide "$PERM_ID" allow 2>&1 | grep -q 'no open ask' || fail "a second decision is refused"
-"$CTL" session-remote e2e-aws off | expect "d['remote'] is False" || fail "session-remote off"
-printf '%s' "$PERM_PAYLOAD" | "$CTL" permission | expect "d=={'remote': False}" || fail "off steps aside again"
-echo "permission asks: ok (not remote → aside; remote → register → wait → allow → hook exit)"
-
-# --- team control (#220, grantor) ------------------------------------------
-# Bo lets leaders send to one session; the hint rides Bo's now.json and
-# Ann's snapshot says what Bo lets her do. Driving itself lands with the
-# driver PR (the mirror listener is off in mock mode).
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grant leaders --sessions s-e2e --send \
-    | expect "d['audience']=='leaders' and d['sessions']==['s-e2e'] and d['capabilities']==['send']" || fail "team grant"
-GRANT="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grants | json "d['grants'][0]['id']")"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish --projects "$SOCKDIR/fixture/projects" >/dev/null || fail "publish with a grant"
-"$CTL" team-fetch | expect "[m for m in d['members'] if m['name']=='Bo'][0].get('controls')==['send']" || fail "the grant hint did not reach the leader's snapshot"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team revoke "$GRANT" | expect "d['removed']" || fail "team revoke"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team grants | expect "d['grants']==[]" || fail "revoke left the grant"
-# Driver over the store lane: Ann grants Bo `send` on the live session;
-# Bo's send finds no endpoint in Ann's now.json (no listener in mock
-# mode) and lands in the store; Ann's next fetch executes it into the
-# session's peer inbox and acks; Bo reads the ack. A capability Bo was
-# NOT given is acked as a refusal. (The HTTP lanes are unit-tested: a
-# listener here would collide with the real app's mirror port.)
-ANN_KID="$("$CTL" team-status | json "d['kid']")"
-"$CTL" team grant "$KID" --sessions e2e-aws --send | expect "d['capabilities']==['send']" || fail "ann grant"
-ANN_GRANT="$("$CTL" team grants | json "d['grants'][0]['id']")"
-printf 'hello from Bo via the store' | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team send "$ANN_KID" e2e-aws \
-    | expect "d['lane']=='store' and d['outcome']=='queued'" || fail "team send"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team mode "$ANN_KID" e2e-aws acceptEdits | expect "d['lane']=='store'" || fail "team mode"
-"$CTL" team-fetch >/dev/null || fail "grantor fetch"
-grep -q 'hello from Bo via the store' "$INBOX" \
-    || fail "the store command never reached the session (events: $("$CTL" events --limit 100 | python3 -c "import json,sys; print([e['text'] for e in json.load(sys.stdin) if e['icon']=='person.2'])"); acks: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 400))"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks \
-    | expect "sorted(r['outcome'] for r in d)==['delivered','noGrant']" || fail "acks (got: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 300))"
-"$CTL" team revoke "$ANN_GRANT" | expect "d['removed']" || fail "ann revoke"
-"$CTL" events --limit 100 | expect "d and all(e['id'] and e['kind'] for e in d) and any(e['kind']=='team-control' and e['icon']=='person.2' for e in d)" || fail "events rows carry id and kind (#615)"
-LAST_EVENT=$("$CTL" events --limit 100 | python3 -c "import json,sys; print(json.load(sys.stdin)[-1]['id'])")
-"$CTL" events --after "$LAST_EVENT" | expect "d['known'] is True and d['after']=='$LAST_EVENT' and d['rows']==[]" || fail "events --after the newest id is known with no rows (#346)"
-"$CTL" events --after nope --limit 3 | expect "d['known'] is False and len(d['rows'])==3" || fail "events --after an unknown id re-seeds with the full tail (#346)"
-
-# Phase 2 (#220): a `stop` grant without --pre waits for Ann's tap; the tap
-# runs the Mac's own session-stop (Esc — no PTY here — then SIGTERM after
-# the grace) and the answer rides the outbox to Bo's next fetch. Revoked ⇒
-# noGrant, judged before liveness, so the dead session does not matter.
-"$CTL" team grant "$KID" --sessions e2e-aws --stop | expect "d['capabilities']==['stop'] and 'preauthorized' not in d" || fail "stop grant"
-STOP_GRANT="$("$CTL" team grants | json "d['grants'][0]['id']")"
-DRIVE="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" e2e-aws stop)" || fail "team drive stop"
-echo "$DRIVE" | expect "d['lane']=='store' and d['outcome']=='queued'" || fail "team drive stop lands in the store (got: $DRIVE)"
-STOP_CMD="$(echo "$DRIVE" | json "d['id']")"
-"$CTL" team-fetch >/dev/null || fail "grantor fetch (stop)"
-PENDING_ID="$("$CTL" team-pending | json "[p['id'] for p in d if p['action']=='stop' and p['session']=='e2e-aws'][0]")" || fail "team-pending lists the wait ($("$CTL" team-pending 2>&1 | head -c 300))"
-[ "$PENDING_ID" = "$STOP_CMD" ] || fail "the wait carries the command's id"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$STOP_CMD']==['pending']" || fail "Bo reads pending"
-"$CTL" team-allow "$STOP_CMD" | expect "d['outcome']=='done'" || fail "team-allow (got: $("$CTL" team-pending 2>&1 | head -c 200))"
-"$CTL" team-pending | expect "d==[]" || fail "the wait is gone after the tap"
-i=0; until ! kill -0 "$SESSION_PID" 2>/dev/null; do i=$((i + 1)); [ "$i" -lt 40 ] || fail "session-stop never signalled the session after the grace"; sleep 0.5; done
-"$CTL" team-fetch >/dev/null || fail "grantor fetch (outbox)"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$STOP_CMD']==['done']" || fail "the decision reached Bo (got: $(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks 2>&1 | head -c 300))"
-"$CTL" team revoke "$STOP_GRANT" | expect "d['removed']" || fail "stop revoke"
-AGAIN="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" e2e-aws stop | json "d['id']")" || fail "team drive stop again"
-"$CTL" team-fetch >/dev/null || fail "grantor fetch (revoked)"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "[r['outcome'] for r in d if r['id']=='$AGAIN']==['noGrant']" || fail "a revoked grant is refused"
-echo "team control: ok (Phase 2 stop → pending → allow → done; revoked → noGrant)"
-
-# Phase 2 (#220, PR 4a): the same grants over the socket, for the desktop's Team page.
-"$CTL" team-grants | expect "d['grants']==[]" || fail "team-grants starts empty"
-"$CTL" team-grant "$KID" --cap send,stop,delete --sessions e2e-aws --pre stop,delete --expires 600 \
-    | expect "d['audience']==['$KID'] and d['sessions']==['e2e-aws'] and d['capabilities']==['delete','send','stop'] and d['preauthorized']==['stop'] and d['expires']>0" \
-    || fail "team-grant (delete is never pre-authorised)"
-SOCK_GRANT="$("$CTL" team-grants | json "d['grants'][0]['id']")"
-"$CTL" team-grant Bo --cap view | expect "d['audience']==['$KID'] and d['capabilities']==['view'] and 'preauthorized' not in d and 'expires' not in d" || fail "team-grant by name"
-"$CTL" team-grant leaders --cap fly >/dev/null 2>&1 && fail "team-grant took an unknown capability"
-"$CTL" team-revoke "$SOCK_GRANT" | expect "d['removed']" || fail "team-revoke"
-"$CTL" team-revoke "$SOCK_GRANT" | expect "d['removed'] is False" || fail "team-revoke twice"
-"$CTL" team-grants | expect "len(d['grants'])==1 and d['grants'][0]['capabilities']==['view']" || fail "the second grant stays"
-"$CTL" team-revoke "$("$CTL" team-grants | json "d['grants'][0]['id']")" | expect "d['removed']" || fail "revoke the second"
-echo "team grants over the socket: ok"
-
-# The CLI's own grant goes through the app when it answers (#220): it is in
-# team-grants at once. Like #354's `team status` above: without
-# INFINITUS_TEAM_DIR — set, the CLI is its own identity and keeps the file.
-CLI_ROUTED="$(env -u INFINITUS_TEAM_DIR "$CTL" team grant leaders --view | json "d['id']")" || fail "team grant via the app"
-"$CTL" team-grants | expect "[g['id'] for g in d['grants']]==['$CLI_ROUTED'] and d['grants'][0]['capabilities']==['view']" || fail "the CLI grant did not reach the app at once"
-env -u INFINITUS_TEAM_DIR "$CTL" team revoke "$CLI_ROUTED" | expect "d['removed']" || fail "team revoke via the app"
-"$CTL" team-grants | expect "d['grants']==[]" || fail "the CLI revoke did not reach the app"
-echo "team grant via the app: ok"
 
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window
@@ -942,10 +736,8 @@ python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail 
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,
-# then leaves on its own (tunnels, terminals, owned sessions first). This
-# instance leads a team with a git remote, and applicationShouldTerminate
-# holds the quit for the team's now.json delete (TeamModel.quitBound,
-# 20s) — the wait is bounded above that, and the time is printed.
+# then leaves on its own (tunnels, terminals, owned sessions first) — the
+# wait below is bounded, and the time is printed.
 "$CTL" quit | expect "d['quitting'] is True" || fail "quit"
 # The app is this shell's child: until `wait` reaps it the pid lingers as
 # a zombie, so the exit shows as state Z, not as a missing pid.

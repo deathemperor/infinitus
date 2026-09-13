@@ -7,8 +7,6 @@ import InfinitusCore
 /// what turning it on costs.
 struct LockPane: View {
     @ObservedObject var lock: LockModel
-    /// Team names, set when turning off needs a warning first.
-    @State private var offWarning: [String]?
     @State private var busy = false
 
     private static let relockLabels: [LockPolicy.Relock: String] = [
@@ -44,23 +42,11 @@ struct LockPane: View {
                      + "you unlock; biometrics fall back to your password, as "
                      + "the system does. A timed re-lock settles on your next "
                      + "interaction or when the Mac wakes — nothing ticks "
-                     + "while the Mac is idle. Teams need this on: creating a "
-                     + "team, accepting an invite and requesting to join stay "
-                     + "unavailable until it is.")
+                     + "while the Mac is idle.")
             }
             .settingsAnchor("Lock/Unlocking")
         }
         .formStyle(.grouped)
-        .confirmationDialog("Turn off biometric unlock?",
-                            isPresented: Binding(get: { offWarning != nil },
-                                                 set: { if !$0 { offWarning = nil } })) {
-            Button("Turn Off", role: .destructive) { lock.turnOff(); offWarning = nil }
-            Button("Keep On", role: .cancel) { offWarning = nil }
-        } message: {
-            Text("You're in \(ListFormatter.localizedString(byJoining: offWarning ?? [])). "
-                 + "Team data stays on this Mac and re-locks only behind the "
-                 + "identity prompt on each launch; you stay in the team.")
-        }
     }
 
     private func toggle(_ on: Bool) {
@@ -71,8 +57,7 @@ struct LockPane: View {
                 busy = false
             }
         } else {
-            let teams = lock.teamNames()
-            if teams.isEmpty { lock.turnOff() } else { offWarning = teams }
+            lock.turnOff()
         }
     }
 }

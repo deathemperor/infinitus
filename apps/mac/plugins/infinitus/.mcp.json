@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "infinitus": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/mcp/serve.sh"
-    }
-  }
-}

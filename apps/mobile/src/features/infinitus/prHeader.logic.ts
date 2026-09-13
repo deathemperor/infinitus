@@ -156,7 +156,10 @@ export function prHeaderMenuItems(input: {
 /** "Babysitting r/10" while the thread is babysat (#269 A), for the thread
     list row and the header menu's status line; null while off. */
 export function babysitLabel(babysit: ThreadBabysit | null | undefined): string | null {
-  return babysit == null ? null : `Babysitting ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}`;
+  if (babysit == null) return null;
+  return babysit.stoppedAt === undefined
+    ? `Babysitting ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}`
+    : `Babysit stopped ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}`;
 }
 
 function prChecksDescription(checksState: PullRequestChecksState | null): string {

@@ -93,18 +93,15 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             .font(PopupFont.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize()
-                        if let age = cells.staleAge {
-                            Text("· \(age)")
+                        if let stale = cells.staleAge {
+                            Text("· \(stale.label)")
                                 .font(PopupFont.caption)
                                 .foregroundStyle(.orange)
                                 .fixedSize()
-                                .instantTip("Usage from \(age) — swapd could not "
-                                            + "refresh this account; it retries on its own")
+                                .instantTip(stale.tip)
                         }
                     }
-                    .instantTip(cells.staleAge.map {
-                        "Usage from \($0) — swapd could not refresh this account; it retries on its own"
-                    } ?? "Subscription: \(account.plan ?? "?")")
+                    .instantTip(cells.staleAge?.tip ?? "Subscription: \(account.plan ?? "?")")
                     .alignedColumn("plan")
                     .activeBand(account.active)
                     if let note = SentinelNotes.note(for: account.usageStatus) {
