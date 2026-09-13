@@ -162,11 +162,29 @@ final class HeadroomTests: XCTestCase {
     }
 
     func testWireShape() throws {
-        let v = Headroom(state: .low, window: "7d", pct: 84, reason: "7d at 84%, holding from 80%")
+        let v = Headroom(state: .low, window: "7d", pct: 84, reason: "7d at 84%, holding from 80%", since: 1_000_000)
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(v)) as? [String: Any]
         XCTAssertEqual(json?["state"] as? String, "low")
         XCTAssertEqual(json?["window"] as? String, "7d")
         XCTAssertEqual(json?["pct"] as? Double, 84)
         XCTAssertNotNil(json?["reason"])
+        XCTAssertEqual(json?["since"] as? Double, 1_000_000)
+    }
+
+    func testSinceIsSetOnAStateChangeAndCarriedOtherwise() throws {
+        // #616 remainder 2: `since` marks when the CURRENT state started —
+        // reset on every state change, carried unchanged while it holds.
+        let hot = try usage(#"{"fiveHour": {"pct": 81}}"#)
+        let band = try usage(#"{"fiveHour": {"pct": 65}}"#)
+        let v1 = Headroom.verdict(previous: nil, usage: hot, lowPct: low, abundantPct: abundant, now: 1_000)
+        XCTAssertEqual(v1?.state, .low)
+        XCTAssertEqual(v1?.since, 1_000, "first verdict: since is now")
+        let v2 = Headroom.verdict(previous: v1, usage: band, lowPct: low, abundantPct: abundant, now: 2_000)
+        XCTAssertEqual(v2?.state, .low, "65% is inside the band: still low")
+        XCTAssertEqual(v2?.since, 1_000, "same state: since carries from v1")
+        let cool = try usage(#"{"fiveHour": {"pct": 50}}"#)
+        let v3 = Headroom.verdict(previous: v2, usage: cool, lowPct: low, abundantPct: abundant, now: 3_000)
+        XCTAssertEqual(v3?.state, .abundant, "a state change")
+        XCTAssertEqual(v3?.since, 3_000, "state changed: since resets to now")
     }
 }

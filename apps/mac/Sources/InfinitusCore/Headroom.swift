@@ -30,9 +30,14 @@ public struct Headroom: Codable, Sendable, Equatable {
     public let window: String
     public let pct: Double
     public let reason: String
+    /// When this verdict's state was first reached (epoch seconds); an
+    /// additive wire key (#616 remainder 2) — carried unchanged while the
+    /// state holds, reset to `now` on every state change, so the ledger
+    /// entry a relaunch seeds from reads as of the state's own start.
+    public let since: Double?
 
-    public init(state: State, window: String, pct: Double, reason: String) {
-        self.state = state; self.window = window; self.pct = pct; self.reason = reason
+    public init(state: State, window: String, pct: Double, reason: String, since: Double? = nil) {
+        self.state = state; self.window = window; self.pct = pct; self.reason = reason; self.since = since
     }
 
     /// `previous` is the verdict for the SAME active account; pass nil
@@ -60,24 +65,30 @@ public struct Headroom: Codable, Sendable, Equatable {
         if let w = usage.sevenDay { windows.append(("7d", w.pct)) }
         for w in usage.scoped ?? [] { windows.append((w.name ?? "?", w.pct)) }
         guard let (window, pct) = windows.max(by: { $0.1 < $1.1 }) else { return previous }
+        // `since`: carried from `previous` while the state holds, reset to
+        // `now` on any state change (or when there was no previous verdict).
+        func make(_ state: State, window: String, pct: Double, reason: String) -> Headroom {
+            let since = (previous == nil || previous?.state != state) ? now : (previous?.since ?? now)
+            return Headroom(state: state, window: window, pct: pct, reason: reason, since: since)
+        }
         let shown = "\(window) at \(Int(pct.rounded()))%"
         if pct >= lowPct {
-            return Headroom(state: holding, window: window, pct: pct,
-                            reason: "\(shown), \(interrupt ? "interrupting" : "holding") from \(Int(lowPct))%")
+            return make(holding, window: window, pct: pct,
+                        reason: "\(shown), \(interrupt ? "interrupting" : "holding") from \(Int(lowPct))%")
         }
         if let fill {
             let fillPct = windows.first { $0.0 == fill.window }?.1 ?? pct
             let minutes = Int(max(0, (fill.at - now) / 60).rounded())
             let verb = interrupt ? "interrupting" : "holding"
-            return Headroom(state: holding, window: fill.window, pct: fillPct,
-                            reason: "\(fill.window) at \(Int(fillPct.rounded()))%, fills in \(minutes) min before its reset — \(verb)")
+            return make(holding, window: fill.window, pct: fillPct,
+                        reason: "\(fill.window) at \(Int(fillPct.rounded()))%, fills in \(minutes) min before its reset — \(verb)")
         }
         if pct <= abundantPct || previous == nil {
-            return Headroom(state: .abundant, window: window, pct: pct,
-                            reason: "\(shown), releasing at \(Int(abundantPct))%")
+            return make(.abundant, window: window, pct: pct,
+                        reason: "\(shown), releasing at \(Int(abundantPct))%")
         }
         let held: State = previous?.state == .abundant ? .abundant : holding
-        return Headroom(state: held, window: window, pct: pct,
-                        reason: "\(shown), between \(Int(abundantPct))% and \(Int(lowPct))%: still \(held.rawValue)")
+        return make(held, window: window, pct: pct,
+                    reason: "\(shown), between \(Int(abundantPct))% and \(Int(lowPct))%: still \(held.rawValue)")
     }
 }

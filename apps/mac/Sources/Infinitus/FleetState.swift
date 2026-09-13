@@ -103,14 +103,25 @@ final class FleetState: ObservableObject, Identifiable {
         }
     }
 
+    /// Where this fleet's last headroom verdict is persisted (#616
+    /// remainder 2), so a relaunch's first judgement can seed its
+    /// hysteresis instead of starting from `previous: nil`.
+    private var headroomLedgerKey: String { "headroom_ledger_" + id }
+
     /// Re-judges the headroom from the last snapshot: after every apply,
     /// and when the host's mode or thresholds change. A swap starts the
     /// hysteresis over on the new account; the same account with no
-    /// usage this poll keeps its verdict (#159).
+    /// usage this poll keeps its verdict (#159). The first judgement
+    /// after launch — `headroom` still nil, not a swap — seeds `previous`
+    /// from the persisted ledger entry for this same account, so an
+    /// account held before the relaunch is not read as abundant for one
+    /// poll; the ledger is read at most once, since `??` only evaluates
+    /// its right side while `headroom` is nil.
     func judgeHeadroom(swapped: Bool = false) {
         var next: Headroom?
+        var active: Account?
         if host.priorityMode != "off", let fleet = lastFleet {
-            let active = fleet.accounts.first { $0.active }
+            active = fleet.accounts.first { $0.active }
             // The forecast is fleet-wide but only means anything for the
             // primary's own account, and only while it still names the
             // account this snapshot has active — a forecast built before
@@ -119,13 +130,23 @@ final class FleetState: ObservableObject, Identifiable {
             if host.primary === self, let line = host.forecast?.active, line.email == active?.email {
                 fill = line.bindsAt.map { Headroom.Fill(window: line.bindsWindow ?? "?", at: $0) }
             }
-            next = Headroom.verdict(previous: swapped ? nil : headroom, usage: active?.usage,
+            let previous = swapped ? nil : (headroom ?? HeadroomLedger.seed(
+                AppDefaults.standard.data(forKey: headroomLedgerKey), fleetKey: id, email: active?.email))
+            next = Headroom.verdict(previous: previous, usage: active?.usage,
                                     lowPct: Double(host.priorityLowPct),
                                     abundantPct: Double(host.priorityAbundantPct),
                                     interrupt: host.priorityMode == "interrupt", fill: fill,
                                     now: host.forecast?.computedAt ?? Date().timeIntervalSince1970)
         }
-        if headroom != next { headroom = next }
+        if headroom != next {
+            headroom = next
+            if let next, let email = active?.email,
+               let data = HeadroomLedger.encode(fleetKey: id, email: email, headroom: next) {
+                AppDefaults.standard.set(data, forKey: headroomLedgerKey)
+            } else {
+                AppDefaults.standard.removeObject(forKey: headroomLedgerKey)
+            }
+        }
     }
 
     /// Dead or alive as of each account's last snapshot WITH usage —
@@ -175,7 +196,13 @@ final class FleetState: ObservableObject, Identifiable {
            previousActive != now {
             switchFlashTick += 1
         }
-        judgeHeadroom(swapped: previousActive != fleet.activeNumber)
+        // The launch-cache `seed(_:)` sets `activeNumber` before the
+        // first `apply`, so `previousActive` is already the cached
+        // account: a same-account launch must not read as a swap, or the
+        // ledger seed below would never apply (#616 remainder 2). A
+        // genuinely different account on that first apply still starts
+        // over — via the ledger's own email mismatch, not this flag.
+        judgeHeadroom(swapped: previousActive != nil && previousActive != fleet.activeNumber)
         // The death sequence (user 2026-08-31: kill animation for
         // the last drop of any kind, "still play dead animation
         // after"): the row keeps its gauges while the killing
