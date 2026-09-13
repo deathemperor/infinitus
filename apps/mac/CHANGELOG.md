@@ -21,6 +21,7 @@ publishes the matching section as the GitHub release body.
 - A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
 - The Team features are gone (shared fleets, member roster, join codes, nearby discovery, team control): Infinitus is about threads now.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
+- `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
 
 ### Desktop
 - A thread whose AWS or gcloud command fails on expired credentials gets a "sign-in needed" line in its work log and the Mac starts that sign-in, which shows under Sign-ins.
