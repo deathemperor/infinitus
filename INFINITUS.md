@@ -74,7 +74,10 @@ makes wrong, in its own PR.
   release; a PR writes its note as a fragment in `apps/mac/changelog.d/`
   — `Surface: sentence` per line — and the cut runs
   `node scripts/fold-changelog.mjs <version>` to fold the fragments and
-  `## Unreleased` into that section), `--prerelease` iff the version carries a prerelease tag, then
+  `## Unreleased` into that section. The script unlinks every fragment it
+  folds, so those deletions belong in the cut commit itself: the tag must
+  point at a tree whose `changelog.d/` holds only its README, which the
+  `notes` job checks before anything is built), `--prerelease` iff the version carries a prerelease tag, then
   bumps the cask from the standalone zip. The tag must equal
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
@@ -2125,9 +2128,19 @@ agent-activity` (the session cards' kinds retired with #1041).
   `client-activity` and `lock-status` with canned data. The manifest and
   the pref catalog are `infinitusctl` captures (every value reset to its
   default), trimmed with the Mac: the session-profile and past-session
-  verbs and the three retired push prefs went with #1091. The accounts
+  verbs and the three retired push prefs went with #1091, the Team and
+  checkpoint blocks with #1139. The accounts
   (`ada-fixture`…) and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
+  `fork-visual-fixture.guard.test.ts` keeps the capture honest against
+  `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift`
+  (#1139, the `PREF_COPY` guard's sibling from #1122): a verb it claims or
+  a pref key it carries after the Mac dropped one hands every capability
+  gate in the web a `true` no real build gives, and the pages render in CI
+  what a user cannot see. Commands are checked one way — the fixture
+  answers only what the pass exercises, so a Mac verb it omits is fine —
+  and it may answer no verb it does not claim; prefs and sections must
+  match the catalog exactly.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
   shows (a pref row label, the fixture's team or profile name, "Re-lock",

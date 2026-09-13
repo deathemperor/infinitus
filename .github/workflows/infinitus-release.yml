@@ -30,6 +30,53 @@ permissions:
   contents: read
 
 jobs:
+  # Release notes have to exist BEFORE anything is signed. `publish` reads
+  # the `## <version>` section out of apps/mac/CHANGELOG.md and refuses a
+  # tag without one, but it runs last, so a cut that skipped the fold used
+  # to fail only after a full sign-and-notarize run. This is the same check
+  # in seconds. It also fails on a leftover fragment, the signature of a
+  # hand-tag that never ran fold-changelog.mjs: the script unlinks what it
+  # folds, so a proper cut commit carries the deletions and this sees an
+  # empty changelog.d.
+  #
+  # The job itself always runs and only its STEPS are tag-gated (ci.yml's
+  # mac_changes idiom): a skipped job skips everything that `needs:` it,
+  # which would strand the dispatch dry run and the nightly's workflow_call
+  # with nothing built.
+  notes:
+    name: Check release notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Release notes and fragments
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          # VERSION, not the tag: the mac job enforces that they match, and
+          # this is the file the fold was run against.
+          version="$(head -1 VERSION | tr -cd '0-9A-Za-z.-')"
+          if [[ -d apps/mac/changelog.d ]]; then
+            left="$(find apps/mac/changelog.d -type f ! -name README.md | sort)"
+            if [[ -n "$left" ]]; then
+              echo "Unfolded release-note fragments at $GITHUB_REF_NAME:" >&2
+              printf '%s\n' "$left" >&2
+              echo "Run 'node scripts/fold-changelog.mjs $version' and commit the deletions it makes." >&2
+              exit 1
+            fi
+          fi
+          awk -v v="$version" '
+            $0 == "## " v { grab = 1; next }
+            grab && /^## /  { exit }
+            grab            { print }
+          ' apps/mac/CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then
+            echo "apps/mac/CHANGELOG.md has no '## $version' section; a release ships with notes." >&2
+            exit 1
+          fi
+          { echo "Release notes for $version:"; cat notes.md; } >> "$GITHUB_STEP_SUMMARY"
+
   # The Swift app on the macOS 26 image (the glass chrome needs its SDK).
   # Two bundles from one sha: the standalone `Infinitus-<v>.zip` (the cask's)
   # and `Infinitus-Menu-Bar-<v>.zip` (CFBundleName "Infinitus Menu Bar", no
@@ -38,6 +85,7 @@ jobs:
   # ticket into the desktop bundle (#777).
   mac:
     name: Build menu bar app
+    needs: notes
     runs-on: macos-26
     timeout-minutes: 60
     defaults:
@@ -151,7 +199,7 @@ jobs:
 
   desktop:
     name: Build desktop macOS arm64
-    needs: mac
+    needs: [notes, mac]
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -444,6 +492,7 @@ jobs:
   # runner because `gh` doesn't exist in the swift image.
   linux:
     name: Build Linux tray
+    needs: notes
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
