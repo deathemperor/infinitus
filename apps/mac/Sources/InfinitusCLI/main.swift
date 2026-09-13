@@ -15,18 +15,6 @@ let programName: String = {
     return name.isEmpty ? "infinitusctl" : name
 }()
 
-// `team` runs in-process (TeamCommand.swift) and needs no app.
-if args.first == "team" {
-    exit(runTeam(Array(args.dropFirst())))
-}
-// `plugin` drives `claude plugin …` (PluginCommand.swift); no app needed.
-if args.first == "plugin" {
-    exit(PluginCommand.run(Array(args.dropFirst())))
-}
-// `mcp` serves the plugin's MCP tools over stdio (MCPCommand.swift).
-if args.first == "mcp" {
-    exit(MCPCommand.run())
-}
 // `environments`/`projects`/`threads`/`thread`/`desktop` talk to Infinitus
 // desktop's server with the credential the app keeps (DesktopCommand.swift).
 if let code = runDesktopVerbs(args) {
@@ -42,13 +30,10 @@ func usage() -> String {
         if !c.options.isEmpty { out += "  [\(c.options.joined(separator: ", "))]" }
         out += "\n"
     }
-    out += "  team <subcommand>      teams: create, code, request, approve, publish… (`\(programName) team --help`)\n"
-    out += "  plugin install|uninstall|status   the Claude Code plugin: hooks that push prompts to the phone the moment they appear\n"
-    out += "  mcp                    the plugin's MCP server over stdio (fleet_status, list_sessions, session_message)\n"
     out += "  environments | projects | threads | thread show|send|new|interrupt|release|rename|title | desktop status|credential\n"
     out += "                         Infinitus desktop's projects and threads (`\(programName) thread --help`)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. swapd/claude, cliproxy/claude).\n"
-    out += "proxy-key, 9router-password, push-slack, push-telegram, aws-login-code, gcloud-login-code and signin-code read their secret from stdin.\n"
+    out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code and signin-code read their secret from stdin.\n"
     out += "Socket: \(ControlProtocol.socketURL().path)\n"
     return out
 }
@@ -70,9 +55,7 @@ while i < args.count {
     let a = args[i]
     if a.hasPrefix("--") {
         let key = String(a.dropFirst(2))
-        // `--remote` is a bare flag for aws-login but carries a URL for
-        // team-create (the app's fallback to the second positional stays as a belt).
-        let flagOnly = command == "team-create" ? ["yes", "local", "status"] : ["yes", "local", "remote", "status"]
+        let flagOnly = ["yes", "local", "remote", "status"]
         if flagOnly.contains(key) || i + 1 >= args.count || args[i + 1].hasPrefix("--") {
             options[key] = "true"
         } else {
@@ -90,7 +73,7 @@ while i < args.count {
 // read (`activities-token --forget` hung a run for 90 min, 2026-09-11).
 let stdinPiped = isatty(0) == 0
 var secret: String?
-if stdinPiped, ["proxy-key", "9router-password", "push-slack", "push-telegram", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "push", "send", "approve", "permission", "team-create", "team-join", "team-hostname", "desktop-credential"].contains(command) {
+if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "event", "push", "send", "approve", "desktop-credential"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
@@ -180,6 +163,6 @@ if reply.restarting {
 }
 exit(reply.ok ? 0 : 1)
 #else
-FileHandle.standardError.write(Data("\(command) needs the Infinitus Mac app (control socket); only `team` runs here\n".utf8))
+FileHandle.standardError.write(Data("\(command) needs the Infinitus Mac app (control socket)\n".utf8))
 exit(3)
 #endif

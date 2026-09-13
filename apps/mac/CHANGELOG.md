@@ -8,9 +8,20 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
+- "Allow for this session" and the session permission mode switch are gone with the plugin.
+- Per-prompt repository checkpoints are gone (the list, diffs and restore on the Mac, the phone and `infinitusctl checkpoints`); thread checkpoints live in Infinitus desktop.
+- The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
+- The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
+- A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
+- A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
+- The Team features are gone (shared fleets, member roster, join codes, nearby discovery, team control): Infinitus is about threads now.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
+- The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
+- A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
 - Settings › Updates has a Nightly track — last night's build of everything from main — beside Release, and you can switch between the two either way (#1042).
 
 ## 0.5.0-alpha.7

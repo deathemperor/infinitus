@@ -759,7 +759,6 @@ describe("AccountsPage", () => {
     expect(markup.indexOf("Sign-ins")).toBeGreaterThan(markup.indexOf("OpenAI (cliproxy)"));
     expect(markup).toContain("dev");
     expect(markup).toContain("Lapsed 2h ago");
-    expect(markup).toContain("Waiting: api · feature/login");
     expect(markup).toContain("Sign in: AWS dev");
     expect(markup).toContain("me@example.com");
     expect(markup).toContain("Waiting for the Mac&#x27;s browser…");
@@ -771,7 +770,7 @@ describe("AccountsPage", () => {
     expect(empty).toContain("Sign in: AWS dev");
   });
 
-  it("starts a lapsed profile's sign-in scoped to its session", async () => {
+  it("starts a lapsed profile's sign-in without naming a session", async () => {
     testState.snapshot = {
       ...readySnapshot,
       awsLogins: [
@@ -795,11 +794,11 @@ describe("AccountsPage", () => {
 
     expect(testState.command).toHaveBeenNthCalledWith(1, {
       environmentId,
-      input: { command: "aws-login", args: ["dev"], options: { pid: "101" } },
+      input: { command: "aws-login", args: ["dev"], options: {} },
     });
     expect(testState.command).toHaveBeenNthCalledWith(2, {
       environmentId,
-      input: { command: "aws-login", args: ["legacy"], options: { local: "true", pid: "303" } },
+      input: { command: "aws-login", args: ["legacy"], options: { local: "true" } },
     });
     renderer.unmount();
   });

@@ -451,9 +451,13 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   identifiers); `InfinitusBabysit.ts` — `InfinitusBabysitLive`: watches
   `thread.pull-request-synced`, `-turn-queue-removed`, `-session-set` (idle →
   `requestSync`), `-meta-updated`; queues a round via `thread.turn.queue`
-  and bumps `babysitRounds`; at the cap turns babysit off with an `error`
-  activity `babysit.stopped` (the sidebar's "failed" bucket keys on session
-  error only), on merge an `info` `babysit.done`; the boot sweep (parked
+  and bumps `babysitRounds`; at the cap sends `babysitStopped` — the record
+  keeps its rounds and gains `stoppedAt`, the verdict reads it as off, the
+  toggle reads "Babysit stopped" and the sidebar's Needs attention section
+  lists the thread as "Babysit" until the user sends again
+  (`collectNeedsAttention`, on `latestUserMessageAt`) — with an `error`
+  activity `babysit.stopped`; on merge clears the record with an `info`
+  `babysit.done`; the boot sweep (parked
   until activation) seeds what is red without acting, a thread the sweep
   missed seeds itself on first sight. `PullRequestSyncReactor.ts` — babysat
   threads' open PRs are due like unsettled ones, and a requested sync writes
@@ -618,7 +622,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`).
   Web: `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`:
   the draft's id is the first member, the rest are minted, titles carry the
-  model; `bestOfSiblings`, `bestOfMemberStatus`); `BestOfPicker.tsx` — the
+  model; `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats` off the
+  usage rollup, `bestOfMemberChanges` — "5 files, +42 −7" — off the vcs
+  status stream the sidebar row for that worktree already holds); `BestOfPicker.tsx` — the
   "Best of" control beside the model picker, checkboxes for the active
   provider's models, "Run N"; `ChatView.tsx` `onSend(…, bestOf)` starts one
   bootstrap turn per member (text only, no `titleSeed`) and pins each;
@@ -1078,8 +1084,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   toggles stay in `ClientSettingsSchema` as optional inputs and are never
   written again. Fork-thread events only: the account events (a limit,
   every account dead, revived) stay the native app's Notification Center
-  items, and the server's `thread.phase` push keeps `local: false` because
-  the desktop's banner covers that screen.
+  items.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
@@ -1095,7 +1100,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
   over its `sessions` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
-  the Menu bar page keeps `display` + `about`; a section the build lacks
+  the Menu bar page keeps `display` + `about`; the Priority page reads the
+  catalog's `priority` section and, on a build before the Mac's session
+  sweep (#1041), `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
@@ -1235,12 +1242,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
   `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
   › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off [--yes]|now|relock <arg>` / `unlock` (native
-  #788), each answering `{enabled, locked, relock}`. The switch turns the
-  lock on (the Mac's own prompt runs there; the row says "Confirm on the
-  Mac" while it waits) or off; a `lock off` refused inside a team ("this Mac
-  is in …; lock off --yes …") becomes a Keep on / Turn off confirm whose
-  Turn off sends `--yes`. Re-lock is a select over the four native labels
+  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
+  each answering `{enabled, locked, relock}`. The switch turns the lock on
+  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
+  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
+  Re-lock is a select over the four native labels
   (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
@@ -1406,7 +1412,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Accounts page (fleet sections, account rows and their actions, the forecast
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
-  nothing lapsed); row/section/sign-in models come from
+  nothing lapsed; one row per tool and profile, no session names and no
+  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):
   a server whose config arrived with `false` or without the field
@@ -1751,12 +1759,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@t3tools/client-runtime/state/infinitusAccounts`). The per-Mac Sessions
-  card it carried (rows from `@t3tools/client-runtime/state/infinitusSessions`,
-  "Move to a thread" over `agentSessions.import`) was dropped on the #941
-  walk, and the home chip's waiting-session badge (`sessions.logic.ts`)
-  with the #1041 sweep — the phone's surface is threads, and nothing on it
-  reads `@t3tools/client-runtime/state/infinitusSessions` any more.
+  `@t3tools/client-runtime/state/infinitusAccounts`).
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -1893,14 +1896,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   on failure (the held banner still offers Pin).
 - `apps/mobile/src/features/infinitus/liveActivity.logic.ts`,
   `pushRegistration.ts`, `pushForget.ts` — the phone's `activities-token`
-  registration with the Mac, now for the `alert` kind alone: the Mac-driven
-  Live Activity (the `InfinitusWorking` / `InfinitusRevival` cards, their
-  bridge, the Settings switch and the #845 test card) went with the #1041
-  sweep — its content was the Mac's terminal-session states; a card drawn
-  from thread phases is the follow-up filed there. `pusherMac` still picks
-  the Mac the alerts come from (`infinitusLiveActivityMac`).
-  `pushRegistration.ts` logs a refused `activities-token`
-  (`[infinitus-push]`) since the bridge sends with `reportFailure: false`.
+  registration with the Mac for the `alert` kind (the Mac's account-event
+  pushes reach the phone as banners); `pusherMac` picks the Mac the alerts
+  come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
+  refused `activities-token` (`[infinitus-push]`) since the bridge sends
+  with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
@@ -1936,10 +1936,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
-
-- `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
-  `native` branch's nightly jobs (schedules run only from the default
-  branch).
 
 - `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR
   to `main` and by hand: builds the web app, starts `fork-visual-fixture.mjs`

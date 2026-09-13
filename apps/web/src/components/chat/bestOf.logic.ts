@@ -1,4 +1,9 @@
-import type { OrchestrationThreadShell, ThreadId, ThreadUsageRollup } from "@t3tools/contracts";
+import type {
+  OrchestrationThreadShell,
+  ThreadId,
+  ThreadUsageRollup,
+  VcsStatusLocalResult,
+} from "@t3tools/contracts";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 
 /**
@@ -134,4 +139,17 @@ export function bestOfMemberStats(
   }
   if (usage.durationMs !== undefined) parts.push(formatDuration(usage.durationMs));
   return parts.join(" · ");
+}
+
+/**
+ * What a member has written so far (#269 B), off its worktree's status
+ * stream: "5 files, +42 −7". Null before the first status and while the
+ * tree is clean, so the row shows nothing rather than zeros.
+ */
+export function bestOfMemberChanges(
+  status: Pick<VcsStatusLocalResult, "hasWorkingTreeChanges" | "workingTree"> | null,
+): string | null {
+  if (status === null || !status.hasWorkingTreeChanges) return null;
+  const { files, insertions, deletions } = status.workingTree;
+  return `${files.length} ${files.length === 1 ? "file" : "files"}, +${insertions} −${deletions}`;
 }

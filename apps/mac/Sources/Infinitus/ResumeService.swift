@@ -27,7 +27,7 @@ final class ResumeService: ObservableObject {
 
     /// Event-log sink, wired by AppModel: (SF Symbol, text).
     var log: ((String, String) -> Void)?
-    /// AppModel.push (Notification Center + engine away-push), wired by
+    /// AppModel.push (Notification Center + the phone), wired by
     /// AppModel — for the sub-agent nudge, which is notice-worthy on its
     /// own (#117), unlike the plain resume which only logs.
     var push: ((String) -> Void)?

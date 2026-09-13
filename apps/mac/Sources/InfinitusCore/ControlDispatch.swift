@@ -13,29 +13,11 @@ import Foundation
 public enum ControlDispatch {
     /// What the caller (the tray) can actually do for a command.
     public struct Handlers: Sendable {
-        /// `UserPromptSubmit` with a cwd and a session id: record a
-        /// workspace checkpoint. Called synchronously from here — the
-        /// caller hands the git work to its own queue, the way
-        /// `AppModel.recordCheckpoint` detaches it.
-        public var checkpoint: @Sendable (_ cwd: String, _ sessionId: String, _ subject: String) -> Void
         /// `status`'s result: what this frontend is and how much it sees.
         public var status: @Sendable () -> JSONValue
-        /// A hook's session id to the pid of the live session it names —
-        /// the Mac's lookup (#486); nil when the caller has none.
-        public var sessionPid: @Sendable (_ sessionId: String) -> Int?
-        /// Every parsed hook, with its pid when known: the caller decides
-        /// what to push (a Notification's `pushLine`) — after the
-        /// checkpoint, before the reply.
-        public var hook: @Sendable (_ event: HookEvent, _ pid: Int?) -> Void
 
-        public init(checkpoint: @Sendable @escaping (String, String, String) -> Void,
-                    status: @Sendable @escaping () -> JSONValue,
-                    sessionPid: @Sendable @escaping (String) -> Int? = { _ in nil },
-                    hook: @Sendable @escaping (HookEvent, Int?) -> Void = { _, _ in }) {
-            self.checkpoint = checkpoint
+        public init(status: @Sendable @escaping () -> JSONValue) {
             self.status = status
-            self.sessionPid = sessionPid
-            self.hook = hook
         }
     }
 
@@ -49,21 +31,6 @@ public enum ControlDispatch {
         switch request.command {
         case "status":
             return ControlReply(ok: true, result: handlers.status())
-
-        case "event":
-            // Same contract as the Mac's `case "event"`: the payload rides
-            // in `secret` because the CLI reads it from stdin, never argv.
-            guard let payload = request.secret, let event = HookEvent.parse(payload) else {
-                return .failure("event: a Claude Code hook payload (JSON with hook_event_name) is expected on stdin")
-            }
-            let pid = event.sessionId.flatMap(handlers.sessionPid)
-            if event.name == "UserPromptSubmit", let cwd = event.cwd, let sessionId = event.sessionId {
-                handlers.checkpoint(cwd, sessionId, event.prompt ?? "")
-            }
-            // Every hook reaches the caller (a Notification is its push);
-            // whatever it does, a hook never sees a failure it would retry.
-            handlers.hook(event, pid)
-            return ControlReply(ok: true, result: .object(["pid": pid.map { .number(Double($0)) } ?? .null]))
 
         default:
             return .failure(unsupportedMessage(request.command))

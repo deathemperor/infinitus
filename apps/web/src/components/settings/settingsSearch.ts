@@ -600,7 +600,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/source-control",
     scope: "environment-defaults",
     searchTerms: [
-      "version control git github gitlab bitbucket azure devops hosting integrations credentials scan server environment",
+      "version control git github gitlab forgejo gitea tea codeberg bitbucket azure devops hosting integrations credentials scan server environment",
     ],
   },
   {
@@ -730,7 +730,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus",
     targetId: "infinitus-display",
     infinitusOnly: true,
-    searchTerms: ["menu bar popup sessions startup about updates"],
+    searchTerms: ["menu bar popup startup about updates threads"],
   },
   {
     // Fork (#574): the Slack bridge sits on the Menu bar page under Threads.
@@ -805,6 +805,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-engines",
     infinitusOnly: true,
     searchTerms: ["swapd cliproxy 9router proxy accounts registered key"],
+  },
+  {
+    id: "github-routing",
+    title: "GitHub routing",
+    to: "/settings/connections",
+    searchTerms: ["pull request trusted environments shared credentials permissions read actions"],
   },
   {
     id: "archive",

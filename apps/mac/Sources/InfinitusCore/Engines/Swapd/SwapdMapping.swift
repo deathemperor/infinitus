@@ -183,7 +183,7 @@ public enum SwapdMapping {
     }
 
     /// swapd's kebab-case statuses in cswap's vocabulary — the one every
-    /// surface already renders (`SentinelNotes`, `TeamFleetDoc`).
+    /// surface already renders (`SentinelNotes`).
     /// `stale` is not a sentinel: the windows are simply an older good
     /// fetch, which the row shows as usage with its age beside it.
     public static func usageStatus(_ raw: String) -> String {

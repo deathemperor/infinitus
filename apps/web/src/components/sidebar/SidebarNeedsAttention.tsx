@@ -42,6 +42,7 @@ const STATUS_LABEL: Record<NeedsAttentionStatus, { label: string; className: str
   input: { label: "Input", className: "text-indigo-600 dark:text-indigo-300" },
   held: { label: "Held", className: "text-muted-foreground" },
   limited: { label: "Limit", className: "text-muted-foreground" },
+  stopped: { label: "Babysit", className: "text-destructive/80" },
 };
 
 /**

@@ -159,41 +159,6 @@ describe("InfinitusLockPanel", () => {
     expect(rendered()).toContain("the unlock prompt was cancelled");
   });
 
-  it("turns a refused lock off into a confirm that sends --yes", async () => {
-    fake.run = vi
-      .fn()
-      .mockResolvedValueOnce(status(true, false))
-      .mockResolvedValueOnce(status(true, false))
-      .mockResolvedValueOnce({
-        _tag: "Failure",
-        cause: Cause.fail(
-          new InfinitusCommandFailed({
-            command: "lock",
-            error: "this Mac is in Alpha; lock off --yes turns the lock off anyway",
-            restarting: false,
-          }),
-        ),
-      })
-      .mockResolvedValue(status(false, false));
-    await renderPanel();
-    await act(async () => {
-      (
-        byLabel("Unlock with Touch ID or password").props as {
-          onCheckedChange: (checked: boolean) => void;
-        }
-      ).onCheckedChange(false);
-    });
-    expect(rendered()).toContain("You're in Alpha");
-    await act(async () => {
-      (byText("Turn off").props as { onClick: () => void }).onClick();
-    });
-    expect(fake.run).toHaveBeenLastCalledWith({
-      environmentId: "env-1",
-      input: { command: "lock", args: ["off"], options: { yes: "true" } },
-    });
-    expect(rendered()).not.toContain("You're in Alpha");
-  });
-
   it("locks now and unlocks from the status row", async () => {
     fake.run = vi
       .fn()
