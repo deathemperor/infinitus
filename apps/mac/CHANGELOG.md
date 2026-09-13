@@ -10,10 +10,6 @@ publishes the matching section as the GitHub release body.
 
 ## 0.5.0-alpha.8
 
-### Desktop
-- A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
-- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
-
 ### Mac
 - The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
 - "Allow for this session" and the session permission mode switch are gone with the plugin.
@@ -26,6 +22,8 @@ publishes the matching section as the GitHub release body.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
+- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
 - A thread whose AWS or gcloud command fails on expired credentials gets a "sign-in needed" line in its work log and the Mac starts that sign-in, which shows under Sign-ins.
 - Infinitus desktop keeps the computer awake while a thread on it has a turn running; Settings › General › Keep awake turns that off (#1075).
 - Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
