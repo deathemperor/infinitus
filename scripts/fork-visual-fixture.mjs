@@ -10,8 +10,8 @@
  *
  * The manifest and the preference catalog in `fork-visual-fixture.data.json`
  * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; accounts, the profiles, the forecast and
- * the stats are made up. Secrets: none — every write verb
+ * pref value reset to its default; the accounts, the forecast and the stats
+ * are made up. Secrets: none — every write verb
  * and every unknown verb is refused with `ok: false`, and only verb names are
  * logged. No dependencies; node ≥ 22.
  */
@@ -98,6 +98,12 @@ const fleets = () => [
   },
 ];
 
+/** The active account's 5h pace, in percent per hour: 34 % to full in the two
+    hours it has before the window resets, so the projection is one a real Mac
+    could produce (`UsageForecast.project` drops `hitsAt` when the reset comes
+    first, and the guard test holds the fixture to that). */
+const ACTIVE_FIVE_HOUR_RATE = (100 - ACCOUNTS[0].five) / 2;
+
 const forecastLine = (account) => ({
   number: account.number,
   email: account.email,
@@ -108,9 +114,9 @@ const forecastLine = (account) => ({
     {
       name: "5h",
       pct: account.five,
-      ratePctPerHour: account.active ? 12.5 : 0,
+      ratePctPerHour: account.active ? ACTIVE_FIVE_HOUR_RATE : 0,
       resetsAt: nowSeconds() + 2 * 3600 + 600,
-      hitsAt: account.active ? nowSeconds() + 5 * 3600 : null,
+      hitsAt: account.active ? nowSeconds() + 2 * 3600 : null,
     },
     {
       name: "7d",
@@ -131,20 +137,6 @@ const forecast = () => ({
     allDeadAt: nowSeconds() + 6 * 86_400,
     drainOrder: [1, 3, 2],
   },
-});
-
-const profiles = () => ({
-  profiles: [
-    {
-      name: "nightly-review",
-      cwd: "~/code/app",
-      engine: "claude",
-      permissionMode: "acceptEdits",
-      model: "opus",
-      allowTools: ["Edit", "Bash git"],
-    },
-    { name: "docs-sweep", engine: "codex", prompt: "Read the docs folder and list what is stale." },
-  ],
 });
 
 const tally = (n, usd) => ({
@@ -204,6 +196,10 @@ const statsDay = (scale) => ({
   reverts: 1 * scale,
   prsOpened: 3 * scale,
   prsMerged: 2 * scale,
+  // The two the "Mean hours to merge" tile divides: 9 h per merged PR, one
+  // timing per merge, so the tile reads 4.5 whatever the period.
+  mergeHoursTotal: 9 * scale,
+  mergeCount: 2 * scale,
   // The compact form the Mac sends once the repo set is dropped, which the
   // Repos tile only reads when `repos` is absent or empty.
   repoTally: 3,
@@ -435,8 +431,6 @@ function answer(request, socketPath) {
     case "prefs":
       // One verb for reads and writes; the fixture holds no state to write.
       return args[0] === "set" ? undefined : data.prefs;
-    case "profiles":
-      return profiles();
     case "stats":
       return stats(typeof options.period === "string" ? options.period : "week");
     case "utilization":

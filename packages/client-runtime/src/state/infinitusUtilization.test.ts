@@ -4,6 +4,7 @@ import {
   compactTokens,
   decodeUtilization,
   fiveHourSummary,
+  formatCount,
   historyLines,
   historyRange,
   liveRateText,
@@ -223,6 +224,12 @@ describe("run rate", () => {
       "6.3k",
       "2.4M",
     ]);
+    // A turn count is grouped, not compacted: a week of turns reads "1,620".
+    expect([formatCount(12), formatCount(1620), formatCount(1_200_000)]).toEqual([
+      "12",
+      "1,620",
+      "1,200,000",
+    ]);
     expect(liveRateText(decodeUtilization(reply)!)).toBe(
       "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",
     );
@@ -230,5 +237,30 @@ describe("run rate", () => {
       "Live: 0 output tokens/min over the last 5 minutes.",
     );
     expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+  });
+
+  it("prefers this server's own live rate over the Mac's transcript tail (#1127)", () => {
+    const mac = { days: 1, samples: [], liveRate: { perMinute: 1500 } } as const;
+
+    expect(
+      liveRateText(mac, { windowMinutes: 5, turns: 3, outputPerMinute: 900, totalPerMinute: 4200 }),
+    ).toBe("Live: ≈ 900 output tokens/min over the last 5 minutes, across 3 turns on this server.");
+    // One turn is not "1 turns".
+    expect(
+      liveRateText(mac, { windowMinutes: 5, turns: 1, outputPerMinute: 120, totalPerMinute: 800 }),
+    ).toBe("Live: ≈ 120 output tokens/min over the last 5 minutes, across 1 turn on this server.");
+    // No turn in the window is unknown, not zero: the Mac still speaks while
+    // it has a figure, and once its own field empties there is no line at all.
+    expect(
+      liveRateText(mac, { windowMinutes: 5, turns: 0, outputPerMinute: 0, totalPerMinute: 0 }),
+    ).toBe("Live: 1.5k output tokens/min over the last 5 minutes.");
+    expect(
+      liveRateText(
+        { days: 1, samples: [] },
+        { windowMinutes: 5, turns: 0, outputPerMinute: 0, totalPerMinute: 0 },
+      ),
+    ).toBeNull();
+    // A server that never answered leaves the Mac's line untouched.
+    expect(liveRateText(mac, null)).toBe("Live: 1.5k output tokens/min over the last 5 minutes.");
   });
 });

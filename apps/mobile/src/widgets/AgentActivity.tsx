@@ -37,6 +37,8 @@ export interface AgentActivityRowProps {
   readonly status: string;
   readonly updatedAt: string;
   readonly deepLink: string;
+  /** The row's turn `startedAt`, carried while it is starting or running (#1047). */
+  readonly startedAt?: string;
 }
 
 export interface AgentActivityProps {
@@ -185,6 +187,19 @@ export function AgentActivity(
     </HStack>
   );
 
+  // A working row ticks its own elapsed time: `Text(timerInterval:)` is drawn by
+  // SwiftUI on the phone, so the card counts up between pushes instead of going
+  // stale. Both bounds come from the row's `startedAt` — the widget reads no
+  // clock of its own — and the upper one stops the display a day in, past which
+  // a running row is a stuck turn rather than a long one.
+  const elapsedCapMs = 24 * 60 * 60 * 1000;
+  const elapsedRange = (row: AgentActivityRowProps) => {
+    if (row.phase !== "starting" && row.phase !== "running") return null;
+    const startedMs = row.startedAt === undefined ? Number.NaN : Date.parse(row.startedAt);
+    if (!Number.isFinite(startedMs)) return null;
+    return { lower: new Date(startedMs), upper: new Date(startedMs + elapsedCapMs) };
+  };
+
   // Single-line row used by every presentation: glyph, title, inline project,
   // status. The project and status carry layoutPriority(1) so when space runs
   // out it's the title that truncates, never the (short) project name or the
@@ -211,6 +226,21 @@ export function AgentActivity(
         {row.projectTitle}
       </Text>
       <Spacer minLength={8} />
+      {(() => {
+        const elapsed = elapsedRange(row);
+        return elapsed === null ? null : (
+          <Text
+            timerInterval={elapsed}
+            countsDown={false}
+            modifiers={[
+              font({ size: 11 }),
+              foregroundStyle(secondaryForeground),
+              lineLimit(1),
+              layoutPriority(1),
+            ]}
+          />
+        );
+      })()}
       <Text
         modifiers={[
           font({ weight: "semibold", size: 11 }),

@@ -419,7 +419,7 @@ struct SyncPane: View {
                        + "snapshot; nothing leaves the machine otherwise.",
                  done: serving),
             Step(id: 2, title: "Put Infinitus on the phone",
-                 detail: "Install the Infinitus phone app from the App Store.",
+                 detail: "Install the Infinitus phone app on the phone.",
                  done: server.lastServed != nil),
             Step(id: 3, title: "Pick how the phone reaches this Mac",
                  detail: remote
@@ -500,8 +500,7 @@ struct SyncPane: View {
         out += ["", "## Do the unticked steps, in order",
                 "1. Serving: a toggle in the Infinitus menu bar app (Settings → Devices → "
                 + "\"Serve the fleet to my phone\"). No shell equivalent — ask the user to flip it.",
-                "2. Phone app: install Infinitus from the App Store — ask the user to do this "
-                + "on their phone.",
+                "2. Phone app: the Infinitus phone app, installed by the user on their phone.",
                 "3. A route. Same Wi-Fi needs nothing. From anywhere, either:",
                 "   - Tailscale: `brew install --cask tailscale-app` (the pkg asks for an admin "
                 + "password — the user types it), open Tailscale, sign in; on the phone install "

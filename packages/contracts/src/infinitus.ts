@@ -314,6 +314,28 @@ export const InfinitusUtilization = Schema.Struct({
 });
 export type InfinitusUtilization = typeof InfinitusUtilization.Type;
 
+/**
+ * Fork (#1127): this server's own live output rate, folded from the turns it
+ * recorded (`projection_turn_usage`) rather than read off the Mac. It replaces
+ * `InfinitusUtilization.liveRate`, which the Mac tails out of terminal
+ * transcripts — a source the session sweep (#1041) retires, after which that
+ * field is always null.
+ *
+ * `turns` counts only the completed turns in the window whose provider
+ * reported usage: a `usageUnavailable` row carries zero tokens for "not
+ * reported", and counting it would read as a turn that burned nothing. Zero
+ * turns means nothing ran and the page draws no line. Estimates, like every
+ * usage figure here — never billing truth.
+ */
+export const InfinitusLiveTokenRate = Schema.Struct({
+  windowMinutes: Schema.Finite,
+  turns: Schema.Finite,
+  outputPerMinute: Schema.Finite,
+  /** Input included, and input already counts cache reads and writes. */
+  totalPerMinute: Schema.Finite,
+});
+export type InfinitusLiveTokenRate = typeof InfinitusLiveTokenRate.Type;
+
 /** One live Claude Code session from the `sessions` reply. That reply is built
     by hand rather than encoded from a struct, so a session with no name,
     status, permission mode or profile carries an explicit null there. */
@@ -598,15 +620,15 @@ export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
  * ISO 8601 strings because those decoders use `.iso8601`.
  */
 
-/** Which Live Activity a token drives: a `*-start` token lets the Mac start
-    the activity while the app is closed (iOS 17.2 push-to-start), a plain one
-    belongs to a running activity, `alert` is an ordinary notification token. */
+/** Which push a token takes: `alert` is an ordinary notification token;
+    `agent-activity-start` lets the Mac start the phone's lock-screen thread
+    card while the app is closed (iOS 17.2 push-to-start) and `agent-activity`
+    is a running card's own token (#1047). The Mac-driven session cards'
+    `working` / `revival` kinds retired with #1041. */
 export const InfinitusActivityPushKind = Schema.Literals([
-  "working-start",
-  "working",
-  "revival-start",
-  "revival",
   "alert",
+  "agent-activity-start",
+  "agent-activity",
 ]);
 export type InfinitusActivityPushKind = typeof InfinitusActivityPushKind.Type;
 

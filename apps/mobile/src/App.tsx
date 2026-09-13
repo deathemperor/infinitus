@@ -18,6 +18,7 @@ import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
 import { InfinitusAlertPushBridge } from "./features/infinitus/InfinitusAlertPushBridge";
 import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
+import { InfinitusThreadCardBridge } from "./features/infinitus/InfinitusThreadCardBridge";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
 import { IncomingShareProvider } from "./features/sharing/IncomingShareProvider";
@@ -135,6 +136,7 @@ function AppContent() {
               <ThreadArrangementHost />
               <InfinitusAlarmsBridge />
               <InfinitusAlertPushBridge />
+              <InfinitusThreadCardBridge />
               <InfinitusNotificationPresenter />
             </BlurTargetView>
             {/* Anchored-menu overlays render here — in-window, so the

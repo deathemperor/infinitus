@@ -802,7 +802,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/notifications",
     targetId: "infinitus-push",
     infinitusOnly: true,
-    searchTerms: ["push phone alerts waiting exhausted revived aws sign-in"],
+    // The four rows left are account events (#1041 took `push_waiting` and
+    // `push_aws_login` with the Mac's session tracker), so the terms name
+    // those and nothing else.
+    searchTerms: ["push phone notification account exhausted limit revived revive countdown lead"],
   },
   {
     id: "infinitus-devices",
@@ -810,7 +813,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/devices",
     targetId: "infinitus-devices",
     infinitusOnly: true,
-    searchTerms: ["phone mirror lan tunnel cloudflare rendezvous live activity"],
+    // "live activity" went with the Mac's cards (#1041); the page is the phone
+    // mirror, the tunnel fronting this server, and the pairing cards under it.
+    searchTerms: ["phone mirror lan tunnel cloudflare rendezvous pair qr port hostname"],
   },
   {
     id: "infinitus-engines",

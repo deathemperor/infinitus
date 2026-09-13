@@ -71,7 +71,13 @@ makes wrong, in its own PR.
   the one GitHub release — DMG, zip, blockmaps, the updater manifest, both
   menu bar zips, the Linux binaries — titled `Infinitus <version>`, notes
   from the `## <version>` section of `apps/mac/CHANGELOG.md` (no section, no
-  release), `--prerelease` iff the version carries a prerelease tag, then
+  release; a PR writes its note as a fragment in `apps/mac/changelog.d/`
+  — `Surface: sentence` per line — and the cut runs
+  `node scripts/fold-changelog.mjs <version>` to fold the fragments and
+  `## Unreleased` into that section. The script unlinks every fragment it
+  folds, so those deletions belong in the cut commit itself: the tag must
+  point at a tree whose `changelog.d/` holds only its README, which the
+  `notes` job checks before anything is built), `--prerelease` iff the version carries a prerelease tag, then
   bumps the cask from the standalone zip. The tag must equal
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the
@@ -143,6 +149,17 @@ makes wrong, in its own PR.
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
   `gh pr merge --squash --auto`. Every commit carries
   `Co-Authored-By: Claude Code <noreply@anthropic.com>`.
+- **Worktrees share one clone's `refs/remotes/origin`.** Several sessions
+  work in worktrees of the same clone, so `git fetch && git merge origin/main`
+  can merge a tip another session fetched moments earlier and land a branch
+  that silently misses commits already on main (#1092 missed #1091 this way,
+  with a clean-looking stat). After every merge of main and before arming
+  auto-merge: `git fetch origin main && git merge-base --is-ancestor
+origin/main HEAD || echo STALE`. A PR whose checks are green but whose
+  mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
+  `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
+  (auto-merge drops on reopen; arm it again). Never push empty commits for
+  either.
 - **Never install anything on the developer's Mac** (toolchains, brew,
   Xcode components, Docker). `vp i` inside the worktree is fine.
 - Secrets travel over stdin, never argv; shown masked only.
@@ -926,8 +943,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Mac alerts / reset alarms
-  toggles, sending mode, the alerting Mac) after General.
+  `SettingsInfinitusSection` (Accounts row, Mac alerts / thread card (with
+  its test card, #1047) / reset alarms toggles, sending mode, the alerting
+  Mac) after General.
 - `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
   link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
   `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
@@ -939,13 +957,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
   token, so the Mac's pushes reach the phone as banners; it withdraws the
   kind with `activities-token --forget <deviceId>/<kind>` through
-  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702) and
-  `InfinitusNotificationPresenter` (the app's one foreground notification
-  handler: Infinitus notifications show as banners in-app, T3's keep the
-  no-handler default).
+  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702),
+  `InfinitusThreadCardBridge` (the lock-screen thread card's tokens, #1047:
+  the push-to-start token as `agent-activity-start` and each running
+  `AgentActivity` card's own token as `agent-activity`, re-read on every
+  foreground and after a local start; both withdrawn the same way when the
+  switch goes off) and `InfinitusNotificationPresenter` (the app's one
+  foreground notification handler: Infinitus notifications show as banners
+  in-app, T3's keep the no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
+  `infinitusThreadCardEnabled` (#1047, absent reads on) /
   `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
   `"queue" | "steer"`) keys (interface and sanitizer).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
@@ -1056,6 +1079,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   filter button, in the Android header; its
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
+- `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's
+  elapsed timer (#1047 follow-up), the fork's one edit to the widget:
+  `AgentActivityRowProps` gains an optional `startedAt` (the turn's, which the
+  server sends on a starting or running row and the Mac forwards untouched)
+  and `renderCompactRow` draws a `Text` with `timerInterval` +
+  `countsDown={false}` for such a row, so SwiftUI counts it up on the phone
+  between pushes. Both bounds are derived from `startedAt` — the widget reads
+  no clock — and the upper one caps the display a day in. It lives here rather
+  than in a fork file because the widget body carries the `"widget"` directive
+  and is serialized into the widget extension's bundle: it can reference only
+  imported view and modifier factories, never a module-scope helper of ours.
+  Keep the edit to those two places so every upstream sync meets a small one.
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
   `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
@@ -1455,6 +1490,30 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   without the verb keeps the forecast and says what is missing; one whose
   reply carries no telemetry keeps the chart and the run rate, and the two
   sections are simply absent. Sidebar "Utilization" beside Activity.
+- Live token rate (#1127): the run-rate section's "Live:" line comes from this
+  server, not the Mac. `packages/contracts/src/infinitus.ts` —
+  `InfinitusLiveTokenRate` (`windowMinutes`, `turns`, `outputPerMinute`,
+  `totalPerMinute`); `rpc.ts` — `infinitus.liveTokenRate` (empty payload,
+  `AuthOrchestrationReadScope` in `RpcAuthorization.ts`: counts only, no thread
+  named). `apps/server/src/persistence/ProjectionTurnUsage.ts` —
+  `listCompletedSince` reads the window's rows whole (minutes wide, so the row
+  count is small); `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test)
+  is the fold — five minutes, and a `usageUnavailable` row skipped entirely,
+  since its zero tokens mean "not reported" and would read as a turn that
+  burned nothing. `ws.ts` pulls the repository and answers; a read that fails
+  is logged and answers no turns, which draws no line, rather than failing a
+  cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
+  Utilization page's own cadence, and `infinitusUtilization.ts`'s
+  `liveRateText(u, server?)` — the line reads "Live: ≈ N output tokens/min …
+  across N turns on this server" (the #834 "≈" rule: a five-minute
+  extrapolation is an estimate; the Mac's own line is left as it is, being
+  transitional). The server's rate wins whenever it has turns
+  behind it, since the Mac's `liveRate` tails the terminal transcripts the
+  session sweep (#1041) retires and goes permanently null. Zero turns is
+  unknown, not zero, so it stands aside for a Mac that still reports one.
+  Limit: the line lives inside the run-rate section, which still needs the
+  Mac's `utilization` verb to have answered; the per-fleet split #1127 mentions
+  (#779's attribution) is not done.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:
@@ -1510,8 +1569,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
   — the four Settings › Infinitus routes, thin shells over the panes above.
   Profiles (#165, the Mac's "named way to start a session") left with the
-  #1041 sessions sweep, its `profiles` contract with it; the fixture keeps
-  answering the verb until the Mac drops it.
+  #1041 sessions sweep, its `profiles` contract with it, and the fixture's
+  canned reply with the Mac's own verb (#1091).
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
@@ -1651,7 +1710,24 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   publish, revocable there (the next CLI request gets 401 until the next
   publish). A refused write revokes the new session again. Withheld exactly
   where the port is (dev runner, isolated socket, worktree `.t3`); the token
-  reaches no log or span. Two HTTP routes for a CLI with no WebSocket, both
+  reaches no log or span. The publish repeats on a 60 s heartbeat (#1137):
+  the keeper reads the app's own catalog and republishes port and credential
+  only when `fork_server_port` names a port that is not ours, so a server
+  that published over this one and died is corrected within a minute instead
+  of leaving the tunnel on a closed port until someone relaunches the app. A
+  read and not a blind write, because every publish re-mints the
+  `infinitusctl` session and doing that on a timer would rotate the CLI's
+  token every minute; an absent pref and a value that is not a port both read
+  as no drift for the same reason. The heartbeat is the only part here that
+  needs no watcher — `observed` starts no poll, so the app-came-back edge
+  never fires on a server nobody is looking at, which is how the stale
+  publish survived. The edge and the heartbeat share one permit: a publish
+  revokes, issues and hands over, so interleaved they could leave the app
+  holding a token the other call revoked and a matching port the heartbeat
+  would never repair. The drift line names the foreign port, so two live
+  publishers fighting over the pref read as the same port coming back every
+  minute. Residual: a stale publisher that used the same port
+  leaves a credential this server cannot tell from its own. Two HTTP routes for a CLI with no WebSocket, both
   behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
   list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
   from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
@@ -2036,6 +2112,24 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
   device's clock format — the phone has no timestamp setting — null once
   the instant is past).
+- `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+
+  `liveActivityStarts.ts`, `testCard.logic.ts`) — the phone half of the
+  lock-screen thread card (#1047, part 2; the Mac's `push
+{kind: "thread.activity"}` is part 1, the server's fold part 3). The card
+  is upstream's `AgentActivity` Live Activity, edited only for the elapsed
+  timer (the registration point above): the Mac pushes
+  its `{name, props}` envelope, so the phone only files tokens — the
+  push-to-start one and each running card's own — with the Mac it follows
+  (`pusherMac`) through `activities-token`, the alert kind's path, and
+  withdraws both kinds when Settings › Infinitus › "Thread card on the lock
+  screen" goes off (default on, iOS only). "Show a test card" starts the
+  card locally with a fabricated state (`TEST_CARD_STATE`, one row per
+  ranked phase, the working one dated against the press so its timer ticks —
+  `testCardState`), no APNs in the loop, so a blank card blames the widget and
+  a refusal (ActivityKit's message in an alert) blames the phone's settings;
+  with cards live the row ends them all. `packages/contracts/src/infinitus.ts`
+  `InfinitusActivityPushKind` is `alert | agent-activity-start |
+agent-activity` (the session cards' kinds retired with #1041).
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
@@ -2068,12 +2162,23 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
   Infinitus control socket the visual pass runs against in CI: a Node net
   server speaking the one-line protocol that answers `manifest`, `status`,
-  `fleets`, `forecast`, `prefs`, `profiles`, `stats`, `events`, `aws-logins`,
+  `fleets`, `forecast`, `prefs`, `stats`, `events`, `aws-logins`,
   `client-activity` and `lock-status` with canned data. The manifest and
   the pref catalog are `infinitusctl` captures (every value reset to its
-  default); the accounts (`ada-fixture`…), the profiles (`nightly-review`)
-  and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
+  default), trimmed with the Mac: the session-profile and past-session
+  verbs and the three retired push prefs went with #1091, the Team and
+  checkpoint blocks with #1139. The accounts
+  (`ada-fixture`…) and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
+  `fork-visual-fixture.guard.test.ts` keeps the capture honest against
+  `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift`
+  (#1139, the `PREF_COPY` guard's sibling from #1122): a verb it claims or
+  a pref key it carries after the Mac dropped one hands every capability
+  gate in the web a `true` no real build gives, and the pages render in CI
+  what a user cannot see. Commands are checked one way — the fixture
+  answers only what the pass exercises, so a Mac verb it omits is fine —
+  and it may answer no verb it does not claim; prefs and sections must
+  match the catalog exactly.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
   shows (a pref row label, the fixture's team or profile name, "Re-lock",

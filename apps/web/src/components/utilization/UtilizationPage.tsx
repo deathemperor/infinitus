@@ -11,6 +11,7 @@ import {
   compactTokens,
   decodeUtilization,
   fiveHourSummary,
+  formatCount,
   historyLines,
   historyRange,
   liveRateText,
@@ -24,7 +25,7 @@ import {
   type HistoryLine,
   type WasteRow,
 } from "@t3tools/client-runtime/state/infinitusUtilization";
-import type { InfinitusUtilization } from "@t3tools/contracts/infinitus";
+import type { InfinitusLiveTokenRate, InfinitusUtilization } from "@t3tools/contracts/infinitus";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
@@ -106,6 +107,12 @@ export function UtilizationPage() {
   const utilization = useMemo(
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
+  );
+  // This server's own live rate (#1127), folded from the turns it recorded.
+  // No Mac verb behind it, so it survives the session sweep that empties the
+  // Mac's own `liveRate`; a failed read simply leaves the line out.
+  const liveTokenRateQuery = useEnvironmentQuery(
+    ready ? infinitusEnvironment.liveTokenRate({ environmentId, input: {} }) : null,
   );
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
@@ -204,7 +211,7 @@ export function UtilizationPage() {
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
-            <RunRateSection utilization={utilization} />
+            <RunRateSection utilization={utilization} liveTokenRate={liveTokenRateQuery.data} />
           </>
         )}
       </div>
@@ -626,9 +633,15 @@ function WasteRowLine({
   );
 }
 
-function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
+function RunRateSection({
+  utilization,
+  liveTokenRate,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly liveTokenRate: InfinitusLiveTokenRate | null;
+}) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization);
+  const live = liveRateText(utilization, liveTokenRate);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">
@@ -654,7 +667,7 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
                   <td className="py-1 text-left text-foreground">{row.label}</td>
                   <td className="py-1 text-right">{compactTokens(row.tokens)}</td>
                   <td className="py-1 text-right">{row.usd.toFixed(2)}</td>
-                  <td className="py-1 text-right">{row.messages}</td>
+                  <td className="py-1 text-right">{formatCount(row.messages)}</td>
                 </tr>
               ))}
             </tbody>

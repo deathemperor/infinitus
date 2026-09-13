@@ -3,7 +3,9 @@
 Product notes: concise, what you get and why it matters — no commit
 links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
-publishes the matching section as the GitHub release body.
+publishes the matching section as the GitHub release body. A PR adds its
+line as a fragment in `changelog.d/` (see its README), never here: the
+release cut folds the fragments and `## Unreleased` into the new section.
 
 ## Unreleased
 
@@ -12,15 +14,18 @@ publishes the matching section as the GitHub release body.
 - Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
 - Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
 - Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
+- The two keep-awake switches are gone; Infinitus desktop holds sleep off while a thread runs.
+- An account whose usage swapd could not refresh no longer pulses "resetting…" forever against a reset its frozen reading has already passed (#1118).
+- An expired token reads "token expired — deferred" instead of "retrying", which promised a retry the row could not see coming (#1118).
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
 - A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
-- The session tracker is gone: no live session list beyond the snapshot's count, no feed, chat, timeline, attention, names or input from the Mac, the phone or `infinitusctl`.
-- The browser page ("Copy Browser Link") is gone.
-- Keep awake is gone (Settings › Display's two switches and the `keep_awake` prefs).
-- Expired `aws login` / `gcloud auth login` are no longer detected from terminal sessions; `aws-login` / `gcloud-login` lose `--pid`, and sign-ins started from the desktop app or the phone work as before.
-- The old native phone client's sources (`apps/mac/ios`) are removed.
+- Rows an engine could not refresh say how old their numbers are instead of reading as current, on every engine rather than swapd alone.
+- The desktop's thread card can be shown on the phone's lock screen: the Mac starts it, redraws it as threads move and ends it when the desktop says so (#1047).
+
+### Phone
+- Settings › Infinitus has "Thread card on the lock screen": a Live Activity of what your threads are doing, kept moving by the Mac over push with the app closed, plus a test card that needs no push (#1047).
 
 
 ## 0.5.0-alpha.8

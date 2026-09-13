@@ -111,11 +111,6 @@ interface GitActionsControlProps {
   gitCwd: string | null;
   activeThreadRef: ScopedThreadRef | null;
   draftId?: DraftId;
-  /**
-   * Opens the thread's own change request beside it. Absent when the thread has no project to
-   * place it against, in which case it still opens in the browser.
-   */
-  onOpenPullRequest?: ((number: number) => void) | undefined;
 }
 
 interface PendingDefaultBranchAction {
@@ -947,7 +942,6 @@ export default function GitActionsControl({
   gitCwd,
   activeThreadRef,
   draftId,
-  onOpenPullRequest,
 }: GitActionsControlProps) {
   const updateThreadMetadata = useAtomCommand(
     threadEnvironment.updateMetadata,
@@ -964,7 +958,6 @@ export default function GitActionsControl({
     [activeThreadRef],
   );
   const openPrLink = useOpenPrLink(activeThreadRef ?? undefined);
-  const openLink = useOpenLink(activeThreadRef);
   const activeDraftThread = useComposerDraftStore((store) =>
     draftId
       ? store.getDraftSession(draftId)
@@ -1193,35 +1186,24 @@ export default function GitActionsControl({
     };
   }, [activeEnvironmentId, gitCwd, refreshVcsStatus]);
 
-  const openExistingPr = useCallback(async () => {
-    const openPr = gitStatusForActions?.pr?.state === "open" ? gitStatusForActions.pr : null;
-    // Beside the thread where it was made, the way the browser opens beside it. Checked before
-    // the shell, which opening in the app does not need.
-    if (openPr && onOpenPullRequest) {
-      onOpenPullRequest(openPr.number);
-      return;
-    }
-    const prUrl = openPr?.url ?? null;
-    if (!prUrl) {
-      toastManager.add({
-        type: "error",
-        title: "No open pull request found.",
-        data: threadToastData,
-      });
-      return;
-    }
-    void openLink(prUrl).catch((err: unknown) => {
-      console.error(err);
-      toastManager.add(
-        stackedThreadToast({
+  const openExistingPr = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const openPr = gitStatusForActions?.pr?.state === "open" ? gitStatusForActions.pr : null;
+      if (!openPr) {
+        toastManager.add({
           type: "error",
-          title: "Unable to open pull request link",
-          description: err instanceof Error ? err.message : "An error occurred.",
-          ...(threadToastData !== undefined ? { data: threadToastData } : {}),
-        }),
-      );
-    });
-  }, [gitStatusForActions, onOpenPullRequest, openLink, threadToastData]);
+          title: "No open pull request found.",
+          data: threadToastData,
+        });
+        return;
+      }
+      // By its own URL, the way the sidebar's PR badge and the branch toolbar open one: the
+      // repository a pull request belongs to is in the link, and deriving it from the project
+      // instead reads the checkout's primary remote — on a fork, somebody else's repository.
+      openPrLink(event, openPr.url);
+    },
+    [gitStatusForActions, openPrLink, threadToastData],
+  );
 
   runGitActionWithToast = useEffectEvent(
     async ({
@@ -1504,9 +1486,9 @@ export default function GitActionsControl({
     });
   };
 
-  const runQuickAction = () => {
+  const runQuickAction = (event: MouseEvent<HTMLElement>) => {
     if (quickAction.kind === "open_pr") {
-      void openExistingPr();
+      openExistingPr(event);
       return;
     }
     if (quickAction.kind === "open_publish") {
@@ -1567,10 +1549,10 @@ export default function GitActionsControl({
     }
   };
 
-  const openDialogForMenuItem = (item: GitActionMenuItem) => {
+  const openDialogForMenuItem = (item: GitActionMenuItem, event: MouseEvent<HTMLElement>) => {
     if (item.disabled) return;
     if (item.kind === "open_pr") {
-      void openExistingPr();
+      openExistingPr(event);
       return;
     }
     if (item.dialogAction === "push") {
@@ -1697,7 +1679,9 @@ export default function GitActionsControl({
               size="xs"
               className="ps-[8.5px]"
               disabled={isGitActionRunning || quickAction.disabled}
-              onClick={runQuickAction}
+              onClick={(event) => {
+                runQuickAction(event);
+              }}
             >
               <GitQuickActionIcon quickAction={quickAction} SourceControlIcon={SourceControlIcon} />
               <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
@@ -1754,8 +1738,8 @@ export default function GitActionsControl({
                   <MenuItem
                     key={`${item.id}-${item.label}`}
                     disabled={item.disabled}
-                    onClick={() => {
-                      openDialogForMenuItem(item);
+                    onClick={(event) => {
+                      openDialogForMenuItem(item, event);
                     }}
                   >
                     <GitActionItemIcon icon={item.icon} SourceControlIcon={SourceControlIcon} />

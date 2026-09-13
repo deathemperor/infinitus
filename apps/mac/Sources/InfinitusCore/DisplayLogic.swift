@@ -173,9 +173,9 @@ public enum StaleAge {
 }
 
 public extension Account {
-    /// The row's age caption when swapd could not refresh this account
-    /// (#965); nil for every non-stale row, and nil when stale but the
-    /// engine gave no age to show.
+    /// The row's age caption when the engine could not refresh this
+    /// account (#965); nil for every non-stale row, and nil when stale
+    /// but the engine gave no age to show.
     var staleAgeLabel: String? {
         guard stale == true else { return nil }
         return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
@@ -186,7 +186,24 @@ public extension Account {
     var staleTip: String? {
         guard let age = staleAgeLabel else { return nil }
         let why = staleReason.map { " (\($0))" } ?? ""
-        return "Usage from \(age) — swapd could not refresh this account\(why); it retries on its own"
+        return "Usage from \(age) — the engine could not refresh this account\(why); it retries on its own"
+    }
+
+    /// Whether a reset instant carried by this account still says anything
+    /// at `now`. A stale row is a FROZEN measurement — its reset is the one
+    /// that was true when the last good fetch landed — so once that instant
+    /// has passed with no fetch to confirm it, the row knows nothing about
+    /// the window any more. Counting down to it, or pulsing "resetting…"
+    /// against it, narrates data this build does not have: slot 12 pulsed
+    /// the revive word for 86 minutes against a reset that had already gone
+    /// by inside a 429-backed-off snapshot (#1118).
+    ///
+    /// Fresh rows are always knowable, and so is a stale row whose reset is
+    /// still ahead: the engine will very likely refresh before it arrives,
+    /// and if it doesn't, this turns false the moment it passes.
+    func resetIsKnowable(_ resetsAt: String?, now: Date = Date()) -> Bool {
+        guard stale == true, let reset = WeeklyRoll.parse(resetsAt) else { return true }
+        return reset > now
     }
 }
 
@@ -214,8 +231,16 @@ public enum SentinelNotes {
     /// (relogin_required ran three lines, user screenshot 2026-08-31).
     /// The full note rides the row's tooltip; statuses already short
     /// fall through unchanged.
+    ///
+    /// token_expired says "deferred", not "retrying": the row cannot see
+    /// whether a retry is due (the engine may be an hour into a 429
+    /// backoff), and a credential the engine has given up on reports
+    /// relogin_required instead — so "retrying" was a promise this surface
+    /// had no way to keep and read as a hang when it went unanswered for
+    /// hours (#1118, swapd#30). "Deferred" is the state, which the row
+    /// does know; the tooltip's full note still says it retries on its own.
     static let shortNotes: [String: String] = [
-        "token_expired": "token expired — retrying",
+        "token_expired": "token expired — deferred",
         "foreign_credential": "foreign credential",
         "keychain_unavailable": "keychain locked",
         "relogin_required": "re-login needed",

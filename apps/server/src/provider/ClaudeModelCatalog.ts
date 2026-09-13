@@ -230,12 +230,24 @@ function resolveClaudeCatalogContextWindow(
   return typeof value === "string" ? value : undefined;
 }
 
+export interface ClaudeCatalogApiModelIdOptions {
+  /**
+   * Fork (#1088): whether the manifest's bracket suffixes (`claude-opus-5[1m]`)
+   * may be appended. They are Anthropic's own wire syntax — an Anthropic-
+   * compatible proxy in front of the API answers 400 "unknown provider for
+   * model" on one — so a proxied instance asks for the plain slug. Defaults on.
+   */
+  readonly modelSuffixes?: boolean;
+}
+
 export function resolveClaudeCatalogApiModelId(
   catalog: ClaudeModelCatalog,
   modelSelection: ModelSelection,
+  options?: ClaudeCatalogApiModelIdOptions,
 ): string {
   const entry = resolveClaudeCatalogModel(catalog, modelSelection.model);
   const slug = entry?.model.slug ?? modelSelection.model;
+  if (options?.modelSuffixes === false) return slug;
   const descriptors = getProviderOptionDescriptors({
     caps: entry?.model.capabilities ?? EMPTY_CAPABILITIES,
     selections: modelSelection.options,

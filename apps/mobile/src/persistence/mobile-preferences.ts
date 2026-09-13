@@ -51,6 +51,9 @@ export interface Preferences {
   /** Infinitus (fork): local reset / swap alarms planned from the Mac's fleet. */
   readonly infinitusAlarmsEnabled?: boolean;
   readonly infinitusPushAlertsEnabled?: boolean;
+  /** Infinitus (fork, #1047): the Mac keeps a lock-screen card of the
+      threads moving over push; absent reads on. */
+  readonly infinitusThreadCardEnabled?: boolean;
   /** Infinitus (fork, #742): pin each new task as the server creates it. */
   readonly infinitusPinAtCreation?: boolean;
   /** Infinitus (fork, #807): what a follow-up does while the thread's turn
@@ -120,6 +123,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     infinitusLiveActivityMac?: string;
     infinitusAlarmsEnabled?: boolean;
     infinitusPushAlertsEnabled?: boolean;
+    infinitusThreadCardEnabled?: boolean;
     infinitusPinAtCreation?: boolean;
     infinitusComposerSendMode?: "queue" | "steer";
   } = {};
@@ -206,6 +210,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.infinitusPushAlertsEnabled === "boolean") {
     preferences.infinitusPushAlertsEnabled = parsed.infinitusPushAlertsEnabled;
+  }
+  if (typeof parsed.infinitusThreadCardEnabled === "boolean") {
+    preferences.infinitusThreadCardEnabled = parsed.infinitusThreadCardEnabled;
   }
   if (typeof parsed.infinitusPinAtCreation === "boolean") {
     preferences.infinitusPinAtCreation = parsed.infinitusPinAtCreation;

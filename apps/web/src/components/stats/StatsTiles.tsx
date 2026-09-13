@@ -14,7 +14,10 @@ export function StatsTileGroupView({ group }: { readonly group: StatsTileGroup }
   );
 }
 
-/** Value, delta vs the previous period, sparkline of the days. */
+/** Value, delta vs the previous period, sparkline of the days. A value carrying
+    a unit ("34 tool calls") stays on one line and pushes the delta to the next
+    instead of breaking mid-phrase; the sparkline sits at the tile's foot, so a
+    two-line value does not lift its row's other sparklines out of line. */
 function StatsTileView({ tile }: { readonly tile: StatsTile }) {
   const deltaClass =
     tile.delta === null
@@ -27,8 +30,10 @@ function StatsTileView({ tile }: { readonly tile: StatsTile }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border p-3">
       <p className="text-muted-foreground text-xs">{tile.id}</p>
-      <p className="flex items-baseline gap-2">
-        <span className="font-semibold text-foreground text-lg tabular-nums">{tile.value}</span>
+      <p className="flex flex-wrap items-baseline gap-2">
+        <span className="whitespace-nowrap font-semibold text-foreground text-lg tabular-nums">
+          {tile.value}
+        </span>
         {tile.delta === null ? null : (
           <span className={`text-[11px] tabular-nums ${deltaClass}`}>{tile.delta}</span>
         )}
@@ -40,7 +45,7 @@ function StatsTileView({ tile }: { readonly tile: StatsTile }) {
 
 /** The day series as one polyline; flat when every point is zero. */
 function Sparkline({ series }: { readonly series: ReadonlyArray<number> }) {
-  if (series.length < 2) return <div className="h-6" aria-hidden />;
+  if (series.length < 2) return <div className="mt-auto h-6" aria-hidden />;
   const width = 96;
   const height = 24;
   const max = Math.max(...series, 0);
@@ -54,7 +59,7 @@ function Sparkline({ series }: { readonly series: ReadonlyArray<number> }) {
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="h-6 w-full text-primary"
+      className="mt-auto h-6 w-full text-primary"
       preserveAspectRatio="none"
       aria-hidden
     >

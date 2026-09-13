@@ -183,7 +183,7 @@ export function ProxyProviderFields({
               <span className="text-xs font-medium text-foreground">Base URL</span>
               <Input
                 className="bg-background"
-                placeholder="http://127.0.0.1:20128/v1"
+                placeholder="http://127.0.0.1:20128"
                 value={draft.baseUrl}
                 onChange={(event) => changeProxy({ ...draft, baseUrl: event.target.value })}
               />

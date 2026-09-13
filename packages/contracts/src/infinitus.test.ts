@@ -553,7 +553,7 @@ describe("the phone-only write bodies", () => {
 
   // The keys the native phone sends today (NetworkFleetMirror, ISO 8601 dates).
   const registration = {
-    kind: "working-start",
+    kind: "agent-activity-start",
     token: "8f3a…c1",
     deviceId: "F3B1D2E4-0000-4000-8000-000000000001",
     deviceName: "Loc's iPhone",
@@ -566,7 +566,7 @@ describe("the phone-only write bodies", () => {
 
   it("round-trips a token registration with every field", () => {
     const decoded = decodeRegistration(registration);
-    expect(decoded.kind).toBe("working-start");
+    expect(decoded.kind).toBe("agent-activity-start");
     expect(decoded.macId).toBe("env-7c2f");
     expect(encodeRegistration(decoded)).toEqual(registration);
   });
