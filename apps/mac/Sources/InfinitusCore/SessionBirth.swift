@@ -1,5 +1,35 @@
 import Foundation
 
+/// The permission modes a session can run in and be moved to, as Claude
+/// Code spells them, with the labels the pickers show.
+public enum SessionModes {
+    /// The modes a session can start in. The default (ask for every
+    /// tool) is "no flag", so it is not in this list.
+    public static let permissionModes: [(mode: String, label: String)] = [
+        ("manual", "Ask every time"),
+        ("acceptEdits", "Auto-accept edits"),
+        ("auto", "Auto"),
+        ("bypassPermissions", "Full access"),
+    ]
+    /// The modes a running session can be moved to (#163 phase 2) through
+    /// the plugin's PreToolUse hook: `supervised` clears the hook mode.
+    /// `auto` is Claude Code's own classifier and has no hook equivalent.
+    public static let hookModes: [(mode: String, label: String)] = [
+        ("supervised", "Supervised"),
+        ("acceptEdits", "Auto-accept edits"),
+        ("bypassPermissions", "Full access"),
+    ]
+    /// How much a mode lets through, for "a start mode is a floor": the
+    /// hook can only widen what Claude Code would otherwise ask about.
+    public static func modeRank(_ mode: String?) -> Int {
+        switch mode {
+        case "bypassPermissions": return 2
+        case "acceptEdits", "auto": return 1
+        default: return 0
+        }
+    }
+}
+
 /// How a session was started by Infinitus (#163 / #165): the profile it
 /// was born from, the permission mode it runs in, the session it
 /// resumed. Claude Code's own session record carries none of this, so
@@ -53,23 +83,12 @@ public struct SessionBirth: Codable, Sendable, Equatable {
     public var effectiveMode: String? { hookMode ?? permissionMode }
     /// The start mode as the pickers spell it, nil when supervised.
     public var modeLabelForStart: String? {
-        permissionMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
-    }
-
-    /// `host` is the reply's: a request without `headless` still lands
-    /// on the owned actor when Settings makes "owned" the default.
-    public init?(request: SessionStart.Request, host: String? = nil) {
-        let profile = request.profile?.trimmingCharacters(in: .whitespaces)
-        let mode = request.permissionMode.flatMap { m in SessionStart.permissionModes.contains { $0.mode == m } ? m : nil }
-        let headless = request.headless == true || host == "owned"
-        guard (profile?.isEmpty == false) || mode != nil || request.resume != nil || headless else { return nil }
-        self.init(profile: profile?.isEmpty == false ? profile : nil, permissionMode: mode, resumedFrom: request.resume,
-                  forked: request.resume != nil && request.fork == true ? true : nil, headless: headless ? true : nil)
+        permissionMode.flatMap { m in SessionModes.permissionModes.first { $0.mode == m }?.label }
     }
 
     /// The mode as the pickers spell it ("Full access"), nil when supervised.
     public var modeLabel: String? {
-        effectiveMode.flatMap { m in SessionStart.permissionModes.first { $0.mode == m }?.label }
+        effectiveMode.flatMap { m in SessionModes.permissionModes.first { $0.mode == m }?.label }
     }
 
     /// What the session row shows beside the name: "Review · Full access",

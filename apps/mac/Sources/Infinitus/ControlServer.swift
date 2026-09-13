@@ -159,9 +159,6 @@ final class ControlServer {
     /// ISO8601DateFormatter is an ICU `udat_open` each time, and `events`
     /// built one per row on every desktop-app poll (#346's sample).
     nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
-    /// `session-stop` (#220 Phase 2): how long after the Esc a session
-    /// that still owns its pid gets SIGTERM.
-    static let stopGrace: Double = 5
 
     private func handle(line: Data) async -> ControlReply {
         let request: ControlRequest
@@ -263,85 +260,6 @@ final class ControlServer {
                                 "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null,
                                 "needs": .array(needs.map { .string($0) })])
             }))
-
-        case "profiles":
-            return ControlReply(ok: true, result: try .of(["profiles": model.sessionProfiles.profiles]))
-
-        case "profile-set":
-            guard let name = r.args.first?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
-                throw Fail("usage: profile-set <name> [--cwd f] [--engine e] [--mode m] [--model m] [--system s] [--prompt p] [--allow \"Edit, Bash git\"]")
-            }
-            if let engine = r.options["engine"], !["claude", "codex"].contains(engine) { throw Fail("engine must be claude or codex") }
-            if let mode = r.options["mode"], !SessionStart.permissionModes.contains(where: { $0.mode == mode }) {
-                throw Fail("mode must be one of " + SessionStart.permissionModes.map(\.mode).joined(separator: ", "))
-            }
-            let profile = SessionProfile(name: name, cwd: r.options["cwd"], engine: r.options["engine"],
-                                         permissionMode: r.options["mode"], model: r.options["model"],
-                                         systemPrompt: r.options["system"], prompt: r.options["prompt"],
-                                         allowTools: r.options["allow"].flatMap(SessionProfiles.parseAllowList))
-            model.sessionProfiles.set(profile)
-            if let err = model.sessionProfiles.lastError { throw Fail(err) }
-            let saved = model.sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }
-            return ControlReply(ok: true, result: try .of(["profile": saved]))
-
-        case "profile-remove":
-            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: profile-remove <name>") }
-            let existed = model.sessionProfiles.profiles.contains { SessionProfiles.same($0.name, name) }
-            model.sessionProfiles.remove(name)
-            return ControlReply(ok: true, result: .object(["removed": .bool(existed)]))
-        case "past-sessions":
-            let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
-                                             limit: r.options["limit"].flatMap(Int.init) ?? 50,
-                                             search: r.options["search"],
-                                             hidden: model.hiddenSessions.withLock { $0 })
-            return ControlReply(ok: true, result: try .of(PastSessions.Reply(sessions: sessions)))
-
-        case "session-delete":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: session-delete <sessionId> --yes") }
-            guard r.options["yes"] != nil else { throw Fail("session-delete hides a session; pass --yes") }
-            let claudeDir = ClaudeSessions.configHome()
-            if let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
-                throw Fail("session \(id) is live (pid \(live.pid)); stop it first")
-            }
-            let hidden = model.hiddenSessions.withLock { $0 }
-            guard PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: hidden) != nil || hidden.contains(id) else {
-                throw Fail("no past session \(id)")
-            }
-            try model.hiddenSessions.withLock { ids -> Void in
-                ids.insert(id)
-                var file = PastSessions.Hidden()
-                file.ids = ids
-                try file.save(root: AppSupport.root())
-            }
-            return ControlReply(ok: true, result: .object(["hidden": .string(id)]))
-
-
-        case "session-stop":
-            guard let pidText = r.args.first, let pid = Int32(pidText), pid > 1 else {
-                throw Fail("usage: session-stop <pid> --yes")
-            }
-            guard r.options["yes"] != nil else { throw Fail("session-stop signals a process; pass --yes") }
-            guard let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { $0.pid == pid }) else {
-                throw Fail("no live session with pid \(pid)")
-            }
-            // The escape reaches the session's own surface first — a clean
-            // stop, if it is mid-turn to see it; the grace's SIGTERM is
-            // the one that always lands.
-            let esc = await model.send(SessionInput.Request(kind: .key, text: "esc"), toPid: Int(pid), icon: "stop.circle", what: "control stop")
-            let sessionId = record.sessionId
-            Task.detached(priority: .utility) {
-                try? await Task.sleep(nanoseconds: UInt64(Self.stopGrace * 1_000_000_000))
-                // Pid reuse is why this re-resolves by session id: only a
-                // record that still names both the pid and the session is
-                // signalled.
-                guard ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .contains(where: { $0.sessionId == sessionId && $0.pid == pid }) else { return }
-                kill(pid_t(pid), SIGTERM)
-            }
-            return ControlReply(ok: true, result: .object([
-                "pid": .number(Double(pid)), "sessionId": .string(sessionId),
-                "esc": .string(esc.outcome), "grace": .number(Self.stopGrace),
-            ]))
 
 
         case "push":

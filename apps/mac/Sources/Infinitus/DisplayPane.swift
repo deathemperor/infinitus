@@ -168,24 +168,12 @@ struct DisplayPane: View {
 
     @ViewBuilder private var sessionsSection: some View {
         Section {
-            Toggle("Name unnamed sessions with Claude Haiku",
-                   isOn: $model.sessionAutoNames)
-            Picker("New sessions from the phone open in", selection: $model.sessionHost) {
-                Text("cmux when installed, else Terminal").tag("auto")
-                Text("cmux").tag("cmux")
-                Text("Terminal").tag("terminal")
-                Text("No terminal — Infinitus runs it, chat from the app or phone").tag("owned")
-            }
             // The phone's picker with its live previews (#151): one row
             // per style, drawn in the current theme.
             ChatHeaderPicker(selection: $model.chatHeader, theme: model.rowTheme)
         } header: {
             Text("Sessions")
         } footer: {
-            Text("Naming asks Claude Haiku once per "
-                 + "session on the active account — roughly a fraction of "
-                 + "a cent each, and it re-asks when the work moves on. "
-                 + "The terminal choice takes effect at the next launch.")
         }
         .settingsAnchor("Display/Sessions")
     }
@@ -333,8 +321,6 @@ extension DisplayPane {
             entry(popup, "Compact rows", ["compact", "one line", "dense"]),
             entry(popup, "Hide the action buttons", ["actions", "buttons", "footer", "chips"]),
             entry(popup, "Sort rows by headroom", ["order", "sort", "headroom", "next"]),
-            entry(sessions, "Name unnamed sessions with Claude Haiku", ["haiku", "name", "title", "auto name"]),
-            entry(sessions, "New sessions from the phone open in", ["terminal", "cmux", "phone", "host", "headless", "owned"]),
             entry(sessions, "Chat header", ["hud", "compact", "strip", "chat", "header", "unit frame"]),
             entry(startup, "Refresh interval", ["poll", "interval", "refresh", "seconds"],
                   anchor: startupAnchor),
