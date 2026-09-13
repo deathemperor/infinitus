@@ -15,7 +15,12 @@ import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
 import { buildThreadRouteParams } from "../threadRoutes";
-import { BEST_OF_STATUS_LABEL, bestOfMemberStatus, bestOfSiblings } from "./chat/bestOf.logic";
+import {
+  BEST_OF_STATUS_LABEL,
+  bestOfMemberStats,
+  bestOfMemberStatus,
+  bestOfSiblings,
+} from "./chat/bestOf.logic";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
@@ -172,6 +177,7 @@ export function BestOfGroupCard({
       <ul className="mt-1.5 flex flex-col gap-0.5">
         {siblings.map((sibling) => {
           const status = bestOfMemberStatus(sibling);
+          const stats = bestOfMemberStats(sibling.usage);
           const current = sibling.id === threadId;
           return (
             <li key={sibling.id} className="flex items-center gap-2 text-xs">
@@ -193,6 +199,9 @@ export function BestOfGroupCard({
                 {sibling.modelSelection.model}
                 {current ? " (this thread)" : ""}
               </button>
+              {stats ? (
+                <span className="text-muted-foreground shrink-0 tabular-nums">{stats}</span>
+              ) : null}
               <span
                 className={cn(
                   "text-muted-foreground shrink-0",

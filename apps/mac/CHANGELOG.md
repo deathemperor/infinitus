@@ -11,10 +11,12 @@ publishes the matching section as the GitHub release body.
 ## 0.5.0-alpha.7
 
 ### Desktop
+- A turn that finishes with messages still queued behind it no longer posts "Thread completed" or rings; the thread is not done until the queue is (#270).
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
 - Settings › Infinitus › Profiles is gone with the terminal sessions it started; the Sessions page is now "Priority", at the same place (#1041).
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
+- The Best-of card shows each member's turns, tool calls and wall time beside its status, off the thread's own counters (#269).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 - `infinitusctl thread show` and `thread send --wait` read a thread again instead of failing with "unreadable reply" (#1048).
 
