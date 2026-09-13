@@ -42,7 +42,17 @@ export const ALWAYS_ABSENT: ReadonlyArray<string> = [
 export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   { route: "/settings/infinitus", label: "Menu bar", marker: "Show the account name" },
   { route: "/settings/infinitus/themes", label: "Themes", marker: "Off — plain numbers" },
-  { route: "/settings/infinitus/animations", label: "Animations", marker: "Intro style" },
+  {
+    route: "/settings/infinitus/animations",
+    label: "Animations",
+    // A select's value, not its label: a label renders whether or not the
+    // choice names arrived, so the value is the part that proves they did.
+    marker: "[Popup entrance: Slide down from the top]",
+    shows: ["[Title flourish: Zoom in]", "[Pace fire: Ember]"],
+    // Each one is a key of this page humanised for want of web copy, the same
+    // failure `Fork ` guards above.
+    absent: ["Intro style", "Intro title", "Intro speed", "Burn style"],
+  },
   { route: "/settings/infinitus/sessions", label: "Priority", marker: "Session priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
   {
