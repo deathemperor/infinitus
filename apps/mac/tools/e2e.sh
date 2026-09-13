@@ -62,7 +62,6 @@ cleanup() {
     pkill -f "$SOCKDIR/aws" 2>/dev/null || true
     pkill -f "aws-own-login-listener" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
-    [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
     [ -z "${DESK_PID:-}" ] || kill "$DESK_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
     "$INFINITUS_SWAPD_CLI" reset >/dev/null 2>&1 || true
@@ -221,23 +220,6 @@ echo "You are now logged in as [e2e@example.com]."
 STUB
 chmod +x "$SOCKDIR/gcloud"
 export INFINITUS_GCLOUD_CLI="$SOCKDIR/gcloud"
-# A live Claude session record (#612): the `sessions` verb and the
-# snapshot's session count need a pid on disk. The transcript-based
-# AWS/gcloud need scan and its messaging-socket delivery left with the
-# session sweep (#1041) — sign-ins now start from a verb, never a scan.
-export CLAUDE_CONFIG_DIR="$SOCKDIR/claude"
-sleep 3600 &
-SESSION_PID=$!
-SESSION_CWD="$SOCKDIR/proj"
-mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
-# A session record lands whole (#1002): `cat >` truncates first, and the
-# app lists the records the moment a hook's refresh fires — one second
-# after the Stop event.
-write_record() { cat >"$1.tmp" && mv -f "$1.tmp" "$1"; }
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
-{"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
- "name":"e2e-aws","startedAt":1700000000000}
-EOF
 # A login wrapper an earlier instance left behind (#274): spawned from a
 # subshell that exits, so it is launchd's child like the real leftover.
 ( /usr/bin/script -q /dev/null "$SOCKDIR/aws" login --remote --profile e2e-orphan </dev/null >/dev/null 2>&1 & )
@@ -499,12 +481,6 @@ until "$CTL" status >/dev/null 2>&1; do
     sleep 1
 done
 echo "control: ok (dead socket path re-bound after ${i}s)"
-
-# --- sessions verb (#612, snapshot count survivor) ------------------------
-# The session tracker is gone (#1041); what's left is the one row the
-# `sessions` verb and the fleet's session count still read off disk.
-"$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['cwd']=='$SESSION_CWD' and s['startedAt']=='2023-11-14T22:13:20Z' for s in d)" || fail "sessions row fields (#612)"
-echo "sessions: ok (one live record, #612)"
 
 # --- AWS sign-in, started by the verb (#1041: no more transcript scan) ----
 aws_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e-login' and not l.get('provider') for l in d['logins'])"; }

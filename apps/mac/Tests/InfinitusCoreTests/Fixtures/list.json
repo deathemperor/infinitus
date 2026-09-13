@@ -192,13 +192,5 @@
       "usageFetchedAt": "2026-08-27T21:09:44Z",
       "usageAgeSeconds": 111.8
     }
-  ],
-  "liveSessions": {
-    "busy": 4,
-    "idle": 7,
-    "waiting": 0,
-    "shell": 1,
-    "unknown": 2,
-    "total": 14
-  }
+  ]
 }

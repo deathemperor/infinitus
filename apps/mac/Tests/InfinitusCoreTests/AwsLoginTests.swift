@@ -124,9 +124,9 @@ final class AwsLoginTests: XCTestCase {
     }
 
     func testWireShapesRoundTrip() throws {
-        let item = AwsLogin.Item(profile: "papaya-login", flow: .remote, pid: 42, sessionLabel: "banyan",
+        let item = AwsLogin.Item(profile: "papaya-login", flow: .remote,
                                  state: AwsLogin.State(profile: "papaya-login", flow: .remote, phase: .waitingForCode,
-                                                       url: "https://x", startedAt: 1, pid: 42))
+                                                       url: "https://x", startedAt: 1))
         let data = try JSONEncoder().encode(item)
         XCTAssertEqual(try JSONDecoder().decode(AwsLogin.Item.self, from: data), item)
         let start = try JSONDecoder().decode(AwsLogin.StartRequest.self, from: Data(#"{"profile":"p"}"#.utf8))

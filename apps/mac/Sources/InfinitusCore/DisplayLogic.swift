@@ -140,26 +140,6 @@ public enum TitleFormatter {
     }
 }
 
-/// The agent chip's tooltip — the session-counter breakdown (docs/TODO.md
-/// item, tooltip form chosen 2026-08-29).
-public enum SessionSummary {
-    public static func tooltip(_ live: LiveSessions) -> String {
-        let tail = "\(live.total) live Claude Code sessions — all ride the active account"
-        guard let idle = live.idle, let waiting = live.waiting,
-              let shell = live.shell, let unknown = live.unknown else {
-            // Older engine: no breakdown on the record.
-            return "\(live.busy) session(s) mid-turn of " + tail
-        }
-        var parts = ["\(live.busy) working"]
-        if idle > 0 { parts.append("\(idle) idle") }
-        if waiting > 0 { parts.append("\(waiting) waiting") }
-        if shell > 0 { parts.append("\(shell) in shell") }
-        if unknown > 0 { parts.append("\(unknown) unknown") }
-        return parts.joined(separator: " · ") + " of " + tail
-    }
-}
-
-
 /// How old a stale reading is, for the row (#965): "just now" under a
 /// minute, then minutes, hours, days — the desktop's wording.
 public enum StaleAge {

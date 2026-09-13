@@ -59,11 +59,6 @@ struct PanelServiceStatus: Encodable {
     let word: String
 }
 
-struct PanelSessionsChip: Encodable {
-    let busy: Int
-    let total: Int
-}
-
 struct PanelEngine: Encodable {
     let running: Bool
     let word: String   // "auto" | "off" — the mac's EngineBadgeText wording
@@ -89,14 +84,12 @@ struct PanelPayload: Encodable {
     let schemaVersion: Int
     let themeId: String
     let title: String       // bar-style active line for the panel header
-    let sessionsLine: String?
     let activeNumber: Int?
     let accounts: [PanelAccount]
     let themes: [PanelTheme]
     let nextRecovery: PanelRecovery?
     /// Footer chips (#9 parity), all nil in the error path.
     let serviceStatus: PanelServiceStatus?
-    let sessionsChip: PanelSessionsChip?
     let engine: PanelEngine?
     /// Phones heard from by `serve`, newest first; additive field.
     let devices: [PanelDevice]
@@ -199,9 +192,8 @@ struct InfinitusTray {
     static let swapdInstall = "cargo install --git https://github.com/deathemperor/swapd swapd"
 
     /// The Claude fleet off one `swapd list --json` (#756): the provider's
-    /// view through the same SwapdMapping the Mac uses, the live Claude
-    /// Code sessions attached (swapd knows nothing about them), packed as
-    /// the AccountList this file renders — and its bytes, which are what
+    /// view through the same SwapdMapping the Mac uses, packed as the
+    /// AccountList this file renders — and its bytes, which are what
     /// the mirror hands the phone. No Claude provider, or one with no
     /// accounts, is an empty fleet, not an error: the onboarding branch.
     static func fleet(bin: String, now: Date = Date()) async throws -> (AccountList, Data) {
@@ -210,8 +202,7 @@ struct InfinitusTray {
         let mapped = view.map { SwapdMapping.fleet(from: $0, provider: .claude, now: now) }
         let list = AccountList(
             activeAccountNumber: mapped?.activeNumber, accounts: mapped?.accounts ?? [],
-            nextCandidate: mapped?.nextCandidate, nextRecovery: mapped?.nextRecovery,
-            liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))
+            nextCandidate: mapped?.nextCandidate, nextRecovery: mapped?.nextRecovery)
         return (list, (try? JSONEncoder().encode(list)) ?? Data())
     }
 
@@ -263,10 +254,7 @@ struct InfinitusTray {
                                    titleReset: "countdown")
             let recovery = RecoveryMath.corrected(engine: list.nextRecovery, accounts: list.accounts, activeNumber: list.activeAccountNumber)
             let rows = list.accounts.map { row($0, list: list, recovery: recovery, theme: theme, now: now) }
-            var tooltip = rows.joined(separator: "\n")
-            if let live = list.liveSessions {
-                tooltip += "\n" + SessionSummary.tooltip(live)
-            }
+            let tooltip = rows.joined(separator: "\n")
             let cls: String
             if let active, AccountVitals.isDead(active.usage) { cls = "dead" }
             else if let active, active.usageStatus != "ok" { cls = "warning" }
@@ -339,10 +327,10 @@ struct InfinitusTray {
         func emitError(_ message: String) {
             emitPanel(PanelPayload(
                 schemaVersion: 1, themeId: theme.id,
-                title: "\(TitleFormatter.icon) \(message)", sessionsLine: nil,
+                title: "\(TitleFormatter.icon) \(message)",
                 activeNumber: nil, accounts: [], themes: themes,
                 nextRecovery: nil,
-                serviceStatus: nil, sessionsChip: nil, engine: nil, devices: [], error: message))
+                serviceStatus: nil, engine: nil, devices: [], error: message))
         }
         guard let bin = SwapdLocator.locate() else {
             emitError("swapd not found")
@@ -449,11 +437,9 @@ struct InfinitusTray {
                 title: list.accounts.isEmpty
                     ? "\(TitleFormatter.icon) no accounts — swapd add"
                     : TitleFormatter.format(account: active, prefs: prefs, now: now),
-                sessionsLine: list.liveSessions.map { SessionSummary.tooltip($0) },
                 activeNumber: active?.number, accounts: accounts,
                 themes: themes, nextRecovery: panelRecovery,
                 serviceStatus: footer.panelStatus,
-                sessionsChip: list.liveSessions.map { PanelSessionsChip(busy: $0.busy, total: $0.total) },
                 engine: footer.panelEngine, devices: TrayClients.panelDevices(now: now), error: nil))
         } catch {
             emitError("engine error: \(error)")
@@ -541,7 +527,7 @@ struct InfinitusTray {
 
     /// One `PushTriggers` tick off a freshly-collected list — mirrors
     /// `AppModel.refreshSnapshot`'s block verbatim (same account health
-    /// mapping, same `liveSessions.sessions`). Only `serve` calls this:
+    /// mapping). Only `serve` calls this:
     /// it runs a persistent process, unlike `status`/`panel` which are
     /// one-shot waybar/quickshell execs with no state to carry a
     /// multi-tick episode (e.g. the two-quiet-ticks "sessions finished"
@@ -591,12 +577,10 @@ struct InfinitusTray {
     // socket and hands `ControlDispatch` these handlers.
 
     /// `infinitusctl status` against the tray: enough to prove whose
-    /// socket answered and that it can see this box's sessions.
+    /// socket answered.
     static func controlStatus(appVersion: String = BuiltVersion.string) -> JSONValue {
-        let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).count
-        return .object(["platform": .string("linux"),
-                        "version": .string(appVersion),
-                        "sessions": .number(Double(sessions))])
+        .object(["platform": .string("linux"),
+                "version": .string(appVersion)])
     }
 
     static func controlHandlers() -> ControlDispatch.Handlers {

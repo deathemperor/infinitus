@@ -11,13 +11,17 @@ public struct AgentActivityState: Equatable, Sendable {
     public let title: String
     /// The line under it, also the push-to-start alert's body.
     public let subtitle: String
+    /// How many threads the card counts as active — the desktop's own
+    /// busy signal now that the terminal session tracker is gone (#1041 d6).
+    public let activeCount: Int
     /// The whole state as JSON with sorted keys, so two equal states are
     /// the same string (the pusher skips a repeat).
     public let props: String
 
-    public init(title: String, subtitle: String, props: String) {
+    public init(title: String, subtitle: String, activeCount: Int, props: String) {
         self.title = title
         self.subtitle = subtitle
+        self.activeCount = activeCount
         self.props = props
     }
 
@@ -27,13 +31,13 @@ public struct AgentActivityState: Equatable, Sendable {
         guard let title = (object["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !title.isEmpty,
               let subtitle = object["subtitle"] as? String,
-              object["activeCount"] is Int,
+              let activeCount = object["activeCount"] as? Int,
               object["updatedAt"] is String,
               object["activities"] is [Any],
               JSONSerialization.isValidJSONObject(object),
               let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         else { return nil }
-        return AgentActivityState(title: title, subtitle: subtitle,
+        return AgentActivityState(title: title, subtitle: subtitle, activeCount: activeCount,
                                   props: String(decoding: data, as: UTF8.self))
     }
 }

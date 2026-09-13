@@ -240,21 +240,6 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: try .of(["quitting": true]))
 
-        case "sessions":
-            // #612: the id, the account alias and the start ride along
-            // for the fork's sessions list.
-            let account = model.activeAccountName
-            let iso = Self.iso
-            return ControlReply(ok: true, result: .array(model.sessionRows().map { row in
-                .object(["pid": .number(Double(row.pid)), "name": row.name.map { .string($0) } ?? .null,
-                        "cwd": .string(row.cwd), "status": row.status.map { .string($0) } ?? .null,
-                        "kind": .string(row.kind),
-                        "sessionId": .string(row.sessionId),
-                        "account": account.map { .string($0) } ?? .null,
-                        "startedAt": row.startedAt.map { .string(iso.string(from: $0)) } ?? .null])
-            }))
-
-
         case "push":
             // #269 G: the desktop's thread phase changes ride the Mac's
             // own pusher, so they get its gating and every channel on.
@@ -262,8 +247,12 @@ final class ControlServer {
             // phone's lock screen — no Notification Center line for it.
             if let payload = r.secret, let activity = ThreadActivityPush.parse(payload) {
                 switch activity {
-                case .show(let state): model.liveActivityPusher.pushAgentActivity(state)
-                case .end: model.liveActivityPusher.pushAgentActivity(nil)
+                case .show(let state):
+                    model.liveActivityPusher.pushAgentActivity(state)
+                    model.desktopActiveThreads = state.activeCount
+                case .end:
+                    model.liveActivityPusher.pushAgentActivity(nil)
+                    model.desktopActiveThreads = 0
                 }
                 return ControlReply(ok: true, result: .object(["pushed": .bool(true), "card": .bool(true)]))
             }
@@ -395,7 +384,7 @@ final class ControlServer {
             }
             // The outstanding item for that profile says which CLI's listener the callback is for.
             let items = await MainActor.run { model.awsLogins }
-            let provider = AwsLogin.inferProvider(profile: profile, pid: nil, items: items)
+            let provider = AwsLogin.inferProvider(profile: profile, items: items)
             let reply = await model.awsLoginRunner.relay(provider: provider, profile: profile, url: url)
             guard reply.ok, let state = reply.state else { throw Fail(reply.error ?? "not accepted") }
             return ControlReply(ok: true, result: try .of(["state": state]))

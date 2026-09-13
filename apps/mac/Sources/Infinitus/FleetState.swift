@@ -22,7 +22,6 @@ final class FleetState: ObservableObject, Identifiable {
     @Published var nextCandidate: Int?
     @Published var candidateOrder: [Int]?
     @Published var nextRecovery: NextRecovery?
-    @Published var liveSessions: LiveSessions?
     @Published var switchFlashTick = 0
     @Published var deathTicks: [Int: Int] = [:]
     @Published var dying: Set<Int> = []
@@ -78,7 +77,6 @@ final class FleetState: ObservableObject, Identifiable {
         nextCandidate = fleet.nextCandidate
         candidateOrder = fleet.candidateOrder
         nextRecovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: fleet.accounts, activeNumber: fleet.activeNumber)
-        liveSessions = fleet.liveSessions
         lastFleet = fleet
     }
 
@@ -163,7 +161,6 @@ final class FleetState: ObservableObject, Identifiable {
             if candidateOrder != fleet.candidateOrder { candidateOrder = fleet.candidateOrder }
             let recovery = RecoveryMath.corrected(engine: fleet.nextRecovery, accounts: list, activeNumber: fleet.activeNumber)
             if nextRecovery != recovery { nextRecovery = recovery }
-            if liveSessions != fleet.liveSessions { liveSessions = fleet.liveSessions }
         }
         if let now = fleet.activeNumber, let previousActive,
            previousActive != now {

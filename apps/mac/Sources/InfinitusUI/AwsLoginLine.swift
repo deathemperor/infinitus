@@ -23,7 +23,7 @@ public struct AwsLoginLine<M: FleetModel>: View {
                     .lineLimit(1)
                 if item.state == nil || item.state?.phase == .failed {
                     Button("Log in here") {
-                        model.startLogin(provider: item.providerOrAws, profile: item.profile, pid: item.pid, local: true)
+                        model.startLogin(provider: item.providerOrAws, profile: item.profile, pid: nil, local: true)
                     }
                     .font(PopupFont.caption)
                     .buttonStyle(.plain)
@@ -38,8 +38,7 @@ public struct AwsLoginLine<M: FleetModel>: View {
     }
 
     private func line(_ item: AwsLogin.Item) -> String {
-        let who = item.sessionLabel.map { "\($0) needs" } ?? "Needs"
-        var text = "\(who) \(item.providerOrAws.loginLabel) (\(item.profile))"
+        var text = "Needs \(item.providerOrAws.loginLabel) (\(item.profile))"
         if let s = item.state {
             switch s.phase {
             case .starting: text += " · starting…"

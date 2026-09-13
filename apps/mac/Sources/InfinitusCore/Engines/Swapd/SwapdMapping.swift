@@ -176,10 +176,9 @@ public enum SwapdMapping {
                     activeNumber: view.activeSlot ?? carried,
                     nextCandidate: view.nextCandidate,
                     nextRecovery: view.nextRecovery.map { NextRecovery(number: $0.slot, at: $0.at) },
-                    // swapd knows nothing about this Mac's Claude Code
-                    // sessions, and its list is not `AccountList` bytes the
-                    // phone could decode — both stay nil, like the proxy's.
-                    liveSessions: nil, raw: nil)
+                    // swapd's list is not `AccountList` bytes the phone
+                    // could decode — stays nil, like the proxy's.
+                    raw: nil)
     }
 
     /// swapd's kebab-case statuses in cswap's vocabulary — the one every

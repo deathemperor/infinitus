@@ -73,12 +73,10 @@ public extension AwsLogin {
     /// phone from before the field sends `/aws-login/start`, `/code` and
     /// its status poll with the profile alone, so a gcloud item's "Sign
     /// in from this phone" must still run gcloud. The outstanding items
-    /// decide — the one for that profile (and pid, when given) — and
-    /// only a profile no item knows falls back to aws.
-    static func inferProvider(profile: String, pid: Int?, items: [Item]) -> Provider {
-        let matching = items.filter { $0.profile == profile }
-        if let pid, let hit = matching.first(where: { $0.pid == pid }) { return hit.providerOrAws }
-        return matching.first?.providerOrAws ?? .aws
+    /// decide — the first one for that profile — and only a profile no
+    /// item knows falls back to aws.
+    static func inferProvider(profile: String, items: [Item]) -> Provider {
+        items.first { $0.profile == profile }?.providerOrAws ?? .aws
     }
 }
 

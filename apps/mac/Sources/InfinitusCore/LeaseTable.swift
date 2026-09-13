@@ -13,6 +13,9 @@ public enum ClientActivity {
     public static let ttlCapMs = 300_000
 
     public struct Scope: Codable, Sendable, Hashable {
+        // `sessions` / `session` stay so an old client's report still
+        // decodes; the terminal session tracker they were for is gone
+        // (#1041 d6) and nothing on this Mac serves them any more.
         public enum Kind: String, Codable, Sendable { case sessions, session, fleets, stats }
         public let type: Kind
         public let pid: Int32?

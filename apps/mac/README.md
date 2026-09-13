@@ -110,7 +110,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Themed menu bar** — the loop in the theme's color with its icon, a glow on switch, death and revival, an ember breath while burning ahead of pace.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
-- **Sessions & status chips** — the live Claude Code session count, engine status, auto-mode.
+- **Status chips** — engine status, auto-mode.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
@@ -130,13 +130,12 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back.
-- **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the desktop app's Activity page keeps the log across relaunches.
-- **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.
+- **`infinitusctl`** — an agent-facing control CLI: status, fleets, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.
 
 ## Privacy
 

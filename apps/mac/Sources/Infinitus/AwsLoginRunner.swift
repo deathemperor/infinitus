@@ -160,7 +160,7 @@ actor AwsLoginRunner {
         process.standardInput = stdin
         process.standardOutput = out
         process.standardError = out
-        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970, pid: nil,
+        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970,
                                    provider: provider == .aws ? nil : provider)
         out.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData

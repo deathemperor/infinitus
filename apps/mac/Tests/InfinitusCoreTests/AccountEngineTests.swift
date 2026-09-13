@@ -36,8 +36,7 @@ final class AccountEngineTests: XCTestCase {
         let raw = try fixture("list.json")
         let list = try JSONDecoder().decode(AccountList.self, from: raw)
         let fleet = EngineFleet(engineID: "swapd", provider: .claude, accounts: list.accounts,
-                                activeNumber: list.activeAccountNumber,
-                                liveSessions: list.liveSessions, raw: raw)
+                                activeNumber: list.activeAccountNumber, raw: raw)
         XCTAssertEqual(fleet.key, "swapd/claude")
         XCTAssertEqual(fleet.activeNumber, 5)
         let data = try JSONEncoder().encode([fleet])
@@ -45,7 +44,6 @@ final class AccountEngineTests: XCTestCase {
         XCTAssertEqual(back.count, 1)
         XCTAssertEqual(back[0].accounts.count, list.accounts.count)
         XCTAssertEqual(back[0].raw, raw)
-        XCTAssertEqual(back[0].liveSessions?.busy, 4)
         // The raw bytes still decode as the list payload the phone reads.
         let again = try JSONDecoder().decode(AccountList.self, from: back[0].raw!)
         XCTAssertEqual(again.activeAccountNumber, 5)

@@ -331,7 +331,7 @@ public actor CLIProxyEngine: AccountEngine {
                                accounts: accounts, activeNumber: fleet.activeNumber,
                                nextCandidate: next,
                                nextRecovery: fleet.nextRecovery,
-                               liveSessions: nil, raw: nil)
+                               raw: nil)
         }
     }
 

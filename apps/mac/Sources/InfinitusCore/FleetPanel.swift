@@ -91,17 +91,13 @@ public extension EngineFleet {
 
     /// The primary fleet as the `AccountList` every pre-multi-engine
     /// consumer decodes (the phone's `listJSON`, the tray's cache).
-    /// `liveSessions` overrides the fleet's own when the caller counted
-    /// sessions itself.
-    static func primaryList(_ fleets: [EngineFleet],
-                            liveSessions: LiveSessions? = nil) -> AccountList? {
+    static func primaryList(_ fleets: [EngineFleet]) -> AccountList? {
         guard let fleet = primary(of: fleets) else { return nil }
         return AccountList(schemaVersion: 1,
                            activeAccountNumber: fleet.activeNumber,
                            accounts: fleet.accounts,
                            nextCandidate: fleet.nextCandidate,
-                           nextRecovery: fleet.nextRecovery,
-                           liveSessions: liveSessions ?? fleet.liveSessions)
+                           nextRecovery: fleet.nextRecovery)
     }
 }
 
@@ -230,14 +226,14 @@ public enum FleetPanel {
     /// case, which is a normal state with its own copy, not an error.
     /// `installHint` lets a host name its own way to add one; core never
     /// names an engine's install command.
-    public static func panel(fleets: [EngineFleet], live: LiveSessions?,
+    public static func panel(fleets: [EngineFleet],
                              engineInstalled: Bool,
                              engine: EngineIndicator? = nil,
                              caveats: [String: String] = [:],
                              installHint: String? = nil,
                              now: Date = Date()) -> Panel {
         guard engineInstalled else {
-            return Panel(sections: [], footer: footer(live: live, accounts: 0, engine: engine),
+            return Panel(sections: [], footer: footer(accounts: 0, engine: engine),
                          empty: "No account engine installed."
                               + (installHint.map { " " + $0 } ?? ""),
                          engine: engine)
@@ -247,7 +243,7 @@ public enum FleetPanel {
         }
         let accounts = sections.reduce(0) { $0 + $1.rows.count }
         guard accounts > 0 else {
-            return Panel(sections: [], footer: footer(live: live, accounts: 0, engine: engine),
+            return Panel(sections: [], footer: footer(accounts: 0, engine: engine),
                          empty: fleets.isEmpty
                              ? "Reading accounts\u{2026}"
                              : "No accounts yet \u{2014} register the account "
@@ -255,29 +251,28 @@ public enum FleetPanel {
                          engine: engine)
         }
         return Panel(sections: sections,
-                     footer: footer(live: live, accounts: accounts, engine: engine),
+                     footer: footer(accounts: accounts, engine: engine),
                      empty: nil, engine: engine)
     }
 
     /// Single-fleet convenience for a host that only has one flat
     /// `AccountList` (the panel's `INFINITUS_ACCOUNTS_JSON` fixture, an
     /// older mirror).
-    public static func panel(list: AccountList?, live: LiveSessions?,
+    public static func panel(list: AccountList?,
                              engineInstalled: Bool,
                              engineID: String = "swapd",
                              engine: EngineIndicator? = nil,
                              now: Date = Date()) -> Panel {
         guard let list else {
-            return panel(fleets: [], live: live, engineInstalled: engineInstalled,
+            return panel(fleets: [], engineInstalled: engineInstalled,
                          engine: engine, now: now)
         }
         let fleet = EngineFleet(engineID: engineID, provider: .claude,
                                 accounts: list.accounts,
                                 activeNumber: list.activeAccountNumber,
                                 nextCandidate: list.nextCandidate,
-                                nextRecovery: list.nextRecovery,
-                                liveSessions: list.liveSessions)
-        return panel(fleets: [fleet], live: live, engineInstalled: engineInstalled,
+                                nextRecovery: list.nextRecovery)
+        return panel(fleets: [fleet], engineInstalled: engineInstalled,
                      engine: engine, now: now)
     }
 
@@ -361,19 +356,14 @@ public enum FleetPanel {
                                         ahead: window.aheadOfPace))
     }
 
-    /// "7 sessions · 1 busy · 2 accounts · 9Router · routed".
-    public static func footer(live: LiveSessions?, accounts: Int,
+    /// "2 accounts · 9Router · routed".
+    public static func footer(accounts: Int,
                               engine: EngineIndicator? = nil) -> String {
         var parts: [String] = []
-        if let live {
-            parts.append("\(live.total) session\(live.total == 1 ? "" : "s")")
-            if live.busy > 0 { parts.append("\(live.busy) busy") }
-            if let waiting = live.waiting, waiting > 0 { parts.append("\(waiting) waiting") }
-        }
         if accounts > 0 {
             parts.append("\(accounts) account\(accounts == 1 ? "" : "s")")
         }
         if let engine { parts.append(engine.text) }
-        return parts.isEmpty ? "no sessions" : parts.joined(separator: " \u{00B7} ")
+        return parts.isEmpty ? "no accounts" : parts.joined(separator: " \u{00B7} ")
     }
 }

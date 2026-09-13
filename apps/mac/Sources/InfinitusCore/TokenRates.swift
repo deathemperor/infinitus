@@ -73,8 +73,17 @@ public enum TokenRateScanner {
         var files: [String: FileEntry] = [:]
     }
 
+    /// Claude Code's config home — `CLAUDE_CONFIG_DIR` when set, else `~/.claude`.
+    public static func configHome(home: String = NSHomeDirectory(),
+                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let dir = environment["CLAUDE_CONFIG_DIR"], !dir.isEmpty {
+            return URL(fileURLWithPath: dir)
+        }
+        return URL(fileURLWithPath: "\(home)/.claude")
+    }
+
     public static func defaultProjectsDir() -> URL {
-        ClaudeSessions.configHome().appendingPathComponent("projects")
+        configHome().appendingPathComponent("projects")
     }
 
     public static func scan(projectsDir: URL, cacheURL: URL?,

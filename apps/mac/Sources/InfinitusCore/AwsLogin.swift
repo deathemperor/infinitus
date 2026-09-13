@@ -60,15 +60,13 @@ public enum AwsLogin {
         /// Failure text (sanitized last output line) or the success line.
         public var message: String?
         public let startedAt: Double
-        /// The session that needed it, if the login was started for one.
-        public let pid: Int?
         /// nil = aws (see `Provider`).
         public let provider: Provider?
         public var providerOrAws: Provider { provider ?? .aws }
         public var runKey: String { AwsLogin.runKey(provider: providerOrAws, profile: profile) }
         public init(profile: String, flow: Flow, phase: Phase = .starting, url: String? = nil,
                     userCode: String? = nil, callbackPort: Int? = nil, message: String? = nil,
-                    startedAt: Double, pid: Int?, provider: Provider? = nil) {
+                    startedAt: Double, provider: Provider? = nil) {
             self.profile = profile
             self.flow = flow
             self.phase = phase
@@ -77,7 +75,6 @@ public enum AwsLogin {
             self.callbackPort = callbackPort
             self.message = message
             self.startedAt = startedAt
-            self.pid = pid
             self.provider = provider
         }
     }
@@ -85,17 +82,14 @@ public enum AwsLogin {
     /// What the snapshot carries: every session that needs a login,
     /// merged with the runner's state for that profile.
     public struct Item: Codable, Sendable, Equatable, Identifiable {
-        /// The aws id is byte-identical to before the provider field —
-        /// it is persisted in the announced-pushes set.
-        public var id: String { (provider == .gcloud ? "gcloud:" : "") + "\(profile)|\(pid ?? 0)" }
+        /// `provider:profile` — `"gcloud:" + profile` for gcloud, the bare
+        /// profile for aws; persisted in the announced-pushes set.
+        public var id: String { (provider == .gcloud ? "gcloud:" : "") + profile }
         public let profile: String
         /// The flow the phone would start (`.remote` / `.deviceCode`).
         public let flow: Flow
-        public let pid: Int?
-        /// The session's display name (record name or repo folder).
-        public let sessionLabel: String?
         public let state: State?
-        /// When the session's CLI call failed on expired credentials —
+        /// When the need's CLI call failed on expired credentials —
         /// the push keys on it, so a fresh failure after a relaunch is
         /// news and a re-failure hours later is news again (#29).
         public let failedAt: Date?
@@ -106,12 +100,10 @@ public enum AwsLogin {
         public let provider: Provider?
         public var providerOrAws: Provider { provider ?? .aws }
         public var runKey: String { AwsLogin.runKey(provider: providerOrAws, profile: profile) }
-        public init(profile: String, flow: Flow, pid: Int?, sessionLabel: String?, state: State?,
+        public init(profile: String, flow: Flow, state: State?,
                     failedAt: Date? = nil, account: Account? = nil, provider: Provider? = nil) {
             self.profile = profile
             self.flow = flow
-            self.pid = pid
-            self.sessionLabel = sessionLabel
             self.state = state
             self.failedAt = failedAt
             self.account = account
@@ -119,30 +111,17 @@ public enum AwsLogin {
         }
     }
 
-    /// The login that belongs to a profile's CURRENT need: one still in
-    /// flight, or one that finished after the need's CLI call failed. A
-    /// finished login older than that failure is history — the ledger
-    /// keeps a day of it — not this need's login (a stale "done" made a
-    /// fresh need report as signed in, e2e 2026-09-04).
-    public static func current(_ state: State?, needFailedAt: Date?) -> State? {
-        guard let state else { return nil }
-        guard state.phase == .done || state.phase == .failed, let needFailedAt else { return state }
-        return needFailedAt.timeIntervalSince1970 > state.startedAt ? nil : state
-    }
-
     /// What the runner keeps across a relaunch (#29: a Mac relaunch
     /// wiped every login it knew about, so a met need came back as
-    /// unmet). Finished logins survive as they are; a run in flight for a
-    /// session survives as a failure that says why — its CLI died with
-    /// the app — while a hand-started run just goes with its CLI.
+    /// unmet). Finished logins survive as they are; every running state
+    /// survives as a failure that says why — its CLI died with the app.
     public enum Ledger {
         public static let doneMaxAge: TimeInterval = 24 * 3600
         public static let failedMaxAge: TimeInterval = 3600
         public static let relaunchMessage = "the app relaunched mid-login — start it again"
 
         public static func snapshot(running: [State], finished: [State]) -> [State] {
-            finished + running.compactMap { state in
-                guard state.pid != nil else { return nil }
+            finished + running.map { state in
                 var failed = state
                 failed.phase = .failed
                 failed.message = relaunchMessage

@@ -22,6 +22,13 @@ final class ThreadActivityPushTests: XCTestCase {
         XCTAssertEqual(again, parsed)
     }
 
+    /// #1041 d6: `activeCount` survives parse — it is the desktop's busy
+    /// signal for `WindowPlanner` now that the terminal session count is gone.
+    func testActiveCountSurvivesParse() throws {
+        guard case .show(let parsed)? = ThreadActivityPush.parse(state) else { return XCTFail("expected a card") }
+        XCTAssertEqual(parsed.activeCount, 2)
+    }
+
     func testANullStateEndsTheCard() {
         XCTAssertEqual(ThreadActivityPush.parse(#"{"kind":"thread.activity","state":null}"#), .end)
     }

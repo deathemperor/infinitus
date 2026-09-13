@@ -76,7 +76,7 @@ final class FleetPanelTests: XCTestCase {
     /// reported them — that is what 9Router's Claude/Gemini/Codex
     /// providers become on both frontends.
     func testEveryFleetBecomesItsOwnSection() {
-        let panel = FleetPanel.panel(fleets: fleets(), live: nil, engineInstalled: true)
+        let panel = FleetPanel.panel(fleets: fleets(), engineInstalled: true)
         XCTAssertNil(panel.empty)
         XCTAssertEqual(panel.sections.map(\.key),
                        ["9router/claude", "9router/gemini", "9router/codex"])
@@ -90,7 +90,7 @@ final class FleetPanelTests: XCTestCase {
     /// panel is byte-identical to the pre-multi-fleet one, which is the
     /// Mac's `FleetStack` rule ("with one fleet nothing is added").
     func testHeadersOnlyWhenSeveralFleetsHaveRows() {
-        let many = FleetPanel.panel(fleets: fleets(), live: nil, engineInstalled: true)
+        let many = FleetPanel.panel(fleets: fleets(), engineInstalled: true)
         let headers = many.lines.compactMap { line -> FleetLabel? in
             if case .header(let l) = line { return l }
             return nil
@@ -100,7 +100,7 @@ final class FleetPanelTests: XCTestCase {
         guard case .header = many.lines.first else { return XCTFail("expected a header first") }
         guard case .account = many.lines[1] else { return XCTFail("expected a row after the header") }
 
-        let one = FleetPanel.panel(fleets: [fleets()[0]], live: nil, engineInstalled: true)
+        let one = FleetPanel.panel(fleets: [fleets()[0]], engineInstalled: true)
         XCTAssertTrue(one.lines.allSatisfy { if case .account = $0 { return true } else { return false } },
                       "a lone fleet gets no header, exactly like the Mac popup")
         XCTAssertEqual(one.rows.count, 2)
@@ -110,7 +110,7 @@ final class FleetPanelTests: XCTestCase {
         let withEmpty = FleetPanel.panel(
             fleets: [fleets()[0],
                      EngineFleet(engineID: "9router", provider: .kiro, accounts: [])],
-            live: nil, engineInstalled: true)
+            engineInstalled: true)
         XCTAssertTrue(withEmpty.lines.allSatisfy {
             if case .account = $0 { return true } else { return false }
         }, "one populated fleet is still a lone fleet")
@@ -121,7 +121,7 @@ final class FleetPanelTests: XCTestCase {
             fleets: [fleets()[0],
                      EngineFleet(engineID: "9router", provider: .kiro, accounts: []),
                      fleets()[2]],
-            live: nil, engineInstalled: true)
+            engineInstalled: true)
         let mixedHeaders = mixed.lines.compactMap { line -> FleetLabel? in
             if case .header(let l) = line { return l }
             return nil
@@ -133,7 +133,7 @@ final class FleetPanelTests: XCTestCase {
     /// The "primary" active account is the Claude fleet's even when a
     /// non-Claude fleet stacks first.
     func testActiveNumberPrefersTheClaudeFleet() {
-        let reordered = FleetPanel.panel(fleets: [fleets()[1], fleets()[0]], live: nil,
+        let reordered = FleetPanel.panel(fleets: [fleets()[1], fleets()[0]],
                                          engineInstalled: true)
         XCTAssertEqual(reordered.sections.first?.label.provider, .gemini)
         XCTAssertEqual(reordered.activeNumber, fleets()[0].activeNumber,
@@ -142,7 +142,7 @@ final class FleetPanelTests: XCTestCase {
         // cannot answer — `lines` already hides it, so the highlight
         // has to come from a section that actually paints.
         let emptyClaude = EngineFleet(engineID: "9router", provider: .claude, accounts: [])
-        let geminiOnly = FleetPanel.panel(fleets: [emptyClaude, fleets()[1]], live: nil,
+        let geminiOnly = FleetPanel.panel(fleets: [emptyClaude, fleets()[1]],
                                           engineInstalled: true)
         XCTAssertTrue(geminiOnly.sections.contains { $0.label.provider == .claude && $0.rows.isEmpty })
         XCTAssertEqual(geminiOnly.activeNumber, fleets()[1].activeNumber)
@@ -152,7 +152,7 @@ final class FleetPanelTests: XCTestCase {
     /// ordinals are PER PROVIDER: forwarding a Gemini row's #1 as a
     /// Claude switch would swap the wrong account.
     func testRowsCarryTheirEngineAndProvider() {
-        let panel = FleetPanel.panel(fleets: fleets(), live: nil, engineInstalled: true)
+        let panel = FleetPanel.panel(fleets: fleets(), engineInstalled: true)
         let gemini = panel.sections[1].rows[0]
         XCTAssertEqual(gemini.engineID, "9router")
         XCTAssertEqual(gemini.provider, .gemini)
@@ -165,7 +165,7 @@ final class FleetPanelTests: XCTestCase {
     /// Row naming, death and gauges are the Mac's: alias over local part,
     /// any spent window kills the row, bars fill by REMAINING.
     func testRowNamingDeathAndGaugesMatchTheMac() {
-        let panel = FleetPanel.panel(fleets: fleets(), live: nil, engineInstalled: true)
+        let panel = FleetPanel.panel(fleets: fleets(), engineInstalled: true)
         let rows = panel.sections[0].rows
         XCTAssertEqual(rows[0].name, "work", "alias wins")
         XCTAssertEqual(rows[1].name, "two", "else the address's local part")
@@ -188,43 +188,41 @@ final class FleetPanelTests: XCTestCase {
     /// it is still reading, an engine with zero accounts says how to
     /// register one — without naming any engine.
     func testEmptyStatesDistinguishNoEngineFromNoAccounts() {
-        let none = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false)
+        let none = FleetPanel.panel(fleets: [], engineInstalled: false)
         XCTAssertEqual(none.empty, "No account engine installed.")
         XCTAssertFalse(none.empty?.contains("swapd") == true, "core copy names no engine")
-        let hinted = FleetPanel.panel(fleets: [], live: nil, engineInstalled: false,
+        let hinted = FleetPanel.panel(fleets: [], engineInstalled: false,
                                       installHint: "`pip install claude-swap` adds one.")
         XCTAssertEqual(hinted.empty, "No account engine installed. `pip install claude-swap` adds one.")
         XCTAssertTrue(none.sections.isEmpty)
 
-        let reading = FleetPanel.panel(fleets: [], live: nil, engineInstalled: true)
+        let reading = FleetPanel.panel(fleets: [], engineInstalled: true)
         XCTAssertEqual(reading.empty, "Reading accounts\u{2026}")
 
         let bare = FleetPanel.panel(
             fleets: [EngineFleet(engineID: "swapd", provider: .claude, accounts: [])],
-            live: nil, engineInstalled: true)
+            engineInstalled: true)
         XCTAssertTrue(bare.empty?.contains("register the account you are logged into") == true)
         XCTAssertFalse(bare.empty?.contains("swapd") == true, "core copy names no engine")
     }
 
-    /// The footer counts sessions and accounts and names the engine —
-    /// the 9Router indicator the panel was missing entirely.
+    /// The footer counts accounts and names the engine — the 9Router
+    /// indicator the panel was missing entirely.
     func testFooterCountsAndNamesTheEngine() {
-        let live = LiveSessions(busy: 1, total: 3, idle: 1, waiting: 1, shell: 0, unknown: 0, sessions: nil)
         let panel = FleetPanel.panel(
-            fleets: fleets(), live: live, engineInstalled: true,
+            fleets: fleets(), engineInstalled: true,
             engine: FleetPanel.EngineIndicator(name: "9Router", routed: true))
-        XCTAssertEqual(panel.footer,
-                       "3 sessions \u{00B7} 1 busy \u{00B7} 1 waiting \u{00B7} 4 accounts \u{00B7} 9Router \u{00B7} routed")
+        XCTAssertEqual(panel.footer, "4 accounts \u{00B7} 9Router \u{00B7} routed")
         XCTAssertEqual(panel.engine?.routed, true)
         // Not routed: the engine is named without claiming the traffic.
         XCTAssertEqual(FleetPanel.EngineIndicator(name: "swapd", routed: false).text, "swapd")
-        XCTAssertEqual(FleetPanel.footer(live: nil, accounts: 0), "no sessions")
+        XCTAssertEqual(FleetPanel.footer(accounts: 0), "no accounts")
     }
 
     /// A caveat rides its engine's header, keyed by engine id — the same
     /// `AppModel.fleetCaveats` lookup `FleetState.fleetLabel` does.
     func testCaveatsAttachToTheirEnginesHeader() {
-        let panel = FleetPanel.panel(fleets: fleets(), live: nil, engineInstalled: true,
+        let panel = FleetPanel.panel(fleets: fleets(), engineInstalled: true,
                                      caveats: ["9router": "priority is 9Router's"])
         XCTAssertEqual(panel.sections[0].label.caveat, "priority is 9Router's")
         XCTAssertTrue(panel.sections[0].label.text.hasSuffix("\u{2014} priority is 9Router's"))
@@ -237,7 +235,7 @@ final class FleetPanelTests: XCTestCase {
             account(1, "a@example.com"),
             account(2, "b@example.com", usage: Usage(fiveHour: UsageWindow(pct: 5))),
         ])
-        let panel = FleetPanel.panel(list: list, live: nil, engineInstalled: true)
+        let panel = FleetPanel.panel(list: list, engineInstalled: true)
         XCTAssertEqual(panel.sections.count, 1)
         XCTAssertEqual(panel.sections[0].key, "swapd/claude")
         XCTAssertEqual(panel.activeNumber, 2)
@@ -245,7 +243,7 @@ final class FleetPanelTests: XCTestCase {
         XCTAssertTrue(panel.lines.allSatisfy {
             if case .account = $0 { return true } else { return false }
         })
-        XCTAssertEqual(FleetPanel.panel(list: nil, live: nil, engineInstalled: true).empty,
+        XCTAssertEqual(FleetPanel.panel(list: nil, engineInstalled: true).empty,
                        "Reading accounts\u{2026}", "a nil list is still reading, not empty")
     }
 
@@ -257,10 +255,10 @@ final class FleetPanelTests: XCTestCase {
                           sevenDay: UsageWindow(pct: 88, resetsAt: "2026-09-04T12:00:00Z"))
         let fleet = EngineFleet(engineID: "swapd", provider: .claude,
                                 accounts: [account(1, "a@example.com", usage: usage)])
-        let before = FleetPanel.panel(fleets: [fleet], live: nil, engineInstalled: true,
+        let before = FleetPanel.panel(fleets: [fleet], engineInstalled: true,
                                       now: WeeklyRoll.parse("2026-09-04T11:00:00Z")!)
         XCTAssertEqual(before.rows[0].gauges[1].usedPct, 88, accuracy: 0.001)
-        let after = FleetPanel.panel(fleets: [fleet], live: nil, engineInstalled: true,
+        let after = FleetPanel.panel(fleets: [fleet], engineInstalled: true,
                                      now: WeeklyRoll.parse("2026-09-04T13:00:00Z")!)
         XCTAssertEqual(after.rows[0].gauges[1].usedPct, 0, accuracy: 0.001,
                        "a rolled weekly window reads as fresh, not 88%")
@@ -280,20 +278,12 @@ final class FleetPanelTests: XCTestCase {
     }
 
     /// `listJSON` for a phone older than `fleets`: the primary fleet as an
-    /// `AccountList`, with the host's own session counts when it has them.
+    /// `AccountList`.
     func testPrimaryListFlattensForOlderClients() throws {
-        let live = LiveSessions(busy: 2, total: 5, idle: 3, waiting: 0, shell: 0, unknown: 0, sessions: nil)
-        let list = try XCTUnwrap(EngineFleet.primaryList(fleets(), liveSessions: live))
+        let list = try XCTUnwrap(EngineFleet.primaryList(fleets()))
         XCTAssertEqual(list.schemaVersion, 1)
         XCTAssertEqual(list.activeAccountNumber, 1)
         XCTAssertEqual(list.accounts.map(\.email), ["one@example.com", "two@example.com"])
-        XCTAssertEqual(list.liveSessions?.total, 5)
-        // Without an override the fleet's own sessions ride along.
-        let fleetSessions = LiveSessions(busy: 0, total: 1, idle: 1, waiting: 0, shell: 0,
-                                         unknown: 0, sessions: nil)
-        let own = EngineFleet(engineID: "swapd", provider: .claude, accounts: [],
-                              liveSessions: fleetSessions)
-        XCTAssertEqual(EngineFleet.primaryList([own])?.liveSessions?.total, 1)
         XCTAssertNil(EngineFleet.primaryList([]))
     }
 }

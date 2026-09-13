@@ -39,8 +39,6 @@ public protocol FleetModel: ObservableObject {
     var isPlayground: Bool { get }
 
     // Footer chips (#9 phase D2) — what FooterChips reads.
-    /// Live Claude Code sessions on the host's machine (the brain chip).
-    var liveSessions: LiveSessions? { get }
     /// The sessions card's presentation flag; a host that shows the card
     /// some other way (the phone renders it inline) keeps it false.
     var sessionsShown: Bool { get set }

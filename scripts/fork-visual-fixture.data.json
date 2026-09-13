@@ -133,7 +133,7 @@
         "effect": "read",
         "name": "aws-logins",
         "options": [],
-        "replyShape": "{logins: [{profile, provider?, flow, pid, sessionLabel, state: {phase, url, userCode, message, startedAt} | null}]}",
+        "replyShape": "{logins: [{profile, provider?, flow, state: {phase, url, userCode, message, startedAt} | null}]}",
         "summary": "Sessions whose AWS or gcloud sign-in lapsed (the expired-credentials signature in their newest tool results), each with the flow the phone would start and any login in flight; `provider` is \"gcloud\" for gcloud items and absent for AWS."
       },
       {
@@ -418,14 +418,6 @@
         "options": [],
         "replyShape": "{routingStrategy}",
         "summary": "PUT the proxy's routing strategy."
-      },
-      {
-        "args": [],
-        "effect": "read",
-        "name": "sessions",
-        "options": [],
-        "replyShape": "[{pid, name?, cwd, status?, kind, profile?, permissionMode?, sessionId, account?, startedAt?, needs}]",
-        "summary": "The live Claude Code sessions: pid, name, folder, status, session id, the account alias they run on, start time (ISO 8601) and pending sign-in needs (`aws-login:<profile>`, `gcloud-login:<account>`)."
       }
     ],
     "schemaVersion": 1
@@ -565,15 +557,6 @@
         "section": "display",
         "type": "double",
         "value": 0.7
-      },
-      {
-        "choices": ["compact", "strip", "hud"],
-        "default": "compact",
-        "effect": "live",
-        "key": "chat_header",
-        "section": "display",
-        "type": "string",
-        "value": "compact"
       },
       {
         "choices": [

@@ -21,22 +21,17 @@ public struct AccountList: Codable, Sendable {
     /// Advisory, only when nextCandidate is absent: every account is at
     /// a limit — this one's last maxed window resets soonest.
     public let nextRecovery: NextRecovery?
-    /// Live Claude Code sessions on this machine (they all ride the
-    /// active account's credential). busy = mid-turn right now.
-    public let liveSessions: LiveSessions?
 
     public init(schemaVersion: Int = 1, activeAccountNumber: Int?,
                 accounts: [Account], nextCandidate: Int? = nil,
                 candidateOrder: [Int]? = nil,
-                nextRecovery: NextRecovery? = nil,
-                liveSessions: LiveSessions? = nil) {
+                nextRecovery: NextRecovery? = nil) {
         self.schemaVersion = schemaVersion
         self.activeAccountNumber = activeAccountNumber
         self.accounts = accounts
         self.nextCandidate = nextCandidate
         self.candidateOrder = candidateOrder
         self.nextRecovery = nextRecovery
-        self.liveSessions = liveSessions
     }
 }
 
@@ -48,121 +43,6 @@ public struct NextRecovery: Codable, Sendable, Equatable {
     public init(number: Int, at: String) {
         self.number = number
         self.at = at
-    }
-}
-
-public struct LiveSessions: Codable, Sendable, Equatable {
-    public let busy: Int
-    public let total: Int
-    /// Additive breakdown (an older engine omits them; the chip tooltip
-    /// falls back to busy/total): "unknown" is a record with no status —
-    /// e.g. sdk-cli sessions. busy+idle+waiting+shell+unknown == total.
-    public let idle: Int?
-    public let waiting: Int?
-    public let shell: Int?
-    public let unknown: Int?
-    /// Additive per-session detail (busy first, capped engine-side).
-    public let sessions: [SessionDetail]?
-
-    public init(busy: Int, total: Int, idle: Int? = nil, waiting: Int? = nil,
-                shell: Int? = nil, unknown: Int? = nil,
-                sessions: [SessionDetail]? = nil) {
-        self.busy = busy
-        self.total = total
-        self.idle = idle
-        self.waiting = waiting
-        self.shell = shell
-        self.unknown = unknown
-        self.sessions = sessions
-    }
-}
-
-public struct SessionDetail: Codable, Sendable, Hashable {
-    public let pid: Int
-    public let cwd: String
-    public let status: String
-    public let kind: String
-    public let startedAt: Double   // epoch milliseconds
-    /// Claude Code's session id (#391): the engine's rows carry none, the
-    /// Mac fills it from the session record before publishing, so a phone
-    /// can name the session by id as well as pid; nil from an older Mac.
-    public let sessionId: String?
-
-    public init(pid: Int, cwd: String, status: String, kind: String,
-                startedAt: Double, sessionId: String? = nil) {
-        self.pid = pid
-        self.cwd = cwd
-        self.status = status
-        self.kind = kind
-        self.startedAt = startedAt
-        self.sessionId = sessionId
-    }
-}
-
-extension LiveSessions {
-    /// The app's own scan of Claude Code's session records, in the shape
-    /// the engine feed used to carry (#756: cswap's `list --json` scanned
-    /// them engine-side; swapd reports none, so the app fills the primary
-    /// fleet's block itself). Busy rows first; a record with no status
-    /// counts as unknown.
-    public init(records: [ClaudeSessionRecord]) {
-        var counts: [String: Int] = [:]
-        let rows = records.map { r -> SessionDetail in
-            let status = r.status ?? "unknown"
-            counts[status, default: 0] += 1
-            return SessionDetail(pid: Int(r.pid), cwd: r.cwd, status: status, kind: r.kind,
-                                 startedAt: (r.startedAt?.timeIntervalSince1970 ?? 0) * 1000,
-                                 sessionId: r.sessionId.isEmpty ? nil : r.sessionId)
-        }
-        let order = ["busy": 0, "waiting": 1, "idle": 2, "shell": 3]
-        let sorted = rows.enumerated().sorted { a, b in
-            let ra = order[a.element.status] ?? 4, rb = order[b.element.status] ?? 4
-            return ra != rb ? ra < rb : a.offset < b.offset
-        }.map(\.element)
-        self.init(busy: counts["busy"] ?? 0, total: rows.count,
-                  idle: counts["idle"] ?? 0, waiting: counts["waiting"] ?? 0, shell: counts["shell"] ?? 0,
-                  unknown: rows.count - (counts["busy"] ?? 0) - (counts["idle"] ?? 0)
-                      - (counts["waiting"] ?? 0) - (counts["shell"] ?? 0),
-                  sessions: sorted)
-    }
-
-    /// The same list with `status(pid)` overriding a session's status
-    /// where it answers — an owned session's actor knows busy/idle/
-    /// waiting, the roster record the engine scanned says nothing (#151),
-    /// so the card read "unknown". The counts follow the rows.
-    public func overlaying(status: (Int) -> String?) -> LiveSessions {
-        guard let sessions else { return self }
-        var busy = busy, idle = idle ?? 0, waiting = waiting ?? 0, unknown = unknown ?? 0
-        let rows = sessions.map { s -> SessionDetail in
-            guard let fresh = status(s.pid), fresh != s.status else { return s }
-            for (name, delta) in [(s.status, -1), (fresh, 1)] {
-                switch name {
-                case "busy": busy += delta
-                case "idle": idle += delta
-                case "waiting": waiting += delta
-                case "unknown": unknown += delta
-                default: break
-                }
-            }
-            return SessionDetail(pid: s.pid, cwd: s.cwd, status: fresh, kind: s.kind, startedAt: s.startedAt,
-                                 sessionId: s.sessionId)
-        }
-        guard rows != sessions else { return self }
-        return LiveSessions(busy: max(0, busy), total: total, idle: self.idle == nil ? nil : max(0, idle),
-                            waiting: self.waiting == nil ? nil : max(0, waiting), shell: shell,
-                            unknown: self.unknown == nil ? nil : max(0, unknown), sessions: rows)
-    }
-
-    /// The same rows carrying Claude Code's session id where `ids` knows
-    /// the pid (#391); a row with no match keeps what it had.
-    public func tagging(sessionIds ids: [Int: String]) -> LiveSessions {
-        guard let sessions, !ids.isEmpty else { return self }
-        let rows = sessions.map { s -> SessionDetail in
-            guard let id = ids[s.pid], id != s.sessionId else { return s }
-            return SessionDetail(pid: s.pid, cwd: s.cwd, status: s.status, kind: s.kind, startedAt: s.startedAt, sessionId: id)
-        }
-        guard rows != sessions else { return self }
-        return LiveSessions(busy: busy, total: total, idle: idle, waiting: waiting, shell: shell, unknown: unknown, sessions: rows)
     }
 }
 

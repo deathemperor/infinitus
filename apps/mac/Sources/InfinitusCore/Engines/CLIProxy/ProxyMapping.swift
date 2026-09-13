@@ -387,7 +387,7 @@ public enum ProxyMapping {
 
             fleets.append(EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
                                       activeNumber: activeNumber, nextCandidate: candidate,
-                                      nextRecovery: recovery, liveSessions: nil, raw: nil))
+                                      nextRecovery: recovery, raw: nil))
         }
 
         return (fleets, ordinals)

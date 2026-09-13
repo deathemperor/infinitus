@@ -56,7 +56,7 @@ final class GcloudLoginTests: XCTestCase {
     }
 
     func testProviderRidesTheExistingWireShapesAndOldEntriesStayAws() throws {
-        let state = AwsLogin.State(profile: "default", flow: .remote, startedAt: 1, pid: 7, provider: .gcloud)
+        let state = AwsLogin.State(profile: "default", flow: .remote, startedAt: 1, provider: .gcloud)
         let back = try JSONDecoder().decode(AwsLogin.State.self, from: JSONEncoder().encode(state))
         XCTAssertEqual(back.provider, .gcloud)
         // A ledger entry or a phone body from before the field: aws.
@@ -66,8 +66,8 @@ final class GcloudLoginTests: XCTestCase {
         let start = try JSONDecoder().decode(AwsLogin.StartRequest.self, from: Data(#"{"profile":"me@example.com","provider":"gcloud"}"#.utf8))
         XCTAssertEqual(start.provider, .gcloud)
         // Item ids: the aws one is byte-identical to before (persisted in the announced set); gcloud's is distinct.
-        XCTAssertEqual(AwsLogin.Item(profile: "p", flow: .remote, pid: 3, sessionLabel: nil, state: nil).id, "p|3")
-        XCTAssertEqual(AwsLogin.Item(profile: "p", flow: .remote, pid: 3, sessionLabel: nil, state: nil, provider: .gcloud).id, "gcloud:p|3")
+        XCTAssertEqual(AwsLogin.Item(profile: "p", flow: .remote, state: nil).id, "p")
+        XCTAssertEqual(AwsLogin.Item(profile: "p", flow: .remote, state: nil, provider: .gcloud).id, "gcloud:p")
         XCTAssertEqual(AwsLogin.runKey(provider: .aws, profile: "default"), "aws:default")
         XCTAssertNotEqual(AwsLogin.runKey(provider: .aws, profile: "default"), AwsLogin.runKey(provider: .gcloud, profile: "default"))
     }
@@ -75,14 +75,11 @@ final class GcloudLoginTests: XCTestCase {
     /// A phone from before the field sends no provider: the outstanding
     /// items say which CLI the profile belongs to.
     func testAProviderlessBodyResolvesAgainstTheOutstandingItems() {
-        let items = [AwsLogin.Item(profile: "default", flow: .remote, pid: 3, sessionLabel: nil, state: nil, provider: .gcloud),
-                     AwsLogin.Item(profile: "default", flow: .relay, pid: 4, sessionLabel: nil, state: nil),
-                     AwsLogin.Item(profile: "me@example.com", flow: .remote, pid: nil, sessionLabel: nil, state: nil, provider: .gcloud)]
-        XCTAssertEqual(AwsLogin.inferProvider(profile: "default", pid: 3, items: items), .gcloud)
-        XCTAssertEqual(AwsLogin.inferProvider(profile: "default", pid: 4, items: items), .aws)
-        XCTAssertEqual(AwsLogin.inferProvider(profile: "default", pid: nil, items: items), .gcloud, "first outstanding item for the profile")
-        XCTAssertEqual(AwsLogin.inferProvider(profile: "me@example.com", pid: nil, items: items), .gcloud)
-        XCTAssertEqual(AwsLogin.inferProvider(profile: "unknown", pid: nil, items: items), .aws)
+        let items = [AwsLogin.Item(profile: "default", flow: .remote, state: nil, provider: .gcloud),
+                     AwsLogin.Item(profile: "me@example.com", flow: .remote, state: nil, provider: .gcloud)]
+        XCTAssertEqual(AwsLogin.inferProvider(profile: "default", items: items), .gcloud, "first outstanding item for the profile")
+        XCTAssertEqual(AwsLogin.inferProvider(profile: "me@example.com", items: items), .gcloud)
+        XCTAssertEqual(AwsLogin.inferProvider(profile: "unknown", items: items), .aws)
     }
 
 }

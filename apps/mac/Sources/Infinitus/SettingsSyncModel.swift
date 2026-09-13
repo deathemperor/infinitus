@@ -38,7 +38,7 @@ final class SettingsSyncModel: ObservableObject {
     static let doubleKeys: Set<String> = ["glass_focused"]
     static let stringKeys: Set<String> = [
         "title_pct", "title_reset", "gamification_style", "popup_layout", "popup_text_size",
-        "burn_style", "chat_header",
+        "burn_style",
     ]
     static var appKeys: Set<String> {
         boolKeys.union(intKeys).union(doubleKeys).union(stringKeys)

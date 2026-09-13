@@ -29,10 +29,8 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(fleet.activeNumber, 2)
         XCTAssertEqual(fleet.nextCandidate, 1)
         XCTAssertEqual(fleet.nextRecovery, NextRecovery(number: 8, at: "2026-09-09T03:29:59Z"))
-        // The engine's list is not `AccountList` bytes and knows nothing
-        // about this Mac's sessions.
+        // The engine's list is not `AccountList` bytes.
         XCTAssertNil(fleet.raw)
-        XCTAssertNil(fleet.liveSessions)
 
         let account = fleet.accounts[0]
         XCTAssertEqual(account.number, 1, "slot is the app's number")

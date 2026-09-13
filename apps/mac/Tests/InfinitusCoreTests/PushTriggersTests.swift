@@ -1,42 +1,6 @@
 import XCTest
 @testable import InfinitusCore
 
-final class LiveSessionsDecodeTests: XCTestCase {
-    func testBreakdownDecodes() throws {
-        let json = #"{"busy":2,"idle":3,"waiting":1,"shell":1,"unknown":2,"total":9}"#
-        let live = try JSONDecoder().decode(LiveSessions.self, from: Data(json.utf8))
-        XCTAssertEqual(live.busy, 2)
-        XCTAssertEqual(live.idle, 3)
-        XCTAssertEqual(live.waiting, 1)
-        XCTAssertEqual(live.shell, 1)
-        XCTAssertEqual(live.unknown, 2)
-    }
-
-    func testOldEngineWithoutBreakdownStillDecodes() throws {
-        let live = try JSONDecoder().decode(
-            LiveSessions.self, from: Data(#"{"busy":1,"total":4}"#.utf8))
-        XCTAssertEqual(live.busy, 1)
-        XCTAssertNil(live.idle)
-    }
-}
-
-final class SessionSummaryTests: XCTestCase {
-    func testBreakdownTooltipSkipsZeroBuckets() throws {
-        let live = try JSONDecoder().decode(LiveSessions.self, from: Data(
-            #"{"busy":4,"idle":7,"waiting":0,"shell":1,"unknown":2,"total":14}"#.utf8))
-        XCTAssertEqual(
-            SessionSummary.tooltip(live),
-            "4 working · 7 idle · 1 in shell · 2 unknown of "
-            + "14 live Claude Code sessions — all ride the active account")
-    }
-
-    func testOldEngineFallsBackToTwoNumbers() throws {
-        let live = try JSONDecoder().decode(
-            LiveSessions.self, from: Data(#"{"busy":1,"total":3}"#.utf8))
-        XCTAssertTrue(SessionSummary.tooltip(live).hasPrefix("1 session(s) mid-turn"))
-    }
-}
-
 final class TitleFormatterIconTests: XCTestCase {
     private func account(pct: Double) -> Account {
         try! JSONDecoder().decode(Account.self, from: Data("""

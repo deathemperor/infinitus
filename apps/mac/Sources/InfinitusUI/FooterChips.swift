@@ -2,9 +2,8 @@ import SwiftUI
 import InfinitusCore
 
 /// The popup footer's trailing group (#9 phase D2): Claude service
-/// status, the agent/brain chip with its sessions card, the engine
-/// badge, then the update chips. Everything here is plain SwiftUI, so
-/// the phone renders the very same footer the mac does.
+/// status, the engine badge, then the update chips. Everything here is
+/// plain SwiftUI, so the phone renders the very same footer the mac does.
 ///
 /// The mac keeps the pieces that need AppKit outside: the action
 /// buttons (pin, layout, settings, quit) stay in MenuContent, the

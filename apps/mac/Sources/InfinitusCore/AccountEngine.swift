@@ -80,7 +80,6 @@ public struct EngineFleet: Codable, Sendable {
     /// nil from an engine that only names the next one.
     public let candidateOrder: [Int]?
     public let nextRecovery: NextRecovery?
-    public let liveSessions: LiveSessions?
     /// Verbatim engine bytes when the engine has a native JSON form
     /// (cswap: `list --json`) — the mirror exporter forwards them so the
     /// phone keeps decoding `AccountList` untouched.
@@ -93,8 +92,7 @@ public struct EngineFleet: Codable, Sendable {
     public init(engineID: String, provider: Provider, accounts: [Account],
                 activeNumber: Int? = nil, nextCandidate: Int? = nil,
                 candidateOrder: [Int]? = nil,
-                nextRecovery: NextRecovery? = nil,
-                liveSessions: LiveSessions? = nil, raw: Data? = nil,
+                nextRecovery: NextRecovery? = nil, raw: Data? = nil,
                 capabilities: EngineCapabilities? = nil) {
         self.engineID = engineID
         self.provider = provider
@@ -103,7 +101,6 @@ public struct EngineFleet: Codable, Sendable {
         self.nextCandidate = nextCandidate
         self.candidateOrder = candidateOrder
         self.nextRecovery = nextRecovery
-        self.liveSessions = liveSessions
         self.raw = raw
         self.capabilities = capabilities
     }
@@ -112,7 +109,7 @@ public struct EngineFleet: Codable, Sendable {
     public func with(capabilities: EngineCapabilities) -> EngineFleet {
         EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
                     activeNumber: activeNumber, nextCandidate: nextCandidate,
-                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, raw: raw,
                     capabilities: capabilities)
     }
 
@@ -121,16 +118,7 @@ public struct EngineFleet: Codable, Sendable {
     public func with(accounts: [Account]) -> EngineFleet {
         EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
                     activeNumber: activeNumber, nextCandidate: nextCandidate,
-                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
-                    capabilities: capabilities)
-    }
-
-    /// The same fleet with its live-session list replaced (the owned
-    /// status overlay, #151).
-    public func with(liveSessions: LiveSessions?) -> EngineFleet {
-        EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
-                    activeNumber: activeNumber, nextCandidate: nextCandidate,
-                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, raw: raw,
                     capabilities: capabilities)
     }
 

@@ -37,7 +37,10 @@ final class AppModel: ObservableObject {
     var activeNumber: Int? { primary?.activeNumber }
     var nextCandidate: Int? { primary?.nextCandidate }
     var nextRecovery: NextRecovery? { primary?.nextRecovery }
-    var liveSessions: LiveSessions? { primary?.liveSessions }
+    /// The desktop's thread card's own count of active threads (#1047),
+    /// nil until a card has ever arrived — the busy signal `WindowPlanner`
+    /// reads now that the terminal session tracker is gone (#1041 d6).
+    @Published var desktopActiveThreads: Int?
     /// Session-list popover (brain chip click) — popup-wide state so the
     /// wide chip and the rail badge share one popover.
     @Published var sessionsShown = false
@@ -291,9 +294,6 @@ final class AppModel: ObservableObject {
     @Published var introTitle: String { didSet { defaults.set(introTitle, forKey: "intro_title") } }
     /// Pace fire on 7d/model bars ("off"/"ember"/"flame"/"limit").
     @Published var burnStyle: String { didSet { defaults.set(burnStyle, forKey: "burn_style") } }
-    /// The chat window's header — "compact", "strip" or "hud" (#151), the
-    /// phone's own `chat_header` choices.
-    @Published var chatHeader: String { didSet { defaults.set(chatHeader, forKey: "chat_header") } }
     /// Mock mode (user 2026-08-31): the bundled demo fleet stands in
     /// for the engine. Machine-local, deliberately never synced. swapd
     /// is a let, so flipping this relaunches — the restart IS the
@@ -655,38 +655,12 @@ final class AppModel: ObservableObject {
         notify(msg)
     }
 
-    struct SessionRow {
-        let pid: Int; let name: String?; let cwd: String; let status: String?; let kind: String
-        let sessionId: String; let startedAt: Date?
-    }
-
     /// The alias every live session runs on right now — one active
     /// account per engine, so it is the fleet's, not the session's (#612).
     var activeAccountName: String? {
         guard let fleet = primary, let n = fleet.activeNumber,
               let account = fleet.accounts.first(where: { $0.number == n }) else { return nil }
         return account.alias ?? String(account.email.prefix(while: { $0 != "@" }))
-    }
-
-    /// The live sessions as the control socket lists them (#79): the
-    /// record plus the name the popup shows.
-    func sessionRows() -> [SessionRow] {
-        return ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { record in
-            SessionRow(pid: Int(record.pid), name: record.name, cwd: record.cwd, status: record.status,
-                      kind: record.kind, sessionId: record.sessionId, startedAt: record.startedAt)
-        }
-    }
-
-    /// A pid, or a name / folder name, case-insensitively; the newest
-    /// session wins a tie.
-    func sessionPid(matching who: String) -> Int? {
-        let rows = sessionRows()
-        if let pid = Int(who), rows.contains(where: { $0.pid == pid }) { return pid }
-        let wanted = who.lowercased()
-        return rows.last { row in
-            row.name?.lowercased() == wanted
-                || URL(fileURLWithPath: row.cwd).lastPathComponent.lowercased() == wanted
-        }?.pid
     }
 
     /// Probes the engine as each dead account's countdown ends (see
@@ -820,7 +794,6 @@ final class AppModel: ObservableObject {
         introSpeed = defaults.object(forKey: "intro_speed") as? Double ?? 1.0
         introTitle = defaults.string(forKey: "intro_title") ?? "zoom"
         burnStyle = defaults.string(forKey: "burn_style") ?? "ember"
-        chatHeader = defaults.string(forKey: "chat_header") ?? "compact"
         // Local: init reads it again below before every stored
         // property is set (two-phase init forbids self.mockMode there).
         // `bool(forKey:)`, not `object as? Bool`: the argument domain of
@@ -1040,7 +1013,6 @@ final class AppModel: ObservableObject {
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
-        set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
         set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
@@ -1079,8 +1051,11 @@ final class AppModel: ObservableObject {
         // poll's clock: anchored to `now` they crept later between
         // fetches and snapped back on each new sample.
         let measuredAt = fresh.map(\.t).max() ?? now
+        // The terminal session count is gone (#1041 d6); the desktop's
+        // thread card says whether threads are running, and before any
+        // card has ever arrived the plan is drawn as if busy.
         let plan = WindowPlanner.plan(accounts: states, burnPctPerHour: rates["5h"],
-                                      busySessions: list.liveSessions?.busy ?? 0, now: now,
+                                      busySessions: desktopActiveThreads ?? 1, now: now,
                                       measuredAt: measuredAt)
         if plan != battlePlan { battlePlan = plan }
         let inputs = list.accounts.map { a in
@@ -1374,20 +1349,20 @@ final class AppModel: ObservableObject {
             start: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
                 let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: request.pid, items: items)
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
                 return await self.startAwsLogin(provider: provider, profile: request.profile, pid: request.pid,
                                                 local: request.local ?? false, remote: request.remote)
             },
             code: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
                 let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: nil, items: items)
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
                 return await self.submitAwsLoginCode(provider: provider, profile: request.profile, code: request.code)
             },
             callback: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
                 let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: nil, items: items)
+                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
                 return await self.awsLoginRunner.relay(provider: provider, profile: request.profile, url: request.url)
             })
         mirrorServer.descriptor.set {
@@ -1407,7 +1382,7 @@ final class AppModel: ObservableObject {
     private func rebuildAwsLogins() {
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
         let items: [AwsLogin.Item] = awsLoginStates.filter { $0.phase != .done }.map { state in
-            AwsLogin.Item(profile: state.profile, flow: state.flow, pid: nil, sessionLabel: nil, state: state,
+            AwsLogin.Item(profile: state.profile, flow: state.flow, state: state,
                          account: state.providerOrAws == .aws ? AwsLogin.account(profile: state.profile, configText: configText) : nil,
                          provider: state.provider)
         }
@@ -1442,10 +1417,7 @@ final class AppModel: ObservableObject {
         guard !isPlayground, !mockMode || ProcessInfo.processInfo.environment[provider.cliOverrideEnv] != nil
         else { return AwsLogin.Reply(ok: false, error: "not in a demo instance") }
         if !local, remote == nil {
-            // Against the profile's need, when a session has one: a login
-            // finished before that need failed isn't this need's login.
-            let need = awsLogins.first { $0.providerOrAws == provider && $0.profile == profile && $0.pid != nil }
-            let state = AwsLogin.current(await awsLoginRunner.state(provider: provider, profile: profile), needFailedAt: need?.failedAt)
+            let state = await awsLoginRunner.state(provider: provider, profile: profile)
             return AwsLogin.Reply(ok: state != nil, state: state, error: state == nil ? "no login in flight for \(profile)" : nil)
         }
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
@@ -1995,7 +1967,7 @@ final class AppModel: ObservableObject {
             engineLastGood[r.id] = Date()
             for reported in fleets {
                 let state = registry.state(for: reported)
-                let fleet = withLocalSessions(reported, primary: state === primary)
+                let fleet = reported
                 let before = state.lastFleet
                 let change = state.apply(fleet)
                 anyChanged = anyChanged || change.changed
@@ -2083,8 +2055,7 @@ final class AppModel: ObservableObject {
                                accounts: fleet.accounts,
                                nextCandidate: fleet.nextCandidate,
                                candidateOrder: fleet.candidateOrder,
-                               nextRecovery: fleet.nextRecovery,
-                               liveSessions: fleet.liveSessions)
+                               nextRecovery: fleet.nextRecovery)
         let raw = fleet.raw ?? (try? JSONEncoder().encode(list)) ?? Data()
         let previous = change.previousActive
         let firstLoad = change.firstLoad
@@ -2146,7 +2117,6 @@ final class AppModel: ObservableObject {
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo,
-                                            projects: { self.projectSummaries() },
                                             now: mirrorNow)
             }
         }
@@ -2203,20 +2173,6 @@ final class AppModel: ObservableObject {
         if !isPlayground { await sync.tick() }
     }
 
-    /// T3's project list for the window and the mirror (spec §2.1). Off
-    /// the main actor (called from the exporter's detached tick).
-    /// `live` is the caller's own `ClaudeSessions.list` when it has one
-    /// (the workspace window lists for its inputs anyway, #384); nil lists here.
-    nonisolated func projectSummaries(live: [ClaudeSessionRecord]? = nil) -> [ProjectSummary] {
-        let claudeDir = ClaudeSessions.configHome()
-        let live = live ?? ClaudeSessions.list(claudeDir: claudeDir)
-        let recentCwds = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
-        // The branch is one HEAD-file read per cwd (#346) — no spawn, no
-        // memo, so a checkout shows on the next pump.
-        return ProjectSummary.derive(live: live, recentCwds: recentCwds,
-                                     branch: { cwd in T3GitFacts.branch(cwd: cwd) })
-    }
-
     /// The badge click: running -> stop, stopped -> start ("auto switch
     /// status is clickable to toggle", user 2026-08-30). Deliberate states
     /// only — refused/backing-off/mismatch stay informational.
@@ -2264,16 +2220,6 @@ final class AppModel: ObservableObject {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    /// The primary fleet's live sessions are the app's own scan when the
-    /// engine reports none (#756: cswap's list carried them, swapd's does
-    /// not) — the mirror's sessions block and the session→account
-    /// attribution read this block off the primary fleet. Never in the
-    /// playground (demo data only).
-    func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
-        guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
-        return fleet.with(liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))
     }
 
     func rename(_ number: Int, to name: String) { primary?.rename(number, to: name) }

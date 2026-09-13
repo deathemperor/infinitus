@@ -21,9 +21,6 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(first.usage?.sevenDay?.pct, 100.0)
         XCTAssertEqual(first.usage?.scoped?.first?.name, "Fable")
         XCTAssertNotNil(first.usage?.sevenDay?.countdown)
-        XCTAssertEqual(list.liveSessions?.busy, 4)
-        XCTAssertEqual(list.liveSessions?.idle, 7)
-        XCTAssertEqual(list.liveSessions?.unknown, 2)
     }
 
     func testNextRecoveryDecodesAndIsOptional() throws {
@@ -55,41 +52,9 @@ final class ModelsTests: XCTestCase {
         XCTAssertNil(list.activeAccountNumber)
         XCTAssertEqual(list.accounts[0].usageStatus, "no_credentials")
     }
-
-    /// The owned status overlay (#151): the actor's word replaces the
-    /// roster's empty one, the counts follow, everything else is untouched.
-    func testLiveSessionsOverlayRewritesRowsAndCounts() {
-        let live = LiveSessions(busy: 1, total: 3, idle: 0, waiting: 0, shell: 0, unknown: 2, sessions: [
-            SessionDetail(pid: 1, cwd: "/a", status: "busy", kind: "interactive", startedAt: 0),
-            SessionDetail(pid: 2, cwd: "/b", status: "unknown", kind: "interactive", startedAt: 0),
-            SessionDetail(pid: 3, cwd: "/c", status: "unknown", kind: "interactive", startedAt: 0),
-        ])
-        let out = live.overlaying { pid in pid == 2 ? "waiting" : pid == 3 ? "idle" : nil }
-        XCTAssertEqual(out.sessions?.map(\.status), ["busy", "waiting", "idle"])
-        XCTAssertEqual([out.busy, out.idle, out.waiting, out.unknown, out.total], [1, 1, 1, 0, 3])
-        XCTAssertEqual(live.overlaying { _ in nil }, live)
-        XCTAssertEqual(LiveSessions(busy: 0, total: 0).overlaying { _ in "busy" }, LiveSessions(busy: 0, total: 0))
-    }
 }
 
 final class ChillDepthTests: XCTestCase {
-    func testSessionRowsTakeTheSessionIdByPidAndDecodeWithout() throws {
-        let rows = LiveSessions(busy: 1, total: 2, sessions: [
-            SessionDetail(pid: 1, cwd: "/a", status: "busy", kind: "interactive", startedAt: 0),
-            SessionDetail(pid: 2, cwd: "/b", status: "idle", kind: "interactive", startedAt: 0),
-        ])
-        let tagged = rows.tagging(sessionIds: [1: "s-one", 9: "stranger"])
-        XCTAssertEqual(tagged.sessions?.map(\.sessionId), ["s-one", nil])
-        XCTAssertEqual(tagged.busy, 1)
-        XCTAssertEqual(rows.tagging(sessionIds: [:]), rows)
-        // An engine row (or an older Mac's snapshot) has no such key.
-        let engineRow = try JSONDecoder().decode(
-            SessionDetail.self, from: Data(#"{"pid":7,"cwd":"/c","status":"busy","kind":"interactive","startedAt":1}"#.utf8))
-        XCTAssertNil(engineRow.sessionId)
-        let wire = try JSONDecoder().decode(SessionDetail.self, from: try JSONEncoder().encode(tagged.sessions![0]))
-        XCTAssertEqual(wire.sessionId, "s-one")
-    }
-
     func testBehindPaceScales() {
         XCTAssertEqual(GaugeMath.chillDepth(usedPct: 22, expectedPct: 31, ahead: false),
                        0.3, accuracy: 0.001)
@@ -120,7 +85,6 @@ final class ModelsCodableTests: XCTestCase {
             AccountList.self, from: JSONEncoder().encode(list))
         XCTAssertEqual(again.accounts.count, list.accounts.count)
         XCTAssertEqual(again.activeAccountNumber, list.activeAccountNumber)
-        XCTAssertEqual(again.liveSessions?.busy, list.liveSessions?.busy)
         let a = list.accounts[0], b = again.accounts[0]
         XCTAssertEqual(a.email, b.email)
         XCTAssertEqual(a.usage?.sevenDay?.pct, b.usage?.sevenDay?.pct)
@@ -137,28 +101,5 @@ final class ModelsCodableTests: XCTestCase {
         XCTAssertEqual(account.usage?.fiveHour?.pct, 12)
         let list = AccountList(activeAccountNumber: 3, accounts: [account])
         XCTAssertEqual(list.schemaVersion, 1)
-    }
-
-    /// #756: the app's own session scan fills the block cswap's list used
-    /// to carry — busy first, counts by status, epoch milliseconds.
-    func testLiveSessionsBuildFromTheAppsOwnRecords() {
-        func record(_ pid: Int32, _ status: String?, _ id: String = "s") -> ClaudeSessionRecord {
-            ClaudeSessionRecord(pid: pid, sessionId: id, cwd: "/w", kind: "interactive", status: status,
-                                messagingSocketPath: "", peerProtocol: 1,
-                                startedAt: Date(timeIntervalSince1970: 1_700_000_000))
-        }
-        let live = LiveSessions(records: [record(1, "idle", "a"), record(2, "busy", "b"), record(3, nil, ""), record(4, "waiting", "d")])
-        XCTAssertEqual(live.busy, 1)
-        XCTAssertEqual(live.total, 4)
-        XCTAssertEqual(live.idle, 1)
-        XCTAssertEqual(live.waiting, 1)
-        XCTAssertEqual(live.shell, 0)
-        XCTAssertEqual(live.unknown, 1)
-        XCTAssertEqual(live.sessions?.map(\.pid), [2, 4, 1, 3])
-        XCTAssertEqual(live.sessions?.first?.startedAt, 1_700_000_000_000)
-        XCTAssertEqual(live.sessions?.first?.sessionId, "b")
-        XCTAssertNil(live.sessions?.last?.sessionId)
-        XCTAssertEqual(live.sessions?.last?.status, "unknown")
-        XCTAssertEqual(LiveSessions(records: []).total, 0)
     }
 }
