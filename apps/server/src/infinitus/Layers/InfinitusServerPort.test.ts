@@ -31,6 +31,7 @@ import {
   DESKTOP_CREDENTIAL_SUBJECT,
   DESKTOP_CREDENTIAL_TTL,
   keepServerPortPublished,
+  publishedPort,
   publishServerPort,
   serverPortWithheldReason,
 } from "./InfinitusServerPort.ts";
@@ -256,6 +257,23 @@ const portWrites = (calls: ReadonlyArray<Call>) =>
     .filter((call) => call.command === "prefs" && call.args[0] === "set")
     .map((call) => call.args);
 
+const HEARTBEAT = Duration.seconds(60);
+
+/** A pref catalog naming `fork_server_port`, as the app reports it. */
+const catalogWithPort = (value: unknown) => ({
+  sections: [{ slug: "devices", name: "Devices" }],
+  prefs: [
+    {
+      key: "fork_server_port",
+      type: "int",
+      default: 3773,
+      value,
+      section: "devices",
+      effect: "live",
+    },
+  ],
+});
+
 /** Subscribes (which is what makes the service poll) and hands back the queue. */
 const watch = Effect.fn("watch")(function* () {
   const infinitus = yield* InfinitusService;
@@ -453,15 +471,85 @@ describe("publishServerPort: the desktop credential (#822)", () => {
 });
 
 describe("keepServerPortPublished", () => {
-  effectIt.effect("publishes at startup and never polls on its own", () =>
+  effectIt.effect("republishes within a minute when another server took the port (#1137)", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const keeper = yield* Effect.forkChild(keepServerPortPublished(3774));
+      yield* settle;
+      expect(portWrites(yield* stub.calls)).toHaveLength(1);
+
+      // A server that published over us and died: the app names its port.
+      yield* stub.setResult("prefs", catalogWithPort(3841));
+      yield* TestClock.adjust(HEARTBEAT);
+      yield* settle;
+      expect(portWrites(yield* stub.calls)).toEqual([
+        ["set", "fork_server_port", "3774"],
+        ["set", "fork_server_port", "3774"],
+      ]);
+
+      // Once the app names ours again the heartbeat goes quiet.
+      yield* stub.setResult("prefs", catalogWithPort(3774));
+      yield* TestClock.adjust(Duration.minutes(5));
+      yield* settle;
+      expect(portWrites(yield* stub.calls)).toHaveLength(2);
+
+      yield* Fiber.interrupt(keeper);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("the heartbeat never re-mints the credential while the port is ours", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const auth = yield* AuthStub;
+      yield* stub.setResult("manifest", manifestWithCredential());
+      yield* stub.setResult("prefs", catalogWithPort(3774));
+      const keeper = yield* Effect.forkChild(keepServerPortPublished(3774));
+      yield* settle;
+      expect((yield* auth.issued).length).toBe(1);
+
+      yield* TestClock.adjust(Duration.minutes(10));
+      yield* settle;
+
+      // Ten heartbeats, still the one session: a CLI holding the token keeps it.
+      expect((yield* auth.issued).length).toBe(1);
+
+      yield* Fiber.interrupt(keeper);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("an app that is away does not stop the heartbeat", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const keeper = yield* Effect.forkChild(keepServerPortPublished(3774));
+      yield* settle;
+
+      yield* stub.setUnavailable("ENOENT");
+      yield* TestClock.adjust(Duration.minutes(3));
+      yield* settle;
+
+      yield* stub.setUnavailable(null);
+      yield* stub.setResult("prefs", catalogWithPort(3841));
+      yield* TestClock.adjust(HEARTBEAT);
+      yield* settle;
+      expect(portWrites(yield* stub.calls)).toHaveLength(2);
+
+      yield* Fiber.interrupt(keeper);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("publishes at startup; the heartbeat reads but starts no poll", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;
       const keeper = yield* Effect.forkChild(keepServerPortPublished(3774));
 
       yield* TestClock.adjust(Duration.minutes(5));
 
+      // One write at startup: the heartbeat reads the catalog, and this app
+      // names no port of its own, so there is nothing to correct.
       expect(portWrites(yield* stub.calls)).toEqual([["set", "fork_server_port", "3774"]]);
-      expect((yield* stub.calls).map((call) => call.command)).toEqual(["manifest", "prefs"]);
+      const commands = (yield* stub.calls).map((call) => call.command);
+      expect(commands.slice(0, 2)).toEqual(["manifest", "prefs"]);
+      expect(new Set(commands.slice(2))).toEqual(new Set(["prefs"]));
 
       yield* Fiber.interrupt(keeper);
     }).pipe(Effect.provide(testLayer())),
@@ -534,4 +622,31 @@ describe("keepServerPortPublished", () => {
       yield* Fiber.interrupt(keeper);
     }).pipe(Effect.provide(testLayer(null))),
   );
+});
+
+describe("publishedPort (#1137)", () => {
+  const catalog = (prefs: ReadonlyArray<Record<string, unknown>>) =>
+    ({ sections: [], prefs }) as unknown as Parameters<typeof publishedPort>[0];
+  const entry = (value: unknown) => ({
+    key: "fork_server_port",
+    type: "int",
+    default: 3773,
+    value,
+    section: "devices",
+    effect: "live",
+  });
+
+  it("reads the port the app names, however it typed it", () => {
+    expect(publishedPort(catalog([entry(3841)]))).toBe(3841);
+    expect(publishedPort(catalog([entry(3774)]))).toBe(3774);
+    expect(publishedPort(catalog([entry("3841")]))).toBe(3841);
+  });
+
+  it("answers undefined for an absent pref and an uncomparable value", () => {
+    // Nothing to correct, and a false positive here would republish — and so
+    // rotate the infinitusctl credential — every minute.
+    expect(publishedPort(catalog([]))).toBeUndefined();
+    expect(publishedPort(catalog([entry(null)]))).toBeUndefined();
+    expect(publishedPort(catalog([entry("not a port")]))).toBeUndefined();
+  });
 });
