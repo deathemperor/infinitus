@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { ThreadId, TurnId, type OrchestrationThreadShell } from "@t3tools/contracts";
 
 import {
+  bestOfMemberStats,
   bestOfMemberStatus,
   bestOfMemberTitle,
   bestOfSiblings,
@@ -114,5 +115,37 @@ describe("bestOfMemberStatus", () => {
     expect(bestOfMemberStatus(shell("a", { latestTurn: turn("error") }))).toBe("failed");
     expect(bestOfMemberStatus(shell("a", { latestTurn: turn("interrupted") }))).toBe("stopped");
     expect(bestOfMemberStatus(shell("a"))).toBe("running");
+  });
+});
+
+describe("bestOfMemberStats (#269 B)", () => {
+  const usage = {
+    source: "runtime" as const,
+    turns: 3,
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedInputTokens: 0,
+    cacheCreationTokens: 0,
+    reasoningTokens: 0,
+    subagentTurns: 0,
+    costUsd: null,
+    models: [],
+    lastTurnAt: "2026-09-12T00:00:00.000Z",
+    toolCalls: 12,
+    durationMs: 250_000,
+  };
+
+  it("reads turns, tool calls and wall time off the thread's usage rollup", () => {
+    expect(bestOfMemberStats(usage)).toBe("3 turns · 12 tool calls · 4m 10s");
+    expect(bestOfMemberStats({ ...usage, turns: 1, toolCalls: 1, durationMs: 900 })).toBe(
+      "1 turn · 1 tool call · 900ms",
+    );
+  });
+
+  it("leaves out what the rollup does not carry, and says nothing before a turn", () => {
+    const { toolCalls: _toolCalls, durationMs: _durationMs, ...bare } = usage;
+    expect(bestOfMemberStats(bare)).toBe("3 turns");
+    expect(bestOfMemberStats({ ...usage, turns: 0 })).toBeNull();
+    expect(bestOfMemberStats(undefined)).toBeNull();
   });
 });

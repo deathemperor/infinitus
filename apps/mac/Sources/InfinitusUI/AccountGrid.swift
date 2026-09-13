@@ -27,7 +27,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
     private var anyGauged: Bool {
         model.compactRows ? false : model.accounts.contains { a in
             let c = AccountCells(model: model, usage: usage, account: a)
-            return SentinelNotes.note(for: a.usageStatus) == nil && !c.dead && !c.allFresh
+            return SentinelNotes.note(for: a.usageStatus) == nil && !c.allFresh
         }
     }
 
@@ -93,18 +93,15 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             .font(PopupFont.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize()
-                        if let age = cells.staleAge {
-                            Text("· \(age)")
+                        if let stale = cells.staleAge {
+                            Text("· \(stale.label)")
                                 .font(PopupFont.caption)
                                 .foregroundStyle(.orange)
                                 .fixedSize()
-                                .instantTip("Usage from \(age) — swapd could not "
-                                            + "refresh this account; it retries on its own")
+                                .instantTip(stale.tip)
                         }
                     }
-                    .instantTip(cells.staleAge.map {
-                        "Usage from \($0) — swapd could not refresh this account; it retries on its own"
-                    } ?? "Subscription: \(account.plan ?? "?")")
+                    .instantTip(cells.staleAge?.tip ?? "Subscription: \(account.plan ?? "?")")
                     .alignedColumn("plan")
                     .activeBand(account.active)
                     if let note = SentinelNotes.note(for: account.usageStatus) {
@@ -126,44 +123,6 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             .gridCellUnsizedAxes(anyGauged ? .horizontal : [])
                             .activeBand(account.active)
                         oneLineFillers
-                    } else if cells.showAsDead,
-                              cells.deadCause?.kind == .session,
-                              account.usage?.sevenDay != nil {
-                        // Dead on the 5h window ONLY (user 2026-09-01):
-                        // the weekly and per-model quotas still carry real
-                        // signal — gauges shown WITH their reset times
-                        // ("all accounts need to show 7d reset time no
-                        // matter what status", user 2026-09-03); the 5h
-                        // cause line keeps its own countdown.
-                        if model.compactRows {
-                            HStack(spacing: 12) {
-                                cells.deadCell
-                                cells.windowCell(account.usage?.sevenDay,
-                                                 session: false)
-                                cells.spendCell
-                                cells.scopedCells
-                            }
-                            .fixedSize()
-                            .alignedColumn("usage")
-                            .activeBand(account.active)
-                            oneLineFillers
-                            cells.cashCell.alignedColumn("cash")
-                        } else {
-                            cells.deadCell.alignedColumn("5h")
-                            cells.windowCell(account.usage?.sevenDay,
-                                             session: false)
-                                .alignedColumn("7d")
-                            cells.spendCell.alignedColumn("spend")
-                            cells.scopedCells
-                            cells.cashCell.alignedColumn("cash")
-                        }
-                    } else if cells.showAsDead {
-                        // A dead row shows ONLY what blocks it — a full MP
-                        // gauge on an unusable account reads as usable.
-                        cells.deadCell
-                            .gridCellUnsizedAxes(anyGauged ? .horizontal : [])
-                        oneLineFillers
-                        cells.cashCell.alignedColumn("cash")
                     } else if cells.allFresh {
                         // A fully-available account carries no signal worth
                         // five gauges — one "ready" line in every mode.
@@ -448,23 +407,13 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                                         && !model.isPlayground
                                         ? "Re-login now — opens this account's private login window"
                                         : note)
-                    } else if cells.showAsDead,
-                              cells.deadCause?.kind == .session,
-                              account.usage?.sevenDay != nil {
-                        // 5h-only death: weekly + per-model still shown,
-                        // with their reset times (user 2026-09-03).
-                        cells.deadCell
-                        cells.windowCell(account.usage?.sevenDay,
-                                         session: false)
-                        cells.spendCell
-                        cells.scopedCells
-                    } else if cells.showAsDead {
-                        cells.deadCell
                     } else if cells.allFresh {
                         cells.readyCell
                     } else {
                         // One attribute per line — the whole point of the
-                        // stacked layout (user request 2026-08-30).
+                        // stacked layout (user request 2026-08-30). A dead
+                        // row's blocking window wears the dead line; the
+                        // rest keep their gauges and reset times.
                         cells.windowCell(account.usage?.fiveHour, session: true)
                         cells.windowCell(account.usage?.sevenDay, session: false)
                         cells.spendCell

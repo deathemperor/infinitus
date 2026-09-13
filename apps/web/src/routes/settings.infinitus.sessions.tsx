@@ -6,7 +6,7 @@ import { InfinitusPrefsPanel } from "../components/settings/infinitus/InfinitusP
     catalog's `sessions` section carries — the mode, and the two thresholds
     native's headroom verdict binds on. */
 function SettingsInfinitusSessionsRoute() {
-  return <InfinitusPrefsPanel sectionSlugs={["sessions"]} title="Sessions" />;
+  return <InfinitusPrefsPanel sectionSlugs={["sessions"]} title="Priority" />;
 }
 
 export const Route = createFileRoute("/settings/infinitus/sessions")({

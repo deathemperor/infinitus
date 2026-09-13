@@ -23,7 +23,7 @@ describe("pusherMac", () => {
 
 describe("registrationBody / registrationCommand", () => {
   const body = registrationBody({
-    kind: "working-start",
+    kind: "alert",
     token: "8f3a",
     deviceId: "dev-1",
     deviceName: "Loc's iPhone",
@@ -34,7 +34,7 @@ describe("registrationBody / registrationCommand", () => {
 
   it("files the Mac under its environment id and asks for the expo envelope", () => {
     expect(body).toEqual({
-      kind: "working-start",
+      kind: "alert",
       token: "8f3a",
       deviceId: "dev-1",
       deviceName: "Loc's iPhone",
@@ -56,7 +56,7 @@ describe("registrationBody / registrationCommand", () => {
 
   function bodyInput() {
     return {
-      kind: "working" as const,
+      kind: "alert" as const,
       token: "t",
       deviceId: "d",
       deviceName: "n",
@@ -69,10 +69,10 @@ describe("registrationBody / registrationCommand", () => {
 
 describe("shouldSendToken", () => {
   it("sends a new token at once, a repeat only after the interval", () => {
-    const sent = new Map([["working" as const, { token: "a", at: 1_000 }]]);
-    expect(shouldSendToken(sent, "working", "b", 1_001)).toBe(true);
-    expect(shouldSendToken(sent, "revival", "a", 1_001)).toBe(true);
-    expect(shouldSendToken(sent, "working", "a", 1_001)).toBe(false);
-    expect(shouldSendToken(sent, "working", "a", 1_000 + TOKEN_RESEND_INTERVAL_MS)).toBe(true);
+    const sent = new Map([["alert" as const, { token: "a", at: 1_000 }]]);
+    expect(shouldSendToken(sent, "alert", "b", 1_001)).toBe(true);
+    expect(shouldSendToken(new Map(), "alert", "a", 1_001)).toBe(true);
+    expect(shouldSendToken(sent, "alert", "a", 1_001)).toBe(false);
+    expect(shouldSendToken(sent, "alert", "a", 1_000 + TOKEN_RESEND_INTERVAL_MS)).toBe(true);
   });
 });

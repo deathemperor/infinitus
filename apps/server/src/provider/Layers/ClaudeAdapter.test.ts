@@ -4540,6 +4540,66 @@ describe("ClaudeAdapterLive", () => {
       return { runtimeEvents, runtimeEventsFiber, drainSdkMessages };
     });
 
+  // Fork (#974): a proxy that never serves a cache read is a cost and speed
+  // footgun nothing on screen names; five large uncached calls in a row say so
+  // once, and a call that read the cache would have cleared the run.
+  it.effect("warns once when five calls in a row re-sent the context uncached", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      for (let call = 1; call <= 7; call += 1) {
+        harness.query.emit({
+          type: "assistant",
+          session_id: "sdk-session-cache",
+          uuid: `assistant-cache-${call}`,
+          parent_tool_use_id: null,
+          message: {
+            id: `assistant-message-cache-${call}`,
+            content: [{ type: "text", text: `step ${call}` }],
+            usage: {
+              input_tokens: 120_000 + call,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+              output_tokens: 40,
+            },
+          },
+        } as unknown as SDKMessage);
+      }
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-cache",
+        uuid: "result-cache",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      const warnings = runtimeEvents.filter((event) => event.type === "runtime.warning");
+      assert.equal(warnings.length, 1);
+      const warning = warnings[0];
+      assert.equal(warning?.type, "runtime.warning");
+      if (warning?.type !== "runtime.warning") return;
+      assert.match(warning.payload.message, /^No prompt cache: 5 calls in a row/);
+      assert.deepEqual(warning.payload.detail, { calls: 5, inputTokens: 120_005 });
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("surfaces a rejected Claude usage limit once per turn", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
