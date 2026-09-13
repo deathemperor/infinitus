@@ -14,7 +14,19 @@
 name: Infinitus nightly
 on:
   schedule:
+    # Two slots an hour apart, because one is not reliably delivered. GitHub
+    # drops most of this repo's cron occurrences: upstream's Release, at
+    # `8,38 * * * *`, got 2 of 48 on 2026-09-11, 8 of 48 on the 12th and 4 of
+    # 36 by 18:11Z on the 13th — 4-17 %, each 7-47 min late — and the nightly's
+    # own first slot produced no run at all. A twice-hourly cron survives that
+    # by repetition; a once-a-day cron has one occurrence to lose.
+    # A night where both fire costs one extra build, never a broken release:
+    # the `infinitus-nightly` concurrency group (cancel-in-progress false)
+    # serializes them, each run's version carries its own run number, and the
+    # publish uploads its assets before pruning the older night's, excluding
+    # its own version from the prune. The later run simply wins.
     - cron: "17 17 * * *" # 17:17 UTC, off the hour like #1034 (00:17 GMT+7)
+    - cron: "17 18 * * *" # the retry, an hour on
   workflow_dispatch:
     inputs:
       publish:
