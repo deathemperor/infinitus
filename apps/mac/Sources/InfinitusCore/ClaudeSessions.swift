@@ -105,8 +105,8 @@ public enum ClaudeSessions {
     /// What each record file last decoded to, per sessions directory
     /// (#1002): a writer that truncates before it writes leaves the file
     /// empty for a moment, and a listing in that moment must not lose the
-    /// session — its sidebar row, its Live Activity push and its AWS need
-    /// all went with it for a minute. Pruned to the files present.
+    /// session — its sidebar row and its AWS need went with it for a
+    /// minute. Pruned to the files present.
     private final class LastGood: @unchecked Sendable {
         let lock = NSLock()
         var byDir: [String: [String: ClaudeSessionRecord]] = [:]

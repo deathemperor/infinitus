@@ -107,26 +107,7 @@ export const PREF_COPY: Readonly<
     description: "What a session's chat wears above the transcript.",
     choices: { compact: "Compact", strip: "Stat strip", hud: "Game HUD" },
   },
-  revival_panel: { label: "Floating countdown when every account is out" },
   // Display › Sessions and startup.
-  checkpoints_enabled: {
-    label: "Checkpoint the repository at every prompt",
-    description: "Records the working tree as a hidden git ref; git status is untouched.",
-  },
-  session_auto_names: {
-    label: "Name unnamed sessions with Claude Haiku",
-    description: "Asks once per session on the active account, roughly a fraction of a cent.",
-  },
-  session_host: {
-    label: "New sessions from the phone open in",
-    description: "Takes effect at the next launch.",
-    choices: {
-      auto: "cmux when installed, else Terminal",
-      cmux: "cmux",
-      terminal: "Terminal",
-      owned: "No terminal — Infinitus runs it, chat from the app or phone",
-    },
-  },
   keep_awake: { label: "Keep the Mac awake while sessions are working" },
   keep_awake_display: { label: "Keep the screen on too" },
   // Themes.
@@ -151,10 +132,39 @@ export const PREF_COPY: Readonly<
       ocean: "Ocean — tides & deep water",
     },
   },
+  // Animations: the popup's launch choreography and the bars' pace fire. The
+  // keys are the Mac's internal words ("intro", "burn"); the screen says what
+  // each one does.
+  intro_style: {
+    label: "Popup entrance",
+    description: "How the account rows arrive when the popup opens.",
+    choices: {
+      top: "Slide down from the top",
+      bottom: "Slide up from the bottom",
+      fade: "Fade in",
+      rows: "One row at a time",
+    },
+  },
+  intro_title: {
+    label: "Title flourish",
+    description: "How the Infinitus title lands after them.",
+    choices: { zoom: "Zoom in", slam: "Slam down", spin: "Spin in", off: "None" },
+  },
+  intro_speed: {
+    label: "Animation speed",
+    description: "Multiplies every entrance animation; higher is faster.",
+  },
+  burn_style: {
+    label: "Pace fire",
+    description: "How a bar burns while its usage outruns the clock.",
+    choices: {
+      off: "Off",
+      ember: "Ember",
+      flame: "Flame",
+      limit: "Limit break — RPG theme only, else ember",
+    },
+  },
   // Push.
-  push_sessions_done: { label: "All sessions finish working" },
-  push_waiting: { label: "A session waits on you" },
-  push_aws_login: { label: "A session needs an AWS sign-in" },
   push_all_dead: { label: "All accounts are exhausted" },
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },
@@ -163,18 +173,27 @@ export const PREF_COPY: Readonly<
   mirror_lan_enabled: { label: "Serve the fleet to my phone" },
   mirror_tunnel_enabled: { label: "Expose through a Cloudflare quick tunnel" },
   mirror_rendezvous_enabled: { label: "Publish the current URL to infinitus.run" },
-  live_activity_rate_seconds: {
-    label: "Lock-screen tok/min interval (seconds)",
-    description: "Zero pushes tok/min with other changes only.",
+  // Devices: the tunnel fronting this server's own port, which the "Pair a
+  // phone" card below hands the QR when the phone is off the Wi‑Fi. The keys
+  // are the Mac's (#572) and say "fork"; the screen never does (#823).
+  fork_tunnel_enabled: {
+    label: "Reach this server through a Cloudflare tunnel",
+    description: "Lets a phone pair and connect from outside your network.",
+  },
+  fork_server_port: {
+    label: "Server port",
+    description: "The port this server listens on. Infinitus writes it at startup.",
+  },
+  fork_tunnel_hostname: {
+    label: "Tunnel hostname",
+    description:
+      "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
   },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
   engine_9router_enabled: { label: "9Router engine on (rotates behind its own endpoint)" },
-  // About. The two update toggles are the engine updater's, which the Mac shows
-  // under Engines even though the catalog files them here.
-  update_auto_check: { label: "Check for engine updates automatically" },
-  update_auto_install: { label: "Install engine updates automatically" },
+  // About.
   update_channel: {
     label: "Update channel",
     choices: { stable: "Stable", nightly: "Nightly" },

@@ -10,8 +10,8 @@
  *
  * The manifest and the preference catalog in `fork-visual-fixture.data.json`
  * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; accounts, the profiles, the forecast and
- * the stats are made up. Secrets: none — every write verb
+ * pref value reset to its default; the accounts, the forecast and the stats
+ * are made up. Secrets: none — every write verb
  * and every unknown verb is refused with `ok: false`, and only verb names are
  * logged. No dependencies; node ≥ 22.
  */
@@ -133,20 +133,6 @@ const forecast = () => ({
   },
 });
 
-const profiles = () => ({
-  profiles: [
-    {
-      name: "nightly-review",
-      cwd: "~/code/app",
-      engine: "claude",
-      permissionMode: "acceptEdits",
-      model: "opus",
-      allowTools: ["Edit", "Bash git"],
-    },
-    { name: "docs-sweep", engine: "codex", prompt: "Read the docs folder and list what is stale." },
-  ],
-});
-
 const tally = (n, usd) => ({
   n,
   s: n * 90,
@@ -162,10 +148,19 @@ const statsDay = (scale) => ({
   humanMessages: 40 * scale,
   phoneMessages: 6 * scale,
   agentMessages: 120 * scale,
+  nudges: 3 * scale,
+  subagents: 4 * scale,
   turns: 90 * scale,
   toolCalls: { Edit: 55 * scale, Bash: 70 * scale, Read: 140 * scale },
+  toolErrors: 5 * scale,
+  questions: 7 * scale,
+  denials: 1 * scale,
+  retries: 2 * scale,
   waitingSeconds: 1800 * scale,
   compactions: 2 * scale,
+  // A max across days on the Mac, not a sum, so it does not scale with the
+  // period — and the one tile that carries a unit ("34 tool calls").
+  longestUnattended: 34,
   inputTokens: 900_000 * scale,
   outputTokens: 120_000 * scale,
   usd: 18.4 * scale,
@@ -192,11 +187,18 @@ const statsDay = (scale) => ({
   linesRemoved: 210 * scale,
   filesTouched: 31 * scale,
   coAuthoredByClaude: 9 * scale,
+  reverts: 1 * scale,
   prsOpened: 3 * scale,
   prsMerged: 2 * scale,
+  // The compact form the Mac sends once the repo set is dropped, which the
+  // Repos tile only reads when `repos` is absent or empty.
+  repoTally: 3,
   switches: 1 * scale,
-  limitStops: 0,
-  minutesLostToLimits: 0,
+  limitStops: 2 * scale,
+  revivals: 2 * scale,
+  minutesLostToLimits: 11 * scale,
+  ignites: 1 * scale,
+  resumes: 3 * scale,
 });
 
 // #747: the Utilization page's history and run rate — one sample per
@@ -222,18 +224,62 @@ const utilization = (days) => {
       });
     }
   }
+  // The window telemetry beside the chart: the Mac reconstructs these off
+  // its full history, so they are their own rows rather than a fold of the
+  // samples above. Three closed 5h windows per account plus one still
+  // ticking for the active one, and the last two weekly rollovers.
+  const fiveHourWindows = [];
+  for (const account of ACCOUNTS) {
+    for (let back = 1; back <= 3; back += 1) {
+      const resetsAt = now - back * 21_600 - account.number * 900;
+      fiveHourWindows.push({
+        email: account.email,
+        number: account.number,
+        start: resetsAt - 18_000,
+        resetsAt,
+        peakPct: Math.max(2, account.five + back * 7 - account.number * 3),
+        samples: 40 - back * 6,
+        closed: true,
+      });
+    }
+  }
+  fiveHourWindows.push({
+    email: ACCOUNTS[0].email,
+    number: ACCOUNTS[0].number,
+    start: now - 7200,
+    resetsAt: now + 10_800,
+    peakPct: ACCOUNTS[0].five,
+    samples: 12,
+    closed: false,
+  });
+  const generations = ACCOUNTS.flatMap((account, index) => [
+    {
+      email: account.email,
+      window: "7d",
+      resetAt: now - 86_400 * (2 + index),
+      finalPct: Math.max(5, account.seven - 4),
+      observationGap: index === 1 ? 9 * 3600 : 1200,
+    },
+    {
+      email: account.email,
+      window: "7d",
+      resetAt: now - 86_400 * (9 + index),
+      finalPct: Math.max(5, account.seven - 18),
+      observationGap: 600,
+    },
+  ]);
   return {
     days,
     bucketSeconds: bucket,
     samples,
-    generations: [],
-    fiveHourWindows: [],
+    generations,
+    fiveHourWindows,
     replay: {
       from: now - days * 86_400,
       to: now,
       switches: 2,
-      coldSwitches: 0,
-      stalledSeconds: 0,
+      coldSwitches: 1,
+      stalledSeconds: 780,
       sawActiveFlag: true,
     },
     windows: ["5h", "7d"],
@@ -296,9 +342,49 @@ const events = () => [
     icon: "arrow.triangle.2.circlepath",
     text: "Switched to ada-fixture",
   },
-  { id: "evt-2", at: isoIn(-1200), kind: "team", icon: "person.3", text: "Grace's Mac published" },
+  // One row of every kind the Mac logs, worded the way it words them
+  // (`AppModel.logEvent`'s call sites; `all exhausted` is `EngineEvent`'s
+  // default summary), so the Activity route's chips are all on screen and
+  // the visual pass can assert them (#1111).
   {
-    id: "evt-3",
+    id: "evt-2",
+    at: isoIn(-2700),
+    kind: "death",
+    icon: "heart.slash",
+    text: "grace-fixture hit a limit",
+  },
+  { id: "evt-3", at: isoIn(-2400), kind: "limit", icon: "battery.0percent", text: "all exhausted" },
+  {
+    id: "evt-4",
+    at: isoIn(-2100),
+    kind: "revival",
+    icon: "heart.fill",
+    text: "grace-fixture is back — reset early",
+  },
+  {
+    id: "evt-5",
+    at: isoIn(-1800),
+    kind: "ignite",
+    icon: "flag.checkered",
+    text: "ignited linus-fixture — window started, resets 11:17 PM",
+  },
+  {
+    id: "evt-6",
+    at: isoIn(-1500),
+    kind: "desktop",
+    icon: "key",
+    text: "desktop credential stored for http://127.0.0.1:3773",
+  },
+  {
+    id: "evt-7",
+    at: isoIn(-1350),
+    kind: "pairing",
+    icon: "🔑",
+    text: "phone pairing token regenerated",
+  },
+  { id: "evt-8", at: isoIn(-1200), kind: "team", icon: "person.3", text: "Grace's Mac published" },
+  {
+    id: "evt-9",
     at: isoIn(-300),
     kind: "other",
     icon: "sparkles",
@@ -335,8 +421,6 @@ function answer(request, socketPath) {
     case "prefs":
       // One verb for reads and writes; the fixture holds no state to write.
       return args[0] === "set" ? undefined : data.prefs;
-    case "profiles":
-      return profiles();
     case "stats":
       return stats(typeof options.period === "string" ? options.period : "week");
     case "utilization":

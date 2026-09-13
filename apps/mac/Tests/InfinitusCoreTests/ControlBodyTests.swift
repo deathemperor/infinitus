@@ -17,9 +17,9 @@ final class ControlBodyTests: XCTestCase {
     }
 
     func testAPushRegistrationDecodesWithItsISODate() throws {
-        let body = #"{"kind":"working","token":"ab12","deviceId":"d1","deviceName":"Phone","environment":"sandbox","themeID":null,"registeredAt":"2026-09-10T10:00:00Z","macId":"m-1"}"#
+        let body = #"{"kind":"alert","token":"ab12","deviceId":"d1","deviceName":"Phone","environment":"sandbox","themeID":null,"registeredAt":"2026-09-10T10:00:00Z","macId":"m-1"}"#
         let r = try ControlBody.decode(ActivityPushRegistration.self, from: request("activities-token", body: body))
-        XCTAssertEqual(r.slot, "d1/working")
+        XCTAssertEqual(r.slot, "d1/alert")
         XCTAssertEqual(r.macId, "m-1")
         XCTAssertTrue(r.isSandbox)
         XCTAssertEqual(r.registeredAt, ISO8601DateFormatter().date(from: "2026-09-10T10:00:00Z"))

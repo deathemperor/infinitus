@@ -31,6 +31,8 @@ import {
   LIMIT_MARKER_KIND,
   limitMarkerSummary,
   limitStopFromEvent,
+  proxyInstanceLabel,
+  proxyStop,
   RESUME_COOLDOWN_MS,
   RESUME_MARKER_KIND,
   resumeMarkerSummary,
@@ -175,7 +177,8 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
       Effect.gen(function* () {
         stops.delete(threadId);
         if (marks.delete(threadId)) yield* publish;
-        if (stops.size === 0) yield* stopWatching;
+        // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
+        if (![...stops.values()].some((stop) => stop.proxy === null)) yield* stopWatching;
       });
 
     /** The row and the sidebar entry a stop leaves the moment it lands. */
@@ -206,6 +209,7 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
               stop: stop.kind,
               accounts: [...stop.activeAtStop.values()],
               resetsAt,
+              proxy: stop.proxy,
             },
             turnId: stop.turnId,
             createdAt,
@@ -233,6 +237,23 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
         return publish;
       });
 
+    /** The proxied instance the thread runs on (#1088), read only once an
+        event is a stop; an unreadable shell or settings names none. */
+    const proxyFor = (threadId: ThreadId) =>
+      Effect.gen(function* () {
+        const shell = yield* projectionSnapshotQuery.getThreadShellById(threadId);
+        if (Option.isNone(shell)) return null;
+        const current = yield* settings.getSettings;
+        return proxyInstanceLabel(current.providerInstances, shell.value.modelSelection);
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("infinitus.resume-on-limit.proxy-unknown", {
+            threadId,
+            cause: Cause.pretty(cause),
+          }).pipe(Effect.as(null)),
+        ),
+      );
+
     const onRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
         const existing = stops.get(event.threadId);
@@ -240,9 +261,11 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
           yield* forget(event.threadId);
         }
         const snapshot = yield* infinitus.snapshot;
-        const stop = limitStopFromEvent(event, yield* nowMillis, snapshot);
-        if (stop === null) return;
-        if (stop.turnId !== null && resumed.has(stop.turnId)) return;
+        const plain = limitStopFromEvent(event, yield* nowMillis, snapshot);
+        if (plain === null) return;
+        if (plain.turnId !== null && resumed.has(plain.turnId)) return;
+        const proxy = yield* proxyFor(plain.threadId);
+        const stop = proxy === null ? plain : proxyStop(plain, proxy);
         const known = stops.get(stop.threadId);
         stops.set(stop.threadId, stop);
         if (known === undefined) yield* mark(stop);
@@ -251,8 +274,10 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
           threadId: stop.threadId,
           turnId: stop.turnId,
           kind: stop.kind,
+          proxy: stop.proxy !== null,
         });
-        yield* startWatching;
+        // A proxy's stop waits for nothing on this Mac: no poll for it.
+        if (stop.proxy === null) yield* startWatching;
       });
 
     const onSnapshot = (snapshot: InfinitusSnapshot): Effect.Effect<void> =>

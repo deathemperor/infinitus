@@ -24,6 +24,8 @@ const ALWAYS_ON_SCREEN = [
   "Unlocking",
   "Engine status",
   "Pairing requests",
+  "Accounts",
+  "Activity",
   "Utilization",
   "Stats",
   "Infinitus is not answering — it may be closed, or running on another machine.",
@@ -40,6 +42,8 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/notifications",
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
+      "/accounts",
+      "/activity",
       "/utilization",
       "/stats",
     ]);
@@ -47,8 +51,10 @@ describe("FORK_VISUAL_ROUTES", () => {
 
   it("uses markers a not-answering page cannot show", () => {
     for (const route of FORK_VISUAL_ROUTES) {
-      for (const shown of ALWAYS_ON_SCREEN) {
-        expect(shown.includes(route.marker), `${route.route}: "${route.marker}"`).toBe(false);
+      for (const phrase of [route.marker, ...(route.shows ?? [])]) {
+        for (const shown of ALWAYS_ON_SCREEN) {
+          expect(shown.includes(phrase), `${route.route}: "${phrase}"`).toBe(false);
+        }
       }
     }
   });
@@ -79,17 +85,77 @@ describe("routeFailures", () => {
     ]);
     expect(routeFailures(lock, "Re-lock · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
   });
+
+  it("names each `shows` phrase the capture is missing, beside the marker", () => {
+    const activity = FORK_VISUAL_ROUTES.find((route) => route.route === "/activity")!;
+    expect(
+      routeFailures(activity, "Activity 8:46 PM ignite ignited linus-fixture — window"),
+    ).toEqual([
+      'missing "all out all exhausted"',
+      'missing "limit grace-fixture hit a limit"',
+      'missing "revival grace-fixture is back"',
+      'missing "desktop desktop credential stored"',
+      'missing "pairing phone pairing token"',
+      'missing "switch Switched to ada-fixture"',
+    ]);
+  });
+
+  it("fails a Stats tile that lost its figure and reads zero again (#1115)", () => {
+    const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
+    const capture = [stats.marker, ...stats.shows!].join(" ");
+    expect(routeFailures(stats, capture)).toEqual([]);
+    expect(routeFailures(stats, capture.replace("Nudges 21", "Nudges 0"))).toEqual([
+      'missing "Nudges 21"',
+    ]);
+  });
+
+  it("fails a row humanised from a fork_ pref key the web has no copy for", () => {
+    expect(routeFailures(lock, "Re-lock Fork tunnel enabled")).toEqual(['shows "Fork "']);
+    expect(routeFailures(lock, "Re-lock Tunnel hostname")).toEqual([]);
+  });
+
+  it("fails a field whose label rendered but whose value did not", () => {
+    const devices = FORK_VISUAL_ROUTES.find(
+      (route) => route.route === "/settings/infinitus/devices",
+    )!;
+    const port = "[Server port: 3773]";
+    const missing = 'missing "[Publish the current URL to infinitus.run: on]"';
+    // The label alone is what `innerText` captured, and what a switch that
+    // never took its pref still draws.
+    expect(routeFailures(devices, `Publish the current URL to infinitus.run ${port}`)).toEqual([
+      missing,
+    ]);
+    expect(
+      routeFailures(devices, `[Publish the current URL to infinitus.run: off] ${port}`),
+    ).toEqual([missing]);
+    expect(
+      routeFailures(devices, `[Publish the current URL to infinitus.run: on] ${port}`),
+    ).toEqual([]);
+  });
+
+  it("fails the port #1110 grouped into 3,773", () => {
+    const devices = FORK_VISUAL_ROUTES.find(
+      (route) => route.route === "/settings/infinitus/devices",
+    )!;
+    const on = "[Publish the current URL to infinitus.run: on]";
+    expect(routeFailures(devices, `${on} [Server port: 3,773]`)).toEqual([
+      'missing "[Server port: 3773]"',
+    ]);
+    expect(routeFailures(devices, `${on} [Server port: 3773]`)).toEqual([]);
+  });
 });
 
 describe("checkVisualPass", () => {
+  const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
+
   it("reads one capture per route and reports every failure", () => {
     const captures = new Map<string, string>([
       ["settings-infinitus-lock", "Unlocking Re-lock Locked"],
-      ["stats", "Stats Session lengths"],
+      ["stats", `Stats ${[stats.marker, ...stats.shows!].join(" ")}`],
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[9]!, FORK_VISUAL_ROUTES[8]!],
+      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[11]!, FORK_VISUAL_ROUTES[10]!],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],

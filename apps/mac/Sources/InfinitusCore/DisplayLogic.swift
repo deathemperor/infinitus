@@ -173,9 +173,9 @@ public enum StaleAge {
 }
 
 public extension Account {
-    /// The row's age caption when swapd could not refresh this account
-    /// (#965); nil for every non-stale row, and nil when stale but the
-    /// engine gave no age to show.
+    /// The row's age caption when the engine could not refresh this
+    /// account (#965); nil for every non-stale row, and nil when stale
+    /// but the engine gave no age to show.
     var staleAgeLabel: String? {
         guard stale == true else { return nil }
         return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
@@ -186,7 +186,24 @@ public extension Account {
     var staleTip: String? {
         guard let age = staleAgeLabel else { return nil }
         let why = staleReason.map { " (\($0))" } ?? ""
-        return "Usage from \(age) — swapd could not refresh this account\(why); it retries on its own"
+        return "Usage from \(age) — the engine could not refresh this account\(why); it retries on its own"
+    }
+
+    /// Whether a reset instant carried by this account still says anything
+    /// at `now`. A stale row is a FROZEN measurement — its reset is the one
+    /// that was true when the last good fetch landed — so once that instant
+    /// has passed with no fetch to confirm it, the row knows nothing about
+    /// the window any more. Counting down to it, or pulsing "resetting…"
+    /// against it, narrates data this build does not have: slot 12 pulsed
+    /// the revive word for 86 minutes against a reset that had already gone
+    /// by inside a 429-backed-off snapshot (#1118).
+    ///
+    /// Fresh rows are always knowable, and so is a stale row whose reset is
+    /// still ahead: the engine will very likely refresh before it arrives,
+    /// and if it doesn't, this turns false the moment it passes.
+    func resetIsKnowable(_ resetsAt: String?, now: Date = Date()) -> Bool {
+        guard stale == true, let reset = WeeklyRoll.parse(resetsAt) else { return true }
+        return reset > now
     }
 }
 
@@ -214,8 +231,16 @@ public enum SentinelNotes {
     /// (relogin_required ran three lines, user screenshot 2026-08-31).
     /// The full note rides the row's tooltip; statuses already short
     /// fall through unchanged.
+    ///
+    /// token_expired says "deferred", not "retrying": the row cannot see
+    /// whether a retry is due (the engine may be an hour into a 429
+    /// backoff), and a credential the engine has given up on reports
+    /// relogin_required instead — so "retrying" was a promise this surface
+    /// had no way to keep and read as a hang when it went unanswered for
+    /// hours (#1118, swapd#30). "Deferred" is the state, which the row
+    /// does know; the tooltip's full note still says it retries on its own.
     static let shortNotes: [String: String] = [
-        "token_expired": "token expired — retrying",
+        "token_expired": "token expired — deferred",
         "foreign_credential": "foreign credential",
         "keychain_unavailable": "keychain locked",
         "relogin_required": "re-login needed",
@@ -289,13 +314,21 @@ public enum ResetLabel {
         return "\(Self.countdown(reset, now: now))·\(shortClock(reset, now: now, calendar: calendar))"
     }
 
-    /// "22:10" today, "Sep 4" on another day.
+    /// "22:10" within the day ahead, "Sep 4" further out.
     static func shortClock(_ reset: Date, now: Date, calendar: Calendar) -> String {
         let f = DateFormatter()
         f.calendar = calendar
         f.timeZone = calendar.timeZone
-        f.dateFormat = calendar.isDate(reset, inSameDayAs: now) ? "HH:mm" : "MMM d"
+        f.dateFormat = showsDate(reset, now: now) ? "MMM d" : "HH:mm"
         return f.string(from: reset)
+    }
+
+    /// A date earns its width only past 24 hours out. A 5h window that
+    /// crosses midnight resets on another calendar day but is still hours
+    /// away — its countdown already says which one, so "(Sep 14 03:00)"
+    /// was noise (user 2026-09-13, "5h reset: don't show date").
+    static func showsDate(_ reset: Date, now: Date) -> Bool {
+        reset.timeIntervalSince(now) >= 86400
     }
 
     /// De-spaced countdown: "5d7h", "1h44m", "12m".
@@ -313,11 +346,7 @@ public enum ResetLabel {
         let f = DateFormatter()
         f.calendar = calendar
         f.timeZone = calendar.timeZone
-        if calendar.isDate(reset, inSameDayAs: now) {
-            f.dateFormat = "HH:mm"
-        } else {
-            f.dateFormat = "MMM d HH:mm"
-        }
+        f.dateFormat = showsDate(reset, now: now) ? "MMM d HH:mm" : "HH:mm"
         return f.string(from: reset)
     }
 }

@@ -130,6 +130,8 @@ function withFakeClaudeEnv<A, E, R>(
     configDirMustBe?: string;
     cwdMustNotBe?: string;
     claudeConfig?: Partial<ClaudeSettings>;
+    /** `ANTHROPIC_BASE_URL`, to run the layer as a proxied instance (#1088). */
+    proxyBaseUrl?: string;
   },
   effectFn: (textGeneration: TextGeneration.TextGeneration["Service"]) => Effect.Effect<A, E, R>,
 ) {
@@ -250,9 +252,13 @@ function withFakeClaudeEnv<A, E, R>(
     );
 
     const config = decodeClaudeSettings(input.claudeConfig ?? {});
+    // The layer reads the process environment when none is given, and a
+    // developer's shell may export ANTHROPIC_BASE_URL (#1088), which would put
+    // every harness on the proxied path — no model suffix. Pin it to a plain
+    // environment, PATH included (the fake CLI is already on it by now).
     const textGeneration = yield* makeClaudeTextGeneration(
       config,
-      undefined,
+      { ...process.env, ANTHROPIC_BASE_URL: input.proxyBaseUrl ?? "" },
       Effect.succeed(SYNTHETIC_CLAUDE_MODEL_CATALOG),
     );
     return yield* effectFn(textGeneration);
@@ -371,6 +377,36 @@ it.layer(ClaudeTextGenerationTestLayer)("ClaudeTextGeneration", (it) => {
             expect(generated.title).toBe("Improve orchestration flow");
           }),
       ),
+  );
+
+  // #1088: the bracket suffix is Anthropic's own wire syntax; a proxy in front
+  // of the API answers 400 "unknown provider for model …[expanded]".
+  it.effect("asks a proxied instance for the plain slug, without the model suffix", () =>
+    withFakeClaudeEnv(
+      {
+        output: JSON.stringify({ structured_output: { title: "Proxied title" } }),
+        proxyBaseUrl: "http://127.0.0.1:8317",
+        argsMustContain: `--model ${SYNTHETIC_CLAUDE_CAPABLE_MODEL} --effort max`,
+        argsMustNotContain: "[expanded]",
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generateThreadTitle({
+            cwd: process.cwd(),
+            message: "Route this through the proxy",
+            modelSelection: createModelSelection(
+              ProviderInstanceId.make("claudeAgent"),
+              SYNTHETIC_CLAUDE_CAPABLE_MODEL,
+              [
+                { id: "effort", value: "max" },
+                { id: "contextWindow", value: "expanded" },
+              ],
+            ),
+          });
+
+          expect(generated.title).toBe("Proxied title");
+        }),
+    ),
   );
 
   it.effect(

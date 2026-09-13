@@ -72,7 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
-    @StateObject private var reliabilityModel: ResumeReliabilityModel
     @StateObject private var appRelease: AppReleaseModel
     @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -106,15 +105,13 @@ struct InfinitusApp: App {
         _brew = StateObject(wrappedValue: brew)
         model.brewUpdater = brew
         brew.relaunch = { model.relaunchApp() }
-        let reliabilityModel = ResumeReliabilityModel()
-        _reliabilityModel = StateObject(wrappedValue: reliabilityModel)
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
             appDelegate?.statusHolder = StatusItemHolder(
                 model: model,
                 settingsTabs: {
                     settingsTabs(
-                        model: model, reliabilityModel: reliabilityModel,
+                        model: model,
                         appRelease: release, brew: brew)
                 })
         }
@@ -142,7 +139,7 @@ struct InfinitusApp: App {
         // macOS 15+, and SceneBuilder takes no #available branch.)
         Settings {
             SettingsRoot(tabs: settingsTabs(
-                model: model, reliabilityModel: reliabilityModel,
+                model: model,
                 appRelease: appRelease, brew: brew))
         }
         // ⌘, would raise that hidden scene window (and the controller
@@ -164,7 +161,7 @@ struct InfinitusApp: App {
 /// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(
-    model: AppModel, reliabilityModel: ResumeReliabilityModel,
+    model: AppModel,
     appRelease: AppReleaseModel, brew: BrewUpdater
 ) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
@@ -212,7 +209,7 @@ struct InfinitusApp: App {
                     // auto-switch daemon runs is the tab's own business.
                     provider: ProviderBadge(live: model.swapdRegistered
                                             && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model, reliability: reliabilityModel))),
+                    view: AnyView(SwapdEnginePane(model: model))),
         SettingsTab(title: "CLIProxyAPI", symbol: "network",
                     keywords: ["proxy", "cliproxy", "router", "management",
                                "key", "engine", "provider", "claude"],
@@ -565,8 +562,7 @@ struct MenuContent: View {
                                 model: model, progress: model.sessionProgress,
                                 status: ServiceStatusSummary(indicator: status.indicator),
                                 onStatusTap: { status.openPage() },
-                                serviceChrome: StatusHoverCard(status: status),
-                                sessionsCard: { live in AnyView(MacSessionsPopover(model: model, live: live)) })
+                                serviceChrome: StatusHoverCard(status: status))
                             if !model.footerActionsHidden {
                                 Button {
                                     model.showSettings?()
@@ -677,7 +673,6 @@ struct MenuContent: View {
             .instantTip("Pop out into a window")
         }
         serviceDot
-        brainBadge
         if model.appUpdatePending {
             Button { model.relaunchApp() } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -705,34 +700,6 @@ struct MenuContent: View {
         }
     }
 
-    /// Rail-width session chip: the brain with the busy count as a badge
-    /// (agentChip's full-mode text row is wider than the rail).
-    @ViewBuilder private var brainBadge: some View {
-        if let live = model.liveSessions {
-            Image(systemName: "brain")
-                .font(.caption)
-                .foregroundStyle(live.busy > 0 ? Color.orange : Color.secondary)
-                .overlay(alignment: .topTrailing) {
-                    if live.busy > 0 {
-                        Text("\(live.busy)")
-                            .font(.system(size: 8, weight: .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 3)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(Color.orange))
-                            .offset(x: 8, y: -7)
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { model.sessionsShown.toggle() }
-                .popover(isPresented: $model.sessionsShown, arrowEdge: .trailing) {
-                    MacSessionsPopover(model: model, live: live)
-                }
-                .instantTip(SessionSummary.tooltip(live))
-        }
-    }
-
     /// How many icons compactControls will actually emit — must mirror
     /// its conditionals so the rail's column math stays honest.
     private var compactRailItemCount: Int {
@@ -741,7 +708,6 @@ struct MenuContent: View {
         if !model.footerActionsHidden {
             n += 7                                  // 5 actions + restart + quit
         }
-        if let live = model.liveSessions, live.busy > 0 { n += 1 }
         if model.appUpdatePending { n += 1 }
         if model.appUpdateVersion != nil { n += 1 }
         return n
@@ -769,7 +735,6 @@ struct MenuContent: View {
             .instantTip("Pop out into a window")
         }
         serviceDot
-        agentChip
         if model.appUpdatePending {
             Button { model.relaunchApp() } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -823,50 +788,6 @@ struct MenuContent: View {
         AllDeadBanner(model: model)
         if let err = model.lastError {
             Text(err).font(.caption).foregroundStyle(.red).lineLimit(2)
-        }
-    }
-
-    /// Live Claude Code sessions on this machine — they all ride the
-    /// active account's credential. Compact shows the brain only when
-    /// something is actually working.
-    @ViewBuilder private var agentChip: some View {
-        if let live = model.liveSessions, !model.compactRows || live.busy > 0 {
-            Group {
-                if model.compactRows {
-                    // The icon rail's cells are 20pt: side-by-side text
-                    // clips there (user screenshot), so compact wears the
-                    // count as a badge on the brain instead.
-                    Image(systemName: "brain")
-                        .font(.caption)
-                        .foregroundStyle(Color.orange)
-                        .overlay(alignment: .topTrailing) {
-                            Text("\(live.busy)")
-                                .font(.system(size: 8, weight: .bold))
-                                .monospacedDigit()
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 3)
-                                .padding(.vertical, 1)
-                                .background(Capsule().fill(Color.orange))
-                                .offset(x: 8, y: -7)
-                        }
-                } else {
-                    HStack(spacing: 3) {
-                        Image(systemName: "brain")
-                            .font(.caption)
-                            .foregroundStyle(live.busy > 0 ? Color.orange : Color.secondary)
-                        Text(live.busy > 0 ? "\(live.busy) working · \(live.total)"
-                                           : "\(live.total)")
-                            .font(.caption).monospacedDigit()
-                            .foregroundStyle(live.busy > 0 ? Color.orange : Color.secondary)
-                    }
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { model.sessionsShown.toggle() }
-            .popover(isPresented: $model.sessionsShown, arrowEdge: .bottom) {
-                MacSessionsPopover(model: model, live: live)
-            }
-            .instantTip(SessionSummary.tooltip(live), edge: .above)
         }
     }
 

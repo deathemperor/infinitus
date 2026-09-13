@@ -159,9 +159,6 @@ final class ControlServer {
     /// ISO8601DateFormatter is an ICU `udat_open` each time, and `events`
     /// built one per row on every desktop-app poll (#346's sample).
     nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
-    /// `session-stop` (#220 Phase 2): how long after the Esc a session
-    /// that still owns its pid gets SIGTERM.
-    static let stopGrace: Double = 5
 
     private func handle(line: Data) async -> ControlReply {
         let request: ControlRequest
@@ -264,151 +261,21 @@ final class ControlServer {
                                 "needs": .array(needs.map { .string($0) })])
             }))
 
-        case "nudge":
-            // #612: the resume nudge for one session, by hand — what the
-            // service does on its tick for every limit-stopped session,
-            // without ResumeGate: the caller asked.
-            guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {
-                throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`")
-            }
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = model.ownedRoster(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else {
-                throw Fail("no live session \(pid)")
-            }
-            let outcome: (nudged: Bool, channel: String?, reason: String?) = await Task.detached(priority: .utility) {
-                guard let stop = Transcript.findStopped(sessions: [record], claudeDir: claudeDir).first else {
-                    return (false, nil, "not resumable: the transcript does not end in a limit stop")
-                }
-                let coordinator = ResumeCoordinator(hosts: PtyHosts.available(), claudeDir: claudeDir)
-                let result = coordinator.resume([stop])
-                if result.accepted.contains(where: { $0.sessionId == stop.sessionId }) {
-                    return (true, result.channel[stop.sessionId], nil)
-                }
-                return (false, nil, "unreachable: no terminal surface, no peer socket, or mid-turn")
-            }.value
-            if outcome.nudged {
-                model.resume.noteManualNudge(sessionId: record.sessionId)
-                model.logEvent("other", icon: "play.circle", "nudged \(record.sessionId.prefix(8)) by hand via \(outcome.channel ?? "?")")
-            }
-            return ControlReply(ok: true, result: .object(["pid": .number(Double(pid)), "nudged": .bool(outcome.nudged),
-                                                           "channel": outcome.channel.map { .string($0) } ?? .null,
-                                                           "reason": outcome.reason.map { .string($0) } ?? .null]))
-
-        case "profiles":
-            return ControlReply(ok: true, result: try .of(["profiles": model.sessionProfiles.profiles]))
-
-        case "profile-set":
-            guard let name = r.args.first?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
-                throw Fail("usage: profile-set <name> [--cwd f] [--engine e] [--mode m] [--model m] [--system s] [--prompt p] [--allow \"Edit, Bash git\"]")
-            }
-            if let engine = r.options["engine"], !["claude", "codex"].contains(engine) { throw Fail("engine must be claude or codex") }
-            if let mode = r.options["mode"], !SessionStart.permissionModes.contains(where: { $0.mode == mode }) {
-                throw Fail("mode must be one of " + SessionStart.permissionModes.map(\.mode).joined(separator: ", "))
-            }
-            let profile = SessionProfile(name: name, cwd: r.options["cwd"], engine: r.options["engine"],
-                                         permissionMode: r.options["mode"], model: r.options["model"],
-                                         systemPrompt: r.options["system"], prompt: r.options["prompt"],
-                                         allowTools: r.options["allow"].flatMap(SessionProfiles.parseAllowList))
-            model.sessionProfiles.set(profile)
-            if let err = model.sessionProfiles.lastError { throw Fail(err) }
-            let saved = model.sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }
-            return ControlReply(ok: true, result: try .of(["profile": saved]))
-
-        case "profile-remove":
-            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: profile-remove <name>") }
-            let existed = model.sessionProfiles.profiles.contains { SessionProfiles.same($0.name, name) }
-            model.sessionProfiles.remove(name)
-            return ControlReply(ok: true, result: .object(["removed": .bool(existed)]))
-        case "past-sessions":
-            let sessions = PastSessions.list(claudeDir: ClaudeSessions.configHome(),
-                                             limit: r.options["limit"].flatMap(Int.init) ?? 50,
-                                             search: r.options["search"],
-                                             hidden: model.hiddenSessions.withLock { $0 })
-            return ControlReply(ok: true, result: try .of(PastSessions.Reply(sessions: sessions)))
-
-        case "resume-session":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: resume-session <sessionId> [--fork]") }
-            let claudeDir = ClaudeSessions.configHome()
-            let fork = r.options["fork"] != nil
-            // A live session's transcript is another process's to write —
-            // talk to it instead of resuming it twice. A fork writes a new
-            // one, so a live session can be branched.
-            if !fork, let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
-                throw Fail("session \(id) is live (pid \(live.pid)); use `infinitusctl send \(live.pid)`, or --fork to branch it")
-            }
-            guard let past = PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: model.hiddenSessions.withLock { $0 }) else {
-                throw Fail("no past session \(id); see `infinitusctl past-sessions`")
-            }
-            let request = SessionStart.Request(cwd: past.cwd, resume: past.sessionId, fork: fork ? true : nil)
-            let reply = SessionLauncher.start(request, preferredHost: model.sessionHost)
-            if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
-                model.recordBirth(pid: pid, birth)
-            }
-            return ControlReply(ok: reply.outcome == "started", result: try .of(reply),
-                                error: reply.outcome == "started" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
-
-        case "session-delete":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: session-delete <sessionId> --yes") }
-            guard r.options["yes"] != nil else { throw Fail("session-delete hides a session; pass --yes") }
-            let claudeDir = ClaudeSessions.configHome()
-            if let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
-                throw Fail("session \(id) is live (pid \(live.pid)); stop it first")
-            }
-            let hidden = model.hiddenSessions.withLock { $0 }
-            guard PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: hidden) != nil || hidden.contains(id) else {
-                throw Fail("no past session \(id)")
-            }
-            try model.hiddenSessions.withLock { ids -> Void in
-                ids.insert(id)
-                var file = PastSessions.Hidden()
-                file.ids = ids
-                try file.save(root: AppSupport.root())
-            }
-            return ControlReply(ok: true, result: .object(["hidden": .string(id)]))
-
-        case "send":
-            guard let text = r.secret, !text.isEmpty else { throw Fail("send: the message is expected on stdin") }
-            guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {
-                throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`")
-            }
-            let reply = await model.send(SessionInput.Request(kind: .message, text: text),
-                                         toPid: pid, icon: "💬", what: "control send")
-            return ControlReply(ok: reply.outcome == "delivered", result: try .of(reply),
-                                error: reply.outcome == "delivered" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
-
-        case "session-stop":
-            guard let pidText = r.args.first, let pid = Int32(pidText), pid > 1 else {
-                throw Fail("usage: session-stop <pid> --yes")
-            }
-            guard r.options["yes"] != nil else { throw Fail("session-stop signals a process; pass --yes") }
-            guard let record = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).first(where: { $0.pid == pid }) else {
-                throw Fail("no live session with pid \(pid)")
-            }
-            // The escape reaches the session's own surface first — a clean
-            // stop, if it is mid-turn to see it; the grace's SIGTERM is
-            // the one that always lands.
-            let esc = await model.send(SessionInput.Request(kind: .key, text: "esc"), toPid: Int(pid), icon: "stop.circle", what: "control stop")
-            let sessionId = record.sessionId
-            Task.detached(priority: .utility) {
-                try? await Task.sleep(nanoseconds: UInt64(Self.stopGrace * 1_000_000_000))
-                // Pid reuse is why this re-resolves by session id: only a
-                // record that still names both the pid and the session is
-                // signalled.
-                guard ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .contains(where: { $0.sessionId == sessionId && $0.pid == pid }) else { return }
-                kill(pid_t(pid), SIGTERM)
-            }
-            return ControlReply(ok: true, result: .object([
-                "pid": .number(Double(pid)), "sessionId": .string(sessionId),
-                "esc": .string(esc.outcome), "grace": .number(Self.stopGrace),
-            ]))
-
 
         case "push":
             // #269 G: the desktop's thread phase changes ride the Mac's
             // own pusher, so they get its gating and every channel on.
+            // #1047: its thread card state rides the same verb to the
+            // phone's lock screen — no Notification Center line for it.
+            if let payload = r.secret, let activity = ThreadActivityPush.parse(payload) {
+                switch activity {
+                case .show(let state): model.liveActivityPusher.pushAgentActivity(state)
+                case .end: model.liveActivityPusher.pushAgentActivity(nil)
+                }
+                return ControlReply(ok: true, result: .object(["pushed": .bool(true), "card": .bool(true)]))
+            }
             guard let payload = r.secret, let push = ThreadPhasePush.parse(payload) else {
-                throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} is expected on stdin")
+                throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} or {kind: \"thread.activity\", state} is expected on stdin")
             }
             model.push(push.line)
             return ControlReply(ok: true, result: .object(["pushed": .bool(true)]))
@@ -902,6 +769,19 @@ final class ControlServer {
             ]
             if let s = model.proxyRoutingStrategy { out["routingStrategy"] = .string(s) }
             if let e = model.engineErrors[CLIProxyEngine.engineID] { out["error"] = .string(e) }
+            return ControlReply(ok: true, result: .object(out))
+
+        case "9router":
+            // The proxy's read verb for the other engine. Its error was
+            // reachable only from the Mac's own Settings pane, so a
+            // 9Router that had stopped refreshing could not be diagnosed
+            // from the CLI, the phone or the desktop app at all.
+            var out: [String: JSONValue] = [
+                "baseURL": .string(model.nineRouterBaseURL),
+                "passwordPresent": .bool(model.nineRouterPasswordPresent),
+                "enabled": .bool(model.nineRouterEnabled),
+            ]
+            if let e = model.engineErrors[NineRouterEngine.engineID] { out["error"] = .string(e) }
             return ControlReply(ok: true, result: .object(out))
 
         case "proxy-key":

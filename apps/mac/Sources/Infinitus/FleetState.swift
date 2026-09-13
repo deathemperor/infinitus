@@ -82,6 +82,29 @@ final class FleetState: ObservableObject, Identifiable {
         lastFleet = fleet
     }
 
+    /// Age the rows this fleet is still showing after its engine failed
+    /// to refresh them (`StaleMarking`). Deliberately NOT `apply`: no
+    /// snapshot arrived, so the liveness diff, the headroom verdict, the
+    /// "a real snapshot decoded" gate and the switch flash must all stay
+    /// exactly where the last good one left them. Only the captions move.
+    /// Silent when the age reads the same as last pass, since an hours-old
+    /// row would otherwise repaint every minute to say the same thing.
+    func markStale(reason: String, lastGood: Date?, now: Date) {
+        guard let last = lastFleet else { return }
+        let marked = StaleMarking.marked(last, reason: reason, lastGood: lastGood, now: now)
+        lastFleet = marked
+        guard !Self.sameStaleCaptions(accounts, marked.accounts) else { return }
+        accounts = marked.accounts
+    }
+
+    private static func sameStaleCaptions(_ a: [Account], _ b: [Account]) -> Bool {
+        guard a.count == b.count else { return false }
+        return zip(a, b).allSatisfy {
+            $0.stale == $1.stale && $0.staleReason == $1.staleReason
+                && $0.staleAgeLabel == $1.staleAgeLabel
+        }
+    }
+
     /// Re-judges the headroom from the last snapshot: after every apply,
     /// and when the host's mode or thresholds change. A swap starts the
     /// hysteresis over on the new account; the same account with no
@@ -383,7 +406,6 @@ extension FleetState: FleetModel {
     var reviveLead: TimeInterval { host.reviveLead }
     var burnStyle: String { host.burnStyle }
     var popupLayout: String { host.popupLayout }
-    var waitingResume: Int? { host.waitingResume }
     var fillScale: Double { host.fillScale }
     var isPlayground: Bool { host.isPlayground }
     var sessionsShown: Bool {

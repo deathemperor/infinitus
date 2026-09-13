@@ -121,17 +121,42 @@ final class StaleAgeTests: XCTestCase {
         let throttled = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380,
                                 stale: true, staleReason: "http-429")
         XCTAssertEqual(throttled.staleTip,
-                       "Usage from 6 min ago — swapd could not refresh this account (http-429); "
+                       "Usage from 6 min ago — the engine could not refresh this account (http-429); "
                        + "it retries on its own")
 
         let unexplained = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380, stale: true)
         XCTAssertEqual(unexplained.staleTip,
-                       "Usage from 6 min ago — swapd could not refresh this account; "
+                       "Usage from 6 min ago — the engine could not refresh this account; "
                        + "it retries on its own")
 
         XCTAssertNil(Account(number: 1, email: "a@b.c", usageAgeSeconds: 380).staleTip)
         XCTAssertNil(Account(number: 1, email: "a@b.c", stale: true, staleReason: "timeout").staleTip,
                      "no age, no sentence — same rule as the label")
+    }
+
+    /// The shape that pulsed "resetting…" for 86 minutes (#1118): slot 12
+    /// was an hour into an `http-429` backoff, and the frozen snapshot it
+    /// kept serving named a reset that had already gone by. A live
+    /// countdown against that instant narrates a window nothing is
+    /// watching, so the row stops claiming to know it.
+    func testStaleResetIsUnknowableOnceItHasPassed() {
+        let now = WeeklyRoll.parse("2026-09-13T16:16:00Z")!
+        let stale = Account(number: 12, email: "a@b.c", usageAgeSeconds: 5190,
+                            stale: true, staleReason: "http-429")
+
+        XCTAssertFalse(stale.resetIsKnowable("2026-09-13T14:50:00Z", now: now),
+                       "the snapshot's reset is 86 min behind us and no fetch has confirmed it")
+        XCTAssertTrue(stale.resetIsKnowable("2026-09-13T16:30:00Z", now: now),
+                      "still ahead — the engine will likely refresh before it lands")
+
+        // A fresh row is always knowable: its reset is a measurement, not a
+        // memory, even once it passes (that's the real "resetting…").
+        let fresh = Account(number: 1, email: "a@b.c")
+        XCTAssertTrue(fresh.resetIsKnowable("2026-09-13T14:50:00Z", now: now))
+
+        // Nothing to judge: no reset on record, or an unparseable one.
+        XCTAssertTrue(stale.resetIsKnowable(nil, now: now))
+        XCTAssertTrue(stale.resetIsKnowable("not a date", now: now))
     }
 }
 
@@ -189,7 +214,10 @@ final class SentinelNotesTests: XCTestCase {
 
     func testShortFormsStayOneLine() {
         XCTAssertEqual(SentinelNotes.short(for: "relogin_required"), "re-login needed")
-        XCTAssertEqual(SentinelNotes.short(for: "token_expired"), "token expired — retrying")
+        // "Deferred", not "retrying": the row cannot see whether a retry is
+        // due, and a credential the engine gave up on says relogin_required
+        // instead — "retrying" read as a hang for hours (#1118).
+        XCTAssertEqual(SentinelNotes.short(for: "token_expired"), "token expired — deferred")
         // Already-short notes fall through to the full text.
         XCTAssertEqual(SentinelNotes.short(for: "api_key"), "API key (no quota)")
         XCTAssertEqual(SentinelNotes.short(for: "no_credentials"), "no credentials")
@@ -218,6 +246,15 @@ final class ResetLabelTests: XCTestCase {
         let w = try window(#"{"pct": 10, "resetsAt": "2026-01-03T08:00:00Z"}"#)
         let now = WeeklyRoll.parse("2026-01-01T08:00:00Z")!
         XCTAssertEqual(ResetLabel.label(w, now: now, calendar: utc), "2d 0h (Jan 3 08:00)")
+    }
+
+    /// A 5h window that crosses midnight resets tomorrow but is hours
+    /// away — the countdown says which day, so no date.
+    func testCrossMidnightWithinADayKeepsTheClockAlone() throws {
+        let w = try window(#"{"pct": 98, "resetsAt": "2026-01-02T03:00:00Z"}"#)
+        let now = WeeklyRoll.parse("2026-01-01T22:04:00Z")!
+        XCTAssertEqual(ResetLabel.label(w, now: now, calendar: utc), "4h 56m (03:00)")
+        XCTAssertEqual(ResetLabel.compact(w, now: now, calendar: utc), "4h56m·03:00")
     }
 
     func testMinutesOnly() throws {

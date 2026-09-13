@@ -33,7 +33,7 @@ final class SettingsSyncModel: ObservableObject {
         "compact_rows", "footer_actions_hidden",
         "keep_awake", "keep_awake_display",
         "sort_headroom",
-        "push_sessions_done", "push_all_dead", "push_last_alive",
+        "push_all_dead", "push_last_alive",
     ]
     static let intKeys: Set<String> = ["refresh_interval", "revive_lead_minutes"]
     static let doubleKeys: Set<String> = ["glass_focused"]

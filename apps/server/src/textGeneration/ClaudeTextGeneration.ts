@@ -49,6 +49,7 @@ import {
   scopeClaudeModelCatalog,
 } from "../provider/ClaudeModelCatalog.ts";
 import { makeClaudeEnvironment } from "../provider/Drivers/ClaudeHome.ts";
+import { isProxiedClaudeEnvironment } from "../provider/claudeProxyInstance.ts";
 
 const CLAUDE_TIMEOUT_MS = 180_000;
 
@@ -205,7 +206,10 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
           "--json-schema",
           jsonSchemaStr,
           "--model",
-          resolveClaudeCatalogApiModelId(catalog, resolvedModelSelection),
+          resolveClaudeCatalogApiModelId(catalog, resolvedModelSelection, {
+            // A proxied instance (#1088) takes the plain slug, not `…[1m]`.
+            modelSuffixes: !isProxiedClaudeEnvironment(claudeEnvironment),
+          }),
           ...(cliEffort ? ["--effort", cliEffort] : []),
           "--settings",
           settingsJson,

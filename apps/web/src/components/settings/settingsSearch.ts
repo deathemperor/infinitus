@@ -651,7 +651,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "project-actions",
     title: "Actions",
     to: "/settings/projects",
-    searchTerms: ["commands scripts setup run dev server checkout worktree t3.json import"],
+    searchTerms: [
+      "commands scripts setup run dev server checkout worktree infinitus.json t3.json import",
+    ],
   },
   {
     id: "environment-icon",
@@ -771,7 +773,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/sessions",
     targetId: "infinitus-sessions",
     infinitusOnly: true,
-    searchTerms: ["session priority mode hold interrupt headroom low abundant pct background"],
+    // "session" stays while the mode row still reads "Session priority": that
+    // label is retitled with the Mac's pane, not before (#1069).
+    searchTerms: [
+      "thread session priority mode hold interrupt headroom low abundant pct background",
+    ],
   },
   // Fork (#270 B): the Dock badge, above the push toggles; banners are upstream's row (#1032).
   {

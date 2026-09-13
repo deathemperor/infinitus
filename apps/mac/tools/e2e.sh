@@ -43,7 +43,6 @@ export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
 export INFINITUS_SWAPD_CLI="$PWD/tools/demo-swapd"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
-export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 LOG="$(mktemp -t infinitus-e2e)"
 # This run's own defaults domain (#690): unbundled debug binaries used to
 # share one, so a peer's leftover fork_server_port could fail another
@@ -121,7 +120,6 @@ defaults write "$DOMAIN" popover_pinned -bool false
 defaults write "$DOMAIN" gamification_style rpg
 defaults write "$DOMAIN" burn_style ember
 defaults write "$DOMAIN" mock_mode -bool true   # demo fleet: the swapd engine is $INFINITUS_SWAPD_CLI (the locator honours it)
-defaults write "$DOMAIN" resume_stopped_sessions -bool true   # the limit-stop round below; off by default, read at launch
 
 # --- AWS sign-in fixtures (must exist before launch: env is read at start) --
 # A stub `aws` in place of the real CLI: `login --remote --profile P`
@@ -357,11 +355,7 @@ REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
 "$CTL" randomize-names swapd/claude | expect "len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts']) and len(d['names'])==len(d['fleet']['accounts'])" || fail "randomize-names didn't give every account its own name"
 # One account re-rolls alone (#145): one name, worn by that account, still distinct from every other.
 "$CTL" randomize-names swapd/claude 2 | expect "len(d['names'])==1 and [a for a in d['fleet']['accounts'] if a['number']==2][0].get('alias')==d['names'][0] and len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts'])" || fail "randomize-names <n> didn't re-roll account 2 alone"
-"$CTL" profile-set e2e-review --cwd /tmp --mode acceptEdits --model opus --allow "Edit, Bash git" | expect "d['profile']['name']=='e2e-review' and d['profile']['permissionMode']=='acceptEdits' and d['profile']['model']=='opus' and d['profile']['allowTools']==['Edit','Bash git']" || fail "profile-set didn't save the fields"
-"$CTL" profiles | expect "[p['name'] for p in d['profiles']]==['e2e-review']" || fail "profiles didn't list the saved profile"
-"$CTL" profile-remove e2e-review | expect "d['removed'] is True" || fail "profile-remove didn't remove"
-"$CTL" past-sessions --limit 3 | expect "isinstance(d['sessions'], list) and len(d['sessions'])<=3" || fail "past-sessions didn't list"
-echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions, profiles)"
+echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names)"
 "$CTL" plan | expect "'plan' in d and (d['plan'] is None or 'steps' in d['plan'])" || fail "plan verb"
 "$CTL" ignite swapd/claude 2 | expect "'fleet' in d" || fail "ignite verb"
 
@@ -414,8 +408,8 @@ echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
 # --- windows: Settings open idles too ------------------------------------
-# The Settings-open case sat at 18% for a week (#346: transcript reads,
-# the past-sessions walk and the machine sampler all ran on behind it)
+# The Settings-open case sat at 18% for a week (#346: transcript reads
+# and the machine sampler all ran on behind it)
 # while the pop-out gate read 0.5%; this is the gate
 # that would have caught it. Settle first: the window builds its tabs on
 # the first open.
@@ -475,6 +469,10 @@ echo "prefs: ok"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+# #1047: the desktop's thread card on the push verb — a null state ends
+# it (no phone registered: a no-op that still answers), a stray shape is refused.
+printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True" || fail "push thread.activity end"
+printf '{"kind":"thread.activity","state":{"title":"x"}}' | "$CTL" push 2>&1 | grep -q "thread.activity" || fail "push thread.activity refuses a stray state"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
 # #835: --forget has no body, so a stdin pipe nobody closes must not hold it
 # (a fifo opened read-write never reaches EOF).
@@ -557,10 +555,8 @@ echo "aws: need surfaced after ${i}s"
 # The session's own stuck login (#275) must still be waiting on its
 # callback here, or the release round below passes for the wrong reason.
 pgrep -f "aws login --profile e2e-login" >/dev/null || fail "the session's own aws login is not running before the sign-in (#1007)"
-# #612: the row carries the id, the start and the need the fork's list shows;
-# the by-hand nudge is a no-op with its reason on a session that never stopped.
+# #612: the row carries the id, the start and the need the fork's list shows.
 "$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
-"$CTL" nudge "$SESSION_PID" | expect "d['pid']==$SESSION_PID and d['nudged']==False and d['reason'].startswith('not resumable')" || fail "nudge no-op"
 "$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).
@@ -576,33 +572,24 @@ done
 "$CTL" aws-logins | expect "next(l['state']['url'] for l in d['logins'] if l['profile']=='e2e-login').startswith('https://e2e.invalid/')" || fail "no URL for the phone"
 "$CTL" aws-login e2e-login --status | expect "d['state']['phase']=='waitingForCode'" || fail "--status did not report the login in flight"
 printf 'E2E-CODE-OK' | "$CTL" aws-login-code e2e-login >/dev/null || fail "aws-login-code"
-# Signed in: the item drops (the failure predates the login) and the
-# session gets its nudge over its own inbox socket.
+# Signed in: the item drops (the failure predates the login).
 i=0
 while aws_login_item; do
     i=$((i + 1)); [ "$i" -lt 20 ] || fail "need did not clear after the login (phase $(aws_phase e2e-login))"
     sleep 1
 done
-i=0
-until grep -q "AWS login for profile e2e-login completed from the phone" "$INBOX" 2>/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "session never got the continue nudge (inbox: $(cat "$INBOX" 2>/dev/null | head -c 300))"
-    sleep 1
-done
-echo "aws: code flow signed in, need cleared, session nudged"
-# The session's own stuck login (#275) was released before the nudge,
-# and the nudge says so.
+echo "aws: code flow signed in, need cleared"
+# The session's own stuck login (#275) is released once the phone sign-in lands.
 i=0
 while pgrep -f "aws login --profile e2e-login" >/dev/null; do
     i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|aws-own-login-listener' | grep -v grep | head -4 | tr '\n' ';'))"
     sleep 1
 done
-grep -q "Your own .aws login. was stopped" "$INBOX" \
-    || fail "nudge does not say the session's own login was stopped (inbox: $(tail -c 400 "$INBOX" 2>/dev/null | tr '\n' ' '))"
-echo "aws: the session's own stuck login released, nudge says so"
+echo "aws: the session's own stuck login released"
 # --- gcloud sign-in from the phone (#367) --------------------------------
 # The same session's gcloud call dies on lapsed credentials: the need
 # surfaces as a gcloud item against the pid, the paste-back flow signs
-# in, the item clears, the session is nudged with the gcloud wording.
+# in, and the item clears.
 TS2="$(python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
 cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
 {"type":"assistant","timestamp":"$TS2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_gc","name":"Bash","input":{"command":"gcloud storage ls --account=e2e@example.com"}}]}}
@@ -629,12 +616,7 @@ while gcloud_login_item; do
     i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud need did not clear after the login (phase $(gcloud_phase))"
     sleep 1
 done
-i=0
-until grep -q "gcloud login for e2e@example.com completed from the phone" "$INBOX" 2>/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "session never got the gcloud continue nudge"
-    sleep 1
-done
-echo "gcloud: code flow signed in, need cleared, session nudged"
+echo "gcloud: code flow signed in, need cleared"
 # Rebind refusal: the CLI asks to overwrite the profile's session; the
 # app answers n and reports which account it was bound to.
 "$CTL" aws-login e2e-rebind --remote >/dev/null || fail "aws-login e2e-rebind"
@@ -672,59 +654,6 @@ while aws_login_item; do
 done
 "$CTL" aws-login e2e-login --status | expect "'outside the app' in d['state']['message']" || fail "probe outcome not recorded"
 echo "aws: lapse met outside the app cleared by the probe"
-# --- limit stop, supervisor switch, resume nudge (#964) ------------------
-# The session's transcript ends in a plan-limit stop while every usage
-# read is stale (swapd degrades the active slot to `stale` while a CLI
-# holds its lock): the resume gate holds. A switch to another account is
-# the target's fresh poll (#964), so the nudge lands once that account
-# has been active for ResumeGate.stableSeconds (30 s, #136's ping-pong
-# guard) with no usage poll after the switch. The fake session takes the
-# nudge over its peer socket; the Activity line names the account.
-"$INFINITUS_SWAPD_CLI" simulate stalefetch >/dev/null
-"$CTL" refresh | expect "d[0]['activeNumber']==1" || fail "account 1 must be active before the limit stop"
-cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
-{"type":"assistant","uuid":"e2e-stop-1","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)","isApiErrorMessage":true,"error":"rate_limit","message":{"role":"assistant","content":[{"type":"text","text":"You've hit your usage limit."}]}}
-EOF
-held_line() { "$CTL" events --limit 100 | expect "any(e['kind']=='nudge' and 'stopped session(s) held' in e['text'] for e in d)"; }
-nudged() { grep -q "hit its usage limit" "$INBOX"; }
-"$CTL" refresh >/dev/null || fail "refresh after the limit stop"
-i=0
-until held_line; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "the limit-stopped session was not held on a stale usage read (#964)"
-    sleep 1
-done
-nudged && fail "a resume nudge landed before any switch"
-echo "resume: limit stop held on a stale usage read"
-SWITCHED_AT=$(date +%s)
-# The account's shown name (the run's RPG theme renames it) is what the
-# resumed line carries.
-NAME2="$("$CTL" switch swapd/claude 2 | json "$(acct 2)['alias'] if d['fleet']['activeNumber']==2 else ''")"
-[ -n "$NAME2" ] || fail "switch to 2 after the stop"
-sleep 5
-"$CTL" refresh >/dev/null || fail "refresh 5 s after the switch"
-sleep 3
-nudged && fail "a resume nudge landed before the account had been active for 30 s (#136)"
-"$INFINITUS_SWAPD_CLI" list | expect "all(a['ageSeconds']>=3600 for a in d['providers'][0]['accounts'])" || fail "the stale-fetch scenario lapsed"
-until [ $(( $(date +%s) - SWITCHED_AT )) -ge 31 ]; do sleep 1; done
-"$CTL" refresh >/dev/null || fail "refresh once the account is stable"
-i=0
-until nudged; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "the stopped session was never nudged after the switch (#964)"
-    sleep 1
-done
-# The session continues: its transcript moves, so the resume round's
-# watch ends and the Activity line lands.
-cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
-{"type":"assistant","uuid":"e2e-cont-1","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)","message":{"role":"assistant","content":[{"type":"text","text":"Continuing."}]}}
-EOF
-i=0
-until "$CTL" events --limit 100 | expect "any(e['kind']=='nudge' and e['text']=='resumed e2e-aws via socket on $NAME2' for e in d)"; do
-    i=$((i + 1)); [ "$i" -lt 30 ] || fail "no Activity line naming the account the session resumed on"
-    sleep 1
-done
-"$INFINITUS_SWAPD_CLI" simulate off >/dev/null
-"$CTL" switch swapd/claude 1 | expect "d['fleet']['activeNumber']==1" || fail "switch back to 1 after the resume round"
-echo "resume: nudged after the switch with no usage poll, the Activity line names the account"
 
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
 # credential comes on stdin like every secret and stays in this run's own
@@ -743,7 +672,7 @@ printf '%s' "$DESK_TOKEN" | "$CTL" desktop-credential --origin "http://127.0.0.1
 "$CTL" desktop status | expect "d['reachable'] is True and d['version']=='0.0.0-demo'" || fail "desktop status reachable"
 "$CTL" desktop status | grep -q "$DESK_TOKEN" && fail "desktop status must never print the token"
 "$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is True and d['label'].startswith('…')" || fail "desktop credential accepted"
-"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT'" || fail "environments"
+"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT' and d[0]['platform']=='darwin'" || fail "environments"
 "$CTL" projects | expect "d[0]['id']=='p-demo' and d[0]['name']=='Demo project' and d[0]['env']=='env-demo'" || fail "projects"
 "$CTL" threads | expect "[t['id'] for t in d]==['t-running','t-idle'] and d[0]['status']=='running' and d[1]['status']=='held' and d[1]['hold']['summary']=='at limit until 09:00' and d[0]['project']=='Demo project'" || fail "threads"
 "$CTL" threads --status held | expect "len(d)==1 and d[0]['id']=='t-idle'" || fail "threads --status held"
@@ -806,8 +735,8 @@ python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail 
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,
-# then leaves on its own (tunnels, terminals, owned sessions first) — the
-# wait below is bounded, and the time is printed.
+# then leaves on its own (tunnels stop first) — the wait below is bounded,
+# and the time is printed.
 "$CTL" quit | expect "d['quitting'] is True" || fail "quit"
 # The app is this shell's child: until `wait` reaps it the pid lingers as
 # a zombie, so the exit shows as state Z, not as a missing pid.

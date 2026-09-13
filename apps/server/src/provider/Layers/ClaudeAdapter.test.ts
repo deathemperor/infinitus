@@ -191,8 +191,12 @@ function makeHarness(config?: {
       }
     | undefined;
 
+  // The adapter reads the process environment when none is given, and a
+  // developer's shell may export ANTHROPIC_BASE_URL (#1088), which would put
+  // every harness on the proxied path. Pin it to a plain environment.
+  const environment: NodeJS.ProcessEnv = { ...process.env, ANTHROPIC_BASE_URL: "" };
   const adapterOptions: ClaudeAdapterLiveOptions = {
-    ...(config?.environment ? { environment: config.environment } : {}),
+    environment: config?.environment ?? environment,
     ...(config?.instanceId ? { instanceId: config.instanceId } : {}),
     ...(config?.scopedLimitNames ? { scopedLimitNames: config.scopedLimitNames } : {}),
     modelCatalog: Effect.succeed(SYNTHETIC_CLAUDE_MODEL_CATALOG),
@@ -2322,6 +2326,20 @@ describe("ClaudeAdapterLive", () => {
       state: "failed",
       errorMessage: /prompt exceeds the model's context window/,
     },
+    // `blocking_limit` is the CLI's prompt-too-long gate — autocompact ran
+    // too early or freed too little — and reads like its sibling above, not
+    // like a usage limit.
+    {
+      name: "the context-window gate",
+      result: {
+        subtype: "success",
+        is_error: false,
+        terminal_reason: "blocking_limit",
+        errors: [],
+      },
+      state: "failed",
+      errorMessage: /prompt exceeds the model's context window/,
+    },
     {
       name: "a listed tool failure",
       result: {
@@ -2436,6 +2454,8 @@ describe("ClaudeAdapterLive", () => {
         payload.errorMessage,
         "Claude usage limit reached. Send the message again once the limit resets.",
       );
+      // Resume-on-limit (#648) reads this, never the wording above.
+      assert.equal(payload.usageLimited, true);
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
@@ -2898,6 +2918,14 @@ describe("ClaudeAdapterLive", () => {
         if (completed._tag === "Some" && completed.value.type === "turn.completed") {
           assert.equal(completed.value.payload.state, "failed", reason);
           assert.ok(completed.value.payload.errorMessage, `${reason} carries an error message`);
+          // No usage window rejected this turn, so nothing reads it as a
+          // limit stop — `blocking_limit` above all, which is the CLI's
+          // prompt-too-long gate and once said "a usage limit" outright.
+          assert.equal(
+            completed.value.payload.usageLimited,
+            undefined,
+            `${reason} is not a usage limit`,
+          );
         }
       }).pipe(
         Effect.provideService(Random.Random, makeDeterministicRandomService()),
@@ -6821,6 +6849,37 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  // #1088: the bracket suffix is Anthropic's own wire syntax; a proxy in front
+  // of the API answers 400 "unknown provider for model …[expanded]".
+  it.effect("asks a proxied instance for the plain slug, without the model suffix", () => {
+    const harness = makeHarness({
+      environment: { ...process.env, ANTHROPIC_BASE_URL: "http://127.0.0.1:8317" },
+    });
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "hello",
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: SYNTHETIC_CLAUDE_CAPABLE_MODEL,
+        },
+        attachments: [],
+      });
+
+      assert.deepEqual(harness.query.setModelCalls, [SYNTHETIC_CLAUDE_CAPABLE_MODEL]);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("updates model on sendTurn for the adapter's bound custom instance id", () => {
     const customInstanceId = ProviderInstanceId.make("claude_openrouter");
     const harness = makeHarness({ instanceId: customInstanceId });
@@ -8214,6 +8273,89 @@ describe("fork fallback (side questions)", () => {
       );
     },
   );
+
+  it.effect("forks at the session's end when the CLI refuses before the first send", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+        resumeCursor: {
+          threadId: THREAD_ID,
+          resume: SOURCE_SESSION,
+          resumeSessionAt: "assistant-9",
+          resumeSessionAtLatest: true,
+          fork: true,
+        },
+      });
+      // The CLI refuses the fork point while reading its options: it never
+      // asked for a prompt, so this lands before the side question is sent.
+      anchorRefused(harness.query);
+      yield* settle;
+      assert.equal(harness.queries.length, 2);
+
+      // A side question asks in plan mode; the mode and the prompt must land
+      // on the fallback's query, not on the one the CLI already dropped.
+      yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "which browser tool the agent use to test?",
+        attachments: [],
+        interactionMode: "plan",
+      });
+      yield* settle;
+
+      const second = harness.queries[1]!;
+      assert.deepEqual(second.setPermissionModeCalls, ["plan"]);
+      assert.equal(
+        yield* Effect.promise(() => readFirstPromptText(harness.getLastCreateQueryInput())),
+        "which browser tool the agent use to test?",
+      );
+      const repair = runtimeEvents.find((event) => event.type === "runtime.warning");
+      assert.equal(
+        repair?.type === "runtime.warning" && repair.payload.message,
+        FORK_AT_END_MESSAGE,
+      );
+      assert.equal(
+        runtimeEvents.some((event) => event.type === "runtime.error"),
+        false,
+      );
+
+      init(second, "7c9e6679-7425-40de-944b-e07fc1f90ae7");
+      second.emit({
+        type: "assistant",
+        session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        uuid: "assistant-answer",
+        parent_tool_use_id: null,
+        message: { id: "message-answer", content: [{ type: "text", text: "An answer." }] },
+      } as unknown as SDKMessage);
+      second.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        uuid: "result-answer",
+      } as unknown as SDKMessage);
+      while (!runtimeEvents.some((event) => event.type === "turn.completed")) {
+        yield* Effect.yieldNow;
+      }
+      runtimeEventsFiber.interruptUnsafe();
+      const completed = runtimeEvents.find((event) => event.type === "turn.completed");
+      assert.equal(completed?.type === "turn.completed" && completed.payload.state, "completed");
+      assert.equal(harness.queries.length, 2);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
 
   it.effect("fails an earlier turn's anchor plainly instead of forking elsewhere", () => {
     const harness = makeHarness();
