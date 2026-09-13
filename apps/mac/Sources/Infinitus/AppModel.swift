@@ -2678,11 +2678,20 @@ final class AppModel: ObservableObject {
 /// every requirement is an existing member; only the relogin action is
 /// mac-only, so it lands here rather than in the protocol's no-op.
 extension AppModel: FleetModel {
+    // A click while a flow already runs brings ITS windows back rather
+    // than doing nothing (user 2026-09-13: "pressing again show nothing"
+    // — the sign-in was alive the whole time, buried under the pinned
+    // pop-out). `start` keeps its own guard; this is the way back in.
     func startRelogin(_ account: Account) {
+        guard !TokenFlow.shared.running, !addingFirstAccount else {
+            TokenFlow.shared.reopenAuth(); return
+        }
         TokenFlow.shared.start(model: self, relogin: account)
     }
     func addAccount() {
-        guard !TokenFlow.shared.running, !addingFirstAccount else { return }
+        guard !TokenFlow.shared.running, !addingFirstAccount else {
+            TokenFlow.shared.reopenAuth(); return
+        }
         TokenFlow.shared.start(model: self)
     }
     var canAddAccount: Bool { currentLoginEngine != nil }

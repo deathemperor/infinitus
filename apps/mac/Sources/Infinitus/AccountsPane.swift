@@ -452,6 +452,11 @@ private let addAccountFooter =
         w.setContentSize(NSSize(width: 520, height: 190))
         w.isReleasedWhenClosed = false
         w.center()
+        // Above a PINNED pop-out, which floats (user 2026-09-13: the
+        // re-login window "closes immediately" — it opened at .normal
+        // under a full-screen pinned pop-out at .floating and was never
+        // reachable again). Settings does the same.
+        w.level = .floating
         authWindow = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -498,6 +503,7 @@ private let addAccountFooter =
         w.contentView = web
         w.isReleasedWhenClosed = false
         w.center()
+        w.level = .floating          // same reason as the companion window
         webWindow = w
         w.makeKeyAndOrderFront(nil)
     }
@@ -529,7 +535,12 @@ private let addAccountFooter =
         session.start()
     }
 
+    /// Brings a running flow's windows back to the front — the only way
+    /// in once they are buried, and what a second click on Add / Re-login
+    /// does. A headless run has no windows of ours to raise.
     func reopenAuth() {
+        guard !headless else { return }
+        webWindow?.makeKeyAndOrderFront(nil)
         if let w = authWindow {
             w.makeKeyAndOrderFront(nil)
         } else if let url = authURL {
