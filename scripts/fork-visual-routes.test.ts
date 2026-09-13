@@ -104,6 +104,36 @@ describe("routeFailures", () => {
     expect(routeFailures(lock, "Re-lock Fork tunnel enabled")).toEqual(['shows "Fork "']);
     expect(routeFailures(lock, "Re-lock Tunnel hostname")).toEqual([]);
   });
+
+  it("fails a field whose label rendered but whose value did not", () => {
+    const devices = FORK_VISUAL_ROUTES.find(
+      (route) => route.route === "/settings/infinitus/devices",
+    )!;
+    const port = "[Server port: 3773]";
+    const missing = 'missing "[Publish the current URL to infinitus.run: on]"';
+    // The label alone is what `innerText` captured, and what a switch that
+    // never took its pref still draws.
+    expect(routeFailures(devices, `Publish the current URL to infinitus.run ${port}`)).toEqual([
+      missing,
+    ]);
+    expect(
+      routeFailures(devices, `[Publish the current URL to infinitus.run: off] ${port}`),
+    ).toEqual([missing]);
+    expect(
+      routeFailures(devices, `[Publish the current URL to infinitus.run: on] ${port}`),
+    ).toEqual([]);
+  });
+
+  it("fails the port #1110 grouped into 3,773", () => {
+    const devices = FORK_VISUAL_ROUTES.find(
+      (route) => route.route === "/settings/infinitus/devices",
+    )!;
+    const on = "[Publish the current URL to infinitus.run: on]";
+    expect(routeFailures(devices, `${on} [Server port: 3,773]`)).toEqual([
+      'missing "[Server port: 3773]"',
+    ]);
+    expect(routeFailures(devices, `${on} [Server port: 3773]`)).toEqual([]);
+  });
 });
 
 describe("checkVisualPass", () => {

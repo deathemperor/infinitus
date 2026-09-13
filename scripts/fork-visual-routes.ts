@@ -15,7 +15,8 @@ export interface ForkVisualRoute {
   readonly route: string;
   /** The page's name in the report. */
   readonly label: string;
-  /** Text only the populated page shows. */
+  /** Text only the populated page shows. A field's value counts, written the
+      way the harness captures one: `[<accessible name>: <what the user reads>]`. */
   readonly marker: string;
   /** Further text the populated page must show, for a page whose render is
       worth proving in more than one place; each is checked like `marker`. */
@@ -49,7 +50,19 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     label: "Notifications",
     marker: "All sessions finish working",
   },
-  { route: "/settings/infinitus/devices", label: "Devices", marker: "Serve the fleet to my phone" },
+  {
+    route: "/settings/infinitus/devices",
+    label: "Devices",
+    // A switch's state, which the fixture sets on where its two neighbours are
+    // off. A label renders whether or not its control took the pref, so the
+    // value is the only part of this page that proves one arrived — and a
+    // switch state is the same string whatever the number formatting.
+    marker: "[Publish the current URL to infinitus.run: on]",
+    // The port the fixture sets, unformatted. #1110 shipped a port that read
+    // "3,773" — the label and the description were on screen, so nothing here
+    // saw it. It is a number field's value, so this is the check that would.
+    shows: ["[Server port: 3773]"],
+  },
   { route: "/settings/infinitus/engines", label: "Engines", marker: "swapd engine on" },
   {
     route: "/accounts",
