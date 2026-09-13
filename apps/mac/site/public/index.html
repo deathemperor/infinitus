@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Infinitus — Claude Code account fleet manager for macOS &amp; Linux</title>
-<meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges, 15 themes. macOS and Linux (Omarchy / Arch).">
-<meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, Claude Code rate limit, 5-hour window, weekly limit, swapd, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, session resume">
+<meta name="description" content="Infinitus is a free, open-source menu bar app that runs a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, 15 themes. macOS and Linux (Omarchy / Arch).">
+<meta name="keywords" content="Claude Code, Claude usage limit, Claude account switcher, Claude Code rate limit, 5-hour window, weekly limit, swapd, menu bar app, macOS, Linux, Omarchy, Quickshell, Anthropic, AI agent tooling, thread resume">
 <meta name="author" content="deathemperor">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="theme-color" content="#0a0d11">
@@ -14,7 +14,7 @@
 <meta property="og:site_name" content="Infinitus">
 <meta property="og:locale" content="en_US">
 <meta property="og:title" content="Infinitus — your Claude fleet, never off the clock">
-<meta property="og:description" content="Free, open-source mission control for a fleet of Claude Code accounts: live usage gauges, auto-rotation on limits, session resume, 15 themes. macOS &amp; Linux.">
+<meta property="og:description" content="Free, open-source mission control for a fleet of Claude Code accounts: live usage gauges, auto-rotation on limits, 15 themes. macOS &amp; Linux.">
 <meta property="og:image" content="https://infinitus.run/img/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -254,7 +254,7 @@
       "@id": "https://infinitus.run/#app",
       "name": "Infinitus",
       "url": "https://infinitus.run/",
-      "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, session resume nudges and 15 themes.",
+      "description": "Menu bar mission control for a fleet of Claude Code accounts: live 5-hour and weekly usage gauges, automatic account rotation when a limit hits, and 15 themes.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS 14+, Linux (Omarchy / Arch, Quickshell)",
       "license": "https://github.com/deathemperor/infinitus/blob/main/LICENSE",
@@ -270,13 +270,12 @@
       "featureList": [
         "Live 5-hour, weekly and per-model usage gauges for every Claude Code account",
         "Automatic rotation to the freshest account when a limit hits",
-        "Resume nudges that restart stopped Claude Code sessions after a switch",
-        "Session progress: what each running agent is doing, todo counts, retries",
+        "Threads stopped by a usage limit carry on by themselves in Infinitus desktop once an account is back",
         "15 themes with their own intro, death and revival effects",
         "Usage history and utilization estimates",
         "Priority mode: a headroom verdict per fleet so clients pause background work before a window binds",
         "iPhone companion over Wi-Fi, Tailscale or Cloudflare tunnels, paired with one QR",
-        "Session chat from the phone: streamed replies, prompts answered, photo and file attachments, Share sheet from any app",
+        "Thread chat from the phone: streamed replies, approvals and questions answered, photo and file attachments",
         "infinitusctl control CLI for the Mac app and Infinitus desktop's threads, and an onboarding brief for coding agents",
         "Linux tray daemon with an Omarchy Quickshell panel plugin"
       ],
@@ -295,9 +294,9 @@
       "@id": "https://infinitus.run/#faq",
       "mainEntity": [
         { "@type": "Question", "name": "What is Infinitus?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Infinitus is a free, open-source menu bar app for macOS (and a tray daemon plus panel plugin for Linux) that manages a fleet of Claude Code accounts. It shows every account's 5-hour, weekly and per-model usage, rotates to the freshest account when a limit hits, and nudges stopped sessions back to work." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "Infinitus is a free, open-source menu bar app for macOS (and a tray daemon plus panel plugin for Linux) that manages a fleet of Claude Code accounts. It shows every account's 5-hour, weekly and per-model usage, rotates to the freshest account when a limit hits, so a thread in Infinitus desktop carries on across the wall." } },
         { "@type": "Question", "name": "Does Infinitus work with Claude Code?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus reads Claude Code's own local files to show session progress and drives account switching through the swapd CLI. It never modifies Claude Code itself." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus drives account switching through the swapd CLI and reads Claude Code's own local files for usage. It never modifies Claude Code itself." } },
         { "@type": "Question", "name": "Which platforms does Infinitus support?",
           "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. An iOS companion app is in progress." } },
         { "@type": "Question", "name": "Is Infinitus free?",
@@ -337,9 +336,8 @@
   <p class="lede">
     Two or more Claude subscriptions? Infinitus is mission control for
     a fleet of Claude Code accounts.
-    It watches every usage window, rotates to the freshest account the
-    moment a limit hits, and nudges your stopped sessions back to work —
-    so an agent run survives the five-hour wall without you.
+    It watches every usage window and rotates to the freshest account the
+    moment a limit hits — so a run survives the five-hour wall without you.
   </p>
   <div class="cta">
     <a class="btn primary" href="/download/mac">Download for macOS</a>
@@ -387,9 +385,9 @@
         <p>Consume-first auto-switch picks the account whose weekly window
         resets soonest. Limits become a hand-off, not an outage.</p></div>
       <div class="step"><span class="n">03 · RESUME</span>
-        <h3>Sessions pick themselves back up</h3>
-        <p>Stopped Claude Code sessions get a resume nudge on the fresh
-        account — with guards so a mid-turn session is never interrupted.</p></div>
+        <h3>Threads pick themselves back up</h3>
+        <p>A thread a usage limit stopped carries on in Infinitus desktop
+        as soon as an account is back, from the turn it was cut off on.</p></div>
     </div>
   </div>
 </section>
@@ -413,29 +411,19 @@
       at one thing — briefly — when it matters.</p>
     <h3 class="group">Watch &amp; switch</h3>
     <div class="grid">
-      <div class="card"><h3><span class="dot">●</span>Session progress</h3>
-        <p>Zero-token transcript parsing shows what every agent is doing:
-        current task, todo progress, quiet time, retry trouble.</p></div>
       <div class="card"><h3><span class="dot">●</span>Revival probes</h3>
         <p>When a countdown ends the Mac asks the engine again at once,
         and "account is back" tells you — flagged when Anthropic reset
         early, and once for the whole fleet when everyone returns.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Resume guards</h3>
-        <p>Evidence-gated nudges: only after a real switch or a fresh
-        capacity verdict, never into a busy session, with cooldowns.</p></div>
       <div class="card"><h3><span class="dot">●</span>All-dead countdown</h3>
         <p>When every account is limited, the popup, the desktop app and the
-        phone count down to the first revival — and say how many sessions
-        are waiting on it.</p></div>
+        phone count down to the first revival.</p></div>
       <div class="card"><h3><span class="dot">●</span>At this pace</h3>
         <p>Measured burn per window, when each runs out, when the whole
         fleet is out — and a full forecast dashboard behind it.</p></div>
       <div class="card"><h3><span class="dot">●</span>Reset battle plans</h3>
         <p>The smart engine triggers 5-hour windows deliberately, chaining
-        two sessions back-to-back on the same account.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Session narration</h3>
-        <p>Optional one-line Claude summaries of what each agent is doing —
-        off by default, strictly budgeted, only while you're looking.</p></div>
+        two windows back-to-back on the same account.</p></div>
       <div class="card"><h3><span class="dot">●</span>One account, done right</h3>
         <p>Single account? A card with big gauges and the reset time in
         the menu bar — no fleet vocabulary until you add a second.</p></div>
@@ -446,83 +434,40 @@
         <p>Your fleet on the iPhone — over Wi-Fi, Tailscale, your own
         Cloudflare hostname or a free quick tunnel. One QR, every route;
         the Mac lists which devices are connected and how.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Session chat</h3>
-        <p>Every session as a chat on the phone: markdown replies streamed
-        live, tool runs in one chip, sub-agent cards. Answer prompts, reply,
-        attach photos from the camera or files, or share an image from any
-        app's Share sheet straight into a session.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Headless sessions</h3>
-        <p>Start a session with no terminal at all — from the popup, the
-        phone, or as the default. The desktop app, the phone and the
-        browser page are its chat; its prompts, questions, plans and
-        images reach all three.</p></div>
-      <div class="card"><h3><span class="dot">●</span>New session screens (preview)</h3>
-        <p>Turn them on in Settings › Appearance: a flat thread list with
-        snoozed and settled shelves and search, a session as a chat
-        thread, a task sheet under +, thread settings and a git pill.</p></div>
-      <div class="card"><h3><span class="dot">●</span>A browser page, no app needed</h3>
-        <p>Any machine with a browser gets the sessions list, a chat with
-        a session and Start a session, at the "Copy Browser Link" address
-        in Settings › Devices.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Thread chat</h3>
+        <p>Every thread as a chat on the phone: markdown replies streamed
+        live, tool runs in one chip, sub-agent cards. Answer approvals and
+        questions, reply, attach photos from the camera or files.</p></div>
       <div class="card"><h3><span class="dot">●</span>Live Activities</h3>
-        <p>Working sessions in the Dynamic Island; when everything is
-        limited, a lock-screen revival countdown that ticks natively, one
-        pair per paired Mac. With an APNs key on the Mac they keep moving
-        with the app closed.</p></div>
+        <p>A lock-screen card of what your threads are doing, started by
+        the Mac and kept moving over push with the app closed. Turn it on
+        in Settings › Infinitus.</p></div>
       <div class="card"><h3><span class="dot">●</span>Game HUD chat header</h3>
         <p>A ringed portrait with the level on its rim, a name plate,
         HP/MP-style bars and a buff square per model — or a compact
         header, or a stat strip. Every style previews live in your theme.</p></div>
       <div class="card"><h3><span class="dot">●</span>Crash reports, on-device</h3>
         <p>The phone app and the Mac app record their own crashes into
-        Settings. Nothing leaves your machine; any report can go into a
-        session's chat for triage.</p></div>
+        Settings. Nothing leaves your machine.</p></div>
       <div class="card"><h3><span class="dot">●</span>Widgets in your theme</h3>
         <p>Home-screen and lock-screen widgets draw the active account's
-        windows as your theme names and colors them, what's waiting on
-        you, and the revival countdown when every account is limited —
-        and one for whichever paired Mac you pick.</p></div>
+        windows as your theme names and colors them, and the revival
+        countdown when every account is limited — and one for whichever
+        paired Mac you pick.</p></div>
       <div class="card"><h3><span class="dot">●</span>AWS and gcloud login from the phone</h3>
-        <p>A session stuck on an expired <code>aws login</code> or
-        <code>gcloud auth login</code> shows up on your phone; sign in
-        there (passkeys included) and the session is told to carry on.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Sessions first</h3>
-        <p>The phone opens on what's waiting for you; unnamed sessions
-        get a Haiku title that follows the work; one Continue button
-        for a session a limit or a crash stopped.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Start a session from the phone</h3>
-        <p>A repository, the engine, a first prompt: the Mac opens a cmux
-        workspace or a Terminal window and the chat follows. "Start a
-        session in Infinitus" works from Siri, on any paired Mac.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Allow for this session</h3>
-        <p>The permission card can allow a tool for the rest of the
-        session — Bash by command verb, so allowing git never allows rm.
-        With the plugin, that prompt never comes back.</p></div>
+        <p>A thread whose <code>aws</code> or <code>gcloud</code> command
+        hit expired credentials shows up on your phone; sign in there
+        (passkeys included) and the next run has them again.</p></div>
+      <div class="card"><h3><span class="dot">●</span>Threads first</h3>
+        <p>The phone opens on what's waiting for you: the threads that
+        need an approval, an answer or a look.</p></div>
       <div class="card"><h3><span class="dot">●</span>Star &amp; pause from the phone</h3>
         <p>Swipe or long-press an account to star it or pause its
         rotation; on the Mac, right-click the name in the popup, and a
         paused row shows a play button to resume.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Profiles</h3>
-        <p>Named ways to start a session — folder, engine, permissions,
-        model, prompts, tools allowed without asking — as chips on the
-        phone, in Siri and in the Mac's Start a session.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Checkpoints, review, fork</h3>
-        <p>Every prompt checkpoints the repository; diff or restore one,
-        review a turn's hunks from the phone, or fork a past session under
-        a new id.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Claude Code plugin</h3>
-        <p><code>infinitusctl plugin install</code> adds hooks that tell
-        the Mac the moment a session needs you or ends a turn — the phone
-        gets the prompt at once, not at the next poll — and an MCP server
-        so a session can read the fleet and message another session.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Capture into a session</h3>
-        <p>On the Mac, Capture Screen for a Session… takes a region or a
-        window, a session, a note. On the phone, Share → Infinitus from
-        any app does the same, into a session on any paired Mac.</p></div>
       <div class="card"><h3><span class="dot">●</span>Dictate in any language</h3>
         <p>Vietnamese in, English out — translated on the phone, or sent
-        as spoken with a note asking for an English reply. The
-        recognizer knows your session's terms.</p></div>
+        as spoken with a note asking for an English reply.</p></div>
     </div>
     <h3 class="group">Themes &amp; history</h3>
     <div class="grid">
@@ -532,25 +477,8 @@
       <div class="card"><h3><span class="dot">●</span>Usage history</h3>
         <p>Per-account utilization over time with waste estimates —
         see the capacity your fleet left on the table. iCloud sync.</p></div>
-      <div class="card"><h3><span class="dot">●</span>Team (preview)</h3>
-        <p>A team on any git remote you already have — GitHub, GitLab, a
-        bare repo on a NAS. Members publish stats, sessions, chosen
-        transcripts and their fleet — every account with tier, state and
-        headroom — end-to-end encrypted to the people they pick, or keep
-        any kind off the wire entirely; the host sees file names and
-        sizes. Leaders get insights: who's on, who's blocked, who's about
-        to run dry, cost per member, repo and model. Invite links, team codes, same-network
-        discovery and leader-initiated LAN invites; the phone has a Team
-        tab with its own Nearby, and Linux and Windows members join and
-        publish with <code>infinitusctl team</code> alone. Grant a teammate
-        the right to prompt, approve or steer a chosen session on your Mac;
-        every command is verified, audited and shown while it happens.
-        Drive theirs from their detail or <code>infinitusctl team send</code>
-        &mdash; over LAN, a tunnel, or the store on their next fetch. A leader
-        with a Cloudflare token gives each member a stable hostname under the
-        team's zone; their Mac runs the tunnel from the next fetch on.</p></div>
       <div class="card"><h3><span class="dot">●</span>Stats</h3>
-        <p>Commits, lines, PRs, messages, sessions, tool calls, switches,
+        <p>Commits, lines, PRs, messages, tool calls, switches,
         limits and cost, by day, week, month or year — with the trend
         against the last one. Where the effort went, per activity, model,
         engine (Claude Code, Codex CLI) and effort setting. A tokens/min
@@ -559,8 +487,8 @@
     <h3 class="group">Integrations &amp; agents</h3>
     <div class="grid">
       <div class="card"><h3><span class="dot">●</span>Linux port</h3>
-        <p>A Quickshell panel for Omarchy / Arch with the same gauges,
-        dead-account flash, and session rows.</p></div>
+        <p>A Quickshell panel for Omarchy / Arch with the same gauges
+        and dead-account flash.</p></div>
       <div class="card"><h3><span class="dot">●</span>Agent-ready</h3>
         <p><code>infinitusctl</code> drives the app over a local socket and
         Infinitus desktop's projects and threads (<code>threads</code>,
@@ -683,12 +611,12 @@
       <dd>A free, open-source menu bar app (macOS) and tray daemon + panel
         plugin (Linux) that manages a fleet of Claude Code accounts: every
         account's 5-hour, weekly and per-model usage at a glance, automatic
-        rotation to the freshest account when a limit hits, and resume nudges
-        that put stopped sessions back to work.</dd>
+        rotation to the freshest account when a limit hits, so a thread in
+        Infinitus desktop carries on across the wall.</dd>
       <dt>Does it work with Claude Code?</dt>
-      <dd>Yes. It reads Claude Code's own local session files to show progress
-        and switches accounts through the <a href="https://github.com/deathemperor/swapd"><code>swapd</code></a> CLI. It
-        never modifies Claude Code.</dd>
+      <dd>Yes. It switches accounts through the <a href="https://github.com/deathemperor/swapd"><code>swapd</code></a> CLI and reads
+        Claude Code's own local files for usage. It never modifies Claude
+        Code.</dd>
       <dt>Which platforms?</dt>
       <dd>macOS 14+ on Apple silicon (Homebrew cask), and Linux — a static
         <code>infinitus-tray</code> for x86_64 and aarch64 with a Quickshell
@@ -797,7 +725,7 @@
         evEl.innerHTML = '<b>window reset</b> — fleet revived, back to work';
       } else {
         evEl.innerHTML = '<b>limit hit</b> — switched ' + a.name + " → " +
-          accounts[next].name + " · resume nudge sent to 3 sessions";
+          accounts[next].name + " · the fleet carried on";
       }
       activeIdx = next;
     }

@@ -394,7 +394,10 @@ export type InfinitusPrefs = typeof InfinitusPrefs.Type;
 /** A login in flight: `flow` is `relay`, `deviceCode`, `remote` or `local`;
     `phase` walks `starting` → `waitingForBrowser` / `waitingForCode` → `done`
     / `failed`; `url` and `userCode` are what a person opens and types on
-    another device; `startedAt` is epoch seconds. */
+    another device; `startedAt` is epoch seconds. Its `pid` was the session
+    that needed the login, never the login process's own
+    (`AwsLogin.State`: "The session that needed it, if the login was started
+    for one."), and left with the item's `pid` / `sessionLabel` (#1041). */
 export const InfinitusAwsLoginState = Schema.Struct({
   profile: Schema.String,
   flow: Schema.String,
@@ -404,7 +407,6 @@ export const InfinitusAwsLoginState = Schema.Struct({
   callbackPort: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   message: Schema.optionalKey(Schema.NullOr(Schema.String)),
   startedAt: Schema.Number,
-  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusAwsLoginState = typeof InfinitusAwsLoginState.Type;
@@ -627,12 +629,12 @@ export const InfinitusActivityPushRegistration = Schema.Struct({
 });
 export type InfinitusActivityPushRegistration = typeof InfinitusActivityPushRegistration.Type;
 
-/** What a client is looking at: every session, one session by pid, the fleet,
-    or the stats. The Mac only does per-session work while some client holds a
-    lease on that scope. */
+/** What a client is looking at: the fleet, or the stats. The Mac only does
+    that work while some client holds a lease on the scope. The two session
+    scopes and the `pid` that named one left with the Mac's session tracker
+    (#1041); the fork's server never sent either. */
 export const InfinitusClientActivityScope = Schema.Struct({
-  type: Schema.Literals(["sessions", "session", "fleets", "stats"]),
-  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  type: Schema.Literals(["fleets", "stats"]),
 });
 export type InfinitusClientActivityScope = typeof InfinitusClientActivityScope.Type;
 
@@ -665,67 +667,6 @@ export const InfinitusCrashReport = Schema.Struct({
   raw: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
-
-/*
- * Live Activity content (LiveActivityState.swift). The Mac pushes these as the
- * APNs `content-state` and the phone renders them; they arrive pre-themed
- * (labels, glyphs, colour names, dense reset labels), the widget only draws.
- * Encoded with Swift's default JSONEncoder, so the one date, `revivesAt`, is a
- * number of seconds since 2001-01-01 UTC, not a string.
- */
-
-/** One usage window, themed: its label ("MP", "× Dragon"), colour name, the
-    percentage used (0–100) and the dense reset label ("4h20m·17:49"). */
-export const InfinitusActivityWindow = Schema.Struct({
-  label: Schema.String,
-  color: Schema.String,
-  pct: Schema.Number,
-  reset: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusActivityWindow = typeof InfinitusActivityWindow.Type;
-
-/** The working-sessions card: the active account as its themed row, session
-    counts, the tokens-per-minute gauge, the next candidate as a hint. `binding`
-    indexes the window closest to its limit. `rateIcon`/`rateLabel` are absent
-    on older Macs, which keep the bolt and "tok/min". */
-export const InfinitusWorkingActivityState = Schema.Struct({
-  active: Schema.String,
-  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  slot: Schema.String,
-  plan: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  cash: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  windows: Schema.Array(InfinitusActivityWindow),
-  binding: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  busy: Schema.Number,
-  total: Schema.Number,
-  waiting: Schema.Number,
-  next: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  tokensPerMinute: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  tokenFraction: Schema.Number,
-  accent: Schema.String,
-  plain: Schema.Boolean,
-  rateIcon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  rateLabel: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusWorkingActivityState = typeof InfinitusWorkingActivityState.Type;
-
-/** The all-dead revival countdown: who revives when (`revivesAt`, seconds since
-    2001), the live and waiting session counts, the accounts after the reviver
-    in recovery order, the theme's words and flash colour; `revived` is the
-    final state once the fleet came back. */
-export const InfinitusRevivalActivityState = Schema.Struct({
-  reviver: Schema.String,
-  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  revivesAt: Schema.Number,
-  sessions: Schema.Number,
-  waiting: Schema.Number,
-  later: Schema.Array(Schema.String),
-  reviveWord: Schema.String,
-  deadWord: Schema.String,
-  accent: Schema.String,
-  revived: Schema.Boolean,
-});
-export type InfinitusRevivalActivityState = typeof InfinitusRevivalActivityState.Type;
 
 /** What a snapshot subscriber needs beyond the fast set (#587 step 2, #659):
     `stats` puts the `stats` scope in the server's lease while at least one

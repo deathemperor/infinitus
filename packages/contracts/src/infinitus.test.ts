@@ -15,11 +15,9 @@ import {
   InfinitusFleet,
   InfinitusManifest,
   InfinitusPrefs,
-  InfinitusRevivalActivityState,
   InfinitusSnapshot,
   InfinitusThreadForkRefused,
   InfinitusStatus,
-  InfinitusWorkingActivityState,
 } from "./infinitus.ts";
 
 const decodeReply = Schema.decodeUnknownSync(InfinitusControlReply);
@@ -511,31 +509,37 @@ describe("the phone-only write bodies", () => {
     expect(() => decodeRegistration({ ...registration, kind: "widget" })).toThrow();
   });
 
-  it("decodes a lease report whose scopes mix a pid and none", () => {
+  it("decodes the two scopes the server still sends", () => {
     const decoded = decodeActivity({
       clientId: "phone-1",
       visible: true,
       focused: true,
       recentlyInteracted: false,
-      scopes: [{ type: "sessions" }, { type: "session", pid: 4243 }, { type: "fleets" }],
+      scopes: [{ type: "fleets" }, { type: "stats" }],
       ttlMs: 30_000,
     });
-    expect(decoded.scopes[1]?.pid).toBe(4243);
-    expect(decoded.scopes[0]?.pid).toBeUndefined();
+    expect(decoded.scopes.map((scope) => scope.type)).toEqual(["fleets", "stats"]);
   });
 
-  it("rejects a scope kind the lease table does not know", () => {
-    expect(() =>
-      decodeActivity({
-        clientId: "phone-1",
-        visible: true,
-        focused: true,
-        recentlyInteracted: false,
-        scopes: [{ type: "threads" }],
-        ttlMs: 30_000,
-      }),
-    ).toThrow();
-  });
+  it.each([["sessions"], ["session"], ["threads"]])(
+    "rejects the %s scope, which the lease table does not take (#1041)",
+    (type) => {
+      // The report is outgoing — the server only ever sends `fleets` and, while
+      // a Stats page is mounted, `stats`. Narrowing the schema therefore takes
+      // nothing away from a client; the two session scopes left with the Mac's
+      // session tracker and cannot be asked for again by accident.
+      expect(() =>
+        decodeActivity({
+          clientId: "phone-1",
+          visible: true,
+          focused: true,
+          recentlyInteracted: false,
+          scopes: [{ type }],
+          ttlMs: 30_000,
+        }),
+      ).toThrow();
+    },
+  );
 
   it("decodes a crash report with and without its raw diagnostic", () => {
     const report = {
@@ -551,68 +555,6 @@ describe("the phone-only write bodies", () => {
     };
     expect(decodeCrash(report).raw).toBeUndefined();
     expect(decodeCrash({ ...report, raw: "{}" }).raw).toBe("{}");
-  });
-});
-
-describe("the Live Activity content states", () => {
-  const decodeWorking = Schema.decodeUnknownSync(InfinitusWorkingActivityState);
-  const decodeRevival = Schema.decodeUnknownSync(InfinitusRevivalActivityState);
-
-  it("decodes a working card the way the Mac's default encoder writes it", () => {
-    const decoded = decodeWorking({
-      active: "death2",
-      icon: "bolt",
-      slot: "P1",
-      plan: "Max 20×",
-      cash: null,
-      windows: [
-        { label: "5h", color: "green", pct: 0.42, reset: "1h10m·13:00" },
-        { label: "7d", color: "amber", pct: 0.88, reset: null },
-      ],
-      binding: 1,
-      busy: 2,
-      total: 3,
-      waiting: 0,
-      next: "death4",
-      tokensPerMinute: 1200,
-      tokenFraction: 0.6,
-      accent: "teal",
-      plain: false,
-    });
-    expect(decoded.windows[1]?.pct).toBe(0.88);
-    expect(decoded.rateIcon).toBeUndefined();
-  });
-
-  it("decodes a revival card whose revivesAt is seconds since 2001", () => {
-    const decoded = decodeRevival({
-      reviver: "death3",
-      icon: null,
-      revivesAt: 810_000_000,
-      sessions: 4,
-      waiting: 2,
-      later: ["loc 2:50 PM"],
-      reviveWord: "revives",
-      deadWord: "is dead",
-      accent: "red",
-      revived: false,
-    });
-    expect(decoded.revivesAt).toBe(810_000_000);
-    expect(decoded.later).toEqual(["loc 2:50 PM"]);
-  });
-
-  it("rejects a working card missing its window list", () => {
-    expect(() =>
-      decodeWorking({
-        active: "a",
-        slot: "P1",
-        busy: 0,
-        total: 0,
-        waiting: 0,
-        tokenFraction: 0,
-        accent: "x",
-        plain: true,
-      }),
-    ).toThrow();
   });
 });
 
@@ -653,11 +595,27 @@ describe("InfinitusAwsLogins", () => {
     // installed app is briefly an "older Mac": the reply has to keep decoding,
     // with the session simply not reaching the row.
     const decoded = decodeLogins({
-      logins: [{ profile: "papaya", flow: "relay", pid: 4243, sessionLabel: "limitless" }],
+      logins: [
+        {
+          profile: "papaya",
+          flow: "relay",
+          pid: 4243,
+          sessionLabel: "limitless",
+          // The login's own state named the session too — `AwsLogin.State.pid`
+          // is "The session that needed it", never the login process's pid.
+          state: { profile: "papaya", flow: "relay", phase: "done", startedAt: 1, pid: 4243 },
+        },
+      ],
     });
 
     expect(decoded.logins[0]?.profile).toBe("papaya");
-    expect(Object.keys(decoded.logins[0] ?? {})).toEqual(["profile", "flow"]);
+    expect(Object.keys(decoded.logins[0] ?? {})).toEqual(["profile", "flow", "state"]);
+    expect(Object.keys(decoded.logins[0]?.state ?? {})).toEqual([
+      "profile",
+      "flow",
+      "phase",
+      "startedAt",
+    ]);
   });
 
   it("keeps a flow or phase it has never heard of, and rejects a missing profile", () => {
