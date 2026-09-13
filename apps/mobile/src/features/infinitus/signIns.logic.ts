@@ -32,6 +32,19 @@ function phaseOf(item: InfinitusAwsLogin): SignInModel["phase"] {
 
 const providerOf = (item: InfinitusAwsLogin) => (item.provider === "gcloud" ? "gcloud" : "aws");
 
+/** Which of a profile's entries to draw: a running login first, then anything
+    still lapsed, and a finished one last. A `done` entry must never displace an
+    idle one — `phaseOf` reads a missing state as idle and a finished login has
+    one, so ranking by "has a state" would let the finished entry win and the
+    filter below would then drop the profile out of the list entirely, with the
+    credentials still expired and no way left to start the login. */
+const foldRank = (item: InfinitusAwsLogin) => {
+  const phase = phaseOf(item);
+  if (phase === "starting" || phase === "waiting") return 0;
+  if (phase === "done") return 2;
+  return 1;
+};
+
 export function signInModel(item: InfinitusAwsLogin): SignInModel {
   const provider = providerOf(item);
   return {
@@ -51,14 +64,15 @@ export function signInModel(item: InfinitusAwsLogin): SignInModel {
     One row per tool and profile, as the web's list is: the session that hit a
     profile is gone with the Mac's tracker (#1041), so the same profile can
     appear twice with nothing left to tell the rows apart. A group is drawn
-    from its running login when one of them has it, else from the first. */
+    from its running login when one of them has it, else from any entry still
+    lapsed, and only from a finished one when that is all there is. */
 export function lapsedSignIns(snapshot: InfinitusSnapshot | null): ReadonlyArray<SignInModel> {
   if (snapshot === null || !snapshot.available || snapshot.awsLogins === undefined) return [];
   const byProfile = new Map<string, InfinitusAwsLogin>();
   for (const item of snapshot.awsLogins) {
     const key = `${providerOf(item)}:${item.profile}`;
     const kept = byProfile.get(key);
-    if (kept === undefined || ((kept.state ?? null) === null && (item.state ?? null) !== null)) {
+    if (kept === undefined || foldRank(item) < foldRank(kept)) {
       byProfile.set(key, item);
     }
   }

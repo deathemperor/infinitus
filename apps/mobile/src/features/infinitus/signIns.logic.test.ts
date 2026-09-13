@@ -60,6 +60,28 @@ describe("signInModel / lapsedSignIns", () => {
     expect(models[0]).toMatchObject({ key: "aws:papaya", phase: "starting" });
   });
 
+  it.each([
+    ["the finished entry first", true],
+    ["the lapsed entry first", false],
+  ])("keeps a still-lapsed profile that also carries a finished login, %s", (_label, doneFirst) => {
+    // The credentials are still expired, so the row has to stay and stay
+    // actionable. Ranking on "has a state" would have let the finished login
+    // win and the done filter would then have deleted the profile outright.
+    const lapsed = { profile: "papaya", flow: "relay", state: null };
+    const done = {
+      profile: "papaya",
+      flow: "relay",
+      state: { profile: "papaya", flow: "relay", phase: "done", startedAt: 1 },
+    };
+    const models = lapsedSignIns({
+      ...base,
+      awsLogins: doneFirst ? [done, lapsed] : [lapsed, done],
+    });
+
+    expect(models).toHaveLength(1);
+    expect(models[0]).toMatchObject({ key: "aws:papaya", phase: "idle" });
+  });
+
   it("drops finished sign-ins and answers nothing without the field or while unavailable", () => {
     const done = {
       profile: "papaya",
