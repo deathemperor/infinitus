@@ -114,6 +114,16 @@ describe("Claude model catalog", () => {
       }),
       "claude-synthetic-next[large]",
     );
+    // A proxied instance (#1088) takes the plain slug: the bracket suffix is
+    // Anthropic's own syntax and an Anthropic-compatible proxy rejects it.
+    assert.strictEqual(
+      resolveClaudeCatalogApiModelId(
+        catalog,
+        { instanceId: ProviderInstanceId.make("claudeAgent"), model: "synthetic" },
+        { modelSuffixes: false },
+      ),
+      "claude-synthetic-next",
+    );
   });
 
   it("rejects malformed adapter mappings", () => {

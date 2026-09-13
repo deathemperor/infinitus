@@ -1510,8 +1510,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
   — the four Settings › Infinitus routes, thin shells over the panes above.
   Profiles (#165, the Mac's "named way to start a session") left with the
-  #1041 sessions sweep, its `profiles` contract with it; the fixture keeps
-  answering the verb until the Mac drops it.
+  #1041 sessions sweep, its `profiles` contract with it, and the fixture's
+  canned reply with the Mac's own verb (#1091).
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
@@ -2068,11 +2068,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
   Infinitus control socket the visual pass runs against in CI: a Node net
   server speaking the one-line protocol that answers `manifest`, `status`,
-  `fleets`, `forecast`, `prefs`, `profiles`, `stats`, `events`, `aws-logins`,
+  `fleets`, `forecast`, `prefs`, `stats`, `events`, `aws-logins`,
   `client-activity` and `lock-status` with canned data. The manifest and
   the pref catalog are `infinitusctl` captures (every value reset to its
-  default); the accounts (`ada-fixture`…), the profiles (`nightly-review`)
-  and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
+  default), trimmed with the Mac: the session-profile and past-session
+  verbs and the three retired push prefs went with #1091. The accounts
+  (`ada-fixture`…) and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render

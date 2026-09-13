@@ -151,6 +151,38 @@ export const PREF_COPY: Readonly<
       ocean: "Ocean — tides & deep water",
     },
   },
+  // Animations: the popup's launch choreography and the bars' pace fire. The
+  // keys are the Mac's internal words ("intro", "burn"); the screen says what
+  // each one does.
+  intro_style: {
+    label: "Popup entrance",
+    description: "How the account rows arrive when the popup opens.",
+    choices: {
+      top: "Slide down from the top",
+      bottom: "Slide up from the bottom",
+      fade: "Fade in",
+      rows: "One row at a time",
+    },
+  },
+  intro_title: {
+    label: "Title flourish",
+    description: "How the Infinitus title lands after them.",
+    choices: { zoom: "Zoom in", slam: "Slam down", spin: "Spin in", off: "None" },
+  },
+  intro_speed: {
+    label: "Animation speed",
+    description: "Multiplies every entrance animation; higher is faster.",
+  },
+  burn_style: {
+    label: "Pace fire",
+    description: "How a bar burns while its usage outruns the clock.",
+    choices: {
+      off: "Off",
+      ember: "Ember",
+      flame: "Flame",
+      limit: "Limit break — RPG theme only, else ember",
+    },
+  },
   // Push.
   push_all_dead: { label: "All accounts are exhausted" },
   push_last_alive: { label: "The last alive account nears its limit" },

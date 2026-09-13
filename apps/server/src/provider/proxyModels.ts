@@ -14,8 +14,19 @@ const ModelsReply = Schema.Struct({
 const decodeModelsReply = Schema.decodeUnknownEffect(ModelsReply);
 
 /**
+ * The listing URL for a base URL that is what `ANTHROPIC_BASE_URL` takes: the
+ * SDK appends `/v1/messages` to it, so the models live at `<base>/v1/models`.
+ * A base URL a user typed with `/v1` already on it means the same proxy, so
+ * the version segment is added only when it is not there.
+ */
+function proxyModelsUrl(baseUrl: string): string {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+  return new URL(base.endsWith("/v1") ? `${base}/models` : `${base}/v1/models`).toString();
+}
+
+/**
  * Fork: list the models an Anthropic-compatible proxy serves at
- * `<baseUrl>/models`, so the add-instance wizard offers pickers for the
+ * `<baseUrl>/v1/models`, so the add-instance wizard offers pickers for the
  * ANTHROPIC_DEFAULT_*_MODEL slots. The key goes out as both header spellings
  * proxies accept; error details never echo it.
  */
@@ -24,7 +35,7 @@ export const fetchProxyModels = Effect.fn("fetchProxyModels")(function* (
 ): Effect.fn.Return<ProviderProxyModelsResult, ProviderProxyModelsError, HttpClient.HttpClient> {
   const client = yield* HttpClient.HttpClient;
   const url = yield* Effect.try({
-    try: () => new URL(`${input.baseUrl.replace(/\/+$/, "")}/models`).toString(),
+    try: () => proxyModelsUrl(input.baseUrl),
     catch: () => new ProviderProxyModelsError({ detail: "The base URL is not valid." }),
   });
   const request = HttpClientRequest.get(url).pipe(

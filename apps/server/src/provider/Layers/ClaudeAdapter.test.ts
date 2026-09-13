@@ -191,8 +191,12 @@ function makeHarness(config?: {
       }
     | undefined;
 
+  // The adapter reads the process environment when none is given, and a
+  // developer's shell may export ANTHROPIC_BASE_URL (#1088), which would put
+  // every harness on the proxied path. Pin it to a plain environment.
+  const environment: NodeJS.ProcessEnv = { ...process.env, ANTHROPIC_BASE_URL: "" };
   const adapterOptions: ClaudeAdapterLiveOptions = {
-    ...(config?.environment ? { environment: config.environment } : {}),
+    environment: config?.environment ?? environment,
     ...(config?.instanceId ? { instanceId: config.instanceId } : {}),
     ...(config?.scopedLimitNames ? { scopedLimitNames: config.scopedLimitNames } : {}),
     modelCatalog: Effect.succeed(SYNTHETIC_CLAUDE_MODEL_CATALOG),
@@ -6839,6 +6843,37 @@ describe("ClaudeAdapterLive", () => {
       assert.deepEqual(harness.query.setModelCalls, [
         `${SYNTHETIC_CLAUDE_CAPABLE_MODEL}[expanded]`,
       ]);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  // #1088: the bracket suffix is Anthropic's own wire syntax; a proxy in front
+  // of the API answers 400 "unknown provider for model …[expanded]".
+  it.effect("asks a proxied instance for the plain slug, without the model suffix", () => {
+    const harness = makeHarness({
+      environment: { ...process.env, ANTHROPIC_BASE_URL: "http://127.0.0.1:8317" },
+    });
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "hello",
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: SYNTHETIC_CLAUDE_CAPABLE_MODEL,
+        },
+        attachments: [],
+      });
+
+      assert.deepEqual(harness.query.setModelCalls, [SYNTHETIC_CLAUDE_CAPABLE_MODEL]);
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
