@@ -195,7 +195,7 @@ export const PREF_COPY: Readonly<
     label: "Update channel",
     choices: { stable: "Stable", nightly: "Nightly" },
   },
-  // Sessions: session priority mode (#616 hold, #743 interrupt). The verdict
+  // Priority: thread priority mode (#616 hold, #743 interrupt). The verdict
   // itself is native's; these are the knobs it reads.
   priority_mode: {
     label: "Thread priority",
