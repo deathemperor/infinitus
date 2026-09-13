@@ -382,18 +382,18 @@ describe("parseControlInput", () => {
     expect(parseControlInput(style, "Hades").ok).toBe(false);
   });
 
-  it("labels the session priority modes, the interrupt choice included (#743)", () => {
+  it("labels the thread priority modes, the interrupt choice included (#743)", () => {
     const mode = pref({
       key: "priority_mode",
-      section: "sessions",
+      section: "priority",
       type: "string",
       default: "off",
       value: "hold",
       choices: ["off", "hold", "interrupt"],
     });
-    const row = rowOf(catalog([{ slug: "sessions", name: "Sessions" }], [mode]), "priority_mode");
+    const row = rowOf(catalog([{ slug: "priority", name: "Priority" }], [mode]), "priority_mode");
 
-    expect(row.label).toBe("Session priority");
+    expect(row.label).toBe("Thread priority");
     expect(row.control).toEqual({
       kind: "select",
       value: "hold",

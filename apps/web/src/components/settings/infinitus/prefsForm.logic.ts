@@ -198,7 +198,7 @@ export const PREF_COPY: Readonly<
   // Sessions: session priority mode (#616 hold, #743 interrupt). The verdict
   // itself is native's; these are the knobs it reads.
   priority_mode: {
-    label: "Session priority",
+    label: "Thread priority",
     description:
       "What happens to background threads (not pinned) while the fleet they spend on is low on headroom.",
     choices: {

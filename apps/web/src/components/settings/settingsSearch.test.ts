@@ -241,8 +241,8 @@ describe("searchSettings", () => {
     expect(searchSettings("thread priority", available).map((item) => item.id)).toContain(
       "infinitus-sessions",
     );
-    // The page holds back this server's threads (#1041), but the mode row on
-    // screen still reads "Session priority" until the Mac's pane is retitled.
+    // The row reads "Thread priority" since #1069; "session" stays a search
+    // term so anyone who knew it by its old name still lands on the page.
     expect(searchSettings("session priority", available).map((item) => item.id)).toContain(
       "infinitus-sessions",
     );

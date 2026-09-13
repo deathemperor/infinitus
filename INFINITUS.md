@@ -1137,11 +1137,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
-  over its `sessions` section (#743: `priority_mode` with the `interrupt`
-  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
+  over its `priority` section (#743: `priority_mode` with the `interrupt`
+  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
+  the mode row labelled "Thread priority" since #1069) —
   the Menu bar page keeps `display` + `about`; the Priority page reads the
-  catalog's `priority` section and, on a build before the Mac's session
-  sweep (#1041), `sessions`; a section the build lacks
+  catalog's `priority` section and, on a build before that rename,
+  `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with

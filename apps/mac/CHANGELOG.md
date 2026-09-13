@@ -24,6 +24,9 @@ release cut folds the fragments and `## Unreleased` into the new section.
 - Rows an engine could not refresh say how old their numbers are instead of reading as current, on every engine rather than swapd alone.
 - The desktop's thread card can be shown on the phone's lock screen: the Mac starts it, redraws it as threads move and ends it when the desktop says so (#1047).
 
+### Desktop
+- Settings › Infinitus › Priority reads "Thread priority": the setting has held back threads, not terminal sessions, since the sessions sweep (#1069).
+
 ### Phone
 - Settings › Infinitus has "Thread card on the lock screen": a Live Activity of what your threads are doing, kept moving by the Mac over push with the app closed, plus a test card that needs no push (#1047).
 
