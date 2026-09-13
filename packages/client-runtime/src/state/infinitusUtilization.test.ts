@@ -3,11 +3,14 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   compactTokens,
   decodeUtilization,
+  fiveHourSummary,
   historyLines,
   historyRange,
   liveRateText,
+  replayText,
   runRateRows,
   utilizationWindows,
+  wasteRows,
 } from "./infinitusUtilization.ts";
 
 const t0 = 1_800_000_000;
@@ -37,7 +40,55 @@ const reply = {
   ],
   windows: ["5h", "7d", "Fable"],
   emails: ["grace@example.com", "ada@example.com"],
-  generations: [{ email: "ada@example.com", window: "7d", resetAt: t0, finalPct: 80 }],
+  generations: [
+    { email: "ada@example.com", window: "7d", resetAt: t0, finalPct: 80 },
+    {
+      email: "grace@example.com",
+      window: "Fable",
+      resetAt: t0 - 86_400,
+      finalPct: 30,
+      observationGap: 9 * 3600,
+    },
+    { email: "ada@example.com", window: "7d", resetAt: "yesterday", finalPct: 10 },
+  ],
+  fiveHourWindows: [
+    {
+      email: "ada@example.com",
+      number: 1,
+      start: t0 - 18_000,
+      resetsAt: t0,
+      peakPct: 62,
+      samples: 30,
+      closed: true,
+    },
+    {
+      email: "grace@example.com",
+      number: 2,
+      start: t0 - 36_000,
+      resetsAt: t0 - 18_000,
+      peakPct: 2,
+      samples: 4,
+      closed: true,
+    },
+    {
+      email: "ada@example.com",
+      number: 1,
+      start: t0,
+      resetsAt: t0 + 18_000,
+      peakPct: 20,
+      samples: 6,
+      closed: false,
+    },
+    { email: "ada@example.com", start: t0 - 10 * 86_400, resetsAt: t0, peakPct: 9 },
+  ],
+  replay: {
+    from: t0 - 7 * 86_400,
+    to: t0,
+    switches: 3,
+    coldSwitches: 1,
+    stalledSeconds: 900,
+    sawActiveFlag: true,
+  },
   rates: {
     computedAt: t0,
     lastHour: {
@@ -102,6 +153,56 @@ describe("historyLines", () => {
   it("spans the asked range up to the newest sample", () => {
     expect(historyRange(u, t0)).toEqual({ from: t0 + 1800 - 7 * 86_400, to: t0 + 1800 });
     expect(historyRange({ ...u, samples: [] }, t0)).toEqual({ from: t0 - 7 * 86_400, to: t0 });
+  });
+});
+
+describe("window telemetry", () => {
+  const u = decodeUtilization(reply)!;
+
+  it("lists the weekly rollovers newest first, with the headroom that expired", () => {
+    const rows = wasteRows(u, { "grace@example.com": "grace" });
+    // The third generation is worded wrong (a string `resetAt`) and drops alone.
+    expect(rows.map((row) => [row.label, row.window, row.wastePct, row.observationGap])).toEqual([
+      ["ada@example.com", "7d", 20, null],
+      ["grace", "Fable", 70, 9 * 3600],
+    ]);
+    expect(wasteRows({ days: 7, samples: [] })).toEqual([]);
+  });
+
+  it("summarises the five-hour windows that started inside the range", () => {
+    const range = { from: t0 - 7 * 86_400, to: t0 };
+    const summary = fiveHourSummary(u, range, { "ada@example.com": "ada" });
+    // Newest first; the row missing `samples` and `closed` drops, and the one
+    // starting ten days back is outside the range.
+    expect(summary?.windows.map((window) => [window.label, window.peakPct, window.closed])).toEqual(
+      [
+        ["ada", 20, false],
+        ["ada", 62, true],
+        ["grace@example.com", 2, true],
+      ],
+    );
+    expect(summary?.count).toBe(3);
+    expect(Math.round(summary?.meanPeakPct ?? 0)).toBe(28);
+    // Only the closed 2 % window counts as never used.
+    expect(summary?.unused).toBe(1);
+    expect(fiveHourSummary({ days: 7, samples: [] }, range)).toBeNull();
+  });
+
+  it("words the range's replay, and stays quiet without the active flag", () => {
+    expect(replayText(u)).toBe(
+      "Over this range: 3 account switches, 1 onto a cold 5h clock, 15 min stalled at the 5h limit.",
+    );
+    expect(
+      replayText({
+        days: 7,
+        samples: [],
+        replay: { from: t0, to: t0, switches: 1, coldSwitches: 0, stalledSeconds: 0 },
+      }),
+    ).toBe("Over this range: 1 account switch, nothing stalled at the 5h limit.");
+    expect(
+      replayText({ ...u, replay: { ...(u.replay as object), sawActiveFlag: false } }),
+    ).toBeNull();
+    expect(replayText({ days: 7, samples: [] })).toBeNull();
   });
 });
 

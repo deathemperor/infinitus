@@ -264,36 +264,6 @@ final class ControlServer {
                                 "needs": .array(needs.map { .string($0) })])
             }))
 
-        case "nudge":
-            // #612: the resume nudge for one session, by hand — what the
-            // service does on its tick for every limit-stopped session,
-            // without ResumeGate: the caller asked.
-            guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {
-                throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`")
-            }
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = model.ownedRoster(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else {
-                throw Fail("no live session \(pid)")
-            }
-            let outcome: (nudged: Bool, channel: String?, reason: String?) = await Task.detached(priority: .utility) {
-                guard let stop = Transcript.findStopped(sessions: [record], claudeDir: claudeDir).first else {
-                    return (false, nil, "not resumable: the transcript does not end in a limit stop")
-                }
-                let coordinator = ResumeCoordinator(hosts: PtyHosts.available(), claudeDir: claudeDir)
-                let result = coordinator.resume([stop])
-                if result.accepted.contains(where: { $0.sessionId == stop.sessionId }) {
-                    return (true, result.channel[stop.sessionId], nil)
-                }
-                return (false, nil, "unreachable: no terminal surface, no peer socket, or mid-turn")
-            }.value
-            if outcome.nudged {
-                model.resume.noteManualNudge(sessionId: record.sessionId)
-                model.logEvent("other", icon: "play.circle", "nudged \(record.sessionId.prefix(8)) by hand via \(outcome.channel ?? "?")")
-            }
-            return ControlReply(ok: true, result: .object(["pid": .number(Double(pid)), "nudged": .bool(outcome.nudged),
-                                                           "channel": outcome.channel.map { .string($0) } ?? .null,
-                                                           "reason": outcome.reason.map { .string($0) } ?? .null]))
-
         case "profiles":
             return ControlReply(ok: true, result: try .of(["profiles": model.sessionProfiles.profiles]))
 
@@ -326,27 +296,6 @@ final class ControlServer {
                                              hidden: model.hiddenSessions.withLock { $0 })
             return ControlReply(ok: true, result: try .of(PastSessions.Reply(sessions: sessions)))
 
-        case "resume-session":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: resume-session <sessionId> [--fork]") }
-            let claudeDir = ClaudeSessions.configHome()
-            let fork = r.options["fork"] != nil
-            // A live session's transcript is another process's to write —
-            // talk to it instead of resuming it twice. A fork writes a new
-            // one, so a live session can be branched.
-            if !fork, let live = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.sessionId == id }) {
-                throw Fail("session \(id) is live (pid \(live.pid)); use `infinitusctl send \(live.pid)`, or --fork to branch it")
-            }
-            guard let past = PastSessions.find(sessionId: id, claudeDir: claudeDir, hidden: model.hiddenSessions.withLock { $0 }) else {
-                throw Fail("no past session \(id); see `infinitusctl past-sessions`")
-            }
-            let request = SessionStart.Request(cwd: past.cwd, resume: past.sessionId, fork: fork ? true : nil)
-            let reply = SessionLauncher.start(request, preferredHost: model.sessionHost)
-            if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
-                model.recordBirth(pid: pid, birth)
-            }
-            return ControlReply(ok: reply.outcome == "started", result: try .of(reply),
-                                error: reply.outcome == "started" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
-
         case "session-delete":
             guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: session-delete <sessionId> --yes") }
             guard r.options["yes"] != nil else { throw Fail("session-delete hides a session; pass --yes") }
@@ -366,15 +315,6 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(id)]))
 
-        case "send":
-            guard let text = r.secret, !text.isEmpty else { throw Fail("send: the message is expected on stdin") }
-            guard let who = r.args.first, let pid = model.sessionPid(matching: who) else {
-                throw Fail("no live session matches \(r.args.first ?? "?"); see `infinitusctl sessions`")
-            }
-            let reply = await model.send(SessionInput.Request(kind: .message, text: text),
-                                         toPid: pid, icon: "💬", what: "control send")
-            return ControlReply(ok: reply.outcome == "delivered", result: try .of(reply),
-                                error: reply.outcome == "delivered" ? nil : "\(reply.outcome)\(reply.detail.map { ": " + $0 } ?? "")")
 
         case "session-stop":
             guard let pidText = r.args.first, let pid = Int32(pidText), pid > 1 else {

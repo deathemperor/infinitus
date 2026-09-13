@@ -167,6 +167,22 @@ export const PREF_COPY: Readonly<
     label: "Lock-screen tok/min interval (seconds)",
     description: "Zero pushes tok/min with other changes only.",
   },
+  // Devices: the tunnel fronting this server's own port, which the "Pair a
+  // phone" card below hands the QR when the phone is off the Wi‑Fi. The keys
+  // are the Mac's (#572) and say "fork"; the screen never does (#823).
+  fork_tunnel_enabled: {
+    label: "Reach this server through a Cloudflare tunnel",
+    description: "Lets a phone pair and connect from outside your network.",
+  },
+  fork_server_port: {
+    label: "Server port",
+    description: "The port this server listens on. Infinitus writes it at startup.",
+  },
+  fork_tunnel_hostname: {
+    label: "Tunnel hostname",
+    description:
+      "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
+  },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },

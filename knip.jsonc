@@ -56,7 +56,7 @@
       "ignoreDependencies": ["playwright-core", "electron-builder"],
     },
     "apps/web": {
-      // Worktree setup invokes this directly from t3.json.
+      // Worktree setup invokes this directly from infinitus.json.
       "entry": ["scripts/warm-dep-cache.ts"],
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still

@@ -1,4 +1,5 @@
 import {
+  LEGACY_T3_PROJECT_FILE_NAME,
   T3_PROJECT_FILE_NAME,
   type EnvironmentId,
   type T3ProjectFile,
@@ -13,10 +14,10 @@ const NO_SCRIPTS: ReadonlyArray<T3ProjectFileScript> = [];
 
 export interface T3ProjectFileState {
   /**
-   * - `valid`: t3.json exists and decoded.
-   * - `invalid`: t3.json exists but fails to decode (the server then ignores
-   *   the whole file, including `iconPath` and every script).
-   * - `missing`: no readable t3.json at the workspace root.
+   * - `valid`: the project file exists and decoded.
+   * - `invalid`: it exists but fails to decode (the server then ignores the
+   *   whole file, including `iconPath` and every script).
+   * - `missing`: no readable project file at the workspace root.
    * - `loading`: the file query has not settled yet.
    */
   status: "loading" | "missing" | "invalid" | "valid";
@@ -26,16 +27,30 @@ export interface T3ProjectFileState {
 }
 
 /**
- * Decoded state of the project's checked-in `t3.json`, including whether the
- * file exists but is broken — which the runtime otherwise swallows silently.
+ * Decoded state of the project's checked-in project file, including whether
+ * the file exists but is broken — which the runtime otherwise swallows
+ * silently. `infinitus.json` decides when it exists; a checkout carrying only
+ * upstream's `t3.json` is read from that, the server's own order.
  */
 export function useT3ProjectFileState(
   environmentId: EnvironmentId,
   cwd: string | null,
 ): T3ProjectFileState {
-  const query = useProjectFileQuery(environmentId, cwd ?? "", T3_PROJECT_FILE_NAME, cwd !== null);
+  const preferred = useProjectFileQuery(
+    environmentId,
+    cwd ?? "",
+    T3_PROJECT_FILE_NAME,
+    cwd !== null,
+  );
+  const legacy = useProjectFileQuery(
+    environmentId,
+    cwd ?? "",
+    LEGACY_T3_PROJECT_FILE_NAME,
+    cwd !== null,
+  );
+  const query = preferred.data !== null ? preferred : legacy;
   const contents = query.data && !query.data.truncated ? query.data.contents : null;
-  const isPending = query.isPending;
+  const isPending = preferred.isPending || legacy.isPending;
   return useMemo(() => {
     if (contents === null) {
       return {
@@ -53,7 +68,7 @@ export function useT3ProjectFileState(
 }
 
 /**
- * Scripts declared in the project's checked-in `t3.json`, offered in the
+ * Scripts declared in the project's checked-in project file, offered in the
  * scripts menu for import. Missing, truncated, or invalid files resolve to
  * an empty list.
  */

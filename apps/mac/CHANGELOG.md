@@ -7,9 +7,12 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
-### Desktop
-- A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
-- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
+### Mac
+- A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
+- `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
+
+
+## 0.5.0-alpha.8
 
 ### Mac
 - The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
@@ -24,6 +27,8 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
 
 ### Desktop
+- A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
+- Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
 - A thread whose AWS or gcloud command fails on expired credentials gets a "sign-in needed" line in its work log and the Mac starts that sign-in, which shows under Sign-ins.
 - Infinitus desktop keeps the computer awake while a thread on it has a turn running; Settings › General › Keep awake turns that off (#1075).
 - Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
@@ -36,6 +41,8 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+- Resume nudges are gone: a terminal session a usage limit stopped is no longer typed a "continue" once an account works again (threads resume on their own in Infinitus desktop).
+- The Mac no longer nudges a terminal session after an AWS or gcloud sign-in from the phone; the sign-in itself is unchanged.
 
 ### Desktop
 - A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).
