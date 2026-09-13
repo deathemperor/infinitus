@@ -66,19 +66,16 @@ infinitus-tray serve --port 9000 --token ABCD1234…
 infinitus-tray serve --token-file /run/secrets/infinitus-token
 ```
 
-`serve` also ticks the away-push triggers (#13 parity: all sessions
-finished, all accounts exhausted, last account standing, waiting on
-you) once per re-collect — `status`/`panel` are one-shot execs with no
-state to carry a multi-tick episode across, so only `serve` can do
-this. Each firing message is shown by `notify-send` if it's on `PATH`,
-and logged to stderr. Gate each trigger with an env var (default on
-for all four):
+`serve` also ticks the away-push triggers (#13 parity: all accounts
+exhausted, last account standing) once per re-collect — `status`/`panel`
+are one-shot execs with no state to carry a multi-tick episode across,
+so only `serve` can do this. Each firing message is shown by
+`notify-send` if it's on `PATH`, and logged to stderr. Gate each
+trigger with an env var (default on for both):
 
 ```sh
-INFINITUS_PUSH_SESSIONS_DONE=0   # off: "all sessions finished"
 INFINITUS_PUSH_ALL_DEAD=0        # off: "all accounts exhausted"
 INFINITUS_PUSH_LAST_ALIVE=0      # off: "last account standing"
-INFINITUS_PUSH_WAITING=0         # off: "waiting on you"
 ```
 
 Run it under systemd (`packaging/omarchy/infinitus-serve.service`):

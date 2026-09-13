@@ -8,6 +8,10 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The sessions popover is gone: the footer chip, the live session list and the Start-a-session form left the menu bar app.
+- Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
+- Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
+- Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.

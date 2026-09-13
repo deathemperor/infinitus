@@ -2,8 +2,8 @@ import XCTest
 @testable import InfinitusCore
 
 /// The answer side of a parked `AskUserQuestion` (#422): one encoder for the
-/// Mac workspace panel and the phone card, checked against its decoder
-/// (`OwnedWire.decision(answers:pending:)`) with a round trip below.
+/// Mac workspace panel and the phone card, checked against
+/// `SessionInput.Answers.decode`.
 final class T3PendingAnswersTests: XCTestCase {
 
     // MARK: - parse
@@ -121,41 +121,6 @@ final class T3PendingAnswersTests: XCTestCase {
         XCTAssertEqual(out.flatMap(SessionInput.Answers.decode), ["Which colour?": "Red"])
         XCTAssertNil(T3PendingAnswers.encode([q], picks: ["q": ["Purple"]], custom: [:]),
                     "an unrecognised pick alone answers nothing")
-    }
-
-    // MARK: - round trip against the decoder
-
-    private func pending(_ questions: [T3PendingAnswers.Question]) -> PendingRequest {
-        PendingRequest(requestId: "r", toolName: "AskUserQuestion", toolUseId: nil, description: nil,
-                       inputJSON: "{}", suggestionsJSON: nil,
-                       questions: questions.map {
-                           PendingRequest.Question(question: $0.question, header: $0.header,
-                                                   options: $0.options.map(\.label), multiSelect: $0.multiSelect)
-                       }, receivedAt: Date())
-    }
-
-    func testRoundTripSingleSelectPick() throws {
-        let q = question(options: ["Red", "Blue"])
-        let text = try XCTUnwrap(T3PendingAnswers.encode([q], picks: ["q": ["Blue"]], custom: [:]))
-        XCTAssertEqual(OwnedWire.decision(answers: text, pending: pending([q])), .answers(["Which colour?": "Blue"]))
-    }
-
-    func testRoundTripMultiSelectTwoPicks() throws {
-        let q = question(multiSelect: true, options: ["Red", "Green", "Blue"])
-        let text = try XCTUnwrap(T3PendingAnswers.encode([q], picks: ["q": ["Blue", "Red"]], custom: [:]))
-        XCTAssertEqual(OwnedWire.decision(answers: text, pending: pending([q])), .answers(["Which colour?": "Red, Blue"]))
-    }
-
-    func testRoundTripFreeTextOnASingleSelect() throws {
-        let q = question(options: ["Red", "Blue"])
-        let text = try XCTUnwrap(T3PendingAnswers.encode([q], picks: [:], custom: ["q": "Teal, please"]))
-        XCTAssertEqual(OwnedWire.decision(answers: text, pending: pending([q])), .answers(["Which colour?": "Teal, please"]))
-    }
-
-    func testRoundTripFreeTextOnAMultiSelectWithoutSeparator() throws {
-        let q = question(multiSelect: true, options: ["Red", "Blue"])
-        let text = try XCTUnwrap(T3PendingAnswers.encode([q], picks: [:], custom: ["q": "huge"]))
-        XCTAssertEqual(OwnedWire.decision(answers: text, pending: pending([q])), .answers(["Which colour?": "huge"]))
     }
 
     // MARK: - menuKey

@@ -103,9 +103,6 @@ public enum PrefCatalog {
         Entry("glass_focused", .double, .number(0.7), display),
         Entry("chat_header", .string, .string("compact"), display, choices: strings(["compact", "strip", "hud"])),
         // Display: sessions.
-        Entry("session_auto_names", .bool, .bool(true), display),
-        Entry("session_host", .string, .string("auto"), display,
-              choices: strings(["auto", "cmux", "terminal", "owned"])),
         Entry("keep_awake", .bool, .bool(false), display),
         Entry("keep_awake_display", .bool, .bool(true), display),
         // Themes: any theme id, built-in or custom.
@@ -116,11 +113,8 @@ public enum PrefCatalog {
         Entry("intro_speed", .double, .number(1.0), animations, min: 0.4, max: 2),
         Entry("burn_style", .string, .string("ember"), animations, choices: strings(burnStyles)),
         // Push.
-        Entry("push_sessions_done", .bool, .bool(true), push),
         Entry("push_all_dead", .bool, .bool(true), push),
         Entry("push_last_alive", .bool, .bool(true), push),
-        Entry("push_waiting", .bool, .bool(true), push),
-        Entry("push_aws_login", .bool, .bool(true), push),
         Entry("push_revived", .bool, .bool(true), push),
         Entry("revive_lead_minutes", .int, .number(10), push),
         // Devices: the phone mirror.
