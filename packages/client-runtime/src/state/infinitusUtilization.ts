@@ -292,15 +292,12 @@ export function formatCount(value: number): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
-/** The live line under the table: the popup's five-minute output rate. */
-export function liveRateText(u: InfinitusUtilization): string | null {
-  const live = u.liveRate;
-  if (live === undefined || live === null) return null;
-  const peak =
-    live.peakPerMinute !== undefined && live.peakPerMinute > live.perMinute
-      ? `, peak ${compactTokens(live.peakPerMinute)}`
-      : "";
-  return `Live: ${compactTokens(live.perMinute)} output tokens/min over the last 5 minutes${peak}.`;
+/** The live line under the table. Since #1127 the rate is the server's own,
+    folded from the turns it ran, so the sentence says whose work it counts —
+    the Mac's `liveRate` covered every Claude session on the machine. */
+export function liveRateText(live: { readonly perMinute: number } | null): string | null {
+  if (live === null) return null;
+  return `Live: ${compactTokens(live.perMinute)} output tokens/min over the last 5 minutes on this server's threads.`;
 }
 
 export const RUN_RATE_NOTE =

@@ -172,7 +172,8 @@ origin/main HEAD || echo STALE`. A PR whose checks are green but whose
   `subscribeInfinitusPairing` / `infinitus.pairingDecide` (approve-on-Mac
   pairing, #710) the same way, contracts in `infinitusPairing.ts`;
   `subscribeCaptures` / `captures.apply` (#433) the same way, contracts in
-  `captures.ts`.
+  `captures.ts`; `infinitus.liveRate` (#1127, the live output rate off this
+  server's own turn usage — no Mac verb) the same way.
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`,
   `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding
   (#270 A). `VcsRemoveWorktreeInput` gains `keepWork` (commit whatever the
@@ -1461,7 +1462,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   on a row the Mac stopped watching hours before the reset; 5h windows are
   left out, since they recycle ~34× a week) and Run rate (tokens,
   API-equivalent $ and turns over the last
-  hour / day / week, unpriced models, the live output rate) read the Mac's
+  hour / day / week, unpriced models) read the Mac's
   `utilization --days n` through `infinitusEnvironment.utilization`, a
   query atom re-read every 5 min while the page is mounted and dropped a
   minute after it leaves; `InfinitusUtilization` in
@@ -1474,7 +1475,19 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `packages/client-runtime/src/state/infinitusUtilization.ts`. A build
   without the verb keeps the forecast and says what is missing; one whose
   reply carries no telemetry keeps the chart and the run rate, and the two
-  sections are simply absent. Sidebar "Utilization" beside Activity.
+  sections are simply absent. The live output rate under the forecast is the
+  server's own (#1127), not part of that reply: `infinitus.liveRate` folds
+  the per-turn usage rows (#834) this server recorded in the last five
+  minutes — `ProjectionTurnUsageRepository.listCompletedSince` and
+  `apps/server/src/infinitus/liveRate.logic.ts`, which spreads each turn's
+  output tokens over the wall time it ran and counts only the part inside
+  the window, so a long turn finishing now cannot read as twice the rate.
+  Drawn whatever the Mac answered, through `infinitusEnvironment.liveRate`
+  (re-read every minute while the page is mounted), and absent when no turn
+  completed in the window. A turn still running contributes nothing until
+  it completes, so the number lags by up to one turn; the Mac's own
+  `liveRate` field stays in the contract, no longer drawn. Sidebar
+  "Utilization" beside Activity.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:

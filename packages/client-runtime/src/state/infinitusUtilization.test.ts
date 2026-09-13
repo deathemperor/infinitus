@@ -230,12 +230,13 @@ describe("run rate", () => {
       "1,620",
       "1,200,000",
     ]);
-    expect(liveRateText(decodeUtilization(reply)!)).toBe(
-      "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",
+    // Since #1127 the rate is the server's own, handed in directly.
+    expect(liveRateText({ perMinute: 1500 })).toBe(
+      "Live: 1.5k output tokens/min over the last 5 minutes on this server's threads.",
     );
-    expect(liveRateText({ days: 1, samples: [], liveRate: { perMinute: 0 } })).toBe(
-      "Live: 0 output tokens/min over the last 5 minutes.",
+    expect(liveRateText({ perMinute: 0 })).toBe(
+      "Live: 0 output tokens/min over the last 5 minutes on this server's threads.",
     );
-    expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+    expect(liveRateText(null)).toBeNull();
   });
 });

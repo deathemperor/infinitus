@@ -110,6 +110,8 @@ import {
 } from "./orchestration/Normalizer.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
+import { ProjectionTurnUsageRepository } from "./persistence/ProjectionTurnUsage.ts";
+import { LIVE_RATE_WINDOW_MS, liveOutputRate } from "./infinitus/liveRate.logic.ts";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor.ts";
 import { WORKTREE_CAP_SUGGESTIONS, worktreeCapRefusal } from "./orchestration/worktreeCap.logic.ts";
 import {
@@ -515,6 +517,7 @@ const makeWsRpcLayer = (
       const crypto = yield* Crypto.Crypto;
       const sql = yield* SqlClient.SqlClient;
       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
+      const projectionTurnUsageRepository = yield* ProjectionTurnUsageRepository;
       /** A reference's host-level link key; the project's own host where the ref names none. */
       const resolvePullRequestSyncKey = (reference: PullRequestRef) =>
         reference.host !== undefined && reference.repository.includes("/")
@@ -3253,6 +3256,34 @@ const makeWsRpcLayer = (
                 ),
               ),
             { "rpc.aggregate": "infinitus", "thread.id": input.threadId },
+          ),
+        // The live output rate (#1127): this server's per-turn usage rows
+        // over the last five minutes, folded here rather than inside the
+        // Mac's `utilization` reply, which passes through opaque.
+        [WS_METHODS.infinitusLiveRate]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusLiveRate,
+            Effect.gen(function* () {
+              const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+              const rows = yield* projectionTurnUsageRepository.listCompletedSince({
+                since: new Date(nowMs - LIVE_RATE_WINDOW_MS).toISOString(),
+              });
+              return {
+                liveRate: liveOutputRate(
+                  rows.map((row) => row.turnUsage),
+                  nowMs,
+                ),
+              };
+            }).pipe(
+              // A rate the database cannot answer is nothing to draw, not a
+              // page-level failure: the line simply stays off.
+              Effect.catchAll((error) =>
+                Effect.logWarning("infinitus.liveRate.read-failed", error).pipe(
+                  Effect.as({ liveRate: null }),
+                ),
+              ),
+            ),
+            { "rpc.aggregate": "infinitus" },
           ),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
           observeRpcStreamEffect(

@@ -70,9 +70,11 @@ const NEEDS_NEWER_APP =
  * carries (every account's projection at its own measured pace); History
  * (every account's percentage of one window over 1 / 7 / 30 days) and Run
  * rate (tokens, API-equivalent $ and messages over the last hour / day /
- * week, plus the live output rate) read `utilization --days n` through the
- * utilization query atom, held and re-read every 5 min only while this page
- * is mounted. Primary environment only, like Stats.
+ * week) read `utilization --days n` through the utilization query atom, held
+ * and re-read every 5 min only while this page is mounted. The live output
+ * rate (#1127) is the server's own read of the turns it ran, re-read every
+ * minute, and draws whether or not the Mac answered. Primary environment
+ * only, like Stats.
  */
 export function UtilizationPage() {
   const environmentId = usePrimaryEnvironmentId();
@@ -108,6 +110,12 @@ export function UtilizationPage() {
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
   );
+  // The live rate is this server's own (#1127), not a Mac verb: it draws
+  // whether or not the app answered `utilization`, and needs no `days`.
+  const liveRateQuery = useEnvironmentQuery(
+    ready ? infinitusEnvironment.liveRate({ environmentId, input: {} }) : null,
+  );
+  const live = liveRateText(liveRateQuery.data?.liveRate ?? null);
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
     const out: Record<string, string> = {};
@@ -145,6 +153,7 @@ export function UtilizationPage() {
         onClick={() => {
           snapshotQuery.refresh();
           if (hasHistoryVerb) utilizationQuery.refresh();
+          liveRateQuery.refresh();
         }}
         aria-label="Refresh utilization"
         aria-busy={snapshotQuery.isPending || utilizationQuery.isPending}
@@ -188,6 +197,7 @@ export function UtilizationPage() {
     body = (
       <div className="flex flex-col gap-8">
         <ForecastSection forecast={forecast} />
+        {live !== null ? <p className="text-muted-foreground text-xs">{live}</p> : null}
         {!hasHistoryVerb ? (
           <p className="text-muted-foreground text-sm">{NEEDS_NEWER_APP}</p>
         ) : utilizationQuery.error !== null ? (
@@ -629,7 +639,6 @@ function WasteRowLine({
 
 function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">
@@ -667,7 +676,6 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
           Tokens counted but not priced: {unpriced.join(", ")}
         </p>
       ) : null}
-      {live !== null ? <p className="text-muted-foreground text-xs">{live}</p> : null}
       <p className="text-muted-foreground text-xs">{RUN_RATE_NOTE}</p>
     </section>
   );

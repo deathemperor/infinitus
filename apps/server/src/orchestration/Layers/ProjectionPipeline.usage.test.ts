@@ -371,4 +371,41 @@ engineLayer("turn usage on the thread projection (#834)", (it) => {
       assert.deepStrictEqual(yield* candidates(), []);
     }),
   );
+
+  it.effect("the live rate reads every thread's turns from an instant on (#1127)", () =>
+    Effect.gen(function* () {
+      const repository = yield* ProjectionTurnUsageRepository;
+      const older = ThreadId.make("thread-live-older");
+      const newer = ThreadId.make("thread-live-newer");
+      yield* repository.upsert({
+        threadId: older,
+        turnUsage: turn("turn-live-1", "2026-09-12T00:00:00.000Z", null),
+      });
+      yield* repository.upsert({
+        threadId: newer,
+        turnUsage: turn("turn-live-2", "2026-09-12T00:04:00.000Z", null),
+      });
+      yield* repository.upsert({
+        threadId: older,
+        turnUsage: turn("turn-live-3", "2026-09-12T00:06:00.000Z", null),
+      });
+
+      const since = (at: string) => repository.listCompletedSince({ since: at });
+      // Both threads' turns, oldest first: the window is the server's, not a
+      // thread's.
+      assert.deepStrictEqual(
+        (yield* since("2026-09-12T00:03:00.000Z")).map((row) => [
+          row.threadId,
+          row.turnUsage.turnId,
+        ]),
+        [
+          [newer, "turn-live-2"],
+          [older, "turn-live-3"],
+        ],
+      );
+      // The boundary is inclusive, and a window past every row is empty.
+      assert.lengthOf(yield* since("2026-09-12T00:06:00.000Z"), 1);
+      assert.deepStrictEqual(yield* since("2026-09-12T00:07:00.000Z"), []);
+    }),
+  );
 });

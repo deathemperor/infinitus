@@ -522,6 +522,19 @@ export const InfinitusReleaseThreadResult = Schema.Struct({
 });
 export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;
 
+/**
+ * Fork (#1127): the live output rate, folded from this server's own per-turn
+ * usage rows (#834) rather than the Mac's transcript tail. Output tokens per
+ * minute over the last five minutes; null when no turn completed inside that
+ * window, which the Utilization page draws as nothing at all rather than a
+ * zero that would read as an idle fleet. A turn still running contributes
+ * nothing until it completes, so the number lags by up to one turn.
+ */
+export const InfinitusLiveRateResult = Schema.Struct({
+  liveRate: Schema.NullOr(Schema.Struct({ perMinute: Schema.Finite })),
+});
+export type InfinitusLiveRateResult = typeof InfinitusLiveRateResult.Type;
+
 /** Fork a thread at a turn (#270 E2): a new thread on the same branch and
     worktree whose Claude session continues from that turn; the source is not
     touched. `turnCount` is the checkpoint turn count shown on the message. */

@@ -33,6 +33,12 @@ const INFINITUS_UTILIZATION_REFRESH_MS = 300_000;
 const INFINITUS_UTILIZATION_IDLE_TTL_MS = 60_000;
 /** The Activity page's read (#659): `events --limit 100` once on mount; the
     snapshot subscription's deltas carry everything after. No re-read. */
+/** The Utilization page's live rate (#1127): this server's own turn usage
+    summed over the last five minutes, so a re-read every minute is what makes
+    it live; one scan of a small table, held only while the page is mounted. */
+const INFINITUS_LIVE_RATE_STALE_MS = 30_000;
+const INFINITUS_LIVE_RATE_REFRESH_MS = 60_000;
+const INFINITUS_LIVE_RATE_IDLE_TTL_MS = 60_000;
 const INFINITUS_EVENTS_STALE_MS = 60_000;
 const INFINITUS_EVENTS_IDLE_TTL_MS = 60_000;
 const INFINITUS_PAIRING_IDLE_TTL_MS = 1_000;
@@ -100,6 +106,14 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     releaseThread: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:infinitus:releaseThread",
       tag: WS_METHODS.infinitusReleaseThread,
+    }),
+    /** The live output rate (#1127): the server's own read, not a Mac verb. */
+    liveRate: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:liveRate",
+      tag: WS_METHODS.infinitusLiveRate,
+      staleTimeMs: INFINITUS_LIVE_RATE_STALE_MS,
+      refreshIntervalMs: INFINITUS_LIVE_RATE_REFRESH_MS,
+      idleTtlMs: INFINITUS_LIVE_RATE_IDLE_TTL_MS,
     }),
     // A read verb as a query: the same forward as `command`, held and re-read
     // only while a page subscribes. Keyed by its whole input, so each period
