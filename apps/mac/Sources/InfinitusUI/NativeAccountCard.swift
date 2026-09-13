@@ -96,16 +96,6 @@ public struct AccountUsageLines<M: FleetModel, U: UsageSource>: View {
             if let note = SentinelNotes.note(for: account.usageStatus) {
                 SentinelActionText(model: model, account: account, note: note)
                     .lineLimit(1)
-            } else if cells.showAsDead, cells.deadCause?.kind == .session,
-                      account.usage?.sevenDay != nil {
-                // 5h-only death (user 2026-09-01): the weekly and
-                // per-model quotas still carry signal, reset times shown.
-                cells.deadCell
-                cells.windowCell(account.usage?.sevenDay, session: false)
-                cells.spendCell
-                cells.scopedCells
-            } else if cells.showAsDead {
-                cells.deadCell
             } else if cells.allFresh {
                 cells.readyCell
             } else {

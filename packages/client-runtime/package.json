@@ -155,10 +155,6 @@
       "types": "./src/state/infinitusActivity.ts",
       "default": "./src/state/infinitusActivity.ts"
     },
-    "./state/infinitusSessions": {
-      "types": "./src/state/infinitusSessions.ts",
-      "default": "./src/state/infinitusSessions.ts"
-    },
     "./state/models": {
       "types": "./src/state/models.ts",
       "default": "./src/state/models.ts"

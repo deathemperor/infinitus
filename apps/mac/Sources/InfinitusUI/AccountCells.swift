@@ -303,10 +303,17 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         .activeBand(banded && account.active)
     }
 
-    /// One line replacing every usage cell on a dead row. Plain words, not
-    /// themed icon soup — "📦 💊 spent" read as a riddle (user-verified);
-    /// only the color and the dead marker carry the theme here.
+    /// The dead line as a cell of its own (the narrow list's one-liner).
     @ViewBuilder var deadCell: some View {
+        deadLine.fixedSize().activeBand(banded && account.active)
+    }
+
+    /// One line saying what blocks a dead row, drawn in that window's own
+    /// cell while the other gauges stay (user 2026-09-13: "anything is
+    /// down, the others are visible"). Plain words, not themed icon soup —
+    /// "📦 💊 spent" read as a riddle (user-verified); only the color and
+    /// the dead marker carry the theme here.
+    @ViewBuilder var deadLine: some View {
         if let cause = deadCause {
             HStack(spacing: 4) {
                 // Themed label + themed verb ("MP down", "🎬 sold out");
@@ -343,8 +350,6 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             .instantTip("\(plainCause(cause)) is used up (100%) — the "
                         + "account can't serve requests until it resets"
                         + (cause.countdown.map { " in \($0)" } ?? ""))
-            .fixedSize()
-            .activeBand(banded && account.active)
         }
     }
 
@@ -431,7 +436,9 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     @ViewBuilder func windowCell(_ w: UsageWindow?, session: Bool,
                                  timer: Bool = true) -> some View {
         Group {
-            if let w, !hiddenInCompact(w.pct) {
+            if showAsDead, let cause = deadCause, cause.blocks(session: session) {
+                deadLine.fixedSize()
+            } else if let w, !hiddenInCompact(w.pct) {
                 HStack(spacing: 3) {
                     // No ahead-of-pace badge: the burn effect on the bar
                     // itself carries that signal now (user 2026-08-31,
@@ -611,7 +618,9 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         }) { entry in
             let w = entry.win
             Group {
-                if hiddenInCompact(w.pct) {
+                if showAsDead, let cause = deadCause, cause.blocks(scoped: w.name) {
+                    deadLine
+                } else if hiddenInCompact(w.pct) {
                     if banded, !model.compactRows {
                         Text(verbatim: "")
                             .frame(maxWidth: .infinity)
