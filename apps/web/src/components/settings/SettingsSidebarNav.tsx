@@ -29,7 +29,6 @@ import {
   Settings2Icon,
   SmartphoneIcon,
   SparklesIcon,
-  UsersIcon,
   SwatchBookIcon,
   XIcon,
 } from "lucide-react";
@@ -102,7 +101,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/infinitus/animations": SparklesIcon,
   "/settings/infinitus/sessions": GaugeIcon,
   "/settings/infinitus/lock": LockIcon,
-  "/settings/infinitus/team": UsersIcon,
   "/settings/infinitus/notifications": BellIcon,
   "/settings/infinitus/devices": SmartphoneIcon,
   "/settings/infinitus/engines": CpuIcon,
@@ -117,7 +115,6 @@ const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath
   "/settings/infinitus/animations",
   "/settings/infinitus/sessions",
   "/settings/infinitus/lock",
-  "/settings/infinitus/team",
   "/settings/infinitus/notifications",
   "/settings/infinitus/devices",
   "/settings/infinitus/engines",
