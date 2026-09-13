@@ -23,11 +23,9 @@ export type SettingsPath =
   | "/settings/infinitus/animations"
   | "/settings/infinitus/sessions"
   | "/settings/infinitus/lock"
-  | "/settings/infinitus/team"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
-  | "/settings/infinitus/profiles"
   | "/settings/archived";
 
 /**
@@ -97,13 +95,11 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/infinitus": "Menu bar",
   "/settings/infinitus/themes": "Themes",
   "/settings/infinitus/animations": "Animations",
-  "/settings/infinitus/sessions": "Sessions",
+  "/settings/infinitus/sessions": "Priority",
   "/settings/infinitus/lock": "Lock",
-  "/settings/infinitus/team": "Team",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
-  "/settings/infinitus/profiles": "Profiles",
   "/settings/archived": "Archive",
 };
 
@@ -468,14 +464,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "snap-shot-enabled",
   },
   {
-    // Fork (#270 H): the completion sound sits beside the capture sound.
-    id: "completion-sound",
-    title: "Completion sound",
-    to: "/settings/snap-shot",
-    targetId: "snap-shot-enabled",
-    searchTerms: ["turn finished done bell chime background window notification"],
-  },
-  {
     id: "snap-shot-flash",
     title: "Capture flash",
     to: "/settings/snap-shot",
@@ -771,53 +759,13 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "infinitus-sessions",
-    title: "Infinitus sessions",
+    title: "Infinitus priority",
     to: "/settings/infinitus/sessions",
     targetId: "infinitus-sessions",
     infinitusOnly: true,
     searchTerms: ["session priority mode hold interrupt headroom low abundant pct background"],
   },
-  // Fork (#270 B): the desktop's own notifications, above the push toggles.
-  {
-    id: "desktop-notify-approval",
-    title: "Notify when a thread needs approval",
-    to: "/settings/infinitus/notifications",
-    targetId: "desktop-notifications",
-    infinitusOnly: true,
-    searchTerms: ["desktop notification banner os approval waiting"],
-  },
-  {
-    id: "desktop-notify-input",
-    title: "Notify when a thread needs input",
-    to: "/settings/infinitus/notifications",
-    targetId: "desktop-notifications",
-    infinitusOnly: true,
-    searchTerms: ["desktop notification banner os question answer waiting"],
-  },
-  {
-    id: "desktop-notify-held",
-    title: "Notify when a turn is held",
-    to: "/settings/infinitus/notifications",
-    targetId: "desktop-notifications",
-    infinitusOnly: true,
-    searchTerms: ["desktop notification banner os held headroom"],
-  },
-  {
-    id: "desktop-notify-failure",
-    title: "Notify when a session fails",
-    to: "/settings/infinitus/notifications",
-    targetId: "desktop-notifications",
-    infinitusOnly: true,
-    searchTerms: ["desktop notification banner os failed error"],
-  },
-  {
-    id: "desktop-notify-completion",
-    title: "Notify when a turn finishes",
-    to: "/settings/infinitus/notifications",
-    targetId: "desktop-notifications",
-    infinitusOnly: true,
-    searchTerms: ["desktop notification banner os done completed finished"],
-  },
+  // Fork (#270 B): the Dock badge, above the push toggles; banners are upstream's row (#1032).
   {
     id: "desktop-badge",
     title: "Dock badge",
@@ -833,14 +781,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-lock",
     infinitusOnly: true,
     searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
-  },
-  {
-    id: "infinitus-team",
-    title: "Infinitus team",
-    to: "/settings/infinitus/team",
-    targetId: "infinitus-team",
-    infinitusOnly: true,
-    searchTerms: ["team join code invite roster members requests leader fetch publish"],
   },
   {
     id: "infinitus-push",
@@ -865,14 +805,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-engines",
     infinitusOnly: true,
     searchTerms: ["swapd cliproxy 9router proxy accounts registered key"],
-  },
-  {
-    id: "infinitus-profiles",
-    title: "Infinitus session profiles",
-    to: "/settings/infinitus/profiles",
-    targetId: "infinitus-profiles",
-    infinitusOnly: true,
-    searchTerms: ["profile folder engine permission mode model system prompt tools"],
   },
   {
     id: "archive",
@@ -906,11 +838,9 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/infinitus/animations": null,
   "/settings/infinitus/sessions": null,
   "/settings/infinitus/lock": null,
-  "/settings/infinitus/team": null,
   "/settings/infinitus/notifications": null,
   "/settings/infinitus/devices": null,
   "/settings/infinitus/engines": null,
-  "/settings/infinitus/profiles": null,
 };
 
 /** Search keeps the selected target. A missing row can explain its owning scope instead. */

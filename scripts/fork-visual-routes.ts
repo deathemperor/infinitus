@@ -36,14 +36,8 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   { route: "/settings/infinitus", label: "Menu bar", marker: "Show the account name" },
   { route: "/settings/infinitus/themes", label: "Themes", marker: "Off — plain numbers" },
   { route: "/settings/infinitus/animations", label: "Animations", marker: "Intro style" },
-  { route: "/settings/infinitus/sessions", label: "Sessions", marker: "Session priority" },
+  { route: "/settings/infinitus/sessions", label: "Priority", marker: "Session priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
-  {
-    route: "/settings/infinitus/team",
-    label: "Team",
-    marker: "Lighthouse",
-    absent: ["Reading the team", "This Mac is not in a team"],
-  },
   {
     route: "/settings/infinitus/notifications",
     label: "Notifications",
@@ -51,7 +45,6 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   },
   { route: "/settings/infinitus/devices", label: "Devices", marker: "Serve the fleet to my phone" },
   { route: "/settings/infinitus/engines", label: "Engines", marker: "swapd engine on" },
-  { route: "/settings/infinitus/profiles", label: "Profiles", marker: "nightly-review" },
   {
     route: "/utilization",
     label: "Utilization",
