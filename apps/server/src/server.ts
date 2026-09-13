@@ -305,7 +305,9 @@ const PlatformServicesLive = Layer.unwrap(
   }),
 );
 
-const ReactorLayerLive = Layer.empty.pipe(
+/** The orchestration reactors, and the fork layers that read them. Continued
+    by `ReactorLayerLive` below, which is what the runtime provides. */
+const ReactorCoreLayerLive = Layer.empty.pipe(
   Layer.provideMerge(OrchestrationReactorLive),
   Layer.provideMerge(ProviderRuntimeIngestionLive),
   Layer.provideMerge(ProviderCommandReactorLive),
@@ -322,6 +324,21 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(ThreadPullRequestReactor.layer),
   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(RuntimeReceiptBusLive),
+);
+
+/**
+ * The fork's own reactors, on top of the list above.
+ *
+ * The split is not cosmetic: `pipe` is typed to twenty arguments, and one
+ * list of these reached it. A twenty-first `Layer.provideMerge` does not
+ * read as "too many arguments" where it was written — the overload falls
+ * through, the composition degrades to `any`, and the build fails with a
+ * hundred errors in `bin.ts` and the CLI tests, none of which name the line
+ * that caused them. Chaining costs nothing: `X.pipe(a, b).pipe(c)` composes
+ * exactly as `X.pipe(a, b, c)` does, so a layer added to either list
+ * provides to everything written above it, as before.
+ */
+const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
