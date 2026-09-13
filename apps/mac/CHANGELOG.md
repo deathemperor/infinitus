@@ -11,6 +11,7 @@ publishes the matching section as the GitHub release body.
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
+- A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
 
 
 ## 0.5.0-alpha.8
