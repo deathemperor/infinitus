@@ -18,10 +18,16 @@ import FoundationNetworking
 /// is unauthenticated, so this needs no credential, and it is only ever
 /// spoken to loopback.
 ///
-/// Scope: this refuses a target that was never alive. A target that dies
-/// *after* its publish is the server heartbeat's job (#1146) — the live
-/// server re-publishes its own port within the minute and takes the target
-/// back. The two together are what make the pair robust.
+/// What is protected is a *working* target, not the pref: a publish is only
+/// refused when the port it would replace answers and the new one does not.
+/// With nothing behind either port — the app started before the backend, or
+/// the pref still holds a stale number — refusing would wedge the pref for no
+/// benefit, so the publish goes through.
+///
+/// Scope: this refuses a target that is not alive *now*. A target that dies
+/// after its publish is the server heartbeat's job (#1146) — the live server
+/// re-publishes its own port within the minute and takes the target back. The
+/// two together are what make the pair robust.
 public enum ForkServerProbe {
     /// One probe exchange: the well-known URL in, the HTTP status out, or a
     /// throw for a connection that never got that far. A closure so tests
@@ -46,6 +52,25 @@ public enum ForkServerProbe {
     public static func answers(port: Int, using transport: Transport) async -> Bool {
         guard let url = url(port: port) else { return false }
         do { return (200..<300).contains(try await transport(url)) } catch { return false }
+    }
+
+    public enum Verdict: Equatable {
+        /// Follow the publish: the new port answers, it is the port already in
+        /// use (the live server's own heartbeat), or there is no working target
+        /// to lose.
+        case accept
+        /// Keep the target the app has: it answers and the new one does not.
+        case refuse
+    }
+
+    /// The whole rule, in probe order so the common case costs one exchange:
+    /// a publish onto the port already in use is never probed, one onto a port
+    /// that answers is followed, and only a publish that would trade a working
+    /// target for a silent one is refused.
+    public static func verdict(newPort: Int, currentPort: Int, using transport: Transport) async -> Verdict {
+        if newPort == currentPort { return .accept }
+        if await answers(port: newPort, using: transport) { return .accept }
+        return await answers(port: currentPort, using: transport) ? .refuse : .accept
     }
 
     /// The work-log line a refused publish leaves, so the reason is on the

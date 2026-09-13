@@ -1868,13 +1868,14 @@ final class AppModel: ObservableObject {
     }
 
     /// Guards a fork-server publish that would move the target (#1137): the
-    /// port must actually serve `/.well-known/t3/environment` before the quick
-    /// tunnel retargets and the CLI's credential origin is replaced. A publish
-    /// naming the port already in use is the live server's own heartbeat
-    /// (#1146) and is never probed. Refusals are logged, not silent.
+    /// quick tunnel and the CLI's credential origin only follow a port that
+    /// serves `/.well-known/t3/environment`, and only when the port they would
+    /// leave still does. `ForkServerProbe.verdict` holds the rule; this adds
+    /// the work-log line, so a refusal is on the record rather than inferred.
     func acceptsForkServerPublish(port: Int) async -> Bool {
-        if port == forkServerPort { return true }
-        if await ForkServerProbe.answers(port: port, using: forkServerProbe) { return true }
+        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: forkServerPort,
+                                                   using: forkServerProbe)
+        if verdict == .accept { return true }
         logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
         return false
     }
