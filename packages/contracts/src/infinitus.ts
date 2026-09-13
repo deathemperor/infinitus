@@ -394,7 +394,10 @@ export type InfinitusPrefs = typeof InfinitusPrefs.Type;
 /** A login in flight: `flow` is `relay`, `deviceCode`, `remote` or `local`;
     `phase` walks `starting` → `waitingForBrowser` / `waitingForCode` → `done`
     / `failed`; `url` and `userCode` are what a person opens and types on
-    another device; `startedAt` is epoch seconds. */
+    another device; `startedAt` is epoch seconds. Its `pid` was the session
+    that needed the login, never the login process's own
+    (`AwsLogin.State`: "The session that needed it, if the login was started
+    for one."), and left with the item's `pid` / `sessionLabel` (#1041). */
 export const InfinitusAwsLoginState = Schema.Struct({
   profile: Schema.String,
   flow: Schema.String,
@@ -404,7 +407,6 @@ export const InfinitusAwsLoginState = Schema.Struct({
   callbackPort: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   message: Schema.optionalKey(Schema.NullOr(Schema.String)),
   startedAt: Schema.Number,
-  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusAwsLoginState = typeof InfinitusAwsLoginState.Type;
@@ -627,12 +629,12 @@ export const InfinitusActivityPushRegistration = Schema.Struct({
 });
 export type InfinitusActivityPushRegistration = typeof InfinitusActivityPushRegistration.Type;
 
-/** What a client is looking at: every session, one session by pid, the fleet,
-    or the stats. The Mac only does per-session work while some client holds a
-    lease on that scope. */
+/** What a client is looking at: the fleet, or the stats. The Mac only does
+    that work while some client holds a lease on the scope. The two session
+    scopes and the `pid` that named one left with the Mac's session tracker
+    (#1041); the fork's server never sent either. */
 export const InfinitusClientActivityScope = Schema.Struct({
-  type: Schema.Literals(["sessions", "session", "fleets", "stats"]),
-  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  type: Schema.Literals(["fleets", "stats"]),
 });
 export type InfinitusClientActivityScope = typeof InfinitusClientActivityScope.Type;
 

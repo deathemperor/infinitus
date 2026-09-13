@@ -511,31 +511,37 @@ describe("the phone-only write bodies", () => {
     expect(() => decodeRegistration({ ...registration, kind: "widget" })).toThrow();
   });
 
-  it("decodes a lease report whose scopes mix a pid and none", () => {
+  it("decodes the two scopes the server still sends", () => {
     const decoded = decodeActivity({
       clientId: "phone-1",
       visible: true,
       focused: true,
       recentlyInteracted: false,
-      scopes: [{ type: "sessions" }, { type: "session", pid: 4243 }, { type: "fleets" }],
+      scopes: [{ type: "fleets" }, { type: "stats" }],
       ttlMs: 30_000,
     });
-    expect(decoded.scopes[1]?.pid).toBe(4243);
-    expect(decoded.scopes[0]?.pid).toBeUndefined();
+    expect(decoded.scopes.map((scope) => scope.type)).toEqual(["fleets", "stats"]);
   });
 
-  it("rejects a scope kind the lease table does not know", () => {
-    expect(() =>
-      decodeActivity({
-        clientId: "phone-1",
-        visible: true,
-        focused: true,
-        recentlyInteracted: false,
-        scopes: [{ type: "threads" }],
-        ttlMs: 30_000,
-      }),
-    ).toThrow();
-  });
+  it.each([["sessions"], ["session"], ["threads"]])(
+    "rejects the %s scope, which the lease table does not take (#1041)",
+    (type) => {
+      // The report is outgoing — the server only ever sends `fleets` and, while
+      // a Stats page is mounted, `stats`. Narrowing the schema therefore takes
+      // nothing away from a client; the two session scopes left with the Mac's
+      // session tracker and cannot be asked for again by accident.
+      expect(() =>
+        decodeActivity({
+          clientId: "phone-1",
+          visible: true,
+          focused: true,
+          recentlyInteracted: false,
+          scopes: [{ type }],
+          ttlMs: 30_000,
+        }),
+      ).toThrow();
+    },
+  );
 
   it("decodes a crash report with and without its raw diagnostic", () => {
     const report = {
@@ -653,11 +659,27 @@ describe("InfinitusAwsLogins", () => {
     // installed app is briefly an "older Mac": the reply has to keep decoding,
     // with the session simply not reaching the row.
     const decoded = decodeLogins({
-      logins: [{ profile: "papaya", flow: "relay", pid: 4243, sessionLabel: "limitless" }],
+      logins: [
+        {
+          profile: "papaya",
+          flow: "relay",
+          pid: 4243,
+          sessionLabel: "limitless",
+          // The login's own state named the session too — `AwsLogin.State.pid`
+          // is "The session that needed it", never the login process's pid.
+          state: { profile: "papaya", flow: "relay", phase: "done", startedAt: 1, pid: 4243 },
+        },
+      ],
     });
 
     expect(decoded.logins[0]?.profile).toBe("papaya");
-    expect(Object.keys(decoded.logins[0] ?? {})).toEqual(["profile", "flow"]);
+    expect(Object.keys(decoded.logins[0] ?? {})).toEqual(["profile", "flow", "state"]);
+    expect(Object.keys(decoded.logins[0]?.state ?? {})).toEqual([
+      "profile",
+      "flow",
+      "phase",
+      "startedAt",
+    ]);
   });
 
   it("keeps a flow or phase it has never heard of, and rejects a missing profile", () => {
