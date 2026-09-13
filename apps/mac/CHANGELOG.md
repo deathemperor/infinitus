@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Desktop
+- "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
+
 ### Phone
 - A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).
 

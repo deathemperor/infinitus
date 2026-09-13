@@ -12,6 +12,7 @@ import {
   getDesktopUpdateArmedTooltip,
   getDesktopUpdateArmedDialog,
   getDesktopUpdateRunningTurnsDialog,
+  resolveInstallWhenIdleStep,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
@@ -395,5 +396,46 @@ describe("running local turns before a desktop install (#829)", () => {
     expect(getDesktopUpdateArmedTooltip(2)).toBe(
       "Installs when 2 running threads finish. Click to cancel.",
     );
+  });
+
+  it("keeps the armed wait through a newer release and fires once it is downloaded", () => {
+    // #1037: the wait was armed on 1.2.4 with a thread running; 1.2.5 arrives.
+    const downloaded = {
+      ...baseState,
+      status: "downloaded" as const,
+      availableVersion: "1.2.4",
+      downloadedVersion: "1.2.4",
+    };
+    expect(resolveInstallWhenIdleStep(downloaded, "install", 1)).toBe("wait");
+    const superseded = {
+      ...downloaded,
+      status: "available" as const,
+      availableVersion: "1.2.5",
+      downloadedVersion: null,
+    };
+    expect(resolveInstallWhenIdleStep(superseded, "download", 1)).toBe("wait");
+    const downloading = { ...superseded, status: "downloading" as const };
+    expect(resolveInstallWhenIdleStep(downloading, "none", 0)).toBe("wait");
+    const newer = { ...superseded, status: "downloaded" as const, downloadedVersion: "1.2.5" };
+    expect(resolveInstallWhenIdleStep(newer, "install", 1)).toBe("wait");
+    expect(resolveInstallWhenIdleStep(newer, "install", 0)).toBe("install");
+  });
+
+  it("drops the armed wait only when nothing is left to install", () => {
+    const upToDate = {
+      ...baseState,
+      status: "up-to-date" as const,
+      availableVersion: null,
+      downloadedVersion: null,
+    };
+    expect(resolveInstallWhenIdleStep(upToDate, "none", 0)).toBe("disarm");
+    expect(resolveInstallWhenIdleStep(null, "none", 0)).toBe("disarm");
+    const checking = {
+      ...baseState,
+      status: "checking" as const,
+      availableVersion: "1.2.4",
+      downloadedVersion: "1.2.4",
+    };
+    expect(resolveInstallWhenIdleStep(checking, "none", 0)).toBe("wait");
   });
 });
