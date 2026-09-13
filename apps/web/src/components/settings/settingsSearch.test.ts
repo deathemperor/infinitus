@@ -221,6 +221,9 @@ describe("searchSettings", () => {
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
+      // Last, on no title match: the project file the Actions row imports from
+      // is named infinitus.json, and that is a name people search for.
+      "project-actions",
     ]);
   });
 

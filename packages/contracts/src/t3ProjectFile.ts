@@ -15,10 +15,7 @@ export const LEGACY_T3_PROJECT_FILE_NAME = "t3.json";
  * The names a workspace root is searched for, in order. The first one that
  * exists decides; a second file is never merged into the first.
  */
-export const T3_PROJECT_FILE_NAMES = [
-  T3_PROJECT_FILE_NAME,
-  LEGACY_T3_PROJECT_FILE_NAME,
-] as const;
+export const T3_PROJECT_FILE_NAMES = [T3_PROJECT_FILE_NAME, LEGACY_T3_PROJECT_FILE_NAME] as const;
 
 /** Public URL of the published JSON Schema for {@link T3ProjectFile}. */
 export const T3_PROJECT_FILE_SCHEMA_URL = "https://infinitus.run/schema/infinitus.json";

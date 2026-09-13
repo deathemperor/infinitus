@@ -6,10 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
-import {
-  LEGACY_T3_PROJECT_FILE_NAME,
-  T3_PROJECT_FILE_NAME,
-} from "@t3tools/contracts";
+import { LEGACY_T3_PROJECT_FILE_NAME, T3_PROJECT_FILE_NAME } from "@t3tools/contracts";
 
 import * as T3ProjectFileLoader from "./T3ProjectFileLoader.ts";
 
@@ -75,11 +72,7 @@ it.layer(TestLayer)("T3ProjectFileLoader", (it) => {
       Effect.gen(function* () {
         const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
         const cwd = yield* makeTempDir;
-        yield* writeProjectFile(
-          cwd,
-          '{ "iconPath": "legacy.svg" }',
-          LEGACY_T3_PROJECT_FILE_NAME,
-        );
+        yield* writeProjectFile(cwd, '{ "iconPath": "legacy.svg" }', LEGACY_T3_PROJECT_FILE_NAME);
 
         const loaded = yield* loader.load(cwd);
 
@@ -95,11 +88,7 @@ it.layer(TestLayer)("T3ProjectFileLoader", (it) => {
         const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
         const cwd = yield* makeTempDir;
         yield* writeProjectFile(cwd, '{ "iconPath": "preferred.svg" }');
-        yield* writeProjectFile(
-          cwd,
-          '{ "iconPath": "legacy.svg" }',
-          LEGACY_T3_PROJECT_FILE_NAME,
-        );
+        yield* writeProjectFile(cwd, '{ "iconPath": "legacy.svg" }', LEGACY_T3_PROJECT_FILE_NAME);
 
         const loaded = yield* loader.load(cwd);
 
@@ -117,11 +106,7 @@ it.layer(TestLayer)("T3ProjectFileLoader", (it) => {
         const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
         const cwd = yield* makeTempDir;
         yield* writeProjectFile(cwd, "{ not json");
-        yield* writeProjectFile(
-          cwd,
-          '{ "iconPath": "legacy.svg" }',
-          LEGACY_T3_PROJECT_FILE_NAME,
-        );
+        yield* writeProjectFile(cwd, '{ "iconPath": "legacy.svg" }', LEGACY_T3_PROJECT_FILE_NAME);
 
         const loaded = yield* loader.load(cwd);
 
