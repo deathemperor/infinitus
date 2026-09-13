@@ -18,7 +18,7 @@ import { useForgetOnSwitchOff } from "./pushForget";
 import { tokenSender } from "./pushRegistration";
 
 /** Headless. Registers this phone's plain notification token with the Mac
-    that drives its cards as the `alert` kind (#702), so the Mac's limit /
+    it follows as the `alert` kind (#702), so the Mac's limit /
     waiting / AWS-login alerts reach the phone as banners; a tap opens
     Settings › Accounts. Re-sent when APNs rotates the token and on every
     foreground (throttled). iOS only, off until the toggle is on, and nothing
