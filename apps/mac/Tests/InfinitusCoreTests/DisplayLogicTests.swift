@@ -121,12 +121,12 @@ final class StaleAgeTests: XCTestCase {
         let throttled = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380,
                                 stale: true, staleReason: "http-429")
         XCTAssertEqual(throttled.staleTip,
-                       "Usage from 6 min ago — swapd could not refresh this account (http-429); "
+                       "Usage from 6 min ago — the engine could not refresh this account (http-429); "
                        + "it retries on its own")
 
         let unexplained = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380, stale: true)
         XCTAssertEqual(unexplained.staleTip,
-                       "Usage from 6 min ago — swapd could not refresh this account; "
+                       "Usage from 6 min ago — the engine could not refresh this account; "
                        + "it retries on its own")
 
         XCTAssertNil(Account(number: 1, email: "a@b.c", usageAgeSeconds: 380).staleTip)

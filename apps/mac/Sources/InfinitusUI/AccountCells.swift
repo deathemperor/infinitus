@@ -147,8 +147,8 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             : theme.planLabel(plan, compact: compactText)
     }
 
-    /// "6 min ago" beside the plan, with its tooltip, when swapd could
-    /// not refresh this account (#965); nil for every other row.
+    /// "6 min ago" beside the plan, with its tooltip, when the engine
+    /// could not refresh this account (#965); nil for every other row.
     var staleAge: (label: String, tip: String)? {
         guard let label = account.staleAgeLabel, let tip = account.staleTip else { return nil }
         return (label, tip)

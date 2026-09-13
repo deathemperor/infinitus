@@ -173,9 +173,9 @@ public enum StaleAge {
 }
 
 public extension Account {
-    /// The row's age caption when swapd could not refresh this account
-    /// (#965); nil for every non-stale row, and nil when stale but the
-    /// engine gave no age to show.
+    /// The row's age caption when the engine could not refresh this
+    /// account (#965); nil for every non-stale row, and nil when stale
+    /// but the engine gave no age to show.
     var staleAgeLabel: String? {
         guard stale == true else { return nil }
         return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
@@ -186,7 +186,7 @@ public extension Account {
     var staleTip: String? {
         guard let age = staleAgeLabel else { return nil }
         let why = staleReason.map { " (\($0))" } ?? ""
-        return "Usage from \(age) — swapd could not refresh this account\(why); it retries on its own"
+        return "Usage from \(age) — the engine could not refresh this account\(why); it retries on its own"
     }
 }
 

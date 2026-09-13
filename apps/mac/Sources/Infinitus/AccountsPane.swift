@@ -1109,7 +1109,7 @@ private struct FleetAccountsSection: View {
         if let age = a.staleAgeLabel {
             chip("Stale · \(age)", .orange)
                 .accessibilityLabel("Stale. The usage shown is from \(age); "
-                                    + "swapd could not refresh it and retries on its own.")
+                                    + "the engine could not refresh it and retries on its own.")
         }
         if a.disabled ?? false {
             // Primary type on the gray fill: secondary-on-secondary at
