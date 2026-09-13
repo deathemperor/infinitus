@@ -88,6 +88,7 @@ import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
 import { InfinitusForkAnchorGate } from "./infinitus/Layers/InfinitusForkAnchorGate.ts";
 import { InfinitusSessionHoldLayers } from "./infinitus/Layers/InfinitusSessionHold.ts";
 import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
+import { InfinitusTurnRateLive } from "./infinitus/Layers/InfinitusTurnRate.ts";
 import { InfinitusSessionInterruptLive } from "./infinitus/Layers/InfinitusSessionInterrupt.ts";
 import { InfinitusBabysitLive } from "./infinitus/Layers/InfinitusBabysit.ts";
 import { InfinitusTurnQueueLive } from "./infinitus/Layers/InfinitusTurnQueue.ts";
@@ -352,8 +353,11 @@ const ReactorLayerLive = Layer.empty.pipe(
   // Fork (#616): the TurnStartGate every provider turn start passes — holds a
   // background thread's start while its fleet's headroom reads low.
   Layer.provideMerge(InfinitusSessionHoldLayers),
-  // Fork (#829): the running turns an update must not cut off.
-  Layer.provideMerge(InfinitusRunningTurnsLive),
+  // Fork: the running turns an update must not cut off (#829), and the
+  // Utilization page's live token rate folded from the turn usage rows
+  // (#1127). Two reads of what this server is doing, merged because the pipe
+  // above is at its argument limit.
+  Layer.provideMerge(Layer.mergeAll(InfinitusRunningTurnsLive, InfinitusTurnRateLive)),
 );
 
 const ProviderSessionDirectoryLayerLive = ProviderSessionDirectoryLive.pipe(

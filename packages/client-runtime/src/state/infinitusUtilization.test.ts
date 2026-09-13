@@ -7,7 +7,7 @@ import {
   formatCount,
   historyLines,
   historyRange,
-  liveRateText,
+  liveTurnRateText,
   replayText,
   runRateRows,
   utilizationWindows,
@@ -230,12 +230,17 @@ describe("run rate", () => {
       "1,620",
       "1,200,000",
     ]);
-    expect(liveRateText(decodeUtilization(reply)!)).toBe(
-      "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",
-    );
-    expect(liveRateText({ days: 1, samples: [], liveRate: { perMinute: 0 } })).toBe(
-      "Live: 0 output tokens/min over the last 5 minutes.",
-    );
-    expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+    // #1127: the live line is this server's own turns, per minute of window.
+    expect(
+      liveTurnRateText({ windowMinutes: 5, turns: 3, inputTokens: 40_000, outputTokens: 6000 }),
+    ).toBe("Live: ≈ 1.2k output tokens/min — 3 turns finished here in the last 5 minutes.");
+    expect(
+      liveTurnRateText({ windowMinutes: 5, turns: 1, inputTokens: 900, outputTokens: 500 }),
+    ).toBe("Live: ≈ 100 output tokens/min — 1 turn finished here in the last 5 minutes.");
+    // Nothing finished in the window: no line at all, never a zero.
+    expect(
+      liveTurnRateText({ windowMinutes: 5, turns: 0, inputTokens: 0, outputTokens: 0 }),
+    ).toBeNull();
+    expect(liveTurnRateText(null)).toBeNull();
   });
 });

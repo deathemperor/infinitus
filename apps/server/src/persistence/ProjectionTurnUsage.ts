@@ -57,6 +57,25 @@ export const DeleteProjectionTurnUsageExceptInput = Schema.Struct({
 });
 export type DeleteProjectionTurnUsageExceptInput = typeof DeleteProjectionTurnUsageExceptInput.Type;
 
+export const SumProjectionTurnUsageSinceInput = Schema.Struct({
+  /** ISO instant; rows completed at or after it are summed. */
+  since: Schema.String,
+});
+export type SumProjectionTurnUsageSinceInput = typeof SumProjectionTurnUsageSinceInput.Type;
+
+/**
+ * Fork (#1127): the turns of every thread that completed inside a window and
+ * what they reported. Turns whose provider reported no usage are left out —
+ * their tokens are zero for "not reported", and counting them would read as
+ * work that spent nothing.
+ */
+export const ProjectionTurnUsageSum = Schema.Struct({
+  turns: Schema.Number,
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+});
+export type ProjectionTurnUsageSum = typeof ProjectionTurnUsageSum.Type;
+
 const ProjectionTurnUsageDbRow = ProjectionTurnUsage.mapFields(
   Struct.assign({ turnUsage: Schema.fromJsonString(ThreadTurnUsage) }),
 );
@@ -77,6 +96,10 @@ export class ProjectionTurnUsageRepository extends Context.Service<
     readonly deleteByThreadId: (
       input: ListProjectionTurnUsageInput,
     ) => Effect.Effect<void, ProjectionRepositoryError>;
+    /** Every thread's turns that completed at or after an instant, summed. */
+    readonly sumSince: (
+      input: SumProjectionTurnUsageSinceInput,
+    ) => Effect.Effect<ProjectionTurnUsageSum, ProjectionRepositoryError>;
     /** Threads the transcript backfill may estimate, most recently active first. */
     readonly listBackfillCandidates: (
       input: ListThreadUsageBackfillCandidatesInput,
@@ -129,6 +152,20 @@ const make = Effect.gen(function* () {
     execute: ({ threadId }) => sql`
       DELETE FROM projection_turn_usage
       WHERE thread_id = ${threadId}
+    `,
+  });
+
+  const sumRowsSince = SqlSchema.findAll({
+    Request: SumProjectionTurnUsageSinceInput,
+    Result: ProjectionTurnUsageSum,
+    execute: ({ since }) => sql`
+      SELECT
+        COUNT(*) AS "turns",
+        COALESCE(SUM(json_extract(usage_json, '$.inputTokens')), 0) AS "inputTokens",
+        COALESCE(SUM(json_extract(usage_json, '$.outputTokens')), 0) AS "outputTokens"
+      FROM projection_turn_usage
+      WHERE completed_at >= ${since}
+        AND json_extract(usage_json, '$.usageUnavailable') IS NULL
     `,
   });
 
@@ -187,6 +224,12 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  const sumSince: ProjectionTurnUsageRepository["Service"]["sumSince"] = (input) =>
+    sumRowsSince(input).pipe(
+      Effect.map((rows) => rows[0] ?? { turns: 0, inputTokens: 0, outputTokens: 0 }),
+      Effect.mapError(toPersistenceSqlError("ProjectionTurnUsageRepository.sumSince:query")),
+    );
+
   const listBackfillCandidates: ProjectionTurnUsageRepository["Service"]["listBackfillCandidates"] =
     (input) =>
       listCandidates(input).pipe(
@@ -200,6 +243,7 @@ const make = Effect.gen(function* () {
     listByThreadId,
     deleteByThreadIdExcept,
     deleteByThreadId,
+    sumSince,
     listBackfillCandidates,
   } satisfies ProjectionTurnUsageRepository["Service"];
 });

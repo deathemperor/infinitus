@@ -1,4 +1,4 @@
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusSnapshot, InfinitusTurnRate } from "@t3tools/contracts/infinitus";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
+  turnRate: null as InfinitusTurnRate | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     utilization: () => ({ label: "utilization-atom" }),
+    turnRate: () => ({ label: "turn-rate-atom" }),
   },
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -31,7 +33,9 @@ vi.mock("../../state/query", () => ({
         ? null
         : atom.label === "utilization-atom"
           ? testState.utilization
-          : testState.snapshot;
+          : atom.label === "turn-rate-atom"
+            ? testState.turnRate
+            : testState.snapshot;
     return {
       data,
       error: null,
@@ -244,6 +248,7 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
+    testState.turnRate = { windowMinutes: 5, turns: 3, inputTokens: 40_000, outputTokens: 6000 };
     testState.capability = true;
     testState.refresh.mockReset();
   });
@@ -265,8 +270,21 @@ describe("UtilizationPage", () => {
     // Turns are grouped like every other count in the fork, never "1200".
     expect(markup).toContain(">1,200<");
     expect(markup).toContain("Tokens counted but not priced: mystery-1");
-    expect(markup).toContain("Live: 1.5k output tokens/min");
     expect(markup).toContain("24 hours");
+  });
+
+  it("reads the live line off this server's turns, not the Mac's retired rate (#1127)", () => {
+    let markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain("1.2k output tokens/min");
+    expect(markup).toContain("3 turns finished here in the last 5 minutes");
+    // The reply's own `liveRate` (1.5k/min) is no longer read.
+    expect(markup).not.toContain("1.5k output tokens/min");
+
+    // An idle server draws no line at all rather than a zero.
+    testState.turnRate = { windowMinutes: 5, turns: 0, inputTokens: 0, outputTokens: 0 };
+    markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain("Run rate");
+    expect(markup).not.toContain("output tokens/min");
   });
 
   it("draws the five-hour windows, the replay and the weekly waste beside the chart", () => {

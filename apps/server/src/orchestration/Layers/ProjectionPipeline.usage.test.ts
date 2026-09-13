@@ -371,4 +371,80 @@ engineLayer("turn usage on the thread projection (#834)", (it) => {
       assert.deepStrictEqual(yield* candidates(), []);
     }),
   );
+
+  it.effect("the live window sums every thread's turns that finished inside it (#1127)", () =>
+    Effect.gen(function* () {
+      const engine = yield* OrchestrationEngineService;
+      const repository = yield* ProjectionTurnUsageRepository;
+      const createdAt = "2026-09-12T00:00:00.000Z";
+      const projectId = ProjectId.make("project-rate");
+      const modelSelection = { instanceId: ProviderInstanceId.make("claude"), model: "opus" };
+      const createThread = (threadId: ThreadId, commandId: string) =>
+        engine.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(commandId),
+          threadId,
+          projectId,
+          title: threadId,
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdAt,
+        });
+      const record = (commandId: string, threadId: ThreadId, turnUsage: ThreadTurnUsage) =>
+        engine.dispatch({
+          type: "thread.turn.usage.record",
+          commandId: CommandId.make(commandId),
+          threadId,
+          turnUsage,
+          createdAt: turnUsage.completedAt,
+        });
+
+      yield* engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-rate-project"),
+        projectId,
+        title: "Rate",
+        workspaceRoot: "/tmp/project-rate",
+        defaultModelSelection: modelSelection,
+        createdAt,
+      });
+      const first = ThreadId.make("thread-rate-first");
+      const second = ThreadId.make("thread-rate-second");
+      yield* createThread(first, "cmd-rate-thread-1");
+      yield* createThread(second, "cmd-rate-thread-2");
+
+      const window = { since: "2026-09-12T00:10:00.000Z" };
+      assert.deepStrictEqual(yield* repository.sumSince(window), {
+        turns: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+
+      // Older than the window: counted by the thread's rollup, not the rate.
+      yield* record("cmd-rate-old", first, turn("turn-old", "2026-09-12T00:05:00.000Z", 0.1));
+      // Two threads, both inside the window.
+      yield* record("cmd-rate-1", first, turn("turn-1", "2026-09-12T00:11:00.000Z", 0.1));
+      yield* record("cmd-rate-2", second, turn("turn-2", "2026-09-12T00:12:00.000Z", null));
+      // A provider that reported nothing leaves a row with zero tokens; it is
+      // no evidence of a rate, so the window leaves it out entirely.
+      yield* record("cmd-rate-3", second, {
+        ...turn("turn-3", "2026-09-12T00:13:00.000Z", null),
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        cacheCreationTokens: 0,
+        reasoningTokens: null,
+        usageUnavailable: true,
+      });
+
+      assert.deepStrictEqual(yield* repository.sumSince(window), {
+        turns: 2,
+        inputTokens: 2000,
+        outputTokens: 200,
+      });
+    }),
+  );
 });

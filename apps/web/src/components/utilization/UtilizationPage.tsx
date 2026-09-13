@@ -14,7 +14,7 @@ import {
   formatCount,
   historyLines,
   historyRange,
-  liveRateText,
+  liveTurnRateText,
   replayText,
   RUN_RATE_NOTE,
   runRateRows,
@@ -25,7 +25,7 @@ import {
   type HistoryLine,
   type WasteRow,
 } from "@t3tools/client-runtime/state/infinitusUtilization";
-import type { InfinitusUtilization } from "@t3tools/contracts/infinitus";
+import type { InfinitusTurnRate, InfinitusUtilization } from "@t3tools/contracts/infinitus";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
@@ -107,6 +107,11 @@ export function UtilizationPage() {
   const utilization = useMemo(
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
+  );
+  // #1127: the live line's number is this server's own, not the Mac's, so it
+  // is read whatever the app's build answers for `utilization`.
+  const turnRateQuery = useEnvironmentQuery(
+    ready ? infinitusEnvironment.turnRate({ environmentId, input: {} }) : null,
   );
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
@@ -205,7 +210,7 @@ export function UtilizationPage() {
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
-            <RunRateSection utilization={utilization} />
+            <RunRateSection utilization={utilization} turnRate={turnRateQuery.data} />
           </>
         )}
       </div>
@@ -627,9 +632,15 @@ function WasteRowLine({
   );
 }
 
-function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
+function RunRateSection({
+  utilization,
+  turnRate,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly turnRate: InfinitusTurnRate | null;
+}) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization);
+  const live = liveTurnRateText(turnRate);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">

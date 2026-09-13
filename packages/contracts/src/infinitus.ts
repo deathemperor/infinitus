@@ -522,6 +522,20 @@ export const InfinitusReleaseThreadResult = Schema.Struct({
 });
 export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;
 
+/** Fork (#1127): what the threads on THIS server spent over a short rolling
+    window, folded from the per-turn usage rows (#834). Not a Mac reply — the
+    Mac's own live rate tailed terminal transcripts and retired with them
+    (#1041). A turn's tokens land at its completion, so the window counts the
+    turns that finished inside it; `turns: 0` means there is nothing to show.
+    Estimates like every other usage figure, never billing truth. */
+export const InfinitusTurnRate = Schema.Struct({
+  windowMinutes: Schema.Finite,
+  turns: Schema.Finite,
+  inputTokens: Schema.Finite,
+  outputTokens: Schema.Finite,
+});
+export type InfinitusTurnRate = typeof InfinitusTurnRate.Type;
+
 /** Fork a thread at a turn (#270 E2): a new thread on the same branch and
     worktree whose Claude session continues from that turn; the source is not
     touched. `turnCount` is the checkpoint turn count shown on the message. */

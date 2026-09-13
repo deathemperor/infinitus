@@ -1447,7 +1447,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   on a row the Mac stopped watching hours before the reset; 5h windows are
   left out, since they recycle ~34× a week) and Run rate (tokens,
   API-equivalent $ and turns over the last
-  hour / day / week, unpriced models, the live output rate) read the Mac's
+  hour / day / week, unpriced models) read the Mac's
   `utilization --days n` through `infinitusEnvironment.utilization`, a
   query atom re-read every 5 min while the page is mounted and dropped a
   minute after it leaves; `InfinitusUtilization` in
@@ -1461,6 +1461,19 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   without the verb keeps the forecast and says what is missing; one whose
   reply carries no telemetry keeps the chart and the run rate, and the two
   sections are simply absent. Sidebar "Utilization" beside Activity.
+  The live line under the run-rate table is the server's own (#1127), not a
+  Mac read: the Mac's `liveRate` tailed terminal transcripts and retired with
+  them (#1041), so `infinitus.turnRate` (`InfinitusTurnRate` in the contracts,
+  read scope, `InfinitusTurnRate` service +
+  `apps/server/src/infinitus/Layers/InfinitusTurnRate.ts`) sums the
+  `projection_turn_usage` rows (#834) whose turn completed inside a five-minute
+  window — `ProjectionTurnUsageRepository.sumSince`, one statement, turns whose
+  provider reported no usage left out — and `liveTurnRateText` words it
+  ("Live: ≈ 1.2k output tokens/min — 3 turns finished here in the last 5
+  minutes"). A turn's tokens land at its completion, so the window counts the
+  turns that finished in it; no turn, no line, never a zero. The read is
+  `infinitusEnvironment.turnRate`, re-read every minute while the page is
+  mounted. A projection read that fails answers an empty window and logs.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:

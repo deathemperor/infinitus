@@ -168,6 +168,7 @@ export const RPC_REQUIRED_SCOPES = {
   // Launching the app spawns a process on the host.
   [WS_METHODS.infinitusLaunch]: AuthOrchestrationOperateScope,
   [WS_METHODS.infinitusReleaseThread]: AuthOrchestrationOperateScope,
+  [WS_METHODS.infinitusTurnRate]: AuthOrchestrationReadScope,
   // Held threads are thread state, read like the snapshot.
   [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
   // A secret to the app (a sign-in code, a key, a token) is administrative:

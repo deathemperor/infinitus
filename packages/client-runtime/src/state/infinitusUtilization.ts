@@ -3,6 +3,7 @@ import {
   InfinitusUtilizationFiveHourWindow,
   InfinitusUtilizationGeneration,
   InfinitusUtilizationReplay,
+  type InfinitusTurnRate,
   type InfinitusUtilizationSample,
   type InfinitusUtilizationTotals,
   type InfinitusUtilizationWindow,
@@ -292,15 +293,19 @@ export function formatCount(value: number): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
-/** The live line under the table: the popup's five-minute output rate. */
-export function liveRateText(u: InfinitusUtilization): string | null {
-  const live = u.liveRate;
-  if (live === undefined || live === null) return null;
-  const peak =
-    live.peakPerMinute !== undefined && live.peakPerMinute > live.perMinute
-      ? `, peak ${compactTokens(live.peakPerMinute)}`
-      : "";
-  return `Live: ${compactTokens(live.perMinute)} output tokens/min over the last 5 minutes${peak}.`;
+/**
+ * The live line under the table (#1127): the output rate of the turns THIS
+ * server finished inside the window, from its own usage rows. The Mac's
+ * `liveRate` tailed terminal transcripts and retired with them (#1041), so
+ * the number now says what the threads here are spending. Null while no turn
+ * reported inside the window — an idle server draws no line rather than a
+ * zero.
+ */
+export function liveTurnRateText(rate: InfinitusTurnRate | null): string | null {
+  if (rate === null || rate.turns <= 0 || rate.windowMinutes <= 0) return null;
+  const perMinute = compactTokens(rate.outputTokens / rate.windowMinutes);
+  const turns = rate.turns === 1 ? "1 turn" : `${rate.turns} turns`;
+  return `Live: ≈ ${perMinute} output tokens/min — ${turns} finished here in the last ${rate.windowMinutes} minutes.`;
 }
 
 export const RUN_RATE_NOTE =

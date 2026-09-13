@@ -93,6 +93,7 @@ import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
+import { InfinitusTurnRate } from "./infinitus/Services/InfinitusTurnRate.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
@@ -564,6 +565,7 @@ const makeWsRpcLayer = (
       const infinitusSessionHold = yield* InfinitusSessionHold;
       const infinitusLimitStops = yield* InfinitusLimitStops;
       const infinitusSessionInterrupt = yield* InfinitusSessionInterrupt;
+      const infinitusTurnRate = yield* InfinitusTurnRate;
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
@@ -3254,6 +3256,12 @@ const makeWsRpcLayer = (
               ),
             { "rpc.aggregate": "infinitus", "thread.id": input.threadId },
           ),
+        // Fork (#1127): the live token rate of this server's own threads. No
+        // thread or account reaches the span, only that it was read.
+        [WS_METHODS.infinitusTurnRate]: (_input) =>
+          observeRpcEffect(WS_METHODS.infinitusTurnRate, infinitusTurnRate.read, {
+            "rpc.aggregate": "infinitus",
+          }),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
           observeRpcStreamEffect(
             WS_METHODS.subscribeInfinitusPairing,
