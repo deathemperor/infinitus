@@ -254,7 +254,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
-  client (#1076). `InfinitusSlackLive` (provided `SlackClientLive` over
+  client (#1076), merged with `InfinitusAgentActivityLive` (#1047). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
@@ -1734,6 +1734,33 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   waited on; an unreachable Mac or a refused verb is logged and the row
   stays. The result text and the command reach no log, span or payload —
   only the thread id, the provider and the profile.
+- `apps/server/src/infinitus/Layers/InfinitusAgentActivity.ts` (+
+  `infinitusAgentActivity.logic.ts`, tests) — the phone's lock-screen thread
+  card, the server half (#1047 part 3; the Mac half is `ThreadActivityPush`
+  in `apps/mac`, the phone's the `AgentActivity` widget). The server folds
+  every live thread's `projectThreadAwareness` (what the T3 Connect relay is
+  fed per thread; side questions skipped) into upstream's aggregate card as
+  the relay's `makeAggregateState` does — ported, since the server cannot
+  import `infra/relay`: the active rows by priority (approval and input,
+  failed, working), then the threads finished within 15 min, five rows at
+  most, "Agent work in progress" / "completed" / "failed"; the title is
+  `PRODUCT_NAME`, and a starting or running row carries its turn's
+  `startedAt`, which the Mac forwards untouched — and hands it to the Mac's
+  `push` verb on stdin (the request line's `secret` field: `{kind, state}`
+  with the kind `thread.activity`, `state: null` ending the card; the reply
+  is `{pushed, card}`). Cadence is `AgentAwarenessRelay`'s: a thread event the relay
+  would publish schedules one fold 5 s later, the fold reads the whole shell
+  snapshot and sends only when the card's identity (everything but the
+  timestamps, at both levels) changed since the last push the Mac took (an
+  unavailable Mac leaves the slot empty, so the next event tries again);
+  each push showing a finished row arms one wake for the moment it ages
+  out, since no thread event says so; a clean shutdown sends `null`
+  best-effort when a card was up. Gated on the manifest's `push` taking a
+  payload whose summary names `thread.activity` (older builds refuse the
+  kind and stay quiet); withheld exactly where the port publish is. Counts
+  and phases reach the log; titles never. Staleness (a phone that stops
+  hearing) is the Mac pusher's, not the server's: an identical card is
+  never re-sent.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
