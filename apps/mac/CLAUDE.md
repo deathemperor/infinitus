@@ -18,10 +18,6 @@ before that the `native` branch). Split out of
   Never read engine internals (`~/.claude-swap-backup/*`). Reading
   Claude Code's own files is fine: `~/.claude/settings.json`,
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.
-- **The resume-nudge mechanism lives HERE, not in the engine** (user
-  2026-08-30; upstream never merged PR #250's copy). InfinitusCore
-  ClaudeSessions/Transcript/PeerSocket/PtyHosts/PtyNudge/SessionResume
-  + ResumeService. Never rebuild it engine-side.
 - **Bundle id is `run.infinitus`**, the phone's `run.infinitus.mobile`
   (+`.widgets`, `.share`), every derived service id under the same
   prefix (user-approved explicit ask, 2026-09-05, with the paid Apple
@@ -139,7 +135,7 @@ before that the `native` branch). Split out of
   account = base URL). Unsigned debug binaries trip an ACL prompt on
   every rebuild — reads skip UI, and the dev loop codesigns the debug
   binary with the Apple Development identity so the grant sticks.
-- A dev instance never pushes Live Activities from the shipped app's
+- A dev instance never pushes alerts from the shipped app's
   APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
   only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
   the pusher stays unconfigured — silently (no last-result line, no
@@ -207,7 +203,7 @@ before that the `native` branch). Split out of
   `INFINITUS_MIRROR_SNAPSHOT=<state-dir>/mirror-snapshot.json`, or
   MirrorExporter overwrites the real app's mirror snapshot (#474), and
   `INFINITUS_APP_SUPPORT=<state-dir>/app-support`, or every other file
-  it writes (stats caches, births, the owned ledger, events…) lands in
+  it writes (stats caches, births, events…) lands in
   the real Application Support/Infinitus (#506; the stats clobber cost
   each relaunch a year's re-read, #346).
 

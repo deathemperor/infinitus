@@ -3,13 +3,13 @@ import InfinitusCore
 import InfinitusUI
 
 /// Feeds the sessions popover's mini progress rows (issue #13 step 2).
-/// Reads Claude Code's own session records + transcript tails — same
-/// engine-isolation rule as ResumeService (never touches the engine).
+/// Reads Claude Code's own session records + transcript tails — the same
+/// engine-isolation rule as everything else here (never touches the engine).
 @MainActor
 final class SessionProgressModel: SessionProgressSource {
     @Published private(set) var byPid: [Int: SessionProgress] = [:]
     /// Fleet-wide output tokens per minute with a slowly decaying peak
-    /// (the footer's ⚡ gauge and the phone's Live Activity).
+    /// (the footer's ⚡ gauge).
     @Published private(set) var tokenRate: TokenRate?
     /// The exporter's facts for leased sessions (#223 phase 3) — the
     /// sessions card reads the attention dot and word off them. Published
@@ -40,12 +40,6 @@ final class SessionProgressModel: SessionProgressSource {
     private var lastSessions: [SessionDetail] = []
     private var rescan: Task<Void, Never>?
     private var rescanWanted = false
-    /// Haiku names for unnamed sessions (SessionNamer.swift); nil on
-    /// playground/mock instances.
-    var namer: SessionNamer? {
-        didSet { namer?.onChange = { [weak self] in self?.applyAutoNames() } }
-    }
-    private var sessionIDByPid: [Int: String] = [:]
 
     /// `sessions`: the engine's current per-session detail (busy-first,
     /// capped) — only those get matched to a transcript and read.
@@ -73,12 +67,8 @@ final class SessionProgressModel: SessionProgressSource {
             var newByPid: [Int: SessionProgress] = [:]
             var newTails: [String: SessionTail] = [:]
             var newCached: [String: SessionProgress] = [:]
-            var ids: [Int: String] = [:]
-            var cwds: [Int: String] = [:]
             var urls: [String: URL] = [:]
             for (session, record) in pairs {
-                ids[session.pid] = record.sessionId
-                cwds[session.pid] = record.cwd
                 let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
                 urls[record.sessionId] = url
                 var tail = tailsCopy[record.sessionId] ?? SessionTail(url: url)
@@ -93,13 +83,13 @@ final class SessionProgressModel: SessionProgressSource {
                 newTails[record.sessionId] = tail
                 newCached[record.sessionId] = progress
             }
-            await self?.finish(byPid: newByPid, tails: newTails, cached: newCached, ids: ids, cwds: cwds,
+            await self?.finish(byPid: newByPid, tails: newTails, cached: newCached,
                                transcripts: urls, light: light)
         }
     }
 
     private func finish(byPid: [Int: SessionProgress], tails: [String: SessionTail],
-                        cached: [String: SessionProgress], ids: [Int: String], cwds: [Int: String],
+                        cached: [String: SessionProgress],
                         transcripts: [String: URL], light: Bool) {
         busy = false
         watch(transcripts)
@@ -107,14 +97,8 @@ final class SessionProgressModel: SessionProgressSource {
         self.tails = tails
         self.cached = cached
         if light, Self.awsNeeds(byPid) == Self.awsNeeds(self.byPid) { return }
-        sessionIDByPid = ids
         scanned = true
         self.byPid = byPid
-        applyAutoNames()
-        if let namer {
-            namer.consider(byPid.compactMap { pid, p in ids[pid].map { ($0, cwds[pid] ?? "", p) } })
-            namer.prune(keeping: Set(ids.values))
-        }
         let perMinute = TokenRate.perMinute(byPid)
         tokenRate = TokenRate(perMinute: perMinute,
                               peakPerMinute: TokenRate.nextPeak(tokenRate?.peakPerMinute ?? 0,
@@ -157,18 +141,4 @@ final class SessionProgressModel: SessionProgressSource {
         }
     }
 
-    /// Stamp Haiku's titles onto the unnamed rows (SessionNamer's
-    /// cache is keyed by session id; rows are keyed by pid).
-    private func applyAutoNames() {
-        guard let namer else { return }
-        var changed = false
-        var next = byPid
-        for (pid, p) in next {
-            guard let id = sessionIDByPid[pid], let title = namer.title(for: id), !title.isEmpty,
-                  p.autoName != title else { continue }
-            next[pid]!.autoName = title
-            changed = true
-        }
-        if changed { byPid = next }
-    }
 }

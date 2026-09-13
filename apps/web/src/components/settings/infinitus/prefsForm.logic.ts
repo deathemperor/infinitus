@@ -152,9 +152,6 @@ export const PREF_COPY: Readonly<
     },
   },
   // Push.
-  push_sessions_done: { label: "All sessions finish working" },
-  push_waiting: { label: "A session waits on you" },
-  push_aws_login: { label: "A session needs an AWS sign-in" },
   push_all_dead: { label: "All accounts are exhausted" },
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },
@@ -166,6 +163,22 @@ export const PREF_COPY: Readonly<
   live_activity_rate_seconds: {
     label: "Lock-screen tok/min interval (seconds)",
     description: "Zero pushes tok/min with other changes only.",
+  },
+  // Devices: the tunnel fronting this server's own port, which the "Pair a
+  // phone" card below hands the QR when the phone is off the Wi‑Fi. The keys
+  // are the Mac's (#572) and say "fork"; the screen never does (#823).
+  fork_tunnel_enabled: {
+    label: "Reach this server through a Cloudflare tunnel",
+    description: "Lets a phone pair and connect from outside your network.",
+  },
+  fork_server_port: {
+    label: "Server port",
+    description: "The port this server listens on. Infinitus writes it at startup.",
+  },
+  fork_tunnel_hostname: {
+    label: "Tunnel hostname",
+    description:
+      "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
   },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },

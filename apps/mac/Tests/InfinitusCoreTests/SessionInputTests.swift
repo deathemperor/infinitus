@@ -1,19 +1,15 @@
 import XCTest
 @testable import InfinitusCore
 
-/// #17 layer 2: the phone sends a reply or a decision into a session.
-/// `FakeHost` is `SessionResumeTests`' scripted multiplexer, reused here
-/// unchanged.
+/// #17 layer 2: the phone sends a reply or a decision into a session —
+/// over its peer socket, or into an owned session's stdin. `hosts` is
+/// always empty (#1041: the terminal-typing leg is gone).
 final class SessionInputTests: XCTestCase {
     private func record(socket: String = "") -> ClaudeSessionRecord {
         ClaudeSessionRecord(pid: 7, sessionId: "s1", cwd: "/repo", messagingSocketPath: socket)
     }
 
-    private func host(_ screens: [String]) -> FakeHost {
-        FakeHost(surfaces: [PtySurface(ref: "s1", tty: "ttys009")], screens: screens)
-    }
-
-    private func deliver(_ request: SessionInput.Request, hosts: [any PtyHost],
+    private func deliver(_ request: SessionInput.Request, hosts: [any PtyHost] = [],
                          socket: String = "", attachmentsDir: URL? = nil,
                          socketSend: @escaping (ClaudeSessionRecord, String) -> Bool = { _, _ in false },
                          owned: ((SessionInput.Request, ClaudeSessionRecord) -> SessionInput.Reply?)? = nil
@@ -30,7 +26,7 @@ final class SessionInputTests: XCTestCase {
 
     func testOwnedHookHandlesKeysBeforeAnyHostIsTouched() {
         var seen: [SessionInput.Request] = []
-        let reply = deliver(SessionInput.Request(kind: .key, text: "1"), hosts: [host(["should not be read"])],
+        let reply = deliver(SessionInput.Request(kind: .key, text: "1"),
                             owned: { req, _ in seen.append(req); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
         XCTAssertEqual(reply, SessionInput.Reply(outcome: "delivered", channel: "stdin"))
         XCTAssertEqual(seen.map(\.text), ["1"])
@@ -39,36 +35,34 @@ final class SessionInputTests: XCTestCase {
     func testOwnedHookSeesApproveAsApproveNotAsKeyOne() {
         // A key "1" means "first option" to a question; approve means allow.
         var seen: [SessionInput.Request.Kind] = []
-        _ = deliver(SessionInput.Request(kind: .approve, text: ""), hosts: [host(["should not be read"])],
+        _ = deliver(SessionInput.Request(kind: .approve, text: ""),
                     owned: { req, _ in seen.append(req.kind); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
         XCTAssertEqual(seen, [.approve])
     }
 
     func testDenyReachesTheOwnedHookAsDeny() {
         var seen: [SessionInput.Request] = []
-        let reply = deliver(SessionInput.Request(kind: .deny, text: "not on main"), hosts: [host(["should not be read"])],
+        let reply = deliver(SessionInput.Request(kind: .deny, text: "not on main"),
                             owned: { req, _ in seen.append(req); return SessionInput.Reply(outcome: "delivered", channel: "stdin") })
         XCTAssertEqual(reply, SessionInput.Reply(outcome: "delivered", channel: "stdin"))
         XCTAssertEqual(seen.map(\.kind), [.deny])
         XCTAssertEqual(seen.map(\.text), ["not on main"])
     }
 
-    func testDenyWithoutAnOwnedChannelFallsBackToKeyThree() {
-        let h = host(["some menu"])
-        let reply = deliver(.init(kind: .deny, text: "not on main"), hosts: [h], owned: { _, _ in nil })
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
-        XCTAssertEqual(h.commands, ["read s1", "line s1 3", "read s1"])
+    func testDenyWithoutAnOwnedChannelReportsNoSurface() {
+        // #1041: no owned hook and no peer socket, so a "3" keypress has
+        // nowhere left to go.
+        let reply = deliver(.init(kind: .deny, text: "not on main"), owned: { _, _ in nil })
+        XCTAssertEqual(reply, .init(outcome: "noSurface"))
     }
 
     func testDenyReasonWithControlCharactersIsRejected() {
-        let h = host(["> "])
-        let reply = deliver(.init(kind: .deny, text: "no\u{1B}[0m"), hosts: [h])
+        let reply = deliver(.init(kind: .deny, text: "no\u{1B}[0m"))
         XCTAssertEqual(reply, .init(outcome: "rejected", detail: "invalid message"))
-        XCTAssertEqual(h.commands, [])
     }
 
-    func testOwnedHookReturningNilFallsThroughToSocketAndPty() {
-        let reply = deliver(SessionInput.Request(kind: .message, text: "hi"), hosts: [host(["❯ "])],
+    func testOwnedHookReturningNilFallsThroughToSocket() {
+        let reply = deliver(SessionInput.Request(kind: .message, text: "hi"),
                             socket: "/tmp/x.sock", socketSend: { _, _ in true }, owned: { _, _ in nil })
         XCTAssertEqual(reply.channel, "socket")
     }
@@ -98,100 +92,56 @@ final class SessionInputTests: XCTestCase {
     // MARK: key validation
 
     func testUnsupportedKeyIsRejectedWithoutTouchingAHost() {
-        let h = host(["> "])
-        let reply = deliver(.init(kind: .key, text: "zz"), hosts: [h])
+        let reply = deliver(.init(kind: .key, text: "zz"))
         XCTAssertEqual(reply, .init(outcome: "rejected", detail: "unsupported key"))
-        XCTAssertEqual(h.commands, [])
     }
 
     func testAnswersGoToTheOwnedHookOrAreRejectedWithoutTouchingAHost() {
-        let h = host(["> "])
-        let reply = deliver(.init(kind: .answers, text: "{}"), hosts: [h])
+        let reply = deliver(.init(kind: .answers, text: "{}"))
         XCTAssertEqual(reply, .init(outcome: "rejected", detail: "answers need a session the app runs"))
-        XCTAssertEqual(h.commands, [])
         var seen: [SessionInput.Request.Kind] = []
-        let owned = deliver(.init(kind: .answers, text: "{}"), hosts: [h],
+        let owned = deliver(.init(kind: .answers, text: "{}"),
                             owned: { req, _ in seen.append(req.kind); return .init(outcome: "delivered", channel: "stdin") })
         XCTAssertEqual(owned.channel, "stdin")
         XCTAssertEqual(seen, [.answers])
-        XCTAssertEqual(h.commands, [])
     }
 
-    func testKeyWhileRunningIsRunning() {
-        let h = host(["Thinking… (esc to interrupt)"])
-        let reply = deliver(.init(kind: .key, text: "1"), hosts: [h])
-        XCTAssertEqual(reply, .init(outcome: "running"))
-    }
-
-    func testKeyEnterSendsAnEmptyLine() {
-        let h = host(["some menu"])
-        let reply = deliver(.init(kind: .key, text: "enter"), hosts: [h])
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
-        XCTAssertEqual(h.commands, ["read s1", "line s1 ", "read s1"])
-    }
-
-    func testKeyEscSendsEscape() {
-        let h = host(["some menu"])
-        let reply = deliver(.init(kind: .key, text: "esc"), hosts: [h])
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
-        XCTAssertEqual(h.commands, ["read s1", "esc s1", "read s1"])
-    }
-
-    func testKeyDigitTypesTheDigit() {
-        let h = host(["some menu"])
-        let reply = deliver(.init(kind: .key, text: "1"), hosts: [h])
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
-        XCTAssertEqual(h.commands, ["read s1", "line s1 1", "read s1"])
-    }
-
+    // #1041: a key press has no channel left at all once it is not owned —
+    // there is no terminal to type it into any more.
     func testKeyWithNoSurfaceReportsNoSurface() {
-        let reply = deliver(.init(kind: .key, text: "y"), hosts: [])
+        let reply = deliver(.init(kind: .key, text: "y"))
         XCTAssertEqual(reply, .init(outcome: "noSurface"))
     }
 
     // MARK: message validation
 
     func testEmptyOrOverlongOrControlCharMessageIsRejected() {
-        let h = host(["> "])
-        XCTAssertEqual(deliver(.init(kind: .message, text: ""), hosts: [h]).outcome, "rejected")
-        XCTAssertEqual(deliver(.init(kind: .message, text: String(repeating: "x", count: 4001)),
-                               hosts: [h]).outcome, "rejected")
-        XCTAssertEqual(deliver(.init(kind: .message, text: "hi\tthere"), hosts: [h]).outcome, "rejected")
+        XCTAssertEqual(deliver(.init(kind: .message, text: "")).outcome, "rejected")
+        XCTAssertEqual(deliver(.init(kind: .message, text: String(repeating: "x", count: 4001))).outcome, "rejected")
+        XCTAssertEqual(deliver(.init(kind: .message, text: "hi\tthere")).outcome, "rejected")
         // A newline is fine.
-        XCTAssertEqual(h.commands, [])
     }
 
-    /// A Continue tap: the Mac's own text, socket first, then the terminal.
-    func testResumeSendsTheContinueTextSocketFirst() {
+    /// A Continue tap: the Mac's own text, over the peer socket.
+    func testResumeSendsTheContinueTextOverTheSocket() {
         var sent: [String] = []
-        let reply = deliver(.init(kind: .resume, text: "ignored"), hosts: [host(["> "])], socket: "/tmp/x.sock",
+        let reply = deliver(.init(kind: .resume, text: "ignored"), socket: "/tmp/x.sock",
                             socketSend: { _, text in sent.append(text); return true })
         XCTAssertEqual(reply, .init(outcome: "delivered", channel: "socket"))
         XCTAssertEqual(sent.count, 1)
         XCTAssertTrue(sent[0].hasPrefix("[Infinitus] Continue where you left off"))
         XCTAssertFalse(sent[0].contains("ignored"))
-        let h = host(["> "])
-        XCTAssertEqual(deliver(.init(kind: .resume, text: ""), hosts: [h]).channel, "pty")
-        XCTAssertTrue(h.commands.contains { $0.contains("Continue where you left off") })
     }
 
-    func testMessageDeliveredViaPty() {
-        let h = host(["> ", "> hi there"])
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [h])
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
-    }
-
-    func testMessageWithASocketIsNeverTyped() {
-        let h = host(["> ", "> hi there"])
-        let reply = deliver(.init(kind: .message, text: "hi\nthere"), hosts: [h],
+    func testMessageWithASocketSucceeds() {
+        let reply = deliver(.init(kind: .message, text: "hi\nthere"),
                             socket: "/tmp/x.sock", socketSend: { _, text in text == PeerSocket.phonePreface + "hi\nthere" })
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "socket"))
-        XCTAssertEqual(h.commands, [], "line breaks kept, terminal untouched")
+        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "socket"), "line breaks kept")
     }
 
     func testMessageGoesToSocketWhenNoSurface() {
         var sent: (ClaudeSessionRecord, String)?
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [],
+        let reply = deliver(.init(kind: .message, text: "hi there"),
                             socket: "/tmp/x.sock", socketSend: { record, text in
             sent = (record, text)
             return true
@@ -200,28 +150,21 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(sent?.1, PeerSocket.phonePreface + "hi there")
     }
 
-    func testMessageWhileRunningWithNoUsableSocketReportsRunning() {
-        let running = host(["Thinking… (esc to interrupt)"])
-        // Socket also unavailable: outcome reflects the pty's own state.
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [running],
-                            socket: "/tmp/x.sock", socketSend: { _, _ in false })
-        XCTAssertEqual(reply, .init(outcome: "running"))
-    }
-
     func testMessageWhileRunningButSocketSucceedsIsStillDelivered() {
-        let running = host(["Thinking… (esc to interrupt)"])
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [running],
+        // #1041: there is no terminal state to read any more — the
+        // outcome follows the socket alone.
+        let reply = deliver(.init(kind: .message, text: "hi there"),
                             socket: "/tmp/x.sock", socketSend: { _, _ in true })
         XCTAssertEqual(reply, .init(outcome: "delivered", channel: "socket"))
     }
 
     func testMessageWithNoSurfaceAndNoSocketPathIsNoChannel() {
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [])
+        let reply = deliver(.init(kind: .message, text: "hi there"))
         XCTAssertEqual(reply, .init(outcome: "noChannel"))
     }
 
     func testMessageWithNoSurfaceButUnsendableSocketIsNoSurface() {
-        let reply = deliver(.init(kind: .message, text: "hi there"), hosts: [],
+        let reply = deliver(.init(kind: .message, text: "hi there"),
                             socket: "/tmp/x.sock", socketSend: { _, _ in false })
         XCTAssertEqual(reply, .init(outcome: "noSurface"))
     }
@@ -285,11 +228,13 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(reply, .init(outcome: "rejected", detail: "unsupported attachment type"))
     }
 
-    func testAttachmentValidationRunsBeforeTouchingAHost() {
-        let h = host(["> "])
-        _ = deliver(.init(kind: .message, text: "hi", attachments: (0..<5).map { _ in tinyPNG() }),
-                    hosts: [h])
-        XCTAssertEqual(h.commands, [])
+    func testAttachmentValidationRunsBeforeTouchingTheSocket() {
+        let reply = deliver(.init(kind: .message, text: "hi", attachments: (0..<5).map { _ in tinyPNG() }),
+                            socket: "/tmp/x.sock", socketSend: { _, _ in
+            XCTFail("socket should never be reached")
+            return false
+        })
+        XCTAssertEqual(reply, .init(outcome: "rejected", detail: "too many attachments"))
     }
 
     func testAttachmentLandsOnDiskWithASanitizedNameAndDeliveredTextListsItsPath() throws {
@@ -298,10 +243,11 @@ final class SessionInputTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dir) }
         let attachment = SessionInput.Attachment(name: "my photo!.png", mime: "image/png",
                                                  data: Data([1, 2, 3]))
-        let h = host(["> ", "> typed"])
+        var sent: String?
         let reply = deliver(.init(kind: .message, text: "look", attachments: [attachment]),
-                            hosts: [h], attachmentsDir: dir)
-        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "pty"))
+                            socket: "/tmp/x.sock", attachmentsDir: dir,
+                            socketSend: { _, text in sent = text; return true })
+        XCTAssertEqual(reply, .init(outcome: "delivered", channel: "socket"))
         let written = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         XCTAssertEqual(written.count, 1)
         let name = try XCTUnwrap(written.first)
@@ -309,9 +255,7 @@ final class SessionInputTests: XCTestCase {
         XCTAssertFalse(name.contains("!"), name)
         XCTAssertFalse(name.contains(" "), name)
         XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent(name)), attachment.data)
-        let typedLine = h.commands.first { $0.hasPrefix("line s1 ") }
-        XCTAssertTrue(typedLine?.contains(dir.appendingPathComponent(name).path) ?? false,
-                     typedLine ?? "<nil>")
+        XCTAssertTrue(sent?.contains(dir.appendingPathComponent(name).path) ?? false, sent ?? "<nil>")
     }
 
     func testAttachmentsOnlyMessageGetsAPlaceholderText() throws {
@@ -328,47 +272,8 @@ final class SessionInputTests: XCTestCase {
     }
 
     func testEmptyTextAndNoAttachmentsIsStillRejected() {
-        let reply = deliver(.init(kind: .message, text: ""), hosts: [host(["> "])])
+        let reply = deliver(.init(kind: .message, text: ""))
         XCTAssertEqual(reply.outcome, "rejected")
     }
 
-    func testSessionStartShellCommandQuotesEverything() {
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/Users/x/my repo", engine: nil, prompt: nil),
-                       "cd '/Users/x/my repo' && exec claude")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: "fix it's bug"),
-                       "cd '/r' && exec codex 'fix it'\\''s bug'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "   "),
-                       "cd '/r' && exec claude")
-    }
-
-    func testSessionStartResumeNamesTheSessionForClaudeOnly() throws {
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1"),
-                       "cd '/r' && exec claude --resume 'abc-1'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "go on", resume: "abc-1"),
-                       "cd '/r' && exec claude --resume 'abc-1' 'go on'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, resume: "abc-1"),
-                       "cd '/r' && exec codex")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", fork: true),
-                       "cd '/r' && exec claude --resume 'abc-1' --fork-session")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, fork: true),
-                       "cd '/r' && exec claude", "a fork without a resume is a plain start")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", permissionMode: "acceptEdits"),
-                       "cd '/r' && exec claude --permission-mode acceptEdits 'go'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", permissionMode: "bypassPermissions"),
-                       "cd '/r' && exec claude --resume 'abc-1' --permission-mode bypassPermissions")
-        // Unknown modes never reach the command line; Codex has no such flag.
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, permissionMode: "yolo; rm -rf /"),
-                       "cd '/r' && exec claude")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, permissionMode: "auto"),
-                       "cd '/r' && exec codex")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", model: "opus",
-                                                 systemPrompt: "Be terse. Don't say 'ok'."),
-                       "cd '/r' && exec claude --model 'opus' --append-system-prompt 'Be terse. Don'\\''t say '\\''ok'\\''.' 'go'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, model: "opus", systemPrompt: "x"),
-                       "cd '/r' && exec codex")
-        // A phone from before resume existed sends no such field.
-        let old = try JSONDecoder().decode(SessionStart.Request.self, from: Data(#"{"cwd":"/r"}"#.utf8))
-        XCTAssertEqual(old, SessionStart.Request(cwd: "/r"))
-        XCTAssertNil(old.resume)
-    }
 }

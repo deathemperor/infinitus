@@ -75,7 +75,6 @@ final class ReceiptsTests: XCTestCase {
     func testRequestsDecodeCommandId() throws {
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
         XCTAssertEqual(try dec.decode(SessionInput.Request.self, from: Data(#"{"kind":"message","text":"hi","commandId":"c1"}"#.utf8)).commandId, "c1")
-        XCTAssertEqual(try dec.decode(SessionStart.Request.self, from: Data(#"{"cwd":"/x","commandId":"c2"}"#.utf8)).commandId, "c2")
         XCTAssertEqual(try dec.decode(SessionAttention.Request.self, from: Data(#"{"action":"pin","commandId":"c3"}"#.utf8)).commandId, "c3")
         XCTAssertNil(try dec.decode(SessionInput.Request.self, from: Data(#"{"kind":"message","text":"hi"}"#.utf8)).commandId)
     }

@@ -395,13 +395,38 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.emit(
           runtimeEvent("turn.completed", {
             state: "failed",
-            errorMessage: "Claude stopped: a usage limit blocked the request.",
+            usageLimited: true,
+            errorMessage:
+              "Claude usage limit reached. Send the message again once the limit resets.",
           }),
         );
         yield* settle(h.watchers, (n) => n === 1);
         yield* h.poll(swapped(at(150)));
         yield* settle(h.turns, (list) => list.length === 1);
         expect(yield* h.interrupts).toEqual([]);
+      }),
+    ),
+  );
+
+  // A context-window failure is not a usage limit: nothing is recorded, so the
+  // thread never reads "Limit hit" and no resume is armed for it.
+  effectIt.effect("a turn that failed on the context window records no stop", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(
+          runtimeEvent("turn.completed", {
+            state: "failed",
+            errorMessage: "Claude stopped: the prompt exceeds the model's context window.",
+          }),
+        );
+        yield* Effect.yieldNow;
+        expect(yield* h.watchers).toBe(0);
+        yield* h.poll(swapped(at(150)));
+        yield* Effect.yieldNow;
+        expect(yield* h.turns).toEqual([]);
+        expect(yield* h.dispatched).toEqual([]);
       }),
     ),
   );
@@ -519,7 +544,9 @@ describe("InfinitusResumeOnLimitLive", () => {
           yield* h.emit(
             runtimeEvent("turn.completed", {
               state: "failed",
-              errorMessage: "Claude stopped: a usage limit blocked the request.",
+              usageLimited: true,
+              errorMessage:
+                "Claude usage limit reached. Send the message again once the limit resets.",
             }),
           );
           const dispatched = yield* settle(h.dispatched, (list) => list.length === 1);
@@ -556,7 +583,9 @@ describe("InfinitusResumeOnLimitLive", () => {
               "turn.completed",
               {
                 state: "failed",
-                errorMessage: "Claude stopped: a usage limit blocked the request.",
+                usageLimited: true,
+                errorMessage:
+                  "Claude usage limit reached. Send the message again once the limit resets.",
               },
               TurnId.make("turn-proxied"),
               proxiedThreadId,

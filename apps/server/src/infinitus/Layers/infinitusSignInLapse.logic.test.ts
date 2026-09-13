@@ -2,6 +2,7 @@ import type { ProviderRuntimeEvent } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  hasLoginInFlight,
   manifestHasVerb,
   signInLapse,
   signInLapseFromEvent,
@@ -132,5 +133,41 @@ describe("the row and the verb (#1076)", () => {
     };
     expect(manifestHasVerb([command as never], "aws-login")).toBe(true);
     expect(manifestHasVerb([command as never], "gcloud-login")).toBe(false);
+  });
+});
+
+describe("hasLoginInFlight (#1076)", () => {
+  const state = (phase: string) => ({ profile: "papaya", flow: "local", phase, startedAt: 0 });
+  const aws = { provider: "aws", profile: "papaya" } as const;
+
+  it("counts a login still waiting on a person, whatever the phase", () => {
+    for (const phase of ["starting", "waitingForBrowser", "waitingForCode"]) {
+      expect(hasLoginInFlight([{ profile: "papaya", state: state(phase) }], aws)).toBe(true);
+    }
+  });
+
+  it("does not count a login that ended, one with no state, or another credential", () => {
+    expect(hasLoginInFlight([{ profile: "papaya", state: state("done") }], aws)).toBe(false);
+    expect(hasLoginInFlight([{ profile: "papaya", state: state("failed") }], aws)).toBe(false);
+    expect(hasLoginInFlight([{ profile: "papaya" }], aws)).toBe(false);
+    expect(hasLoginInFlight([{ profile: "banyan", state: state("starting") }], aws)).toBe(false);
+    expect(
+      hasLoginInFlight([{ profile: "papaya", provider: "gcloud", state: state("starting") }], aws),
+    ).toBe(false);
+    expect(hasLoginInFlight([], aws)).toBe(false);
+  });
+
+  it("reads a missing provider as AWS and matches gcloud on its own name", () => {
+    const gcloud = { provider: "gcloud", profile: "papaya" } as const;
+    expect(
+      hasLoginInFlight(
+        [{ profile: "papaya", provider: "gcloud", state: state("waitingForCode") }],
+        gcloud,
+      ),
+    ).toBe(true);
+    expect(hasLoginInFlight([{ profile: "papaya", state: state("starting") }], gcloud)).toBe(false);
+    expect(
+      hasLoginInFlight([{ profile: "papaya", provider: null, state: state("starting") }], aws),
+    ).toBe(true);
   });
 });
