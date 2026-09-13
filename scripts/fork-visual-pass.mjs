@@ -160,20 +160,33 @@ await send("Emulation.setDeviceMetricsOverride", {
 const pageText = async () =>
   ((await evaluate("document.body.innerText")) ?? "").replace(/\s+/g, " ");
 
-/** Until the app tree is mounted; reloads on the stalled connection gate. */
-const waitForApp = async (label) => {
+/**
+ * Until the app tree is mounted on `expectPath`; reloads on the stalled
+ * connection gate. The path is half the wait on purpose: the page still on
+ * screen shows the same `APP_MOUNTED` markers the next one will, so mount
+ * alone is satisfied by a navigation that has not committed yet — and a run
+ * slow enough for that to repeat drifts whole routes behind, writing each
+ * capture under an earlier route's name. Pass no path for a navigation that
+ * lands somewhere of its own (pairing redirects to the app root).
+ */
+const waitForApp = async (label, expectPath) => {
   const deadline = Date.now() + options.mountTimeoutMs;
+  let path = null;
   while (Date.now() < deadline) {
     const text = await pageText();
+    path = await evaluate("location.pathname");
     if (text.includes(STALLED_GATE)) {
       await evaluate("location.reload()");
       await sleep(4000);
       continue;
     }
-    if (APP_MOUNTED.some((marker) => text.includes(marker))) return text;
+    const onRoute = expectPath === undefined || path === expectPath;
+    if (onRoute && APP_MOUNTED.some((marker) => text.includes(marker))) return text;
     await sleep(1500);
   }
-  console.warn(`${label}: app not mounted after ${options.mountTimeoutMs} ms (boot shell?)`);
+  console.warn(
+    `${label}: not mounted at ${expectPath ?? "any path"} after ${options.mountTimeoutMs} ms (on ${path}; boot shell?)`,
+  );
   return await pageText();
 };
 
@@ -216,13 +229,21 @@ for (let i = 0; i < 10 && WIZARD_HEADING.test(await pageText()); i++) {
 }
 console.log("after wizard:", (await pageText()).slice(0, 160));
 
+let mismatched = 0;
 for (const route of options.routes) {
   await send("Page.navigate", { url: `${options.baseUrl}${route}` });
-  await waitForApp(route);
+  await waitForApp(route, route);
   await sleep(options.settleMs);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   const name = route.replace(/^\//, "").replace(/\//g, "-") || "home";
   const text = await pageText();
+  // Settling can outlive a redirect, so the shot is proved against the path it
+  // was actually taken on, not the one the wait ended at.
+  const shotPath = await evaluate("location.pathname");
+  if (shotPath !== route) {
+    mismatched++;
+    console.error(`${route}: captured ${shotPath} instead — text-${name}.txt is not this route`);
+  }
   NodeFS.writeFileSync(
     NodePath.join(options.out, `shot-${name}.png`),
     Buffer.from(shot.result.data, "base64"),
@@ -233,4 +254,6 @@ for (const route of options.routes) {
 
 ws.close();
 await shutdown();
-process.exit(0);
+// A capture written under the wrong route's name would let the check pass on a
+// page it never opened, so the run fails rather than leaving that for the eye.
+process.exit(mismatched === 0 ? 0 : 1);
