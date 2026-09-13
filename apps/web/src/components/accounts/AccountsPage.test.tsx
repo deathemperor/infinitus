@@ -165,7 +165,6 @@ const readySnapshot: InfinitusSnapshot = {
       accounts: [account({ number: 7, email: "seven@example.com", usageAgeSeconds: 7_200 })],
     },
   ],
-  sessions: [],
   commands: [],
   forecast: {
     forecast: {
@@ -199,7 +198,6 @@ describe("AccountsPage", () => {
         engines: {},
       },
       fleets: [],
-      sessions: [],
       commands: [],
     };
 
@@ -214,7 +212,7 @@ describe("AccountsPage", () => {
   });
 
   it("says so when the host reports no engines", () => {
-    testState.snapshot = { available: true, fleets: [], sessions: [], commands: [] };
+    testState.snapshot = { available: true, fleets: [], commands: [] };
 
     const markup = renderToStaticMarkup(<AccountsPage />);
 
@@ -733,16 +731,12 @@ describe("AccountsPage", () => {
       {
         profile: "dev",
         flow: "deviceCode",
-        pid: 101,
-        sessionLabel: "api · feature/login",
         failedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
       },
       {
         profile: "me@example.com",
         provider: "gcloud",
         flow: "relay",
-        pid: 202,
-        sessionLabel: "web",
         failedAt: null,
         state: {
           profile: "me@example.com",
@@ -764,7 +758,7 @@ describe("AccountsPage", () => {
     expect(markup).toContain("Waiting for the Mac&#x27;s browser…");
     expect(markup).not.toContain("Sign in: gcloud me@example.com");
 
-    testState.snapshot = { available: true, fleets: [], sessions: [], commands: [], awsLogins };
+    testState.snapshot = { available: true, fleets: [], commands: [], awsLogins };
     const empty = renderToStaticMarkup(<AccountsPage />);
     expect(empty).toContain("Infinitus is running, but no engine reports accounts");
     expect(empty).toContain("Sign in: AWS dev");
@@ -774,8 +768,8 @@ describe("AccountsPage", () => {
     testState.snapshot = {
       ...readySnapshot,
       awsLogins: [
-        { profile: "dev", flow: "deviceCode", pid: 101, failedAt: null },
-        { profile: "legacy", flow: "relay", pid: 303, failedAt: null },
+        { profile: "dev", flow: "deviceCode", failedAt: null },
+        { profile: "legacy", flow: "relay", failedAt: null },
       ],
     };
     let renderer!: ReactTestRenderer;

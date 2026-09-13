@@ -12,8 +12,6 @@ export interface SignInModel {
   readonly profile: string;
   readonly provider: "aws" | "gcloud";
   readonly providerLabel: string;
-  readonly sessionLabel: string | null;
-  readonly pid: number | null;
   readonly phase: "idle" | "starting" | "waiting" | "done" | "failed";
   /** The page to open on this phone, when the Mac's flow printed one. */
   readonly url: string | null;
@@ -32,15 +30,15 @@ function phaseOf(item: InfinitusAwsLogin): SignInModel["phase"] {
   return "waiting";
 }
 
+const providerOf = (item: InfinitusAwsLogin) => (item.provider === "gcloud" ? "gcloud" : "aws");
+
 export function signInModel(item: InfinitusAwsLogin): SignInModel {
-  const provider = item.provider === "gcloud" ? "gcloud" : "aws";
+  const provider = providerOf(item);
   return {
-    key: `${provider}:${item.profile}|${item.pid ?? 0}`,
+    key: `${provider}:${item.profile}`,
     profile: item.profile,
     provider,
     providerLabel: provider === "gcloud" ? "gcloud" : "AWS",
-    sessionLabel: item.sessionLabel ?? null,
-    pid: item.pid ?? null,
     phase: phaseOf(item),
     url: item.state?.url ?? null,
     userCode: item.state?.userCode ?? null,
@@ -49,26 +47,35 @@ export function signInModel(item: InfinitusAwsLogin): SignInModel {
 }
 
 /** The sign-ins a snapshot asks for, finished ones dropped. Empty when the
-    build has no `aws-logins` (the field is absent) or nothing lapsed. */
+    build has no `aws-logins` (the field is absent) or nothing lapsed.
+    One row per tool and profile, as the web's list is: the session that hit a
+    profile is gone with the Mac's tracker (#1041), so the same profile can
+    appear twice with nothing left to tell the rows apart. A group is drawn
+    from its running login when one of them has it, else from the first. */
 export function lapsedSignIns(snapshot: InfinitusSnapshot | null): ReadonlyArray<SignInModel> {
   if (snapshot === null || !snapshot.available || snapshot.awsLogins === undefined) return [];
-  return snapshot.awsLogins.map(signInModel).filter((item) => item.phase !== "done");
+  const byProfile = new Map<string, InfinitusAwsLogin>();
+  for (const item of snapshot.awsLogins) {
+    const key = `${providerOf(item)}:${item.profile}`;
+    const kept = byProfile.get(key);
+    if (kept === undefined || ((kept.state ?? null) === null && (item.state ?? null) !== null)) {
+      byProfile.set(key, item);
+    }
+  }
+  return [...byProfile.values()].map(signInModel).filter((item) => item.phase !== "done");
 }
 
-/** The headline for one item: which session is stuck and on what. */
+/** The headline for one item: which credentials expired, and for what. */
 export function signInHeadline(item: SignInModel): string {
-  const subject = `${item.providerLabel} credentials for ${item.profile}`;
-  return item.sessionLabel
-    ? `${item.sessionLabel} is stuck on expired ${subject}.`
-    : `Expired ${subject}.`;
+  return `Expired ${item.providerLabel} credentials for ${item.profile}.`;
 }
 
 /** Start the sign-in on the Mac's own browser: `aws-login <profile> --local`
-    (`gcloud-login` for gcloud), scoped to the session that hit it. */
+    (`gcloud-login` for gcloud). */
 export function startSignInCommand(item: SignInModel): InfinitusCommandInput {
   return {
     command: item.provider === "gcloud" ? "gcloud-login" : "aws-login",
     args: [item.profile],
-    options: item.pid === null ? { local: "true" } : { local: "true", pid: String(item.pid) },
+    options: { local: "true" },
   };
 }

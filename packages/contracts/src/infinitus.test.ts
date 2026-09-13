@@ -16,7 +16,6 @@ import {
   InfinitusManifest,
   InfinitusPrefs,
   InfinitusRevivalActivityState,
-  InfinitusSession,
   InfinitusSnapshot,
   InfinitusThreadForkRefused,
   InfinitusStatus,
@@ -27,7 +26,6 @@ const decodeReply = Schema.decodeUnknownSync(InfinitusControlReply);
 const decodeStatus = Schema.decodeUnknownSync(InfinitusStatus);
 const decodeFleet = Schema.decodeUnknownSync(InfinitusFleet);
 const decodeForecast = Schema.decodeUnknownSync(InfinitusForecast);
-const decodeSession = Schema.decodeUnknownSync(InfinitusSession);
 const decodeManifest = Schema.decodeUnknownSync(InfinitusManifest);
 const decodePrefs = Schema.decodeUnknownSync(InfinitusPrefs);
 const decodeSnapshot = Schema.decodeUnknownSync(InfinitusSnapshot);
@@ -246,75 +244,6 @@ describe("InfinitusForecast", () => {
   });
 });
 
-describe("InfinitusSession", () => {
-  it("decodes a session with only the keys the app always sends", () => {
-    const decoded = decodeSession({ pid: 4242, cwd: "/Users/dev/code/app", kind: "claude" });
-
-    expect(decoded.name).toBeUndefined();
-    expect(decoded.status).toBeUndefined();
-    expect(decoded.cwd).toBe("/Users/dev/code/app");
-  });
-
-  it("accepts the explicit nulls the sessions reply writes for absent fields", () => {
-    const decoded = decodeSession({
-      pid: 4242,
-      name: null,
-      cwd: "/Users/dev/code/app",
-      status: null,
-      kind: "claude",
-      profile: null,
-      permissionMode: null,
-    });
-
-    expect(decoded.name).toBeNull();
-    expect(decoded.permissionMode).toBeNull();
-    expect(decoded.remote).toBeUndefined();
-    expect(decodeSession({ pid: 1, cwd: "/w", kind: "claude", remote: true }).remote).toBe(true);
-  });
-
-  it("decodes a fully described session", () => {
-    const decoded = decodeSession({
-      pid: 4243,
-      name: "docs sweep",
-      cwd: "/Users/dev/code/app",
-      status: "waiting",
-      kind: "claude",
-      permissionMode: "acceptEdits",
-      profile: "review",
-    });
-
-    expect(decoded.permissionMode).toBe("acceptEdits");
-    expect(decoded.profile).toBe("review");
-  });
-
-  it("decodes the #612 fields a newer app adds, and their absence on an older one", () => {
-    const decoded = decodeSession({
-      pid: 4244,
-      cwd: "/Users/dev/code/app",
-      kind: "claude",
-      sessionId: "e2e-aws",
-      account: "death4",
-      startedAt: "2023-11-14T22:13:20Z",
-      needs: ["aws-login:e2e-login"],
-    });
-    expect(decoded.sessionId).toBe("e2e-aws");
-    expect(decoded.account).toBe("death4");
-    expect(decoded.startedAt).toBe("2023-11-14T22:13:20Z");
-    expect(decoded.needs).toEqual(["aws-login:e2e-login"]);
-
-    const older = decodeSession({ pid: 4244, cwd: "/Users/dev/code/app", kind: "claude" });
-    expect(older.sessionId).toBeUndefined();
-    expect(older.needs).toBeUndefined();
-    expect(
-      decodeSession({ pid: 1, cwd: "/", kind: "claude", account: null, startedAt: null }).account,
-    ).toBeNull();
-  });
-
-  it("rejects a session whose pid arrived as a string", () => {
-    expect(() => decodeSession({ pid: "4242", cwd: "/Users/dev", kind: "claude" })).toThrow();
-  });
-});
-
 describe("InfinitusManifest", () => {
   it("decodes the command table, including the effects beyond read and write", () => {
     const decoded = decodeManifest({
@@ -475,7 +404,6 @@ describe("InfinitusSnapshot", () => {
       available: false,
       unavailableReason: "ENOENT",
       fleets: [],
-      sessions: [],
       commands: [],
     });
 
@@ -491,7 +419,6 @@ describe("InfinitusSnapshot", () => {
       available: true,
       status,
       fleets: [fleet],
-      sessions: [],
       prefs: { sections: [{ slug: "general", name: "General" }], prefs: [] },
       commands: [],
     });
@@ -719,6 +646,18 @@ describe("InfinitusAwsLogins", () => {
     expect(decoded.logins[0]?.state?.userCode).toBe("ABCD-1234");
     expect(decoded.logins[1]?.provider).toBe("gcloud");
     expect(decoded.logins[1]?.state).toBeNull();
+  });
+
+  it("drops the session an older Mac still names on each item (#1041)", () => {
+    // The fields left the schema before the Mac stopped sending them, so every
+    // installed app is briefly an "older Mac": the reply has to keep decoding,
+    // with the session simply not reaching the row.
+    const decoded = decodeLogins({
+      logins: [{ profile: "papaya", flow: "relay", pid: 4243, sessionLabel: "limitless" }],
+    });
+
+    expect(decoded.logins[0]?.profile).toBe("papaya");
+    expect(Object.keys(decoded.logins[0] ?? {})).toEqual(["profile", "flow"]);
   });
 
   it("keeps a flow or phase it has never heard of, and rejects a missing profile", () => {

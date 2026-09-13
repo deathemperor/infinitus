@@ -55,7 +55,7 @@ const LOCK_COMMANDS = ["lock-status", "lock", "unlock"].map((name) => ({
 function snapshot(
   commands: ReadonlyArray<{ readonly name: string }> = LOCK_COMMANDS,
 ): InfinitusSnapshot {
-  return { available: true, fleets: [], sessions: [], commands } as unknown as InfinitusSnapshot;
+  return { available: true, fleets: [], commands } as unknown as InfinitusSnapshot;
 }
 
 const status = (enabled: boolean, locked: boolean, relock = "immediately") => ({

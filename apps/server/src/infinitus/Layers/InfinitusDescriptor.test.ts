@@ -35,7 +35,6 @@ const polled = (forkTunnel: Record<string, unknown> | undefined): InfinitusSnaps
   available: true,
   status: status(forkTunnel),
   fleets: [],
-  sessions: [],
   commands: [],
 });
 
@@ -43,7 +42,6 @@ const notPolled: InfinitusSnapshot = {
   available: false,
   unavailableReason: NOT_POLLED_REASON,
   fleets: [],
-  sessions: [],
   commands: [],
 };
 

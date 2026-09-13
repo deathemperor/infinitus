@@ -47,7 +47,6 @@ const manifest: ReadonlyArray<InfinitusManifestCommand> = [
 const snapshotWith = (commands: ReadonlyArray<InfinitusManifestCommand>): InfinitusSnapshot => ({
   available: true,
   fleets: [],
-  sessions: [],
   commands,
 });
 
@@ -55,7 +54,6 @@ const unavailable = (reason: string): InfinitusSnapshot => ({
   available: false,
   unavailableReason: reason,
   fleets: [],
-  sessions: [],
   commands: [],
 });
 const notPolled = unavailable(NOT_POLLED_REASON);

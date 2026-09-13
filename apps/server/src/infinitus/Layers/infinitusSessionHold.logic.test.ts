@@ -26,7 +26,6 @@ const fleet = (
 const snapshot = (fleets: ReadonlyArray<InfinitusFleet>): InfinitusSnapshot => ({
   available: true,
   fleets,
-  sessions: [],
   commands: [],
 });
 

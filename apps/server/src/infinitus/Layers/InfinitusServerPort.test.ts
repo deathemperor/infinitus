@@ -76,7 +76,6 @@ const pollResults = (): Record<string, unknown> => ({
   },
   manifest: manifestWith("status", "fleets", "sessions", "prefs"),
   fleets: [],
-  sessions: [],
   prefs: { sections: [], prefs: [] },
 });
 

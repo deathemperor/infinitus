@@ -68,7 +68,6 @@ import { ActivityPage } from "./ActivityPage";
 const readySnapshot: InfinitusSnapshot = {
   available: true,
   fleets: [],
-  sessions: [],
   commands: [
     { name: "events", args: [], options: ["limit"], effect: "read", summary: "", replyShape: "" },
   ],
@@ -168,7 +167,6 @@ describe("ActivityPage", () => {
       available: false,
       unavailableReason: "socket gone",
       fleets: [],
-      sessions: [],
       commands: [],
     };
     expect(renderToStaticMarkup(<ActivityPage />)).toContain("offline: socket gone");

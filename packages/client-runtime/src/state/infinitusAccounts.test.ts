@@ -59,7 +59,6 @@ function snapshot(overrides: Partial<InfinitusSnapshot> = {}): InfinitusSnapshot
   return {
     available: true,
     fleets: [],
-    sessions: [],
     commands: [],
     ...overrides,
   };
@@ -573,8 +572,6 @@ describe("sign-in rows", () => {
     return {
       profile: "dev",
       flow: "deviceCode",
-      pid: 101,
-      sessionLabel: "api · feature/login",
       failedAt: "2026-09-10T08:00:00Z",
       ...overrides,
     };
@@ -591,7 +588,7 @@ describe("sign-in rows", () => {
       snapshot({
         awsLogins: [
           login(),
-          login({ profile: "me@example.com", provider: "gcloud", flow: "relay", pid: 202 }),
+          login({ profile: "me@example.com", provider: "gcloud", flow: "relay" }),
         ],
       }),
     );
@@ -671,7 +668,7 @@ describe("sign-in rows", () => {
       snapshot({
         awsLogins: [
           login(),
-          login({ profile: "me@example.com", provider: "gcloud", flow: "relay", pid: null }),
+          login({ profile: "me@example.com", provider: "gcloud", flow: "relay" }),
         ],
       }),
     );

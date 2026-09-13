@@ -111,7 +111,6 @@ function snapshot(
   return {
     available: true,
     fleets: [],
-    sessions: [],
     commands: [],
     prefs: CATALOG,
     ...overrides,

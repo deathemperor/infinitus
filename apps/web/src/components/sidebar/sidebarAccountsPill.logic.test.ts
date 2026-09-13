@@ -33,7 +33,6 @@ function snapshot(overrides: Partial<InfinitusSnapshot> = {}): InfinitusSnapshot
   return {
     available: true,
     fleets: [],
-    sessions: [],
     commands: [],
     ...overrides,
   };

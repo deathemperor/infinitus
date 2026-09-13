@@ -43,7 +43,6 @@ const exhaustedSnapshot: InfinitusSnapshot = {
       ],
     },
   ],
-  sessions: [],
   commands: [],
 };
 const plainId = EnvironmentId.make("server-2");
@@ -83,7 +82,6 @@ const readySnapshot: InfinitusSnapshot = {
       ],
     },
   ],
-  sessions: [],
   commands: [],
 };
 
@@ -121,7 +119,6 @@ describe("macAccountsModel", () => {
         available: false,
         unavailableReason: "the socket refused the connection",
         fleets: [],
-        sessions: [],
         commands: [],
       },
       NOW,
@@ -216,7 +213,7 @@ describe("commandFailureMessage", () => {
 describe("homeChip", () => {
   it("is silent while loading and muted when the app is unavailable", () => {
     expect(homeChip(null, NOW)).toBeNull();
-    expect(homeChip({ available: false, fleets: [], sessions: [], commands: [] }, NOW)).toEqual({
+    expect(homeChip({ available: false, fleets: [], commands: [] }, NOW)).toEqual({
       label: "Infinitus",
       pct: null,
       tone: "off",

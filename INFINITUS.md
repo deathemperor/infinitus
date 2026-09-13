@@ -1500,7 +1500,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
   nothing lapsed; one row per tool and profile, no session names and no
-  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  `--pid` scope since the Mac's session sweep, #1041 — the phone's own
+  `apps/mobile/src/features/infinitus/signIns.logic.ts` folds and words its
+  rows the same way, and `InfinitusAwsLogin` carries neither `pid` nor
+  `sessionLabel` any more, so an older app still sending them has them
+  dropped at the boundary); row/section/sign-in
   models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):

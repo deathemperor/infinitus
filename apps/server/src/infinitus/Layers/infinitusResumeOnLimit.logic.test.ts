@@ -46,7 +46,6 @@ const snapshotWith = (
 ): InfinitusSnapshot => ({
   available: true,
   fleets: [{ key: `swapd/${provider}`, engineID: "swapd", provider, capabilities: [], accounts }],
-  sessions: [],
   commands: [],
 });
 
