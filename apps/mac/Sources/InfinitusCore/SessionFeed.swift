@@ -16,10 +16,9 @@ public struct SessionFeedItem: Codable, Sendable, Equatable {
         /// transcript lives under `<session>/subagents/`, summarized here
         /// like Remote Control does (user 2026-09-03, from the phone).
         case agent
-        /// A kind this build doesn't know: a newer Mac's feed (or a
-        /// newer teammate's shared transcript) decoded here. Kept as a
-        /// plain line rather than failing the whole chunk — TeamReader
-        /// and the phone decode a feed in one go (Infi2, 2026-09-06).
+        /// A kind this build doesn't know: a newer Mac's feed decoded
+        /// here. Kept as a plain line rather than failing the whole
+        /// chunk — the phone decodes a feed in one go (Infi2, 2026-09-06).
         case other
 
         public init(from decoder: Decoder) throws {

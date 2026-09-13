@@ -37,9 +37,8 @@ final class MirrorTokenBox: @unchecked Sendable {
         lock.lock(); token = new; lock.unlock()
     }
 
-    /// The Sync pane's phone switch (#356): the listener may be up for
-    /// Team Nearby alone, and then every phone route drops its
-    /// connection exactly as if nothing were listening.
+    /// The Sync pane's phone switch: every phone route drops its
+    /// connection exactly as if nothing were listening while it's off.
     var phoneEnabled: Bool {
         lock.lock(); defer { lock.unlock() }
         return phone
@@ -372,202 +371,6 @@ final class MirrorSessionInputBox: @unchecked Sendable {
     }
 }
 
-/// Team session control (#220): the grantor's endpoint, boxed like the
-/// rest. Rebuilt off main when the team standing changes (`refreshTeamControl`);
-/// `respond` (the HTTP lanes) and `storePass` (the store lane) both run
-/// under `MirrorTeamControlBox.queue`, so the replay set and the rate
-/// limit are mutated by one thread, and execution hops to
-/// `mirrorInputQueue` inside the endpoint's `execute`.
-final class MirrorTeamControlBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var endpoint: TeamControl.Endpoint?
-    private var teamDir: URL?
-    private var deliverer: (@Sendable (Int32, SessionInput.Request, String) -> SessionInput.Reply)?
-    /// A non-drive verb (#220 Phase 2): runs through `ControlServer.run` on
-    /// the main actor (`AppModel.setRunVerb`). nil while the app is
-    /// starting or shutting down.
-    private var verbRunner: (@Sendable (TeamControl.LocalVerb) -> SessionInput.Reply)?
-    /// Verification, the replay set and the rate limit are single-threaded
-    /// here for BOTH lanes (#220); delivery hops to `mirrorInputQueue`.
-    static let queue = DispatchQueue(label: "run.infinitus.team-control")
-    /// The live feed by session id (the phone's tail, keyed by pid).
-    var tail = TeamControlRoute.Tail { _, _ in nil }
-    /// Every command, accepted or refused, with the driver's roster name.
-    var onAudit: (@Sendable (TeamControl.Audit, String?) -> Void)?
-
-    /// A team reload must not forget a wait or an unsent ack: `pending`
-    /// and `outbox` carry over from the old endpoint (#220 Phase 2).
-    func set(_ new: TeamControl.Endpoint?, teamDir dir: URL?) {
-        lock.lock()
-        if var e = new, let old = endpoint {
-            e.pending = old.pending
-            e.outbox = old.outbox
-            endpoint = e
-        } else {
-            endpoint = new
-        }
-        teamDir = dir
-        lock.unlock()
-    }
-
-    /// The shared input deliverer (AppModel.deliverSessionInput), read at
-    /// execute time — the endpoint is first built at `start()`, before
-    /// AppModel has wired it (the e2e's "app is shutting down" refusal).
-    func setDeliver(_ new: @escaping @Sendable (Int32, SessionInput.Request, String) -> SessionInput.Reply) {
-        lock.lock(); deliverer = new; lock.unlock()
-    }
-
-    func deliver(_ pid: Int32, _ request: SessionInput.Request, from origin: String) -> SessionInput.Reply {
-        lock.lock(); let current = deliverer; lock.unlock()
-        guard let current else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
-        return current(pid, request, origin)
-    }
-
-    /// The runner for a non-drive verb (`AppModel`, beside `setDeliver`).
-    func setRunVerb(_ new: @escaping @Sendable (TeamControl.LocalVerb) -> SessionInput.Reply) {
-        lock.lock(); verbRunner = new; lock.unlock()
-    }
-
-    func runVerb(_ verb: TeamControl.LocalVerb) -> SessionInput.Reply {
-        lock.lock(); let current = verbRunner; lock.unlock()
-        guard let current else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
-        return current(verb)
-    }
-
-    /// Waits for the grantor's Allow/Deny (Settings › Team, `infinitusctl team-pending`).
-    func pending() -> [TeamControl.PendingCommand] {
-        lock.lock(); defer { lock.unlock() }
-        return Array((endpoint?.pending ?? [:]).values)
-    }
-
-    /// `Self.queue` only.
-    func respond(_ request: MirrorTransport.Request) -> Data? {
-        lock.lock(); var ep = endpoint; let dir = teamDir; lock.unlock()
-        ep?.lastAudit = nil
-        let response = TeamControlRoute.respond(request, endpoint: &ep, tail: tail)
-        guard let ep else { return response }
-        lock.lock()
-        endpoint?.seen = ep.seen
-        endpoint?.limit = ep.limit
-        endpoint?.heavyLimit = ep.heavyLimit
-        endpoint?.pending = ep.pending
-        endpoint?.outbox = ep.outbox
-        lock.unlock()
-        if let audit = ep.lastAudit {
-            if let dir {
-                try? ep.seen.save(teamDir: dir)
-                try? ep.outbox.save(teamDir: dir)
-            }
-            let name = ep.roster()?.everyone.first { $0.keys.kid == audit.driver }?.name
-            onAudit?(audit, name)
-        }
-        return response
-    }
-
-    /// The grantor's tap (#220 Phase 2 §4): on `Self.queue`, like the
-    /// other two lanes, so it cannot interleave with a fetch's store pass
-    /// or an inbound command.
-    func decide(_ id: String, allow: Bool, completion: @escaping @Sendable ((ack: TeamControl.Ack, audit: TeamControl.Audit)?) -> Void) {
-        Self.queue.async {
-            self.lock.lock(); let current = self.endpoint; let dir = self.teamDir; self.lock.unlock()
-            guard var ep = current else { completion(nil); return }
-            guard let decided = TeamControl.decide(id, allow: allow, endpoint: &ep) else { completion(nil); return }
-            self.lock.lock()
-            self.endpoint?.seen = ep.seen
-            self.endpoint?.limit = ep.limit
-            self.endpoint?.heavyLimit = ep.heavyLimit
-            self.endpoint?.pending = ep.pending
-            self.endpoint?.outbox = ep.outbox
-            self.lock.unlock()
-            if let dir {
-                try? ep.outbox.save(teamDir: dir)
-                try? ep.seen.save(teamDir: dir)
-            }
-            let name = ep.roster()?.everyone.first { $0.keys.kid == decided.audit.driver }?.name
-            self.onAudit?(decided.audit, name)
-            completion((decided.ack, decided.audit))
-        }
-    }
-
-    /// Lane 4 (#220 §5.3): after a fetch, the commands under the store
-    /// addressed to me. Called on the team queue; hops onto the control
-    /// queue so the HTTP route can't interleave.
-    func storePass(_ client: TeamClient) {
-        Self.queue.sync {
-            lock.lock(); let current = endpoint; let dir = teamDir; lock.unlock()
-            guard var ep = current, let dir else { return }
-            var handled = TeamControl.Handled.load(teamDir: dir)
-            let audits: [TeamControl.Audit]
-            do { audits = try TeamControl.Store.grantorPass(client: client, endpoint: &ep, handled: &handled) }
-            catch { Lifecycle.log.error("team control store pass: \(TeamGit.masked("\(error)"), privacy: .public)"); return }
-            lock.lock()
-            endpoint?.seen = ep.seen
-            endpoint?.limit = ep.limit
-            endpoint?.heavyLimit = ep.heavyLimit
-            endpoint?.pending = ep.pending
-            endpoint?.outbox = ep.outbox
-            lock.unlock()
-            // The pass drains the outbox (published straight to the store
-            // above); the disk copy must not resurrect what already went
-            // out on the next relaunch.
-            try? ep.outbox.save(teamDir: dir)
-            guard !audits.isEmpty else { return }
-            try? ep.seen.save(teamDir: dir)
-            try? handled.save(teamDir: dir)
-            let roster = ep.roster()
-            for audit in audits { onAudit?(audit, roster?.everyone.first { $0.keys.kid == audit.driver }?.name) }
-        }
-    }
-}
-
-/// The Nearby standing (TXT record + `/team/*` routes, spec §6.4), boxed
-/// like the rest: the main actor refreshes it when the discoverable
-/// switch flips, the connection handlers read it on the network queue.
-final class MirrorTeamBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var local: TeamNearby.Local = .hidden
-
-    var current: TeamNearby.Local {
-        lock.lock(); defer { lock.unlock() }
-        return local
-    }
-
-    func set(_ new: TeamNearby.Local) {
-        lock.lock(); local = new; lock.unlock()
-    }
-
-    /// Where a LAN request lands: pending under the team, then the
-    /// requests branch — a git push, so callers run it off the network
-    /// queue. An invitation (spec §6.4) is only a file write: it stays
-    /// sealed until the Team pane's Accept opens it.
-    var endpoint: TeamNearby.Endpoint {
-        TeamNearby.Endpoint(local: current, store: { request in
-            // The app's secrets store (keychain on a real Mac), never the
-            // CLI's file store: a request sealed to the file identity's keys
-            // is one the pane can never open.
-            let paths = TeamPaths.standard()
-            return try TeamNearby.Store.save(request, paths: paths, secrets: TeamSecretsFactory.make(paths: paths)())
-        }, storeInvite: { invite in
-            try TeamNearby.Store.saveInvite(invite, paths: TeamPaths.standard())
-        })
-    }
-}
-
-/// Answers `/mirror/team/*` for the phone (spec §9 step 8): one async
-/// handler set by AppModel, returning the JSON body or nil for 404.
-final class MirrorTeamMirrorBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var handler: (@Sendable (MirrorTransport.Request) async -> Data?)?
-    func set(_ handler: @escaping @Sendable (MirrorTransport.Request) async -> Data?) {
-        lock.lock(); self.handler = handler; lock.unlock()
-    }
-    func call(_ request: MirrorTransport.Request) async -> Data? {
-        lock.lock(); let h = handler; lock.unlock()
-        guard let h else { return nil }
-        return await h(request)
-    }
-}
-
 /// Serves the fleet snapshot to the phone (#9): one Bonjour advertised
 /// (`_infinitus._tcp`) TCP listener answering `GET /snapshot` with the
 /// exact bytes MirrorExporter wrote. Off by default behind the Sync
@@ -623,13 +426,6 @@ final class MirrorServer: ObservableObject {
     let awsLogin = MirrorAwsLoginBox()
     /// Answers `POST /crashes`; set by AppModel once at start.
     let crashes = MirrorCrashBox()
-    /// Nearby (spec §6.4): the TXT record and `/team/key` + `/team/request`.
-    let team = MirrorTeamBox()
-    /// Answers `/mirror/team/*` (spec §9 step 8); set by AppModel once at start.
-    let teamMirror = MirrorTeamMirrorBox()
-    private var advertisedName = ""
-    private var teamDiscoverable = false
-    private var defaultsObserver: NSObjectProtocol?
     /// Answers `POST /sessions/start` (#91); set by AppModel once at start.
     let sessionStart = MirrorSessionStartBox()
     /// Answers `GET /sessions/past` (#164); set by AppModel once at start.
@@ -638,8 +434,6 @@ final class MirrorServer: ObservableObject {
     /// Answers `POST /app/update` (#121); set by AppModel once at start.
     let appUpdate = MirrorAppUpdateBox()
     let accountAction = MirrorAccountActionBox()
-    /// Team session control (#220): `/team/command` and `/team/sessions/<id>/tail`.
-    let teamControl = MirrorTeamControlBox()
     /// Event-log sink (icon, text), set by AppModel.
     var log: ((String, String) -> Void)?
     /// Fires with the bound port once the listener is up — the quick
@@ -648,14 +442,9 @@ final class MirrorServer: ObservableObject {
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "run.infinitus.mirror-server")
-    /// `/team/*` requests only: serialized so concurrent LAN callers can't
-    /// race `TeamGit`'s bare-repo push (no in-process lock of its own) and
-    /// turn each other's request into an unearned 503.
-    private static let teamStoreQueue = DispatchQueue(label: "run.infinitus.team-store")
 
     /// Off: phone routes (snapshot, tails, pairing, the descriptor) drop
-    /// their connection while `/team/*` and session control keep
-    /// answering — the listener serves Team Nearby on its own (#356).
+    /// their connection while the listener is up.
     var phoneEnabled: Bool {
         get { token.phoneEnabled }
         set { token.setPhone(newValue) }
@@ -664,26 +453,14 @@ final class MirrorServer: ObservableObject {
     func start(machineName: String, token: String) {
         self.token.set(token)
         guard listener == nil else { return }
-        advertisedName = machineName
         // The last export renders immediately: a phone that asks before
         // the first refresh of this launch still gets a fleet.
         if payload.latest == nil,
            let data = try? Data(contentsOf: MirrorExporter.url) {
             payload.set(data)
         }
-        if defaultsObserver == nil {
-            // Event-driven, never polled: the Team pane (plan 5) or
-            // `infinitusctl team-discoverable` flips the default and this
-            // re-advertises once per change.
-            defaultsObserver = NotificationCenter.default.addObserver(
-                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.refreshTeamStanding() }
-            }
-        }
         status = "starting…"
         listen(on: MirrorTransport.defaultPort, name: machineName)
-        refreshTeamStanding(force: true)
-        refreshTeamControl()
     }
 
     var isListening: Bool { listener != nil }
@@ -693,106 +470,6 @@ final class MirrorServer: ObservableObject {
         listener = nil
         port = nil
         status = nil
-    }
-
-    /// Rebuilds the grantor endpoint (#220) off the main actor: at start
-    /// and after every TeamModel load (a team created mid-run). Grants,
-    /// roster and the replay set are read from disk per request, so
-    /// `infinitusctl team grant` takes effect with no IPC. No team, or no
-    /// identity this process can read ⇒ no endpoint ⇒ every control route
-    /// answers 404.
-    func refreshTeamControl() {
-        let feed = sessionFeed
-        let box = teamControl
-        DispatchQueue.global(qos: .utility).async {
-            let paths = TeamPaths.standard()
-            let secrets = TeamSecretsFactory.make(paths: paths)()
-            guard let id = paths.teamIDs().sorted().first,
-                  let identity = try? TeamClient.identity(paths: paths, secrets: secrets) else {
-                box.set(nil, teamDir: nil); return
-            }
-            let dir = paths.teamDir(id)
-            let live: @Sendable () -> [String: Int32] = {
-                Dictionary(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { ($0.sessionId, $0.pid) },
-                           uniquingKeysWith: { _, newer in newer })
-            }
-            var endpoint = TeamControl.Endpoint(
-                identity: identity,
-                roster: {
-                    (try? Data(contentsOf: paths.rosterFile(id)))
-                        .flatMap { try? CanonicalJSON.decode(Signed<TeamRoster>.self, from: $0) }?.doc
-                },
-                grants: { TeamGrants.load(teamDir: dir) },
-                liveSessions: live,
-                execute: { action, text, session, pid in
-                    // #220 Phase 2: a drive action is `SessionInput` into
-                    // a live session; everything else is one of the
-                    // grantor's own control verbs, run through
-                    // `box.runVerb` so a teammate, the phone and the CLI
-                    // share one dispatch.
-                    if TeamGrants.driveCapabilities.contains(action) {
-                        guard let pid, let request = TeamControl.request(action: action, text: text) else {
-                            return SessionInput.Reply(outcome: "rejected", detail: "nothing to run for \(action)")
-                        }
-                        return mirrorInputQueue.sync { box.deliver(pid, request, from: "team") }
-                    }
-                    guard let verb = TeamControl.localVerb(action: action, text: text, session: session, pid: pid) else {
-                        return SessionInput.Reply(outcome: TeamControl.Outcome.badRequest, detail: "nothing to run for \(action)")
-                    }
-                    return box.runVerb(verb)
-                },
-                seen: TeamControl.SeenIDs.load(teamDir: dir), limit: TeamControl.RateLimit())
-            // The disk copy is what there is on a cold start; `set`'s
-            // carry-over then keeps a running endpoint's own outbox across
-            // a reload, so neither a relaunch nor a team-standing change
-            // drops an ack the grantor already minted.
-            endpoint.outbox = TeamControl.Outbox.load(teamDir: dir)
-            box.tail = TeamControlRoute.Tail { sessionId, since in
-                guard let pid = live()[sessionId] else { return nil }
-                return feed.call(pid, 200, since: since, wait: 0)
-            }
-            box.set(endpoint, teamDir: dir)
-        }
-    }
-
-    /// Reads the switch and, when it changed, rebuilds the standing off
-    /// the main actor (it opens the team clones) and re-advertises.
-    /// `force`: re-read the standing even with the toggle unchanged — after
-    /// create/join/leave/approve the role in the TXT record moved (a Mac
-    /// that became leader after launch kept advertising `r=none`, user
-    /// screenshot 2026-09-07).
-    func refreshTeamStanding(force: Bool = false) {
-        let on = AppDefaults.standard.bool(forKey: TeamNearby.discoverableDefaultsKey)
-        guard force || on != teamDiscoverable else { return }
-        teamDiscoverable = on
-        let name = advertisedName
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            // The same secrets store as TeamModel (keychain on a real Mac).
-            // With the CLI's file store here the advert carried a second,
-            // teamless identity: the Mac listed ITSELF as "none · not in
-            // this team" and advertised r=none while leading (2026-09-07).
-            let paths = TeamPaths.standard()
-            let local = TeamNearby.Local.load(name: name, discoverable: on, paths: paths,
-                                              secrets: TeamSecretsFactory.make(paths: paths)())
-            Task { @MainActor in
-                // A newer toggle may have already landed while this one
-                // was opening team clones on the concurrent queue — an
-                // out-of-order finish must not overwrite the standing
-                // with a stale one.
-                guard let self, on == self.teamDiscoverable else { return }
-                self.team.set(local)
-                self.advertise()
-                self.log?("📡", on ? "nearby: discoverable as \(name)" : "nearby: hidden")
-            }
-        }
-    }
-
-    /// (Re)registers the Bonjour service with the current TXT record —
-    /// setting `service` on a running listener updates the record in
-    /// place (nw_listener_set_advertise_descriptor).
-    private func advertise() {
-        listener?.service = NWListener.Service(name: advertisedName, type: MirrorTransport.bonjourType,
-                                               txtRecord: team.current.record.txtData)
     }
 
     private func listen(on rawPort: UInt16, name: String) {
@@ -811,8 +488,7 @@ final class MirrorServer: ObservableObject {
             status = "couldn't open a port"
             return
         }
-        listener.service = NWListener.Service(name: name, type: MirrorTransport.bonjourType,
-                                              txtRecord: team.current.record.txtData)
+        listener.service = NWListener.Service(name: name, type: MirrorTransport.bonjourType)
         let payload = self.payload
         let token = self.token
         let sessionFeed = self.sessionFeed
@@ -833,9 +509,6 @@ final class MirrorServer: ObservableObject {
         let activityTokens = self.activityTokens
         let awsLogin = self.awsLogin
         let crashes = self.crashes
-        let team = self.team
-        let teamMirror = self.teamMirror
-        let teamControl = self.teamControl
         let served: @Sendable (MirrorTransport.Request) -> Void = { [weak self] request in
             let client = MirrorClient(request: request)
             Task { @MainActor in
@@ -848,7 +521,7 @@ final class MirrorServer: ObservableObject {
         listener.newConnectionHandler = { [queue] connection in
             Self.serve(connection, payload: payload, token: token, sessionFeed: sessionFeed,
                        sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage, activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs,
-                       team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, queue: queue, onServed: served)
+                       appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, queue: queue, onServed: served)
         }
         listener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in self?.handle(state, wasFixedPort: rawPort != 0, name: name) }
@@ -887,38 +560,6 @@ final class MirrorServer: ObservableObject {
 
     // MARK: - Connection handling (network queue)
 
-    /// RFC 1918 / link-local IPv4, or IPv6 link-local / ULA: the addresses
-    /// a same-LAN peer can have. Loopback is deliberately excluded — a
-    /// machine is never "nearby" to itself, and `cloudflared`'s quick
-    /// tunnel proxies every internet request to this listener over
-    /// 127.0.0.1, which would otherwise let a tunnel URL reach
-    /// `/team/*` with no pairing token. A tailnet client (100.64/10,
-    /// public v4, global v6) is never "nearby" either, and `/team/*`
-    /// carries no pairing token, so nothing else gets in.
-    nonisolated static func isLANPeer(_ endpoint: NWEndpoint?) -> Bool {
-        guard let endpoint, case .hostPort(let host, _) = endpoint else { return false }
-        switch host {
-        case .ipv4(let v4):
-            let b = [UInt8](v4.rawValue)
-            guard b.count == 4 else { return false }
-            return b[0] == 10 || (b[0] == 172 && (16...31).contains(b[1]))
-                || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254)
-        case .ipv6(let v6):
-            let b = [UInt8](v6.rawValue)
-            guard b.count == 16 else { return false }
-            if b[0] == 0xfe && (b[1] & 0xc0) == 0x80 { return true }   // fe80::/10
-            if (b[0] & 0xfe) == 0xfc { return true }                     // fc00::/7
-            // ::ffff:a.b.c.d — the v4-only listener never yields one, but be exact.
-            if b.prefix(10).allSatisfy({ $0 == 0 }) && b[10] == 0xff && b[11] == 0xff,
-               let v4 = IPv4Address(Data(b[12...])) {
-                return isLANPeer(.hostPort(host: .ipv4(v4), port: 0))
-            }
-            return false
-        default:
-            return false
-        }
-    }
-
     private nonisolated static func serve(_ connection: NWConnection,
                                           payload: MirrorPayloadBox,
                                           token: MirrorTokenBox,
@@ -933,16 +574,15 @@ final class MirrorServer: ObservableObject {
                                           leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
                                           activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, prefs: MirrorPrefsBox,
-                                          team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
+                                          appUpdate: MirrorAppUpdateBox,
                                           awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
-                                          teamMirror: MirrorTeamMirrorBox,
                                           queue: DispatchQueue,
                                           onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.start(queue: queue)
         receive(connection, buffer: Data(), payload: payload, token: token,
                sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs,
-               team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
+               appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, onServed: onServed)
     }
 
     private nonisolated static func receive(_ connection: NWConnection,
@@ -960,9 +600,8 @@ final class MirrorServer: ObservableObject {
                                           leases: LeaseTable,
                                             sessionImage: MirrorSessionImageBox,
                                             activityTokens: MirrorActivityTokenBox, crashes: MirrorCrashBox, sessionStart: MirrorSessionStartBox, pastSessions: MirrorPastSessionsBox, prefs: MirrorPrefsBox,
-                                            team: MirrorTeamBox, teamControl: MirrorTeamControlBox, appUpdate: MirrorAppUpdateBox,
+                                            appUpdate: MirrorAppUpdateBox,
                                             awsLogin: MirrorAwsLoginBox, accountAction: MirrorAccountActionBox,
-                                            teamMirror: MirrorTeamMirrorBox,
                                             onServed: @escaping @Sendable (MirrorTransport.Request) -> Void) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) {
             data, _, isComplete, error in
@@ -977,29 +616,16 @@ final class MirrorServer: ObservableObject {
             // for a caller that was always going to get a 401
             // (2026-09-03 attachments).
             let head = MirrorTransport.parseRequest(buffer)
-            // Peers hold no pairing token: `/team/*` from a LAN address is
-            // routed on its own (TeamNearby.respond answers 404 while
-            // hidden); everything else — including `/team/*` from a
-            // tunnel — still needs the token before a body byte is buffered.
-            // Team session control (#220): a sealed command or a signed
-            // tail header authenticates itself, so neither the pairing
-            // token nor the LAN gate applies — a teammate drives over the
-            // tunnel too. Without grants the route answers 404.
-            let controlRoute = head.map {
-                $0.path == TeamControlRoute.commandPath || TeamControlRoute.tailSessionId($0.path) != nil
-            } ?? false
-            let teamRoute = !controlRoute && (head.map { $0.path.hasPrefix(TeamNearby.routePrefix) } ?? false)
-                && Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint)
             let wellKnown = head.map { $0.method == "GET" && $0.path == MirrorTransport.wellKnownPath } ?? false
-            // Phone switch off (#356): the listener is up for the team
-            // alone, so a phone route gets what it would with no
-            // listener — a closed connection, never a 401 that reads as
-            // "unpaired" on the phone.
-            if head != nil, !teamRoute, !controlRoute, !token.phoneEnabled {
+            // Phone switch off (#356): the listener is up for nothing else
+            // now, so a phone route gets what it would with no listener —
+            // a closed connection, never a 401 that reads as "unpaired"
+            // on the phone.
+            if head != nil, !token.phoneEnabled {
                 connection.cancel()
                 return
             }
-            if let head, !teamRoute, !controlRoute, !wellKnown, !MirrorTransport.isAuthorized(head, token: token.current) {
+            if let head, !wellKnown, !MirrorTransport.isAuthorized(head, token: token.current) {
                 connection.send(content: MirrorTransport.unauthorizedResponse(),
                                 completion: .contentProcessed { _ in connection.cancel() })
                 return
@@ -1013,25 +639,6 @@ final class MirrorServer: ObservableObject {
             // above; the check below stays as the route dispatch's own
             // defense in depth (e.g. a token regenerated mid-request).
             if let request = MirrorTransport.parseRequestWithBody(buffer, bodyCap: cap) {
-                if request.path == TeamControlRoute.commandPath || TeamControlRoute.tailSessionId(request.path) != nil {
-                    MirrorTeamControlBox.queue.async {
-                        let response = teamControl.respond(request) ?? MirrorTransport.notFoundResponse()
-                        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                }
-                if request.path.hasPrefix(TeamNearby.routePrefix),
-                   Self.isLANPeer(connection.currentPath?.remoteEndpoint ?? connection.endpoint) {
-                    // Off this queue, and serialized: a stored request
-                    // pushes to git, and TeamGit holds no lock of its own.
-                    teamStoreQueue.async {
-                        let response = TeamNearby.respond(request, endpoint: team.endpoint)
-                            ?? MirrorTransport.notFoundResponse()
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
-                }
                 guard token.phoneEnabled else { connection.cancel(); return }   // #356, checked off the head above too
                 let response: Data
                 if request.method == "GET", request.path == MirrorTransport.wellKnownPath {
@@ -1254,18 +861,6 @@ final class MirrorServer: ObservableObject {
                     connection.send(content: response,
                                     completion: .contentProcessed { _ in connection.cancel() })
                     return
-                } else if request.path.hasPrefix(TeamMirror.prefix + "/") {
-                    // The phone's Team tab (spec §9): TeamModel work runs
-                    // on its own queue behind the main actor, so off this
-                    // queue like the AWS login routes.
-                    Task {
-                        let response = await teamMirror.call(request)
-                            .map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
-                        onServed(request)
-                        connection.send(content: response,
-                                        completion: .contentProcessed { _ in connection.cancel() })
-                    }
-                    return
                 } else if request.method == "POST",
                           [AwsLogin.startPath, AwsLogin.codePath, AwsLogin.callbackPath].contains(request.path) {
                     // The code / callback never leaves this path: decoded,
@@ -1380,7 +975,7 @@ final class MirrorServer: ObservableObject {
             receive(connection, buffer: buffer, payload: payload, token: token,
                    sessionFeed: sessionFeed, sessionInput: sessionInput, attention: attention, timeline: timeline, commands: commands, files: files, descriptor: descriptor, receipts: receipts, leases: leases, sessionImage: sessionImage,
                    activityTokens: activityTokens, crashes: crashes, sessionStart: sessionStart, pastSessions: pastSessions, prefs: prefs,
-                   team: team, teamControl: teamControl, appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, teamMirror: teamMirror, onServed: onServed)
+                   appUpdate: appUpdate, awsLogin: awsLogin, accountAction: accountAction, onServed: onServed)
         }
     }
 

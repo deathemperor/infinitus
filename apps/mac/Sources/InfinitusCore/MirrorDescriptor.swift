@@ -25,18 +25,17 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         public var attention: Bool?
         public var leases: Bool?
         public var ownedSessions: Bool?
-        public var team: Bool?
         public var pastSessions: Bool?
         public var images: Bool?
         public var files: Bool?
         /// `GET /prefs` (#558): the preference catalog with values.
         public var prefs: Bool?
         public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
-                    ownedSessions: Bool? = nil, team: Bool? = nil,
+                    ownedSessions: Bool? = nil,
                     pastSessions: Bool? = nil, images: Bool? = nil, files: Bool? = nil,
                     prefs: Bool? = nil) {
             self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
-            self.ownedSessions = ownedSessions; self.team = team
+            self.ownedSessions = ownedSessions
             self.pastSessions = pastSessions; self.images = images; self.files = files
             self.prefs = prefs
         }
@@ -63,7 +62,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         #endif
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
                                 capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
-                                                           ownedSessions: true, team: true,
+                                                           ownedSessions: true,
                                                            pastSessions: true, images: true, files: true,
                                                            prefs: true))
     }
@@ -80,7 +79,7 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
                          capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: false,
-                                                    ownedSessions: false, team: false,
+                                                    ownedSessions: false,
                                                     pastSessions: false, images: true, files: true,
                                                     prefs: false))
     }

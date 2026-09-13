@@ -11,12 +11,30 @@ publishes the matching section as the GitHub release body.
 - The Claude Code plugin (its hooks, MCP server and slash commands), `infinitusctl plugin` / `mcp` and the hook verbs are gone: Infinitus no longer watches terminal sessions.
 - "Allow for this session" and the session permission mode switch are gone with the plugin.
 - Per-prompt repository checkpoints are gone (the list, diffs and restore on the Mac, the phone and `infinitusctl checkpoints`); thread checkpoints live in Infinitus desktop.
+- The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
+- The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
+- A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
+- A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
+- The Team features are gone (shared fleets, member roster, join codes, nearby discovery, team control): Infinitus is about threads now.
+- An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
+- A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
+
+## 0.5.0-alpha.7
+
+### Mac
+- An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+
+### Desktop
+- A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).
+- A turn that finishes with messages still queued behind it no longer posts "Thread completed" or rings; the thread is not done until the queue is (#270).
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
 - Settings › Infinitus › Profiles is gone with the terminal sessions it started; the Sessions page is now "Priority", at the same place (#1041).
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
+- The Best-of card shows each member's turns, tool calls and wall time beside its status, off the thread's own counters (#269).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 - `infinitusctl thread show` and `thread send --wait` read a thread again instead of failing with "unreadable reply" (#1048).
 

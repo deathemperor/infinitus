@@ -39,7 +39,7 @@ actor MirrorExporter {
                 fleets: [EngineFleet] = [], forecast: UsageForecast? = nil,
                 plan: WindowPlanner.Plan? = nil, awsLogins: [AwsLogin.Item] = [],
                 progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
-                pushesAlerts: Bool = false, app: AppInfo? = nil, team: TeamSnapshot? = nil,
+                pushesAlerts: Bool = false, app: AppInfo? = nil,
                 profiles: [SessionProfile] = [],
                 // A closure, not a value: T3's project list scans past
                 // sessions and shells out to git per cwd (T3 clone A, #337) —
@@ -127,7 +127,7 @@ actor MirrorExporter {
             forecast: forecast, plan: plan,
             awsLogins: awsLogins.isEmpty ? nil : awsLogins, stats: stats,
             recentCwds: recentCwds.isEmpty ? nil : recentCwds,
-            pushesAlerts: pushesAlerts, app: app, team: team,
+            pushesAlerts: pushesAlerts, app: app,
             profiles: profiles.isEmpty ? nil : profiles,
             projects: { let p = projects(); return p.isEmpty ? nil : p }(),
             births: births.isEmpty ? nil

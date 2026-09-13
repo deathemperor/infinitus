@@ -1,4 +1,10 @@
-import type { OrchestrationThreadShell, ThreadId } from "@t3tools/contracts";
+import type {
+  OrchestrationThreadShell,
+  ThreadId,
+  ThreadUsageRollup,
+  VcsStatusLocalResult,
+} from "@t3tools/contracts";
+import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 
 /**
  * Best of N (#269 B): one prompt, two to four Claude models, one worktree
@@ -117,3 +123,33 @@ export const BEST_OF_STATUS_LABEL: Record<BestOfMemberStatus, string> = {
   failed: "Failed",
   stopped: "Stopped",
 };
+
+/**
+ * One line of stats per member for the card (#269 B), off the thread's own
+ * usage rollup: "3 turns · 12 tool calls · 4m 10s". Tool calls and wall
+ * time are absent while no turn carried them; nothing before the first turn.
+ */
+export function bestOfMemberStats(
+  usage: Pick<ThreadUsageRollup, "turns" | "toolCalls" | "durationMs"> | undefined,
+): string | null {
+  if (usage === undefined || usage.turns === 0) return null;
+  const parts = [`${usage.turns} ${usage.turns === 1 ? "turn" : "turns"}`];
+  if (usage.toolCalls !== undefined) {
+    parts.push(`${usage.toolCalls} ${usage.toolCalls === 1 ? "tool call" : "tool calls"}`);
+  }
+  if (usage.durationMs !== undefined) parts.push(formatDuration(usage.durationMs));
+  return parts.join(" · ");
+}
+
+/**
+ * What a member has written so far (#269 B), off its worktree's status
+ * stream: "5 files, +42 −7". Null before the first status and while the
+ * tree is clean, so the row shows nothing rather than zeros.
+ */
+export function bestOfMemberChanges(
+  status: Pick<VcsStatusLocalResult, "hasWorkingTreeChanges" | "workingTree"> | null,
+): string | null {
+  if (status === null || !status.hasWorkingTreeChanges) return null;
+  const { files, insertions, deletions } = status.workingTree;
+  return `${files.length} ${files.length === 1 ? "file" : "files"}, +${insertions} −${deletions}`;
+}

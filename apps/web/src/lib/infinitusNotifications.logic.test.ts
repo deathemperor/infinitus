@@ -4,6 +4,7 @@ import {
   attentionCount,
   attentionNotificationTitle,
   legacyNotificationMode,
+  notificationKind,
   quietForViewer,
 } from "./infinitusNotifications.logic";
 
@@ -63,5 +64,36 @@ describe("attentionCount", () => {
         { status: "working" },
       ]),
     ).toBe(2);
+  });
+});
+
+describe("notificationKind (#270 B)", () => {
+  const seen = { input: null, completion: 1000 };
+
+  it("rings a new input request, queued or not", () => {
+    expect(notificationKind(seen, { input: "t2:approval", completion: 1000 }, 0)).toBe("input");
+    expect(notificationKind(seen, { input: "t2:input", completion: 1000 }, 2)).toBe("input");
+  });
+
+  it("rings a later completion only while nothing is queued", () => {
+    expect(notificationKind(seen, { input: null, completion: 2000 }, 0)).toBe("completion");
+    expect(notificationKind(seen, { input: null, completion: 2000 }, 1)).toBeNull();
+    expect(
+      notificationKind({ input: null, completion: null }, { input: null, completion: 2000 }, 0),
+    ).toBe("completion");
+  });
+
+  it("stays quiet for a completion already seen, so a removed queued row rings nothing", () => {
+    expect(
+      notificationKind({ input: null, completion: 2000 }, { input: null, completion: 2000 }, 0),
+    ).toBeNull();
+    expect(notificationKind(seen, { input: null, completion: 1000 }, 0)).toBeNull();
+    expect(
+      notificationKind(
+        { input: "t2:input", completion: null },
+        { input: "t2:input", completion: null },
+        0,
+      ),
+    ).toBeNull();
   });
 });

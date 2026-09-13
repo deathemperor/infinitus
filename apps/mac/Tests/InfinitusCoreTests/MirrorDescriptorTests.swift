@@ -35,7 +35,7 @@ final class MirrorDescriptorTests: XCTestCase {
 
     /// #486 slice 2 gave the tray timeline and sequence; slice 4 the
     /// attention and image routes. It still only claims what a Linux
-    /// session can deliver (no team, no leases, …).
+    /// session can deliver (no leases, …).
     func testTrayDescriptorClaimsWhatALinuxSessionServes() throws {
         let d = MirrorDescriptor.tray(machineId: "m1", label: "omarchy-box", appVersion: "dev")
         XCTAssertEqual(d.platform, "linux")
@@ -43,7 +43,7 @@ final class MirrorDescriptorTests: XCTestCase {
                        d.capabilities.attention, d.capabilities.images] {
             XCTAssertEqual(served, true)
         }
-        for other in [d.capabilities.leases, d.capabilities.ownedSessions, d.capabilities.team,
+        for other in [d.capabilities.leases, d.capabilities.ownedSessions,
                      d.capabilities.pastSessions, d.capabilities.prefs] {
             XCTAssertEqual(other, false)
         }

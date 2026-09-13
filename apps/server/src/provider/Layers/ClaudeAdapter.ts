@@ -25,7 +25,14 @@ import {
 import { parseCliArgs } from "@t3tools/shared/cliArgs";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import { type ClaudeScopedLimitNames, claudeRateLimitEventToUpdate } from "./claudeUsageLimits.ts";
-import { claudeTurnUsageDelta, type ClaudeResultTotals } from "./claudeTurnUsage.logic.ts";
+import {
+  claudeTurnUsageDelta,
+  INITIAL_PROMPT_CACHE_WATCH,
+  promptCacheVerdict,
+  promptCacheWarningText,
+  type ClaudeResultTotals,
+  type PromptCacheWatch,
+} from "./claudeTurnUsage.logic.ts";
 import {
   isTransportErrorMessage,
   isTransportResult,
@@ -441,6 +448,8 @@ interface ClaudeSessionContext {
   forkAnchor: { readonly latest: boolean; state: "pending" | "reopening" | "spent" } | undefined;
   /** Fork (#834): the last result's cumulative totals, differenced per turn. */
   lastResultTotals: ClaudeResultTotals | undefined;
+  /** No prompt cache (#974): the run of large uncached calls, per session. */
+  promptCache: PromptCacheWatch;
   lastThreadStartedId: string | undefined;
   /** Limits already announced for the running turn, keyed `window:resetsAt`. */
   announcedUsageLimits: { turnId: string; keys: Set<string> } | undefined;
@@ -3321,6 +3330,22 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       return;
     }
 
+    // No prompt cache (#974): every API response counts, a subagent's too —
+    // it runs on the same instance, and the case that prompted this was one.
+    const cacheVerdict = promptCacheVerdict(
+      context.promptCache,
+      typeof message.message.id === "string" ? message.message.id : undefined,
+      message.message.usage,
+    );
+    context.promptCache = cacheVerdict.watch;
+    if (cacheVerdict.warn !== undefined) {
+      yield* emitRuntimeWarning(
+        context,
+        promptCacheWarningText(cacheVerdict.warn.calls),
+        cacheVerdict.warn,
+      );
+    }
+
     // Subagent-owned assistant snapshots (parent_tool_use_id set) are the
     // subagent's own conversation, not the parent's. Emitting them created
     // interleaved "Agent N done"-adjacent leak messages and spawned synthetic
@@ -5383,6 +5408,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
             ? { latest: resumeState.resumeSessionAtLatest === true, state: "pending" }
             : undefined,
         lastResultTotals: undefined,
+        promptCache: INITIAL_PROMPT_CACHE_WATCH,
         lastThreadStartedId: undefined,
         announcedUsageLimits: undefined,
         stopped: false,

@@ -210,8 +210,7 @@ public enum MirrorTransport {
     /// /sessions/*/input` keeps the small default.
     public static func bodyCap(method: String, path: String) -> Int {
         guard method == "POST" else { return defaultBodyCap }
-        // A sealed team command carries a prompt (#220) — the input cap.
-        if sessionInputPid(path) != nil || path == TeamControlRoute.commandPath { return sessionInputBodyCap }
+        if sessionInputPid(path) != nil { return sessionInputBodyCap }
         return defaultBodyCap
     }
 
