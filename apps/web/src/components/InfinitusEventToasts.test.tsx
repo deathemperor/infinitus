@@ -1,11 +1,9 @@
-
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
 import * as DateTime from "effect/DateTime";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,

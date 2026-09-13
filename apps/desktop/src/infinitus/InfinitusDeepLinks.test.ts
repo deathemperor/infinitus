@@ -43,7 +43,6 @@ describe("parseDesktopDeepLink (#270 D)", () => {
     expect(link?.kind === "new" ? link.prompt.length : null).toBe(MAX_DEEP_LINK_PROMPT_LENGTH);
   });
 
-
   it("claims nothing else", () => {
     expect(parseDesktopDeepLink("infinitus://app/index.html", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus-dev://thread/e/t", "infinitus")).toBeNull();
