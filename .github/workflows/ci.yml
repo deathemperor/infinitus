@@ -404,7 +404,10 @@ jobs:
             fi
           fi
 
-          paths=$(tr '\t' '\n' <<< "$rows")
+          # Release notes are prose the Swift build never reads: a PR whose only
+          # apps/mac change is its changelog.d fragment (or CHANGELOG.md at a
+          # release cut) pays no macOS minutes.
+          paths=$(tr '\t' '\n' <<< "$rows" | grep -vE '^apps/mac/(changelog\.d/|CHANGELOG\.md$)')
 
           pattern='^apps/mac/|^\.github/workflows/ci\.yml$'
 
