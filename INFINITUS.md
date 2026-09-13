@@ -1027,12 +1027,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   settings, `ThreadNotificationCoordinator`, the `Notification` API and two
   bundled sounds; ruling #1032, which retired the fork's #270 B banners over
   the Electron main process and the #270 H per-window completion sound).
-  The fork layers three things. In `ThreadNotificationCoordinator.tsx` (an
+  The fork layers a few things. In `ThreadNotificationCoordinator.tsx` (an
   upstream file, one registration point): `held` and `failed` threads
   notify like input does (the holds come from the environment's
   `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
   and the thread on screen stays quiet while the window has focus
-  (`quietForViewer`) — upstream posts and rings for it. The Dock badge
+  (`quietForViewer`) — upstream posts and rings for it. Next, #270 B's
+  queue rule: a turn that completes while the thread still has
+  `queuedTurns` neither posts nor rings
+  (`notificationKind`), since the #806 drain sends the next row the moment
+  the turn ends; the completion still counts as seen, so removing the queued
+  row afterwards rings nothing for it, and an approval or question rings
+  queued or not because the drain cannot pass it. The Dock badge
   (`desktopBadgeAttention`, on by default) counts the threads in approval
   or input through the `setBadgeCount` bridge method, the one IPC left
   (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`
@@ -1903,17 +1909,6 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
   it: `--routes` prints the routes for the harness's argument list, `--out
   <dir>` reads the captures and exits 1 on the first miss.
-
-- `packages/contracts/src/agentSessions.ts`,
-  `apps/server/src/project/AgentSessionScanner.ts`,
-  `apps/server/src/project/AgentSessionImporter.ts` — fork extension of
-  upstream's session import (#648): `AgentSessionImportInput.providerSessionIds`
-  (optional) filters the scanner to those transcript names before any budget
-  is spent (filtered-out files are neither imported nor counted as skipped),
-  and `AgentSessionImportResult.threads` (present only with a filter) lists
-  `{providerSessionId, threadId}` for each requested session that now has a
-  thread, imported now or earlier. Without the field the RPC behaves exactly
-  as upstream.
 
 - `.github/workflows/native-nightly-dispatch.yml` — cron dispatcher for the
   `native` branch's nightly jobs (schedules run only from the default
