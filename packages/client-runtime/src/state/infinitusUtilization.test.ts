@@ -112,7 +112,6 @@ const reply = {
     files: 9,
     unpricedModels: ["mystery-1"],
   },
-  liveRate: { perMinute: 1500, peakPerMinute: 4200 },
 };
 
 describe("decodeUtilization (#747)", () => {

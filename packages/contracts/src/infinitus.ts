@@ -303,14 +303,6 @@ export const InfinitusUtilization = Schema.Struct({
       }),
     ),
   ),
-  liveRate: Schema.optionalKey(
-    Schema.NullOr(
-      Schema.Struct({
-        perMinute: Schema.Finite,
-        peakPerMinute: Schema.optionalKey(Schema.Finite),
-      }),
-    ),
-  ),
 });
 export type InfinitusUtilization = typeof InfinitusUtilization.Type;
 

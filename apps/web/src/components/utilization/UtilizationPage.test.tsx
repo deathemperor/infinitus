@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
+  liveRate: null as { liveRate: { perMinute: number } | null } | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     utilization: () => ({ label: "utilization-atom" }),
+    liveRate: () => ({ label: "live-rate-atom" }),
   },
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -31,7 +33,9 @@ vi.mock("../../state/query", () => ({
         ? null
         : atom.label === "utilization-atom"
           ? testState.utilization
-          : testState.snapshot;
+          : atom.label === "live-rate-atom"
+            ? testState.liveRate
+            : testState.snapshot;
     return {
       data,
       error: null,
@@ -167,7 +171,6 @@ const utilizationReply = {
       files: 9,
       unpricedModels: ["mystery-1"],
     },
-    liveRate: { perMinute: 1500, peakPerMinute: 4200 },
   },
 };
 const inADay = inAnHour + 86_400;
@@ -244,6 +247,7 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
+    testState.liveRate = { liveRate: { perMinute: 1500 } };
     testState.capability = true;
     testState.refresh.mockReset();
   });
@@ -306,6 +310,13 @@ describe("UtilizationPage", () => {
     markup = renderToStaticMarkup(<UtilizationPage />);
     expect(markup).toContain("need a newer Infinitus app");
     expect(markup).not.toContain("Run rate");
+    // #1127: the live rate is this server's own, so it is drawn even where the
+    // Mac cannot answer `utilization` — and nothing is drawn when no turn ran.
+    expect(markup).toContain("Live: 1.5k output tokens/min");
+
+    testState.liveRate = { liveRate: null };
+    markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).not.toContain("output tokens/min");
   });
 
   it("renders every account's line with its windows, paces and the window that binds first", () => {
