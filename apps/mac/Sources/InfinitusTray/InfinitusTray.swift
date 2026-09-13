@@ -881,7 +881,7 @@ struct InfinitusTray {
         // design, so it never changes and is built once up front. `files`,
         // `timeline`, `sequence`, `checkpoints`, `attention` and `images`
         // are true; the tray still answers nothing else the Mac's newer
-        // routes (leases, team, …) cover.
+        // routes (leases, …) cover.
         //
         let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
             machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: BuiltVersion.string)))

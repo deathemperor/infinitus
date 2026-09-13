@@ -127,11 +127,13 @@ export const InfinitusBabysitLive = Layer.effectDiscard(
     ) =>
       Effect.gen(function* () {
         const createdAt = DateTime.formatIso(yield* DateTime.now);
+        // The cap keeps the record with `stoppedAt` so the sidebar can say
+        // so (#269 A); a merge is done with, and clears it.
         yield* orchestrationEngine.dispatch({
           type: "thread.meta.update",
           commandId: yield* serverCommandId("off"),
           threadId: shell.id,
-          babysit: false,
+          ...(reason === "cap" ? { babysitStopped: true as const } : { babysit: false }),
         });
         yield* orchestrationEngine.dispatch({
           type: "thread.activity.append",

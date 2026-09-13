@@ -1078,10 +1078,6 @@ export const ServerSettings = Schema.Struct({
   // Fork (#648): a thread's turn stopped by a Claude usage limit resumes on the
   // account Infinitus swapped to. Default on; the switch is Settings › Infinitus.
   infinitusResumeOnLimit: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
-  // Fork (#269 G): a thread waiting on a person, finished or failed is pushed
-  // through the Mac's own channels (phone, Slack, Telegram); the Mac's own
-  // notice is skipped, the desktop's notifications (#270 B) cover its screen.
-  infinitusPushBridge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Fork (#574): the Slack bridge; its tokens are redacted for clients.
   infinitusSlack: InfinitusSlackSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   /**
@@ -1426,7 +1422,6 @@ export const ServerSettingsPatch = Schema.Struct({
   enableLegacyTokenStreaming: Schema.optionalKey(Schema.Boolean),
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   infinitusResumeOnLimit: Schema.optionalKey(Schema.Boolean),
-  infinitusPushBridge: Schema.optionalKey(Schema.Boolean),
   infinitusSlack: Schema.optionalKey(InfinitusSlackSettingsPatch),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),

@@ -68,9 +68,6 @@ public struct MirrorSnapshot: Codable, Sendable {
     /// Settings can show both apps' versions and trigger the Mac's
     /// update. Additive optional — an old Mac's snapshot decodes nil.
     public let app: AppInfo?
-    /// The Mac's team (Settings › Team) for the phone's Team tab (plan 8).
-    /// Additive optional — a Mac without a team, or an older Mac, sends nil.
-    public let team: TeamSnapshot?
     /// The Mac's saved session profiles (#165) — the phone's Start a
     /// session chips. Additive optional.
     public let profiles: [SessionProfile]?
@@ -94,7 +91,7 @@ public struct MirrorSnapshot: Codable, Sendable {
                 awsLogins: [AwsLogin.Item]? = nil,
                 stats: Stats.Bundle? = nil,
                 recentCwds: [String]? = nil, pushesAlerts: Bool? = nil,
-                app: AppInfo? = nil, team: TeamSnapshot? = nil, profiles: [SessionProfile]? = nil,
+                app: AppInfo? = nil, profiles: [SessionProfile]? = nil,
                 projects: [ProjectSummary]? = nil,
                 births: [Int: SessionBirth]? = nil,
                 factsByPid: [Int: SessionFacts]? = nil,
@@ -117,7 +114,6 @@ public struct MirrorSnapshot: Codable, Sendable {
         self.recentCwds = recentCwds
         self.pushesAlerts = pushesAlerts
         self.app = app
-        self.team = team
         self.profiles = profiles
         self.projects = projects
         self.births = births

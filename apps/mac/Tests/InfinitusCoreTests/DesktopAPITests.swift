@@ -53,6 +53,22 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertEqual(log.calls[0].url, "http://127.0.0.1:3773/api/orchestration/threads/t%201?turnLimit=3")
     }
 
+    /// #1048: today's desktop wraps the thread in `{snapshotSequence, thread, page?}`.
+    func testThreadDetailDecodesTheSnapshotEnvelope() throws {
+        let log = Log()
+        let detail = """
+        {"snapshotSequence":59220,"thread":{"id":"t1","projectId":"p1","title":"Account state anomaly","runtimeMode":"full-access","interactionMode":"default",
+         "latestTurn":{"turnId":"u9","state":"completed","assistantMessageId":"m9"},"session":{"threadId":"t1","status":"idle","activeTurnId":null},
+         "messages":[{"id":"m9","role":"assistant","text":"hello","turnId":"u9","streaming":false,"createdAt":"2026-09-12T00:00:01Z"}],
+         "activities":[],"proposedPlans":[],"checkpoints":[]},"page":{"turnLimit":1,"hasMore":true}}
+        """
+        let thread = try api([(200, detail)], log: log).thread("t1", turnLimit: 1)
+        XCTAssertEqual(thread.id, "t1")
+        XCTAssertEqual(thread.title, "Account state anomaly")
+        XCTAssertEqual(thread.session?.status, "idle")
+        XCTAssertEqual(thread.messages.map(\.text), ["hello"])
+    }
+
     func testANonSuccessAnswerIsAFailureWithTheDesktopsStatusAndBody() {
         let log = Log()
         XCTAssertThrowsError(try api([(500, "{\"error\":\"boom\"}")], log: log).shell()) { error in

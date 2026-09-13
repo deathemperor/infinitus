@@ -349,10 +349,6 @@ public enum StatsScanner {
         /// call, before this call's budget spent any of it — the
         /// denominator for a "scanned X of Y" readout.
         public var bytesTotal = 0
-        /// Every file the scan folded, keyed by path — cwd, engine, the
-        /// per-day tallies and the session span — so a caller can fold
-        /// its own subset (the team publisher drops excluded projects).
-        public var entries: [String: FileEntry] = [:]
     }
 
     struct Cache: Codable {
@@ -717,7 +713,6 @@ public enum StatsScanner {
             due = true
         }
         if let cacheURL, !unchanged, due { write(cache, to: cacheURL) }
-        result.entries = live
         return result
     }
 

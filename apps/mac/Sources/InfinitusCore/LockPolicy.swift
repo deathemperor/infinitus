@@ -6,8 +6,7 @@ import Foundation
 /// the app feeds it the moments that matter (a surface shows or hides, a
 /// window becomes key, the Mac sleeps or wakes), so an armed re-lock costs
 /// nothing while idle and is settled on the next interaction. Carries no
-/// key material: re-locking hides views, and the team working key stays
-/// wherever it lives (TeamClient).
+/// key material: re-locking only hides views.
 ///
 /// Re-lock modes:
 ///   .immediately  locks when a surface hides (the pop-out closes, Settings

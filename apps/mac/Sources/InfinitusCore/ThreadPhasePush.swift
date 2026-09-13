@@ -10,19 +10,8 @@ public struct ThreadPhasePush: Equatable, Sendable {
     public let title: String
     public let phase: String
     public let detail: String?
-    /// Whether the Mac posts its own Notification Center notice too.
-    /// `local: false` (#1020): the desktop already shows the banner for
-    /// its own threads (#270 B), so the push goes to the phone and the
-    /// away channels only. Absent or not a bool reads true.
-    public let local: Bool
-    /// Whether the Mac's Slack webhook gets the line. `slack: false`
-    /// (#574): a thread that started from Slack already reports its
-    /// milestones in its own thread there, so the Mac's webhook post
-    /// would be a second message; Telegram and the phone are unchanged.
-    /// Absent or not a bool reads true.
-    public let slack: Bool
 
-    /// `{kind: "thread.phase", threadId, title, phase, detail?, local?, slack?}`;
+    /// `{kind: "thread.phase", threadId, title, phase, detail?}`;
     /// nil for any other shape, so a stray payload is refused, never pushed.
     public static func parse(_ json: String) -> ThreadPhasePush? {
         guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
@@ -32,9 +21,7 @@ public struct ThreadPhasePush: Equatable, Sendable {
         let title = (object["title"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let detail = (object["detail"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         return ThreadPhasePush(threadId: threadId, title: title.isEmpty ? "a thread" : title,
-                               phase: phase, detail: (detail?.isEmpty ?? true) ? nil : detail,
-                               local: object["local"] as? Bool ?? true,
-                               slack: object["slack"] as? Bool ?? true)
+                               phase: phase, detail: (detail?.isEmpty ?? true) ? nil : detail)
     }
 
     /// One line, the way the Mac's own pushes read: "<title> — waiting

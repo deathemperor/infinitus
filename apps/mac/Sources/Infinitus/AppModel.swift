@@ -114,73 +114,6 @@ final class AppModel: ObservableObject {
     @Published var eventLog: [EventEntry] = []
     let eventStore = EventStore()
     private let launchedAt = Date()
-    /// Team session control (#220): the audit feed and who is driving
-    /// which session (by session id) until when — read at render time,
-    /// no timer.
-    let teamControlFeed = TeamControlFeed()
-    struct Driven { let name: String; let project: String; let until: Date }
-    @Published var drivenBy: [String: Driven] = [:]
-    /// One "your commands are failing" notification per driver per hour.
-    private var controlRefusalNotified: [String: Date] = [:]
-    static let drivenByWindow: TimeInterval = 60
-    static let executedOutcomes: Set<String> = ["delivered", "running", "captured"]
-    static let notifiedRefusals: Set<String> = ["expired", "replayed", "notLive", "rateLimited", "badRequest"]
-
-    func recordTeamControl(_ audit: TeamControl.Audit, driverName: String?) {
-        let driver = driverName ?? String(audit.driver.prefix(8))
-        let project = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-            .first { $0.sessionId == audit.session }.map { URL(fileURLWithPath: $0.cwd).lastPathComponent } ?? audit.session
-        let line = TeamControlFeed.Line(driver: driver, session: project, action: audit.action, outcome: audit.outcome, detail: audit.detail)
-        teamControlFeed.append(line)
-        logEvent("team-control", icon: "person.2", line.text)
-        if Self.executedOutcomes.contains(audit.outcome) {
-            drivenBy[audit.session] = Driven(name: driver, project: project, until: Date().addingTimeInterval(Self.drivenByWindow))
-        }
-        if driverName != nil, Self.notifiedRefusals.contains(audit.outcome),
-           controlRefusalNotified[audit.driver].map({ Date().timeIntervalSince($0) > 3600 }) ?? true {
-            controlRefusalNotified[audit.driver] = Date()
-            notify("\(driver)'s commands are failing: \(audit.outcome)")
-        }
-        if audit.outcome == TeamControl.Outcome.pending {
-            notify("\(driver) asks to \(audit.action) \(project) — allow or deny in Settings › Team, or `infinitusctl team-pending`")
-        }
-        refreshTeamPending()
-    }
-
-    /// Mirrors the box's in-memory waits into the feed's screen-safe rows
-    /// (#220 Phase 2 §7.1). Called on every audit: `pending`, `done`,
-    /// `refused`, `denied`, `expired` and `revoked` all change the list.
-    func refreshTeamPending() {
-        let entries = mirrorServer.teamControl.pending()
-        guard !entries.isEmpty else { teamControlFeed.setPending([]); return }
-        let sessions = entries.contains { $0.command.session != TeamControl.machineSession }
-            ? ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()) : []
-        let rows = entries.map { entry -> TeamControlFeed.Pending in
-            let driver = team.snapshot?.members.first { $0.kid == entry.driver }?.name ?? String(entry.driver.prefix(8))
-            let project: String
-            if entry.command.session == TeamControl.machineSession {
-                project = "this Mac"
-            } else if let session = sessions.first(where: { $0.sessionId == entry.command.session }) {
-                project = URL(fileURLWithPath: session.cwd).lastPathComponent
-            } else {
-                project = entry.command.session
-            }
-            return TeamControlFeed.Pending(id: entry.command.id, driver: driver, project: project,
-                                           action: entry.command.action, expires: Date(timeIntervalSince1970: TimeInterval(entry.expires)))
-        }
-        teamControlFeed.setPending(rows)
-    }
-
-    /// Where a teammate reaches this Mac right now (#220 §5.1), for now.json.
-    var controlEndpoints: TeamControl.Endpoints {
-        var e = TeamControl.Endpoints()
-        if let port = mirrorServer.port, let lan = MirrorPairing.lanAddress(in: LocalAddresses.ipv4()) { e.lan = "\(lan):\(port)" }
-        if namedTunnel.connected { e.hostname = namedTunnel.hostname }
-        if quickTunnel.url != nil, let kid = team.kid, let id = team.paths.teamIDs().sorted().first {
-            e.rendezvous = TeamControl.rendezvousKey(team: id, kid: kid)
-        }
-        return e
-    }
     lazy var statsModel = StatsModel(eventStore: eventStore)
 
     /// Every event goes through here: the Activity pane's tail and the
@@ -221,8 +154,6 @@ final class AppModel: ObservableObject {
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
-    /// Permission asks routed to the desktop and the web (#79 item 3).
-    let permissionAsks = PermissionAsks()
 
     private func profileAllowRules(_ birth: SessionBirth) -> [ToolApproval.Rule] {
         guard let name = birth.profile else { return [] }
@@ -843,14 +774,6 @@ final class AppModel: ObservableObject {
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
     private(set) lazy var lock = LockModel(defaults: defaults)
-    /// Settings › Team (spec §9). Secrets in the keychain, or files when
-    /// INFINITUS_TEAM_DIR redirects the team dir (e2e, a second instance).
-    private(set) lazy var team: TeamModel = {
-        let paths = TeamPaths.standard()
-        let model = TeamModel(paths: paths, makeSecrets: TeamSecretsFactory.make(paths: paths), defaults: defaults)
-        model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
-        return model
-    }()
     /// The desktop's CLI credential (#822): stored by `desktop-credential`, read by `desktop-token`.
     private(set) lazy var desktopCredential: DesktopCredential = {
         let credential = DesktopCredential(defaults: defaults)
@@ -866,18 +789,10 @@ final class AppModel: ObservableObject {
     /// Every app notification: Notification Center here, and the same
     /// text to any phone that registered an alert token (issue #3).
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
-    /// phone.
-    /// `local: false` skips the Mac's own Notification Center notice and
-    /// still reaches the phone (#1020: the desktop
-    /// shows its own banner for its threads, and two banners per phase
-    /// change kept the bridge off).
-    func push(_ msg: String, local: Bool = true, slack: Bool = true) {
-        if local {
-            notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
-        } else {
-            liveActivityPusher.pushAlert(title: "Infinitus", body: msg,
-                                         unlessRevival: PushTriggers.isAllDeadMessage(msg))
-        }
+    /// phone (#756: the engine's own away-push channels went with cswap;
+    /// swapd's `notify` only reports).
+    func push(_ msg: String) {
+        notify(msg, phoneUnlessRevival: PushTriggers.isAllDeadMessage(msg))
     }
 
     struct SessionRow {
@@ -1232,7 +1147,6 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = mirrorServer.leases
-        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
         if !isPlayground, !mockMode {
             let namer = SessionNamer(appSupport: AppSupport.root())
             namer.enabled = sessionAutoNames
@@ -1603,58 +1517,6 @@ final class AppModel: ObservableObject {
         mirrorServer.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
-        mirrorServer.teamControl.onAudit = { [weak self] audit, name in
-            Task { @MainActor in self?.recordTeamControl(audit, driverName: name) }
-        }
-        teamControlFeed.decide = { [weak self] id, allow in
-            self?.mirrorServer.teamControl.decide(id, allow: allow) { _ in }
-        }
-        // Both re-apply the listener first: joining, leaving or flipping
-        // Discoverable decides whether the team keeps it up (#356).
-        team.onLoaded = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamControl() }
-        team.onActed = { [weak self] in self?.reapplyMirrorLANForTeam(); self?.mirrorServer.refreshTeamStanding(force: true) }
-        // #220 §5.4: a leader's hostname for this Mac — token to the keychain,
-        // the named tunnel on. The LAN listener is the user's switch, not ours.
-        team.onHostname = { [weak self] hostname, from in
-            guard let self else { return }
-            let host = NamedTunnel.normalizeHostname(hostname.hostname)
-            guard !host.isEmpty else { return }
-            // A re-give mints a fresh token for the same host: the running
-            // cloudflared holds the old one, so it restarts below.
-            if namedTunnel.isRunning, namedTunnel.hostname == host { namedTunnel.stop() }
-            NamedTunnel.setToken(hostname.token, for: host)
-            mirrorNamedTunnelHost = host
-            mirrorNamedTunnelEnabled = true
-            let who = team.snapshot?.members.first { $0.kid == from }?.name ?? String(from.prefix(8))
-            let hint = mirrorLANEnabled ? "" : " — turn on the LAN listener to run it"
-            logEvent("team", icon: "network", "\(who) gave this Mac the hostname \(host)\(hint)")
-        }
-        // Team session control (#220): the phone's delivery path, origin
-        // "team". Wired here, not in applyMirrorLAN — the store lane runs
-        // with the LAN listener off.
-        mirrorServer.teamControl.setDeliver { [weak self] pid, request, origin in
-            self?.deliverSessionInput(pid: pid, request, from: origin)
-                ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
-        }
-        // #220 Phase 2: a granted non-drive action is the Mac's own control
-        // verb, run through ControlServer.run on the main actor. The team-control
-        // queue waits here (never main): main is free while the verb runs, so
-        // team-allow — a verb itself, suspended at its await — cannot deadlock it.
-        mirrorServer.teamControl.setRunVerb { [weak self] verb in
-            guard let self else { return SessionInput.Reply(outcome: "rejected", detail: "app is shutting down") }
-            let done = DispatchSemaphore(value: 0)
-            let slot = OSAllocatedUnfairLock<ControlReply?>(initialState: nil)
-            Task { @MainActor in
-                let reply = await self.controlServer.run(ControlRequest(command: verb.command, args: verb.args, options: verb.options, secret: nil))
-                slot.withLock { $0 = reply }
-                done.signal()
-            }
-            guard done.wait(timeout: .now() + 30) == .success, let reply = slot.withLock({ $0 }) else {
-                return SessionInput.Reply(outcome: TeamControl.Outcome.refused, detail: "still running after 30 s")
-            }
-            return TeamControl.verbReply(verb, ok: reply.ok, error: reply.error)
-        }
-        team.onFetched = { [mirrorServer] client in mirrorServer.teamControl.storePass(client) }
         quickTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
@@ -1759,22 +1621,6 @@ final class AppModel: ObservableObject {
                     return Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)")
                 }
             }))
-        // The phone's Team tab (spec §9 step 8) — every call lands on the
-        // main actor, where TeamModel lives.
-        mirrorServer.teamMirror.set { [weak self] request in
-            guard let team = await MainActor.run(body: { self?.team }) else { return nil }
-            return await TeamMirrorHandler.reply(request, team: team)
-        }
-        team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(projectsDir: URL(fileURLWithPath: "/nonexistent"), home: NSHomeDirectory()) }
-        // The fixture instance (e2e) publishes what the publisher scans itself.
-        let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"] ?? ""
-        team.ownsScan = { [weak self] in fixture.isEmpty && self?.statsModel.enabled == true }
-        team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
-        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
-        // The memo holds what the team needs of a scan; the table goes back (#499).
-        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
-        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        team.load()
         crashReports = crashStore.list()
         scanMacCrashReports()
         quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
@@ -1857,24 +1703,10 @@ final class AppModel: ObservableObject {
     /// Starts or stops the phone companion's LAN listener (#9). Never in
     /// the playground: it seeds from the real defaults and would
     /// advertise a second service with the same machine name.
-    /// The team hooks' cheap form (#356): re-run the full apply only when
-    /// the listener's up/down answer changed — `applyMirrorLAN` rewires
-    /// every handler and drops the thumbnail cache, too much for every load.
-    private func reapplyMirrorLANForTeam() {
-        let wanted = mirrorLANEnabled || team.discoverable || team.inTeam
-        if wanted != mirrorServer.isListening { applyMirrorLAN() }
-    }
-
     private func applyMirrorLAN() {
         let allowed = exposureAllowed
-        // Team Nearby rides the same listener (#356): a discoverable Mac
-        // or a team member keeps it up with the phone switch off, and the
-        // phone routes then drop their connections. The tunnels stay the
-        // phone's alone.
-        let teamWantsLAN = team.discoverable || team.inTeam
-        team.nearbyAvailable = allowed
         mirrorServer.phoneEnabled = mirrorLANEnabled
-        guard allowed, mirrorLANEnabled || teamWantsLAN else {
+        guard allowed, mirrorLANEnabled else {
             mirrorServer.stop()
             quickTunnel.stop()
             namedTunnel.stop()
@@ -2298,48 +2130,6 @@ final class AppModel: ObservableObject {
         crashReports = crashStore.list()
     }
 
-    /// What this Mac publishes to its team (spec §7): Claude Code's own
-    /// files, this Mac's live sessions and crash reports, each engine's
-    /// active account with its window percentages, and the blockers
-    /// the pop-out shows (lapsed AWS logins, an all-limited fleet).
-    /// INFINITUS_TEAM_PROJECTS swaps the projects dir for a fixture
-    /// (the e2e gate) and skips the Codex scan.
-    func teamSources() -> TeamPublisher.Sources {
-        let claudeDir = ClaudeSessions.configHome()
-        var s = TeamPublisher.Sources(projectsDir: claudeDir.appendingPathComponent("projects"), home: NSHomeDirectory())
-        s.codexDir = StatsScanner.defaultCodexDir()
-        if let fixture = ProcessInfo.processInfo.environment["INFINITUS_TEAM_PROJECTS"], !fixture.isEmpty {
-            s.projectsDir = URL(fileURLWithPath: fixture)
-            s.codexDir = nil
-        }
-        s.liveSessions = ClaudeSessions.list(claudeDir: claudeDir)
-        s.crashes = crashStore.list()
-        s.endpoints = controlEndpoints
-        if let id = team.paths.teamIDs().sorted().first {
-            let hints = TeamGrants.load(teamDir: team.paths.teamDir(id)).hints
-            s.grantsTo = hints.isEmpty ? nil : hints
-        }
-        let lastFleets = fleets.compactMap(\.lastFleet)
-        s.fleets = lastFleets.map { fleet in
-            let active = fleet.accounts.first { $0.number == fleet.activeNumber }
-            var windows: [TeamDocs.Window] = []
-            if let w = active?.usage?.fiveHour { windows.append(TeamDocs.Window(label: "5h", pct: Int(w.pct.rounded()))) }
-            if let w = active?.usage?.sevenDay { windows.append(TeamDocs.Window(label: "7d", pct: Int(w.pct.rounded()))) }
-            return TeamDocs.Fleet(engine: fleet.engineID, account: active.map { $0.alias ?? $0.email }, windows: windows)
-        }
-        // Every account, for the member fleet view (#221); this Mac's one
-        // token rate rides the primary fleet.
-        let perMinute = sessionProgress.tokenRate?.perMinute ?? 0
-        let rate: Double? = perMinute > 0 ? Double(perMinute) : nil
-        s.fleetRows = lastFleets.enumerated().map { i, fleet in
-            TeamDocs.FleetDoc.row(fleet, tokensPerMinute: i == 0 ? rate : nil)
-        }
-        s.blockers = awsLogins.map { "\($0.providerOrAws.loginLabel): \($0.profile)" }
-            + lastFleets.filter { !$0.accounts.isEmpty && $0.activeNumber == nil && $0.nextCandidate == nil }
-                .map { "\($0.engineID): every account limited" }
-        return s
-    }
-
     /// This Mac's own crashes: `~/Library/Logs/DiagnosticReports/
     /// Infinitus-*.ips` newer than the last look. The first look starts
     /// the clock — old reports aren't news.
@@ -2576,10 +2366,6 @@ final class AppModel: ObservableObject {
     func publishRendezvous(_ url: String) {
         guard mirrorRendezvousEnabled else { return }
         if let target = MirrorRendezvous.url(token: mirrorPairToken) { publish(url, at: target, label: "tunnel address") }
-        // #220: teammates derive this key from the roster alone.
-        if let key = controlEndpoints.rendezvous, let target = MirrorRendezvous.url(key: key) {
-            publish(url, at: target, label: "team control address")
-        }
     }
 
     private func publish(_ url: String, at target: URL, label: String) {
@@ -2817,7 +2603,6 @@ final class AppModel: ObservableObject {
         let bundle = Bundle.main.bundleURL.path
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
-        let team = team
         Task {
             await oldSwapd?.stop()
             let p = Process()
@@ -2825,10 +2610,8 @@ final class AppModel: ObservableObject {
             // Unbundled dev runs are a bare executable — `open` on its
             // directory would just raise Finder.
             let exe = Bundle.main.executablePath ?? ""
-            // applicationShouldTerminate can hold quit up to
-            // TeamModel.quitBound (20s) for a team's now.json delete, so a
-            // fixed sleep can no longer be trusted to outlast this
-            // process — wait for the pid to actually exit instead.
+            // A fixed sleep can't be trusted to outlast this process —
+            // wait for the pid to actually exit instead.
             let pid = ProcessInfo.processInfo.processIdentifier
             let wait = "while /bin/kill -0 \(pid) 2>/dev/null; do sleep 0.1; done; "
             let cmd = bundle.hasSuffix(".app")
@@ -2836,16 +2619,7 @@ final class AppModel: ObservableObject {
                 : wait + "exec \"\(exe)\""
             p.arguments = ["-c", cmd]
             try? p.run()
-            // Same as shutdown() (#656): the team's now.json delete runs
-            // here, so applicationShouldTerminate answers .terminateNow.
-            // From inside a Task, .terminateLater parks the main thread in
-            // AppKit's nested event loop and the reply never runs — the
-            // bundle sat wedged in this very call for 30 minutes on
-            // 2026-09-11 (sampled), its control socket accepting and never
-            // answering, the reopen shell waiting on a pid that never left.
-            await team.quit()
             await MainActor.run {
-                AppDelegate.teamQuitDone = true
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -3035,9 +2809,7 @@ final class AppModel: ObservableObject {
                                         tokenRate: sessionProgress.tokenRate)
             }
             statsModel.refreshIfStale()
-            team.refreshIfStale() // inside the !mockMode guard above: the automatic loop is real-instance-only; a mock instance still answers team-* control commands directly
             let stats = statsModel.bundle
-            let teamSnapshot = team.snapshot
             // This Mac's own version, mirrored for the phone's Settings
             // (#121) — same keys ControlServer.status reads.
             let info = Bundle.main.infoDictionary ?? [:]
@@ -3062,7 +2834,7 @@ final class AppModel: ObservableObject {
                                             awsLogins: awsLogins, progress: progress,
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
-                                            app: appInfo, team: teamSnapshot,
+                                            app: appInfo,
                                             profiles: sessionProfilesList,
                                             projects: { self.projectSummaries(profiles: sessionProfilesList) },
                                             births: self.sessionBirths,
@@ -3273,20 +3045,12 @@ final class AppModel: ObservableObject {
         forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor
         let owned = ownedBox.existing
-        let team = team
         Task {
             await swapdSupervisor?.stop()
             // Owned Claude sessions are this process's children (#151):
             // they don't outlive the app either (the #274 lesson).
             await owned?.stopAll()
-            // The team's now.json delete here, not in applicationShouldTerminate:
-            // from inside a Task, `.terminateLater` parks the main thread in
-            // AppKit's nested event loop and the reply never runs (#654: the
-            // e2e's quit sat there past 30s; sampled 2026-09-11). Bounded by
-            // TeamModel.quitBound.
-            await team.quit()
             await MainActor.run {
-                AppDelegate.teamQuitDone = true
                 NSApplication.shared.terminate(nil)
             }
         }

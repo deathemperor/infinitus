@@ -47,18 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         AppDelegate.terminating = true
         Lifecycle.log.notice("quit requested by pid \(Lifecycle.quitSenderPID.map(String.init) ?? "self", privacy: .public)")
-        // Spec §7: `now.json` goes on quit, on EVERY quit — Cmd-Q, logout,
-        // the relaunch path — not only AppModel.shutdown(). Bounded
-        // (TeamModel.quitBound) so a dead remote never holds the quit.
-        guard let team = model?.team, team.inTeam, !AppDelegate.teamQuitDone else { return .terminateNow }
-        AppDelegate.teamQuitDone = true
-        Task { @MainActor in
-            await team.quit()
-            sender.reply(toApplicationShouldTerminate: true)
-        }
-        return .terminateLater
+        return .terminateNow
     }
-    static var teamQuitDone = false
 
     /// `open Infinitus.app` on an already-running instance lands here: show
     /// the pinned window. This is the guaranteed way into the UI when the
@@ -76,14 +66,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.showPinnedWindow()
         }
         return false
-    }
-
-    /// `infinitus://join/…` from a QR, a message or the phone (spec §6.2).
-    func application(_ application: NSApplication, open urls: [URL]) {
-        guard let model else { return }
-        for url in urls {
-            if model.team.open(url: url) { break }
-        }
     }
 }
 
@@ -211,11 +193,8 @@ struct InfinitusApp: App {
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
         SettingsTab(title: LockModel.paneTitle, symbol: "lock.fill", tint: .gray,
                     keywords: ["biometric", "touch id", "face id", "password",
-                               "unlock", "privacy", "team"],
+                               "unlock", "privacy"],
                     view: AnyView(LockPane(lock: model.lock))),
-        SettingsTab(title: TeamModel.paneTitle, symbol: "person.3", tint: .teal,
-                    keywords: ["team", "invite", "code", "join", "members", "leader", "share", "publish", "exclude", "control", "grant", "drive"],
-                    view: AnyView(TeamPane(team: model.team, feed: model.teamControlFeed))),
     ]
     + [
         SettingsTab(title: "About", symbol: "info.circle", tint: .indigo,

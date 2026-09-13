@@ -18,11 +18,18 @@ export function ThreadBabysitToggle({
   babysit: ThreadBabysit | null;
   onToggle: (on: boolean) => void;
 }) {
-  const on = babysit !== null;
-  const label = on ? `Babysit ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}` : "Babysit";
+  const stopped = babysit !== null && babysit.stoppedAt !== undefined;
+  const on = babysit !== null && !stopped;
+  const label = on
+    ? `Babysit ${babysit.rounds}/${BABYSIT_MAX_ROUNDS}`
+    : stopped
+      ? "Babysit stopped"
+      : "Babysit";
   const tooltip = on
     ? `Babysitting: a fix round is queued whenever the pull request conflicts, fails its checks or gets changes requested (${babysit.rounds} of ${BABYSIT_MAX_ROUNDS} rounds used). Click to stop.`
-    : "Babysit the pull request: queue a fix round whenever it conflicts, fails its checks or gets changes requested.";
+    : stopped
+      ? `Babysit stopped after ${BABYSIT_MAX_ROUNDS} rounds; the pull request still needs work. Click to start again.`
+      : "Babysit the pull request: queue a fix round whenever it conflicts, fails its checks or gets changes requested.";
   return (
     <Tooltip>
       <TooltipTrigger

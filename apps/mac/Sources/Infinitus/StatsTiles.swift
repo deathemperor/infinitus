@@ -3,8 +3,7 @@ import SwiftUI
 import Charts
 import InfinitusCore
 
-/// The Stats tiles (`Stats.Presentation.groups`) as Form sections — the
-/// Stats pane and a teammate's detail render the same view.
+/// The Stats tiles (`Stats.Presentation.groups`) as Form sections.
 struct StatsTiles: View {
     let summary: Stats.Summary
     var theme: RowTheme = .off

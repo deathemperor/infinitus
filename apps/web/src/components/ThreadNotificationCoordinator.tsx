@@ -5,7 +5,12 @@ import * as Option from "effect/Option";
 import { useEffect, useRef } from "react";
 
 import { getClientSettings, useClientSettings } from "../hooks/useSettings";
-import { attentionNotificationTitle, quietForViewer } from "../lib/infinitusNotifications.logic";
+import {
+  attentionNotificationTitle,
+  notificationKind,
+  quietForViewer,
+  type ThreadNotificationRecord,
+} from "../lib/infinitusNotifications.logic";
 import { useEnvironment, useEnvironments } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
@@ -64,14 +69,14 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
     viewedEnvironmentId === undefined || viewedThreadId === undefined
       ? null
       : `${viewedEnvironmentId}:${viewedThreadId}`;
-  const previous = useRef(new Map<ThreadId, { input: string | null; completion: number | null }>());
+  const previous = useRef(new Map<ThreadId, ThreadNotificationRecord>());
 
   useEffect(() => {
     if (shell.status !== "live" || Option.isNone(shell.snapshot)) {
       previous.current.clear();
       return;
     }
-    const next = new Map<ThreadId, { input: string | null; completion: number | null }>();
+    const next = new Map<ThreadId, ThreadNotificationRecord>();
     for (const thread of shell.snapshot.value.threads) {
       const held = heldEntryFor(holds, thread.id);
       const status = resolveSidebarThreadStatus(thread, {
@@ -90,12 +95,8 @@ function EnvironmentNotifications({ environmentId }: { environmentId: Environmen
           : (prior?.completion ?? null);
       next.set(thread.id, { input, completion });
       if (!prior || mode === "off" || thread.archivedAt !== null) continue;
-      const kind =
-        input && input !== prior.input
-          ? "input"
-          : completion !== null && (prior.completion === null || completion > prior.completion)
-            ? "completion"
-            : null;
+      // Fork (#270 B): a completion with turns still queued is not the end.
+      const kind = notificationKind(prior, { input, completion }, thread.queuedTurns?.length ?? 0);
       if (!kind) continue;
       if (quietForViewer(viewedKey, `${environmentId}:${thread.id}`, document)) continue;
       if (hasNotificationSound(mode)) {

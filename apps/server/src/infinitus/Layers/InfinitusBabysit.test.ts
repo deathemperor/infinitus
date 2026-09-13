@@ -344,7 +344,7 @@ describe("InfinitusBabysitLive (#269 A)", () => {
         yield* h.emit(event("thread.pull-request-synced", one));
         yield* settle(h.commands, (list) => list.length === 2);
         const commands = yield* h.commands;
-        expect(commands[0]).toMatchObject({ type: "thread.meta.update", babysit: false });
+        expect(commands[0]).toMatchObject({ type: "thread.meta.update", babysitStopped: true });
         expect(commands[1]).toMatchObject({
           type: "thread.activity.append",
           activity: { tone: "error", kind: "babysit.stopped" },
