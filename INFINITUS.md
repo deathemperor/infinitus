@@ -1782,7 +1782,10 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `gcloud-login <account>` flow through `InfinitusService.command` (no `--pid`:
   a thread has no session pid; the Mac runs its default flow, and that path's
   post-write poll re-reads `aws-logins`, so the login reaches the Sign-ins
-  lists at once instead of at the next cycle). Once per thread per profile
+  lists at once instead of at the next cycle) — unless that same reply
+  already shows a login for the credential in flight (`hasLoginInFlight`: any
+  `state.phase` short of `done`/`failed`), which is a browser tab waiting on
+  a person and must not be taken over. Once per thread per profile
   per hour (a thread reaching two expired AWS profiles in one hour needs both
   logins); one sequential worker off the event stream, so the turn is never
   waited on; an unreachable Mac or a refused verb is logged and the row

@@ -165,6 +165,25 @@ export function manifestHasVerb(
   return commands.some((command) => command.name === verb);
 }
 
+/** Whether the Mac already has a login running for this credential, read off
+    the snapshot's `aws-logins` reply: a phase past `done`/`failed` is over,
+    anything else is still waiting on a person and must not be restarted. */
+export function hasLoginInFlight(
+  logins: ReadonlyArray<{
+    readonly profile: string;
+    readonly provider?: string | null;
+    readonly state?: { readonly phase: string } | null;
+  }>,
+  lapse: SignInLapse,
+): boolean {
+  return logins.some((login) => {
+    const provider = login.provider === "gcloud" ? "gcloud" : "aws";
+    if (provider !== lapse.provider || login.profile !== lapse.profile) return false;
+    const phase = login.state?.phase;
+    return phase !== undefined && phase !== "done" && phase !== "failed";
+  });
+}
+
 /** "AWS sign-in needed on papaya" / "gcloud sign-in needed on application-default". */
 export function signInMarkerSummary(lapse: SignInLapse): string {
   return `${lapse.provider === "aws" ? "AWS" : "gcloud"} sign-in needed on ${lapse.profile}`;

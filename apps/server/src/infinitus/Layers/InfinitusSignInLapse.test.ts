@@ -83,6 +83,16 @@ const manifest = (...names: ReadonlyArray<string>): InfinitusSnapshot => ({
   fleets: [],
   commands: names.map(command),
 });
+const withLogin = (phase: string, profile = "default"): InfinitusSnapshot => ({
+  ...manifest("aws-login", "gcloud-login"),
+  awsLogins: [
+    {
+      profile,
+      flow: "local",
+      state: { profile, flow: "local", phase, startedAt: 0 },
+    },
+  ],
+});
 const notPolled: InfinitusSnapshot = {
   available: false,
   unavailableReason: "not polled",
@@ -235,6 +245,26 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
       yield* h.emit(toolResult(one, SSO_EXPIRED));
       expect((yield* h.rows).length).toBe(1);
       expect(yield* h.logins).toEqual([]);
+    }),
+  );
+
+  effectIt.effect("a login already waiting on a person is left alone", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({ snapshot: withLogin("waitingForBrowser") });
+      yield* h.emit(toolResult(one, SSO_EXPIRED));
+      expect((yield* h.rows).length).toBe(1);
+      expect(yield* h.logins).toEqual([]);
+    }),
+  );
+
+  effectIt.effect("a login that finished or failed does not block the next one", () =>
+    Effect.gen(function* () {
+      const done = yield* makeHarness({ snapshot: withLogin("done") });
+      yield* done.emit(toolResult(one, SSO_EXPIRED));
+      expect(yield* done.logins).toEqual([["aws-login", "default"]]);
+      const other = yield* makeHarness({ snapshot: withLogin("starting", "banyan") });
+      yield* other.emit(toolResult(one, SSO_EXPIRED));
+      expect(yield* other.logins).toEqual([["aws-login", "default"]]);
     }),
   );
 

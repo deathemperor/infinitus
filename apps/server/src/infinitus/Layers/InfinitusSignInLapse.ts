@@ -18,6 +18,7 @@ import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import {
+  hasLoginInFlight,
   manifestHasVerb,
   SIGN_IN_DEBOUNCE_MS,
   SIGN_IN_MARKER_KIND,
@@ -42,7 +43,10 @@ const SEEN_LIMIT = 500;
  * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow — through
  * `InfinitusService.command`, whose post-write poll re-reads `aws-logins`, so
  * the started login reaches the web's Sign-ins section and the phone at once
- * rather than at the next scheduled cycle. Once per thread per profile per hour: a
+ * rather than at the next scheduled cycle. A login the snapshot's
+ * `aws-logins` already shows in flight is left alone: it is waiting on a
+ * person at a browser, and starting a second one would take its place.
+ * Once per thread per profile per hour: a
  * session that keeps retrying the same call is one need, while a second
  * profile that lapses in the same hour is its own. Everything runs
  * on one sequential worker off the event stream, so the turn is never
@@ -66,16 +70,13 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
 
     // The snapshot answers the last poll and nobody polls a headless server:
     // an unpolled placeholder, or an app last seen down, is polled again so
-    // the manifest gate can open.
-    const manifestHas = (verb: string) =>
-      Effect.gen(function* () {
-        let snapshot = yield* infinitus.snapshot;
-        if (!snapshot.available) {
-          yield* infinitus.refresh;
-          snapshot = yield* infinitus.snapshot;
-        }
-        return snapshot.available && manifestHasVerb(snapshot.commands, verb);
-      });
+    // the manifest gate can open and the `aws-logins` list below is current.
+    const polled = Effect.gen(function* () {
+      const snapshot = yield* infinitus.snapshot;
+      if (snapshot.available) return snapshot;
+      yield* infinitus.refresh;
+      return yield* infinitus.snapshot;
+    });
 
     const mark = (threadId: ThreadId, turnId: TurnId | null, lapse: SignInLapse) =>
       Effect.gen(function* () {
@@ -101,8 +102,15 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
       const verb = signInVerb(lapse.provider);
       const context = { threadId, provider: lapse.provider };
       return Effect.gen(function* () {
-        if (!(yield* manifestHas(verb))) {
+        const snapshot = yield* polled;
+        if (!snapshot.available || !manifestHasVerb(snapshot.commands, verb)) {
           yield* Effect.logDebug("infinitus.signin-lapse.no-verb", context);
+          return;
+        }
+        // A login already open is waiting on a person at a browser; a second
+        // one would take its place and lose the tab they are looking at.
+        if (hasLoginInFlight(snapshot.awsLogins ?? [], lapse)) {
+          yield* Effect.logDebug("infinitus.signin-lapse.in-flight", context);
           return;
         }
         yield* infinitus.command({ command: verb, args: [lapse.profile], options: {} }).pipe(
