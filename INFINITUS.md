@@ -149,7 +149,7 @@ makes wrong, in its own PR.
   that silently misses commits already on main (#1092 missed #1091 this way,
   with a clean-looking stat). After every merge of main and before arming
   auto-merge: `git fetch origin main && git merge-base --is-ancestor
-  origin/main HEAD || echo STALE`. A PR whose checks are green but whose
+origin/main HEAD || echo STALE`. A PR whose checks are green but whose
   mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
   `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
   (auto-merge drops on reopen; arm it again). Never push empty commits for
