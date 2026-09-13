@@ -17,7 +17,6 @@ import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
 import { InfinitusAlertPushBridge } from "./features/infinitus/InfinitusAlertPushBridge";
-import { InfinitusLiveActivityBridge } from "./features/infinitus/InfinitusLiveActivityBridge";
 import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
@@ -31,6 +30,8 @@ import { appAtomRegistry } from "./state/atom-registry";
 import { OverlayPortalHost } from "./components/OverlayPortal";
 import { appBlurTargetRef } from "./lib/appBlurTarget";
 import { useMobileNavigationTheme } from "./lib/useMobileNavigationTheme";
+
+import { SubscriptionUsageCoordinator } from "./widgets/SubscriptionUsageCoordinator";
 
 import "../global.css";
 
@@ -112,6 +113,7 @@ function AppContent() {
   return (
     <>
       <SplashScreenCoordinator />
+      <SubscriptionUsageCoordinator />
       <GestureHandlerRootView className="flex-1">
         <KeyboardProvider statusBarTranslucent>
           <SafeAreaProvider>
@@ -131,7 +133,6 @@ function AppContent() {
               </IncomingShareProvider>
               <ConfirmDialogHost />
               <ThreadArrangementHost />
-              <InfinitusLiveActivityBridge />
               <InfinitusAlarmsBridge />
               <InfinitusAlertPushBridge />
               <InfinitusNotificationPresenter />

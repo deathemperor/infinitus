@@ -113,6 +113,65 @@ final class StaleAgeTests: XCTestCase {
         let staleNoAge = Account(number: 1, email: "a@b.c", stale: true)
         XCTAssertNil(staleNoAge.staleAgeLabel)
     }
+
+    /// The one sentence every surface hangs on the age: it names the
+    /// engine's error kind when there is one, so a throttled account
+    /// (`http-429`) and a dead network read differently.
+    func testStaleTipCarriesTheReason() {
+        let throttled = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380,
+                                stale: true, staleReason: "http-429")
+        XCTAssertEqual(throttled.staleTip,
+                       "Usage from 6 min ago — swapd could not refresh this account (http-429); "
+                       + "it retries on its own")
+
+        let unexplained = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380, stale: true)
+        XCTAssertEqual(unexplained.staleTip,
+                       "Usage from 6 min ago — swapd could not refresh this account; "
+                       + "it retries on its own")
+
+        XCTAssertNil(Account(number: 1, email: "a@b.c", usageAgeSeconds: 380).staleTip)
+        XCTAssertNil(Account(number: 1, email: "a@b.c", stale: true, staleReason: "timeout").staleTip,
+                     "no age, no sentence — same rule as the label")
+    }
+}
+
+/// A dead row draws its dead line in the blocking window's own place
+/// and keeps every other gauge (user 2026-09-13: "anything is down, the
+/// others are visible"), so each cell asks whether the cause is ITS
+/// window.
+final class DeadCauseTests: XCTestCase {
+    private func window(_ pct: Double, resetsAt: String, name: String? = nil) -> UsageWindow {
+        UsageWindow(pct: pct, resetsAt: resetsAt, countdown: nil, clock: nil, name: name)
+    }
+
+    func testCauseIsTheLatestResetAmongTheDeadWindows() {
+        let usage = Usage(fiveHour: window(0, resetsAt: "2026-09-13T06:00:00Z"),
+                          sevenDay: window(100, resetsAt: "2026-09-15T11:00:00Z"),
+                          scoped: [window(100, resetsAt: "2026-09-17T06:00:00Z", name: "Fable")])
+        let cause = AccountVitals.cause(usage)
+        XCTAssertEqual(cause?.kind, .scoped)
+        XCTAssertEqual(cause?.name, "Fable")
+        XCTAssertNil(AccountVitals.cause(Usage(fiveHour: window(40, resetsAt: "2026-09-13T06:00:00Z"))))
+    }
+
+    func testACauseBlocksOnlyItsOwnWindow() {
+        let fable = AccountVitals.cause(Usage(
+            fiveHour: window(0, resetsAt: "2026-09-13T06:00:00Z"),
+            sevenDay: window(66, resetsAt: "2026-09-15T11:00:00Z"),
+            scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Fable"),
+                     window(3, resetsAt: "2026-09-15T11:00:00Z", name: "Opus")]))!
+        XCTAssertTrue(fable.blocks(scoped: "Fable"))
+        XCTAssertFalse(fable.blocks(scoped: "Opus"))
+        XCTAssertFalse(fable.blocks(session: true))
+        XCTAssertFalse(fable.blocks(session: false))
+
+        let session = AccountVitals.cause(Usage(
+            fiveHour: window(100, resetsAt: "2026-09-13T06:00:00Z"),
+            sevenDay: window(66, resetsAt: "2026-09-15T11:00:00Z")))!
+        XCTAssertTrue(session.blocks(session: true))
+        XCTAssertFalse(session.blocks(session: false))
+        XCTAssertFalse(session.blocks(scoped: nil))
+    }
 }
 
 final class SentinelNotesTests: XCTestCase {

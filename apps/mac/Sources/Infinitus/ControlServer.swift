@@ -191,20 +191,6 @@ final class ControlServer {
         catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
     }
 
-    /// A granted verb, run by a teammate through their own tap or a
-    /// preauthorized command (#220 Phase 2): the same table, the same
-    /// logging, but no busy gate — it runs from inside `MirrorTeamControlBox`,
-    /// which already serializes team commands on its own queue, and a gate
-    /// here would deadlock a verb that races a store pass or an HTTP lane.
-    func run(_ r: ControlRequest) async -> ControlReply {
-        if let command = ControlCommand.named(r.command), command.effect != .read {
-            let shown = r.args.prefix(1).joined(separator: " ")
-            Self.log.notice("\(r.command, privacy: .public) \(shown, privacy: .public) (team)")
-        }
-        do { return try await dispatch(r) }
-        catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
-    }
-
     // MARK: dispatch
 
     private struct Fail: LocalizedError {
@@ -212,7 +198,7 @@ final class ControlServer {
         init(_ m: String) { errorDescription = m }
     }
 
-    /// The snapshot after a team action, or the action's error.
+    /// The lock's current state, for `lock-status`/`lock on|off|now|relock|unlock`.
     private func lockReply() -> ControlReply {
         let policy = model.lock.policy
         return ControlReply(ok: true, result: .object([
@@ -220,19 +206,6 @@ final class ControlServer {
             "locked": .bool(policy.locked),
             "relock": .string(policy.relock.label),
         ]))
-    }
-
-    /// A teammate by kid or by roster name (exact, then case-insensitive).
-    private func teammate(_ who: String?) throws -> String {
-        guard let who, !who.isEmpty else { throw Fail("a teammate's kid or name is expected") }
-        let members = model.team.snapshot?.members ?? []
-        if let m = members.first(where: { $0.kid == who || $0.name == who }) ?? members.first(where: { $0.name.lowercased() == who.lowercased() }) { return m.kid }
-        throw Fail("no teammate \(who)")
-    }
-
-    private func teamReply() throws -> ControlReply {
-        if let err = model.team.lastError { throw Fail(err) }
-        return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
     }
 
     private func dispatch(_ r: ControlRequest) async throws -> ControlReply {
@@ -462,7 +435,7 @@ final class ControlServer {
             // The escape reaches the session's own surface first — a clean
             // stop, if it is mid-turn to see it; the grace's SIGTERM is
             // the one that always lands.
-            let esc = await model.send(SessionInput.Request(kind: .key, text: "esc"), toPid: Int(pid), icon: "stop.circle", what: "team stop")
+            let esc = await model.send(SessionInput.Request(kind: .key, text: "esc"), toPid: Int(pid), icon: "stop.circle", what: "control stop")
             let sessionId = record.sessionId
             Task.detached(priority: .utility) {
                 try? await Task.sleep(nanoseconds: UInt64(Self.stopGrace * 1_000_000_000))
@@ -774,7 +747,7 @@ final class ControlServer {
             let limit = Int(r.options["limit"] ?? "") ?? 100
             func row(_ e: AppModel.EventEntry) -> JSONValue {
                 // `kind` is the durable log's vocabulary (switch, limit,
-                // revival, nudge, team…) and `id` holds for this app run,
+                // revival, nudge…) and `id` holds for this app run,
                 // so a consumer classifies and dedupes without reading
                 // icons or text (#615).
                 .object(["id": .string(e.id.uuidString),
@@ -866,12 +839,6 @@ final class ControlServer {
                     guard on else { throw Fail(model.lock.lastError ?? "the unlock prompt was cancelled") }
                 }
             case "off":
-                // The pane warns before turning it off inside a team; the
-                // verb wants the same deliberate step.
-                let teams = model.lock.teamNames()
-                guard teams.isEmpty || r.options["yes"] != nil else {
-                    throw Fail("this Mac is in \(teams.joined(separator: ", ")); lock off --yes turns the lock off anyway")
-                }
                 model.lock.turnOff()
             case "now":
                 model.lock.lockNow()
@@ -883,7 +850,7 @@ final class ControlServer {
                 }
                 model.lock.relock = relock
             default:
-                throw Fail("usage: lock on|off [--yes]|now|relock immediately|5m|1h|sleep")
+                throw Fail("usage: lock on|off|now|relock immediately|5m|1h|sleep")
             }
             return lockReply()
 
@@ -894,166 +861,6 @@ final class ControlServer {
             if let err = model.lock.lastError { throw Fail(err) }
             guard !model.lock.policy.locked else { throw Fail("the unlock prompt was cancelled") }
             return lockReply()
-
-        case "team-status":
-            return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
-
-        case "team-create":
-            // infinitusctl's arg parser treats `--remote` as a bare flag (it
-            // has no way to know team-create wants a value), so the URL
-            // lands as the second positional instead of options["remote"].
-            // Fall back to that positional when the option came back as the
-            // flag sentinel (review round 1, C1).
-            let remote = r.options["remote"].flatMap { $0 == "true" ? nil : $0 } ?? r.args.dropFirst().first
-            guard let name = r.args.first, !name.isEmpty, let remote, !remote.isEmpty else {
-                throw Fail("usage: team-create <name> --remote <url> [--as <your name>]")
-            }
-            // The remote's write token rides stdin (#747, `stdin: "secret"`);
-            // empty stdin is the credential-less create it always was.
-            await model.team.create(name: name, remote: remote, token: r.secret, leaderName: r.options["as"] ?? "Leader")
-            return try teamReply()
-
-        case "team-join":
-            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: team-join <your name>  (the team code or invite link on stdin)") }
-            guard let code = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else {
-                throw Fail("team-join needs the team code or invite link on stdin")
-            }
-            if let failure = await model.team.join(code: code, name: name) { throw Fail(failure) }
-            return try teamReply()
-
-        case "team-hostname":
-            // Settings › Team › Hostnames: the Cloudflare zone, the label
-            // and the API token (stdin) hostnames are minted under.
-            if r.options["clear"] != nil {
-                await model.team.forgetCloudflare()
-                if let err = model.team.lastError { throw Fail(err) }
-                return ControlReply(ok: true, result: .object([
-                    "zone": .null, "label": .null, "configured": .bool(model.team.cloudflareConfigured),
-                ]))
-            }
-            guard let zone = r.options["zone"], zone != "true", !zone.isEmpty,
-                  let label = r.options["label"], label != "true", !label.isEmpty else {
-                throw Fail("usage: team-hostname --zone <zone> --label <label>  (the Cloudflare API token on stdin) | team-hostname --clear")
-            }
-            guard let token = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {
-                throw Fail("team-hostname needs the Cloudflare API token on stdin")
-            }
-            await model.team.saveCloudflare(zone: zone, label: label, token: token)
-            if let err = model.team.lastError { throw Fail(err) }
-            return ControlReply(ok: true, result: .object([
-                "zone": .string(zone), "label": .string(label),
-                "configured": .bool(model.team.cloudflareConfigured),
-            ]))
-
-        case "team-code":
-            let days = min(max(r.options["days"].flatMap(Int.init) ?? 7, 1), 3650)
-            if r.options["invite"] != nil { await model.team.mintInvite(days: days) } else { await model.team.mintCode(days: days) }
-            if let err = model.team.lastError { throw Fail(err) }
-            guard let code = model.team.code else { throw Fail("no code") }
-            return ControlReply(ok: true, result: .object(["code": .string(code)]))
-
-        case "team-fetch":
-            await model.team.fetchNow()
-            return try teamReply()
-
-        case "team-publish":
-            await model.team.publishNow()
-            if let err = model.team.lastError { throw Fail(err) }
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.lastReport ?? TeamPublisher.Report()))
-
-        case "team-compact":
-            await model.team.compact()
-            if let err = model.team.lastError { throw Fail(err) }
-            return try teamReply()
-
-        case "team-approve", "team-decline":
-            guard let kid = r.args.first, !kid.isEmpty else { throw Fail("usage: \(r.command) <kid>") }
-            if r.command == "team-approve" { await model.team.approve(kid: kid) } else { await model.team.decline(kid: kid) }
-            return try teamReply()
-
-        case "team-sessions":
-            let kid = try teammate(r.args.first)
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.drivableSessions(of: kid)))
-
-        case "team-drive":
-            guard r.args.count >= 3 else {
-                throw Fail("usage: team-drive <kid|name> <session|-> <send|approve|mode|resume|key|stop|resume-past|delete|swap|hold> [text…]")
-            }
-            let kid = try teammate(r.args[0])
-            let action = r.args[2]
-            guard action != TeamGrants.view, TeamGrants.capabilities.contains(action) else {
-                throw Fail("team-drive: action must be one of \(TeamGrants.capabilities.filter { $0 != TeamGrants.view }.joined(separator: ", "))")
-            }
-            let text = r.args.dropFirst(3).joined(separator: " ")
-            guard let delivery = await model.team.drive(kid: kid, session: r.args[1], action: action, text: text.isEmpty ? nil : text) else {
-                throw Fail(model.team.lastError ?? "team-drive: not delivered")
-            }
-            return ControlReply(ok: true, result: try JSONValue.of(delivery))
-
-        case "team-pending":
-            let names = model.team.snapshot?.members ?? []
-            let rows = model.mirrorServer.teamControl.pending().sorted { $0.expires < $1.expires }.map { entry -> JSONValue in
-                let driver = names.first { $0.kid == entry.driver }?.name ?? String(entry.driver.prefix(8))
-                return .object([
-                    "id": .string(entry.command.id), "driver": .string(driver), "session": .string(entry.command.session),
-                    "action": .string(entry.command.action), "expires": .number(Double(entry.expires)),
-                ])
-            }
-            return ControlReply(ok: true, result: .array(rows))
-
-        case "team-allow", "team-deny":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: \(r.command) <id>") }
-            let allow = r.command == "team-allow"
-            let decided = await withCheckedContinuation { (k: CheckedContinuation<(ack: TeamControl.Ack, audit: TeamControl.Audit)?, Never>) in
-                model.mirrorServer.teamControl.decide(id, allow: allow) { k.resume(returning: $0) }
-            }
-            guard let decided else { throw Fail("no waiting command \(id); see team-pending") }
-            return ControlReply(ok: true, result: .object([
-                "id": .string(decided.ack.id), "outcome": .string(decided.ack.outcome),
-                "detail": decided.ack.detail.map { .string($0) } ?? .null,
-            ]))
-
-        case "team-grants":
-            guard model.team.snapshot != nil else { throw Fail("not in a team") }
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.grants))
-
-        case "team-grant":
-            let usage = "usage: team-grant <leaders|team|kid,…> --cap <a,b> [--sessions <id,id>] [--pre <a,b>] [--expires <seconds>]"
-            guard let first = r.args.first, let target = TeamShares.parseTarget([first]), target != .off else {
-                throw Fail(usage)
-            }
-            let audience: TeamRoster.ShareTarget
-            switch target {
-            case .members(let names): audience = .members(try names.map { try teammate($0) })
-            default: audience = target
-            }
-            let caps = (r.options["cap"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty }
-            guard !caps.isEmpty, caps.allSatisfy({ TeamGrants.capabilities.contains($0) }) else {
-                throw Fail("--cap takes a comma list of \(TeamGrants.capabilities.joined(separator: ", "))")
-            }
-            let sessions: TeamGrants.Sessions
-            if let s = r.options["sessions"], s != "true" {
-                sessions = .some(s.split(separator: ",").map(String.init).filter { !$0.isEmpty })
-            } else {
-                sessions = .all
-            }
-            let preauthorized = Set((r.options["pre"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty })
-            var expires: Int?
-            if let e = r.options["expires"] {
-                guard let seconds = Int(e), seconds > 0 else { throw Fail("--expires takes seconds from now") }
-                expires = Int(Date().timeIntervalSince1970) + seconds
-            }
-            let grant = await model.team.addGrant(audience: audience, sessions: sessions, capabilities: Set(caps),
-                                                   preauthorized: preauthorized, expires: expires)
-            if let err = model.team.lastError { throw Fail(err) }
-            guard let grant else { throw Fail("grant not saved") }
-            return ControlReply(ok: true, result: try JSONValue.of(grant))
-
-        case "team-revoke":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: team-revoke <id>") }
-            let removed = await model.team.revokeGrant(id: id)
-            if let err = model.team.lastError { throw Fail(err) }
-            return ControlReply(ok: true, result: .object(["removed": .bool(removed)]))
 
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {
@@ -1186,14 +993,6 @@ final class ControlServer {
             try await proxy.setRoutingStrategy(strategy)
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: .object(["routingStrategy": .string(strategy)]))
-
-        case "team-discoverable":
-            guard let arg = r.args.first, ["on", "off"].contains(arg) else { throw Fail("usage: team-discoverable on|off") }
-            // Through the model: its setter writes the default MirrorServer
-            // watches (Nearby, spec §6.4) and brings the listener up or
-            // down with it (#356).
-            model.team.discoverable = arg == "on"
-            return ControlReply(ok: true, result: .object(["discoverable": .bool(arg == "on")]))
 
         case "desktop-credential":
             // #822: the desktop's own push at port publish (or a hand-fed

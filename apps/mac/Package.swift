@@ -6,16 +6,10 @@ import PackageDescription
 // plain `swift build` / `swift test` work on Linux too (core + tray + CLI)
 // without #if litter through the app sources.
 var targets: [Target] = [
-    // System zlib: the team envelope deflates plaintext before sealing
-    // (docs/superpowers/specs/2026-09-05-team-design.md §3). Same bytes
-    // on macOS, Linux and iOS; the Apple SDK and the swift docker image
-    // both ship zlib.
-    .systemLibrary(name: "CZlib", path: "Sources/CZlib", pkgConfig: "zlib",
-                   providers: [.apt(["zlib1g-dev"])]),
     // Pure layer: models, feed decoding, supervisor state machine.
     // No AppKit import — everything here runs under `swift test`.
     .target(name: "InfinitusCore",
-            dependencies: [.product(name: "Crypto", package: "swift-crypto"), "CZlib"],
+            dependencies: [.product(name: "Crypto", package: "swift-crypto")],
             path: "Sources/InfinitusCore"),
     // Linux/Omarchy frontend: a Waybar custom module over the same core
     // (packaging/omarchy). The engine stays behind `swapd … --json`.
@@ -26,8 +20,8 @@ var targets: [Target] = [
     ),
     // Agent-facing control CLI: talks to the running app over its control
     // socket (ControlProtocol.swift); bundled into Infinitus.app/Contents/MacOS.
-    // `infinitusctl team …` runs in-process, so the binary is built on every
-    // platform; the socket-backed commands answer "needs the Mac app" elsewhere.
+    // Built on every platform; the socket-backed commands answer "needs the
+    // Mac app" elsewhere.
     .executableTarget(
         name: "InfinitusCLI",
         dependencies: ["InfinitusCore"],

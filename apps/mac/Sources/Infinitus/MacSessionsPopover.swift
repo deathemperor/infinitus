@@ -26,12 +26,6 @@ struct MacSessionsPopover: View {
             // No row action: the session chat window is retired (#654) —
             // the Infinitus desktop app is where a session opens.
             SessionListCard(live: live, progress: model.sessionProgress, births: model.sessionBirths)
-            // Team session control (#220 §6): who drove a session in the last minute.
-            let driving = model.drivenBy.filter { $0.value.until > Date() }
-            ForEach(driving.keys.sorted(), id: \.self) { id in
-                Label("\(driving[id]!.name) is driving \(driving[id]!.project)", systemImage: "person.2")
-                    .font(PopupFont.caption2).foregroundStyle(.secondary)
-            }
             Divider()
             CheckpointsSection(model: model, live: live)
             Divider()

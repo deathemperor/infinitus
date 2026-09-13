@@ -180,6 +180,14 @@ public extension Account {
         guard stale == true else { return nil }
         return (usageAgeSeconds ?? lastGoodAgeSeconds).map(StaleAge.label)
     }
+
+    /// The sentence behind that caption, one for every surface: the age,
+    /// and the engine's error kind when it named one.
+    var staleTip: String? {
+        guard let age = staleAgeLabel else { return nil }
+        let why = staleReason.map { " (\($0))" } ?? ""
+        return "Usage from \(age) — swapd could not refresh this account\(why); it retries on its own"
+    }
 }
 
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
@@ -329,6 +337,19 @@ public enum AccountVitals {
         public let countdown: String?
         public let clock: String?
         public enum Kind: Equatable, Sendable { case session, weekly, scoped, credit }
+
+        /// Whether this cause IS the 5h (`session`) or 7d window: the row
+        /// draws its dead line in that window's place and keeps every
+        /// other gauge (user 2026-09-13: "anything is down, the others
+        /// are visible").
+        public func blocks(session: Bool) -> Bool {
+            kind == (session ? .session : .weekly)
+        }
+
+        /// The same for a scoped (per-model) window, by its name.
+        public func blocks(scoped name: String?) -> Bool {
+            kind == .scoped && self.name == name
+        }
     }
 
     public static func cause(_ usage: Usage?) -> DeadCause? {

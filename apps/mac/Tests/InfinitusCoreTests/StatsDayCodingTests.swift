@@ -22,8 +22,8 @@ final class StatsDayCodingTests: XCTestCase {
         XCTAssertEqual(try roundTrip(Stats.Day()), Stats.Day())
     }
 
-    /// The plain encoder — the CLI's stats JSON, the phone's snapshot,
-    /// team docs — still writes every key, dense hours included.
+    /// The plain encoder — the CLI's stats JSON, the phone's snapshot —
+    /// still writes every key, dense hours included.
     func testThePlainEncoderWritesEveryField() throws {
         let plain = JSONEncoder()
         // `peakMinute` is optional and nil by default: left out, as synthesized.

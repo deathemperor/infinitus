@@ -15,15 +15,13 @@ const ALWAYS_ON_SCREEN = [
   "Menu bar",
   "Themes",
   "Animations",
-  "Sessions",
+  "Priority",
   "Lock",
   "Team",
   "Notifications",
   "Devices",
   "Engines",
-  "Profiles",
   "Unlocking",
-  "Session profiles",
   "Engine status",
   "Pairing requests",
   "Utilization",
@@ -39,11 +37,9 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/animations",
       "/settings/infinitus/sessions",
       "/settings/infinitus/lock",
-      "/settings/infinitus/team",
       "/settings/infinitus/notifications",
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
-      "/settings/infinitus/profiles",
       "/utilization",
       "/stats",
     ]);
@@ -66,22 +62,22 @@ describe("FORK_VISUAL_ROUTES", () => {
 });
 
 describe("routeFailures", () => {
-  const team = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/infinitus/team")!;
+  const lock = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/infinitus/lock")!;
 
   it("passes text that shows the marker and none of the empty states", () => {
-    expect(routeFailures(team, "Settings Team Lighthouse Leader · fetched 1 min ago")).toEqual([]);
+    expect(routeFailures(lock, "Settings Lock Re-lock after 5 min")).toEqual([]);
   });
 
   it("fails a missing capture, a missing marker, and each forbidden phrase", () => {
-    expect(routeFailures(team, null)).toEqual(["no text capture"]);
-    expect(routeFailures(team, "Settings Team Reading the team…")).toEqual([
-      'missing "Lighthouse"',
-      'shows "Reading the team"',
+    expect(routeFailures(lock, null)).toEqual(["no text capture"]);
+    expect(routeFailures(lock, "Settings Lock Still connecting")).toEqual([
+      'missing "Re-lock"',
+      'shows "Still connecting"',
     ]);
-    expect(routeFailures(team, `Lighthouse ${ALWAYS_ABSENT[0]}`)).toEqual([
+    expect(routeFailures(lock, `Re-lock ${ALWAYS_ABSENT[0]}`)).toEqual([
       `shows "${ALWAYS_ABSENT[0]}"`,
     ]);
-    expect(routeFailures(team, "Lighthouse · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
+    expect(routeFailures(lock, "Re-lock · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
   });
 });
 
@@ -93,7 +89,7 @@ describe("checkVisualPass", () => {
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[11]!, FORK_VISUAL_ROUTES[10]!],
+      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[9]!, FORK_VISUAL_ROUTES[8]!],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],

@@ -70,6 +70,10 @@ import {
   resolveGrokAcpBaseModelId,
 } from "../acp/GrokAcpSupport.ts";
 import {
+  buildGrokBackgroundTaskEvents,
+  type GrokBackgroundTaskRecord,
+} from "../acp/XAiBackgroundTasks.ts";
+import {
   extractGrokPlanMarkdownFromToolCallData,
   extractXAiAskUserQuestions,
   extractXAiExitPlanMarkdown,
@@ -172,6 +176,8 @@ interface GrokSessionContext {
   currentModelId: string | undefined;
   currentReasoningEffort: string | undefined;
   stopped: boolean;
+  /** Live monitor/shell identities and their originating turns. */
+  readonly backgroundTasks: Map<string, GrokBackgroundTaskRecord>;
 }
 
 function settlePendingApprovalsAsCancelled(
@@ -1313,6 +1319,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                 ? normalizeGrokReasoningEffort(requestedStartReasoningEffort)
                 : currentStartReasoningEffort,
             stopped: false,
+            backgroundTasks: new Map(),
           };
 
           const nf = yield* Stream.runDrain(
@@ -1335,6 +1342,24 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                 }
 
                 const notificationTurnId = resolveNotificationTurnId(ctx);
+                if (event._tag === "ToolCallUpdated" && !ctx.stopped) {
+                  for (const taskEvent of buildGrokBackgroundTaskEvents({
+                    tasks: ctx.backgroundTasks,
+                    toolCallId: event.toolCall.toolCallId,
+                    rawInput: event.toolCall.data.rawInput,
+                    rawOutput: event.toolCall.data.rawOutput,
+                    toolCallStatus: event.toolCall.status,
+                    turnId: notificationTurnId,
+                  })) {
+                    yield* offerRuntimeEvent({
+                      ...taskEvent,
+                      ...(yield* makeEventStamp()),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                    });
+                  }
+                }
+
                 if (
                   notificationTurnId === undefined ||
                   ctx.interruptedTurnIds.has(notificationTurnId)
