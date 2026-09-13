@@ -40,6 +40,9 @@ private let addAccountFooter =
     /// The CLI's "OAuth error: …" line after a paste, handed back with
     /// the field (nil once a new code goes in).
     @Published var codeError: String?
+    /// Why the system sign-in sheet did not come up, when it did not
+    /// (a plain cancel is not a failure and leaves this nil).
+    @Published var sheetError: String?
     /// Which account this flow is for (relogin) — display only; cswap
     /// matches the credential identity itself.
     @Published var reloginTarget: String?
@@ -135,6 +138,7 @@ private let addAccountFooter =
         code = ""
         buffer = ""
         authURL = nil
+        sheetError = nil
         pasteCode = true
         phase = .launching
         self.model = model
@@ -182,6 +186,7 @@ private let addAccountFooter =
         }
         code = ""
         authURL = nil
+        sheetError = nil
         pasteCode = false
         phase = .launching
         self.model = model
@@ -516,11 +521,23 @@ private let addAccountFooter =
     /// account chooser covers multi-account there.
     func startSystemSheet() {
         guard let url = authURL else { return }
+        sheetError = nil
         let session = ASWebAuthenticationSession(
-            url: url, callbackURLScheme: nil) { [weak self] _, _ in
+            url: url, callbackURLScheme: nil) { [weak self] _, error in
             // No custom-scheme callback exists — the flow ends when the
-            // user copies the code and closes the sheet; nothing to do.
+            // user copies the code and closes the sheet, so a plain
+            // cancel is the NORMAL ending and says nothing. Any other
+            // error means the sheet never got the user to the page, and
+            // silence there left only the passkey-less private window
+            // (user 2026-09-14: "the windows didn't open, I had to use
+            // private window with no passkey").
             self?.systemSession = nil
+            guard let error else { return }
+            let failure = error as NSError
+            guard !(failure.domain == ASWebAuthenticationSessionErrorDomain
+                    && failure.code == ASWebAuthenticationSessionError.canceledLogin.rawValue)
+            else { return }
+            self?.sheetError = failure.localizedDescription
         }
         let provider = AuthAnchorProvider(window: authWindow)
         anchorProvider = provider
@@ -532,7 +549,15 @@ private let addAccountFooter =
         // fresh session costs one Touch ID tap and bleeds nothing.
         session.prefersEphemeralWebBrowserSession = true
         systemSession = session
-        session.start()
+        // `start()` answers false when the sheet cannot present at all —
+        // an anchor window that is off-screen or buried does it. Dropping
+        // that Bool is what made the sheet look like it simply never
+        // opened; say so and offer the way on.
+        if !session.start() {
+            systemSession = nil
+            sheetError = "The sign-in sheet couldn't open. Try \u{201C}Reopen sign-in sheet\u{201D}, "
+                + "or use the private window (no passkeys)."
+        }
     }
 
     /// Brings a running flow's windows back to the front — the only way
@@ -573,7 +598,12 @@ final class AuthAnchorProvider: NSObject,
     init(window: NSWindow?) { self.window = window }
     func presentationAnchor(for session: ASWebAuthenticationSession)
         -> ASPresentationAnchor {
-        window ?? NSApp.windows.first ?? ASPresentationAnchor()
+        // Never `NSApp.windows.first`: this app is LSUIElement, so that
+        // is the status-bar window, which cannot host the sheet. Fall
+        // back to a real visible titled window, else a bare anchor.
+        window ?? NSApp.windows.first {
+            $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel)
+        } ?? ASPresentationAnchor()
     }
 }
 
@@ -665,6 +695,10 @@ private struct AuthWindowRoot: View {
                     Spacer()
                     Button("Cancel") { flow.cancel() }
                 }
+            }
+            if let why = flow.sheetError {
+                Text(why).font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 6) {
                 Button("Reopen sign-in sheet") { flow.startSystemSheet() }
