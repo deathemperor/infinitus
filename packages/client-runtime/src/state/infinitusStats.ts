@@ -68,6 +68,8 @@ const DayPayload = Schema.Struct({
   reverts: Count,
   prsOpened: Count,
   prsMerged: Count,
+  mergeHoursTotal: Count,
+  mergeCount: Count,
   repos: Schema.optionalKey(Schema.Array(Schema.String)),
   repoTally: Count,
   switches: Count,
@@ -118,6 +120,12 @@ const processedTokens = (d: StatsDay) =>
   n(d.inputTokens) + n(d.cacheReadTokens) + n(d.cacheWriteTokens) + n(d.outputTokens);
 /** `inputTokens` plus cache writes — a cache write is a fresh, uncached read. */
 const uncachedInputTokens = (d: StatsDay) => n(d.inputTokens) + n(d.cacheWriteTokens);
+const usdPerCommit = (d: StatsDay) => ratio(n(d.usd), n(d.commits));
+const usdPerPR = (d: StatsDay) => ratio(n(d.usd), n(d.prsMerged));
+const tokensPerLine = (d: StatsDay) =>
+  ratio(n(d.outputTokens), n(d.linesAdded) + n(d.linesRemoved));
+/** Hours from a PR opening to its merge, meaned over the merges the Mac timed. */
+const meanMergeHours = (d: StatsDay) => ratio(n(d.mergeHoursTotal), n(d.mergeCount));
 
 // MARK: tiles
 
@@ -193,6 +201,22 @@ function ratioTile(s: StatsSummary, id: string, read: DayRatio): StatsTile {
     id,
     value: value === null ? "—" : value.toFixed(1),
     delta: value === null || previous === null ? null : deltaText(value, previous),
+    series: bucketed(
+      s.daily.map((point) => read(point.day) ?? 0),
+      true,
+    ),
+  };
+}
+
+/** A money tile over a ratio: always two decimals (a per-commit figure is
+    cents, never the hundreds `formatMoney` rounds), and no delta — the
+    previous period's denominator makes the comparison meaningless. */
+function moneyRatioTile(s: StatsSummary, id: string, read: DayRatio): StatsTile {
+  const value = read(s.total);
+  return {
+    id,
+    value: value === null ? "—" : `$${value.toFixed(2)}`,
+    delta: null,
     series: bucketed(
       s.daily.map((point) => read(point.day) ?? 0),
       true,
@@ -291,6 +315,10 @@ export function statsTileGroups(s: StatsSummary): ReadonlyArray<StatsTileGroup> 
         tile(s, "Uncached input", uncachedInputTokens),
         tile(s, "Cache writes", (d) => n(d.cacheWriteTokens)),
         money(s, "Cache savings", (d) => n(d.cacheSavingsUSD)),
+        moneyRatioTile(s, "Per commit", usdPerCommit),
+        moneyRatioTile(s, "Per PR", usdPerPR),
+        ratioTile(s, "Tokens / line", tokensPerLine),
+        ratioTile(s, "Mean hours to merge", meanMergeHours),
       ],
     },
   ];

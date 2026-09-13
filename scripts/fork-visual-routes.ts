@@ -133,6 +133,13 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Minutes lost, all out 77",
       "Ignites 7",
       "Resumes 21",
+      // The Cost group's four ratio tiles, which the web left out until it was
+      // diffed against the Mac's own catalogue. Each divides two figures, so a
+      // tile that stopped reading one of them reads "—" rather than a number.
+      "Per commit $2.04",
+      "Per PR $9.20",
+      "Tokens / line 141.2",
+      "Mean hours to merge 4.5",
     ],
   },
 ];

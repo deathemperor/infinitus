@@ -190,6 +190,10 @@ const statsDay = (scale) => ({
   reverts: 1 * scale,
   prsOpened: 3 * scale,
   prsMerged: 2 * scale,
+  // The two the "Mean hours to merge" tile divides: 9 h per merged PR, one
+  // timing per merge, so the tile reads 4.5 whatever the period.
+  mergeHoursTotal: 9 * scale,
+  mergeCount: 2 * scale,
   // The compact form the Mac sends once the repo set is dropped, which the
   // Repos tile only reads when `repos` is absent or empty.
   repoTally: 3,
