@@ -6,6 +6,7 @@ import {
 } from "@t3tools/contracts";
 import {
   InfinitusCommandFailed,
+  type InfinitusCommandInput,
   type InfinitusManifestCommand,
   type InfinitusSnapshot,
 } from "@t3tools/contracts/infinitus";
@@ -23,10 +24,6 @@ import { describe, expect } from "vite-plus/test";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
-import {
-  InfinitusControlClient,
-  type InfinitusControlRequestInput,
-} from "../Services/InfinitusControlClient.ts";
 import { InfinitusSignInLapseLive } from "./InfinitusSignInLapse.ts";
 import { SIGN_IN_MARKER_KIND } from "./infinitusSignInLapse.logic.ts";
 
@@ -101,7 +98,7 @@ const makeHarness = (input: {
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
-    const requests = yield* Ref.make<ReadonlyArray<InfinitusControlRequestInput>>([]);
+    const requests = yield* Ref.make<ReadonlyArray<InfinitusCommandInput>>([]);
     const current = yield* Ref.make(input.snapshot ?? manifest("aws-login", "gcloud-login"));
     const layer = InfinitusSignInLapseLive.pipe(
       Layer.provide(
@@ -123,10 +120,7 @@ const makeHarness = (input: {
             refresh: Ref.set(current, input.polled ?? manifest("aws-login", "gcloud-login")),
             changes: () => Stream.empty,
             observed: Stream.empty,
-          }),
-          Layer.mock(InfinitusControlClient)({
-            socketPath: "/tmp/test.sock",
-            request: (request) =>
+            command: (request) =>
               Ref.update(requests, (list) => [...list, request]).pipe(
                 Effect.andThen(input.reply ?? Effect.succeed({ state: {} })),
               ),
@@ -161,7 +155,7 @@ const makeHarness = (input: {
         ),
       ),
       logins: Ref.get(requests).pipe(
-        Effect.map((list) => list.map((request) => [request.command, ...(request.args ?? [])])),
+        Effect.map((list) => list.map((request) => [request.command, ...request.args])),
       ),
     };
   });

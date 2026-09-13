@@ -1779,9 +1779,10 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `application-default` account. A hit leaves one `infinitus.signin.needed`
   work-log row ("AWS sign-in needed on <profile>") and, on an app whose
   manifest lists the verb, starts the Mac's `aws-login <profile>` /
-  `gcloud-login <account>` flow over the control client (no `--pid`: a thread
-  has no session pid; the Mac runs its default flow and the login shows in
-  the Sign-ins lists like one started by hand). Once per thread per profile
+  `gcloud-login <account>` flow through `InfinitusService.command` (no `--pid`:
+  a thread has no session pid; the Mac runs its default flow, and that path's
+  post-write poll re-reads `aws-logins`, so the login reaches the Sign-ins
+  lists at once instead of at the next cycle). Once per thread per profile
   per hour (a thread reaching two expired AWS profiles in one hour needs both
   logins); one sequential worker off the event stream, so the turn is never
   waited on; an unreachable Mac or a refused verb is logged and the row

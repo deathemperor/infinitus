@@ -17,7 +17,6 @@ import { OrchestrationEngineService } from "../../orchestration/Services/Orchest
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
-import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
 import {
   manifestHasVerb,
   SIGN_IN_DEBOUNCE_MS,
@@ -40,9 +39,10 @@ const SEEN_LIMIT = 500;
  * CLIs' expired-credentials signatures; a hit leaves one
  * `infinitus.signin.needed` work-log row on the thread ("AWS sign-in needed
  * on <profile>") and, on an app whose manifest lists the verb, starts the
- * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow over the
- * control client — the login then shows in the Sign-ins lists (`aws-logins`)
- * like one started by hand. Once per thread per profile per hour: a
+ * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow — through
+ * `InfinitusService.command`, whose post-write poll re-reads `aws-logins`, so
+ * the started login reaches the web's Sign-ins section and the phone at once
+ * rather than at the next scheduled cycle. Once per thread per profile per hour: a
  * session that keeps retrying the same call is one need, while a second
  * profile that lapses in the same hour is its own. Everything runs
  * on one sequential worker off the event stream, so the turn is never
@@ -55,7 +55,6 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
     const providerService = yield* ProviderService;
     const orchestrationEngine = yield* OrchestrationEngineService;
     const infinitus = yield* InfinitusService;
-    const control = yield* InfinitusControlClient;
     const crypto = yield* Crypto.Crypto;
     const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
     const eventId = crypto.randomUUIDv4.pipe(Effect.map(EventId.make));
@@ -106,7 +105,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
           yield* Effect.logDebug("infinitus.signin-lapse.no-verb", context);
           return;
         }
-        yield* control.request({ command: verb, args: [lapse.profile] }).pipe(
+        yield* infinitus.command({ command: verb, args: [lapse.profile], options: {} }).pipe(
           Effect.asVoid,
           Effect.tap(() => Effect.logInfo("infinitus.signin-lapse.login-started", context)),
           Effect.catchTags({
