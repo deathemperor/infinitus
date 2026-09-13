@@ -51,8 +51,8 @@ makes wrong, in its own PR.
   fork ignores the file and drops it from the merge (`git rm --cached`), so
   each sync meets it as a modify/delete conflict resolved the same way.
 - **`apps/mac` is the Swift app** (#823 layer 2, 2026-09-12). Today's
-  native Infinitus (menu bar, engines, team, tunnels, mirror API, control
-  socket, PTY host, Linux tray) lives in `apps/mac` with its own CLAUDE.md
+  native Infinitus (menu bar, engines, tunnels, mirror API, control
+  socket, Linux tray) lives in `apps/mac` with its own CLAUDE.md
   (read it when working there), its own CHANGELOG/VERSION, path-filtered
   CI jobs (`mac-*` in ci.yml) and its own workflow
   (`mac-linux-sanitize.yml`; releases are `infinitus-release.yml` and the
