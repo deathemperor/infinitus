@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+
 ### Desktop
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
