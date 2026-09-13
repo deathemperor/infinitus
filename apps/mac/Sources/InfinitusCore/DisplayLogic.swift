@@ -329,6 +329,19 @@ public enum AccountVitals {
         public let countdown: String?
         public let clock: String?
         public enum Kind: Equatable, Sendable { case session, weekly, scoped, credit }
+
+        /// Whether this cause IS the 5h (`session`) or 7d window: the row
+        /// draws its dead line in that window's place and keeps every
+        /// other gauge (user 2026-09-13: "anything is down, the others
+        /// are visible").
+        public func blocks(session: Bool) -> Bool {
+            kind == (session ? .session : .weekly)
+        }
+
+        /// The same for a scoped (per-model) window, by its name.
+        public func blocks(scoped name: String?) -> Bool {
+            kind == .scoped && self.name == name
+        }
     }
 
     public static func cause(_ usage: Usage?) -> DeadCause? {

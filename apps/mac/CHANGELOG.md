@@ -10,7 +10,11 @@ publishes the matching section as the GitHub release body.
 
 ## 0.5.0-alpha.7
 
+### Mac
+- An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+
 ### Desktop
+- A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).
 - A turn that finishes with messages still queued behind it no longer posts "Thread completed" or rings; the thread is not done until the queue is (#270).
 - Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
 - Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
