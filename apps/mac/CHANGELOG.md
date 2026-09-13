@@ -7,8 +7,8 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
-- Desktop: terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
 ### Desktop
+- Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 
