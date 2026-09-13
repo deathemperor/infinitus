@@ -211,9 +211,13 @@ export function UtilizationPage() {
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
-            <RunRateSection utilization={utilization} liveTokenRate={liveTokenRateQuery.data} />
+            <RunRateSection utilization={utilization} />
           </>
         )}
+        {/* Outside the verb gate above: this server's own turns are readable
+            whatever the Mac answers, so the line survives a build with no
+            `utilization` verb and a reply that could not be read. */}
+        <LiveRateLine liveTokenRate={liveTokenRateQuery.data} utilization={utilization} />
       </div>
     );
   }
@@ -633,15 +637,8 @@ function WasteRowLine({
   );
 }
 
-function RunRateSection({
-  utilization,
-  liveTokenRate,
-}: {
-  readonly utilization: InfinitusUtilization;
-  readonly liveTokenRate: InfinitusLiveTokenRate | null;
-}) {
+function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization, liveTokenRate);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">
@@ -679,9 +676,30 @@ function RunRateSection({
           Tokens counted but not priced: {unpriced.join(", ")}
         </p>
       ) : null}
-      {live !== null ? <p className="text-muted-foreground text-xs">{live}</p> : null}
       <p className="text-muted-foreground text-xs">{RUN_RATE_NOTE}</p>
     </section>
+  );
+}
+
+/**
+ * The live output rate (#1127), drawn outside the run-rate section because it
+ * is not from the same place: the table is the Mac's transcript scan, this is
+ * the turns this server recorded. It stays on screen on a build whose Mac has
+ * no `utilization` verb, where the whole section above is missing.
+ */
+function LiveRateLine({
+  liveTokenRate,
+  utilization,
+}: {
+  readonly liveTokenRate: InfinitusLiveTokenRate | null;
+  readonly utilization: InfinitusUtilization | null;
+}) {
+  const live = liveRateText(liveTokenRate, utilization);
+  if (live === null) return null;
+  return (
+    <p className="text-muted-foreground text-xs" data-testid="utilization-live-rate">
+      {live}
+    </p>
   );
 }
 

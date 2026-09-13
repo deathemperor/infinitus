@@ -1511,9 +1511,15 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   behind it, since the Mac's `liveRate` tails the terminal transcripts the
   session sweep (#1041) retires and goes permanently null. Zero turns is
   unknown, not zero, so it stands aside for a Mac that still reports one.
-  Limit: the line lives inside the run-rate section, which still needs the
-  Mac's `utilization` verb to have answered; the per-fleet split #1127 mentions
-  (#779's attribution) is not done.
+  The line is drawn by `LiveRateLine`, a sibling of the run-rate section rather
+  than a child of it: the table is the Mac's transcript scan and this is the
+  turns this server recorded, so it survives a build whose Mac has no
+  `utilization` verb and a reply that could not be read. Hence
+  `liveRateText(server, u)` — the server's rate first, the Mac's reply second
+  and nullable. Limit: the per-fleet split #1127 mentions (#779's attribution)
+  is not done, and needs a ruling first — the join reaches into swapd's own
+  switch log to decorate one cosmetic line, and account policy lives in the
+  engines here.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:

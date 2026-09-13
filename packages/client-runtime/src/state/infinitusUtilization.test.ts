@@ -230,37 +230,45 @@ describe("run rate", () => {
       "1,620",
       "1,200,000",
     ]);
-    expect(liveRateText(decodeUtilization(reply)!)).toBe(
+    expect(liveRateText(null, decodeUtilization(reply)!)).toBe(
       "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",
     );
-    expect(liveRateText({ days: 1, samples: [], liveRate: { perMinute: 0 } })).toBe(
+    expect(liveRateText(null, { days: 1, samples: [], liveRate: { perMinute: 0 } })).toBe(
       "Live: 0 output tokens/min over the last 5 minutes.",
     );
-    expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+    expect(liveRateText(null, { days: 1, samples: [] })).toBeNull();
   });
 
   it("prefers this server's own live rate over the Mac's transcript tail (#1127)", () => {
     const mac = { days: 1, samples: [], liveRate: { perMinute: 1500 } } as const;
 
     expect(
-      liveRateText(mac, { windowMinutes: 5, turns: 3, outputPerMinute: 900, totalPerMinute: 4200 }),
+      liveRateText({ windowMinutes: 5, turns: 3, outputPerMinute: 900, totalPerMinute: 4200 }, mac),
     ).toBe("Live: ≈ 900 output tokens/min over the last 5 minutes, across 3 turns on this server.");
     // One turn is not "1 turns".
     expect(
-      liveRateText(mac, { windowMinutes: 5, turns: 1, outputPerMinute: 120, totalPerMinute: 800 }),
+      liveRateText({ windowMinutes: 5, turns: 1, outputPerMinute: 120, totalPerMinute: 800 }, mac),
     ).toBe("Live: ≈ 120 output tokens/min over the last 5 minutes, across 1 turn on this server.");
     // No turn in the window is unknown, not zero: the Mac still speaks while
     // it has a figure, and once its own field empties there is no line at all.
     expect(
-      liveRateText(mac, { windowMinutes: 5, turns: 0, outputPerMinute: 0, totalPerMinute: 0 }),
+      liveRateText({ windowMinutes: 5, turns: 0, outputPerMinute: 0, totalPerMinute: 0 }, mac),
     ).toBe("Live: 1.5k output tokens/min over the last 5 minutes.");
     expect(
       liveRateText(
-        { days: 1, samples: [] },
         { windowMinutes: 5, turns: 0, outputPerMinute: 0, totalPerMinute: 0 },
+        {
+          days: 1,
+          samples: [],
+        },
       ),
     ).toBeNull();
     // A server that never answered leaves the Mac's line untouched.
-    expect(liveRateText(mac, null)).toBe("Live: 1.5k output tokens/min over the last 5 minutes.");
+    expect(liveRateText(null, mac)).toBe("Live: 1.5k output tokens/min over the last 5 minutes.");
+    // #1127: the Mac never answered `utilization` at all, so there is no reply
+    // to read — the server's own turns are still a line.
+    expect(
+      liveRateText({ windowMinutes: 5, turns: 2, outputPerMinute: 400, totalPerMinute: 900 }, null),
+    ).toBe("Live: ≈ 400 output tokens/min over the last 5 minutes, across 2 turns on this server.");
   });
 });
