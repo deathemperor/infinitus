@@ -2701,6 +2701,7 @@ export function GeneralSettingsPanel() {
             </>
           }
         />
+        <DesktopKeepAwakeSettings />
       </SettingsSection>
 
       <SettingsSection id="projects-and-threads" title="Projects & threads">
@@ -2920,7 +2921,6 @@ export function GeneralSettingsPanel() {
             }
           />
         ) : null}
-        <DesktopKeepAwakeSettings />
       </SettingsSection>
 
       <SettingsSection id="text-generation" title="Text generation">

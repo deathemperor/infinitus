@@ -4,8 +4,8 @@ import { searchableSetting } from "./settingsSearch";
 import { SettingsRow } from "./settingsLayout";
 
 /**
- * Fork (#1075): the keep-awake switch on Settings › General, after the quit
- * row. Rendered only where the shell can hold a power-save blocker.
+ * Fork (#1075): the keep-awake switch closing Settings › General › Behavior.
+ * Rendered only where the shell can hold a power-save blocker.
  */
 export function DesktopKeepAwakeSettings() {
   const enabled = useClientSettings((settings) => settings.desktopKeepAwake);

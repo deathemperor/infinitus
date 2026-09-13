@@ -1717,7 +1717,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   releases it when its scope closes with the app. Registration points:
   `DesktopKeepAwakeCoordinator` mounted from `__root.tsx` after the badge
   coordinator (it sends once on mount, so a reload cannot leave the blocker
-  held), `DesktopKeepAwakeSettings` after the quit row of Settings › General
+  held), `DesktopKeepAwakeSettings` closing the Behavior section of Settings › General
   with its dirty label and reset entry, the `desktop-keep-awake` search item,
   `SET_KEEP_AWAKE_CHANNEL`, `setKeepAwake` in `ipc/methods/infinitus.ts`, the
   handler and preload lines, the layer in `InfinitusDesktop.layer`. No socket
