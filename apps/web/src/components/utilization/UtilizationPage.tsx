@@ -405,11 +405,13 @@ function HistorySection({
   );
 }
 
-/** A day's range is labelled by the hour, a longer one by the date. */
+/** A day's range is labelled by the hour, a longer one by the date. The day
+    range ends on the same clock time it started, so its labels carry the
+    weekday too — without it both ends of the axis read the same. */
 function axisLabel(seconds: number, days: number): string {
   const date = new Date(seconds * 1000);
   return days <= 1
-    ? date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    ? date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })
     : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 

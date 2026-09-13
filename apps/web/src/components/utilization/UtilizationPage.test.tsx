@@ -343,6 +343,19 @@ describe("UtilizationPage", () => {
     expect(renderToStaticMarkup(<UtilizationPage />)).toContain("no Infinitus adapter");
   });
 
+  it("tells the two ends of a 24-hour chart apart", () => {
+    testState.utilization = { result: { ...utilizationReply.result, days: 1 } };
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    const to = new Date(Math.max(now - 3600, Math.floor(Date.now() / 1000)) * 1000);
+    const from = new Date(to.getTime() - 86_400_000);
+    const label = (date: Date) =>
+      date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    expect(label(from)).not.toBe(label(to));
+    expect(markup).toContain(label(from));
+    expect(markup).toContain(label(to));
+  });
+
   it("shows the offline state from the snapshot", () => {
     testState.snapshot = {
       available: false,
