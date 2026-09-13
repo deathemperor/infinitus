@@ -766,31 +766,6 @@
         "value": "compact"
       },
       {
-        "default": true,
-        "effect": "live",
-        "key": "session_auto_names",
-        "section": "display",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "choices": ["auto", "cmux", "terminal", "owned"],
-        "default": "auto",
-        "effect": "live",
-        "key": "session_host",
-        "section": "display",
-        "type": "string",
-        "value": "auto"
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "checkpoints_enabled",
-        "section": "display",
-        "type": "bool",
-        "value": true
-      },
-      {
         "default": false,
         "effect": "live",
         "key": "keep_awake",
@@ -968,14 +943,6 @@
         "section": "devices",
         "type": "bool",
         "value": true
-      },
-      {
-        "default": 5,
-        "effect": "live",
-        "key": "live_activity_rate_seconds",
-        "section": "devices",
-        "type": "int",
-        "value": 5
       },
       {
         "default": false,
