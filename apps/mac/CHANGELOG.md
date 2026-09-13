@@ -3,7 +3,9 @@
 Product notes: concise, what you get and why it matters — no commit
 links, no internals or workflow detail; one feature note is one line,
 a single short sentence (user 2026-09-04). The release workflow
-publishes the matching section as the GitHub release body.
+publishes the matching section as the GitHub release body. A PR adds its
+line as a fragment in `changelog.d/` (see its README), never here: the
+release cut folds the fragments and `## Unreleased` into the new section.
 
 ## Unreleased
 

@@ -71,7 +71,10 @@ makes wrong, in its own PR.
   the one GitHub release — DMG, zip, blockmaps, the updater manifest, both
   menu bar zips, the Linux binaries — titled `Infinitus <version>`, notes
   from the `## <version>` section of `apps/mac/CHANGELOG.md` (no section, no
-  release), `--prerelease` iff the version carries a prerelease tag, then
+  release; a PR writes its note as a fragment in `apps/mac/changelog.d/`
+  — `Surface: sentence` per line — and the cut runs
+  `node scripts/fold-changelog.mjs <version>` to fold the fragments and
+  `## Unreleased` into that section), `--prerelease` iff the version carries a prerelease tag, then
   bumps the cask from the standalone zip. The tag must equal
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
   published). Installed menu bar apps poll `releases/latest` and the

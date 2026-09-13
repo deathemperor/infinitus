@@ -69,7 +69,10 @@ before that the `native` branch). Split out of
   masked only. Usage-cost figures are estimates, never billing truth.
 - **Release notes: one feature, one line** (user 2026-09-04). A CHANGELOG
   bullet is a single short sentence — no multi-sentence paragraphs, no
-  wrapped essays; details live in the site/README, not the note.
+  wrapped essays; details live in the site/README, not the note. A PR
+  writes its line to `apps/mac/changelog.d/<pr>.md` as `Mac: …` (README
+  there), not into CHANGELOG.md — parallel PRs used to conflict on the
+  one Unreleased block every time; the release cut folds the fragments.
 - Surgical changes; match existing style; no speculative abstractions.
 - **Todos and research notes go to GitHub issues, never to files**
   (user 2026-09-04: "stop noting TODO file to avoid a PR, just log to

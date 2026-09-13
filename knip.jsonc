@@ -21,6 +21,7 @@
         "fork-visual-pass.mjs",
         "fork-visual-fixture.mjs",
         "fork-visual-check.ts",
+        "fold-changelog.mjs",
       ],
     },
     "apps/server": {
