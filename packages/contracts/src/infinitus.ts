@@ -668,67 +668,6 @@ export const InfinitusCrashReport = Schema.Struct({
 });
 export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
 
-/*
- * Live Activity content (LiveActivityState.swift). The Mac pushes these as the
- * APNs `content-state` and the phone renders them; they arrive pre-themed
- * (labels, glyphs, colour names, dense reset labels), the widget only draws.
- * Encoded with Swift's default JSONEncoder, so the one date, `revivesAt`, is a
- * number of seconds since 2001-01-01 UTC, not a string.
- */
-
-/** One usage window, themed: its label ("MP", "× Dragon"), colour name, the
-    percentage used (0–100) and the dense reset label ("4h20m·17:49"). */
-export const InfinitusActivityWindow = Schema.Struct({
-  label: Schema.String,
-  color: Schema.String,
-  pct: Schema.Number,
-  reset: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusActivityWindow = typeof InfinitusActivityWindow.Type;
-
-/** The working-sessions card: the active account as its themed row, session
-    counts, the tokens-per-minute gauge, the next candidate as a hint. `binding`
-    indexes the window closest to its limit. `rateIcon`/`rateLabel` are absent
-    on older Macs, which keep the bolt and "tok/min". */
-export const InfinitusWorkingActivityState = Schema.Struct({
-  active: Schema.String,
-  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  slot: Schema.String,
-  plan: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  cash: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  windows: Schema.Array(InfinitusActivityWindow),
-  binding: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  busy: Schema.Number,
-  total: Schema.Number,
-  waiting: Schema.Number,
-  next: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  tokensPerMinute: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  tokenFraction: Schema.Number,
-  accent: Schema.String,
-  plain: Schema.Boolean,
-  rateIcon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  rateLabel: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusWorkingActivityState = typeof InfinitusWorkingActivityState.Type;
-
-/** The all-dead revival countdown: who revives when (`revivesAt`, seconds since
-    2001), the live and waiting session counts, the accounts after the reviver
-    in recovery order, the theme's words and flash colour; `revived` is the
-    final state once the fleet came back. */
-export const InfinitusRevivalActivityState = Schema.Struct({
-  reviver: Schema.String,
-  icon: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  revivesAt: Schema.Number,
-  sessions: Schema.Number,
-  waiting: Schema.Number,
-  later: Schema.Array(Schema.String),
-  reviveWord: Schema.String,
-  deadWord: Schema.String,
-  accent: Schema.String,
-  revived: Schema.Boolean,
-});
-export type InfinitusRevivalActivityState = typeof InfinitusRevivalActivityState.Type;
-
 /** What a snapshot subscriber needs beyond the fast set (#587 step 2, #659):
     `stats` puts the `stats` scope in the server's lease while at least one
     subscriber asks for it, which moves the Mac's transcript rescan from every
