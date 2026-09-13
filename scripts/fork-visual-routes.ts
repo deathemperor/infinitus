@@ -46,6 +46,18 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   { route: "/settings/infinitus/devices", label: "Devices", marker: "Serve the fleet to my phone" },
   { route: "/settings/infinitus/engines", label: "Engines", marker: "swapd engine on" },
   {
+    route: "/accounts",
+    label: "Accounts",
+    marker: "claude (swapd)",
+    absent: ["no engine reports accounts"],
+  },
+  {
+    route: "/activity",
+    label: "Activity",
+    marker: "Every account change Infinitus made, newest first.",
+    absent: ["Nothing logged yet.", "Only polls so far"],
+  },
+  {
     route: "/utilization",
     label: "Utilization",
     marker: "ada-fixture",

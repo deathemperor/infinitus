@@ -24,6 +24,8 @@ const ALWAYS_ON_SCREEN = [
   "Unlocking",
   "Engine status",
   "Pairing requests",
+  "Accounts",
+  "Activity",
   "Utilization",
   "Stats",
   "Infinitus is not answering — it may be closed, or running on another machine.",
@@ -40,6 +42,8 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/notifications",
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
+      "/accounts",
+      "/activity",
       "/utilization",
       "/stats",
     ]);
@@ -89,7 +93,7 @@ describe("checkVisualPass", () => {
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[9]!, FORK_VISUAL_ROUTES[8]!],
+      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[11]!, FORK_VISUAL_ROUTES[10]!],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],
