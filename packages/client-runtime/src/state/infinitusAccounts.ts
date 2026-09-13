@@ -524,7 +524,7 @@ function waitingSessionLabel(snapshot: InfinitusSnapshot, item: InfinitusAwsLogi
   const session =
     item.pid === undefined || item.pid === null
       ? undefined
-      : snapshot.sessions.find((candidate) => candidate.pid === item.pid);
+      : snapshot.sessions?.find((candidate) => candidate.pid === item.pid);
   if (session?.name) return session.name;
   return item.pid === undefined || item.pid === null ? "a session" : `pid ${item.pid}`;
 }

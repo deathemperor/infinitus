@@ -434,8 +434,7 @@ export const InfinitusEvent = Schema.Struct({
 export type InfinitusEvent = typeof InfinitusEvent.Type;
 
 /** Everything one poll of the socket collects, assembled client-side from the
-    `status`, `fleets`, `forecast`, `sessions`, `prefs` and `manifest`
-    commands. `available: false` with an `unavailableReason` means the socket
+    `status`, `fleets`, `forecast`, `prefs` and `manifest` commands. `available: false` with an `unavailableReason` means the socket
     never answered — no Infinitus running, or a different machine — and then
     every collected field is absent and both lists are empty. */
 export const InfinitusSnapshot = Schema.Struct({
@@ -444,7 +443,9 @@ export const InfinitusSnapshot = Schema.Struct({
   status: Schema.optionalKey(InfinitusStatus),
   fleets: Schema.Array(InfinitusFleet),
   forecast: Schema.optionalKey(InfinitusForecast),
-  sessions: Schema.Array(InfinitusSession),
+  /** The Mac's terminal sessions. No longer read (#1041: threads only); the
+      key stays optional so a snapshot from an older server still decodes. */
+  sessions: Schema.optionalKey(Schema.Array(InfinitusSession)),
   prefs: Schema.optionalKey(InfinitusPrefs),
   awsLogins: Schema.optionalKey(Schema.Array(InfinitusAwsLogin)),
   /** A message, not state: the events new since the previous poll, `[]` when

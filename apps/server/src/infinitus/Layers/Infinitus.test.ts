@@ -98,7 +98,6 @@ const defaultResults = (): Record<string, unknown> => ({
     ],
   },
   fleets: [fleet("swapd/claude")],
-  sessions: [],
   forecast: { forecast: null },
   prefs: { sections: [{ slug: "display", name: "Display" }], prefs: [] },
   switch: { fleet: "swapd/claude" },
@@ -255,7 +254,7 @@ describe("InfinitusService", () => {
       expect(calls).toContain("status");
       expect(calls).toContain("manifest");
       expect(calls).toContain("fleets");
-      expect(calls).toContain("sessions");
+      expect(calls).not.toContain("sessions");
       // The first cycle is also the first slow one, so the catalogue rides along.
       expect(first.prefs?.sections[0]?.slug).toBe("display");
 
@@ -449,7 +448,7 @@ describe("InfinitusService", () => {
       const calls = yield* stub.calls;
       expect(calls[0]).toBe("switch");
       expect(calls).toContain("fleets");
-      expect(calls).toContain("sessions");
+      expect(calls).not.toContain("sessions");
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),
@@ -567,7 +566,7 @@ describe("the lease", () => {
       ),
     );
 
-  effectIt.effect("holds sessions and fleets every 25 s while somebody subscribes", () =>
+  effectIt.effect("holds fleets every 25 s while somebody subscribes", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;
       yield* stub.setResult("manifest", manifestWithLease());
@@ -578,7 +577,7 @@ describe("the lease", () => {
       let bodies = yield* leaseBodies(stub);
       expect(bodies).toHaveLength(1);
       expect(bodies[0]?.ttlMs).toBe(45_000);
-      expect(bodies[0]?.scopes).toEqual([{ type: "sessions" }, { type: "fleets" }]);
+      expect(bodies[0]?.scopes).toEqual([{ type: "fleets" }]);
       expect(bodies[0]?.clientId).toMatch(/^t3-server-/);
 
       // 5 s ticks: t = 5, 10, 15, 20 carry no lease, t = 25 does, t = 50 again.
@@ -602,10 +601,7 @@ describe("the lease", () => {
       yield* stub.setResult("client-activity", { clientId: "t3-server-x" });
       const infinitus = yield* InfinitusService;
       const plain = yield* subscribe(infinitus);
-      expect((yield* leaseBodies(stub))[0]?.scopes).toEqual([
-        { type: "sessions" },
-        { type: "fleets" },
-      ]);
+      expect((yield* leaseBodies(stub))[0]?.scopes).toEqual([{ type: "fleets" }]);
 
       // A stats watcher joins: the next fast tick re-leases with the scope,
       // not the 25 s schedule.
@@ -613,11 +609,7 @@ describe("the lease", () => {
       yield* TestClock.adjust(FAST);
       let bodies = yield* leaseBodies(stub);
       expect(bodies).toHaveLength(2);
-      expect(bodies[1]?.scopes).toEqual([
-        { type: "sessions" },
-        { type: "fleets" },
-        { type: "stats" },
-      ]);
+      expect(bodies[1]?.scopes).toEqual([{ type: "fleets" }, { type: "stats" }]);
 
       // It leaves while the plain subscriber stays: the scope leaves the body
       // on the next tick, and the lease itself is not released.
@@ -626,7 +618,7 @@ describe("the lease", () => {
       bodies = yield* leaseBodies(stub);
       expect(bodies).toHaveLength(3);
       expect(bodies[2]?.ttlMs).toBe(45_000);
-      expect(bodies[2]?.scopes).toEqual([{ type: "sessions" }, { type: "fleets" }]);
+      expect(bodies[2]?.scopes).toEqual([{ type: "fleets" }]);
 
       yield* Fiber.interrupt(plain.fiber);
     }).pipe(Effect.provide(TestLayer)),

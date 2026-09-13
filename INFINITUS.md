@@ -1911,12 +1911,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
   Infinitus control socket the visual pass runs against in CI: a Node net
   server speaking the one-line protocol that answers `manifest`, `status`,
-  `fleets`, `sessions`, `forecast`, `prefs`, `profiles`, `stats`, `events`,
-  `aws-logins`, `client-activity`, `lock-status` and `team-status` with canned
-  data. The manifest and the pref catalog are `infinitusctl` captures (every
-  value reset to its default); the accounts (`ada-fixture`…), the session,
-  the team ("Lighthouse"), the profiles (`nightly-review`) and the stats are
-  made up. Every write and every unknown verb is refused with `ok: false`;
+  `fleets`, `forecast`, `prefs`, `profiles`, `stats`, `events`, `aws-logins`,
+  `client-activity` and `lock-status` with canned data. The manifest and
+  the pref catalog are `infinitusctl` captures (every value reset to its
+  default); the accounts (`ada-fixture`…), the profiles (`nightly-review`)
+  and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
