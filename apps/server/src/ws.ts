@@ -91,6 +91,7 @@ import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
+import { InfinitusLiveTokenRate } from "./infinitus/Services/InfinitusLiveTokenRate.ts";
 import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "./infinitus/Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "./infinitus/Services/InfinitusSessionInterrupt.ts";
@@ -565,6 +566,7 @@ const makeWsRpcLayer = (
       const infinitusLimitStops = yield* InfinitusLimitStops;
       const infinitusSessionInterrupt = yield* InfinitusSessionInterrupt;
       const infinitusSecret = yield* InfinitusSecret;
+      const infinitusLiveTokenRate = yield* InfinitusLiveTokenRate;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
@@ -3230,6 +3232,13 @@ const makeWsRpcLayer = (
               ),
             ),
             { "rpc.aggregate": "infinitus", "thread.turnCount": input.turnCount ?? "latest" },
+          ),
+        [WS_METHODS.infinitusLiveTokenRate]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusLiveTokenRate,
+            // Fork (#1127): the server's own turn usage, not a Mac verb.
+            infinitusLiveTokenRate.read,
+            { "rpc.aggregate": "infinitus" },
           ),
         [WS_METHODS.infinitusReleaseThread]: (input) =>
           observeRpcEffect(

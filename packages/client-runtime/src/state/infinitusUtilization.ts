@@ -1,4 +1,5 @@
 import {
+  type InfinitusLiveTokenRate,
   InfinitusUtilization,
   InfinitusUtilizationFiveHourWindow,
   InfinitusUtilizationGeneration,
@@ -287,15 +288,33 @@ export function compactTokens(value: number): string {
   return value.toFixed(0);
 }
 
-/** The live line under the table: the popup's five-minute output rate. */
-export function liveRateText(u: InfinitusUtilization): string | null {
-  const live = u.liveRate;
-  if (live === undefined || live === null) return null;
-  const peak =
-    live.peakPerMinute !== undefined && live.peakPerMinute > live.perMinute
-      ? `, peak ${compactTokens(live.peakPerMinute)}`
-      : "";
-  return `Live: ${compactTokens(live.perMinute)} output tokens/min over the last 5 minutes${peak}.`;
+/**
+ * The live line under the table (#1127): this server's own output rate over
+ * its rolling window, folded from the per-turn usage it records. Null when no
+ * turn completed in the window — the page draws nothing then, rather than a
+ * zero that reads like "nothing is running" when it means "nothing finished".
+ *
+ * Replaces the Mac's `liveRate`, which tailed terminal transcripts and
+ * retires with them (#1041); it saw every session on the machine, this sees
+ * the threads of this server only.
+ */
+export function liveTokenRateText(rate: InfinitusLiveTokenRate | null): string | null {
+  if (rate === null) return null;
+  const turns = `${rate.turns} ${rate.turns === 1 ? "turn" : "turns"}`;
+  const threads = rate.threads === 1 ? "1 thread" : `${rate.threads} threads`;
+  return `Live: ${compactTokens(rate.perMinute)} output tokens/min over the last ${rate.windowMinutes} minutes (${turns} across ${threads}).`;
+}
+
+/** The per-account split of the live rate, busiest first; empty when nothing
+    can say which account a turn ran on (no Infinitus, no swap log). */
+export function liveTokenRateAccounts(
+  rate: InfinitusLiveTokenRate | null,
+): ReadonlyArray<{ readonly label: string; readonly text: string }> {
+  if (rate === null) return [];
+  return rate.accounts.map((account) => ({
+    label: account.label,
+    text: `${account.label}: ${compactTokens(account.perMinute)}/min`,
+  }));
 }
 
 export const RUN_RATE_NOTE =

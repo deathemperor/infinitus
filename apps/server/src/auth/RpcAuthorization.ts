@@ -175,6 +175,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.infinitusSecret]: AuthAccessWriteScope,
   // Forking a thread creates one, like dispatching thread.create (#270 E2).
   [WS_METHODS.infinitusForkThread]: AuthOrchestrationOperateScope,
+  // The live rate (#1127) is this server's own turn usage, read like the
+  // holds list: thread state, not the account engine.
+  [WS_METHODS.infinitusLiveTokenRate]: AuthOrchestrationReadScope,
   // Pending pairing requests are pairing metadata, like the pairing-links
   // list; deciding one mints a pairing credential, like creating a link.
   [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,

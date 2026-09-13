@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
+  liveRate: null as unknown,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     utilization: () => ({ label: "utilization-atom" }),
+    liveTokenRate: () => ({ label: "live-rate-atom" }),
   },
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -31,7 +33,9 @@ vi.mock("../../state/query", () => ({
         ? null
         : atom.label === "utilization-atom"
           ? testState.utilization
-          : testState.snapshot;
+          : atom.label === "live-rate-atom"
+            ? testState.liveRate
+            : testState.snapshot;
     return {
       data,
       error: null,
@@ -167,8 +171,17 @@ const utilizationReply = {
       files: 9,
       unpricedModels: ["mystery-1"],
     },
-    liveRate: { perMinute: 1500, peakPerMinute: 4200 },
   },
+};
+
+/** #1127: the server's own five-minute rate, which replaced the Mac's. */
+const liveTokenRate = {
+  windowMinutes: 5,
+  outputTokens: 7500,
+  perMinute: 1500,
+  turns: 4,
+  threads: 2,
+  accounts: [{ label: "alpha", outputTokens: 7500, perMinute: 1500 }],
 };
 const inADay = inAnHour + 86_400;
 
@@ -244,6 +257,7 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
+    testState.liveRate = liveTokenRate;
     testState.capability = true;
     testState.refresh.mockReset();
   });
@@ -263,8 +277,24 @@ describe("UtilizationPage", () => {
     expect(markup).toContain("520.0k");
     expect(markup).toContain("31.00");
     expect(markup).toContain("Tokens counted but not priced: mystery-1");
-    expect(markup).toContain("Live: 1.5k output tokens/min");
     expect(markup).toContain("24 hours");
+  });
+
+  it("draws the server's live rate and its per-account split (#1127)", () => {
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    expect(markup).toContain(
+      "Live: 1.5k output tokens/min over the last 5 minutes (4 turns across 2 threads).",
+    );
+    expect(markup).toContain("alpha: 1.5k/min");
+  });
+
+  it("shows no live line when no turn completed in the window (#1127)", () => {
+    testState.liveRate = null;
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    expect(markup).toContain("Run rate");
+    expect(markup).not.toContain("output tokens/min");
   });
 
   it("draws the five-hour windows, the replay and the weekly waste beside the chart", () => {

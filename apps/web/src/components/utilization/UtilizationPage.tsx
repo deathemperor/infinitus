@@ -13,7 +13,8 @@ import {
   fiveHourSummary,
   historyLines,
   historyRange,
-  liveRateText,
+  liveTokenRateAccounts,
+  liveTokenRateText,
   replayText,
   RUN_RATE_NOTE,
   runRateRows,
@@ -24,7 +25,7 @@ import {
   type HistoryLine,
   type WasteRow,
 } from "@t3tools/client-runtime/state/infinitusUtilization";
-import type { InfinitusUtilization } from "@t3tools/contracts/infinitus";
+import type { InfinitusLiveTokenRate, InfinitusUtilization } from "@t3tools/contracts/infinitus";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
@@ -107,6 +108,11 @@ export function UtilizationPage() {
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
   );
+  // #1127: the server's own live rate, read on its own cadence — it does not
+  // need the `utilization` verb, so a build without one still shows it.
+  const liveRateQuery = useEnvironmentQuery(
+    ready ? infinitusEnvironment.liveTokenRate({ environmentId, input: {} }) : null,
+  );
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
     const out: Record<string, string> = {};
@@ -143,6 +149,7 @@ export function UtilizationPage() {
       <Button
         onClick={() => {
           snapshotQuery.refresh();
+          liveRateQuery.refresh();
           if (hasHistoryVerb) utilizationQuery.refresh();
         }}
         aria-label="Refresh utilization"
@@ -204,7 +211,7 @@ export function UtilizationPage() {
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
-            <RunRateSection utilization={utilization} />
+            <RunRateSection utilization={utilization} liveRate={liveRateQuery.data} />
           </>
         )}
       </div>
@@ -626,9 +633,16 @@ function WasteRowLine({
   );
 }
 
-function RunRateSection({ utilization }: { readonly utilization: InfinitusUtilization }) {
+function RunRateSection({
+  utilization,
+  liveRate,
+}: {
+  readonly utilization: InfinitusUtilization;
+  readonly liveRate: InfinitusLiveTokenRate | null;
+}) {
   const rows = runRateRows(utilization);
-  const live = liveRateText(utilization);
+  const live = liveTokenRateText(liveRate);
+  const liveAccounts = liveTokenRateAccounts(liveRate);
   const unpriced = utilization.rates?.unpricedModels ?? [];
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-run-rate">
@@ -666,7 +680,12 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
           Tokens counted but not priced: {unpriced.join(", ")}
         </p>
       ) : null}
-      {live !== null ? <p className="text-muted-foreground text-xs">{live}</p> : null}
+      {live !== null ? (
+        <p className="text-muted-foreground text-xs" data-testid="utilization-live-rate">
+          {live}
+          {liveAccounts.length > 0 ? ` ${liveAccounts.map((row) => row.text).join(", ")}.` : null}
+        </p>
+      ) : null}
       <p className="text-muted-foreground text-xs">{RUN_RATE_NOTE}</p>
     </section>
   );

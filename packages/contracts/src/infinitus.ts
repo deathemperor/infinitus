@@ -314,6 +314,37 @@ export const InfinitusUtilization = Schema.Struct({
 });
 export type InfinitusUtilization = typeof InfinitusUtilization.Type;
 
+/** One account's share of the live rate (#1127), where #779's swap log can
+    say which account a turn ran on. `label` is the alias the fleet shows. */
+export const InfinitusLiveTokenRateAccount = Schema.Struct({
+  label: Schema.String,
+  outputTokens: Schema.Finite,
+  perMinute: Schema.Finite,
+});
+export type InfinitusLiveTokenRateAccount = typeof InfinitusLiveTokenRateAccount.Type;
+
+/** Fork (#1127): this server's own live output rate, folded from the per-turn
+    usage rows it records (#834) over a rolling window — the replacement for
+    the Mac's transcript-tail `liveRate`, which retires with the terminal
+    sessions (#1041). Every turn that completed inside the window counts,
+    whatever its thread is doing now; `threads` says how many threads they
+    came from. `accounts` splits the window by the account #779's swap log
+    says ran each turn, and is empty when nothing can say. The whole value is
+    null when no turn completed in the window, which is how the page knows to
+    show nothing. Recorded tokens, not billing truth. */
+export const InfinitusLiveTokenRate = Schema.Struct({
+  /** The window's length, minutes — what `perMinute` divides by. */
+  windowMinutes: Schema.Finite,
+  outputTokens: Schema.Finite,
+  perMinute: Schema.Finite,
+  /** Completed turns counted, including ones the provider reported no usage
+      for (they add no tokens but they did run). */
+  turns: Schema.Finite,
+  threads: Schema.Finite,
+  accounts: Schema.Array(InfinitusLiveTokenRateAccount),
+});
+export type InfinitusLiveTokenRate = typeof InfinitusLiveTokenRate.Type;
+
 /** One live Claude Code session from the `sessions` reply. That reply is built
     by hand rather than encoded from a struct, so a session with no name,
     status, permission mode or profile carries an explicit null there. */

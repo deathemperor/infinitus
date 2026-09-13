@@ -34,6 +34,7 @@ import {
   InfinitusCommandResult,
   InfinitusHeldThread,
   InfinitusLaunchResult,
+  InfinitusLiveTokenRate,
   InfinitusProtocolError,
   InfinitusReleaseThreadInput,
   InfinitusReleaseThreadResult,
@@ -463,6 +464,7 @@ export const WS_METHODS = {
   subscribeInfinitusHolds: "subscribeInfinitusHolds",
   infinitusSecret: "infinitus.secret",
   infinitusForkThread: "infinitus.forkThread",
+  infinitusLiveTokenRate: "infinitus.liveTokenRate",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
   // Captures (#433)
@@ -1391,6 +1393,16 @@ const WsInfinitusReleaseThreadRpc = Rpc.make(WS_METHODS.infinitusReleaseThread, 
   error: EnvironmentAuthorizationError,
 });
 
+/** Fork (#1127): the server's own live output rate, folded from the per-turn
+    usage it records. Null when no turn completed inside the window — the
+    page draws nothing then. Never fails past authorization: a read that
+    cannot be done is the same null. */
+const WsInfinitusLiveTokenRateRpc = Rpc.make(WS_METHODS.infinitusLiveTokenRate, {
+  payload: Schema.Struct({}),
+  success: Schema.NullOr(InfinitusLiveTokenRate),
+  error: EnvironmentAuthorizationError,
+});
+
 /** Fork (#270 E2): a new thread continuing the Claude session from a turn. */
 const WsInfinitusForkThreadRpc = Rpc.make(WS_METHODS.infinitusForkThread, {
   payload: InfinitusThreadForkInput,
@@ -1594,6 +1606,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusLaunchRpc,
   WsInfinitusReleaseThreadRpc,
   WsInfinitusForkThreadRpc,
+  WsInfinitusLiveTokenRateRpc,
   WsSubscribeInfinitusHoldsRpc,
   WsInfinitusSecretRpc,
   WsSubscribeInfinitusPairingRpc,

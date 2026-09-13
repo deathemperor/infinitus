@@ -6,7 +6,8 @@ import {
   fiveHourSummary,
   historyLines,
   historyRange,
-  liveRateText,
+  liveTokenRateAccounts,
+  liveTokenRateText,
   replayText,
   runRateRows,
   utilizationWindows,
@@ -217,18 +218,47 @@ describe("run rate", () => {
     expect(runRateRows({ days: 1, samples: [] })).toBeNull();
   });
 
-  it("formats tokens compactly and words the live rate", () => {
+  it("formats tokens compactly", () => {
     expect([compactTokens(950), compactTokens(6300), compactTokens(2_400_000)]).toEqual([
       "950",
       "6.3k",
       "2.4M",
     ]);
-    expect(liveRateText(decodeUtilization(reply)!)).toBe(
-      "Live: 1.5k output tokens/min over the last 5 minutes, peak 4.2k.",
+  });
+});
+
+describe("live token rate (#1127)", () => {
+  const rate = {
+    windowMinutes: 5,
+    outputTokens: 7500,
+    perMinute: 1500,
+    turns: 4,
+    threads: 2,
+    accounts: [
+      { label: "ada-fixture", outputTokens: 6000, perMinute: 1200 },
+      { label: "grace-fixture", outputTokens: 1500, perMinute: 300 },
+    ],
+  };
+
+  it("words the server's own rate, with its turn and thread counts", () => {
+    expect(liveTokenRateText(rate)).toBe(
+      "Live: 1.5k output tokens/min over the last 5 minutes (4 turns across 2 threads).",
     );
-    expect(liveRateText({ days: 1, samples: [], liveRate: { perMinute: 0 } })).toBe(
-      "Live: 0 output tokens/min over the last 5 minutes.",
+    expect(liveTokenRateText({ ...rate, turns: 1, threads: 1 })).toBe(
+      "Live: 1.5k output tokens/min over the last 5 minutes (1 turn across 1 thread).",
     );
-    expect(liveRateText({ days: 1, samples: [] })).toBeNull();
+  });
+
+  it("shows nothing when no turn completed in the window", () => {
+    expect(liveTokenRateText(null)).toBeNull();
+    expect(liveTokenRateAccounts(null)).toEqual([]);
+  });
+
+  it("splits by account in the order the server ranked them, empty when unattributed", () => {
+    expect(liveTokenRateAccounts(rate).map((row) => row.text)).toEqual([
+      "ada-fixture: 1.2k/min",
+      "grace-fixture: 300/min",
+    ]);
+    expect(liveTokenRateAccounts({ ...rate, accounts: [] })).toEqual([]);
   });
 });

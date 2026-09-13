@@ -25,6 +25,14 @@ export const ListProjectionTurnUsageInput = Schema.Struct({
 });
 export type ListProjectionTurnUsageInput = typeof ListProjectionTurnUsageInput.Type;
 
+/** Fork (#1127): every thread's turns that completed at or after an instant,
+    for the live rate's rolling window. `since` is an ISO string, compared
+    against the same `completedAt` the rows were written with. */
+export const ListProjectionTurnUsageSinceInput = Schema.Struct({
+  since: Schema.String,
+});
+export type ListProjectionTurnUsageSinceInput = typeof ListProjectionTurnUsageSinceInput.Type;
+
 /**
  * A thread the transcript backfill may estimate (#834): a Claude session
  * binding whose cursor names the session, no rollup and no baseline yet,
@@ -70,6 +78,10 @@ export class ProjectionTurnUsageRepository extends Context.Service<
     readonly listByThreadId: (
       input: ListProjectionTurnUsageInput,
     ) => Effect.Effect<ReadonlyArray<ProjectionTurnUsage>, ProjectionRepositoryError>;
+    /** Every thread's rows from an instant on, oldest completion first (#1127). */
+    readonly listCompletedSince: (
+      input: ListProjectionTurnUsageSinceInput,
+    ) => Effect.Effect<ReadonlyArray<ProjectionTurnUsage>, ProjectionRepositoryError>;
     /** Drop every row of the thread but the named turns' (a revert). */
     readonly deleteByThreadIdExcept: (
       input: DeleteProjectionTurnUsageExceptInput,
@@ -111,6 +123,17 @@ const make = Effect.gen(function* () {
       SELECT thread_id AS "threadId", usage_json AS "turnUsage"
       FROM projection_turn_usage
       WHERE thread_id = ${threadId}
+      ORDER BY completed_at ASC, turn_id ASC
+    `,
+  });
+
+  const listRowsSince = SqlSchema.findAll({
+    Request: ListProjectionTurnUsageSinceInput,
+    Result: ProjectionTurnUsageDbRow,
+    execute: ({ since }) => sql`
+      SELECT thread_id AS "threadId", usage_json AS "turnUsage"
+      FROM projection_turn_usage
+      WHERE completed_at >= ${since}
       ORDER BY completed_at ASC, turn_id ASC
     `,
   });
@@ -173,6 +196,14 @@ const make = Effect.gen(function* () {
     listRowsByThread(input).pipe(
       Effect.mapError(toPersistenceSqlError("ProjectionTurnUsageRepository.listByThreadId:query")),
     );
+  const listCompletedSince: ProjectionTurnUsageRepository["Service"]["listCompletedSince"] = (
+    input,
+  ) =>
+    listRowsSince(input).pipe(
+      Effect.mapError(
+        toPersistenceSqlError("ProjectionTurnUsageRepository.listCompletedSince:query"),
+      ),
+    );
   const deleteByThreadIdExcept: ProjectionTurnUsageRepository["Service"]["deleteByThreadIdExcept"] =
     (input) =>
       deleteRowsExcept(input).pipe(
@@ -198,6 +229,7 @@ const make = Effect.gen(function* () {
   return {
     upsert,
     listByThreadId,
+    listCompletedSince,
     deleteByThreadIdExcept,
     deleteByThreadId,
     listBackfillCandidates,

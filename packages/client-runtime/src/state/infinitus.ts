@@ -31,6 +31,12 @@ const INFINITUS_STATS_IDLE_TTL_MS = 60_000;
 const INFINITUS_UTILIZATION_STALE_MS = 60_000;
 const INFINITUS_UTILIZATION_REFRESH_MS = 300_000;
 const INFINITUS_UTILIZATION_IDLE_TTL_MS = 60_000;
+/** The live rate's read (#1127): the server folds its own five-minute window
+    of per-turn usage, so the figure ages out of date within it. Re-read every
+    30 s while the page is mounted — one indexed range read, no Mac verb. */
+const INFINITUS_LIVE_RATE_STALE_MS = 15_000;
+const INFINITUS_LIVE_RATE_REFRESH_MS = 30_000;
+const INFINITUS_LIVE_RATE_IDLE_TTL_MS = 60_000;
 /** The Activity page's read (#659): `events --limit 100` once on mount; the
     snapshot subscription's deltas carry everything after. No re-read. */
 const INFINITUS_EVENTS_STALE_MS = 60_000;
@@ -123,6 +129,16 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
       refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
       idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
+    }),
+    // The server's own live output rate (#1127), drawn where the Mac's
+    // transcript-tail rate was. Its own atom, not part of `utilization`: the
+    // Mac's reply is five minutes stale by design, this is not.
+    liveTokenRate: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:live-token-rate",
+      tag: WS_METHODS.infinitusLiveTokenRate,
+      staleTimeMs: INFINITUS_LIVE_RATE_STALE_MS,
+      refreshIntervalMs: INFINITUS_LIVE_RATE_REFRESH_MS,
+      idleTtlMs: INFINITUS_LIVE_RATE_IDLE_TTL_MS,
     }),
     // Approve-on-Mac pairing (#710): the server's pending requests, resent
     // whole on every change (metadata and the match code only — never the
