@@ -9,12 +9,14 @@ release cut folds the fragments and `## Unreleased` into the new section.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.9
+
 ### Mac
 - The sessions popover is gone: the footer chip, the live session list and the Start-a-session form left the menu bar app.
 - Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
 - Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
 - Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
-- The two keep-awake switches are gone; Infinitus desktop holds sleep off while a thread runs.
 - An account whose usage swapd could not refresh no longer pulses "resetting…" forever against a reset its frozen reading has already passed (#1118).
 - An expired token reads "token expired — deferred" instead of "retrying", which promised a retry the row could not see coming (#1118).
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
@@ -23,10 +25,25 @@ release cut folds the fragments and `## Unreleased` into the new section.
 - A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
 - Rows an engine could not refresh say how old their numbers are instead of reading as current, on every engine rather than swapd alone.
 - The desktop's thread card can be shown on the phone's lock screen: the Mac starts it, redraws it as threads move and ends it when the desktop says so (#1047).
+- The session tracker is gone: no live session list beyond the snapshot's count, no feed, chat, timeline, attention, names or input from the Mac, the phone or `infinitusctl`.
+- The browser page ("Copy Browser Link") is gone.
+- Keep awake is gone (Settings › Display's two switches and the `keep_awake` prefs); the desktop app holds sleep off while a turn runs.
+- Expired `aws login` / `gcloud auth login` are no longer detected from terminal sessions; `aws-login` / `gcloud-login` lose `--pid`, and sign-ins started from the desktop app or the phone work as before.
+- The old native phone client's sources (`apps/mac/ios`) are removed.
+- The last of the session tracker is gone: no live session count in the menu bar or the Linux tray, no `sessions` verb, no session fields on `aws-logins`, no mirror project list.
+- Settings › Display drops its empty Sessions section, the last of the terminal-session panes (#1041).
+- A server publishing a port nothing serves no longer takes the tunnel and infinitusctl away from the server that is actually up (#1137).
+
+### Desktop
+- Settings › Infinitus › Menu bar drops the Chat header setting, which styled the old iOS client's chat and now has nothing to style (#1068).
+- The Utilization page's live output rate counts only the part of a long turn that ran inside its five-minute window, instead of reading several times the real rate right after one finishes (#1127).
+- Settings › Infinitus › Priority reads "Thread priority": the setting has held back threads, not terminal sessions, since the sessions sweep (#1069).
+- When another server publishes over this one's port and then stops, the phone's pairing tunnel and the infinitusctl desktop commands repair themselves within a minute instead of waiting for a relaunch.
 
 ### Phone
 - Settings › Infinitus has "Thread card on the lock screen": a Live Activity of what your threads are doing, kept moving by the Mac over push with the app closed, plus a test card that needs no push (#1047).
-
+- A working thread on the lock-screen card now shows how long it has been going, ticking on its own between updates.
+- A lapsed sign-in names the expired credentials rather than a terminal session, and one row covers each profile.
 
 ## 0.5.0-alpha.8
 

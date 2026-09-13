@@ -1,1 +1,0 @@
-Desktop: When another server publishes over this one's port and then stops, the phone's pairing tunnel and the infinitusctl desktop commands repair themselves within a minute instead of waiting for a relaunch.
