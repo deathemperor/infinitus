@@ -133,8 +133,9 @@ export class UsageService extends Context.Service<
     readonly refreshRates: Effect.Effect<UsagePricing>;
     /**
      * Fork (#834): the Claude transcripts named by session id
-     * (`<sessionId>.jsonl` under the Claude home's projects), each summed and
-     * priced; a session with no transcript or no usage records is absent.
+     * (`<sessionId>.jsonl` under each configured Claude account's projects
+     * tree), each summed and priced; a session with no transcript or no usage
+     * records is absent.
      */
     readonly readSessionUsage: (input: {
       readonly sessionIds: ReadonlyArray<string>;

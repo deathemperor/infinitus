@@ -210,7 +210,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (the Captures guard also checks `!isPromptsMenuOpen`); `useProjectPromptSnippets`
   is read just above the "Derived: composer trigger / menu" block so the
   slash-menu `useMemo` appends `promptSnippetSlashItems(...)` after
-  `searchSlashCommandItems`, and `pickComposerMenuItem` has a
+  `searchSlashCommandItems`, and `onSelectComposerItem` has a
   `prompt-snippet` branch before the skill one.
 - `apps/web/src/components/chat/ComposerCommandMenu.tsx` — the
   `prompt-snippet` variant of `ComposerCommandItem` (label + description
@@ -517,8 +517,8 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   has its usage half-written; reading the transcript on top would count
   it twice), and a thread is read at most once per process (marked after
   a read that succeeded). It reads
-  `UsageService.readSessionUsage` (`<sessionId>.jsonl` under the Claude
-  home's projects, through the summary scan's file cache, summed, deduped
+  `UsageService.readSessionUsage` (`<sessionId>.jsonl` under each configured
+  Claude account's projects tree, through the summary scan's file cache, summed, deduped
   by `dedupeKey`, priced with the rate table and overrides — null when
   nothing priced) and dispatches the server command `thread.usage.backfill`
   → `thread.usage-backfilled {threadId, usage}` (decider refuses a thread
