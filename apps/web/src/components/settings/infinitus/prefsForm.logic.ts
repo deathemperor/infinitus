@@ -102,9 +102,12 @@ export const PREF_COPY: Readonly<
     label: "Transparency",
     description: "Higher is clearer, lower is frostier; one value for every state.",
   },
+  // The one surface left that draws it is the Infinitus iOS app's chat; the
+  // Mac's own chat window went with the sessions sweep (#1041), so the row no
+  // longer describes anything on this machine (#1068).
   chat_header: {
     label: "Chat header",
-    description: "What a session's chat wears above the transcript.",
+    description: "What the Infinitus iOS app's chat wears above the transcript.",
     choices: { compact: "Compact", strip: "Stat strip", hud: "Game HUD" },
   },
   // Themes.
@@ -195,10 +198,10 @@ export const PREF_COPY: Readonly<
     label: "Update channel",
     choices: { stable: "Stable", nightly: "Nightly" },
   },
-  // Sessions: session priority mode (#616 hold, #743 interrupt). The verdict
+  // Priority: thread priority mode (#616 hold, #743 interrupt). The verdict
   // itself is native's; these are the knobs it reads.
   priority_mode: {
-    label: "Session priority",
+    label: "Thread priority",
     description:
       "What happens to background threads (not pinned) while the fleet they spend on is low on headroom.",
     choices: {

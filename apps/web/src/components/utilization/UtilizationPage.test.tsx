@@ -204,7 +204,6 @@ const readySnapshot: InfinitusSnapshot = {
       ],
     },
   ],
-  sessions: [],
   commands: [forecastVerb, utilizationVerb],
   forecast: {
     forecast: {
@@ -383,7 +382,6 @@ describe("UtilizationPage", () => {
       available: false,
       unavailableReason: "socket gone",
       fleets: [],
-      sessions: [],
       commands: [],
     };
     expect(renderToStaticMarkup(<UtilizationPage />)).toContain("offline: socket gone");

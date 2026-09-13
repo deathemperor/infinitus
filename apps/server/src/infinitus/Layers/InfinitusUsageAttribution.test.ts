@@ -49,7 +49,6 @@ const fleet = {
 const snapshotWith = (commands: ReadonlyArray<InfinitusManifestCommand>): InfinitusSnapshot => ({
   available: true,
   fleets: [fleet],
-  sessions: [],
   commands,
 });
 
@@ -57,7 +56,6 @@ const notPolled: InfinitusSnapshot = {
   available: false,
   unavailableReason: NOT_POLLED_REASON,
   fleets: [],
-  sessions: [],
   commands: [],
 };
 

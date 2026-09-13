@@ -1149,11 +1149,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
-  over its `sessions` section (#743: `priority_mode` with the `interrupt`
-  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
+  over its `priority` section (#743: `priority_mode` with the `interrupt`
+  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
+  the mode row labelled "Thread priority" since #1069) —
   the Menu bar page keeps `display` + `about`; the Priority page reads the
-  catalog's `priority` section and, on a build before the Mac's session
-  sweep (#1041), `sessions`; a section the build lacks
+  catalog's `priority` section and, on a build before that rename,
+  `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
@@ -1536,7 +1537,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
   nothing lapsed; one row per tool and profile, no session names and no
-  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  `--pid` scope since the Mac's session sweep, #1041 — the phone's own
+  `apps/mobile/src/features/infinitus/signIns.logic.ts` folds and words its
+  rows the same way, and `InfinitusAwsLogin` carries neither `pid` nor
+  `sessionLabel` any more, so an older app still sending them has them
+  dropped at the boundary); row/section/sign-in
   models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):

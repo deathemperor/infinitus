@@ -59,7 +59,6 @@ function snapshot(forkTunnel: InfinitusForkTunnel | undefined): InfinitusSnapsho
       ...(forkTunnel === undefined ? {} : { forkTunnel }),
     },
     fleets: [],
-    sessions: [],
     commands: [],
   };
 }

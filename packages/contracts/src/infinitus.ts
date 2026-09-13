@@ -336,31 +336,6 @@ export const InfinitusLiveTokenRate = Schema.Struct({
 });
 export type InfinitusLiveTokenRate = typeof InfinitusLiveTokenRate.Type;
 
-/** One live Claude Code session from the `sessions` reply. That reply is built
-    by hand rather than encoded from a struct, so a session with no name,
-    status, permission mode or profile carries an explicit null there. */
-export const InfinitusSession = Schema.Struct({
-  pid: Schema.Number,
-  name: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  cwd: Schema.String,
-  status: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  kind: Schema.String,
-  permissionMode: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  profile: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  /** Claude Code's session id (#612); absent on a build before it. */
-  sessionId: Schema.optionalKey(Schema.String),
-  /** The alias the session runs on — the fleet's active account stamped on
-      every row (one active account per engine), not a per-session fact. */
-  account: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  /** When the session started, ISO 8601; null from records that predate it. */
-  startedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  /** Pending sign-in needs: `aws-login:<profile>`, `gcloud-login:<account>`. */
-  needs: Schema.optionalKey(Schema.Array(Schema.String)),
-  /** Permission prompts routed here (`session-remote`, #79); absent before it. */
-  remote: Schema.optionalKey(Schema.Boolean),
-});
-export type InfinitusSession = typeof InfinitusSession.Type;
-
 /** The value type a preference holds, which is what `default` and `value`
     carry: `bool` a boolean, `int`/`double` a number, `string` a string. */
 export const InfinitusPrefKind = Schema.Literals(["bool", "int", "double", "string"]);
@@ -409,8 +384,9 @@ export const InfinitusPrefs = Schema.Struct({
 export type InfinitusPrefs = typeof InfinitusPrefs.Type;
 
 /*
- * `aws-logins` (#572 task 7): sessions whose AWS or gcloud sign-in lapsed, each
- * with the flow the phone would start and any login in flight. Structs are open
+ * `aws-logins` (#572 task 7): the AWS profiles and gcloud accounts whose
+ * sign-in lapsed, each with the flow the phone would start and any login in
+ * flight. Structs are open
  * and their enums plain strings, so a flow or phase the app adds later still
  * decodes. Native: `AwsLogin.Item` / `AwsLogin.State`.
  */
@@ -434,15 +410,15 @@ export const InfinitusAwsLoginState = Schema.Struct({
 export type InfinitusAwsLoginState = typeof InfinitusAwsLoginState.Type;
 
 /** One lapsed sign-in: the profile (an account for gcloud), which CLI
-    (`provider` is `gcloud` for gcloud items and absent for AWS), the session
-    that hit it, and the login running for it, if any. `account` is the
-    engine's account record, opaque here. */
+    (`provider` is `gcloud` for gcloud items and absent for AWS), and the login
+    running for it, if any. `account` is the engine's account record, opaque
+    here. The session that hit it — `pid` and `sessionLabel` — left with the
+    Mac's session tracker (#1041); the struct is open, so an older app still
+    sending them decodes unchanged. */
 export const InfinitusAwsLogin = Schema.Struct({
   profile: Schema.String,
   provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
   flow: Schema.String,
-  pid: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  sessionLabel: Schema.optionalKey(Schema.NullOr(Schema.String)),
   state: Schema.optionalKey(Schema.NullOr(InfinitusAwsLoginState)),
   failedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   account: Schema.optionalKey(Schema.Unknown),
@@ -490,9 +466,6 @@ export const InfinitusSnapshot = Schema.Struct({
   status: Schema.optionalKey(InfinitusStatus),
   fleets: Schema.Array(InfinitusFleet),
   forecast: Schema.optionalKey(InfinitusForecast),
-  /** The Mac's terminal sessions. No longer read (#1041: threads only); the
-      key stays optional so a snapshot from an older server still decodes. */
-  sessions: Schema.optionalKey(Schema.Array(InfinitusSession)),
   prefs: Schema.optionalKey(InfinitusPrefs),
   awsLogins: Schema.optionalKey(Schema.Array(InfinitusAwsLogin)),
   /** A message, not state: the events new since the previous poll, `[]` when

@@ -84,7 +84,6 @@ const snapshotWith = (
 ): InfinitusSnapshot => ({
   available: true,
   fleets,
-  sessions: [],
   commands: [],
   prefs: prefs(mode),
 });
@@ -102,7 +101,6 @@ const offline: InfinitusSnapshot = {
   available: false,
   unavailableReason: "connection refused",
   fleets: [],
-  sessions: [],
   commands: [],
 };
 /** What `snapshot` answers before the first poll on a server nobody watches. */
@@ -110,7 +108,6 @@ const notPolled: InfinitusSnapshot = {
   available: false,
   unavailableReason: NOT_POLLED_REASON,
   fleets: [],
-  sessions: [],
   commands: [],
 };
 

@@ -50,7 +50,6 @@ function snapshot(fleets: InfinitusFleet[], leadMinutes?: number): InfinitusSnap
   return {
     available: true,
     fleets,
-    sessions: [],
     commands: [],
     prefs:
       leadMinutes === undefined
