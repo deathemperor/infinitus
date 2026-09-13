@@ -149,6 +149,8 @@ import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts
 import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
 import { importRecentAgentThreads } from "./project/AgentSessionImporter.ts";
 import { forkThreadAtTurn } from "./infinitus/ThreadFork.ts";
+import { foldLiveTokenRate, liveTokenRateSince } from "./infinitus/liveTokenRate.logic.ts";
+import { ProjectionTurnUsageRepository } from "./persistence/ProjectionTurnUsage.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
@@ -567,6 +569,7 @@ const makeWsRpcLayer = (
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
       const captureStore = yield* CaptureStore;
+      const projectionTurnUsage = yield* ProjectionTurnUsageRepository;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
@@ -3253,6 +3256,27 @@ const makeWsRpcLayer = (
                 ),
               ),
             { "rpc.aggregate": "infinitus", "thread.id": input.threadId },
+          ),
+        [WS_METHODS.infinitusLiveTokenRate]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.infinitusLiveTokenRate,
+            Effect.gen(function* () {
+              const now = yield* DateTime.now;
+              const rows = yield* projectionTurnUsage.listCompletedSince({
+                since: liveTokenRateSince(now),
+              });
+              return foldLiveTokenRate(rows.map((row) => row.turnUsage));
+            }).pipe(
+              // A cosmetic figure: rather than fail the call, a read that
+              // cannot answer reports no turns, which draws no line — the
+              // same as a window in which nothing ran.
+              Effect.catchCause((cause) =>
+                Effect.logWarning("infinitus.liveTokenRate: turn usage read failed", cause).pipe(
+                  Effect.as(foldLiveTokenRate([])),
+                ),
+              ),
+            ),
+            { "rpc.aggregate": "infinitus" },
           ),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) =>
           observeRpcStreamEffect(

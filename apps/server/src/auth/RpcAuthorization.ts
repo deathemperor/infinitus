@@ -168,6 +168,9 @@ export const RPC_REQUIRED_SCOPES = {
   // Launching the app spawns a process on the host.
   [WS_METHODS.infinitusLaunch]: AuthOrchestrationOperateScope,
   [WS_METHODS.infinitusReleaseThread]: AuthOrchestrationOperateScope,
+  // The live token rate (#1127) is a fold of this server's own turn records —
+  // counts only, no thread named — so it reads like the snapshot.
+  [WS_METHODS.infinitusLiveTokenRate]: AuthOrchestrationReadScope,
   // Held threads are thread state, read like the snapshot.
   [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
   // A secret to the app (a sign-in code, a key, a token) is administrative:

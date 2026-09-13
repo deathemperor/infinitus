@@ -40,6 +40,7 @@ import {
   ResolvedKeybindingRule,
   type ServerLifecycleStreamEvent,
   ThreadId,
+  type ThreadTurnUsage,
   TurnId,
   UsageLimitSourceId,
   WS_METHODS,
@@ -115,6 +116,7 @@ import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
+import { ProjectionTurnUsageRepository } from "./persistence/ProjectionTurnUsage.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "./infinitus/Services/InfinitusRunningTurns.ts";
@@ -521,6 +523,7 @@ const buildAppUnderTest = (options?: {
     infinitusLimitStops?: Partial<InfinitusLimitStops["Service"]>;
     infinitusSessionInterrupt?: Partial<InfinitusSessionInterrupt["Service"]>;
     infinitusSecret?: Partial<InfinitusSecret["Service"]>;
+    projectionTurnUsage?: Partial<ProjectionTurnUsageRepository["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     usageLimitSources?: Partial<UsageLimitSources.UsageLimitSources["Service"]>;
     providerService?: Partial<ProviderService.ProviderService["Service"]>;
@@ -823,6 +826,12 @@ const buildAppUnderTest = (options?: {
           Layer.mock(InfinitusPairing)({
             pending: Stream.empty,
             decide: () => Effect.succeed({ decided: false }),
+          }),
+          // No turn is recorded here, so the live token rate (#1127) is empty;
+          // the fold and the repository have their own tests.
+          Layer.mock(ProjectionTurnUsageRepository)({
+            listCompletedSince: () => Effect.succeed([]),
+            ...options?.layers?.projectionTurnUsage,
           }),
           // No project keeps captures here; the store has its own tests.
           Layer.mock(CaptureStore)({
@@ -4354,6 +4363,86 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.deepEqual(neither, { released: false, reason: "nothing is held or paused" });
         assert.deepEqual(resumed, ["thread-paused", "thread-idle"]);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "infinitus.liveTokenRate folds the turns completed in the window, and reports none when the read fails (#1127)",
+    () =>
+      Effect.gen(function* () {
+        const asked: Array<string> = [];
+        const turnUsage = (turnId: string, outputTokens: number): ThreadTurnUsage => ({
+          turnId: TurnId.make(turnId),
+          model: "claude-opus-5",
+          inputTokens: 2_000,
+          outputTokens,
+          cachedInputTokens: 0,
+          cacheCreationTokens: 0,
+          reasoningTokens: null,
+          complete: true,
+          hasSubagents: false,
+          costUsd: null,
+          completedAt: "2026-09-12T00:57:00.000Z",
+        });
+        yield* buildAppUnderTest({
+          layers: {
+            projectionTurnUsage: {
+              listCompletedSince: ({ since }) =>
+                Effect.sync(() => {
+                  asked.push(since);
+                  return [
+                    { threadId: ThreadId.make("thread-a"), turnUsage: turnUsage("turn-1", 1_000) },
+                    { threadId: ThreadId.make("thread-b"), turnUsage: turnUsage("turn-2", 500) },
+                  ];
+                }),
+            },
+          },
+        });
+
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const rate = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) => client[WS_METHODS.infinitusLiveTokenRate]({})),
+        );
+
+        assert.deepEqual(rate, {
+          windowMinutes: 5,
+          turns: 2,
+          outputPerMinute: 300,
+          totalPerMinute: 1_100,
+        });
+        // The window's start, not "now": five minutes of ISO 8601.
+        assert.strictEqual(asked.length, 1);
+        assert.match(asked[0] ?? "", /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("infinitus.liveTokenRate answers no turns rather than failing when the read does", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest({
+        layers: {
+          projectionTurnUsage: {
+            listCompletedSince: () =>
+              Effect.fail(
+                new PersistenceSqlError({
+                  operation: "ProjectionTurnUsageRepository.listCompletedSince:query",
+                  detail: "database is locked",
+                }),
+              ),
+          },
+        },
+      });
+
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const rate = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) => client[WS_METHODS.infinitusLiveTokenRate]({})),
+      );
+
+      assert.deepEqual(rate, {
+        windowMinutes: 5,
+        turns: 0,
+        outputPerMinute: 0,
+        totalPerMinute: 0,
+      });
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
   it.effect("subscribeInfinitusHolds streams the threads the hold layer keeps (#741)", () =>

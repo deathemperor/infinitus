@@ -314,6 +314,28 @@ export const InfinitusUtilization = Schema.Struct({
 });
 export type InfinitusUtilization = typeof InfinitusUtilization.Type;
 
+/**
+ * Fork (#1127): this server's own live output rate, folded from the turns it
+ * recorded (`projection_turn_usage`) rather than read off the Mac. It replaces
+ * `InfinitusUtilization.liveRate`, which the Mac tails out of terminal
+ * transcripts — a source the session sweep (#1041) retires, after which that
+ * field is always null.
+ *
+ * `turns` counts only the completed turns in the window whose provider
+ * reported usage: a `usageUnavailable` row carries zero tokens for "not
+ * reported", and counting it would read as a turn that burned nothing. Zero
+ * turns means nothing ran and the page draws no line. Estimates, like every
+ * usage figure here — never billing truth.
+ */
+export const InfinitusLiveTokenRate = Schema.Struct({
+  windowMinutes: Schema.Finite,
+  turns: Schema.Finite,
+  outputPerMinute: Schema.Finite,
+  /** Input included, and input already counts cache reads and writes. */
+  totalPerMinute: Schema.Finite,
+});
+export type InfinitusLiveTokenRate = typeof InfinitusLiveTokenRate.Type;
+
 /** The value type a preference holds, which is what `default` and `value`
     carry: `bool` a boolean, `int`/`double` a number, `string` a string. */
 export const InfinitusPrefKind = Schema.Literals(["bool", "int", "double", "string"]);

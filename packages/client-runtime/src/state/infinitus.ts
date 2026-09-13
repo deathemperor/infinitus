@@ -124,6 +124,17 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
       idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
     }),
+    // The server's own live output rate (#1127). Not a Mac verb: it folds the
+    // turns this server recorded, so it answers even where no Infinitus app
+    // runs. Re-read on the Utilization page's own cadence, and only while that
+    // page holds it.
+    liveTokenRate: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:infinitus:liveTokenRate",
+      tag: WS_METHODS.infinitusLiveTokenRate,
+      staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
+      refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
+      idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
+    }),
     // Approve-on-Mac pairing (#710): the server's pending requests, resent
     // whole on every change (metadata and the match code only — never the
     // phone's secret or the credential). No idle grace: a request lives two
