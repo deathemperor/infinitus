@@ -10,8 +10,8 @@
  *
  * The manifest and the preference catalog in `fork-visual-fixture.data.json`
  * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; accounts, the profiles, the forecast and
- * the stats are made up. Secrets: none — every write verb
+ * pref value reset to its default; the accounts, the forecast and the stats
+ * are made up. Secrets: none — every write verb
  * and every unknown verb is refused with `ok: false`, and only verb names are
  * logged. No dependencies; node ≥ 22.
  */
@@ -131,20 +131,6 @@ const forecast = () => ({
     allDeadAt: nowSeconds() + 6 * 86_400,
     drainOrder: [1, 3, 2],
   },
-});
-
-const profiles = () => ({
-  profiles: [
-    {
-      name: "nightly-review",
-      cwd: "~/code/app",
-      engine: "claude",
-      permissionMode: "acceptEdits",
-      model: "opus",
-      allowTools: ["Edit", "Bash git"],
-    },
-    { name: "docs-sweep", engine: "codex", prompt: "Read the docs folder and list what is stale." },
-  ],
 });
 
 const tally = (n, usd) => ({
@@ -335,8 +321,6 @@ function answer(request, socketPath) {
     case "prefs":
       // One verb for reads and writes; the fixture holds no state to write.
       return args[0] === "set" ? undefined : data.prefs;
-    case "profiles":
-      return profiles();
     case "stats":
       return stats(typeof options.period === "string" ? options.period : "week");
     case "utilization":

@@ -569,38 +569,6 @@
         "summary": "Sends one session the resume nudge by hand (peer socket first, then its terminal); {nudged: false, reason} when its transcript does not end in a limit stop or it cannot be reached."
       },
       {
-        "args": [],
-        "effect": "read",
-        "name": "profiles",
-        "options": [],
-        "replyShape": "{profiles: [{name, cwd?, engine?, permissionMode?, model?, systemPrompt?, prompt?, allowTools?}]}",
-        "summary": "The saved session profiles (Settings › Profiles): name, folder, engine, permission mode, model, system prompt, first prompt."
-      },
-      {
-        "args": ["<name>"],
-        "effect": "write",
-        "name": "profile-set",
-        "options": [
-          "--cwd <folder>",
-          "--engine claude|codex",
-          "--mode acceptEdits|auto|bypassPermissions",
-          "--model <model>",
-          "--system <appended system prompt>",
-          "--prompt <first prompt>",
-          "--allow <\"Edit, Bash git\">"
-        ],
-        "replyShape": "{profile}",
-        "summary": "Creates or replaces a session profile with exactly the fields given (an omitted field is cleared). --allow lists tools a session born from it runs without asking (the plugin's PreToolUse hook)."
-      },
-      {
-        "args": ["<name>"],
-        "effect": "write",
-        "name": "profile-remove",
-        "options": [],
-        "replyShape": "{removed}",
-        "summary": "Deletes a session profile."
-      },
-      {
         "args": ["<pid|name>"],
         "effect": "read",
         "name": "checkpoints",
@@ -623,14 +591,6 @@
         "options": ["--yes"],
         "replyShape": "{restored: {n, sha, at, subject}, backup?: {n, sha, at, subject}}",
         "summary": "Puts the repository's files back to checkpoint n (the current state is checkpointed first, so it is undoable). Needs --yes."
-      },
-      {
-        "args": [],
-        "effect": "read",
-        "name": "past-sessions",
-        "options": ["--limit <n, default 50>", "--search <text>"],
-        "replyShape": "{sessions: [{sessionId, cwd, repo, firstMessage, lastActivityAt, bytes, live}]}",
-        "summary": "Every Claude Code session this Mac has run, newest first (default 50): id, folder, opening prompt, last activity, whether it is live. --search filters that newest set by repo, folder or prompt."
       },
       {
         "args": ["<sessionId>"],
@@ -956,14 +916,6 @@
       {
         "default": true,
         "effect": "live",
-        "key": "push_sessions_done",
-        "section": "push",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "default": true,
-        "effect": "live",
         "key": "push_all_dead",
         "section": "push",
         "type": "bool",
@@ -973,22 +925,6 @@
         "default": true,
         "effect": "live",
         "key": "push_last_alive",
-        "section": "push",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "push_waiting",
-        "section": "push",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "push_aws_login",
         "section": "push",
         "type": "bool",
         "value": true
