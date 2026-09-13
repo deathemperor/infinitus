@@ -5,11 +5,11 @@ Infinitus is one product on three screens: the macOS menu bar app that runs your
 What the desktop, web and phone apps add to the agent client:
 
 - **Accounts page** — every engine's fleet with per-account usage bars, the switch / hold / star / rename actions, the forecast of the next reset, and lapsed AWS and gcloud sign-ins with their device codes.
-- **Settings › Infinitus** — the menu bar app's preferences, notification routes, paired devices (the phone QR code and the tunnel), engines, profiles, lock and team, edited from the browser.
-- **Sidebar** — an Accounts pill with the active account and its fullest window, and a Sessions group listing the Mac's Claude Code sessions, the ones waiting on you first, each row's permission mode settable in place.
+- **Settings › Infinitus** — the menu bar app's preferences, notification routes, paired devices (the phone QR code and the tunnel), engines and lock, edited from the browser.
+- **Sidebar** — an Accounts pill with the active account and its fullest window.
 - **Command palette** — "Open accounts".
-- **Event toasts** — the engine's events (a swap, a reset, a session that needs you) surface as toasts in the app shell.
-- **Phone** — Accounts and Sessions per paired Mac, and a Live Activity the Mac drives while an agent works.
+- **Event toasts** — the engine's events (a swap, a reset, every account exhausted) surface as toasts in the app shell.
+- **Phone** — Accounts per paired Mac, and the Mac's account alerts as banners.
 - **Desktop** — the `run.infinitus.desktop` app, state under `~/.infinitus`, the menu bar app nested as a login item, and in-app updates from the GitHub releases.
 
 Install: `Infinitus-<version>-arm64.dmg` from the [latest release](https://github.com/deathemperor/infinitus/releases/latest) is the desktop app with the menu bar app nested inside as a login item — one download. The menu bar app alone: `brew install --cask deathemperor/tap/infinitus` (or `Infinitus-<version>.zip` from the same release); Linux gets `infinitus-tray-linux-x86_64` / `-aarch64` and `infinitus-omarchy.tar.gz` beside them. The engine is [swapd](https://github.com/deathemperor/swapd).
