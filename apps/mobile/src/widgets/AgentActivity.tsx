@@ -187,11 +187,6 @@ export function AgentActivity(
     </HStack>
   );
 
-  // Single-line row used by every presentation: glyph, title, inline project,
-  // status. The project and status carry layoutPriority(1) so when space runs
-  // out it's the title that truncates, never the (short) project name or the
-  // status label. Single-line keeps rows inside the expanded island's hard
-  // height budget (~160pt) and lets the banner fit more agents.
   // A working row ticks its own elapsed time: `Text(timerInterval:)` is drawn by
   // SwiftUI on the phone, so the card counts up between pushes instead of going
   // stale. Both bounds come from the row's `startedAt` — the widget reads no
@@ -205,6 +200,11 @@ export function AgentActivity(
     return { lower: new Date(startedMs), upper: new Date(startedMs + ELAPSED_CAP_MS) };
   };
 
+  // Single-line row used by every presentation: glyph, title, inline project,
+  // status. The project and status carry layoutPriority(1) so when space runs
+  // out it's the title that truncates, never the (short) project name or the
+  // status label. Single-line keeps rows inside the expanded island's hard
+  // height budget (~160pt) and lets the banner fit more agents.
   const renderCompactRow = (row: AgentActivityRowProps) => (
     <HStack spacing={7} alignment="center">
       <Text

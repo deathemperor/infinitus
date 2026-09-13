@@ -72,7 +72,8 @@ before that the `native` branch). Split out of
   wrapped essays; details live in the site/README, not the note. A PR
   writes its line to `apps/mac/changelog.d/<pr>.md` as `Mac: …` (README
   there), not into CHANGELOG.md — parallel PRs used to conflict on the
-  one Unreleased block every time; the release cut folds the fragments.
+  one Unreleased block every time; the release cut folds the fragments
+  and commits the deletions the fold makes.
 - Surgical changes; match existing style; no speculative abstractions.
 - **Todos and research notes go to GitHub issues, never to files**
   (user 2026-09-04: "stop noting TODO file to avoid a PR, just log to
