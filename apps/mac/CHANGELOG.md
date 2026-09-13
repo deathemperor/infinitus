@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+
+## 0.5.0-alpha.8
+
 ### Desktop
 - A thread routed through a proxy no longer blames one of your Claude accounts when the proxy's limit stops it, and is no longer re-sent into that limit at every account switch (#1088).
 - Worktree branches are named `infinitus/…` instead of `t3code/…`; branches made before this keep working and are still renamed after the first turn.
