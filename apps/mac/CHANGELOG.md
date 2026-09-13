@@ -7,6 +7,9 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
+
 
 ## 0.5.0-alpha.8
 

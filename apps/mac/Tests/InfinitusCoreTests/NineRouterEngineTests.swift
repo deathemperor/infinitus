@@ -212,5 +212,29 @@ final class NineRouterEngineTests: XCTestCase {
             XCTAssertEqual(u?.scoped?.map(\.name), ["Opus"])
         } else { XCTFail("expected ok") }
     }
+
+    /// #1095: 9Router 0.5.x writes `lastError` as a string, which failed the
+    /// whole list decode — `snapshot()` threw on every pass and the popup
+    /// kept showing the last rows it had read successfully.
+    func testConnectionListSurvivesUnexpectedRowShapes() throws {
+        let json = """
+        {"connections":[
+          {"id":"c1","provider":"claude","name":"admin","priority":1,"isActive":true},
+          {"id":"c2","provider":"claude","name":"death0","priority":2,"isActive":true,
+           "lastError":"[400]: {\\"type\\":\\"error\\"}","lastErrorAt":"2026-09-13T11:30:36.113Z","errorCode":400},
+          {"id":"c3","provider":"claude","name":"bloody","priority":3,"isActive":true,
+           "lastError":{"status":401,"message":"expired"}},
+          {"id":"c4","provider":"claude","priority":"not-a-number"},
+          {"id":"c5","provider":"claude","name":"death2","priority":5,"isActive":true}
+        ]}
+        """
+        let list = try JSONDecoder().decode(NineRouterConnectionList.self, from: Data(json.utf8))
+        XCTAssertEqual(list.connections.map(\.id), ["c1", "c2", "c3", "c5"], "only the unreadable row is dropped")
+        XCTAssertEqual(list.connections[1].lastError?.status, 400, "the code is read off the string's prefix")
+        XCTAssertEqual(list.connections[2].lastError?.status, 401, "the object shape still decodes")
+        XCTAssertEqual(NineRouterMapping.usageStatus(for: list.connections[2], now: Date()), "relogin_required")
+        XCTAssertEqual(NineRouterMapping.usageStatus(for: list.connections[1], now: Date()), "ok",
+                       "a 400 is not a login problem")
+    }
 }
 #endif
